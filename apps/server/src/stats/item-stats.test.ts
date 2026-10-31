@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import { readT3Db, threadRows } from '../t3/t3-db.ts';
 import { protocolStatsInputs } from '../../test/execution-observations.ts';
 import { itemStats } from './item-stats.ts';
-import type { ItemStatsReader, StatsSources } from './item-stats.ts';
+import type { StatsSources } from './item-stats.ts';
+import type { ItemStats } from '@lar-factory/shared';
+import { issueKey, namedIssue } from '../threads/item-threads.ts';
 import { assistant, claudeHome, codexHome, codexSession, codexTokens, statsDb, t3Settings, tempDir, usageRates } from '../../test/stats-db.ts';
 import type { FixtureThread } from '../../test/stats-db.ts';
 
@@ -25,17 +27,26 @@ function turn(id: string) {
   return { id, startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:10:00Z' };
 }
 
-function reader(db: string, sources: Partial<StatsSources> = {}): ItemStatsReader {
+/**
+ * An item's stats by repo and issue number: the fixtures name each item's root threads in their first message, and the
+ * reader gets those threads' IDs, as the item's work record would hold them.
+ */
+type IssueStats = ((repo: string, number: number) => ItemStats | null) & { priced: boolean };
+
+function reader(db: string, sources: Partial<StatsSources> = {}): IssueStats {
   return readT3Db(db, (open) => {
-    const before = itemStats(open, threadRows(open), { db, ...NOWHERE, ...sources }, NOW);
+    const sqlRows = threadRows(open);
+    const before = itemStats(open, sqlRows, { db, ...NOWHERE, ...sources }, NOW);
+    const threadIds = (repo: string, number: number) => sqlRows.threads
+      .filter((t) => (t.root ?? t.id) === t.id && typeof t.text === 'string' && namedIssue(t.text) === issueKey(repo, number)).map((t) => t.id);
     const previous = process.env.T3_STATE_DB;
     process.env.T3_STATE_DB = db;
     try {
       const { rows, sessions } = protocolStatsInputs();
       const after = itemStats(open, rows, { db, ...NOWHERE, ...sources }, NOW, sessions);
       return Object.assign((repo: string, number: number) => {
-        const actual = after(repo, number);
-        assert.deepEqual(actual, before(repo, number), 'protocol and SQL stats parity');
+        const actual = after(threadIds(repo, number));
+        assert.deepEqual(actual, before(threadIds(repo, number)), 'protocol and SQL stats parity');
         return actual;
       }, { priced: after.priced });
     } finally {
@@ -45,56 +56,7 @@ function reader(db: string, sources: Partial<StatsSources> = {}): ItemStatsReade
   });
 }
 
-test('an item\'s threads are the roots whose first user message names it, in any of the three forms', (t) => {
-  const threads: FixtureThread[] = [
-    { id: 'start', messages: [`#60 Show new item stats.\n$lar-work ${REPO}#60`, `Build ${REPO}#61`], turns: [turn('a')] },
-    { id: 'handoff', messages: [`Carry on with the review.\n/lar-work ${REPO}#60 please`], turns: [turn('b')] },
-    { id: 'build', messages: [`Build ${REPO}#60. Read builder.md and follow it.`], turns: [turn('c')] },
-    // Named only in a later message, in the middle of a line, or by another repo.
-    { id: 'later', messages: ['hello', `$lar-work ${REPO}#60`], turns: [turn('d')] },
-    { id: 'inline', messages: [`please Build ${REPO}#60`], turns: [turn('e')] },
-    { id: 'other-repo', messages: [`$lar-work maddec01/lar-server#60`], turns: [turn('f')] },
-  ];
-  const stats = reader(statsDb(t, threads));
-  assert.deepEqual(stats(REPO, 60), { agentMs: 30 * MIN, wallMs: 10 * MIN, tokens: 0 }, 'T3\'s own token counts are not read');
-  assert.equal(stats(REPO, 61), null, 'only the first user message counts');
-  assert.equal(stats('maddec01/lar-server', 60)?.agentMs, 10 * MIN);
-});
-
-test('a first message naming several issues counts only toward the first one named, in any form', (t) => {
-  const stats = reader(statsDb(t, [
-    { id: 'two-work', messages: [`$lar-work ${REPO}#1\n/lar-work ${REPO}#2`], turns: [turn('a')] },
-    { id: 'build-first', messages: [`Build ${REPO}#3, then $lar-work ${REPO}#4`], turns: [turn('b')] },
-    { id: 'work-first', messages: [`/lar-work ${REPO}#5 before Build`], turns: [turn('c')] },
-  ]));
-  assert.equal(stats(REPO, 1)?.agentMs, 10 * MIN);
-  assert.equal(stats(REPO, 2), null);
-  assert.equal(stats(REPO, 3)?.agentMs, 10 * MIN);
-  assert.equal(stats(REPO, 4), null);
-  assert.equal(stats(REPO, 5)?.agentMs, 10 * MIN);
-});
-
-test('owner and repo match whatever their case', (t) => {
-  const stats = reader(statsDb(t, [
-    { id: 'upper', messages: [`$lar-work Maddec01/Lar-Factory#5`], turns: [turn('a')] },
-    { id: 'lower', messages: [`Build ${REPO}#5`], turns: [turn('b')] },
-  ]));
-  assert.equal(stats(REPO, 5)?.agentMs, 20 * MIN);
-  assert.equal(stats('MADDEC01/lar-factory', 5)?.agentMs, 20 * MIN);
-});
-
-test('the number must match exactly, and titles are never used', (t) => {
-  const stats = reader(statsDb(t, [
-    { id: 'build-59', title: 'slice #68', messages: [`Build ${REPO}#59`], turns: [turn('a')] },
-    { id: 'issue-60', title: '#6 fix', messages: [`$lar-work ${REPO}#60`], turns: [turn('b')] },
-  ]));
-  assert.equal(stats(REPO, 68), null);
-  assert.equal(stats(REPO, 6), null);
-  assert.equal(stats(REPO, 60)?.agentMs, 10 * MIN);
-  assert.equal(stats(REPO, 59)?.agentMs, 10 * MIN);
-});
-
-test('child threads count through their lineage root, even when their own first message names another issue', (t) => {
+test('child threads count through their lineage root', (t) => {
   const stats = reader(statsDb(t, [
     { id: 'root', messages: [`Build ${REPO}#60`], turns: [turn('a')] },
     { id: 'child', rootThreadId: 'root', messages: [`$lar-work ${REPO}#72`],
@@ -102,7 +64,6 @@ test('child threads count through their lineage root, even when their own first 
     { id: 'stranger', rootThreadId: 'elsewhere', turns: [turn('c')] },
   ]));
   assert.equal(stats(REPO, 60)?.agentMs, 20 * MIN);
-  assert.equal(stats(REPO, 72), null, 'a child is not a root of its own');
 });
 
 /** A ten-minute root turn naming issue `n`, from 09:00. */

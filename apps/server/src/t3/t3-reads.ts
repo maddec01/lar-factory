@@ -1,19 +1,17 @@
 // Protocol observations supply timing. SQLite supplies residual usage pricing.
 
 import { existsSync } from 'node:fs';
-import type { Item, ItemStats } from '@lar-factory/shared';
+import type { ItemStats } from '@lar-factory/shared';
 import { itemStats, transcriptsToRead } from '../stats/item-stats.ts';
 import { warmTranscripts } from '../stats/transcript-usage.ts';
 import type { ItemStatsReader, StatsSources } from '../stats/item-stats.ts';
 import { protocolStatsInputs } from './item-execution.ts';
 import { readT3Db } from './t3-db.ts';
 
-type Issue = Pick<Item, 'repo' | 'number'>;
-
 /** Item stats from execution observations and usage, as the board shows them. */
 export interface T3Reads {
-  /** An item's stats; undefined when it has none, 'unavailable' when they can't be read. */
-  stats: (item: Issue) => ItemStats | 'unavailable' | undefined;
+  /** An item's stats over its work record's thread IDs; undefined when it has none, 'unavailable' when they can't be read. */
+  stats: (threadIds: readonly string[]) => ItemStats | 'unavailable' | undefined;
   /** True when the database is there but its stats can't be read. */
   statsUnavailable: boolean;
   /** Whether a rate table priced the stats; null when no stats were read. */
@@ -21,8 +19,7 @@ export interface T3Reads {
 }
 
 /** An item's stats from `reader`; undefined for an item no thread worked on. */
-const statsLookup = (reader: ItemStatsReader): T3Reads['stats'] => ({ repo, number }) =>
-  reader(repo, number) ?? undefined;
+const statsLookup = (reader: ItemStatsReader): T3Reads['stats'] => (threadIds) => reader(threadIds) ?? undefined;
 
 /** The same answer for every item. */
 const every = <T>(value: T) => (): T => value;

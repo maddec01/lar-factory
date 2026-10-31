@@ -24,10 +24,10 @@ import { apiCost, createOverrideRateTable, parseRateTable, resolveModelAliases }
 import type { Pricing } from './usage-pricing.ts';
 
 /**
- * An item's stats by repo and issue number, or null when no thread worked on it;
+ * An item's stats over its work record's thread IDs, or null when none of them is in T3;
  * `priced` is false when the rate table couldn't be read, so no stats carry a cost.
  */
-export type ItemStatsReader = ((repo: string, number: number) => ItemStats | null) & { priced: boolean };
+export type ItemStatsReader = ((threadIds: readonly string[]) => ItemStats | null) & { priced: boolean };
 
 /** Where item stats read from: T3's database, settings and price table, and the home folder `~` stands for. */
 export interface StatsSources {
@@ -162,8 +162,8 @@ export function itemStats(db: DatabaseSync, rows: ThreadRows, sources: StatsSour
   const settings = readT3Settings(sources.settings, sources.home);
   const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(db, settings.instanceHomes, sessions)));
   const pricing = loadPricing(sources.rates, settings);
-  return Object.assign((repo: string, number: number): ItemStats | null => {
-    const found = time(repo, number);
+  return Object.assign((threadIds: readonly string[]): ItemStats | null => {
+    const found = time(threadIds);
     if (!found) return null;
     const own = found.threads.flatMap((thread) => records.get(thread) ?? []);
     const costUsd = pricing ? apiCost(own, pricing) : null;

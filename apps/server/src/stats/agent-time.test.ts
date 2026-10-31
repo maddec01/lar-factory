@@ -24,8 +24,25 @@ test('an item\'s time comes from plain rows: its root\'s turns less waits, and a
     waits: [{ turn: 't1', createdAt: at(2), resolvedAt: at(4) }],
   }), Date.parse(at(60)));
   // The root works 0-2 and 4-10; the child 5-20, of which 10-20 is outside the root's work.
-  assert.deepEqual(time('maddec01/lar-factory', 7), { agentMs: 18 * MIN, wallMs: 18 * MIN, threads: ['root', 'child'] });
-  assert.equal(time('maddec01/lar-factory', 8), null);
+  assert.deepEqual(time(['root']), { agentMs: 18 * MIN, wallMs: 18 * MIN, threads: ['root', 'child'] });
+  assert.equal(time(['gone']), null, 'a recorded thread T3 no longer has counts nothing');
+  assert.equal(time([]), null);
+});
+
+test("an item's threads are its record's thread IDs and their children, whatever their first message names", () => {
+  const time = agentTime(rows({
+    threads: [
+      { id: 'a', title: 'a', deletedAt: null, root: 'a', parent: null, text: 'hello' },
+      { id: 'b', title: 'b', deletedAt: null, root: 'b', parent: null, text: 'Build maddec01/lar-factory#7' },
+      { id: 'b-child', title: 'b-child', deletedAt: null, root: 'b', parent: 'b', text: null },
+    ],
+    turns: [
+      { id: 't1', thread: 'a', providerThread: 'p1', status: 'completed', startedAt: at(0), completedAt: at(10) },
+      { id: 't2', thread: 'b', providerThread: 'p2', status: 'completed', startedAt: at(20), completedAt: at(25) },
+    ],
+  }), Date.parse(at(60)));
+  assert.deepEqual(time(['a', 'b']), { agentMs: 15 * MIN, wallMs: 15 * MIN, threads: ['a', 'b', 'b-child'] });
+  assert.deepEqual(time(['a', 'a'])?.threads, ['a'], 'a thread recorded twice counts once');
 });
 
 test('an open turn on an active provider thread runs up to now; on an idle one it stops at the thread\'s last activity', () => {
@@ -33,6 +50,6 @@ test('an open turn on an active provider thread runs up to now; on an idle one i
   const threads = [{ id: 'root', title: 'root', deletedAt: null, root: 'root', parent: null, text: 'Build x/y#1' }];
   const turns = [{ id: 't', thread: 'root', providerThread: 'p', status: 'running', startedAt: at(0), completedAt: null }];
   const lastMessages = [{ thread: 'root', at: at(12) }];
-  assert.equal(agentTime(rows({ threads, turns, lastMessages, active: new Set(['p']) }), now)('x/y', 1)?.agentMs, 30 * MIN);
-  assert.equal(agentTime(rows({ threads, turns, lastMessages }), now)('x/y', 1)?.agentMs, 12 * MIN);
+  assert.equal(agentTime(rows({ threads, turns, lastMessages, active: new Set(['p']) }), now)(['root'])?.agentMs, 30 * MIN);
+  assert.equal(agentTime(rows({ threads, turns, lastMessages }), now)(['root'])?.agentMs, 12 * MIN);
 });

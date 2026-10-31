@@ -103,7 +103,7 @@ const readItems = async (board: Board): Promise<Item[]> => (await until(board, (
 const readLiveStats = async (board: Board): Promise<Item[]> =>
   (await until(board, (d) => d.items.some((i) => typeof i.stats === 'object' && !i.stats.frozen))).items;
 
-test("a refresh finds build sub-issues, active and blocked slices with issue searches, not the board query's labels", async (t) => {
+test("a build's slices show their records' progress, and its build sub-issue stays a board item", async (t) => {
   const repository = { nameWithOwner: 'maddec01/lar-factory' };
   const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/lar-factory/issues/${number}`,
     state: 'OPEN', stateReason: null, repository });
@@ -132,7 +132,7 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
       { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
     ] }]);
   const home = claudeHome(t, { 'session-1': { main: [assistant('m0', 1, 2, 3, 4)], subagents: { a1: [assistant('m1', 5, 0, 300, 9)] } } });
-  const items = await readLiveStats(await startBoard(t, { items: [boardIssue(12, 'Done'), boardIssue(13, 'Review')] }, false, false,
+  const items = await readLiveStats(await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['build'] }, items: [boardIssue(12, 'Done'), boardIssue(13, 'Review')] }, false, false,
     { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) }));
   assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 10 + 314 });
   assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
@@ -171,7 +171,7 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   };
   const items = [withPrs(12, [pr(40, 'OPEN'), pr(41, 'MERGED')]), withPrs(13, [pr(42, 'OPEN')])];
   // A slow live-body read must finish before checking the edit and its next authoritative read.
-  const board = await startBoard(t, { items, prReadDelay: 2500 }, false, true, { T3_STATE_DB: db });
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['build'] }, items, prReadDelay: 2500 }, false, true, { T3_STATE_DB: db });
   const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
   await board.untilLogged('updated item stats in https://github.com/maddec01/lar-factory/pull/40');
   await until(board, (data) => data.items.find((item) => item.number === 12)?.linkedPrs.some((pr) => pr.body?.includes('<!-- lar-stats-data ')) === true);
@@ -180,7 +180,7 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   assert.equal(made[0]![3], 'repos/maddec01/lar-factory/pulls/40', 'merged PRs and items without stats are left alone');
   assert.equal(made[0]![5], 'body=PR 40\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":0} -->\n<!-- /lar-stats -->');
 
-  const failing = await startBoard(t, { items, fail: 'pr-edit' }, false, false, { T3_STATE_DB: db });
+  const failing = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['build'] }, items, fail: 'pr-edit' }, false, false, { T3_STATE_DB: db });
   assert.equal((await readItems(failing)).length, 2, 'a failed edit leaves the board working');
 
   const sample = await startBoard(t, {}, true, true, { T3_STATE_DB: db });
@@ -199,7 +199,7 @@ test('a merged item retains its PR figures and adds fresh stats without lowering
       { number: prNumber, url: `https://github.com/maddec01/lar-factory/pull/${prNumber}`, state: 'MERGED', isDraft: false, body },
     ] } } };
   };
-  const board = await startBoard(t, { items: [merged(12, 40, `PR 40\n\n${block}`), merged(13, 41, 'PR 41'), merged(14, 42, `PR 42\n\n${block}`)] },
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'], 'maddec01/lar-factory#13': ['b'] }, items: [merged(12, 40, `PR 40\n\n${block}`), merged(13, 41, 'PR 41'), merged(14, 42, `PR 42\n\n${block}`)] },
     false, true, { T3_STATE_DB: db });
   const items = await readLiveStats(board);
   const frozen = { agentMs: 135 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true };
@@ -222,7 +222,7 @@ test('an item with a merged and an open linked PR shows live stats, and the open
     { number: 40, url: url(40), state: 'MERGED', isDraft: false, body: `PR 40\n\n${frozenBlock}`, mergedAt: '2026-10-19T00:00:00Z' },
     { number: 41, url: url(41), state: 'OPEN', isDraft: false, body: 'PR 41', mergedAt: null },
   ] } } }];
-  const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'] }, items }, false, true, { T3_STATE_DB: db });
   const [item] = await readLiveStats(board);
   assert.deepEqual(item?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
   const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
@@ -245,7 +245,7 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
   const parent = boardIssue(13, 'In progress');
   const items = [{ ...parent, content: { ...parent.content, closedByPullRequestsReferences: prs } },
     { ...build, content: { ...build.content, closedByPullRequestsReferences: { nodes: [prs.nodes[0]] } } }];
-  const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'], 'maddec01/lar-factory#13': ['b'] }, items }, false, true, { T3_STATE_DB: db });
   const read = await readLiveStats(board);
   assert.deepEqual(read.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
   assert.equal((read.find((i) => i.number === 12)?.stats as { frozen?: boolean } | undefined)?.frozen, true);
@@ -295,11 +295,11 @@ test('a concept with two builds merged at different times: each build keeps its 
     assert.deepEqual(of(13).stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 }, 'the parent keeps live own figures');
     assert.deepEqual(itemTotal(of(13), read), { agentMs: 210 * 60_000, wallMs: 130 * 60_000, tokens: 5_000_000, costUsd: 30 });
   };
-  const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#13': ['p'] }, items }, false, true, { T3_STATE_DB: db });
   await check(board);
   await new Promise((r) => setTimeout(r, 300));
   assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH'), [], 'merged PRs are never edited, and the parent writes no block');
-  await check(await startBoard(t, { items }, false, false, { T3_STATE_DB: db }));
+  await check(await startBoard(t, { threads: { 'maddec01/lar-factory#13': ['p'] }, items }, false, false, { T3_STATE_DB: db }));
 });
 
 test('before an edit the board reads the PR again, keeps edits made since its read, and skips a block already current', async (t) => {
@@ -316,7 +316,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
   ] } } }];
   const liveBodies = { [url(40)]: 'PR 40, edited by hand', [url(43)]: `PR 43\n\n${block}` };
   // The sequential PR reads deliberately outlast the former two-second poll.
-  const board = await startBoard(t, { items, liveBodies, prReadDelay: 1200 }, false, false, { T3_STATE_DB: db });
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['build'] }, items, liveBodies, prReadDelay: 1200 }, false, false, { T3_STATE_DB: db });
   const prCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && (args[1]?.includes('/pulls/') || args[2] === 'PATCH'));
   await board.untilLogged(`updated item stats in ${url(40)}`);
   const calls = await prCalls();
@@ -327,9 +327,8 @@ test('before an edit the board reads the PR again, keeps edits made since its re
 });
 
 test('PR edits run beside the refreshes without holding them up, and never two syncs at once', async (t) => {
-  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/lar-factory#12'], turns: [
-    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
-  ] }]);
+  // The build's thread still runs, so its figures aren't final and a refresh soon after a sync starts no other.
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/lar-factory#12'], turns: [{ id: 't', startedAt: '2026-10-20T09:00:00Z' }] }]);
   const raw = rawBuild(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
     { number: 40, url: 'https://github.com/maddec01/lar-factory/pull/40', state: 'OPEN', isDraft: false, body: 'PR 40' },
@@ -338,7 +337,7 @@ test('PR edits run beside the refreshes without holding them up, and never two s
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const release = join(dir, 'release');
   // Keep the edit pending until a slow refresh finishes, regardless of process scheduling.
-  const board = await startBoard(t, { items, prEditHold: release, readDelay: 1500, delayedRepos: ['maddec01/lar-factory'] }, false, true, { T3_STATE_DB: db });
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['build'] }, items, prEditHold: release, readDelay: 1500, delayedRepos: ['maddec01/lar-factory'] }, false, true, { T3_STATE_DB: db });
   const prCalls = async () => (await board.calls()).filter((args) => args[1]?.includes('/pulls/') || args[2] === 'PATCH');
   await board.untilCalled((args) => args[2] === 'PATCH');
   const first = await board.board();

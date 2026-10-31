@@ -263,7 +263,8 @@ let transcriptsRead = false;
 function withT3Reads(items: Item[], withStats = true): Item[] {
   const now = Date.now();
   const fresh = withStats && transcriptsRead;
-  const threads = (workId: string | undefined) => protocolItemThreads(workId && records ? records.threads(workId).map((t) => t.threadId) : []);
+  const threadIds = (workId: string | undefined) => (workId && records ? records.threads(workId).map((t) => t.threadId) : []);
+  const threads = (workId: string | undefined) => protocolItemThreads(threadIds(workId));
   const { stats, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, fresh);
   if (fresh) {
     statsReadAt = now;
@@ -273,7 +274,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
   return items.map((item) => {
     const known = retainStats(previousStats.get(item.id), item.stats);
-    const live = fresh ? stats(item) : item.stats;
+    const live = fresh ? stats(threadIds(item.id)) : item.stats;
     const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item.id) };
     // A slice records its implementer thread, so a build is running while a thread runs for it or any slice.
     const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');

@@ -15,6 +15,8 @@ export function protocolItemThreads(threadIds: readonly string[]) {
   } catch { return threadIds.length ? 'unavailable' as const : undefined; }
 }
 export function protocolThreadByTitle() { return null; }
+/** Spawned boards find started threads through the fake t3 CLI alone. */
+export function protocolStartedThread(): never { throw Error("T3 execution unavailable"); }
 
 /** Spawned boards consume the same protocol mapping as production. */
 export function protocolStatsInputs() {

@@ -94,3 +94,14 @@ test('recovers one late success and holds ambiguous or absent CLI evidence', asy
     assert.equal(answer.uncertain, count === 1 ? undefined : true);
   }
 });
+
+test('finding a started thread skips the recorded ones, and tells absent from unread', async () => {
+  const { findStartedThread } = await import('./t3.ts');
+  const listing = (ids: string[], code: number = 0): T3Run => async (args) => ({ code: args[1] === 'list' ? code : 0, stderr: '', detail: '',
+    stdout: args[1] === 'list' ? JSON.stringify(ids.map((threadId) => ({ threadId, title: 'Build' })))
+      : JSON.stringify({ thread: { threadId: args[2] }, messages: [{ role: 'user', text: 'Build\nissue' }] }) });
+  assert.deepEqual(await findStartedThread('project', 'Build\nissue', ['old'], listing(['old', 'new'])), { threadId: 'new', title: 'Build' });
+  assert.equal(await findStartedThread('project', 'Build\nissue', ['old'], listing(['old'])), 'absent');
+  assert.equal(await findStartedThread('project', 'Build\nissue', [], listing([], 1)), 'unknown');
+  assert.equal(await findStartedThread('project', 'Build\nissue', [], listing(['a', 'b'])), 'unknown', 'two matches establish nothing');
+});

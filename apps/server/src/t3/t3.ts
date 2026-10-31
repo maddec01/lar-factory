@@ -1,6 +1,6 @@
 // Starts T3 Code threads, and adds onboarding's new T3 projects, through the local `t3` CLI.
 
-import { isRecord, type ModelChoice, type StartResult } from '@lar-factory/shared';
+import { isRecord, type ModelChoice, type StartedThread, type StartResult } from '@lar-factory/shared';
 import { runTool, type RunResult } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 
@@ -46,25 +46,33 @@ export async function startThread(project: string, message: string, choice?: Mod
 
 /** List/show can recover a late launch; absence or ambiguity never permits a retry. */
 async function recoverStart(project: string, message: string, run: T3Run): Promise<StartResult> {
+  const found = await findStartedThread(project, message, [], run);
+  return typeof found === 'object' ? { thread: found, error: null } : UNCERTAIN;
+}
+
+/**
+ * The one thread in `project` whose first user message is `message`, leaving out the `known` thread IDs a record already
+ * holds: 'absent' once t3 lists none, 'unknown' when its answer can't be read or names more than one.
+ */
+export async function findStartedThread(project: string, message: string, known: readonly string[], run: T3Run = runT3): Promise<StartedThread | 'absent' | 'unknown'> {
   try {
     const listed = await run(['thread', 'list', '--project', project, '--json'], 10_000);
-    if (listed.code !== 0) return UNCERTAIN;
+    if (listed.code !== 0) return 'unknown';
     const threads: unknown = JSON.parse(listed.stdout);
-    if (!Array.isArray(threads)) return UNCERTAIN;
-    const matches = [];
+    if (!Array.isArray(threads)) return 'unknown';
+    const matches: StartedThread[] = [];
     for (const thread of threads) {
-      if (!isRecord(thread) || typeof thread.threadId !== 'string') return UNCERTAIN;
-      if (thread.title !== message.split('\n')[0]) continue;
+      if (!isRecord(thread) || typeof thread.threadId !== 'string') return 'unknown';
+      if (thread.title !== message.split('\n')[0] || known.includes(thread.threadId)) continue;
       const shown = await run(['thread', 'show', thread.threadId, '--json', '--messages', '2147483647'], 10_000);
-      if (shown.code !== 0) return UNCERTAIN;
+      if (shown.code !== 0) return 'unknown';
       const answer: unknown = JSON.parse(shown.stdout);
-      if (!isRecord(answer) || !isRecord(answer.thread) || answer.thread.threadId !== thread.threadId || !Array.isArray(answer.messages)) return UNCERTAIN;
+      if (!isRecord(answer) || !isRecord(answer.thread) || answer.thread.threadId !== thread.threadId || !Array.isArray(answer.messages)) return 'unknown';
       const first = answer.messages.find(entry => isRecord(entry) && entry.role === 'user');
       if (isRecord(first) && first.text === message) matches.push({ threadId: thread.threadId, title: String(thread.title) });
     }
-    if (matches.length === 1) return { thread: matches[0]!, error: null };
-  } catch { /* Keep duplicate protection when evidence cannot be read. */ }
-  return UNCERTAIN;
+    return matches.length === 1 ? matches[0]! : matches.length ? 'unknown' : 'absent';
+  } catch { return 'unknown'; }
 }
 
 /** Runs `t3` with these arguments and timeout; tests pass a stub. */

@@ -72,5 +72,24 @@ export const MIGRATIONS: readonly Migration[] = [
       PRIMARY KEY (work_id, round, axis, finding),
       FOREIGN KEY (work_id, round, axis) REFERENCES review_axes (work_id, round, axis)
     ) STRICT;
+    -- The T3 threads that worked on a record. A thread works on one record.
+    CREATE TABLE threads (
+      thread_id TEXT PRIMARY KEY,
+      work_id TEXT NOT NULL REFERENCES work_records (work_id),
+      purpose TEXT NOT NULL,
+      recorded_at TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX threads_by_work_id ON threads (work_id);
+    -- A start the board asked T3 for, kept until it resolves to T3's thread ID or a failure.
+    CREATE TABLE launch_intents (
+      intent_id TEXT PRIMARY KEY,
+      work_id TEXT NOT NULL REFERENCES work_records (work_id),
+      purpose TEXT NOT NULL,
+      requested_at TEXT NOT NULL,
+      thread_id TEXT,
+      failure TEXT,
+      resolved_at TEXT
+    ) STRICT;
+    CREATE INDEX launch_intents_by_work_id ON launch_intents (work_id);
   `),
 ];

@@ -5,7 +5,7 @@
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { carriesTwoStatuses, isKindLabel, itemRepoNames, openBlockers, repoKey, sameRepo, startHold, shortAgo } from '@lar-factory/shared';
+import { isKindLabel, itemRepoNames, openBlockers, repoKey, sameRepo, startHold, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -16,7 +16,7 @@ import { AzureFields, ItemTitle, repoTone } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
-import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
+import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
 import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
 
 const NONE_STARTS = 'Every queued item is blocked, needs a T3 project, waits for onboarding, or has a thread at work.';
@@ -38,7 +38,7 @@ const stop = (e: MouseEvent) => e.stopPropagation();
  * onboarding that T3 has a project for, with no item thread running or waiting on you.
  */
 const canStart = (data: BoardData) => (item: Item) => !openBlockers(item).length
-  && !startHold(data, item.repo) && !hasLiveThread(item) && !carriesTwoStatuses(item);
+  && !startHold(data, item.repo) && !hasLiveThread(item);
 
 /** A row's action: Start refining, Open thread while the item has a live thread, once it starts. */
 function RowAction({ item, data }: { item: Item; data: BoardData }) {
@@ -61,7 +61,7 @@ function Row({ item, n, data, now, waits }: { item: Item; n: number; data: Board
       <span className={`${repoTone(repo, data.repos)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
       {/* With no room for the action beside a readable title, it wraps under it, at the right. */}
       <button type="button" className="grid min-w-28 flex-1 gap-0.5 text-left">
-        <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><TwoStatusesMark item={item} className="size-3" /><span className="truncate"><ItemTitle item={item} /></span></span>
+        <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><span className="truncate"><ItemTitle item={item} /></span></span>
         <AzureFields azure={item.azure} />
         <span className="queue-meta truncate text-[11px] text-(--muted-foreground)">{itemRepoNames(item, data.repos)} · queued {shortAgo(item.updatedAt, now)}{labels.length > 0 && ` · ${labels.join(', ')}`}</span>
       </button>

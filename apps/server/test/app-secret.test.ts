@@ -6,7 +6,12 @@ import { boardIssue } from '@lar-factory/shared/test/raw-items';
 
 const SECRET = 'app-secret-for-tests';
 const REFUSED = 'Submit from the board app.';
-const GUARDED = ['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/pick-status', '/api/recheck'];
+/** Every write http.ts guards. */
+const GUARDED = ['/api/pr-readiness', '/api/items', '/api/pick-ticket', '/api/attach-ticket', '/api/queue', '/api/back-to-list', '/api/start',
+  '/api/start-build', '/api/arm', '/api/disarm', '/api/abandon', '/api/close-ticket', '/api/restore', '/api/retention', '/api/needs-you',
+  '/api/item-description', '/api/item-export', '/api/onboarding/projects', '/api/onboarding/repositories', '/api/onboarding/detect',
+  '/api/onboarding/import/tickets', '/api/onboarding/import', '/api/onboarding/setup', '/api/onboarding/pr', '/api/onboarding/pr/changes',
+  '/api/repositories/config-update/pr', '/api/repositories/config-update/dismiss', '/api/repositories/settings', '/api/t3/reauthorize', '/api/recheck'];
 
 const post = (board: Board, path: string, headers: Record<string, string> = {}) => fetch(`${board.url}${path}`, {
   method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json', ...headers }, body: '{}' });

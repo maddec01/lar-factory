@@ -11,7 +11,7 @@
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, itemName, sameRepo, shortAgo } from '@lar-factory/shared';
+import { HINTS, itemRepos, onAzure, openBlockers, itemName, sameRepo, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -19,7 +19,7 @@ import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { EXPANDED, ExpandButton, useExpand } from '../expand-dialog/expand-dialog.tsx';
-import { AbandonButton, ActionError, BackToListButton, PickStatusButtons, QueueButton } from '../items/item-actions.tsx';
+import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { NeedsYou } from '../items/needs-you.tsx';
 import { PrLink } from '../items/pr-link.tsx';
@@ -28,7 +28,7 @@ import { LinkButton } from '../items/link-button.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
-import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
+import { StatusGlyph } from '../items/status-glyph.tsx';
 import { ItemComments, ItemDescription, ItemMeta, ItemRelations } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
 import { useDescriptionEdit } from './use-description-edit.ts';
@@ -38,9 +38,8 @@ import { useItemDetails } from './use-item-details.ts';
 import { AttachTicket } from './attach-ticket.tsx';
 import { RecordText } from './record-text.tsx';
 
-/** The one thing the item's status asks of you; an item carrying more than one status asks you to keep one. */
+/** The one thing the item's status asks of you. */
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {
-  if (carriesTwoStatuses(item)) return <PickStatusButtons item={item} data={data} />;
   switch (item.status) {
     case 'List': return <QueueButton item={item} data={data} />;
     case 'Queued':
@@ -55,15 +54,12 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
   }
 }
 
-/**
- * Back to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. An
- * item carrying more than one status keeps Abandon, which deletes it, but not Back to List, which moves it.
- */
+/** Back to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. */
 function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   const startHolds = useStartHolds(item, data);
   if (item.status === 'List') return <AbandonButton item={item} data={data} />;
   if (item.status !== 'Queued' || startHolds || hasLiveThread(item)) return null;
-  return <>{!carriesTwoStatuses(item) && <BackToListButton item={item} data={data} />}<AbandonButton item={item} data={data} /></>;
+  return <><BackToListButton item={item} data={data} /><AbandonButton item={item} data={data} /></>;
 }
 
 /** The work records the item's record waits on, as the board holds them. */
@@ -93,7 +89,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
   const record = read.state === 'loaded' ? read.details.record : undefined;
   // Work with no ticket has no ticket text to show beside its record's.
   const ticket = !record || item.number > 0;
-  const hint = carriesTwoStatuses(item) ? keepOneText(item.statuses) : HINTS[item.status];
+  const hint = HINTS[item.status];
   // Saving a description writes the ticket, which waits on this Mac's consent to edit the repository's tickets.
   const editable = data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.consent.includes('edit-ticket') ?? false;
   // The open editor in an expanded dialog takes the height the rest leaves.
@@ -108,7 +104,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
       <div className="@container grid shrink-0 gap-1 border-b border-base-300 px-5 pb-3 text-xs text-base-700 sm:px-6" data-item-summary>
         <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
           {itemRepos(item).map((repo) => <RepoTag key={repo} repo={repo} repos={data.repos} />)}
-          <ItemStatusGlyph item={item} /> <span className="font-medium text-base-content">{item.status}</span>
+          <StatusGlyph status={item.status} /> <span className="font-medium text-base-content">{item.status}</span>
           <span className="min-w-0 truncate @max-[30rem]:hidden">· updated {shortAgo(item.updatedAt, now)}</span>
           {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {openBlockers(item).length}</span>}
         </div>

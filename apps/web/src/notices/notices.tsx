@@ -16,7 +16,6 @@ import { kind } from '../buttons/button-kinds.tsx';
 export type Notice =
   | { verb: 'Added' | 'Moved'; item: Item; to: Status }
   /** Keep left the item carrying `status` alone. */
-  | { verb: 'Kept'; item: Item; status: Status }
   | { verb: 'Abandoned'; item: Item }
   /** The ticket of work Abandon set aside closed. */
   | { verb: 'Closed'; item: Item }
@@ -60,11 +59,6 @@ function toastOf(notice: Notice): Toast {
         body: <>{notice.kind === 'build' ? 'Build' : 'Refining'} started for {ref(item)}. {environment && <LinkButton kind="open" href={threadLink(environment, notice.thread.threadId)}>Open thread</LinkButton>}</>,
       };
     }
-    case 'Kept':
-      return {
-        slot: SLOT, what: `Kept ${notice.status} on ${ref(item)}`,
-        body: <>Kept {notice.status} on <TitleLink item={item} />. {viewButton(item)}</>,
-      };
     default:
       return {
         slot: SLOT, what: `${notice.verb} ${ref(item)}`,

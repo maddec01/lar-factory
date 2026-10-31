@@ -19,7 +19,7 @@ import { OpenThread } from '../items/open-thread.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
-import { ItemStatusGlyph } from '../items/status-glyph.tsx';
+import { StatusGlyph } from '../items/status-glyph.tsx';
 import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
 import { dossiersOf, inDossiers } from './dossier-parts.ts';
 import { OnYourDesk, YOURS, picked, stageOf, threadText } from './stage-track.tsx';
@@ -57,7 +57,7 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
   return (
     <div className="border-b border-(--border) last:border-b-0" data-flight={item.id}>
       <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id} className={`${HEAD_A1} cursor-pointer hover:bg-(--accent) ${picked(isPicked)}`}>
-        <span className="grid size-6 place-items-center" data-glyph><ItemStatusGlyph item={item} /></span>
+        <span className="grid size-6 place-items-center" data-glyph><StatusGlyph status={item.status} /></span>
         {/* Line 1 spans line 2's first four columns; the side action takes the repositories column across both lines.
             Below 1024 px, where a dossier drops that column, line 1 spans three and the action sits above the figures. */}
         <span className={`grid ${LINE2_A1} items-center gap-x-4 gap-y-1`} data-line2>

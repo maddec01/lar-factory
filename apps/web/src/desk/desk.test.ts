@@ -72,7 +72,6 @@ test.each<[string, BoardData, string, string, string[]]>([
   ['Needs you', sample, 'I_sample12', 'Answer in its T3 thread', ['Open thread']],
   ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', 'Answer in its T3 thread', ['Open thread']],
   ['Ready with a thread at work on it', withItem('I_sample13', { threads: liveThread }), 'I_sample13', 'A thread is at work on it', ['Open thread']],
-  ['Ready carrying two statuses', withItem('I_sample13', { statuses: ['Ready', 'Verify'] }), 'I_sample13', 'Ready to build', ['Open thread']],
   ['Ready held by open blockers', withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 9, repo: 'maddec01/lar-apple', state: 'open' }, { number: 7, repo: 'maddec01/lar-server', state: 'closed' }] }),
     'I_sample13', 'Waits on #202, lar-apple#9', ['Start after lar-apple#9 ▾', '[Open thread]']],
   ['Ready held by its repository', { ...noBlockers(), repositoryProjects: { 'maddec01/lar-server': NO_PROJECT } }, 'I_sample13', NO_PROJECT, [`Start build (disabled: ${NO_PROJECT})`, '[Open thread]']],

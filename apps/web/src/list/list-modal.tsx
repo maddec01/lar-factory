@@ -19,7 +19,7 @@ import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, repoTone } from '../items/item-parts.tsx';
-import { ItemStatusGlyph } from '../items/status-glyph.tsx';
+import { StatusGlyph } from '../items/status-glyph.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { matchesSearch } from './list-search.ts';
 import { EXPANDED, ExpandButton, useExpand, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
@@ -59,7 +59,7 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
   return (
     <button type="button" onClick={onOpen} data-item={item.id} title={item.title}
       className="flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-base-200/70 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
-      <ItemStatusGlyph item={item} />
+      <StatusGlyph status={item.status} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-[18px] text-base-content">{item.title}</span>
         <AzureFields azure={item.azure} />

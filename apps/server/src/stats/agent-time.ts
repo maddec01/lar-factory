@@ -1,8 +1,8 @@
 // An item's agent and wall time, counted from T3 Code's thread, turn, run and wait
-// rows (docs/adr/0005, 0008). Pure: t3/t3-db.ts reads the rows.
+// rows (docs/adr/0005, 0008) of the threads its work record holds. Pure: t3/t3-db.ts reads the rows.
 
 import type { ThreadRows, TurnRow } from '../t3/t3-db.ts';
-import { issueKey, latestActivity, namedIssue } from '../threads/item-threads.ts';
+import { latestActivity } from '../threads/item-threads.ts';
 import { length, merged, minus } from './intervals.ts';
 import type { Interval } from './intervals.ts';
 
@@ -13,8 +13,8 @@ interface AgentTime {
   threads: string[];
 }
 
-/** An item's time by repo and issue number, or null when no thread worked on it. */
-export type AgentTimeReader = (repo: string, number: number) => AgentTime | null;
+/** An item's time over its work record's thread IDs and their children, or null when none of them is in T3. */
+export type AgentTimeReader = (threadIds: readonly string[]) => AgentTime | null;
 
 function add<V>(map: Map<string, V[]>, key: string, value: V): void {
   const list = map.get(key);
@@ -25,12 +25,10 @@ function add<V>(map: Map<string, V[]>, key: string, value: V): void {
 /** Counts each item's time from the rows once, at `now`, and returns a lookup over it. */
 export function agentTime(rows: ThreadRows, now: number): AgentTimeReader {
   const { threads, turns, runs, waits, lastMessages, active } = rows;
-  const rootsByIssue = new Map<string, string[]>();
+  const known = new Set(threads.map((t) => t.id));
   const threadsByRoot = new Map<string, string[]>();
   const parentOf = new Map<string, string>();
-  for (const { id, root, parent, text } of threads) {
-    const issue = typeof text === 'string' ? namedIssue(text) : null;
-    if (issue) add(rootsByIssue, issue, id);
+  for (const { id, root, parent } of threads) {
     add(threadsByRoot, typeof root === 'string' ? root : id, id);
     if (typeof parent === 'string') parentOf.set(id, parent);
   }
@@ -87,10 +85,9 @@ export function agentTime(rows: ThreadRows, now: number): AgentTimeReader {
     });
   };
 
-  return (repo, number) => {
-    const matched = rootsByIssue.get(issueKey(repo, number));
-    if (!matched) return null;
-    const own = [...new Set(matched.flatMap((root) => [root, ...(threadsByRoot.get(root) ?? [])]))];
+  return (threadIds) => {
+    const own = [...new Set(threadIds.filter((id) => known.has(id)).flatMap((id) => [id, ...(threadsByRoot.get(id) ?? [])]))];
+    if (!own.length) return null;
     // A root adds all its work; a child only its work outside its direct parent's.
     let agentMs = 0;
     for (const thread of own) {

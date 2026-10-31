@@ -1,39 +1,26 @@
 # Triage labels
 
-Lar Factory keeps an item's state in its Status (see `docs/agents/issue-tracker.md`),
-so a label says what an item is, never where it stands. Every repository has
-these workflow labels:
-
-| Label | Meaning |
-| --- | --- |
-| `bug` | Something broken |
-| `feature` | New behaviour |
-| `improvement` | Better existing behaviour |
-| `concept` | A map of work needing decisions and builds |
-| `decision-grill` | Concept decision settled by questions |
-| `decision-prototype` | Concept decision settled by a prototype |
-| `decision-research` | Concept decision settled by research |
-| `decision-task` | Concept decision settled by a small task |
-| `build` | Issue that becomes one PR |
-| `active` | Slice an implementer is working on now |
-| `blocked` | Slice an implementer couldn't finish, waiting for a re-slice |
-
-An item's kind is one of `bug`, `feature`, `improvement` or `concept`. The
-`labels` in `.lar-factory.json` list the repository's custom labels, which mark
-the part of the product an item touches.
+Lar Factory keeps an item's kind and Status in its work record (see
+`docs/agents/issue-tracker.md`). The repository needs no factory labels, and
+the factory adds none to its issues. A kind is one of `bug`, `feature`,
+`improvement` or `concept`. Optional Repository config (`.lar-factory.json`)
+lists the repository's custom `labels`, which mark the part of the product an
+item touches.
 
 ## Matt Pocock's triage roles
 
-Bundled guidance in `lar-shape` and `lar-build` name triage roles. Each maps to this:
+Bundled guidance in `lar-shape` and `lar-build` names triage roles. Each maps
+to this:
 
 | Role | In Lar Factory |
 | --- | --- |
 | `needs-triage` | Status List |
-| `needs-info` | Status Needs you, with a comment that says what is missing |
-| `ready-for-agent` | Unused: threads start from the board, so the item keeps its Status and gets no label |
+| `needs-info` | Status Needs you, asking the user for what is missing |
+| `ready-for-agent` | Unused: threads start from the board, so the item keeps its Status |
 | `ready-for-human` | Status Needs you |
-| `wontfix` | Close the issue as not planned: `gh issue close <number> --reason "not planned"` |
-| `bug` | `bug` |
-| `enhancement` | `feature` or `improvement`: `feature` for new behaviour, `improvement` for better existing behaviour |
+| `wontfix` | Abandon the work on the board, which keeps its record; closing the issue waits for the user's OK |
+| `bug` | Kind `bug` |
+| `enhancement` | Kind `feature` for new behaviour, or `improvement` for better existing behaviour |
 
-Where a skill says to apply a state role, set the Status it maps to.
+Where a skill says to apply a role, record what it maps to. Status moves only
+through the lar skill's `shared/scripts/status.sh`.

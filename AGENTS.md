@@ -39,7 +39,9 @@ the flow and `docs/plan.md` for how it was set up.
   `bash skills/shared/scripts/status.test.sh` and
   `bash skills/shared/scripts/repo-config.test.sh`.
 - skill-sync script changes: run each `.agents/skills/skill-sync/scripts/*.test.sh` with `bash`.
-- PRs appear on the board through the issues they track. Set the issue’s status with `status.sh`; a standalone PR has no board status.
+- Factory work and its Status live in work records on this machine, never on
+  issues or PRs. Move Status with `status.sh <work ID>`; a build's standalone PR
+  has no Status of its own.
 
 ## Domain docs
 
@@ -69,10 +71,10 @@ reusing the download cache in `~/Library/Caches/electron`.
 Use `lar-shape` for shaping and decisions, and `lar-build` for builds.
 
 ### Issue tracker
-GitHub issues in this repository, moved through Lar Factory's board. See `docs/agents/issue-tracker.md`.
+GitHub issues in this repository, read by Lar Factory and picked into work records. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
-Lar Factory's workflow labels, with an item's state kept in its board Status. See `docs/agents/triage-labels.md`.
+No factory labels; an item's kind and Status live in its work record. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 A glossary and ADRs, single-context or multi-context. See `docs/agents/domain.md`.

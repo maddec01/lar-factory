@@ -22,33 +22,36 @@ and a small board app, so you can borrow them. Issues and ideas are welcome.
 
 ## How work moves
 
-Work lives in GitHub Issues, one repo for each part of lar (`lar-server`, `lar-apple`),
-with status labels on each issue placing it on the board:
+Each piece of work has a work record on your machine, in the repository it
+changes (`lar-server`, `lar-apple`). The record's Status places it on the board:
 
 ```
 List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review → Verify / Ready to merge → Done
 ```
 
-1. **List.** Capture bugs, features and ideas as issues.
-2. **Queued.** Pick one by moving it to Queued, then run `/lar-shape <owner/repo#n>`
-   in a new thread in the issue's repository project (the board's Start does
-   this). Nothing starts without this.
-3. **Shaping.** `lar-shape` reads the issue and the code through subagents, and
+1. **List.** Capture bugs, features and ideas on the board, or pick an existing
+   ticket there. A picked ticket's text becomes the record's starting context;
+   the factory never writes back to the ticket.
+2. **Queued.** Move the work to Queued, then run `/lar-shape <work ID>` in a new
+   thread in the repository's project (the board's Start does this). Nothing
+   starts without this.
+3. **Shaping.** `lar-shape` reads the record, the ticket and the code through subagents, and
    proposes a route:
    - **clear**: a bug a subagent can reproduce and diagnose, or a small change;
    - **needs decisions**: it grills you with docs: questions that check your
      terms against the project's glossary and ADRs, and drafts any new terms
      and decisions into the brief for the builder to write. For anything
      visual, it builds two or three prototypes for you to pick from;
-   - **foggy**: the issue becomes a **concept**. Its body is a map (destination,
-     decisions so far, fog, out of scope, domain docs drafts, a diagram), and
-     each decision is its own sub-issue, worked in its own thread. Build
-     sub-issues appear as decisions close.
-4. **Ready.** It writes a brief into the issue (what, how to tell it's done,
+   - **foggy**: the work becomes a **concept**. Its record holds a map
+     (destination, decisions so far, fog, out of scope, domain docs drafts, a
+     diagram) and owns its decisions, each worked in its own thread. Builds
+     appear in the record as decisions complete.
+4. **Ready.** It writes a brief into the record (what, how to tell it's done,
    confirmed assumptions, domain docs drafts). A fresh-context subagent tries
    to find holes in it.
 5. **In progress.** A new thread builds it in its own git worktree, test-first,
-   from the brief alone.
+   from the brief alone, through slices kept in the record. It follows the
+   repository's own rules first.
 6. **Review.** Reviewers run in parallel, each with fresh context. Code
    always runs; the builder picks Security, UI (browser preview or simulator)
    and Performance from what the diff touches. Review runs at most 2 rounds:
@@ -61,14 +64,12 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
    two tries or a runner problem the item goes to Needs you.
 8. **Retro and merge.** After the final review status is set and PR monitoring
    stops, the build thread ends with suggested improvements for you to pick.
-   Picks become follow-up issues in the owning repos (or reuse matching open
-   issues); new issues enter List. Shared/global work goes to Factory, and one
+   Picks become List records in the owning repos, or reuse matching unfinished
+   work; capture writes no ticket. Shared/global work goes to Factory, and one
    suggestion spanning repos becomes one Factory concept for later shaping.
-   Capture leaves the source status unchanged and implements none of the picks.
-   Its source-issue record tracks links and unfinished steps; rerun
-   `/lar-shape <source-owner/repo#n>` to resume capture only, even with a passing
-   brief. See [Retro capture](skills/shared/retro-capture.md) for routing,
-   recovery and privacy rules. You merge the original PR to reach **Done**.
+   Capture leaves the source Status unchanged and implements none of the picks.
+   See [Retro capture](skills/shared/retro-capture.md) for routing, recovery
+   and privacy rules. You merge the PR, and the build reaches **Done**.
 
 **Needs you** means it's waiting on you: a question, a prototype choice or a
 review.
@@ -77,7 +78,7 @@ Factory progress stays in work records on your machine, never on tickets.
 [Work records](skills/shared/issue-tracker/work-records.md) covers picking
 tickets, Status, structure and completion.
 
-Every thread starts small: steps hand over through the issue and the PR, never
+Every thread starts small: steps hand over through the work record and the PR, never
 through a long conversation, and subagents return summaries instead of files.
 
 ## Skills
@@ -128,6 +129,24 @@ newly listed ones, and replaces the checklists.
 The app manages only `lar-shape` and `lar-build`. User-installed skills keep
 their own sources. Copies inside lar's skills change through the checkout's
 `/skill-sync`; lar rules live beside the step that loads each Copy. Workflow Ports are lar step files adapted from upstream, with source credits in their headers and reviewed commits in `UPSTREAM.md`.
+
+### Project rules and provider limits
+
+A repository needs no factory files: Repository config (`.lar-factory.json`),
+the `## Agent skills` block and `docs/agents/` are optional. Without them, each
+thread's prompt carries the factory guidance. Optional Repository config holds
+team-shared defaults, and each user's local settings override them.
+
+Factory threads follow the repository's own rules, checks, commit format and PR
+requirements, and lar's standards fill only the gaps. `lar-build` takes extra
+coding guidance only from the project skills you select during onboarding. When
+a project rule and the factory workflow can't both be met, the thread shows you
+the Clash and asks.
+
+Claude Code and Codex load a repository's startup instructions (`AGENTS.md`,
+`CLAUDE.md`) into every thread and keep their installed skills available.
+Lar Factory can't remove that context or turn those skills off; `lar-build`
+only leaves unselected project skills out of its coding guidance.
 
 ## Board
 

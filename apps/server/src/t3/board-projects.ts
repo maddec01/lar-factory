@@ -4,7 +4,8 @@ import { subscribeProjects } from './project-subscription.ts';
 import { ProjectProtocol, type ProjectRead } from './project-protocol.ts';
 
 /**
- * Server-only API for #700. Supply origin and serverVersion from T3 runtime discovery.
+ * Server-only API for #700. Supply origin and release metadata from T3 runtime discovery.
+ * Release metadata does not gate access; response validation determines compatibility.
  * readProjects retains the last successful observation on failure; reauthorize uses
  * the local auth control plane. Neither operation belongs in browser code.
  *

@@ -8,8 +8,12 @@ projects, active threads and archived threads. Consumers must check availability
 before treating a retained observation as current. Neither failure nor an empty
 family establishes deletion. ADR 0033 still governs deletion confirmation.
 
-The pinned contract is pingdotgg/t3code 97e35bcf23e4dcf34c2dcffadd37c08db0e01e52,
-nightly 0.1.6-nightly.20261030.3917. Source pointers are
+The reference contract is pingdotgg/t3code 97e35bcf23e4dcf34c2dcffadd37c08db0e01e52,
+nightly 0.1.6-nightly.20261030.3917. This identifies the source used to implement
+the adapter, not a required installed release. Reads authenticate and validate
+response envelopes and consumed fields on any T3 release. Malformed responses
+and unavailable endpoints retain the last observation and report failure.
+Source pointers are
 packages/contracts/src/orchestrationV2.ts:1974, 2176, 3617, 3650 and 3832, and
 packages/contracts/src/rpc.ts:1810. Projection entity records remain opaque after
 array and envelope validation. Following consumers must validate the fields they

@@ -32,7 +32,7 @@ let current: { key: string; stop(): void; shell?: ShellRead; lookup?: ReturnType
 export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] | 'unavailable' | undefined {
   const path = serverRuntimePath(process.env);
   const runtime = readJsonRecord(path);
-  if (!t3Running(path) || typeof runtime?.origin !== 'string' || typeof runtime.serverVersion !== 'string') {
+  if (!t3Running(path) || typeof runtime?.origin !== 'string') {
     if (current) current.available = false;
     return 'unavailable';
   }
@@ -43,7 +43,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
     current = state;
     try {
       const origin = new URL(runtime.origin);
-      const version = runtime.serverVersion;
+      const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
       const protocol = boardProjects(runtime.origin, version);
       const entries = new Map<string, ExecutionRead>();
       const fingerprints = new Map<string, string>();

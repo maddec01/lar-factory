@@ -1,7 +1,5 @@
 import { isRecord } from '@lar-factory/shared';
 
-/** Exact contract verified against T3 source 97e35bcf23e4. */
-export const supportedProjectVersion = '0.1.6-nightly.20261030.3917';
 export interface BoardSession { token: string; sessionId: string; expiresAt: string }
 /** Implementations must persist only in the operating system credential store. */
 export interface SessionVault {
@@ -14,10 +12,11 @@ export interface SessionAuthority {
 }
 interface ProjectFact { id: string; title: string; workspaceRoot: string }
 export interface ProjectObservation { projects: ProjectFact[]; observedAt: string }
-type ProjectAvailability = 'available' | 'unavailable' | 'renewal-required' | 'unsupported-version' | 'malformed';
+type ProjectAvailability = 'available' | 'unavailable' | 'renewal-required' | 'malformed';
 export interface ProjectRead { availability: ProjectAvailability; observation?: ProjectObservation }
 
-/** Server-only authenticated reads. No errors or credentials cross this boundary. */
+/** Server-only authenticated reads. Validate the response contract, regardless of release version.
+ * No errors or credentials cross this boundary. */
 export class ProjectProtocol {
   private observation?: ProjectObservation;
   private snapshotTime = -Infinity;
@@ -25,15 +24,13 @@ export class ProjectProtocol {
   private readonly vault: SessionVault;
   private readonly authority: SessionAuthority;
   private readonly request: (token: string) => Promise<Response>;
-  private readonly version: string;
   private readonly now: () => number;
   constructor(vault: SessionVault, authority: SessionAuthority,
-    request: (token: string) => Promise<Response>, version: string,
+    request: (token: string) => Promise<Response>, _serverVersion: string,
     now: () => number = Date.now) {
     this.vault = vault;
     this.authority = authority;
     this.request = request;
-    this.version = version;
     this.now = now;
   }
 
@@ -61,7 +58,6 @@ export class ProjectProtocol {
 
   async readProjects(): Promise<ProjectRead> {
     const result = (availability: ProjectAvailability): ProjectRead => ({ availability, ...(this.observation ? { observation: this.observation } : {}) });
-    if (this.version !== supportedProjectVersion) return result('unsupported-version');
     let session: BoardSession;
     try {
       const stored = await this.vault.read();

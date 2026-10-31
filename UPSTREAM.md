@@ -12,8 +12,9 @@ own skill, citing the Copy's file and section heading, and lists it here.
 "Overridden in" lists the Copy's Overrides: lar rules, in lar's own skills, that
 replace or set aside part of the Copy. Each entry is `<copy file>#<heading> (<lar file>)`,
 with the copy file relative to the Copy's folder (or the file name, for a Copy that
-is one file), and `; ` separates entries. `skill-sync`'s `upstream-changes.sh` reads
-it and flags each Override an upstream change touches.
+is one file), and `; ` separates entries. An entry without `#<heading>` cites the file
+itself, for an Override of text under no heading, such as a preamble. `skill-sync`'s
+`upstream-changes.sh` reads it and flags each Override an upstream change touches.
 
 A Port, in the Ports table, is a lar file rewritten from upstream skill text,
 which lar edits freely. Its first line names its source and points here. Port is
@@ -25,7 +26,7 @@ Maintainer ports an upstream change or skips it.
 
 | Skill | Source | Path | Repository path | Commit | Date | Overridden in |
 | ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
-| `code-review` | mattpocock/skills | `skills/engineering/code-review` | `skills/lar-build/skills/code-review` | `5beb35b040e3` | 2026-10-19 | SKILL.md#1. Pin the fixed point (skills/lar-build/agents/reviewer-code.md); SKILL.md#2. Identify the spec source (skills/lar-build/agents/reviewer-code.md); SKILL.md#4. Spawn both sub-agents in parallel (skills/lar-build/agents/reviewer-code.md); SKILL.md#5. Aggregate (skills/lar-build/agents/reviewer-code.md) |
+| `code-review` | mattpocock/skills | `skills/engineering/code-review` | `skills/lar-build/skills/code-review` | `5beb35b040e3` | 2026-10-19 | SKILL.md (skills/lar-build/agents/reviewer-code.md); SKILL.md#1. Pin the fixed point (skills/lar-build/agents/reviewer-code.md); SKILL.md#2. Identify the spec source (skills/lar-build/agents/reviewer-code.md); SKILL.md#4. Spawn both sub-agents in parallel (skills/lar-build/agents/reviewer-code.md); SKILL.md#5. Aggregate (skills/lar-build/agents/reviewer-code.md) |
 | `security-and-hardening` | addyosmani/agent-skills | `skills/security-and-hardening` | `skills/lar-build/skills/security-and-hardening` | `aeac41d4d005` | 2026-10-13 | SKILL.md#Process: Threat Model First (skills/lar-build/agents/reviewer-security.md); SKILL.md#Ask First (Requires Human Approval) (skills/lar-build/agents/reviewer-security.md); SKILL.md#Verification (skills/lar-build/agents/reviewer-security.md) |
 | `frontend-ui-engineering` | addyosmani/agent-skills | `skills/frontend-ui-engineering` | `skills/lar-build/skills/frontend-ui-engineering` | `aeac41d4d005` | 2026-10-13 | SKILL.md#Red Flags (skills/lar-build/agents/reviewer-ui.md); SKILL.md#Verification (skills/lar-build/agents/reviewer-ui.md) |
 | `references/security-checklist.md` | addyosmani/agent-skills | `references/security-checklist.md` | `skills/lar-build/references/security-checklist.md` | `aeac41d4d005` | 2026-10-13 |  |

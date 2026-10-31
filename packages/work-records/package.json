@@ -5,7 +5,8 @@
   "description": "The factory's work-record database, the one module that writes it, and the lar-work command that opens it directly.",
   "type": "module",
   "exports": {
-    ".": "./src/work-records.ts"
+    ".": "./src/work-records.ts",
+    "./export": "./src/export.ts"
   },
   "bin": {
     "lar-work": "./src/cli.ts"

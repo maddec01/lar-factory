@@ -26,7 +26,8 @@ export type WorkRecordErrorCode =
   | 'busy'
   | 'unwritable'
   | 'schema-too-new'
-  | 'schema-update-failed';
+  | 'schema-update-failed'
+  | 'export-failed';
 
 /** A failure the command reports as it is. Messages name records, tickets and paths, never credentials. */
 export class WorkRecordError extends Error {

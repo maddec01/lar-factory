@@ -4,11 +4,13 @@
 // and each error as one line on stderr.
 
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Status } from '@lar-factory/shared';
+import { exportMarkdown } from './export.ts';
 import {
-  openWorkRecords, WorkRecordError, workRecordsPath, type Body, type BuildPhase, type FindingDisposition, type NewReviewRound, type ReviewAxis,
-  type WorkKind, type WorkRecords,
+  openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
+  type NewReviewRound, type ReviewAxis, type WorkKind, type WorkRecords,
 } from './work-records.ts';
 
 const HELP = `Usage: lar-work <command> [options]
@@ -97,9 +99,30 @@ Threads and launch intents
                                     the record's threads, or to failure F. An intent
                                     resolves once.
 
+Retention and export
+  A record is finished once its delivery PR shows it; a Status or a closed
+  ticket never finishes it. By default this machine keeps finished and set-aside
+  records indefinitely and hides them 7 days after they were finished or set
+  aside. Deleting them after a number of days is a separate choice.
+  retention [--hide-after N] [--delete-after N|never]
+                                    Print this machine's retention setting, after
+                                    saving the given changes to it.
+  hidden                            Print the records the setting hides now.
+  delete-expired                    Delete the records the setting deletes now, with
+                                    their bodies, review rounds, threads and intents.
+                                    Prints the deleted work IDs, and each due record
+                                    kept because a kept record it owns or that waits
+                                    on it still needs it, with the reason.
+  export <work-id> --to D           Write the record's brief, decision or map, and a
+                                    concept's decisions, as markdown files in the
+                                    existing folder D, named from each one's first
+                                    heading. Prints the paths. The files are a copy
+                                    to read; changing them changes no record.
+
 Options
   --data-dir D   Use the work-record database in folder D instead of the
-                 factory's data folder (${workRecordsPath()}).
+                 factory's data folder (${workRecordsPath()}), and the
+                 retention setting there.
   --help         Print this help.
 
 Errors
@@ -112,8 +135,8 @@ class UsageError extends Error {}
 
 const TAKES_WORK_ID = ['read', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
   'children', 'blockers', 'dependents', 'set-body', 'body', 'set-phase', 'set-pr', 'record-review-round', 'set-disposition', 'review-rounds',
-  'add-thread', 'threads', 'record-intent', 'resolve-intent'];
-const COMMANDS = ['create', 'import', 'list', 'intents', ...TAKES_WORK_ID];
+  'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
+const COMMANDS = ['create', 'import', 'list', 'intents', 'retention', 'hidden', 'delete-expired', ...TAKES_WORK_ID];
 
 const OPTIONS = {
   repository: { type: 'string' },
@@ -137,6 +160,9 @@ const OPTIONS = {
   intent: { type: 'string' },
   failure: { type: 'string' },
   unresolved: { type: 'boolean' },
+  'hide-after': { type: 'string' },
+  'delete-after': { type: 'string' },
+  to: { type: 'string' },
   'data-dir': { type: 'string' },
   help: { type: 'boolean' },
 } as const;
@@ -169,6 +195,21 @@ function readRound(values: Values): NewReviewRound {
     if (error instanceof WorkRecordError) throw error;
     throw new WorkRecordError('invalid', `The review round in ${values.file} isn't JSON: ${(error as Error).message}.`);
   }
+}
+
+/** Saves the retention options given, then returns this machine's setting. */
+function retention(values: Values): unknown {
+  const days = (name: 'hide-after' | 'delete-after') => {
+    const value = values[name]!;
+    if (!/^\d+$/.test(value)) throw new UsageError(`--${name} takes a whole number of days${name === 'delete-after' ? ' or never' : ''}.`);
+    return Number(value);
+  };
+  const current = readRetention(values['data-dir']);
+  if (values['hide-after'] === undefined && values['delete-after'] === undefined) return current;
+  return writeRetention({
+    hideAfterDays: values['hide-after'] === undefined ? current.hideAfterDays : days('hide-after'),
+    deleteAfterDays: values['delete-after'] === undefined ? current.deleteAfterDays : values['delete-after'] === 'never' ? null : days('delete-after'),
+  }, values['data-dir']);
 }
 
 /** Runs `command`; `workId` is set for the commands that take one. A string result prints as it is, anything else as JSON. */
@@ -240,6 +281,12 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
       const outcome = values.thread !== undefined ? { threadId: values.thread } : { failure: values.failure! };
       return records.resolveLaunchIntent(workId!, revision(), need(values, 'intent'), outcome);
     }
+    case 'hidden':
+      return records.hidden(readRetention(values['data-dir']));
+    case 'delete-expired':
+      return records.deleteExpired(readRetention(values['data-dir']));
+    case 'export':
+      return exportMarkdown(records, workId!, resolve(need(values, 'to')));
     default:
       throw new UsageError(`Unknown command "${command}".`);
   }
@@ -264,6 +311,10 @@ async function main(args: string[]): Promise<number> {
     if (!COMMANDS.includes(command)) throw new UsageError(`Unknown command "${command}".`);
     if (TAKES_WORK_ID.includes(command) !== (workId !== undefined)) {
       throw new UsageError(workId === undefined ? `${command} needs a work ID.` : `${command} takes no work ID.`);
+    }
+    if (command === 'retention') {
+      process.stdout.write(`${JSON.stringify(retention(values), null, 2)}\n`);
+      return 0;
     }
     records = await openWorkRecords(workRecordsPath(values['data-dir']));
     const result = run(records, command, workId, values);

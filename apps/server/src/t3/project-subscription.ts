@@ -10,7 +10,9 @@ import { supportedProjectVersion, type ProjectProtocol, type ProjectRead } from 
  * Renewal and rejection failures use fixtures. Consumer migration is #706.
  */
 export function subscribeProjects(origin: URL, version: string, protocol: ProjectProtocol,
-  onChange: (read: ProjectRead) => void): () => void {
+  onChange: (read: ProjectRead) => void,
+  execution?: { tag: string; payload: Record<string, unknown>; accept(value: unknown): void }): () => void {
+  if (origin.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname) || origin.username || origin.password) throw new Error('Expected local T3 server');
   let stopped = false;
   let socket: WebSocket | undefined;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -72,7 +74,7 @@ export function subscribeProjects(origin: URL, version: string, protocol: Projec
       const send = (value: unknown) => ws.send(JSON.stringify(value));
       ws.addEventListener('open', () => {
         if (stopped) { ws.close(); return; }
-        send({ _tag: 'Request', id: '1', tag: 'orchestration.subscribeShell', payload: { requestCompletionMarker: true }, headers: [] });
+        send({ _tag: 'Request', id: '1', tag: execution?.tag ?? 'orchestration.subscribeShell', payload: execution?.payload ?? { requestCompletionMarker: true }, headers: [] });
         send({ _tag: 'Ping' });
       });
       heartbeat = setInterval(() => {
@@ -88,13 +90,16 @@ export function subscribeProjects(origin: URL, version: string, protocol: Projec
             lastPong = Date.now();
             if (frame._tag === 'Pong') continue;
             else if (frame._tag === 'Chunk' && frame.requestId === '1' && Array.isArray(frame.values)) {
-              for (const value of frame.values) if (recovery.accept(value)) {
+              for (const value of frame.values) if (execution) { execution.accept(value); } else if (recovery.accept(value)) {
                 observation = recovery.observation();
                 failures = 0;
                 publish('available');
               }
               send({ _tag: 'Ack', requestId: '1' });
-            } else if (frame._tag === 'Exit') disconnected();
+            } else if (frame._tag === 'Exit') {
+              if (execution && isRecord(frame.exit) && frame.exit._tag === 'Success') execution.accept(frame.exit.value);
+              else disconnected();
+            }
           }
         } catch { availability = 'malformed'; disconnected(); }
       });

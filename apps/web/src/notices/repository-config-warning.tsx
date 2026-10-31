@@ -5,7 +5,6 @@ import { sameRepo, shownRepo, type RepositoryConfigProblem } from '@lar-factory/
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useWizardStore } from '../onboarding/wizard-store.ts';
-import { REPLACE_SETTINGS_HELP } from '../onboarding/setup-answers.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { AddingARepository } from './adding-a-repository.tsx';
 import { Warning } from './warning.tsx';
@@ -21,7 +20,7 @@ export function RepositoryConfigWarning({ repo, problem, kind: problemKind }: Re
     {problem} The board reads it again on each refresh.
   </Warning>;
   if (offer?.configProblem) return <Warning dismissKey={dismissKey} title={`${shownRepo(repo)} needs setup`} action={<Button {...kind('other')} onClick={() => start(offer)}>Run onboarding</Button>}>
-    {REPLACE_SETTINGS_HELP}
+    Its settings file can't be used. Run onboarding to replace it.
   </Warning>;
   return (
     <Warning dismissKey={dismissKey} title={`${shownRepo(repo)} is off the board.`}>

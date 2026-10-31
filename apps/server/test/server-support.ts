@@ -52,17 +52,17 @@ export function writeRepositoryList(home: string, repos: readonly string[]): voi
 
 /**
  * Records the work each issue the board used to show is, with the T3 thread IDs `threads` holds by `owner/name#number`: its title, its labels' kind and Status, or Done once closed
- * as done, its ticket, its parent and a build's slices. An issue with no status in an `optedIn` repository, one done before the board's
- * week of Done, a slice and an issue closed as not planned are no work of their own. Returns each issue's work ID by its `owner/name#number`.
+ * as done, its ticket, its parent and a build's slices. An issue done before the board's week of Done, a slice and an issue
+ * closed as not planned are no work of their own. Returns each issue's work ID by its `owner/name#number`.
  */
-async function recordIssues(home: string, raws: readonly RawItem[], optedIn: readonly string[] = [], searched: Searched = {},
+async function recordIssues(home: string, raws: readonly RawItem[], searched: Searched = {},
   threads: Record<string, string[]> = {}): Promise<Map<string, string>> {
   const ids = new Map<string, string>();
   if (!raws.length) return ids;
   const records = await openWorkRecords(workRecordsPath(boardDataDir(home, {})));
   try {
     const recent = (item: Item) => item.status !== 'Done' || Date.now() - Date.parse(item.closedAt ?? item.updatedAt) <= DONE_WINDOW_MS;
-    const items = normalizeItems([...raws], { ...searched, builds: new Set([...readBuilds([...raws]), ...searched.builds ?? []]) }).filter((item) => recent(item) && (item.statuses.length || item.status === 'Done' || !optedIn.includes(item.repo)));
+    const items = normalizeItems([...raws], { ...searched, builds: new Set([...readBuilds([...raws]), ...searched.builds ?? []]) }).filter(recent);
     for (const item of items) {
       const ticket = `${item.repo}#${item.number}`;
       ids.set(ticket, records.importTicket({ title: item.title, repository: item.repo, kind: item.kind, status: item.status, ticket }).record.workId);
@@ -172,14 +172,13 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'))) writeRepositoryList(home, repositories);
   // Only recorded work is on the board, so each fake issue starts recorded, unless `recorded: false` says none is.
   type Ref = { number: number; repository: { nameWithOwner: string } };
-  const { items: issues = [], repoIssues = {}, repoConfigs = {}, builds = [], active = [], blocked = [], recorded = true, threads = {} } = options as {
-    items?: RawItem[]; repoIssues?: Record<string, RawItem['content'][]>; repoConfigs?: Record<string, { show?: string } | null>;
+  const { items: issues = [], repoIssues = {}, builds = [], active = [], blocked = [], recorded = true, threads = {} } = options as {
+    items?: RawItem[]; repoIssues?: Record<string, RawItem['content'][]>;
     builds?: Ref[]; active?: Ref[]; blocked?: Ref[]; recorded?: boolean; threads?: Record<string, string[]> };
   // The fake gh's issue searches, which tell a build sub-issue from a slice and a slice's progress, as a read does.
   const keys = (refs: Ref[]) => new Set(refs.map((r) => refKey(r.repository.nameWithOwner, r.number)));
-  const optedIn = Object.entries(repoConfigs).filter(([, config]) => config?.show === 'opted-in').map(([repo]) => repo);
   const listed = [...issues, ...Object.values(repoIssues).flat().map((content): RawItem => ({ id: content!.id, updatedAt: content!.updatedAt, content }))];
-  const workIds = recorded ? await recordIssues(home, listed, optedIn, { builds: keys(builds), active: keys(active), blocked: keys(blocked) }, threads)
+  const workIds = recorded ? await recordIssues(home, listed, { builds: keys(builds), active: keys(active), blocked: keys(blocked) }, threads)
     : new Map<string, string>();
   const port = 'BOARD_PORT' in env ? env.BOARD_PORT : String(await freePort());
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', new URL('./project-discovery-fixture.ts', import.meta.url).href,

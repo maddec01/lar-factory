@@ -18,13 +18,13 @@ const appleIssue = (number: number, labels: string[] = []) =>
 const projectReads = async (board: Board) => (await board.calls()).filter((args) => args.some((a) => a.includes('states: [OPEN]'))).length;
 const configReads = async (board: Board) => (await board.calls()).filter((args) => args[1]?.endsWith('/.lar-factory.json')).length;
 
-test('each onboarded repository reads its items from the item source its .lar-factory.json names, with its show setting and custom labels', async (t) => {
+test('each onboarded repository reads its items from the item source its .lar-factory.json names and lists its settings', async (t) => {
   const board = await startBoard(t, {
     repositories: [FACTORY, APPLE],
     repoConfigs: { [FACTORY]: { version: 1, role: 'The factory', itemSource: LAR, show: 'all', labels: [] },
       [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: music'] } },
     items: [boardIssue(1, 'Queued', FACTORY), boardIssue(2, 'List', FACTORY)],
-    repoIssues: { [APPLE]: [appleIssue(7, ['status-queued']), appleIssue(8)] },
+    repoIssues: { [APPLE]: [appleIssue(7, ['status-queued'])] },
   });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(data.error, null);
@@ -80,12 +80,12 @@ test("a list that stops being valid JSON clears the repositories and notices of 
 
 test('a change to a .lar-factory.json shows on the next refresh, and the board still shows only recorded work', async (t) => {
   const options = { repositories: [APPLE], repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: LAR, show: 'opted-in' } },
-    items: [boardIssue(1, 'Queued', APPLE)], repoIssues: { [APPLE]: [appleIssue(7)] } };
+    repoIssues: { [APPLE]: [appleIssue(7)] }, recorded: false };
   const board = await startBoard(t, options, false, true);
-  await until(board, (d) => d.items.map((i) => i.number).join() === '1');
+  await until(board, (d) => d.repos[0]?.show === 'opted-in');
   await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } } });
   const data: BoardData = await until(board, (d) => d.repos[0]?.show === 'all');
-  assert.deepEqual(data.items.map((i) => i.number), [1], 'an issue with no work record stays off the board');
+  assert.deepEqual(data.items, [], 'an issue with no work record stays off the board');
   assert.deepEqual(data.repos.map(({ setup: _, ...row }) => row), [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all', labels: [], version: 1 }]);
 });
 

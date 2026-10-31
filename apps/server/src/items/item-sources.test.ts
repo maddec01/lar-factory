@@ -38,7 +38,7 @@ test("a ticket search, read and observation go to the repository's own source, a
   await assert.rejects(source.observeTicket('maddec01/other', 8), /isn't onboarded/);
 });
 
-test('a source with no opted-in repositories lists every item it read', async () => {
+test('a merged source lists every item it read, with or without a status', async () => {
   const project = fakeSource('lar', [{ ...item('I_1', 'maddec01/lar-server'), statuses: [] }], []);
   const issues = fakeSource('apple', [{ ...item('I_2', 'maddec01/lar-apple'), statuses: [] }], []);
   const read = await mergeSources(new Map([['maddec01/lar-server', project], ['maddec01/lar-apple', issues]])).read();
@@ -168,7 +168,7 @@ test("a source whose first read failed, or that its tool blocks, isn't waiting, 
   const landed: ItemsRead[] = [];
   const progress = { started: () => {}, finished: () => {}, landed: (read: ItemsRead) => landed.push(read) };
   const sources = mergeSources(new Map([['maddec01/lar-server', blocked], ['maddec01/lar-docs', failing], ['maddec01/lar-apple', slow.source],
-    ['maddec01/lar-web', slower.source]]), [], new Map<ItemSource, ItemSourceKind>([[blocked, 'azure-board'], [failing, 'issues'], [slow.source, 'issues'], [slower.source, 'issues']]));
+    ['maddec01/lar-web', slower.source]]), new Map<ItemSource, ItemSourceKind>([[blocked, 'azure-board'], [failing, 'issues'], [slow.source, 'issues'], [slower.source, 'issues']]));
   const held = { ...pace(0), waits: (kind: string) => kind === 'azure-board', blocked: (kind: string) => kind === 'azure-board' };
   const reading = sources.read(progress, held);
   await new Promise((resolve) => setImmediate(resolve));
@@ -426,7 +426,7 @@ test('a source whose kind waits reads nothing and checks for no changes, and rea
   const checks: number[] = [];
   const github = Object.assign(countedSource('github', () => [item('I_1', 'maddec01/lar-apple')]), { changes: async (since: number) => { checks.push(since); return []; } });
   const azure = countedSource('azure', () => [item('I_2', 'maddec01/lar-server')]);
-  const sources = mergeSources(new Map([['maddec01/lar-apple', github], ['maddec01/lar-server', azure]]), [],
+  const sources = mergeSources(new Map([['maddec01/lar-apple', github], ['maddec01/lar-server', azure]]),
     new Map([[github, 'issues'], [azure, 'azure-board']]));
   let waiting = new Set<string>(['azure-board']);
   const paced = (now: number) => ({ ...pace(now), waits: (kind: string) => waiting.has(kind) });

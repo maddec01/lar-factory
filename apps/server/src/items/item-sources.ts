@@ -50,8 +50,7 @@ export function configuredSources(configs: readonly RepositoryConfig[], run: Az 
     return [repo, teamSource(repo, itemSource.kind, itemSource.team)];
   }));
   const kinds = new Map(configs.map((config): [ItemSource, ItemSourceKind] => [byRepo.get(config.repo)!, itemSource(repoView(config))]));
-  const optedIn = configs.filter((c) => c.show === 'opted-in').map((c) => c.repo);
-  return mergeSources(byRepo, optedIn, kinds);
+  return mergeSources(byRepo, kinds);
 }
 
 /** How often a source holding active work reads, and how often an idle one does: its safety read for edits made elsewhere. */
@@ -97,22 +96,11 @@ function githubRef(url: string): { repo: string; number: number } | undefined {
  * Merges the repositories' sources, keeping the first copy of each item. Writes go to the source that listed the
  * item, or to its repository's source. An unknown repository refuses writes. Failed reads preserve previous data;
  * a ReadProblem leaves out only its source's items and names the problem for each repository it serves.
- * Opted-in repositories show only items carrying a status. A paced read refreshes due sources and keeps the rest
- * from their last good read, reporting progress as each source lands.
+ * A paced read refreshes due sources and keeps the rest from their last good read, reporting progress as each source lands.
  */
-export function mergeSources(byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = [],
+export function mergeSources(byRepo: ReadonlyMap<string, ItemSource>,
   kinds: ReadonlyMap<ItemSource, ItemSourceKind> = new Map()): MergedSource {
   const sourceByRepo = new Map([...byRepo].map(([repo, source]) => [repo.toLowerCase(), source]));
-  const optIn = new Set(optedIn.map((repo) => repo.toLowerCase()));
-  const optedOut = (repo: string | null) => optIn.has(repo?.toLowerCase() ?? '');
-  /** The item as a read shows it, or null when it's left out. */
-  const shown = (item: Item): Item | null => {
-    if (item.statuses.length > 0) return item;
-    if (!item.untaggedFor) return optedOut(item.repo) ? null : item;
-    const kept = item.untaggedFor.filter((repo) => !optedOut(repo));
-    if (kept.length === item.untaggedFor.length) return item;
-    return kept.length ? { ...item, repo: kept[0]!, untaggedFor: kept } : null;
-  };
   const sources = [...new Set([...byRepo.values()])];
   const named = new Map<ItemSource, string[]>();
   for (const [repo, source] of byRepo) named.set(source, [...named.get(source) ?? [], repo]);
@@ -239,7 +227,7 @@ export function mergeSources(byRepo: ReadonlyMap<string, ItemSource>, optedIn: r
       return kind !== undefined && pace?.blocked?.(kind) === true;
     };
     const waiting = [...byRepo].filter(([, source]) => !lastRead.has(source) && !failed.has(source) && !blocked(source)).map(([repo]) => repo);
-    const read: ItemsRead = { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item) ?? []), ...problems.length > 0 && { problems },
+    const read: ItemsRead = { title: reads[0]?.title ?? '', items, ...problems.length > 0 && { problems },
       ...waiting.length > 0 && { waiting } };
     return { read, listed };
   };

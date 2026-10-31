@@ -26,7 +26,6 @@ export function serve(data: BoardData, projects: ProjectChoice[] | { error: stri
     }
     return url === '/api/onboarding/projects'
       ? new Response(JSON.stringify(Array.isArray(projects) ? { projects } : projects), { status: Array.isArray(projects) ? 200 : 502 })
-      : url === '/api/onboarding/teams' ? new Response(JSON.stringify({ teams: ['Fabrikam Team', 'Other team'] }))
       : url === '/api/onboarding/repositories' ? new Response(JSON.stringify(keep), { status })
       : new Response(JSON.stringify(data));
   });

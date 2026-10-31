@@ -223,9 +223,9 @@ test("onboarding's Clash agent runs on a fresh fetch of origin's default branch,
   assert.equal(bad.status, 400);
 });
 
-test('the sample board detects nothing, saves no setup, finds no Clash and runs no Clash agent', async (t) => {
+test('the sample board detects nothing, saves no setup, imports no ticket, finds no Clash and runs no Clash agent', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/teams', '/api/onboarding/detect', '/api/onboarding/setup', '/api/onboarding/clashes', '/api/onboarding/clash-runs']) {
+  for (const path of ['/api/onboarding/teams', '/api/onboarding/detect', '/api/onboarding/setup', '/api/onboarding/import/tickets', '/api/onboarding/import', '/api/onboarding/clashes', '/api/onboarding/clash-runs']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }

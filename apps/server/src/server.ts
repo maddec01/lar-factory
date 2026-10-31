@@ -37,6 +37,7 @@ import { readProjectTeams } from './onboarding/project-teams.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { findFixedClashes } from './onboarding/fixed-clashes.ts';
 import { detectSetup } from './onboarding/detect-setup.ts';
+import { importTickets, importableTickets } from './onboarding/import-tickets.ts';
 import { saveSetup } from './onboarding/save-setup.ts';
 import { loadBuild } from './page/page.ts';
 import { recordBoard } from './port/board-record.ts';
@@ -701,6 +702,12 @@ const { server, endStreams } = createBoardServer({
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   detectSetup: (input) => detectSetup(input), saveSetup: (input) => saveSetup(input),
+  importableTickets: (input) => importableTickets(input, records),
+  importTickets: async (input) => {
+    const imported = await importTickets(input, records);
+    if ('imported' in imported) reread();
+    return imported;
+  },
   readProjectTeams,
   findFixedClashes: (input) => findFixedClashes(input),
   startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo),

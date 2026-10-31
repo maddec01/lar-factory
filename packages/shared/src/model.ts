@@ -1055,6 +1055,35 @@ export interface LocalSetupAnswers {
 }
 
 /**
+ * An open ticket onboarding's first step offers to import, as it carries a status label or tag. One carrying more than
+ * one Status, or an Azure DevOps work item with no repo- tag, imports once the user resolves it.
+ */
+export interface ImportableTicket {
+  number: number;
+  title: string;
+  url: string;
+  /** The Statuses its labels or tags carry. */
+  statuses: Status[];
+  /** Whether it is an Azure DevOps work item with no repo- tag, which may be another repository's work. */
+  untagged: boolean;
+  /** The work record already holding it, which an import skips; null while none does. */
+  workId: string | null;
+}
+
+/** The user's choice for one ticket to import: the Status, when it carries several, and whether an untagged one is this repository's. */
+export interface TicketImport {
+  number: number;
+  status?: Status;
+  placeHere?: boolean;
+}
+
+/** What importing tickets did: each ticket's record and the threads it recorded, and why each other ticket wasn't imported. */
+export interface TicketsImported {
+  imported: { number: number; workId: string; created: boolean; threads: number }[];
+  refused: { number: number; reason: string }[];
+}
+
+/**
  * The repository edits the user chose in onboarding, which a PR carries once the user approves them: the factory files
  * to drop, and the optional additions, `.lar-factory.json` with these shared defaults and the factory's agent guidance.
  */

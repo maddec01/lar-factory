@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type ClashRun, type Item, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupDetection } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type ClashRun, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
@@ -54,6 +54,10 @@ export interface HttpDeps {
   detectSetup(input: Record<string, unknown>): Promise<{ detection: SetupDetection } | Refused>;
   /** Saves onboarding's answers as the body's repository's local settings, returning the repositories still onboarding, or why it can't. */
   saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
+  /** The body's repository's open tickets carrying a status label or tag, which onboarding offers to import, or why it can't list them. */
+  importableTickets(input: Record<string, unknown>): Promise<{ tickets: ImportableTicket[] } | Refused>;
+  /** Imports the body's chosen tickets as work records, reporting each one, or why it can't import. */
+  importTickets(input: Record<string, unknown>): Promise<TicketsImported | Refused>;
   /** Runs onboarding's fixed checks for known Clashes on the body's repository's default branch, or says why it can't. */
   findFixedClashes(input: Record<string, unknown>): Promise<FixedClashes | Refused>;
   /** Starts onboarding's Clash agent on the body's repository, T3 project and model, or returns its running run; answers the repository's runs. */
@@ -150,7 +154,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
-  detectSetup, saveSetup, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, importableTickets, importTickets, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -313,6 +317,22 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       async run(input) {
         const detected = await detectSetup(input);
         return 'error' in detected ? { status: detected.status, body: { error: detected.error } } : { status: 200, body: { ...detected, error: null } };
+      },
+    },
+    '/api/onboarding/import/tickets': {
+      what: 'the repository whose tickets to list', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const listed = await importableTickets(input);
+        return 'error' in listed ? { status: listed.status, body: { error: listed.error } } : { status: 200, body: { ...listed, error: null } };
+      },
+    },
+    // The board shows the imported records at once when the repository is already on it.
+    '/api/onboarding/import': {
+      what: 'the tickets to import', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const imported = await importTickets(input);
+        if ('error' in imported) return { status: imported.status, body: { error: imported.error } };
+        return { status: 200, body: withBoard({ ...imported, error: null }) };
       },
     },
     // The repository goes on the board with its local settings, and the next read loads its items.

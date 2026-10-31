@@ -22,6 +22,61 @@ export type BuildPhase = (typeof BUILD_PHASES)[number];
 export const BODIES = ['brief', 'decision', 'map'] as const;
 export type Body = (typeof BODIES)[number];
 
+/** The lar-build reviewers, one axis each (`skills/lar-build/agents/builder.md`, Review). */
+export const REVIEW_AXES = ['code', 'security', 'ui', 'performance'] as const;
+export type ReviewAxis = (typeof REVIEW_AXES)[number];
+/** A reviewer's verdict, or `skipped` when the builder didn't run it. */
+export const REVIEW_VERDICTS = ['approve', 'changes', 'skipped'] as const;
+export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
+export const FINDING_SEVERITIES = ['blocker', 'should', 'nit'] as const;
+export type FindingSeverity = (typeof FINDING_SEVERITIES)[number];
+/** What became of a finding: still open, fixed, or rejected with a reason. */
+export const FINDING_DISPOSITIONS = ['open', 'fixed', 'rejected'] as const;
+export type FindingDisposition = (typeof FINDING_DISPOSITIONS)[number];
+
+export interface ReviewFinding {
+  severity: FindingSeverity;
+  /** The reviewer's finding as it gave it, location and fix included. */
+  summary: string;
+  disposition: FindingDisposition;
+  /** Why it was rejected; null otherwise. */
+  reason: string | null;
+}
+
+export interface AxisReview {
+  axis: ReviewAxis;
+  verdict: ReviewVerdict;
+  /** What the reviewer couldn't check, or why a skipped axis was skipped. */
+  notChecked: string | null;
+  findings: ReviewFinding[];
+}
+
+export interface ReviewRound {
+  /** Counts the build's rounds from 1. */
+  round: number;
+  /** The commit the round reviewed from. */
+  base: string;
+  recordedAt: string;
+  reviewers: AxisReview[];
+}
+
+export interface NewReviewRound {
+  base: string;
+  reviewers: readonly {
+    axis: ReviewAxis;
+    verdict: ReviewVerdict;
+    notChecked?: string;
+    findings: readonly { severity: FindingSeverity; summary: string; disposition: FindingDisposition; reason?: string }[];
+  }[];
+}
+
+/** One finding: the `finding`th the `axis` reviewer gave in `round`, counting from 1. */
+export interface FindingRef {
+  round: number;
+  axis: ReviewAxis;
+  finding: number;
+}
+
 /** The kinds that never become a PR of their own, so hold no build phase or PR. */
 const UNBUILT_KINDS: readonly WorkKind[] = ['concept', 'decision', 'slice'];
 
@@ -92,6 +147,12 @@ export interface WorkRecords {
   setBuildPhase(workId: string, revision: number, phase: BuildPhase): WorkRecord;
   /** Records the PR the build delivers through, replacing an earlier one. */
   setPullRequest(workId: string, revision: number, pullRequest: string): WorkRecord;
+  /** Records the build's next review round with every axis and finding, whole or not at all. */
+  recordReviewRound(workId: string, revision: number, round: NewReviewRound): WorkRecord;
+  /** Records what became of a finding. A rejection needs its reason. */
+  setFindingDisposition(workId: string, revision: number, finding: FindingRef, disposition: FindingDisposition, reason?: string): WorkRecord;
+  /** The build's review rounds, oldest first. */
+  reviewRounds(workId: string): ReviewRound[];
   /** The records it owns, in the order they were made. */
   children(workId: string): WorkRecord[];
   /** The records it waits on. */
@@ -140,15 +201,14 @@ function checkRepository(repository: unknown): string {
   return repository;
 }
 
-function checkKind(kind: unknown): WorkKind {
-  if (!WORK_KINDS.includes(kind as WorkKind)) throw invalid(`The kind "${String(kind)}" isn't one of ${WORK_KINDS.join(', ')}.`);
-  return kind as WorkKind;
+/** Throws unless `value` is one of `values`, naming it as `what`. */
+function checkOneOf<T extends string>(values: readonly T[], value: unknown, what: string): T {
+  if (!values.includes(value as T)) throw invalid(`The ${what} "${String(value)}" isn't one of ${values.join(', ')}.`);
+  return value as T;
 }
 
-function checkStatus(status: unknown): Status {
-  if (!STATUSES.includes(status as Status)) throw invalid(`The Status "${String(status)}" isn't one of ${STATUSES.join(', ')}.`);
-  return status as Status;
-}
+const checkKind = (kind: unknown): WorkKind => checkOneOf(WORK_KINDS, kind, 'kind');
+const checkStatus = (status: unknown): Status => checkOneOf(STATUSES, status, 'Status');
 
 /** Throws unless `reference` names a ticket or PR: `owner/name#12`. */
 function checkReference(reference: unknown, what: 'ticket' | 'PR'): string {
@@ -160,11 +220,6 @@ function checkReference(reference: unknown, what: 'ticket' | 'PR'): string {
 
 const checkTicket = (ticket: unknown): string => checkReference(ticket, 'ticket');
 
-function checkBody(body: unknown): Body {
-  if (!BODIES.includes(body as Body)) throw invalid(`The body "${String(body)}" isn't one of ${BODIES.join(', ')}.`);
-  return body as Body;
-}
-
 /** Throws unless a record of `kind` holds `body`. */
 function checkHolds(kind: WorkKind, body: Body): void {
   const holder: WorkKind | undefined = body === 'map' ? 'concept' : body === 'decision' ? 'decision' : undefined;
@@ -175,12 +230,24 @@ function checkHolds(kind: WorkKind, body: Body): void {
 
 /** Throws unless a record of `kind` can be built. */
 function checkBuilt(kind: WorkKind): void {
-  if (UNBUILT_KINDS.includes(kind)) throw invalid(`A ${kind} is never built, so it has no build phase or PR.`);
+  if (UNBUILT_KINDS.includes(kind)) throw invalid(`A ${kind} is never built, so it has no build phase, PR or review rounds.`);
 }
 
 function checkText(text: unknown, what: string): string {
   if (typeof text !== 'string') throw invalid(`The ${what} isn't text.`);
   return text;
+}
+
+function checkFilled(text: unknown, what: string): string {
+  if (typeof text !== 'string' || !text.trim()) throw invalid(`The ${what} is empty or isn't text.`);
+  return text;
+}
+
+/** A finding's disposition and the reason a rejection needs. */
+function checkDisposition(disposition: unknown, reason: unknown): [FindingDisposition, string | null] {
+  const checked = checkOneOf(FINDING_DISPOSITIONS, disposition, 'disposition');
+  if (checked !== 'rejected') return [checked, null];
+  return [checked, checkFilled(reason, 'reason for rejecting a finding')];
 }
 
 /** Throws unless a `parent` may own a `child`. */
@@ -215,6 +282,15 @@ function workRecords(database: Database): WorkRecords {
   const waitsOn = db.prepare(`WITH RECURSIVE waiting (id) AS (SELECT ? UNION SELECT b.blocker_id FROM blockers b JOIN waiting ON b.work_id = waiting.id)
     SELECT 1 FROM waiting WHERE id = ?`);
   const bump = db.prepare('UPDATE work_records SET revision = revision + 1, updated_at = ? WHERE work_id = ?');
+  const hasRounds = db.prepare('SELECT 1 FROM review_rounds WHERE work_id = ? LIMIT 1');
+  const roundRows = db.prepare('SELECT * FROM review_rounds WHERE work_id = ? ORDER BY round');
+  const axisRows = db.prepare('SELECT * FROM review_axes WHERE work_id = ? AND round = ? ORDER BY rowid');
+  const findingRows = db.prepare('SELECT * FROM review_findings WHERE work_id = ? AND round = ? AND axis = ? ORDER BY finding');
+  const nextRound = db.prepare('SELECT coalesce(max(round), 0) + 1 AS next FROM review_rounds WHERE work_id = ?');
+  const insertRound = db.prepare('INSERT INTO review_rounds (work_id, round, base, recorded_at) VALUES (?, ?, ?, ?)');
+  const insertAxis = db.prepare('INSERT INTO review_axes (work_id, round, axis, verdict, not_checked) VALUES (?, ?, ?, ?, ?)');
+  const insertFinding = db.prepare('INSERT INTO review_findings (work_id, round, axis, finding, severity, summary, disposition, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  const disposeFinding = db.prepare('UPDATE review_findings SET disposition = ?, reason = ? WHERE work_id = ? AND round = ? AND axis = ? AND finding = ?');
   const bodyNames = db.prepare('SELECT body FROM bodies WHERE work_id = ?');
   const bodyText = db.prepare('SELECT markdown FROM bodies WHERE work_id = ? AND body = ?');
   const writeBody = db.prepare('INSERT INTO bodies (work_id, body, markdown) VALUES (?, ?, ?) ON CONFLICT DO UPDATE SET markdown = excluded.markdown');
@@ -294,7 +370,7 @@ function workRecords(database: Database): WorkRecords {
           if (row.parent_id) checkOwns(find(row.parent_id), child);
           for (const owned of childRows.all(workId) as unknown as Row[]) checkOwns({ ...row, kind: nextKind }, owned);
           // The new kind must hold what the record already holds.
-          if (row.build_phase || row.pull_request) checkBuilt(nextKind);
+          if (row.build_phase || row.pull_request || hasRounds.get(workId)) checkBuilt(nextKind);
           for (const { body } of bodyNames.all(workId)) checkHolds(nextKind, body as Body);
         }
         const moved = nextStatus ?? row.status;
@@ -361,7 +437,7 @@ function workRecords(database: Database): WorkRecords {
       return {};
     }),
     setBody: (workId, revision, body, markdown) => {
-      const name = checkBody(body);
+      const name = checkOneOf(BODIES, body, 'body');
       const text = checkText(markdown, name);
       return change(workId, revision, (row) => {
         checkHolds(row.kind, name);
@@ -370,19 +446,72 @@ function workRecords(database: Database): WorkRecords {
       });
     },
     body: (workId, body) => database.read(() => {
-      const name = checkBody(body);
+      const name = checkOneOf(BODIES, body, 'body');
       find(workId);
       const row = bodyText.get(workId, name);
       return row ? String(row.markdown) : null;
     }),
     setBuildPhase: (workId, revision, phase) => {
-      if (!BUILD_PHASES.includes(phase)) throw invalid(`The build phase "${String(phase)}" isn't one of ${BUILD_PHASES.join(', ')}.`);
-      return change(workId, revision, (row) => (checkBuilt(row.kind), { build_phase: phase }));
+      const checked = checkOneOf(BUILD_PHASES, phase, 'build phase');
+      return change(workId, revision, (row) => (checkBuilt(row.kind), { build_phase: checked }));
     },
     setPullRequest: (workId, revision, pullRequest) => {
       const reference = checkReference(pullRequest, 'PR');
       return change(workId, revision, (row) => (checkBuilt(row.kind), { pull_request: reference }));
     },
+    recordReviewRound: (workId, revision, round) => change(workId, revision, (row) => {
+      checkBuilt(row.kind);
+      if (typeof round?.base !== 'string' || !/^[0-9a-f]{7,64}$/.test(round.base)) throw invalid(`The round's base "${String(round?.base)}" isn't a commit sha.`);
+      if (!Array.isArray(round.reviewers as unknown) || !round.reviewers.length) throw invalid('The round has no reviewers.');
+      const number = Number(nextRound.get(workId)!.next);
+      insertRound.run(workId, number, round.base, new Date().toISOString());
+      const seen = new Set<ReviewAxis>();
+      for (const reviewer of round.reviewers) {
+        const axis = checkOneOf(REVIEW_AXES, reviewer?.axis, 'axis');
+        if (seen.has(axis)) throw invalid(`The round lists the ${axis} reviewer twice.`);
+        seen.add(axis);
+        const verdict = checkOneOf(REVIEW_VERDICTS, reviewer.verdict, 'verdict');
+        const notChecked = verdict === 'skipped' ? checkFilled(reviewer.notChecked, `reason the ${axis} reviewer was skipped`)
+          : reviewer.notChecked === undefined ? null : checkFilled(reviewer.notChecked, `${axis} reviewer's note on what it couldn't check`);
+        if (!Array.isArray(reviewer.findings as unknown)) throw invalid(`The ${axis} reviewer's findings aren't a list.`);
+        if (verdict === 'skipped' && reviewer.findings.length) throw invalid(`The skipped ${axis} reviewer can't have findings.`);
+        insertAxis.run(workId, number, axis, verdict, notChecked);
+        reviewer.findings.forEach((finding, index) => {
+          const severity = checkOneOf(FINDING_SEVERITIES, finding?.severity, 'severity');
+          const summary = checkFilled(finding.summary, `${axis} finding`);
+          const [disposition, reason] = checkDisposition(finding.disposition, finding.reason);
+          insertFinding.run(workId, number, axis, index + 1, severity, summary, disposition, reason);
+        });
+      }
+      return {};
+    }),
+    setFindingDisposition: (workId, revision, { round, axis, finding }, disposition, reason) => {
+      const [checked, why] = checkDisposition(disposition, reason);
+      return change(workId, revision, () => {
+        const updated = disposeFinding.run(checked, why, workId, round, axis, finding);
+        if (!updated.changes) throw new WorkRecordError('not-found', `The work record ${workId} has no finding ${finding} from the ${axis} reviewer in round ${round}.`);
+        return {};
+      });
+    },
+    reviewRounds: (workId) => database.read(() => {
+      find(workId);
+      return roundRows.all(workId).map((round): ReviewRound => ({
+        round: Number(round.round),
+        base: String(round.base),
+        recordedAt: String(round.recorded_at),
+        reviewers: axisRows.all(workId, Number(round.round)).map((axis): AxisReview => ({
+          axis: axis.axis as ReviewAxis,
+          verdict: axis.verdict as ReviewVerdict,
+          notChecked: axis.not_checked as string | null,
+          findings: findingRows.all(workId, Number(round.round), String(axis.axis)).map((finding): ReviewFinding => ({
+            severity: finding.severity as FindingSeverity,
+            summary: String(finding.summary),
+            disposition: finding.disposition as FindingDisposition,
+            reason: finding.reason as string | null,
+          })),
+        })),
+      }));
+    }),
     children: (workId) => related(childRows, workId),
     blockers: (workId) => related(blockerRows, workId),
     dependents: (workId) => related(dependentRows, workId),

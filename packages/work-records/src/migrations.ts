@@ -43,5 +43,34 @@ export const MIGRATIONS: readonly Migration[] = [
       markdown TEXT NOT NULL,
       PRIMARY KEY (work_id, body)
     ) STRICT;
+    -- A build's review rounds: each reviewer axis's verdict, then its findings in the order it gave them.
+    CREATE TABLE review_rounds (
+      work_id TEXT NOT NULL REFERENCES work_records (work_id),
+      round INTEGER NOT NULL,
+      base TEXT NOT NULL,
+      recorded_at TEXT NOT NULL,
+      PRIMARY KEY (work_id, round)
+    ) STRICT;
+    CREATE TABLE review_axes (
+      work_id TEXT NOT NULL,
+      round INTEGER NOT NULL,
+      axis TEXT NOT NULL,
+      verdict TEXT NOT NULL,
+      not_checked TEXT,
+      PRIMARY KEY (work_id, round, axis),
+      FOREIGN KEY (work_id, round) REFERENCES review_rounds (work_id, round)
+    ) STRICT;
+    CREATE TABLE review_findings (
+      work_id TEXT NOT NULL,
+      round INTEGER NOT NULL,
+      axis TEXT NOT NULL,
+      finding INTEGER NOT NULL,
+      severity TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      disposition TEXT NOT NULL,
+      reason TEXT,
+      PRIMARY KEY (work_id, round, axis, finding),
+      FOREIGN KEY (work_id, round, axis) REFERENCES review_axes (work_id, round, axis)
+    ) STRICT;
   `),
 ];

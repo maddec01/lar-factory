@@ -1,7 +1,7 @@
 ---
 name: lar-shape
-description: Take a queued lar issue through shaping to a Ready brief.
-argument-hint: "<owner/repo#n or issue URL>"
+description: Take a queued lar work record through shaping to a Ready brief.
+argument-hint: "<work ID, owner/repo#n or ticket URL>"
 disable-model-invocation: true
 ---
 
@@ -11,9 +11,10 @@ verifies visible changes and merges every PR.
 ## Rules
 
 Read [prose rules](shared/prose.md) before writing. Read each step and its
-linked references only when reached. The issue is the handover: keep its brief,
-map, decisions and links in its body and comments.
-Move Status at each step per [status](shared/issue-tracker/status.md).
+linked references only when reached. The work record is the handover: keep its
+brief, map, decisions and blockers there through `lar-work` and the shared
+scripts, per [work records](shared/issue-tracker/work-records.md), never in a
+ticket. Move Status at each step with `status.sh`.
 Facts are yours to find; decisions are the user's. Delegated work follows
 [orchestration](shared/orchestration.md), with reports of at most 300 words,
 without files, logs or screenshots. Ask ordinary questions per the

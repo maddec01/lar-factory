@@ -41,5 +41,6 @@ p[data-start-result] { padding: --spacing(1) --spacing(1.5); margin-inline: --sp
 .desk-actions:has(.start-group [data-open-thread]) { height: auto; min-height: --spacing(7); }
 .desk-actions > .start-group:has([data-open-thread]) + span { display: none; }
 .start-group { flex: 0 1 auto; max-width: 100%; flex-wrap: wrap; margin-left: auto; display: inline-flex; align-items: center; gap: --spacing(1.25); position: relative; }
+.desk-actions > .start-group { margin-left: 0; }
 .link-action[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .action-error { order: 1; flex: 1 1 100%; min-width: 0; color: var(--danger-text); font-weight: 600; overflow-wrap: anywhere; }

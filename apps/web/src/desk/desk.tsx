@@ -60,7 +60,7 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
     : null;
   return (
     // A click beside the buttons opens the item dialog, as anywhere else on the card.
-    <KeepClicks className="desk-actions flex h-7 min-w-0 items-center gap-2" passEmpty>
+    <KeepClicks className="desk-actions flex h-7 min-w-0 items-center justify-start gap-2" passEmpty>
       {action ?? <OpenThread item={item} data={data} />}
       {action && <span className="ml-auto flex"><OpenThread item={item} data={data} iconOnly /></span>}
     </KeepClicks>

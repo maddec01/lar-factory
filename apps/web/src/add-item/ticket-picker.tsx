@@ -77,7 +77,7 @@ export function TicketPicker({ id, repo, disabled, onPick }: { id: string; repo:
                 className="flex w-full min-w-0 items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-base-200/70 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60">
                 <span className="shrink-0 tabular-nums text-(--muted-foreground)">#{ticket.number}</span>
                 <span className="min-w-0 flex-1 truncate">{ticket.title}</span>
-                {ticket.workId && <span className="shrink-0 text-xs text-(--muted-foreground)">On the board</span>}
+                {ticket.workId && <span className="shrink-0 text-xs text-(--muted-foreground)">Already added</span>}
               </button>
             </li>
           ))}

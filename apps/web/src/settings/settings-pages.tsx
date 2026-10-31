@@ -2,7 +2,7 @@
 
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
-import { Archive, ExternalLink, FolderGit2, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
+import { Archive, ExternalLink, FolderGit2, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
 import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type Item, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -78,7 +78,7 @@ const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
 
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
 
-/** Whether the check leaves gh out, as no listed repository is on GitHub; Settings then leaves gh out. */
+/** Whether the check leaves gh out, as no listed repository is on GitHub; Diagnostics then leaves gh out. */
 const ghSkipped = (data: BoardData): boolean => !!data.toolProgress?.skipped.includes('gh');
 
 /** Why az isn't checked, once the check leaves it out; else nothing. */
@@ -111,9 +111,8 @@ function onboardingDescription(progress: OnboardingProgress): string {
 
 /**
  * Each repository on this Mac's list by its name: an onboarded one with its provider and item source,
- * Edit, which opens Edit's dialog once the board has its setup, the notice of a changed setup that pauses work and the
- * config update notice while it has them; one still onboarding with what it has answered, the step it stopped at and
- * Resume. Add repository opens the onboarding dialog. The
+ * Edit, which opens Edit's dialog once the board has its setup; one still onboarding with what it has answered, the
+ * step it stopped at and Resume. Add repository opens the onboarding dialog. The
  * board reads GitHub repositories and Azure DevOps sprints.
  */
 function repositoryGroup(data: BoardData): Group {
@@ -246,14 +245,14 @@ export function pages(input: PagesInput): Page[] {
       ] },
       { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },
     ] },
-    { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, description: 'The repositories the board reads, and the command line logins it reads them through.', groups: [
-      { title: 'Command line tools', description: 'The board reads each provider through your own login and never stores a token.', rows: [
-        ...ghSkipped(data) ? [] : [{ id: 'gh', title: 'GitHub CLI', description: toolDescription('gh, for repositories on GitHub.', data.tools?.gh),
-          control: custom(() => <ToolState {...stateOf(data, 'gh', true)} />) }],
-        { id: 'az', title: 'Azure CLI', description: toolDescription(`az with the azure-devops extension, for repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),
+    { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, description: 'The repositories and issue sources shown on the board.', groups: [repositoryGroup(data)] },
+    { id: 'integrations', label: 'Integrations', icon: <Plug />, description: 'Provider logins shared by your repositories.', groups: [
+      { title: 'Issue trackers', description: 'Uses your own command line login. Lar Factory never stores a token.', rows: [
+        { id: 'gh', title: 'GitHub', description: toolDescription('Uses your GitHub CLI login.', data.tools?.gh),
+          control: custom(() => <ToolState {...stateOf(data, 'gh', true)} />) },
+        { id: 'az', title: 'Azure DevOps', description: toolDescription(`Uses your Azure CLI login and Azure DevOps extension.${azSkipped(data)}`, data.tools?.az),
           control: custom(() => <ToolState {...stateOf(data, 'az', true)} />) },
       ] },
-      repositoryGroup(data),
     ] },
     { id: 'skills', label: 'Skills', icon: <Sparkles />, description: 'The skills and checklists Lar Factory installs, and the folders that get them.', groups: [
       targetGroup(input),

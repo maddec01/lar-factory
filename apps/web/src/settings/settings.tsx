@@ -21,7 +21,7 @@ import { useSettingsStore } from './settings-store.ts';
 /** The section list's groups, by section id. */
 const NAV: { label: string; ids: string[] }[] = [
   { label: 'Board', ids: ['general', 'appearance', 'notifications', 'keybindings'] },
-  { label: 'Connections', ids: ['repos', 't3', 'skills'] },
+  { label: 'Connections', ids: ['repos', 'integrations', 't3', 'skills'] },
   { label: 'App', ids: ['updates', 'archive', 'diagnostics'] },
 ];
 

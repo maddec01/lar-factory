@@ -90,7 +90,7 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
       const result = await response.json() as CreationResult & { uncertain?: boolean; board?: BoardData };
       if (result.item && result.board) {
         useBoardStore.getState().beginWrite();
-        useBoardStore.getState().receive(result.board);
+        useBoardStore.getState().receive(result.board, 'action');
         // The page stays where it was; the Added toast's View item goes to the new item.
         set({ submission: { phase: 'complete' }, open: false });
         notify({ verb: 'Added', item: result.item, to: 'List' });

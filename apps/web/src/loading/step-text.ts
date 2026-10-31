@@ -3,17 +3,12 @@
 import type { FirstRead } from '@lar-factory/shared';
 
 const STEP_TEXT: Record<FirstRead['step'], string> = {
-  repositories: 'Checking repositories',
-  items: 'Reading items',
+  repositories: 'Loading projects',
+  items: 'Loading projects',
   finishing: 'Finishing up',
 };
 
-/** "a", "a and b", "a, b and c". */
-export function listed(names: string[]): string {
-  return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
-}
-
-/** What the first read is doing now: the reads still running when there are any, else its step. */
+/** Keep loading copy stable as individual projects finish. */
 export function stepText(read: FirstRead): string {
-  return read.running.length ? `Reading ${listed(read.running)}` : STEP_TEXT[read.step];
+  return read.running.length ? 'Loading projects' : STEP_TEXT[read.step];
 }

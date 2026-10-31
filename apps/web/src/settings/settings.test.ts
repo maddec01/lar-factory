@@ -70,7 +70,7 @@ test('Settings opens from the title bar, in a browser too, as a modal over the b
   expect(modal()!.getAttribute('role')).toBe('dialog');
   expect($$('.settings-nav [role="group"]').map((g) => [g.getAttribute('aria-label'), [...g.querySelectorAll('button')].map(text)])).toEqual([
     ['Board', ['General']],
-    ['Connections', ['Repositories', 'Skills']],
+    ['Connections', ['Repositories', 'Integrations', 'Skills']],
     ['App', ['Updates', 'Archive', 'Diagnostics']],
   ]);
   expect(section('General').getAttribute('aria-current')).toBe('page');
@@ -97,7 +97,7 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
   expect(sections().map(text)).toEqual(['Skills']);
   expect($$('.settings-nav [role="group"]').map((g) => g.getAttribute('aria-label')), 'a group with no match goes').toEqual(['Connections']);
   await type(search(), '');
-  expect(sections()).toHaveLength(6);
+  expect(sections()).toHaveLength(7);
   search().blur();
   await settle(() => modal()!.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true })));
   expect(document.activeElement).toBe(search());
@@ -159,19 +159,14 @@ test('settings only show working controls', async () => {
 /** Each Settings group's title with its rows' ids. */
 const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
 
-test('Repositories shows the command line tools\' logins and each repository with its provider and item source', async () => {
+test('Repositories only shows each repository with its provider and item source', async () => {
   const repos = [sample.repos[0]!, { ...sample.repos[1]!, items: 'issues' as const },
     { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'azure-board' as const, team: 'Fabrikam Team', labels: [] },
     { repo: 'contoso/Fabrikam/lar-web', role: 'Web', items: 'azure-board' as const, team: 'Web Team', labels: [] }];
   await open('Repositories', { ...sample, repos });
-  expect(groups()).toEqual([['Command line tools', ['gh', 'az']], ['Repositories', repos.map((r) => `repo-${r.repo}`)]]);
-  expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
-  expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
-  expect(text(row('az'))).not.toContain('no listed repository');
-  await push({ ...sample, repos, tools: toolChecks(), toolProgress: { checking: [], skipped: ['az'] } });
-  expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in');
-  expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
-  expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
+  expect(groups()).toEqual([['Repositories', repos.map((r) => `repo-${r.repo}`)]]);
+  expect(row('gh')).toBeNull();
+  expect(row('az')).toBeNull();
   expect(repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual([
     `${repos[0]!.repo}GitHub · Issues`,
     `${repos[1]!.repo}GitHub · Issues`,
@@ -206,7 +201,7 @@ test('a repository still onboarding is listed with its provider and its step, an
   ] };
   serve(data, [project('lar-web', { onBoard: true })]);
   await open('Repositories', data);
-  expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
+  expect(groups()[0]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
   expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Work and docsResume');
   expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResume');
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
@@ -225,8 +220,8 @@ test('Diagnostics shows every command Not checked before the first check, then O
   expect(text(row('d-az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
 });
 
-test('the Command line tools rows show signed out, missing or the problem found, with the fix', async () => {
-  await open('Repositories', { ...sample, tools: toolChecks({ gh: { result: 'logged-out', fix: 'gh auth login' },
+test('Integrations shows provider logins and the fix for missing access tools', async () => {
+  await open('Integrations', { ...sample, tools: toolChecks({ gh: { result: 'logged-out', fix: 'gh auth login' },
     az: { result: 'no-extension', version: '2.67.0', fix: 'az extension add --name azure-devops' } }) });
   expect(['gh', 'az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● Signed out', '● No azure-devops extension']);
   expect(text(row('gh'))).toContain('Fix: gh auth login');
@@ -238,10 +233,11 @@ test('the Command line tools rows show signed out, missing or the problem found,
   expect(text(row('az'))).toContain('Fix: brew install azure-cli');
 });
 
-test('Settings hides gh once the checks ran without it, as no listed repository is on GitHub', async () => {
+test('Integrations keeps both providers available while Diagnostics omits unused tools', async () => {
   const { gh: _, ...withoutGh } = toolChecks({ az: { result: 'ok', version: '2.67.0' } });
-  await open('Repositories', { ...sample, tools: withoutGh, toolProgress: { checking: [], skipped: ['gh'] } });
-  expect(groups()[0]).toEqual(['Command line tools', ['az']]);
+  await open('Integrations', { ...sample, tools: withoutGh, toolProgress: { checking: [], skipped: ['gh'] } });
+  expect(groups()[0]).toEqual(['Issue trackers', ['gh', 'az']]);
+  expect(text(row('gh').querySelector('.tool-state'))).toBe('● Not checked');
   await settle(() => section('Diagnostics').click());
   expect($('.settings-row[data-row="d-gh"]')).toBeNull();
   expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');
@@ -250,8 +246,8 @@ test('Settings hides gh once the checks ran without it, as no listed repository 
 test('Settings shows gh and az Checking while their checks run, though other checks landed, and never as left out', async () => {
   const landed = { git: toolChecks().git };
   const data = { ...sample, tools: landed, toolProgress: { checking: ['gh', 't3', 'jq', 'curl', 'az'] as CheckedTool[], skipped: [] } };
-  await open('Repositories', data);
-  expect(groups()[0]).toEqual(['Command line tools', ['gh', 'az']]);
+  await open('Integrations', data);
+  expect(groups()[0]).toEqual(['Issue trackers', ['gh', 'az']]);
   expect(['gh', 'az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● Checking', '● Checking']);
   expect(text(row('az'))).not.toContain('no listed repository');
   await settle(() => section('Diagnostics').click());
@@ -296,8 +292,8 @@ test('Diagnostics shows a gh older than 2.94.0 with its fix', async () => {
   expect(text(row('d-gh'))).toContain('Fix: brew upgrade gh');
 });
 
-test('Repositories shows a gh too old as signed in as well', async () => {
-  await open('Repositories', { ...sample, tools: toolChecks({ gh: { result: 'outdated', version: '2.90.0', fix: 'brew upgrade gh' } }) });
+test('Integrations shows a gh too old as signed in as well', async () => {
+  await open('Integrations', { ...sample, tools: toolChecks({ gh: { result: 'outdated', version: '2.90.0', fix: 'brew upgrade gh' } }) });
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in, 2.90.0, older than 2.94.0');
   expect(text(row('gh'))).toContain('Fix: brew upgrade gh');
 });

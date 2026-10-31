@@ -1,6 +1,6 @@
 // One glyph per status, the way T3 marks a thread working, waiting or done, in the status's colour.
 
-import { Check, Circle, CircleDashed, CircleDot, Clock3, Eye, GitMerge, LoaderCircle } from 'lucide-react';
+import { Check, Circle, CircleDashed, CircleDot, Clock3, Eye, GitMerge, List, LoaderCircle } from 'lucide-react';
 import type { Status } from '@lar-factory/shared';
 
 export const STATUS_COLOR: Record<Status, string> = {
@@ -12,6 +12,7 @@ export function StatusGlyph({ status, className = 'size-3.5' }: { status: Status
   const style = { color: STATUS_COLOR[status] };
   const props = { className: `shrink-0 ${className}`, style, strokeWidth: 2.25 };
   switch (status) {
+    case 'List': return <List {...props} />;
     case 'Needs you': case 'Verify': return <CircleDot {...props} className={`${props.className} status-pulse`} />;
     case 'In progress': return <LoaderCircle {...props} className={`${props.className} animate-spin [animation-duration:2.4s]`} />;
     case 'Shaping': return <CircleDashed {...props} />;

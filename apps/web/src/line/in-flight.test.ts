@@ -68,7 +68,7 @@ test("scoped to a repository whose items haven't landed yet, the main area says 
     firstRead: { step: 'items', running: ['lar-apple'], waiting: ['maddec01/lar-apple'], settled: false } });
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
-  expect(text($('[data-reading]'))).toBe('Reading lar-apple…');
+  expect(text($('[data-reading]'))).toBe('Loading projects…');
   expect([table(), $('section.desk')]).toEqual([null, null]);
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-server'));
   expect([$('[data-reading]'), table() !== null]).toEqual([null, true]);

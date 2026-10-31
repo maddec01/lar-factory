@@ -3,12 +3,13 @@
 // board's CSS adds the coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
-import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
+import { UNREADABLE, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { PrReadiness } from './pr-readiness.tsx';
 import { STATUS_COLOR } from './status-glyph.tsx';
+import { WORKFLOW_STEPS } from './workflow-steps.ts';
 
 const REPO_TONES = 8;
 
@@ -43,12 +44,13 @@ export function AzureFields({ azure }: { azure: AzureWorkItem | undefined }) {
   return <span data-azure title={text} className="block min-w-0 truncate text-xs text-(--muted-foreground)">{text}</span>;
 }
 
-/** Ten steps as a track; the past filled, the current one in its colour. */
+/** Active steps as a track; the past filled, the current one in its colour. */
 export function StepTrack({ status }: { status: Status }) {
-  const at = STATUSES.indexOf(status);
+  const at = WORKFLOW_STEPS.indexOf(status);
+  if (at < 0) return null;
   return (
     <ol className="m-0 flex list-none gap-[3px] p-0">
-      {STATUSES.map((s, i) => (
+      {WORKFLOW_STEPS.map((s, i) => (
         <li key={s} title={s} className="h-1.5 flex-1 rounded-full"
           style={{ background: i < at ? 'color-mix(in srgb, var(--foreground) 28%, transparent)' : i === at ? STATUS_COLOR[s] : 'var(--soft)' }} />
       ))}

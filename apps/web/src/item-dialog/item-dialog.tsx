@@ -1,8 +1,9 @@
 // The item dialog: every item, wherever it's listed, opens here over the page, as the design system's workspace-sized
 // Modal, whose body fades at its scrolled edges. Under its title it shows the item's repository, status and parent, with
 // the agent work figures beside the title. Its body has a progress bar with the slices as an overview, its hint, a meta area of
-// people, labels, dates, milestone or iteration and area, then its description and comments. Sub-tickets
-// and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the
+// people, labels, dates, milestone or iteration and area, then its work record's brief, map or decision, and its ticket's
+// description and comments as ticket context; work with no ticket shows its record alone. The work it waits on,
+// sub-tickets and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the
 // comments. The board's fields show at
 // once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
 // item, and the one action the item's status asks for, with Back to List and Abandon at its left. Its description has
@@ -34,6 +35,7 @@ import type { DescriptionEdit } from './use-description-edit.ts';
 import { ItemProgress } from './item-progress.tsx';
 import { useItemDetails } from './use-item-details.ts';
 import { AttachTicket } from './attach-ticket.tsx';
+import { RecordText } from './record-text.tsx';
 
 /** The one thing the item's status asks of you; an item carrying more than one status asks you to keep one. */
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {
@@ -63,9 +65,12 @@ function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   return <>{!carriesTwoStatuses(item) && <BackToListButton item={item} data={data} />}<AbandonButton item={item} data={data} /></>;
 }
 
-/** Whether the sidebar has anything: pull requests, or sub-tickets (as many as the board counts while the details load). */
+/** The work records the item's record waits on, as the board holds them. */
+const waitsOn = (item: Item) => item.blockers.filter((b) => b.workId);
+
+/** Whether the sidebar has anything: work it waits on, pull requests, or sub-tickets (as many as the board counts while the details load). */
 const hasRelations = (item: Item, read: ItemDetailsRead): boolean =>
-  item.linkedPrs.length > 0
+  item.linkedPrs.length > 0 || waitsOn(item).length > 0
   || (read.state === 'loaded' ? (read.details.subTickets.length > 0 || Boolean(read.details.attachments?.length || read.details.related?.length || read.details.blockers?.length || read.details.relationsError)) : read.state === 'loading' && item.subIssues.total > 0);
 
 const Section = ({ heading, children }: { heading: ReactNode; children: ReactNode }) => (
@@ -84,6 +89,9 @@ interface ContentProps {
 
 function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpanded }: ContentProps) {
   const aside = hasRelations(item, read);
+  const record = read.state === 'loaded' ? read.details.record : undefined;
+  // Work with no ticket has no ticket text to show beside its record's.
+  const ticket = !record || item.number > 0;
   const hint = carriesTwoStatuses(item) ? keepOneText(item.statuses) : HINTS[item.status];
   // The open editor in an expanded dialog takes the height the rest leaves.
   const fill = expanded && edit.editing;
@@ -117,14 +125,18 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
           )}
           <ItemMeta item={item} read={read} now={now} />
           <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}>
-            <ItemDescription read={read} edit={edit} fill={fill} className="@min-[45rem]:col-start-1" />
+            {record && <RecordText item={item} record={record} className="@min-[45rem]:col-start-1" />}
+            {ticket && <ItemDescription read={read} edit={edit} fill={fill} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}
             {aside && (
               <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 @min-[45rem]:col-start-2 @min-[45rem]:row-span-2 @min-[45rem]:row-start-1 @min-[45rem]:border-l @min-[45rem]:border-(--border) @min-[45rem]:pl-6">
+                {waitsOn(item).length > 0 && <Section heading="Waits on"><ul className="m-0 grid list-none gap-1.5 p-0 text-sm" data-waits-on>
+                  {waitsOn(item).map((b) => <li key={b.workId} className={b.state === 'closed' ? 'text-(--muted-foreground) line-through' : ''}>{b.title}</li>)}
+                </ul></Section>}
                 <ItemRelations item={item} read={read} />
                 {item.linkedPrs.length > 0 && <Section heading="Pull requests"><PrList item={item} /></Section>}
               </aside>
             )}
-            <ItemComments itemId={item.id} read={read} now={now} className="@min-[45rem]:col-start-1" />
+            {ticket && <ItemComments itemId={item.id} read={read} now={now} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}
           </div>
           <ActionError item={item} />
           <StartMessage item={item} kind={item.status === 'Ready' ? 'build' : 'refine'} />

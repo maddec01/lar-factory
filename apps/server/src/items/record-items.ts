@@ -3,7 +3,7 @@
 // PRs and provider fields, so a ticket edit never moves, retitles, restructures or blocks work.
 
 import { parseConceptMap, refKey, sameRepo } from '@lar-factory/shared';
-import type { Blocker, IssueRef, Item, Slice, SliceProgress } from '@lar-factory/shared';
+import type { Blocker, IssueRef, Item, NeedsYouOffer, Slice, SliceProgress } from '@lar-factory/shared';
 import type { WorkRecord, WorkRecords } from '@lar-factory/work-records';
 
 /** The number in a ticket reference, `owner/name#12`. */
@@ -25,6 +25,22 @@ export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> 
     for (const repo of [ticket.repo, ...ticket.untaggedFor ?? []]) byTicket.set(refKey(repo, ticket.number).toLowerCase(), ticket);
   }
   return byTicket;
+}
+
+/**
+ * Why the record waits on the user, with what its observations offer: a PR closed unmerged offers reopening it, a
+ * replacement build and setting the work aside; a ticket closed before the work was Done offers setting it aside; a
+ * ticket open on Done work offers reopening the work. Undefined when it doesn't wait.
+ */
+function needsYouOf(records: WorkRecords, record: WorkRecord): Item['needsYou'] {
+  if (!record.needsYou) return undefined;
+  const observed = (of: 'ticket' | 'pr') => records.observations(record.workId).find((o) => o.of === of)?.state;
+  const done = isDone(record);
+  const offers = new Set<NeedsYouOffer>();
+  if (observed('pr') === 'closed') for (const offer of ['reopen-pr', 'replace-pr', 'set-aside'] as const) offers.add(offer);
+  if (observed('ticket') === 'closed' && !done) offers.add('set-aside');
+  if (observed('ticket') === 'open' && done) offers.add('reopen-work');
+  return { reason: record.needsYou, offers: [...offers] };
 }
 
 /**
@@ -74,6 +90,8 @@ export function recordItems(records: WorkRecords, tickets: readonly Item[], repo
       slices,
     };
     if (map) item.map = map;
+    const needsYou = needsYouOf(records, record);
+    if (needsYou) item.needsYou = needsYou;
     return item;
   });
 }

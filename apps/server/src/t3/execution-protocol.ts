@@ -29,7 +29,12 @@ export function subscribeExecution(origin: URL, version: string, protocol: Proje
 export function readExecution(origin: URL, version: string, protocol: ProjectProtocol,
   threadId: string): Promise<ExecutionRead> {
   return new Promise(resolve => {
-    const finish = (read: ExecutionRead) => { queueMicrotask(() => { clearTimeout(timer); stop(); resolve(read); }); };
+    let settled = false;
+    const finish = (read: ExecutionRead) => {
+      if (settled) return;
+      settled = true;
+      queueMicrotask(() => { clearTimeout(timer); stop(); resolve(read); });
+    };
     const timer = setTimeout(() => finish({ availability: 'unavailable' }), 15_000);
     const stop = subscribeExecution(origin, version, protocol, threadId, finish);
   });

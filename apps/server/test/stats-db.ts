@@ -75,6 +75,7 @@ CREATE TABLE orchestration_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, a
 /** Writes the database to a temporary folder removed after the test, and returns its path. */
 export function statsDb(t: TestContext, threads: FixtureThread[], requests: FixtureRequest[] = []): string {
   const path = join(tempDir(t, 'lar-stats-'), 'statev2.sqlite');
+  writeFileSync(path + '.execution.json', JSON.stringify(threads));
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
   const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?, ?)');

@@ -3,7 +3,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DONE_WINDOW_MS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey } from '@lar-factory/shared';
 import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
 import type { TicketObservation } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
@@ -89,9 +89,8 @@ const RECENT_CLOSED_QUERY = `query($owner: String!, $name: String!, $since: Date
 }`;
 
 /**
- * One page of an issue search, for the sub-issue labels the board needs: `build`,
- * `active` and `blocked`. Labels on every sub-issue in OPEN_ISSUES_QUERY cost 60 points a page, not 10; a
- * search page costs 1.
+ * One page of an issue search, for the `build` label of the sub-issues off the read, which says whether one is a build
+ * or a slice. Labels on every sub-issue in OPEN_ISSUES_QUERY cost 60 points a page, not 10; a search page costs 1.
  */
 export const ISSUE_SEARCH_QUERY = `query($q: String!, $after: String) {
   search(type: ISSUE, first: ${SEARCH_PAGE_SIZE}, after: $after, query: $q) { pageInfo { hasNextPage endCursor } nodes { ... on Issue { number repository { nameWithOwner } } } }
@@ -284,17 +283,11 @@ function searchOnce(): LabelSearch {
 }
 
 /**
- * Runs the issue searches at once. The slice label searches look in every repository holding a build's open sub-issue,
- * not only its slices: the sub-issues that are builds take no slice label, so they find the same slices. An issue's
- * own labels decide whether it's a build.
+ * Finds which of the builds' sub-issues are builds, from the read's own labels and a search of the rest. The board reads
+ * no slice progress from tickets: a work record holds its slices' progress.
  */
-async function searchLabels(raws: RawItem[], search: LabelSearch): Promise<Searched> {
-  const [builds, active, blocked] = await Promise.all([
-    search(buildSubIssueSearches(raws)),
-    search(sliceLabelSearches('active', raws)),
-    search(sliceLabelSearches('blocked', raws)),
-  ]);
-  return { builds: new Set([...readBuilds(raws), ...builds]), active, blocked };
+async function searchBuilds(raws: RawItem[], search: LabelSearch): Promise<Searched> {
+  return { builds: new Set([...readBuilds(raws), ...await search(buildSubIssueSearches(raws))]) };
 }
 
 /**
@@ -345,7 +338,7 @@ export async function fetchIssues(ids: readonly string[]): Promise<Item[]> {
 async function boardItems(raws: RawItem[], search = searchOnce()): Promise<Item[]> {
   // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
   // decide which sub-issues are slices, so the dossiers, items with sub-issues on the board, are known once they land.
-  const searching = searchLabels(raws, search);
+  const searching = searchBuilds(raws, search);
   const [searched] = await Promise.all([searching, readDossierBodies(raws, searching), readBuildPrBodies(raws)]);
   return normalizeItems(raws, searched);
 }
@@ -445,7 +438,7 @@ export async function fetchRepoIssues(repo: string, now = Date.now(), { searchRa
   const [open, closed] = await Promise.all([
     // The open issues name most of the searches the read needs, so those start while the closed ones are read.
     readRepoPages<Content>(repo, 'open issues', OPEN_ISSUES_QUERY).then((issues) => {
-      void searchLabels(asRaws(issues), search).catch(() => {});
+      void searchBuilds(asRaws(issues), search).catch(() => {});
       return issues;
     }),
     readClosed(repo, since, now, (issues) => readInFull(issues.filter((issue) => keeps(issue, since) && !asked.has(issue.id)).map((issue) => issue.id)), searchRanges),

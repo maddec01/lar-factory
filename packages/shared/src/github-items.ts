@@ -299,11 +299,3 @@ export function buildSubIssueSearches(raws: RawItem[]): string[] {
     .map((s) => s.repository.nameWithOwner)));
   return [...repos].map((repo) => `is:issue label:build repo:${repo}`);
 }
-
-/** The issue searches for open issues with a slice label, one per repo holding a build's open slice; none when none is open. */
-export function sliceLabelSearches(label: 'active' | 'blocked', raws: RawItem[], builds: ReadonlySet<string> = new Set()): string[] {
-  const repos = new Set(raws.flatMap((raw) =>
-    rawSlices(raw, builds).filter((s) => s.state === 'OPEN').map((s) => s.repository.nameWithOwner)));
-  return [...repos].map((repo) => `is:issue is:open label:${label} repo:${repo}`);
-}
-

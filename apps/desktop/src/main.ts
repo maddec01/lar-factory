@@ -1,7 +1,7 @@
 // The board app's main process: starts the board server as a child with the login
 // shell's PATH, shows its page in a window, starts the server again if it crashes,
 // checks the bundled skills at launch and before each Start build, removes the old
-// launch agent, answers the page's skill install calls, checks Releases for updates, drains and stops the server
+// launch agent, installs the lar-work launcher, answers the page's skill install calls, checks Releases for updates, drains and stops the server
 // before it installs one and stops the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
@@ -24,6 +24,7 @@ import * as BoardServer from "./board-server/BoardServer.ts";
 import * as BoardSupervisor from "./board-server/BoardSupervisor.ts";
 import * as InstallBoard from "./skills/install-board.ts";
 import * as LaunchAgentCleanup from "./launch-agent/launch-agent-cleanup.ts";
+import * as LarWorkLauncher from "./lar-work/lar-work-launcher.ts";
 import * as SkillInstall from "./skills/skill-install.ts";
 import * as T3Instances from "./skills/t3-instances.ts";
 import * as ExternalLink from "./window/external-link.ts";
@@ -352,6 +353,13 @@ const program = Effect.gen(function* () {
       launchctl: "/bin/launchctl",
     }),
   );
+  // Threads run lar-work through a launcher on the PATH that follows this copy of the app.
+  yield* LarWorkLauncher.onLaunch({
+    isPackaged: Electron.app.isPackaged,
+    home: SkillInstall.installHome(NodeOS.homedir(), process.env),
+    executablePath: process.execPath,
+    commandFile: LarWorkLauncher.locateCommand(Electron.app.getAppPath(), Electron.app.isPackaged),
+  });
   yield* quitRequested;
 }).pipe(
   Effect.scoped,

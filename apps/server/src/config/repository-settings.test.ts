@@ -219,9 +219,10 @@ test('a gh failure other than a 404 still fails the whole read', async (t) => {
 
 test('stale factory guidance warns without removing a usable repository; current and personal guidance stay quiet', async (t) => {
   for (const [path, content, stale] of [
-    ['AGENTS.md', '## Agent skills\nUse `lar-work`.', true],
+    ['AGENTS.md', '## Agent skills\nUse `to-tickets`.', true],
     ['docs/agents/domain.md', 'Use the `domain-modeling` skill.', true],
     ['AGENTS.md', '## Personal tools\nUse `tdd`.\n## Agent skills\nUse `lar-shape` and `lar-build`.', false],
+    ['docs/agents/issue-tracker.md', 'Read and change a work record with `lar-work`.', false],
     ['docs/agents/domain.md', 'Read lar-build skills/domain-modeling/SKILL.md.', false],
   ] as const) {
     const run = async (args: string[]) => {

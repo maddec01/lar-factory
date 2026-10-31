@@ -1,10 +1,12 @@
 import { execFile } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
+import { openDatabase } from './database.ts';
+import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkKind, type WorkRecords } from './work-records.ts';
 
 const dirs: string[] = [];
@@ -27,7 +29,7 @@ afterEach(() => {
 describe('work records', () => {
   it('creates a ticketless record with a stable identity and reads it back', async () => {
     const records = await open();
-    const made = records.create({ repository: 'maddec01/lar', kind: 'feature' });
+    const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature' });
     expect(made).toMatchObject({ repository: 'maddec01/lar', kind: 'feature', status: 'List', ticket: null, setAside: false, revision: 1 });
     expect(made.workId).toMatch(/^[0-9a-f-]{36}$/);
     expect(made.createdAt).toBe(made.updatedAt);
@@ -37,7 +39,7 @@ describe('work records', () => {
   it('keeps records and their tickets across close and reopen', async () => {
     const path = join(tempDir(), 'work-records.db');
     const first = await openWorkRecords(path);
-    const made = first.create({ repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#12' });
+    const made = first.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#12' });
     first.close();
     const reopened = await open(path);
     expect(reopened.read(made.workId)).toEqual(made);
@@ -45,34 +47,65 @@ describe('work records', () => {
 
   it('attaches a ticket without changing the work ID', async () => {
     const records = await open();
-    const made = records.create({ repository: 'maddec01/lar', kind: 'concept' });
+    const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'concept' });
     const linked = records.attachTicket(made.workId, made.revision, 'maddec01/lar#7');
     expect(linked).toMatchObject({ workId: made.workId, ticket: 'maddec01/lar#7', revision: 2 });
     expect(records.attachTicket(made.workId, 2, 'maddec01/lar#7')).toEqual(linked);
     expect(() => records.attachTicket(made.workId, 1, 'maddec01/lar#7')).toThrow(expect.objectContaining({ code: 'stale-revision' }));
   });
 
+  it('keeps the title and initial context it was captured with, which a repeated import never overwrites', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const captured = first.create({ title: 'Add dark mode', context: 'The board is too bright.\n', repository: 'maddec01/lar', kind: 'feature' });
+    const imported = first.importTicket({ title: 'Fix login', context: '## Steps\n\nSign in.\n', repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#41' });
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.read(captured.workId)).toMatchObject({ title: 'Add dark mode' });
+    expect(reopened.initialContext(captured.workId)).toBe('The board is too bright.\n');
+    const edited = reopened.importTicket({ title: 'Fix login (edited)', context: 'Edited.', repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#41' });
+    expect(edited).toEqual({ record: imported.record, created: false });
+    expect(reopened.initialContext(imported.record.workId)).toBe('## Steps\n\nSign in.\n');
+    expect(reopened.initialContext(reopened.create({ title: 'No context', repository: 'maddec01/lar', kind: 'bug' }).workId)).toBe('');
+    expect(() => reopened.create({ title: ' ', repository: 'maddec01/lar', kind: 'bug' })).toThrow(/title/);
+    expect(() => reopened.create({ title: 'Two\nlines', repository: 'maddec01/lar', kind: 'bug' })).toThrow(/title/);
+  });
+
+  it('brings an earlier database up to date, keeping its records with an empty title', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, 4) });
+    old.db.prepare(`INSERT INTO work_records (work_id, repository, kind, status, revision, created_at, updated_at)
+      VALUES ('w-1', 'maddec01/lar', 'build', 'List', 1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`).run();
+    old.close();
+
+    const records = await open(path);
+    expect(records.read('w-1')).toMatchObject({ title: '', revision: 1 });
+    expect(records.initialContext('w-1')).toBe('');
+    expect(readdirSync(dirname(path)).filter((file) => file.includes('.before-'))).toEqual([]);
+  });
+
   it('resolves a repeated ticket import to the same record', async () => {
     const path = join(tempDir(), 'work-records.db');
     const first = await openWorkRecords(path);
-    const imported = first.importTicket({ repository: 'maddec01/lar', kind: 'build', ticket: 'maddec01/lar#40' });
+    const imported = first.importTicket({ title: 'Work', repository: 'maddec01/lar', kind: 'build', ticket: 'maddec01/lar#40' });
     first.close();
-    const again = (await open(path)).importTicket({ repository: 'maddec01/lar', kind: 'build', ticket: 'maddec01/lar#40' });
+    const again = (await open(path)).importTicket({ title: 'Work', repository: 'maddec01/lar', kind: 'build', ticket: 'maddec01/lar#40' });
     expect(imported.created).toBe(true);
     expect(again).toEqual({ record: imported.record, created: false });
   });
 
   it('refuses a ticket another record already holds', async () => {
     const records = await open();
-    records.create({ repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#3' });
-    const other = records.create({ repository: 'maddec01/lar', kind: 'bug' });
+    records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#3' });
+    const other = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug' });
     expect(() => records.attachTicket(other.workId, 1, 'maddec01/lar#3')).toThrow(expect.objectContaining({ code: 'ticket-taken' }));
     expect(records.read(other.workId)).toEqual(other);
   });
 
   it('refuses to re-key a record that already has a different ticket', async () => {
     const records = await open();
-    const made = records.create({ repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#3' });
+    const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug', ticket: 'maddec01/lar#3' });
     expect(() => records.attachTicket(made.workId, 1, 'maddec01/lar#4')).toThrow(expect.objectContaining({ code: 'invalid' }));
   });
 
@@ -80,7 +113,7 @@ describe('work records', () => {
     const path = join(tempDir(), 'work-records.db');
     const board = await open(path);
     const thread = await open(path);
-    const made = board.create({ repository: 'maddec01/lar', kind: 'feature' });
+    const made = board.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature' });
 
     const shaped = board.update(made.workId, made.revision, { status: 'Shaping' });
     expect(shaped).toMatchObject({ status: 'Shaping', revision: 2 });
@@ -92,7 +125,7 @@ describe('work records', () => {
 
   it('keeps every commit from two processes writing at once, refusing only stale or locked writes', { timeout: 30_000 }, async () => {
     const path = join(tempDir(), 'work-records.db');
-    const made = (await open(path)).create({ repository: 'maddec01/lar', kind: 'build' });
+    const made = (await open(path)).create({ title: 'Work', repository: 'maddec01/lar', kind: 'build' });
     // Each writer appends a line named after itself to the brief it just read, naming the revision it read. Neither
     // starts writing until both have marked themselves ready.
     const writer = `import { existsSync, writeFileSync } from 'node:fs';
@@ -128,7 +161,7 @@ describe('work records', () => {
 
   it('keeps Queued records in the order they joined the Queue', async () => {
     const records = await open();
-    const [a, b, c] = ['bug', 'feature', 'improvement'].map((kind) => records.create({ repository: 'maddec01/lar', kind: kind as 'bug' }));
+    const [a, b, c] = ['bug', 'feature', 'improvement'].map((kind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind: kind as 'bug' }));
     records.update(c!.workId, 1, { status: 'Queued' });
     records.update(a!.workId, 1, { status: 'Queued' });
     records.update(b!.workId, 1, { status: 'Queued' });
@@ -140,9 +173,9 @@ describe('work records', () => {
 
   it('lists by repository, Status and kind', async () => {
     const records = await open();
-    const lar = records.create({ repository: 'maddec01/lar', kind: 'bug' });
-    records.create({ repository: 'maddec01/other', kind: 'bug' });
-    const concept = records.create({ repository: 'maddec01/lar', kind: 'concept' });
+    const lar = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug' });
+    records.create({ title: 'Work', repository: 'maddec01/other', kind: 'bug' });
+    const concept = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'concept' });
     expect(records.list({ repository: 'maddec01/lar' }).map((r) => r.workId)).toEqual([lar.workId, concept.workId]);
     expect(records.list({ repository: 'maddec01/lar', kind: 'concept' }).map((r) => r.workId)).toEqual([concept.workId]);
     expect(records.list({ status: 'Done' })).toEqual([]);
@@ -150,7 +183,7 @@ describe('work records', () => {
 
   it('sets a record aside and restores it without touching its Status', async () => {
     const records = await open();
-    const made = records.create({ repository: 'maddec01/lar', kind: 'feature', status: 'Ready' });
+    const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature', status: 'Ready' });
     const aside = records.setAside(made.workId, 1);
     expect(aside).toMatchObject({ status: 'Ready', setAside: true, revision: 2 });
     expect(records.restore(aside.workId, 2)).toMatchObject({ status: 'Ready', setAside: false, revision: 3 });
@@ -159,10 +192,10 @@ describe('work records', () => {
 
   it('refuses malformed input and missing records without changing anything', async () => {
     const records = await open();
-    expect(() => records.create({ repository: '', kind: 'bug' })).toThrow(expect.objectContaining({ code: 'invalid' }));
-    expect(() => records.create({ repository: 'maddec01/lar', kind: 'chore' as 'bug' })).toThrow(/kind "chore"/);
-    expect(() => records.create({ repository: 'maddec01/lar', kind: 'bug', status: 'Doing' as 'List' })).toThrow(/Status "Doing"/);
-    expect(() => records.create({ repository: 'maddec01/lar', kind: 'bug', ticket: 'lar-12' })).toThrow(/ticket "lar-12"/);
+    expect(() => records.create({ title: 'Work', repository: '', kind: 'bug' })).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(() => records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'chore' as 'bug' })).toThrow(/kind "chore"/);
+    expect(() => records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug', status: 'Doing' as 'List' })).toThrow(/Status "Doing"/);
+    expect(() => records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'bug', ticket: 'lar-12' })).toThrow(/ticket "lar-12"/);
     expect(() => records.read('nope')).toThrow(expect.objectContaining({ code: 'not-found' }));
     expect(() => records.update('nope', 1, { status: 'Ready' })).toThrow(expect.objectContaining({ code: 'not-found' }));
     expect(records.list({})).toEqual([]);
@@ -170,7 +203,7 @@ describe('work records', () => {
 });
 
 describe('work-record structure', () => {
-  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ repository: 'maddec01/lar', kind });
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind });
 
   it('puts decisions and builds under a concept and slices under a build', async () => {
     const records = await open();
@@ -283,7 +316,7 @@ describe('work-record structure', () => {
 
 
 describe('work-record content', () => {
-  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ repository: 'maddec01/lar', kind });
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind });
 
   it('keeps a build brief, a decision text and a concept map across close and reopen', async () => {
     const path = join(tempDir(), 'work-records.db');
@@ -419,7 +452,7 @@ describe('work-record content', () => {
 });
 
 describe('work-record threads and launch intents', () => {
-  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ repository: 'maddec01/lar', kind });
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind });
 
   it('records thread IDs and a PR that stay on the same work ID when a ticket is attached', async () => {
     const path = join(tempDir(), 'work-records.db');
@@ -464,7 +497,7 @@ describe('work-record threads and launch intents', () => {
   it('resolves an intent to a failure without recording a thread', async () => {
     const records = await open();
     const build = lar(records, 'build');
-    const other = records.create({ repository: 'maddec01/other', kind: 'bug' });
+    const other = records.create({ title: 'Work', repository: 'maddec01/other', kind: 'bug' });
     const { intent } = records.recordLaunchIntent(build.workId, 1, 'build');
     records.recordLaunchIntent(other.workId, 1, 'shape');
     expect(records.launchIntents({ repository: 'maddec01/lar', unresolved: true })).toEqual([intent]);
@@ -478,7 +511,7 @@ describe('work-record threads and launch intents', () => {
 });
 
 describe('work-record retention', () => {
-  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ repository: 'maddec01/lar', kind });
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind });
   /** `n` days after now. */
   const later = (n: number) => new Date(Date.now() + n * 86_400_000);
   const KEEP = { hideAfterDays: 7, deleteAfterDays: null };
@@ -525,7 +558,7 @@ describe('work-record retention', () => {
 
   it('never deletes active or unfinished work, even in Done without a recorded finish', async () => {
     const records = await open();
-    const made = (['List', 'Queued', 'In progress', 'Done'] as const).map((status) => records.create({ repository: 'maddec01/lar', kind: 'feature', status }));
+    const made = (['List', 'Queued', 'In progress', 'Done'] as const).map((status) => records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature', status }));
     expect(records.deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }, later(10_000))).toEqual({ deleted: [], kept: [] });
     expect(ids(records.list({})).toSorted()).toEqual(ids(made).toSorted());
   });

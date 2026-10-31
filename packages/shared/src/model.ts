@@ -409,6 +409,8 @@ export interface FirstRead {
 export const SETTLED_FIRST_READ: FirstRead = { step: 'finishing', running: [], settled: true };
 
 export interface BoardData {
+  /** Sanitized authenticated source state. Credentials stay in the server. */
+  t3Availability?: { availability: 'available' | 'unavailable' | 'renewal-required' | 'unsupported-version' | 'malformed'; observedAt?: string };
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
   repos: RepoConfig[];

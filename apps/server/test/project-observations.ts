@@ -10,3 +10,7 @@ export async function repositoryProjects(env: NodeJS.ProcessEnv = process.env): 
     } };
   } catch { return { availability: 'unavailable' }; }
 }
+
+export async function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
+  return repositoryProjects();
+}

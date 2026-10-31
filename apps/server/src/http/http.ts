@@ -25,6 +25,7 @@ export interface HttpDeps {
   /** Sample mode serves a fixed file: it writes nothing and runs no tools. */
   sample: boolean;
   /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
+  reauthorizeT3?(): Promise<void>;
   recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
   /** Reads one item's details and older comments for the item dialog. */
   itemDetails: ItemDetailsReader;
@@ -150,7 +151,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
   runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
   resetRepository, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
@@ -378,6 +379,18 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       },
     },
     // Looks the tools up again for the notices' Recheck button and onboarding's Checks step.
+    '/api/t3/reauthorize': {
+      what: 'the T3 reauthorization request',
+      async run() {
+        if (sample || !reauthorizeT3) return { status: 403, body: { error: 'T3 reauthorization is unavailable here.' } };
+        try {
+          await reauthorizeT3();
+          return { status: 200, body: withBoard({ error: null }) };
+        } catch {
+          return { status: 503, body: withBoard({ error: 'Could not reauthorize T3. Open T3 Code and try again.' }) };
+        }
+      },
+    },
     '/api/recheck': {
       what: 'the recheck request',
       async run(input) {

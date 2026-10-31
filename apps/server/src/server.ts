@@ -1,3 +1,4 @@
+import { repositoryProjects, reauthorizeRepositoryProjects } from './t3/repository-project-discovery.ts';
 // The board server: reads each item source through `gh` or `az` at its own pace, every 15 s while it holds active work
 // and every 5 min while idle, refreshes T3's threads and stats every 2 s without either, keeps the last good copy in
 // memory, serves it on 127.0.0.1 and pushes each change to open pages over /api/events.
@@ -321,6 +322,10 @@ async function checkQuota(): Promise<void> {
 /** Shows T3's threads, and every LOCAL_STATS_MS its stats, as they are now on the items as last read, pushing only when they changed. */
 function refreshLocal(): void {
   if (refreshing) return;
+  void t3Availability().then(source => {
+    board.update({ t3Availability: source });
+    board.push();
+  });
   const before = board.snapshot().items;
   let after = withT3Reads(before, Date.now() - statsReadAt >= LOCAL_STATS_MS);
   const running = (item: Item) => Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running');
@@ -516,7 +521,7 @@ async function refresh(): Promise<void> {
     board.applyRead(snapshot.items, readRevision, withT3Reads, items.readAfresh);
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting });
     board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? null, itemSourceProblems: snapshot.problems ?? [],
-      t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
+      t3Availability: await t3Availability(), t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;
   } catch (err) {
@@ -595,6 +600,11 @@ const commands = createItemCommands({ board, items, repos: items.repos, offerMod
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  reauthorizeT3: async () => {
+    const read = await reauthorizeRepositoryProjects();
+    board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
+    if (read.availability !== 'available') throw new Error('T3 unavailable');
+  },
   recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null), readSoon, ready: () => firstGhCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
@@ -663,4 +673,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref();
   });
+}
+
+
+async function t3Availability() {
+  const read = await repositoryProjects();
+  return { availability: read.availability, observedAt: read.observation?.observedAt };
 }

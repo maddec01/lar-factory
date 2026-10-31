@@ -34,6 +34,7 @@ function reconcile(): void {
   const { data, clientError } = useBoardStore.getState();
   const active = new Set<string>();
   if (clientError) active.add(CLIENT_ERROR);
+  if (data.t3Availability && data.t3Availability.availability !== 'available') active.add(`t3-source:${data.t3Availability.availability}`);
   if (failedCheck(data.tools, 't3')?.result === 'not-running') active.add('t3');
   for (const name of ['gh', 'git', 'jq', 'curl', 'az'] as const) {
     if (failedCheck(data.tools, name)) active.add(name);

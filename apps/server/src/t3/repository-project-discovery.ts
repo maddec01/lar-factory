@@ -7,7 +7,7 @@ import type { ProjectRead } from './project-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 
 let pending: Promise<ProjectRead> | undefined;
-let current: { key: string; read: ProjectRead; stop: () => void } | undefined;
+let current: { key: string; read: ProjectRead; stop: () => void; protocol: ReturnType<typeof boardProjects> } | undefined;
 
 /** Sanitized discovery state for server callers, including the last successful observation. */
 export function repositoryProjects(env: NodeJS.ProcessEnv = process.env): Promise<ProjectRead> {
@@ -29,7 +29,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
   try {
     const protocol = boardProjects(runtime.origin, runtime.serverVersion);
     const read = await protocol.readProjects();
-    const state = { key, read: { ...read, observation: read.observation ?? current?.read.observation }, stop: () => {} };
+    const state = { key, protocol, read: { ...read, observation: read.observation ?? current?.read.observation }, stop: () => {} };
     current = state;
     state.stop = subscribeProjects(new URL(runtime.origin), runtime.serverVersion, protocol, read => {
       state.read = { ...read, observation: read.observation ?? state.read.observation };
@@ -38,4 +38,20 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
   } catch {
     return { availability: 'unavailable', ...(current?.read.observation ? { observation: current.read.observation } : {}) };
   }
+}
+
+
+let authorizing: Promise<ProjectRead> | undefined;
+/** Coalesce requests and restart discovery after renewing the server-held session. */
+export function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
+  authorizing ??= (async () => {
+    await repositoryProjects();
+    const state = current;
+    if (!state || state.read.availability === 'unsupported-version') throw new Error('T3 unavailable');
+    await state.protocol.reauthorize();
+    state.stop();
+    state.key = '';
+    return repositoryProjects();
+  })().finally(() => { authorizing = undefined; });
+  return authorizing;
 }

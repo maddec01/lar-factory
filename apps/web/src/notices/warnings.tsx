@@ -1,3 +1,4 @@
+import { T3AvailabilityWarning } from './t3-availability-warning.tsx';
 // Active warnings on every screen, and the board app's Drift, Clashes and failed installs. Item-source problems covered by az's fix stay hidden.
 
 import { failedCheck } from '@lar-factory/shared';
@@ -38,6 +39,7 @@ export function Warnings() {
         return check && <CommandWarning key={name} name={name} check={check} />;
       })}
       {az && <AzWarning check={az} />}
+      <T3AvailabilityWarning key={data.t3Availability?.availability} />
       <DriftWarning />
       <InstallOverview />
       {!overview && <ClashWarning />}

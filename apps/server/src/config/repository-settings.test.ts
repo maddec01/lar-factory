@@ -181,19 +181,17 @@ test('a wrong .lar-factory.json keeps the last usable setup on the board and say
   }
 });
 
-test('a repository still onboarding or resetting reads no config and has no problem', async (t) => {
+test('a repository still onboarding reads no config and has no problem', async (t) => {
   const read: string[] = [];
   const gh = async (args: string[]) => {
     read.push(args[1]!);
     if (args[1]?.endsWith('/.lar-factory.json')) return JSON.stringify({ role: 'The factory' });
     throw new Error('Not Found (HTTP 404)');
   };
-  const dir = await dataDir(t, ['maddec01/lar-factory', { repo: 'maddec01/lar-apple', onboarding: { step: 'setup', done: ['project'], answers: { projectId: 'lar-apple' } } },
-    { repo: 'maddec01/lar-web', resetting: { prUrl: 'https://github.com/maddec01/lar-web/pull/9' } }]);
-  const { configs, problems, resetting } = await readOnboardedConfigs(readRepositoryList(dir), gh, dir);
+  const dir = await dataDir(t, ['maddec01/lar-factory', { repo: 'maddec01/lar-apple', onboarding: { step: 'setup', done: ['project'], answers: { projectId: 'lar-apple' } } }]);
+  const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), gh, dir);
   assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
   assert.deepEqual(problems, []);
-  assert.deepEqual(resetting, ['maddec01/lar-web']);
   assert.equal(read[0], 'repos/maddec01/lar-factory/contents/.lar-factory.json');
 });
 

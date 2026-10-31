@@ -462,8 +462,6 @@ export interface BoardData {
   itemSourceProblems?: ItemSourceProblem[];
   /** The repositories on this Mac's list that are still onboarding, in the list's order. Absent in sample mode. */
   onboarding?: OnboardingRepository[];
-  /** Repositories waiting for their reset PR to merge or close, kept in this Mac's list. */
-  resetting?: { repo: string; prUrl: string }[];
   /** A T3 project the board offers to onboard, as its repository has .lar-factory.json and isn't on the list. Absent in sample mode. */
   onboardingOffers?: OnboardingOffer[];
   refreshSeconds: number;
@@ -937,10 +935,6 @@ export interface OnboardingAnswers {
   provider?: Provider;
   /** The Provider and item source step's answers, once it has shown. */
   setup?: SetupAnswers;
-  /** The Cleanup step's picks, once it has shown. */
-  cleanup?: CleanupPicks;
-  /** The custom labels the Labels step picked, once it has shown. */
-  customLabels?: string[];
   /** The wizard's answers the user changed from their detected defaults. */
   choices?: OnboardingChoices;
 }
@@ -979,12 +973,6 @@ export function skillRenameProblem(name: string, bundled: readonly string[], pro
   return null;
 }
 
-/** The Cleanup step's picks: the ticks the user changed, by Clash id, and each skill Clash's pick, by its path. */
-export interface CleanupPicks {
-  ticks: Record<string, boolean>;
-  skills: Record<string, SkillPick>;
-}
-
 /** Where an onboarding stopped when its dialog closed, so Resume reopens it there. */
 export interface OnboardingProgress {
   /** The step it was on, by id. */
@@ -992,20 +980,12 @@ export interface OnboardingProgress {
   /** The steps it has passed, by id. */
   done: string[];
   answers: OnboardingAnswers;
-  /** The onboarding PR, once it is open. */
-  prUrl?: string;
-  /** Set by the board once it finds the PR closed without merging; a save with the same PR keeps it. */
-  prClosed?: true;
-  /** Set by the board when the PR keeps the repository's .lar-factory.json, so only its merge finishes the onboarding; a save with the same PR keeps it. */
-  reusesConfig?: true;
 }
 
 /** A repository on this Mac's list that is still onboarding, with where it stopped. */
 export interface OnboardingRepository {
   repo: string;
   progress: OnboardingProgress;
-  /** Why the board's last refresh couldn't read its PR or .lar-factory.json, with gh's message; absent when it could. */
-  followProblem?: string;
 }
 
 /** A T3 project the board offers to onboard with the Repository config its repository has. */
@@ -1034,7 +1014,7 @@ export interface ProjectChoice {
   config?: RepositoryConfigAnswers;
   /** Why the `.lar-factory.json` it has can't be reused, in place of `config`. */
   configProblem?: string;
-  /** Whether the repository is already on the board or is onboarding/resetting. Unusable settings can start fresh. */
+  /** Whether the repository is already on the board or is onboarding. Unusable settings can start fresh. */
   onBoard: boolean;
 }
 

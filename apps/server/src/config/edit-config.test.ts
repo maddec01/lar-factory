@@ -125,12 +125,11 @@ test("the config update PR refuses a body without a repository and shows a missi
   assert.deepEqual(await openConfigUpdatePr({ repo: REPO }, gh({ fails: { 'pr create': 'HTTP 403' } }).run, 2), { status: 502, error: `Can't open ${REPO}'s Edit PR: HTTP 403` });
 });
 
-test('the config update PR refuses a repository off the list, still onboarding or resetting, and call no gh', async () => {
+test('the config update PR refuses a repository off the list, or still onboarding, and calls no gh', async () => {
   const progress = { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-web' } };
   const lists: [object[], string][] = [
     [[{ repo: 'maddec01/lar-cli' }], `${REPO} is not on this Mac's list.`],
     [[{ repo: REPO, onboarding: progress }], `${REPO} is still onboarding.`],
-    [[{ repo: REPO, resetting: { prUrl: PR } }], `${REPO} is resetting.`],
   ];
   for (const [entries, error] of lists) {
     const dir = listDir(entries);

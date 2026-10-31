@@ -130,7 +130,7 @@ export async function settleDecisions(board: Board, workId: string, decisions: s
 export const NOT_LANDED = { repoConfigs: { 'maddec01/lar-factory': null } };
 
 export function writeOnboarding(home: string, repo: string): void {
-  const progress = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'project-factory' }, prUrl: `https://github.com/${repo}/pull/1` };
+  const progress = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'project-factory' } };
   writeRepositoryList(home, TEST_REPOSITORIES);
   const file = join(home, 'Library/Application Support/Lar Factory/repository-settings.json');
   writeFileSync(file, JSON.stringify({ repositories: TEST_REPOSITORIES.map((r) => (r === repo ? { repo: r, onboarding: progress } : { repo: r })) }));

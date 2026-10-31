@@ -25,7 +25,7 @@ test('a repository still onboarding shows its card with its step instead of the 
 });
 
 test("a card for an older board's onboarding says it stopped at the first step", async () => {
-  const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' }, prUrl: 'https://github.com/maddec01/lar-web/pull/14' };
+  const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' } };
   const data: BoardData = { ...empty, onboarding: [{ repo: 'maddec01/lar-web', progress: pr }] };
   serve(data, []);
   await mountPage(data);

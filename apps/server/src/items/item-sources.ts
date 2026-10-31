@@ -337,7 +337,7 @@ export interface OnboardedSources extends MergedSource {
  * The item source the onboarded repositories name as `load` reads their configs: a read loads them first when it has
  * no pace, before the first read, when reload asked for it or once the pace's idle time has passed since they loaded, and builds the merged source
  * again when they changed, so a config merged to a default branch shows within an idle read. A read leaves out the
- * items of each repository whose config `load` couldn't read or that is resetting, which a shared Azure source may still list, and
+ * items of each repository whose config `load` couldn't read, which a shared Azure source may still list, and
  * so does each read so far it reports as landed. A write goes through the source the last read built.
  */
 export function onboardedSources(load: () => Promise<Omit<OnboardedConfigs, 'setups'>>, build = configuredSources): OnboardedSources {
@@ -360,7 +360,7 @@ export function onboardedSources(load: () => Promise<Omit<OnboardedConfigs, 'set
           current = build(configs);
           key = JSON.stringify(configs);
         }
-        leftOff = new Set([...loaded.problems.map((p) => p.repo), ...loaded.resetting].map((repo) => repo.toLowerCase()));
+        leftOff = new Set(loaded.problems.map((p) => p.repo.toLowerCase()));
       }
       const shown = (read: ItemsRead) => ({ ...read, items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')) });
       const landed = progress?.landed;

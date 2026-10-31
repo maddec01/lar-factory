@@ -118,7 +118,7 @@ function onboardingDescription(progress: OnboardingProgress): string {
  * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting,
  * Edit, which opens Edit's dialog once the board has its setup, the notice of a changed setup that pauses work and the
  * config update notice while it has them; one still onboarding with what it has answered, the step it stopped at and
- * Resume; and one resetting with its PR until it merges or closes. Add repository opens the onboarding dialog. The
+ * Resume. Add repository opens the onboarding dialog. The
  * board reads GitHub repositories and Azure DevOps sprints.
  */
 function repositoryGroup(data: BoardData): Group {
@@ -132,12 +132,8 @@ function repositoryGroup(data: BoardData): Group {
     id: `repo-${repo}`, title: shownRepo(repo), description: onboardingDescription(progress),
     control: custom(() => <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>),
   }));
-  const resetting: Row[] = (data.resetting ?? []).map(({ repo, prUrl }) => ({
-    id: `repo-${repo}`, title: shownRepo(repo), description: 'Resetting. Merge the PR to finish.',
-    control: custom(() => <a className="inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline" href={prUrl} target="_blank" rel="noopener"><ExternalLink className="size-3.5" />Open PR</a>),
-  }));
   return { title: 'Repositories', description: "Each repository works from this Mac's settings, over the shared defaults in its .lar-factory.json when it has one.",
-    rows: [...onboarded, ...onboarding, ...resetting],
+    rows: [...onboarded, ...onboarding],
     footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add repository</Button> };
 }
 

@@ -28,8 +28,8 @@ async function currentConfig(repo: string, run?: Run, branch?: string): Promise<
 }
 
 /**
- * Why Settings and the config update notice can't change `repo`: it is off this Mac's list, still onboarding or
- * resetting, or the list can't be read; null for an onboarded repository.
+ * Why Settings and the config update notice can't change `repo`: it is off this Mac's list or still onboarding, or the
+ * list can't be read; null for an onboarded repository.
  */
 export function notEditable(repo: string, dir = boardDataDir()): Refused | null {
   let entry;
@@ -37,7 +37,6 @@ export function notEditable(repo: string, dir = boardDataDir()): Refused | null 
   catch (err) { return { status: 409, error: message(err) }; }
   if (!entry) return { status: 409, error: `${repo} is not on this Mac's list.` };
   if (entry.onboarding) return { status: 409, error: `${repo} is still onboarding.` };
-  if (entry.resetting) return { status: 409, error: `${repo} is resetting.` };
   return null;
 }
 

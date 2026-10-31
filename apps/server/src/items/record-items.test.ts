@@ -96,3 +96,21 @@ test("in a repository whose source hasn't read yet, only a record with a ticket 
   assert.deepEqual(recordItems(records, [], [REPO], [REPO]).map((i) => i.title), ['Local']);
   assert.deepEqual(recordItems(records, tickets([40, 'List']), [REPO], [REPO]).map((i) => i.title), ['Unread', 'Local']);
 });
+
+test('work that needs you shows the reason, with what its PR and ticket observations offer', async () => {
+  const records = await open();
+  const build = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'Review' });
+  let record = records.setPullRequest(build.workId, build.revision, `${REPO}#40`);
+  record = records.observe(build.workId, record.revision, { of: 'pr', state: 'closed' });
+  records.setNeedsYou(build.workId, record.revision, 'Its PR closed without merging.');
+  const closed = records.importTicket({ title: 'Closed', repository: REPO, kind: 'bug', status: 'Queued', ticket: `${REPO}#12` }).record;
+  records.setNeedsYou(closed.workId, records.observe(closed.workId, closed.revision, { of: 'ticket', state: 'closed' }).revision, 'Its ticket closed.');
+  const reopened = records.importTicket({ title: 'Reopened', repository: REPO, kind: 'bug', status: 'Done', ticket: `${REPO}#13` }).record;
+  records.setNeedsYou(reopened.workId, records.observe(reopened.workId, reopened.revision, { of: 'ticket', state: 'open' }).revision, 'Its ticket reopened.');
+  const calm = records.create({ title: 'Calm', repository: REPO, kind: 'bug' });
+  const shown = new Map(recordItems(records, [], [REPO]).map((item) => [item.id, item.needsYou]));
+  assert.deepEqual(shown.get(build.workId), { reason: 'Its PR closed without merging.', offers: ['reopen-pr', 'replace-pr', 'set-aside'] });
+  assert.deepEqual(shown.get(closed.workId), { reason: 'Its ticket closed.', offers: ['set-aside'] });
+  assert.deepEqual(shown.get(reopened.workId), { reason: 'Its ticket reopened.', offers: ['reopen-work'] });
+  assert.equal(shown.get(calm.workId), undefined);
+});

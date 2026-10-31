@@ -1,11 +1,12 @@
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createServer, type Socket } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
+import { promisify } from 'node:util';
 import type { TestContext } from 'vite-plus/test';
 import { DONE_WINDOW_MS, isSkillCheckRequest, normalizeItems, readBuilds, refKey } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, Item, RawItem, Searched, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
@@ -85,6 +86,16 @@ async function recordIssues(home: string, raws: readonly RawItem[], optedIn: rea
     }
   } finally { records.close(); }
   return ids;
+}
+
+/** The lar-work command threads run. */
+export const LAR_WORK = join(dirname(fileURLToPath(import.meta.resolve('@lar-factory/work-records'))), 'cli.ts');
+
+/** Runs lar-work on the database in `dataDir` as a thread does, and returns the record it printed. */
+export async function larWork(dataDir: string, ...args: string[]): Promise<{ workId: string; revision: number }> {
+  const { stdout } = await promisify(execFile)(process.execPath, ['--disable-warning=ExperimentalWarning', LAR_WORK, ...args, '--data-dir', dataDir]);
+  const printed = JSON.parse(stdout) as { workId: string; revision: number } | { record: { workId: string; revision: number } };
+  return 'record' in printed ? printed.record : printed;
 }
 
 /** A repository no test board onboards, so the decisions blocking its work stay off the board. */
@@ -315,6 +326,10 @@ export async function until(board: Board, check: (data: BoardData) => boolean): 
 
 /** Waits for the board to load its repositories' configs, which Add item checks a draft's repository against. */
 export const onboarded = (board: Board) => until(board, (data) => data.repos.length > 0);
+
+/** Whether a gh call writes to a repository: a write to its API, or a label, issue or PR command other than a read. */
+export const writesRepository = (args: readonly string[]) => args.some((a) => /^(POST|PATCH|PUT|DELETE)$/.test(a))
+  || ['label', 'issue', 'pr'].includes(args[0]!) && !['list', 'view'].includes(args[1]!);
 
 /** Whether a gh call reads a repository's .lar-factory.json. */
 export const readsRepositoryConfig = (args: readonly string[]) => args[0] === 'api' && !!args[1]?.endsWith('/.lar-factory.json');

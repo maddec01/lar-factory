@@ -69,7 +69,9 @@ const closedReads = async (board: Board) => {
 
 /** Waits for the board's reads to run at least `count` of the closed reads of that kind, and gives them all. */
 async function untilClosed(board: Board, kind: 'ranges' | 'pages', count: number) {
-  for (let attempt = 0; attempt < 200 && (await closedReads(board))[kind] < count; attempt++) await new Promise((r) => setTimeout(r, 25));
+  await board.untilCalled(args => args.some(arg => kind === 'ranges'
+    ? arg.startsWith('q=') && arg.includes('is:closed')
+    : arg.includes('states: [CLOSED]')), count);
   return closedReads(board);
 }
 

@@ -223,9 +223,10 @@ export async function readBranchFile(repo: string, path: string, branch?: string
   }
 }
 
-/** Whether gh's login can push to the repository, as the repository's `permissions.push` says. */
-export async function canPush(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<boolean> {
-  return (await run(['api', `repos/${repo}`, '--jq', '.permissions.push'])).trim() === 'true';
+/** What gh's login may do in the repository, as its `permissions` say, and whether it has issues turned on. */
+export async function repositoryAccess(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<{ push: boolean; triage: boolean; issues: boolean }> {
+  const { push, triage, issues } = JSON.parse(await run(['api', `repos/${repo}`, '--jq', '{push: .permissions.push, triage: .permissions.triage, issues: .has_issues}'])) as Record<string, unknown>;
+  return { push: push === true, triage: triage === true, issues: issues === true };
 }
 
 /** Reads up to `maxPages` pages, each after the cursor the one before ended at; throws `tooMany` when there are more. */
@@ -516,11 +517,6 @@ export async function createLabel(repo: string, label: { name: string; color?: s
   run: (args: string[]) => Promise<string> = gh): Promise<void> {
   await run(['label', 'create', '-R', repo, ...label.color ? ['--color', label.color] : [],
     ...label.description ? ['--description', label.description] : [], '--', label.name]);
-}
-
-/** Renames a repository's label; every issue that carries it keeps it under the new name. The old name comes after `--`, so it is no gh flag. */
-export async function renameLabel(repo: string, from: string, to: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['label', 'edit', `--name=${to}`, '--repo', repo, '--', from]);
 }
 
 /** Swaps the status labels an issue carries for `status`'s in one edit; returns the error, or null when GitHub accepted it. */

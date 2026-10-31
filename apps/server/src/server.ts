@@ -13,7 +13,7 @@ import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
-import { onTheBoard, readBoardSettings, readRepositoryList, stillOnboarding, stillResetting, type OnboardedRepository } from './config/repository-config.ts';
+import { onTheBoard, readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { prHost, prUrl } from './config/pr-host.ts';
 import { readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, readPrBody } from './github/github.ts';
@@ -32,14 +32,12 @@ import { createClashRuns } from './onboarding/clash-runs.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
-import {
-  createPrOpener, followOnboardingPrs, followResetPrs, previewOnboardingPr, reopenOnboardingPr, resetRepository,
-} from './onboarding/onboarding-pr.ts';
+import { createPrOpener, previewOnboardingPr } from './onboarding/onboarding-pr.ts';
 import { readProjectTeams } from './onboarding/project-teams.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { findFixedClashes } from './onboarding/fixed-clashes.ts';
-import { createCustomLabel, createRepositoryLabels, readRepositoryLabels, renameRepositoryLabels } from './onboarding/repository-labels.ts';
-import { runSetupCheck } from './onboarding/setup-checks.ts';
+import { detectSetup } from './onboarding/detect-setup.ts';
+import { saveSetup } from './onboarding/save-setup.ts';
 import { loadBuild } from './page/page.ts';
 import { recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
@@ -131,30 +129,8 @@ const items = onboardedSources(async () => {
     board.update({ repos: [], repositoryConfigProblems: [], onboarding: [], resetting: [] });
     throw err;
   }
-  // An onboarding whose PR merged, or whose .lar-factory.json landed another way, finishes here, so a merge made while
-  // the dialog is closed finishes too; a PR closed without merging is marked for the Pull request step.
-  // Each refresh follows every PR again, so a problem from an earlier one goes once its PR reads.
-  const followProblems = new Map<string, string>();
-  list = await followOnboardingPrs(list, undefined, undefined, {
-    failed: (repo, problem) => {
-      log(`can't follow ${repo}'s onboarding PR: ${problem}`);
-      followProblems.set(repo, problem);
-    },
-    // A finished onboarding has its .lar-factory.json now, which the kept answer may not say.
-    finished: configChecks.forget });
-  // A reset PR that merged or closed unmerged drops its entry, so offerOnboarding, which runs after this read, offers the
-  // repository again while its default branch has a .lar-factory.json. A problem logs once until it changes or the PR reads.
-  const resetProblems = new Map<string, string>();
-  list = await followResetPrs(list, undefined, undefined, {
-    failed: (repo, problem) => {
-      if (resetFollowProblems.get(repo) !== problem) log(`can't follow ${repo}'s reset PR: ${problem}`);
-      resetProblems.set(repo, problem);
-    },
-    // The merge took its .lar-factory.json away, which the kept answer may still have.
-    dropped: configChecks.forget });
-  resetFollowProblems = resetProblems;
-  // A repository still onboarding has no Repository config on its default branch until its PR merges, and one
-  // resetting is off the board though its default branch still has one. Each refresh asks gh for every open Edit PR, so
+  // A repository still onboarding has no local settings until it saves them, and one resetting from an earlier board is
+  // kept off the board. Each refresh asks gh for every open Edit PR, so
   // its row's mark survives a restart and goes once the PR merges or closes. A file below the app's Repository config
   // version gets the notice offering its update PR, unless this Mac dismissed it at that version.
   const onboarded = onTheBoard(list);
@@ -167,13 +143,11 @@ const items = onboardedSources(async () => {
       return { ...repoView(config), version: config.version, ...editPrs.has(config.repo) && { editPr: editPrs.get(config.repo) },
         ...configUpdate !== undefined && { configUpdate } };
     }),
-    repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list, followProblems), resetting: stillResetting(list),
+    repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list),
   });
   moveFirstRead({ step: 'items' });
   return read;
 });
-/** Each resetting repository's problem following its reset PR on the last read, so a problem that lasts logs once. */
-let resetFollowProblems = new Map<string, string>();
 /** Each repository's .lar-factory.json answer for onboarding, kept until Recheck. */
 const configChecks = createConfigChecks();
 /** T3's projects as onboarding offers them, as the list is now. */
@@ -726,14 +700,11 @@ const { server, endStreams } = createBoardServer({
   recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), readSoon, ready: () => firstGhCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
-  runSetupCheck: (input) => runSetupCheck(input),
+  detectSetup: (input) => detectSetup(input), saveSetup: (input) => saveSetup(input),
   readProjectTeams,
-  repositoryLabels: { read: (input) => readRepositoryLabels(input), create: (input, progress) => createRepositoryLabels(input, undefined, progress), rename: (input) => renameRepositoryLabels(input),
-    custom: (input) => createCustomLabel(input) },
   findFixedClashes: (input) => findFixedClashes(input),
   startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo),
-  openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
-  resetRepository: (input) => resetRepository(input),
+  openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input),
   readEditConfig: (input) => readEditConfig(input), openEditPr: (input) => openEditPr(input),
   openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),
 });
@@ -761,11 +732,8 @@ reportListening(port);
 if (!fixture) process.on('exit', recordBoard(port));
 // Sample mode runs no tools, so it looks none up. The lookup starts the first read, each source once its tool checks.
 if (!fixture) firstGhCheck = new Promise((resolve, reject) => void recheckTools(true, {}, resolve).catch(reject));
-// Onboarding and reset progress show before the first read, which waits for the tool lookup.
-if (!fixture) {
-  const list = onboarded();
-  board.update({ onboarding: stillOnboarding(list), resetting: stillResetting(list) });
-}
+// Onboarding progress shows before the first read, which waits for the tool lookup.
+if (!fixture) board.update({ onboarding: stillOnboarding(onboarded()) });
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).

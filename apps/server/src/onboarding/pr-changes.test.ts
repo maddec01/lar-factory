@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import type { Clash, OnboardingPicks } from '@lar-factory/shared';
+import type { Clash, FactoryFileKind, OnboardingPicks } from '@lar-factory/shared';
 import type { CommitTree, TreeEntry } from '../github/github.ts';
 import { AGENT_SKILLS_BLOCK } from './agent-setup.ts';
 import { planPrChanges } from './pr-changes.ts';
@@ -17,9 +17,10 @@ function branch(files: Record<string, string>, links: string[] = []) {
   return { tree, read };
 }
 
-const plan = (files: Record<string, string>, picks: Partial<OnboardingPicks> = {}, config: string | null = CONFIG, links: string[] = []) => {
+const plan = (files: Record<string, string>, picks: Partial<OnboardingPicks> = {}, config: string | null = CONFIG, links: string[] = [],
+  edits: { drop?: FactoryFileKind[]; guidance?: boolean } = {}) => {
   const { tree, read } = branch(files, links);
-  return planPrChanges(tree, read, config, { clashes: [], skills: {}, ...picks }, BUNDLED, 'GitHub');
+  return planPrChanges(tree, read, { drop: [], config, guidance: true, ...edits }, { clashes: [], skills: {}, ...picks }, BUNDLED, 'GitHub');
 };
 
 const byPath = (entries: TreeEntry[]) => new Map(entries.map(({ path, ...rest }) => [path, rest]));
@@ -36,6 +37,35 @@ test('a repository with nothing to clean gets the Agent skills block, the docs/a
   assert.deepEqual(entries.get('AGENTS.md'), { mode: '100644', content: AGENT_SKILLS_BLOCK });
   assert.deepEqual(entries.get('.lar-factory.json'), { mode: '100644', content: CONFIG });
   assert.deepEqual([...entries.keys()].sort(), ['.lar-factory.json', 'AGENTS.md', ...DOCS].sort());
+});
+
+test('a repository with no edits chosen gets no change, and declined guidance writes no Agent skills block', async () => {
+  const planned = await plan({ 'AGENTS.md': '# lar-web\n' }, {}, null, [], { guidance: false });
+  assert.deepEqual(planned, { base: 'tree0', entries: [], changes: [] });
+  const config = await plan({ 'AGENTS.md': '# lar-web\n' }, {}, CONFIG, [], { guidance: false });
+  assert.ok(!('problem' in config));
+  assert.deepEqual(config.changes, [{ kind: 'write', path: '.lar-factory.json', created: true }]);
+});
+
+test('dropping factory files deletes .lar-factory.json and the docs/agents/ files and removes each Agent skills section once', async () => {
+  const files = { '.lar-factory.json': CONFIG, 'AGENTS.md': `# lar-web\n\n${AGENT_SKILLS_BLOCK}\n## Checks\n\nRun tests.\n`, 'CLAUDE.md': 'AGENTS.md',
+    'docs/agents/domain.md': 'Old.\n', 'docs/agents/notes.md': 'Mine.\n' };
+  const planned = await plan(files, {}, null, ['CLAUDE.md'], { guidance: false, drop: ['config', 'agent-skills', 'agent-docs'] });
+  assert.ok(!('problem' in planned));
+  assert.deepEqual(planned.changes, [{ kind: 'agent-skills', path: 'AGENTS.md', removed: true }, { kind: 'delete', path: '.lar-factory.json' },
+    { kind: 'delete', path: 'docs/agents/domain.md' }]);
+  assert.deepEqual(byPath(planned.entries), new Map<string, unknown>([
+    ['.lar-factory.json', { mode: '100644', sha: null }], ['docs/agents/domain.md', { mode: '100644', sha: null }],
+    ['AGENTS.md', { mode: '100644', content: '# lar-web\n\n## Checks\n\nRun tests.\n' }],
+  ]));
+});
+
+test("dropping the factory's agent files while adding its guidance is refused, and a shared config added replaces a dropped one", async () => {
+  assert.deepEqual(await plan({ 'AGENTS.md': AGENT_SKILLS_BLOCK }, {}, null, [], { drop: ['agent-skills'] }),
+    { problem: "Keep the factory's agent files or add its guidance, not both." });
+  const replaced = await plan({ '.lar-factory.json': '{}\n' }, {}, CONFIG, [], { guidance: false, drop: ['config'] });
+  assert.ok(!('problem' in replaced));
+  assert.deepEqual(replaced.changes, [{ kind: 'write', path: '.lar-factory.json', created: false }]);
 });
 
 test('a reused .lar-factory.json is left alone, and docs/agents/ files already there are replaced', async () => {

@@ -663,7 +663,7 @@ export function prName(url: string): string {
 
 /** A change of the PR as its list shows it: the path, then what the PR does to it. */
 function changeRow(change: OnboardingPrChange): { path: string; what: string } {
-  if (change.kind === 'agent-skills') return { path: change.path, what: 'Writes the ## Agent skills block.' };
+  if (change.kind === 'agent-skills') return { path: change.path, what: change.removed ? 'Removes the ## Agent skills block.' : 'Writes the ## Agent skills block.' };
   if (change.kind === 'write') return { path: change.path, what: change.created ? 'Adds the file.' : 'Replaces the file.' };
   if (change.kind === 'edit') return { path: change.path, what: `Edits line ${change.line}: ${change.reason}` };
   if (change.kind === 'delete') return { path: change.path, what: 'Deletes it.' };

@@ -120,7 +120,7 @@ test("a Queued item whose repository has no T3 project has its Start refining di
 
 test("a Queued item whose repository is still onboarding has its Start refining disabled until onboarding's PR merges, and Start next passes over it", async () => {
   await mountPage({ ...withChoices, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
-  expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, "Waits for onboarding's PR to merge"]);
+  expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, "Waits for onboarding to finish"]);
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 

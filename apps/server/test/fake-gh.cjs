@@ -73,9 +73,9 @@ const main = async () => {
     }
     return void process.stdout.write(typeof config === 'string' ? config : JSON.stringify(config));
   }
-  // Whether the login can push to a repository: options.canPush, true unless it says false.
-  if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.includes('.permissions.push')) {
-    return void process.stdout.write(`${options.canPush !== false}\n`);
+  // What the login may do in a repository: push and triage unless options.canPush says false, with issues turned on.
+  if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.some((a) => a.includes('.permissions.push'))) {
+    return void output({ push: options.canPush !== false, triage: options.canPush !== false, issues: true });
   }
   // Onboarding's PR: the default branch is main at commit abc123, and options.fail names the call that fails. An
   // opened PR goes in options.prs, by URL, with its state, which a test changes to MERGED to merge it; gh pr close and

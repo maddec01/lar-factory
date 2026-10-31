@@ -1,5 +1,5 @@
 // Azure Repos through az, beside github.ts's gh calls: the default branch's head, files and blobs, and the commit, branch
-// and PR of onboarding, Edit and Reset, made without touching any checkout. A repository is organization/project/repository as its origin URL has them.
+// and PR of onboarding and Edit, made without touching any checkout. A repository is organization/project/repository as its origin URL has them.
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

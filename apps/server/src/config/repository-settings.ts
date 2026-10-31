@@ -5,7 +5,7 @@
 import { join } from 'node:path';
 import {
   CONFIG_VERSION, REPOSITORY_OPERATIONS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
-  type RepositoryConfigProblem, type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings,
+  type LocalSetupAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings,
   type ShowSetting,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
@@ -170,6 +170,27 @@ export function acceptSetup(repo: string, dir = boardDataDir()): void {
   updateSettings(repo, dir, (local, { itemSource, domainDocs }) => ({ ...local, accepted: { itemSource, domainDocs } }));
 }
 
+/** The access an onboarding's detection found, each operation it left unverified out. */
+type FoundAccess = NonNullable<LocalSettings['access']>;
+
+/**
+ * Saves onboarding's answers as the repository's local settings over the latest read of its .lar-factory.json, with
+ * the access its detection found. An answer equal to the shared default inherits it, so a later shared change applies;
+ * any other answer is a local override. The setup it makes is accepted, so no work waits on it.
+ */
+export function saveLocalSetup(repo: string, answers: LocalSetupAnswers, access: FoundAccess, read: SharedRead, dir = boardDataDir()): void {
+  const { projectId, consent, ...answered } = answers;
+  updateSettings(repo, dir, ({ shared, sharedProblem: _, overrides: __, ...local }) => {
+    const kept: LocalSettings = read === null ? local : 'problem' in read
+      ? { ...local, ...shared && { shared }, sharedProblem: read.problem } : { ...local, shared: read.defaults };
+    const overrides = Object.fromEntries(Object.entries(answered)
+      .filter(([key, value]) => JSON.stringify(kept.shared?.[key as keyof SharedRepositorySettings]) !== JSON.stringify(value)));
+    const saved = { ...kept, projectId, overrides, access, consent: [...consent] };
+    const { itemSource, domainDocs } = setupOf(repo, saved);
+    return { ...saved, accepted: { itemSource, domainDocs } };
+  });
+}
+
 /** Sets the operations the user allows the factory to offer for the repository. */
 export function setConsent(repo: string, consent: readonly RepositoryOperation[], dir = boardDataDir()): void {
   updateSettings(repo, dir, (local) => ({ ...local, consent: [...consent] }));
@@ -198,19 +219,23 @@ function azProblem(err: unknown): string {
  * The repository's .lar-factory.json from its default branch, with its version, as applySharedDefaults takes it. Throws
  * when gh can't read it, as a logged-out gh fails every repository.
  */
-async function readSharedDefaults(repo: string, run?: (args: string[]) => Promise<string>): Promise<{ read: SharedRead; version: number }> {
+export async function readSharedDefaults(repo: string, run?: (args: string[]) => Promise<string>): Promise<{ read: SharedRead; version: number }> {
   let text: string | null;
   try { text = await (onAzure(repo) ? readAzureFile : readBranchFile)(repo, '.lar-factory.json', undefined, run); }
   catch (err) {
     if (onAzure(repo)) return { read: { problem: azProblem(err) }, version: CONFIG_VERSION };
     throw err;
   }
-  if (text === null) return { read: null, version: CONFIG_VERSION };
+  return text === null ? { read: null, version: CONFIG_VERSION } : sharedConfigOf(text, onAzure(repo));
+}
+
+/** A .lar-factory.json's text as applySharedDefaults takes it, with its version. */
+export function sharedConfigOf(text: string, azure: boolean): { read: Exclude<SharedRead, null>; version: number } {
   let raw: unknown;
   try { raw = JSON.parse(text); }
   catch { return { read: { problem: ".lar-factory.json isn't valid JSON." }, version: CONFIG_VERSION }; }
   if (!isRecord(raw)) return { read: { problem: ".lar-factory.json isn't a JSON object." }, version: CONFIG_VERSION };
-  const read = sharedDefaultsOf(raw, onAzure(repo));
+  const read = sharedDefaultsOf(raw, azure);
   return { read, version: 'defaults' in read && typeof raw.version === 'number' ? raw.version : CONFIG_VERSION };
 }
 

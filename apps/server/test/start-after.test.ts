@@ -114,10 +114,12 @@ test("a part whose repository has no T3 project can't be armed, as its start wou
 });
 
 
-test('an armed start whose repository Reset takes off the board drops on the next read and never starts, also after a restart', async (t) => {
+test('an armed start whose repository leaves the board drops on the next read and never starts, also after a restart', async (t) => {
   const { board, env, open } = await blockedBuildBoard(t, { files: ['.lar-factory.json'] });
   assert.equal((await arm(board, board.id(12), OPUS)).status, 200);
-  assert.equal((await board.post({ repo: 'maddec01/lar-factory' }, board.url, '/api/repositories/reset')).status, 200);
+  const list = join(env.HOME!, 'Library/Application Support/Lar Factory/repository-settings.json');
+  const { repositories, ...rest } = JSON.parse(readFileSync(list, 'utf8')) as { repositories: { repo: string }[] };
+  writeFileSync(list, JSON.stringify({ ...rest, repositories: repositories.filter((r) => r.repo !== 'maddec01/lar-factory') }));
   const records = await openWorkRecords(workRecordsPath(board.dataDir));
   try {
     records.setBody(open, records.read(open).revision, 'answer', 'Settled.');

@@ -1,7 +1,7 @@
 // Start after: the blocked parts whose start is armed, kept in a JSON file in the board server's data folder so they
 // survive a restart. After each read, and each local change to the work records, the board starts every armed part
 // whose blockers have all completed, on the model choice it was armed with: Start build for a Ready build, today's
-// Start for a Queued item. A part whose repository is still onboarding waits for onboarding's PR to merge.
+// Start for a Queued item. A part whose repository is still onboarding waits for onboarding to finish.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { isOnboarding, isRecord, openBlockers, pickRepoText, startHold, startRepo } from '@lar-factory/shared';
@@ -122,7 +122,7 @@ export function createStartAfter({ board, commands, offerModelChoices, file }: S
           if (error) log(error);
           return [];
         }
-        // A part whose repository is still onboarding stays armed until onboarding's PR merges.
+        // A part whose repository is still onboarding stays armed until onboarding finishes.
         return isOpen(item) || isOnboarding(board.snapshot(), entry.repo ?? item.repo) ? [] : [startNow(item, entry)];
       });
       await Promise.all(runs);

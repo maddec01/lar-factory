@@ -217,7 +217,7 @@ test.each([
 test("a Queued item has Start refining disabled in the footer until onboarding's PR merges while its repository is still onboarding", async () => {
   await mountPage({ ...sample, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
   await openItem('I_sample05');
-  expect(footerControls()).toEqual(['Back to List', 'Abandon', 'GitHub', "Start refining (disabled: Waits for onboarding's PR to merge)"]);
+  expect(footerControls()).toEqual(['Back to List', 'Abandon', 'GitHub', "Start refining (disabled: Waits for onboarding to finish)"]);
 });
 
 test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Start refining, and neither Back to List nor Abandon', async (state) => {
@@ -440,7 +440,7 @@ test('Start build is disabled with the hint while T3 has no project for the repo
 test("Start build is disabled until onboarding's PR merges while the repository is still onboarding", async () => {
   await mountPage({ ...readyBuild, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
   await openItem('I_sample13');
-  expect(footerControls()).toEqual(['GitHub', "Start build (disabled: Waits for onboarding's PR to merge)"]);
+  expect(footerControls()).toEqual(['GitHub', "Start build (disabled: Waits for onboarding to finish)"]);
 });
 
 test.each([['running'], ['needs you']] as const)('a Ready item with a %s thread offers Open thread instead of Start build', async (state) => {

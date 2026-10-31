@@ -1,5 +1,5 @@
 // Where T3 Code keeps its state, and what item stats read from its settings,
-// read-only (docs/adr/0005). The settings parts follow pingdotgg/t3code main at
+// read-only. The settings parts follow pingdotgg/t3code main at
 // f054d1b8018721bd997d99cbb918a7b17bf098a4: apps/server/src/usage/UsageService.ts,
 // claudeUsageReader and codexUsageReader (with CodexHomeLayout's shared home).
 // Whether T3 Code runs follows main at 1c1050eb7fddeedb80cc624dcd834e2a04377b1c:

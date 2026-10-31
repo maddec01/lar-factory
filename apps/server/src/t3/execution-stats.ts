@@ -3,7 +3,7 @@ import type { ThreadRows, ThreadSession } from './t3-db.ts';
 
 /** T3 97e35bc orchestrationV2.ts provider threads own native transcript references.
  * Provider sessions describe runtime attachment, not transcript identity.
- * Keep the SQL-era row interface so ADR0007/0008 calculations stay unchanged.
+ * Keep the SQL-era row interface so the stats calculations stay unchanged.
  */
 export function executionStats(projections: Record<string, unknown>[]): { rows: ThreadRows; sessions: ThreadSession[] } {
   const rows: ThreadRows = { threads: [], turns: [], runs: [], waits: [], lastMessages: [], active: new Set() };

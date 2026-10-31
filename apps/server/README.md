@@ -9,7 +9,7 @@
 
 A local board for the lar project. It reads the onboarded repositories through your
 `gh` login (see [Adding a repository](#adding-a-repository)), each item source at
-its own pace ([ADR 0028](../../docs/adr/0028-each-item-source-reads-at-the-pace-of-its-work.md)):
+its own pace:
 whole every `refreshSeconds` (5 minutes, at least 1), and its changed items
 alone. Every 5 seconds each GitHub source asks GitHub whether anything changed,
 sending the last answer's ETag; an unchanged answer is a 304, which costs no

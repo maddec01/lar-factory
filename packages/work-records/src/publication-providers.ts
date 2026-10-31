@@ -54,7 +54,7 @@ async function withFile<T>(value: unknown, use: (file: string) => Promise<T>): P
   finally { await rm(dir, { recursive: true, force: true }); }
 }
 
-/** Azure creation/reads/comments use invoke. Only revision-guarded work-item PATCH uses az rest (ADR 0029).
+/** Azure creation/reads/comments use invoke. Only revision-guarded work-item PATCH uses az rest.
  * No transport retries. GitHub reads paginate; Azure recovery reads by a bounded WIQL result then batch-inspects. */
 export function publicationProvider(transport: PublicationTransport = {
   github: (args, input) => providerCommand('gh', args, input), azure: (args) => providerCommand('az', args),

@@ -1,4 +1,4 @@
-// Item stats from T3 Code's local database, read-only (docs/adr/0005, 0007), with
+// Item stats from T3 Code's local database, read-only, with
 // tokens from the provider transcripts of each item's threads, priced with T3's
 // cached rate table. T3's queries are in t3/t3-db.ts, its settings and the paths to
 // its files in t3/t3-settings.ts, and agent time in agent-time.ts. The Codex

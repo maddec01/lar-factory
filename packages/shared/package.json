@@ -9,6 +9,7 @@
     "./publication": "./src/publication.ts",
     "./vocabulary": "./src/vocabulary.ts",
     "./provider-command": "./src/provider-command.ts",
+    "./azure-safety": "./src/azure-safety.ts",
     "./data-dir": "./src/data-dir.ts",
     "./install-skills": "./src/install-skills.ts",
     "./install-targets": "./src/install-targets.ts",

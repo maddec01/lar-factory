@@ -12,6 +12,7 @@ import type { AzureWorkItem, Blocker, Item, LinkedPr } from '@lar-factory/shared
 import { AccessLost, NotFound, ReadProblem, TICKET_MATCHES, ticketNumberOf, type ItemSource, type ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
+import { assertAzureCommandAllowed } from '@lar-factory/shared/azure-safety';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 import { linkedPr, prIds, type AzurePr } from './azure-prs.ts';
 import { azureWrites } from './azure-writes.ts';
@@ -65,6 +66,7 @@ async function limited<T, R>(values: readonly T[], limit: number, each: (value: 
 const azCooldown = createCooldown('az');
 
 export async function az(args: string[]): Promise<string> {
+  assertAzureCommandAllowed(args);
   const command = toolCommand('az');
   if (!command) throw new ReadProblem(`${missingTool('az')}.`, 'brew install azure-cli');
   azCooldown.check();

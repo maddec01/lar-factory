@@ -104,7 +104,15 @@ export function protocolThreadByTitle(projectId: string, title: string): { threa
   const shell = current.shells?.filter(shell => shell.projectId === projectId && shell.title === title && !shell.deletedAt)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   if (!shell || typeof shell.id !== 'string') return null;
-  const messages = current.reads?.get(shell.id)?.observation?.projection.messages
+  const messages = protocolThreadById(shell.id).observation?.projection.messages
     .filter(message => message.role === 'assistant').sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   return { threadId: shell.id, latest: typeof messages?.[0]?.text === 'string' ? messages[0].text : null };
+}
+
+/** Thread-ID lookup for the future switch/import; retained facts never imply availability. */
+export function protocolThreadById(threadId: string): ExecutionRead {
+  protocolItemThreads('', 0);
+  const read = current?.reads?.get(threadId);
+  return { availability: current?.available && read ? read.availability : 'unavailable',
+    ...(read?.observation ? { observation: read.observation } : {}) };
 }

@@ -380,6 +380,22 @@ describe('work-record content', () => {
     expect(() => reopened.setBuildPhase(concept.workId, 1, 'plan')).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('A concept is never built') }));
   });
 
+  it('holds one current delivery PR and keeps each replaced one as history', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    first.setPullRequest(build.workId, 1, 'maddec01/lar#88');
+    expect(first.setPullRequest(build.workId, 2, 'maddec01/lar#88')).toMatchObject({ revision: 2 });
+    first.setPullRequest(build.workId, 2, 'maddec01/lar#95');
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.read(build.workId)).toMatchObject({ pullRequest: 'maddec01/lar#95', revision: 3 });
+    expect(reopened.replacedPullRequests(build.workId)).toEqual([{ pullRequest: 'maddec01/lar#88', replacedAt: expect.any(String) }]);
+    expect(() => reopened.setPullRequest(build.workId, 2, 'maddec01/lar#96')).toThrow(expect.objectContaining({ code: 'stale-revision' }));
+    expect(reopened.replacedPullRequests(build.workId)).toHaveLength(1);
+  });
+
   const round1 = {
     base: 'c8890a1a',
     reviewers: [
@@ -544,7 +560,9 @@ describe('work-record retention', () => {
     records.recordReviewRound(build.workId, 2, { base: 'c8890a1a', reviewers: [{ axis: 'code', verdict: 'changes', findings: [{ severity: 'nit', summary: 'x', disposition: 'open' }] }] });
     records.addThread(build.workId, 3, 'thread-1', 'build');
     records.recordLaunchIntent(build.workId, 4, 'build');
-    records.recordFinished(build.workId, 5);
+    records.setPullRequest(build.workId, 5, 'maddec01/lar#1');
+    records.setPullRequest(build.workId, 6, 'maddec01/lar#2');
+    records.recordFinished(build.workId, 7);
     const setting = { hideAfterDays: 7, deleteAfterDays: 30 };
 
     expect(records.deleteExpired(setting, later(29))).toEqual({ deleted: [], kept: [] });

@@ -101,6 +101,11 @@ export interface LaunchIntent {
   resolvedAt: string | null;
 }
 
+export interface ReplacedPullRequest {
+  pullRequest: string;
+  replacedAt: string;
+}
+
 export interface LaunchIntentFilter {
   repository?: string;
   workId?: string;
@@ -192,8 +197,10 @@ export interface WorkRecords {
   /** The record's `body`, or null while it has none. */
   body(workId: string, body: Body): string | null;
   setBuildPhase(workId: string, revision: number, phase: BuildPhase): WorkRecord;
-  /** Records the PR the build delivers through, replacing an earlier one. */
+  /** Records the PR the build delivers through. A record holds one current PR; a replaced one joins its history. */
   setPullRequest(workId: string, revision: number, pullRequest: string): WorkRecord;
+  /** The PRs the record held before its current one, oldest first. */
+  replacedPullRequests(workId: string): ReplacedPullRequest[];
   /** Records the build's next review round with every axis and finding, whole or not at all. */
   recordReviewRound(workId: string, revision: number, round: NewReviewRound): WorkRecord;
   /** Records what became of a finding. A rejection needs its reason. */
@@ -216,7 +223,7 @@ export interface WorkRecords {
   /** The finished and set-aside records `retention` hides at `now`, in the order they were made. */
   hidden(retention: Retention, now?: Date): WorkRecord[];
   /** Deletes the finished and set-aside records `retention` deletes at `now`, with their bodies, review rounds, threads,
-   * launch intents and blocker edges, in one transaction. A due record stays while it owns a kept record or a kept
+   * launch intents, replaced PRs and blocker edges, in one transaction. A due record stays while it owns a kept record or a kept
    * record waits on it; the kept parent and blockers of a deleted record are bumped. */
   deleteExpired(retention: Retention, now?: Date): Expired;
   /** The records it owns, in the order they were made. */
@@ -411,6 +418,8 @@ function workRecords(database: Database): WorkRecords {
   const bodyNames = db.prepare('SELECT body FROM bodies WHERE work_id = ?');
   const bodyText = db.prepare('SELECT markdown FROM bodies WHERE work_id = ? AND body = ?');
   const writeBody = db.prepare('INSERT INTO bodies (work_id, body, markdown) VALUES (?, ?, ?) ON CONFLICT DO UPDATE SET markdown = excluded.markdown');
+  const replacePullRequest = db.prepare('INSERT INTO replaced_pull_requests (work_id, pull_request, replaced_at) VALUES (?, ?, ?)');
+  const replacedRows = db.prepare('SELECT * FROM replaced_pull_requests WHERE work_id = ? ORDER BY rowid');
   const nextQueueOrder = db.prepare('SELECT coalesce(max(queue_order), 0) + 1 AS next FROM work_records WHERE repository = ?');
 
   const find = (workId: string): Row => {
@@ -599,8 +608,17 @@ function workRecords(database: Database): WorkRecords {
     },
     setPullRequest: (workId, revision, pullRequest) => {
       const reference = checkReference(pullRequest, 'PR');
-      return change(workId, revision, (row) => (checkBuilt(row.kind), { pull_request: reference }));
+      return change(workId, revision, (row) => {
+        checkBuilt(row.kind);
+        if (row.pull_request === reference) return null;
+        if (row.pull_request) replacePullRequest.run(workId, row.pull_request, new Date().toISOString());
+        return { pull_request: reference };
+      });
     },
+    replacedPullRequests: (workId) => database.read(() => {
+      find(workId);
+      return replacedRows.all(workId).map((row) => ({ pullRequest: String(row.pull_request), replacedAt: String(row.replaced_at) }));
+    }),
     recordReviewRound: (workId, revision, round) => change(workId, revision, (row) => {
       checkBuilt(row.kind);
       if (typeof round?.base !== 'string' || !/^[0-9a-f]{7,64}$/.test(round.base)) throw invalid(`The round's base "${String(round?.base)}" isn't a commit sha.`);
@@ -725,7 +743,7 @@ function workRecords(database: Database): WorkRecords {
           for (const blocker of blockerRows.all(workId) as unknown as Row[]) if (!due.has(blocker.work_id)) touched.add(blocker.work_id);
         }
         // Children go before their parents, so clear the parents among the deleted records first.
-        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents']
+        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests']
           .map((table) => db.prepare(`DELETE FROM ${table} WHERE work_id = ?`));
         const clearParent = db.prepare('UPDATE work_records SET parent_id = NULL WHERE work_id = ?');
         const deleteBlockers = db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?');

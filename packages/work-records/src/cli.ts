@@ -71,7 +71,10 @@ Content
                                     P is one of plan, implement, domain-docs,
                                     full-checks, review, approve, checks, retro.
   set-pr <work-id> --revision N --pr owner/name#12
-                                    Record the PR the build delivers through.
+                                    Record the PR the build delivers through. A
+                                    record holds one current PR; setting another
+                                    keeps the earlier one as history.
+  pr-history <work-id>              Print the PRs the record held before its current one.
   record-review-round <work-id> --revision N --file F
                                     Record the build's next review round from the
                                     JSON in F: {"base": sha, "reviewers": [{"axis",
@@ -138,7 +141,7 @@ Errors
 class UsageError extends Error {}
 
 const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
-  'children', 'blockers', 'dependents', 'set-body', 'body', 'set-phase', 'set-pr', 'record-review-round', 'set-disposition', 'review-rounds',
+  'children', 'blockers', 'dependents', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition', 'review-rounds',
   'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
 const COMMANDS = ['create', 'import', 'list', 'intents', 'retention', 'hidden', 'delete-expired', ...TAKES_WORK_ID];
 
@@ -271,6 +274,8 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
       return records.setBuildPhase(workId!, revision(), need(values, 'phase') as BuildPhase);
     case 'set-pr':
       return records.setPullRequest(workId!, revision(), need(values, 'pr'));
+    case 'pr-history':
+      return records.replacedPullRequests(workId!);
     case 'record-review-round':
       return records.recordReviewRound(workId!, revision(), readRound(values));
     case 'set-disposition':

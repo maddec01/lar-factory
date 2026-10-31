@@ -34,11 +34,12 @@ credentials; credentials were read directly from Keychain into process memory.
 
 Item-thread refresh uses `item-execution.ts`: active and archived shell arrays,
 with both omission flags disabled, followed by bounded thread-ID projection
-reads. Association still uses only a root's first user message. Descendants are
-read but do not acquire an independent item association. Onboarding title lookup
-uses the same completed observation. An incomplete or disconnected refresh
-returns unavailable and retains the previous lookup and its observation time;
-only a completed empty snapshot means no matching threads. Stats use the same completed protocol observation.
+reads. An item's threads are the thread IDs its work record holds; a thread's
+first user message no longer associates it. Onboarding title lookup uses the
+same completed observation. While T3 can't be read, each recorded thread shows
+its last observation with that observation's time, or unavailable once one was
+never seen. A recorded thread missing from a completed snapshot is left out
+until the T3 CLI confirms it deleted (docs/adr/0033). Stats use the same completed protocol observation.
 
 
 Stats coverage (#709): `execution-stats.ts` maps providerTurns to turn intervals,
@@ -87,9 +88,9 @@ message match. Empty, ambiguous and failed reads retain duplicate protection.
 Real timeout followed by a late launch, deletion and provider mutations were
 not induced by this probe.
 
-Association no longer opens SQLite or requires a usage database. `loadT3Reads`
-uses `protocolItemThreads` directly, including when stats are disabled or their
-residual pricing read fails. A missing usage database reports unavailable stats.
+Association no longer opens SQLite or requires a usage database. The board
+reads threads through `protocolItemThreads` apart from `loadT3Reads`, so threads
+read when stats are disabled or their residual pricing read fails. A missing usage database reports unavailable stats.
 The source audit finds no production project, title, association or timing SQL
 consumer outside the adapter. Legacy SQL helpers remain for parity fixtures;
 `item-stats.ts` retains its optional `threadSessions` default for those fixtures.

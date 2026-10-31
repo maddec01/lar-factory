@@ -23,8 +23,8 @@ async function buildBoard(t: TestContext, items: object[], options: object = {},
 const startBuild = (board: Board, itemId: string, model?: unknown, origin = board.url, drift?: unknown) =>
   board.postSession({ itemId, model, drift }, '/api/start-build', origin);
 
-const message = (home: string, number: number) =>
-  `Build maddec01/lar-factory#${number}. Read ${home}/.agents/skills/lar-build/agents/builder.md and follow it.`;
+const message = (home: string, workId: string) =>
+  `Build ${workId}. Read ${home}/.agents/skills/lar-build/agents/builder.md and follow it.`;
 
 /** The issue edits Start build might make, which it never does: its work records hold the moves. */
 const writes = async (board: Board) => (await board.calls())
@@ -42,7 +42,7 @@ test("Start build moves its concept's work record to In progress, writes nothing
   try { assert.equal(records.read(board.id(40)).status, 'In progress'); } finally { records.close(); }
   assert.deepEqual(await writes(board), []);
   assert.deepEqual(await board.t3Calls(), [
-    ['thread', 'start', 'project-factory', message(home, 12), '--worktree', 'main', '--branch', 'chore/12-issue-12', '--json'],
+    ['thread', 'start', 'project-factory', message(home, board.id(12)), '--worktree', 'main', '--branch', 'chore/12-issue-12', '--json'],
   ]);
 });
 
@@ -50,7 +50,7 @@ test('Start build asks the board app to check the skills before it starts the th
   const { board, home } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { BOARD_SKILL_CHECK: '1' }, () => null);
   assert.equal((await startBuild(board, board.id(12))).status, 200);
   assert.equal(board.skillChecks(), 1);
-  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message(home, 12)]);
+  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message(home, board.id(12))]);
 });
 
 test('a refused skill check refuses Start build with its reason, writes nothing to GitHub and runs no t3', async (t) => {
@@ -80,7 +80,7 @@ test('Drift asks for a choice before Start build writes anything, then starts on
   assert.deepEqual([...await writes(board), ...await board.t3Calls()], []);
   assert.equal((await startBuild(board, board.id(12), undefined, board.url, 'keep')).status, 200);
   assert.deepEqual(choices, [undefined, 'keep']);
-  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message(home, 12)]);
+  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message(home, board.id(12))]);
 });
 
 test('Start build refuses a Drift choice it doesn\'t know without checking the skills', async (t) => {
@@ -99,7 +99,7 @@ test('without a bundle Start build asks for no skill check', async (t) => {
 test('the build message names lar-build under LAR_FACTORY_INSTALL_ROOT when it is set', async (t) => {
   const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { LAR_FACTORY_INSTALL_ROOT: '/tmp/lar-root' });
   assert.equal((await startBuild(board, board.id(12))).status, 200);
-  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message('/tmp/lar-root', 12)]);
+  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message('/tmp/lar-root', board.id(12))]);
 });
 
 test('Start build runs the thread on the picked model choice', async (t) => {
@@ -107,7 +107,7 @@ test('Start build runs the thread on the picked model choice', async (t) => {
   const response = await startBuild(board, board.id(12), { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
   assert.equal(response.status, 200);
   assert.deepEqual(await board.t3Calls(), [
-    ['thread', 'start', 'project-factory', message(home, 12), '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5',
+    ['thread', 'start', 'project-factory', message(home, board.id(12)), '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5',
       '--worktree', 'main', '--branch', 'fix/12-issue-12', '--json'],
   ]);
   assert.match((await (await startBuild(board, board.id(12), { instanceId: 'codex', model: '--help' })).json()).error, /isn't offered/);

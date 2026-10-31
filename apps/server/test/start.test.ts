@@ -13,7 +13,8 @@ import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
 import type { BoardData } from '@lar-factory/shared';
 
-const MESSAGE = '#12 Issue 12\n$lar-shape maddec01/lar-factory#12';
+/** The work message for issue 12's work record on `board`. */
+const message = (board: Board) => `#12 Issue 12\n$lar-shape ${board.id(12)}`;
 
 /** A temporary home with git checkouts of the given origins under ~/Developer/lar. */
 function home(t: TestContext, origins: Record<string, string | null>): string {
@@ -58,8 +59,8 @@ test("Start begins one lar-shape thread in the card's repository project and lea
   assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
   assert.equal((await start(board, board.id(30, 'maddec01/lar-server'))).status, 200);
   assert.deepEqual(await board.t3Calls(), [
-    ['thread', 'start', 'project-factory', MESSAGE, '--json'],
-    ['thread', 'start', 'project-server', '#30 Issue 30\n$lar-shape maddec01/lar-server#30', '--json'],
+    ['thread', 'start', 'project-factory', message(board), '--json'],
+    ['thread', 'start', 'project-server', `#30 Issue 30\n$lar-shape ${board.id(30, 'maddec01/lar-server')}`, '--json'],
   ]);
   assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
 });
@@ -70,7 +71,7 @@ test('Start runs the thread on the picked model choice, still in the repository 
   const response = await start(board, board.id(12), board.url, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
   assert.equal(response.status, 200);
   assert.deepEqual(await board.t3Calls(), [
-    ['thread', 'start', 'project-factory', MESSAGE, '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5', '--json'],
+    ['thread', 'start', 'project-factory', message(board), '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5', '--json'],
   ]);
 });
 

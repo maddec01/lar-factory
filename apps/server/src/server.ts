@@ -268,12 +268,12 @@ let transcriptsRead = false;
 /**
  * Attaches each item's stats and T3 threads, from one read of T3 Code's database. Stats are those frozen in its
  * latest merged linked PR's block once no linked PR is open, else read afresh from the database and transcripts once
- * those were read; threads are read afresh. The board keeps working without either.
+ * those were read; the threads its work record holds are read afresh. The board keeps working without either.
  */
 function withT3Reads(items: Item[], withStats = true): Item[] {
   const now = Date.now();
   const fresh = withStats && transcriptsRead;
-  const threads = (item: Pick<Item, 'repo' | 'number'>) => protocolItemThreads(item.repo, item.number);
+  const threads = (workId: string | undefined) => protocolItemThreads(workId && records ? records.threads(workId).map((t) => t.threadId) : []);
   const { stats, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, fresh);
   if (fresh) {
     statsReadAt = now;
@@ -284,10 +284,10 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   return items.map((item) => {
     const known = retainStats(previousStats.get(item.id), item.stats);
     const live = fresh ? stats(item) : item.stats;
-    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item) };
-    // A slice's implementer thread names the slice, so a build is running while a thread runs for it or any slice.
+    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item.id) };
+    // A slice records its implementer thread, so a build is running while a thread runs for it or any slice.
     const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
-    if (running(shown.threads) || item.slices.some((slice) => running(threads(slice)))) lastRunning.set(item.id, now);
+    if (running(shown.threads) || item.slices.some((slice) => running(threads(slice.workId)))) lastRunning.set(item.id, now);
     return shown;
   });
 }

@@ -8,8 +8,7 @@ import { assistant, claudeHome, statsDb, tempDir } from '../../test/stats-db.ts'
 import * as statsModule from '../stats/item-stats.ts';
 import * as execution from './item-execution.ts';
 vi.spyOn(execution, 'protocolStatsInputs').mockImplementation(() => fixtureInputs());
-vi.spyOn(execution, 'protocolItemThreads').mockImplementation((repo, number) => fixtureThreads(repo, number));
-import { protocolItemThreads as fixtureThreads, protocolStatsInputs as fixtureInputs } from '../../test/execution-observations.ts';
+import { protocolStatsInputs as fixtureInputs } from '../../test/execution-observations.ts';
 
 /** A home folder, settings and price table that don't exist, so tests never read real transcripts. */
 const NOWHERE = {
@@ -28,30 +27,27 @@ function found<T>(value: T | 'unavailable' | undefined): T {
 }
 const turn = { id: 'a1', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:10:00Z' };
 
-test('one read of the database gives each item its stats and threads, and undefined for an item with none', (t) => {
+test('one read of the database gives each item its stats, and undefined for an item with none', (t) => {
   const db = statsDb(t, [{ id: 'a', title: 'Shape #1', messages: [`$lar-work ${REPO}#1`], turns: [turn] }]);
   vi.stubEnv('T3_STATE_DB', db);
   t.onTestFinished(() => { vi.unstubAllEnvs(); });
   const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
   assert.equal(found(reads.stats(item(1))).agentMs, 10 * 60_000);
-  assert.deepEqual(found(reads.threads(item(1))).map((th) => [th.id, th.state]), [['a', 'done']]);
-  assert.deepEqual([reads.stats(item(2)), reads.threads(item(2))], [undefined, undefined]);
+  assert.equal(reads.stats(item(2)), undefined);
   assert.deepEqual([reads.statsUnavailable, reads.priced], [false, false], 'no rate table, so nothing is priced');
 });
 
-test('a missing usage database reports unavailable stats and protocol availability independently', (t) => {
-  vi.mocked(execution.protocolItemThreads).mockReturnValueOnce('unavailable');
+test('a missing or unreadable usage database reports unavailable stats', (t) => {
   const missing = loadT3Reads({ db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite'), ...NOWHERE }, NOW);
-  assert.deepEqual([missing.stats(item(1)), missing.threads(item(1)), missing.statsUnavailable, missing.priced], ['unavailable', 'unavailable', true, null]);
+  assert.deepEqual([missing.stats(item(1)), missing.statsUnavailable, missing.priced], ['unavailable', true, null]);
   const changed = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`] }]);
   vi.stubEnv('T3_STATE_DB', changed + '.unavailable');
   t.onTestFinished(() => { vi.unstubAllEnvs(); });
-  vi.mocked(execution.protocolItemThreads).mockReturnValueOnce('unavailable');
   const broken = loadT3Reads({ db: changed, ...NOWHERE }, NOW);
-  assert.deepEqual([broken.stats(item(1)), broken.threads(item(1)), broken.statsUnavailable, broken.priced], ['unavailable', 'unavailable', true, null]);
+  assert.deepEqual([broken.stats(item(1)), broken.statsUnavailable, broken.priced], ['unavailable', true, null]);
 });
 
-test('stats read more than the thread rows, so they can be unavailable while the threads are read', (t) => {
+test('a stats read that fails reports unavailable stats', (t) => {
   const db = statsDb(t, [{ id: 'a', title: 'Shape #1', messages: [`$lar-work ${REPO}#1`], turns: [turn] }]);
   const failedUsage = vi.spyOn(statsModule, 'itemStats').mockImplementationOnce(() => { throw Error('Usage unavailable'); });
   t.onTestFinished(() => failedUsage.mockRestore());
@@ -60,7 +56,6 @@ test('stats read more than the thread rows, so they can be unavailable while the
   const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
   assert.equal(reads.stats(item(1)), 'unavailable');
   assert.equal(reads.statsUnavailable, true);
-  assert.deepEqual(found(reads.threads(item(1))).map((th) => th.id), ['a']);
 });
 
 test("a warm reads the transcripts of T3's threads not read yet, so the stats read after it reads none", async (t) => {

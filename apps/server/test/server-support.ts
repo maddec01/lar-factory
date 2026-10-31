@@ -275,12 +275,12 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     stop,
     update: (value: object) => writeFile(stateFile, JSON.stringify(value)),
     calls: () => readCalls(stateFile + '.calls'),
-    /** Waits for a matching gh call, including one already recorded, within the caller's test deadline. */
-    untilCalled: (check: (args: string[]) => boolean) => new Promise<string[]>((resolve, reject) => {
+    /** Waits for the requested count of matching gh calls, including those already recorded, within the test deadline. */
+    untilCalled: (check: (args: string[]) => boolean, count = 1) => new Promise<string[]>((resolve, reject) => {
       const ready = () => {
         void readCalls(stateFile + '.calls').then((calls) => {
-          const found = calls.find(check);
-          if (found) { watcher.close(); resolve(found); }
+          const found = calls.filter(check);
+          if (found.length >= count) { watcher.close(); resolve(found[count - 1]!); }
         }).catch(failed);
       };
       const watcher = watch(stateFile + '.calls', ready);

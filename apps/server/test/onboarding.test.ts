@@ -51,14 +51,14 @@ test('the board offers each T3 project whose repository has .lar-factory.json, r
   const reads = async (repo: string) => (await board.calls()).filter((args) => readsRepositoryConfig(args) && args[1] === `repos/${repo}/contents/.lar-factory.json`).length;
   // More refreshes read lar-factory's items, but no answer they have already.
   const refreshed = await reads('maddec01/lar-factory');
-  for (let i = 0; i < 40 && await reads('maddec01/lar-factory') < refreshed + 2; i++) await new Promise((r) => setTimeout(r, 25));
+  await board.untilCalled(args => readsRepositoryConfig(args) && args[1] === 'repos/maddec01/lar-factory/contents/.lar-factory.json', refreshed + 2);
   assert.deepEqual([await reads('maddec01/lar-web'), await reads('maddec01/lar-cli')], [1, 1]);
   // A failed check offers nothing, logs once, and is tried again on the next refresh.
-  for (let i = 0; i < 40 && await reads('maddec01/lar-docs') < 2; i++) await new Promise((r) => setTimeout(r, 25));
+  await board.untilCalled(args => readsRepositoryConfig(args) && args[1] === 'repos/maddec01/lar-docs/contents/.lar-factory.json', 2);
   assert.ok(await reads('maddec01/lar-docs') > 1);
   assert.equal(board.logs().split("can't tell whether maddec01/lar-docs has .lar-factory.json: ").length, 2);
   await board.post({}, board.url, '/api/recheck');
-  for (let i = 0; i < 40 && await reads('maddec01/lar-web') < 2; i++) await new Promise((r) => setTimeout(r, 25));
+  await board.untilCalled(args => readsRepositoryConfig(args) && args[1] === 'repos/maddec01/lar-web/contents/.lar-factory.json', 2);
   assert.equal(await reads('maddec01/lar-web'), 2);
 });
 

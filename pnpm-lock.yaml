@@ -228,6 +228,9 @@ importers:
       '@lar-factory/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@lar-factory/work-records':
+        specifier: workspace:*
+        version: link:../../packages/work-records
     devDependencies:
       '@types/node':
         specifier: ^24.19.2

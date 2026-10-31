@@ -3,7 +3,7 @@
 // view's concept block tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text } from '../../test/support.ts';
+import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -41,7 +41,7 @@ const c200 = sample.items.find((i) => i.id === C200)!;
 /** A Queued grill under #200, blocked by `blockers`. */
 const decision = (blockers: Item['blockers'] = []): Item => ({
   ...sample.items.find((i) => i.id === 'I_sample05')!, id: 'I_d204', number: 204, title: 'Pick the relay host', labels: ['decision-grill'],
-  repo: c200.repo, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'open' },
+  repo: c200.repo, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'open' }, parentId: c200.id,
   blockers,
 });
 const withDecision = (blockers?: Item['blockers']) => writable({ ...sample, items: [...sample.items, decision(blockers)] });
@@ -491,7 +491,7 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
   const child = rawIssue('I_102', 102, 'In progress', ['build'], {
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
-  await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });
+  await mountPage({ ...sample, error: null, items: recorded(normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) })) });
   expect([text(line(1, 'I_100').firstElementChild!.firstElementChild!.firstElementChild), text(line(2, 'I_100'))]).toEqual(['Coupled work', '0/2 partsMoving#102 Issue 102lar-factory']);
   expect(listed('I_100'), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
   expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();

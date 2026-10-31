@@ -7,7 +7,7 @@ import { fakeAz } from '../azure/fake-az.ts';
 import { configuredSources, mergeSources, onboardedSources } from './item-sources.ts';
 
 const item = (id: string, repo: string, status: Status = 'List'): Item => ({
-  id, status, statuses: [status], content: 'ticket', number: Number(id.slice(2)), title: id, url: `https://github.com/${repo}/issues/${id.slice(2)}`, repo,
+  id, status, statuses: [status], content: 'ticket', revision: 0, kind: 'issue', parentId: null, number: Number(id.slice(2)), title: id, url: `https://github.com/${repo}/issues/${id.slice(2)}`, repo,
   labels: [], state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
   updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [],
 });

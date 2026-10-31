@@ -57,19 +57,19 @@ test('the stream pushes each read of GitHub as soon as it finishes', async (t) =
   const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 3500, delayedRepos: ['maddec01/lar-factory'] }, false, true);
   const stream = await openStream(t, board);
   // A repository's items show as its read lands, before the first read ends, so wait for that read to end.
-  await stream.next((d) => d.firstRead.settled && statusOf(d, 'I_1') === 'List');
-  await board.update({ items: [boardIssue(1, 'Ready')] });
+  await stream.next((d) => d.firstRead.settled && statusOf(d, board.id(1)) === 'List');
+  await board.update({ items: [boardIssue(1, 'List', 'maddec01/lar-factory', ['bug'])] });
   assert.equal((await askRead(board)).status, 202);
-  await stream.next((d) => statusOf(d, 'I_1') === 'Ready');
+  await stream.next((d) => d.items.some((i) => i.id === board.id(1) && i.labels.includes('bug')));
 });
 
 test('a change made through the board reaches every open stream', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
   const first = await openStream(t, board);
   const second = await openStream(t, board);
-  for (const stream of [first, second]) await stream.next((d) => statusOf(d, 'I_12') === 'List');
-  assert.equal((await board.post({ itemId: 'I_12' }, board.url, '/api/queue')).status, 200);
-  for (const stream of [first, second]) await stream.next((d) => statusOf(d, 'I_12') === 'Queued');
+  for (const stream of [first, second]) await stream.next((d) => statusOf(d, board.id(12)) === 'List');
+  assert.equal((await board.post({ itemId: board.id(12) }, board.url, '/api/queue')).status, 200);
+  for (const stream of [first, second]) await stream.next((d) => statusOf(d, board.id(12)) === 'Queued');
 });
 
 test('the stream refuses a foreign Host', async (t) => {

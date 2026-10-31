@@ -1,7 +1,7 @@
 // Repository issues as GitHub's GraphQL API returns them, and the rules that turn them into the
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
-import { isBuild, labelStatuses, sliceProgress } from './model.ts';
+import { isBuild, labelKind, labelStatuses, sliceProgress } from './model.ts';
 import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice, Status } from './model.ts';
 import { parseConceptMap } from './concept-map.ts';
 
@@ -209,8 +209,10 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
   const statuses = labelStatuses(rawLabels(raw));
   const item: Item = {
     id: c.id,
+    revision: 0,
     status: closed.closedAs === 'done' ? 'Done' : statuses[0] ?? 'List',
     statuses,
+    kind: labelKind(rawLabels(raw)),
     content: 'ticket',
     number: c.number,
     title: c.title,
@@ -219,6 +221,7 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     labels: rawLabels(raw),
     ...closed,
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
+    parentId: null,
     subIssues: subIssueCounts(raw, builds),
     blockers: c.blockedBy?.nodes.map((b) => ({ number: b.number, repo: b.repository.nameWithOwner, state: issueState(b.state) })) ?? [],
     updatedAt: updated,

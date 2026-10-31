@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { kindOf, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
+import { plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -250,7 +250,7 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   );
 }
 
-const kindLabel = (parent: Item) => (kindOf(parent) === 'concept' ? 'Concept' : 'Coupled work');
+const kindLabel = (parent: Item) => (parent.kind === 'concept' ? 'Concept' : 'Coupled work');
 const repos = (m: Moving, data: BoardData) => [...new Set(m.parts.map((p) => repoName(repoKey(p.item), data.repos)))].join(' + ');
 
 /** Every part as a segment in its status colour, done first, so the bar fills left to right; a dashed one per part the board doesn't read. */

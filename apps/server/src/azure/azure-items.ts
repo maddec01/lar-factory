@@ -7,7 +7,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { STATUSES, decodePart, labelStatuses, repoTag, statusLabel } from '@lar-factory/shared';
+import { STATUSES, decodePart, labelKind, labelStatuses, repoTag, statusLabel } from '@lar-factory/shared';
 import type { AzureWorkItem, Blocker, Item, LinkedPr } from '@lar-factory/shared';
 import { ReadProblem, type ItemSource, type ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
@@ -338,8 +338,10 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       return {
         id: itemId(raw.id),
         ...currentSprint && childNumbers.length > 0 && { currentSprint: { name: currentSprint.name, childNumbers: childNumbers.filter((id) => currentSprint.childIds.includes(id)) } },
+        revision: 0,
         status: closed ? 'Done' : statuses[0] ?? 'List',
         statuses,
+        kind: labelKind(labelsOf(raw)),
         content: 'ticket',
         number: raw.id,
         title: field(raw, 'System.Title'),
@@ -353,6 +355,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
         closedAs: closed ? 'done' : null,
         parent: parent ? { number: parent.id, title: field(parent, 'System.Title'), url: url(parent.id), repo: repoOf(parent),
           state: done(parent) ? 'closed' : 'open', azure: azureWorkItem(parent) } : null,
+        parentId: null,
         subIssues: { total: children.length, completed: children.filter(done).length },
         blockers: linked(raw, 'System.LinkTypes.Dependency-Reverse').map(blocker),
         updatedAt: field(raw, 'System.ChangedDate'),
@@ -386,8 +389,8 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     ...azureWrites(project, workItems, (id, file) => parsed(workItemPatch(organization, project, id, file)), statesOf),
     // A new work item is in its type's first state, Proposed, so it shows open in List.
     create: azureCreate(project, team, invoke, async () => (await backlogOf()).requirementBacklog.defaultWorkItemType.name, (raw, draft) => ({
-      id: itemId(raw.id), status: 'List', statuses: ['List'], content: 'ticket', number: raw.id, title: field(raw, 'System.Title'),
-      url: url(raw.id), repo: draft.repo, azure: azureWorkItem(raw), ...!draft.onlyFor && { untaggedFor: [...repos] }, labels: labelsOf(raw), state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 },
+      id: itemId(raw.id), revision: 0, status: 'List', statuses: ['List'], kind: labelKind(labelsOf(raw)), content: 'ticket', number: raw.id, title: field(raw, 'System.Title'),
+      url: url(raw.id), repo: draft.repo, azure: azureWorkItem(raw), ...!draft.onlyFor && { untaggedFor: [...repos] }, labels: labelsOf(raw), state: 'open', closedAs: null, parent: null, parentId: null, subIssues: { total: 0, completed: 0 },
       blockers: [], updatedAt: field(raw, 'System.ChangedDate'), closedAt: null, linkedPrs: [], slices: [],
     })),
   };

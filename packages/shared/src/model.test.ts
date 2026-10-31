@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -10,8 +10,10 @@ import { day, formatTokens, formatUsd, shortAgo } from './format.ts';
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
   return {
     id: 'x',
+    revision: 0,
     status,
     statuses: status === 'Done' ? [] : [status],
+    kind: labelKind(labels),
     content: 'ticket',
     number: 7,
     title: 't',
@@ -21,6 +23,7 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
     state: 'open',
     closedAs: null,
     parent: null,
+    parentId: null,
     subIssues: { total: 0, completed: 0 },
     blockers: [],
     updatedAt: '2026-10-21T09:00:00Z',
@@ -47,16 +50,17 @@ test('a slice is done once closed as completed, blocked or active while open wit
   assert.equal(sliceProgress('CLOSED', 'DUPLICATE', {}), null, 'a duplicate is closed as not planned too');
 });
 
-test('kinds come from labels', () => {
-  assert.equal(kindOf(item('List', ['bug', 'concept'])), 'concept');
-  assert.equal(kindOf(item('List', [])), 'issue');
-  assert.equal(kindOf(item('List', ['improvement', 'build'])), 'improvement', 'build only switches on slices');
-  assert.equal(kindOf(item('List', ['build', 'bug'])), 'bug');
-  assert.equal(kindOf(item('List', ['build', 'feature'])), 'feature');
-  assert.equal(kindOf(item('List', ['build'])), 'build', 'with no other kind it reads as a build');
-  assert.equal(kindOf(item('List', ['build', 'decision-research'])), 'decision');
-  assert.equal(kindOf(item('List', [['decision:', 'grill'].join(' ')])), 'issue', 'the old decision label is no kind');
+test("a ticket's labels give its kind", () => {
+  assert.equal(labelKind(['bug', 'concept']), 'concept');
+  assert.equal(labelKind([]), 'issue');
+  assert.equal(labelKind(['improvement', 'build']), 'improvement', 'build only switches on slices');
+  assert.equal(labelKind(['build', 'bug']), 'bug');
+  assert.equal(labelKind(['build', 'feature']), 'feature');
+  assert.equal(labelKind(['build']), 'build', 'with no other kind it reads as a build');
+  assert.equal(labelKind(['build', 'decision-research']), 'decision');
+  assert.equal(labelKind([['decision:', 'grill'].join(' ')]), 'issue', 'the old decision label is no kind');
   assert.equal(kindLabel(item('List', ['decision-task'])), 'decision-task');
+  assert.equal(kindLabel(item('List', [], { kind: 'decision' })), 'decision', 'a recorded decision with no ticket label is a decision');
 });
 
 test('the build label makes a build whatever the kind, except on a concept', () => {
@@ -149,13 +153,13 @@ test('an item total adds each sub-issue on the board once, at any depth, and is 
   const repo = 'maddec01/lar-server';
   const under = (n: number) => ({ number: n, title: 't', url: `https://github.com/${repo}/issues/${n}`, repo: 'Maddec01/Lar-Server', state: 'open' as const });
   const parent = item('In progress', [], { id: 'p', number: 7, stats: { agentMs: 10, wallMs: 1, tokens: 100, costUsd: 0.5 } });
-  const build = item('Done', ['build'], { id: 'b', number: 8, parent: under(7), stats: { agentMs: 20, wallMs: 2, tokens: 200, costUsd: 3, frozen: true } });
-  const nested = item('Done', ['build'], { id: 'n', number: 9, parent: under(8), stats: { agentMs: 40, tokens: 400, costUsd: 5, frozen: true } });
-  const quiet = item('Ready', [], { id: 'q', number: 10, parent: under(7) });
-  const other = item('Done', [], { id: 'o', number: 11, repo: 'maddec01/lar-apple', parent: under(7), stats: { agentMs: 1, tokens: 1 } });
+  const build = item('Done', ['build'], { id: 'b', number: 8, parent: under(7), parentId: 'p', stats: { agentMs: 20, wallMs: 2, tokens: 200, costUsd: 3, frozen: true } });
+  const nested = item('Done', ['build'], { id: 'n', number: 9, parent: under(8), parentId: 'b', stats: { agentMs: 40, tokens: 400, costUsd: 5, frozen: true } });
+  const quiet = item('Ready', [], { id: 'q', number: 10, parent: under(7), parentId: 'p' });
+  const other = item('Done', [], { id: 'o', number: 11, repo: 'maddec01/lar-apple', parent: under(7), parentId: 'p', stats: { agentMs: 1, tokens: 1 } });
   const items = [parent, build, nested, quiet, other];
   assert.deepEqual(itemTotal(parent, items), { agentMs: 71, tokens: 701, costUsd: 8.5 },
-    'parent repos match in any case; wall only when every figure has it, frozen only when all are');
+    'wall only when every figure has it, frozen only when all are');
   assert.deepEqual(itemTotal(build, items), { agentMs: 60, tokens: 600, costUsd: 8, frozen: true });
   assert.equal(itemTotal(nested, items), null, 'no sub-issues: the total equals the item stats');
   assert.equal(itemTotal(quiet, items), null);
@@ -164,7 +168,7 @@ test('an item total adds each sub-issue on the board once, at any depth, and is 
     'sub-issues with all-zero figures leave the total equal to the item stats');
   assert.deepEqual(itemTotal(item('Queued', [], { id: 'p', number: 7 }), [build]),
     { agentMs: 20, wallMs: 2, tokens: 200, costUsd: 3, frozen: true }, 'a parent without its own figures totals its sub-issues');
-  const looped = { ...parent, parent: under(8) };
+  const looped = { ...parent, parent: under(8), parentId: 'b' };
   assert.deepEqual(itemTotal(looped, [looped, build, build]), { agentMs: 30, wallMs: 3, tokens: 300, costUsd: 3.5 },
     'each item counts once, even listed twice or in a loop');
   assert.equal(itemTotal(parent, [parent, { ...build, stats: 'unavailable' }]), 'unavailable', 'an unreadable figure leaves the total unknown');

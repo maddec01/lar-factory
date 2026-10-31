@@ -10,7 +10,7 @@ const items = (sampleJson as unknown as { items: Item[] }).items;
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
 const child = (number: number, parent: Item, change: Partial<Item> = {}): Item => ({
   ...byNumber(129), id: `I_c${number}`, number, status: 'Shaping', labels: [],
-  parent: { number: parent.number!, repo: parent.repo!, title: parent.title, url: parent.url!, state: 'open' }, ...change,
+  parent: { number: parent.number!, repo: parent.repo!, title: parent.title, url: parent.url!, state: 'open' }, parentId: parent.id, ...change,
 });
 
 test('every open concept, and every open item with a sub-issue on the board, is a dossier, in board order', () => {

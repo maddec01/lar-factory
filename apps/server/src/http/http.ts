@@ -148,7 +148,7 @@ async function readJson(req: IncomingMessage, res: ServerResponse, what: string)
 }
 
 /** Runs an item command on the body's itemId, or refuses a body that names none. */
-function forItem(unnamed: string, run: (itemId: string, input: Record<string, unknown>) => Promise<Reply>): Write['run'] {
+function forItem(unnamed: string, run: (itemId: string, input: Record<string, unknown>) => Reply | Promise<Reply>): Write['run'] {
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 

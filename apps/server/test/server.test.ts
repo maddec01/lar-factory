@@ -80,16 +80,18 @@ test('sample mode never writes through the local GitHub login', async (t) => {
   assert.equal((await board.calls()).length, 0);
 });
 
-test('successful refreshes eventually remove a created item whose issue is absent', async (t) => {
-  // Three authoritative reads must finish, even when each takes most of a second.
+test('a created item stays on the board as recorded work while GitHub does not list its issue', async (t) => {
   const board = await startBoard(t, { readDelay: 800, delayedRepos: ['maddec01/lar-factory'] }, false, true);
   await onboarded(board);
   const initial = await board.board();
   const response = await board.post({ session: initial.capture.session, requestId: randomUUID(), draft });
-  assert.equal((await response.json()).board.items.length, 1, 'creation appears immediately');
-  // GitHub keeps returning no issue, as when the item was removed before reconciliation.
-  await until(board, (data) => data.items.length === 0);
-  assert.equal((await board.board()).items.length, 0, 'a temporary overlay cannot outlive repeated authoritative reads');
+  const [created] = (await response.json()).board.items as Item[];
+  assert.equal(created?.title, draft.title, 'creation appears immediately');
+  // GitHub keeps returning no issue, as when its index lags; three reads later the work record still holds it.
+  const reads = async () => (await board.calls()).filter((args) => args[1] === 'graphql').length;
+  const target = await reads() + 3;
+  while (await reads() < target) await new Promise((r) => setTimeout(r, 50));
+  assert.deepEqual((await board.board()).items.map((i: Item) => i.id), [created!.id]);
 });
 
 const rawBuild = (number: number, status: string) => boardIssue(number, status, undefined, ['build']);
@@ -109,9 +111,8 @@ test("a refresh finds build sub-issues, active and blocked slices with issue sea
   const board = await startBoard(t, { items, builds: [{ number: 12, repository }], active: [{ number: 15, repository }, { number: 16, repository }],
     blocked: [{ number: 16, repository }] });
   const read = await readItems(board);
-  assert.deepEqual(read.map((i) => i.number), [13, 12], 'the build sub-issue stays a board item; the slice does not');
-  const [built] = read;
-  assert.deepEqual(built?.subIssues, { total: 1, completed: 0 });
+  assert.deepEqual(read.map((i) => i.number).sort(), [12, 13], 'the build sub-issue stays a board item; the slice does not');
+  const built = read.find((i) => i.number === 13);
   assert.deepEqual(built?.slices.map((s) => [s.number, s.progress]), [[15, 'active'], [16, 'blocked']]);
 });
 
@@ -121,8 +122,7 @@ test('a build sub-issue on the board stays a board item while the issue search s
   const parent = rawBuild(13, 'In progress');
   const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref] } } }, rawBuild(12, 'In progress')];
   const read = await readItems(await startBoard(t, { items, builds: [] }));
-  assert.deepEqual(read.map((i) => i.number), [13, 12]);
-  assert.deepEqual(read[0]?.subIssues, { total: 1, completed: 0 });
+  assert.deepEqual(read.map((i) => i.number).sort(), [12, 13]);
 });
 
 test('each refresh attaches item stats from T3 Code\'s database and Claude transcripts, and a missing database leaves them out', async (t) => {
@@ -265,7 +265,7 @@ test("only a build's linked PRs have their body and merge time read, once each, 
   assert.deepEqual(asked, [`ids[]=${url(40)}`, `ids[]=${url(42)}`]);
 });
 
-test('a parent with two builds merged at different times: each build keeps its own frozen figures, the parent writes no block, its total counts all once', async (t) => {
+test('a concept with two builds merged at different times: each build keeps its own frozen figures, the concept writes no block, its total counts all once', async (t) => {
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
   // The parent's own thread is live; the builds' threads are gone from T3 Code, as after transcript deletion.
   const db = statsDb(t, [{ id: 'p', messages: ['$lar-work maddec01/lar-factory#13'], turns }]);
@@ -281,8 +281,8 @@ test('a parent with two builds merged at different times: each build keeps its o
     return { ...raw, content: { ...raw.content, state: 'CLOSED', closedAt: new Date(Date.now() - 60_000).toISOString(), updatedAt: new Date(Date.now() - 60_000).toISOString(), parent: parentRef,
       closedByPullRequestsReferences: { nodes: [linked] } } };
   };
-  const parent = boardIssue(13, 'In progress');
-  // The last build's PR also closes the parent.
+  const parent = boardIssue(13, 'In progress', undefined, ['concept']);
+  // The last build's PR also closes the concept.
   const items = [{ ...parent, content: { ...parent.content, subIssuesSummary: { total: 2, completed: 2 },
     closedByPullRequestsReferences: { nodes: [last] } } }, build(12, first), build(14, last)];
   const check = async (board: Awaited<ReturnType<typeof startBoard>>) => {

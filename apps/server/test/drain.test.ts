@@ -18,12 +18,12 @@ test('a drain answers once running writes finish, and refuses new writes from th
   const board = await startBoard(t, { items: [boardIssue(12, 'Queued')], t3: { delay: 300 } }, false, false, env);
   await until(board, (d) => d.items.length === 1);
   const { capture } = await board.board() as BoardData;
-  const starting = post(board, '/api/start', { session: capture!.session, itemId: 'I_12' });
+  const starting = post(board, '/api/start', { session: capture!.session, itemId: board.id(12) });
   await new Promise((r) => setTimeout(r, 100));
 
   const drain = await post(board, '/api/drain');
   assert.equal(drain.status, 200);
-  assert.ok((await board.board() as BoardData).started?.I_12, 'the drain answered before the running Start finished');
+  assert.ok((await board.board() as BoardData).started?.[board.id(12)], 'the drain answered before the running Start finished');
   assert.equal((await starting).status, 200);
 
   for (const path of GUARDED) {

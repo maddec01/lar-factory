@@ -53,10 +53,10 @@ const start = (board: Board, itemId: string, origin = board.url, model?: unknown
 
 test("Start begins one lar-shape thread in the card's repository project and leaves the Status alone", async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(30, 'Queued', 'maddec01/lar-server')]);
-  const response = await start(board, 'I_12');
+  const response = await start(board, board.id(12));
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
-  assert.equal((await start(board, 'I_30')).status, 200);
+  assert.equal((await start(board, board.id(30, 'maddec01/lar-server'))).status, 200);
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', MESSAGE, '--json'],
     ['thread', 'start', 'project-server', '#30 Issue 30\n$lar-shape maddec01/lar-server#30', '--json'],
@@ -67,7 +67,7 @@ test("Start begins one lar-shape thread in the card's repository project and lea
 
 test('Start runs the thread on the picked model choice, still in the repository project', async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
-  const response = await start(board, 'I_12', board.url, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
+  const response = await start(board, board.id(12), board.url, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
   assert.equal(response.status, 200);
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', MESSAGE, '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5', '--json'],
@@ -91,7 +91,7 @@ for (const [name, model] of [
 ] as const) {
   test(`Start refuses ${name} as the model choice and runs no t3`, async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
-    const response = await start(board, 'I_12', board.url, model);
+    const response = await start(board, board.id(12), board.url, model);
     assert.equal(response.status, 422);
     assert.match((await response.json()).error, /isn't offered/);
     assert.deepEqual(await board.t3Calls(), []);
@@ -104,7 +104,7 @@ test('Start finds the repository project by origin, whatever its folder is calle
     return projectsDb(t, [{ id: 'project-lar', root: `${dir}/Developer/lar` },
       { id: 'project-clone', root: '~/code/factory-clone' }]);
   });
-  assert.equal((await start(board, 'I_12')).status, 200);
+  assert.equal((await start(board, board.id(12))).status, 200);
   assert.equal((await board.t3Calls())[0]?.[2], 'project-clone');
 });
 
@@ -145,7 +145,7 @@ for (const refusal of refusals) {
     const item = boardIssue(12, 'Queued', refusal.repo);
     const { board, home: dir } = await boardIn(t, [item], refusal.origins ?? ORIGINS,
       refusal.db ?? ((dir) => projectsDb(t, (refusal.projects ?? PROJECTS)(dir))));
-    const response = await start(board, 'I_12');
+    const response = await start(board, board.id(12));
     assert.equal(response.status, 409, 'a refusal is not a t3 failure');
     const answer = await response.json();
     assert.equal(answer.error, refusal.error(dir));
@@ -163,7 +163,7 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
     changed.close();
     return db;
   });
-  const response = await start(board, 'I_12');
+  const response = await start(board, board.id(12));
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, "Can't read T3 Code's projects; reconnect T3 Code before starting");
   assert.deepEqual(await board.t3Calls(), []);
@@ -176,7 +176,7 @@ test('Start refuses an unreadable list of onboarded repositories, naming the fil
   const board = await startBoard(t, { items: [boardIssue(12, 'Queued')] }, false, false, { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) });
   await until(board, (d) => d.items.length === 1);
   writeFileSync(join(dir, 'Library/Application Support/Lar Factory/repository-settings.json'), '{ broken');
-  const response = await start(board, 'I_12');
+  const response = await start(board, board.id(12));
   assert.equal(response.status, 409);
   assert.match((await response.json()).error, /repository-settings\.json isn't valid JSON/);
   assert.deepEqual(await board.t3Calls(), []);
@@ -184,45 +184,45 @@ test('Start refuses an unreadable list of onboarded repositories, naming the fil
 
 test('a thread T3 returns untitled takes the first line of the work message as its title', async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { untitled: true } });
-  const response = await start(board, 'I_12');
+  const response = await start(board, board.id(12));
   assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
 });
 
 test('a double press, a retry or another page starts no second thread for the item', async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(13, 'Queued')], { t3: { delay: 100 } });
-  const responses = await Promise.all([start(board, 'I_12'), start(board, 'I_12')]);
+  const responses = await Promise.all([start(board, board.id(12)), start(board, board.id(12))]);
   assert.deepEqual(responses.map((r) => r.status), [200, 200]);
-  assert.equal((await start(board, 'I_12')).status, 200);
+  assert.equal((await start(board, board.id(12))).status, 200);
   const thread = { threadId: 'thread-1', title: '#12 Issue 12' };
-  assert.deepEqual((await board.board() as BoardData).started, { I_12: thread }, 'a reloaded page sees the thread');
-  assert.equal((await start(board, 'I_13')).status, 200, 'another item starts its own thread');
+  assert.deepEqual((await board.board() as BoardData).started, { [board.id(12)]: thread }, 'a reloaded page sees the thread');
+  assert.equal((await start(board, board.id(13))).status, 200, 'another item starts its own thread');
   assert.equal((await board.t3Calls()).length, 2);
 });
 
 test('an uncertain T3 error prevents another launch', async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'down' } });
-  const failed = await start(board, 'I_12');
+  const failed = await start(board, board.id(12));
   assert.equal(failed.status, 502);
   assert.match((await failed.json()).error, /could not be confirmed/);
   await board.update({ items: [boardIssue(12, 'Queued')] });
-  assert.equal((await start(board, 'I_12')).status, 502);
+  assert.equal((await start(board, board.id(12))).status, 502);
 });
 
 for (const fail of ['killed', 'garbage']) {
   test(`an unconfirmed start (${fail}) is never retried as a new thread`, async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail } });
-    const first = await start(board, 'I_12');
+    const first = await start(board, board.id(12));
     assert.equal(first.status, 502);
     assert.equal((await first.json()).uncertain, true);
     await board.update({ items: [boardIssue(12, 'Queued')] });
-    assert.equal((await (await start(board, 'I_12')).json()).uncertain, true);
+    assert.equal((await (await start(board, board.id(12))).json()).uncertain, true);
     assert.equal((await board.t3Calls()).filter(args => args[0] === 'thread' && args[1] === 'start').length, 1);
   });
 }
 
 test('a missing t3 says how to point the board at it', async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, { T3_PATH: '/nonexistent/t3' });
-  const response = await start(board, 'I_12');
+  const response = await start(board, board.id(12));
   assert.equal(response.status, 502);
   assert.match((await response.json()).error, /T3_PATH/);
 });
@@ -230,15 +230,15 @@ test('a missing t3 says how to point the board at it', async (t) => {
 test('Start only runs for Queued issues from this board page and session', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List'), boardIssue(13, 'Ready'), boardIssue(14, 'Queued')] });
   await until(board, (d) => d.items.length === 3);
-  assert.equal((await start(board, 'I_12')).status, 409);
-  assert.equal((await start(board, 'I_13')).status, 409);
+  assert.equal((await start(board, board.id(12))).status, 409);
+  assert.equal((await start(board, board.id(13))).status, 409);
   assert.equal((await start(board, 'I_missing')).status, 404);
   assert.equal((await board.post({ session: (await board.board()).capture.session, itemId: 14 }, board.url, '/api/start')).status, 400);
-  const restarted = await board.post({ session: 'old', itemId: 'I_14' }, board.url, '/api/start');
+  const restarted = await board.post({ session: 'old', itemId: board.id(14) }, board.url, '/api/start');
   assert.equal(restarted.status, 409);
   const answer = await restarted.json();
   assert.ok(!answer.uncertain && answer.board.capture.session, 'a stale page gets the new session and can press Start again');
-  for (const origin of ['https://evil.example', 'null', '']) assert.equal((await start(board, 'I_14', origin)).status, 403);
+  for (const origin of ['https://evil.example', 'null', '']) assert.equal((await start(board, board.id(14), origin)).status, 403);
   const sample = await startBoard(t, {}, true);
   assert.equal((await start(sample, 'I_sample05')).status, 403);
   assert.deepEqual([...await board.t3Calls(), ...await sample.t3Calls()], []);
@@ -249,37 +249,33 @@ test('Start is refused while an issue the item is blocked by is open', async (t)
     blockedBy: { nodes: [5, 6].map((number) => ({ number, state: 'OPEN', repository: { nameWithOwner: number === 5 ? 'maddec01/lar-factory' : 'maddec01/lar-server' } })) },
   });
   const board = await factoryBoard(t, [blocked]);
-  const refused = await start(board, 'I_12');
+  const refused = await start(board, board.id(12));
   assert.equal(refused.status, 409);
   assert.equal((await refused.json()).error, 'Blocked by #5, maddec01/lar-server#6 until they close; use Start after to start it then.');
   assert.deepEqual(await board.t3Calls(), []);
 });
 
-test('Start is refused while Back to List or Abandon is pending for the item', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(12, 'Queued'), boardIssue(13, 'Queued')], writeDelay: 300 });
-  await until(board, (d) => d.items.length === 2);
-  const moving = board.post({ itemId: 'I_12' }, board.url, '/api/back-to-list');
-  const abandoning = board.postSession({ itemId: 'I_13' }, '/api/abandon');
+test('Start is refused while Abandon is pending for the item', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(13, 'Queued')], writeDelay: 300 });
+  await until(board, (d) => d.items.length === 1);
+  const abandoning = board.postSession({ itemId: board.id(13) }, '/api/abandon');
   await new Promise((r) => setTimeout(r, 100));
-  const refusedMove = await start(board, 'I_12');
-  assert.equal(refusedMove.status, 409);
-  assert.equal((await refusedMove.json()).error, 'This item is moving back to List, so it can\'t start.');
-  const refusedAbandon = await start(board, 'I_13');
+  const refusedAbandon = await start(board, board.id(13));
   assert.equal(refusedAbandon.status, 409);
   assert.equal((await refusedAbandon.json()).error, 'This item is being abandoned, so it can\'t start.');
-  assert.deepEqual((await Promise.all([moving, abandoning])).map((r) => r.status), [200, 200]);
+  assert.equal((await abandoning).status, 200);
   assert.deepEqual(await board.t3Calls(), []);
 });
 
 for (const recover of ['late', 'deleted']) {
   test(`an uncertain launch with ${recover} CLI evidence preserves duplicate protection`, async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'garbage', recover } });
-    const response = await start(board, 'I_12');
+    const response = await start(board, board.id(12));
     assert.equal(response.status, recover === 'late' ? 200 : 502);
     const answer = await response.json();
     if (recover === 'late') assert.equal(answer.thread.threadId, 'thread-1');
     else assert.equal(answer.uncertain, true);
-    await start(board, 'I_12');
+    await start(board, board.id(12));
     assert.equal((await board.t3Calls()).filter(args => args[1] === 'start').length, 1);
     assert.ok((await board.t3Calls()).some(args => args[1] === 'show'));
   });

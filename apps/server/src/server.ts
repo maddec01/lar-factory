@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, providerTool, refKey, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
+import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
@@ -19,6 +20,7 @@ import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
+import { recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
@@ -70,6 +72,35 @@ const board = createBoardState({
   modelChoices: [],
   bundledSkills: bundledSkills(),
 });
+
+/**
+ * The work records the board shows and moves, which threads change through lar-work too; null in sample mode and when
+ * the database can't be opened, which `recordsProblem` names as the board's error until it restarts.
+ */
+let records: WorkRecords | null = null;
+let recordsProblem: string | null = null;
+if (!fixture) {
+  try { records = await openWorkRecords(); }
+  catch (err) {
+    recordsProblem = `Can't open the work records: ${(err as Error).message}`;
+    log(recordsProblem);
+    board.update({ error: settings.problem ?? recordsProblem });
+  }
+}
+/** The tickets the item sources read last, which give the records their ticket context. */
+let tickets: Item[] = [];
+let ticketsByRef = new Map<string, Item>();
+/** The repositories whose source that read hadn't read yet, whose records wait for their tickets. */
+let unread: string[] = [];
+/** The ticket item a board item's record names, as the item sources read it last; undefined for work with no ticket. */
+const ticketOf = (item: Item): Item | undefined => (item.number ? ticketsByRef.get(refKey(item.repo, item.number).toLowerCase()) : undefined);
+/** The board items: the onboarded repositories' work records, as they are now, with `read`'s tickets, kept for later. */
+function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tickets, waiting: unread }): Item[] {
+  if (read.items !== tickets) ticketsByRef = ticketsByReference(read.items);
+  tickets = read.items;
+  unread = read.waiting ?? [];
+  return records ? recordItems(records, tickets, items.repos().map((r) => r.repo), unread) : [];
+}
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
 const modelManifest = modelManifestPath();
@@ -252,7 +283,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   return items.map((item) => {
     const known = retainStats(previousStats.get(item.id), item.stats);
     const live = fresh ? stats(item) : item.stats;
-    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : item.stats, threads: threads(item) };
+    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item) };
     // A slice's implementer thread names the slice, so a build is running while a thread runs for it or any slice.
     const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
     if (running(shown.threads) || item.slices.some((slice) => running(threads(slice)))) lastRunning.set(item.id, now);
@@ -278,7 +309,9 @@ const lastRunning = new Map<string, number>();
  * agent's status while T3 can't say, it closed in the last SETTLE_MS, its PR's checks run, the board shows a change to
  * it GitHub hasn't reported, or an armed start waits on it or for it.
  */
-function isActive(item: Item, now: number, waitedOn: ReadonlySet<string>): boolean {
+function isActive(ticket: Item, now: number, waitedOn: ReadonlySet<string>, shownFor: ReadonlyMap<Item, Item>): boolean {
+  // A source paces its tickets; the board knows each by its record's work ID.
+  const item = shownFor.get(ticket) ?? ticket;
   if (now - (lastRunning.get(item.id) ?? -Infinity) < SETTLE_MS) return true;
   if (item.state === 'open' && AGENT_STATUSES.has(item.status) && board.snapshot().tools?.t3?.result !== 'ok') return true;
   if (item.closedAt && now - Date.parse(item.closedAt) < SETTLE_MS) return true;
@@ -306,8 +339,14 @@ function readPace(): ReadPace {
   const now = Date.now();
   const armed = board.snapshot().armed ?? {};
   const waitedOn = new Set(board.snapshot().items.filter((i) => armed[i.id]).flatMap((i) => i.blockers.map((b) => refKey(b.repo, b.number))));
+  // The board item showing each ticket, built once a pace as a source asks about each of its tickets.
+  const shownFor = new Map<Item, Item>();
+  for (const shown of board.snapshot().items) {
+    const ticket = ticketOf(shown);
+    if (ticket && !shownFor.has(ticket)) shownFor.set(ticket, shown);
+  }
   return { now, slow: quotaLow, activeMs: TEST_READ_MS || ACTIVE_READ_MS, idleMs: idleMs(),
-    active: (item) => isActive(item, now, waitedOn), polled: (item) => checksRunning(item, now), waits: waitsForTool, blocked: blockedByTool };
+    active: (item) => isActive(item, now, waitedOn, shownFor), polled: (item) => checksRunning(item, now), waits: waitsForTool, blocked: blockedByTool };
 }
 
 /** Whether gh's quota ran low at its last check, made at most every QUOTA_CHECK_MS. */
@@ -322,7 +361,10 @@ async function checkQuota(): Promise<void> {
   quotaLow = low;
 }
 
-/** Shows T3's threads, and every LOCAL_STATS_MS its stats, as they are now on the items as last read, pushing only when they changed. */
+/**
+ * Shows the work records as they are now, which threads may have changed, with T3's threads and every LOCAL_STATS_MS
+ * its stats, pushing only when they changed. Before the first read lands, there are no records to show yet.
+ */
 function refreshLocal(): void {
   if (refreshing) return;
   void t3Availability().then(source => {
@@ -330,16 +372,21 @@ function refreshLocal(): void {
     board.push();
   });
   const before = board.snapshot().items;
-  let after = withT3Reads(before, Date.now() - statsReadAt >= LOCAL_STATS_MS);
+  if (board.snapshot().fetchedAt !== null || before.length) showRecords(Date.now() - statsReadAt >= LOCAL_STATS_MS);
+  let after = board.snapshot().items;
   const running = (item: Item) => Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running');
   // A run can finish between stats reads. Read its final turn before writing the settled PR block.
-  if (after.some((item, index) => running(before[index]!) && !running(item))) after = withT3Reads(after);
+  const finished = after.some((item) => running(before.find((b) => b.id === item.id) ?? item) && !running(item));
+  if (finished) board.update({ items: after = withT3Reads(after) });
   void commands.reconcileStarts(after);
-  const t3Of = (items: Item[]) => JSON.stringify(items.map((i) => [i.stats, i.threads]));
-  if (t3Of(after) === t3Of(before)) return;
-  board.update({ items: after });
+  if (JSON.stringify(after) === JSON.stringify(before)) return;
   board.push();
   void syncPrStats(after);
+}
+
+/** Shows the work records as they are now with the last tickets read, and their T3 threads; stats only when `withStats`. */
+function showRecords(withStats = false): void {
+  board.applyRead(recordedItems(), board.revision(), (shown) => withT3Reads(shown, withStats));
 }
 
 /**
@@ -511,7 +558,7 @@ async function refresh(): Promise<void> {
       if (board.snapshot().firstRead.settled) return;
       // A read so far confirms no change the board made, as the source of one may not have read yet, and isn't the
       // whole read fetchedAt times.
-      board.applyRead(partial.items, readRevision, withT3Reads, () => false);
+      board.applyRead(recordedItems(partial), readRevision, withT3Reads, () => false);
       board.update({ itemSourceProblems: partial.problems ?? [] });
       moveFirstRead({ waiting: partial.waiting });
     };
@@ -520,10 +567,10 @@ async function refresh(): Promise<void> {
     // Before the first whole read, every source waited for its tool's check or was blocked by it, so nothing read: the
     // board keeps showing no read, as before it. After one, a source its tool blocks keeps its last read, which stays fresh.
     if (fetchedAt === null && repos.length > 0 && repos.every((repo) => snapshot.waiting?.includes(repo.repo) || blockedByTool(itemSource(repo)))) return;
-    const recovered = error !== null && error !== settings.problem || fetchedAt === null;
-    board.applyRead(snapshot.items, readRevision, withT3Reads, items.readAfresh);
+    const recovered = error !== null && error !== (settings.problem ?? recordsProblem) || fetchedAt === null;
+    board.applyRead(recordedItems(snapshot), readRevision, withT3Reads, items.readAfresh);
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting });
-    board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? null, itemSourceProblems: snapshot.problems ?? [],
+    board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? recordsProblem, itemSourceProblems: snapshot.problems ?? [],
       t3Availability: await t3Availability(), t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;
@@ -598,7 +645,12 @@ const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
 /** Onboarding's Clash agent runs, kept while the board runs so closing the dialog leaves a run going. */
 const clashRuns = createClashRuns(offerModelChoices);
-const commands = createItemCommands({ board, items, repos: items.repos, offerModelChoices, checkSkills: parentSkillCheck() });
+const commands = createItemCommands({ board, items, records, reread: (added = []) => {
+  tickets = [...tickets.filter((t) => !added.some((a) => a.id === t.id)), ...added];
+  showRecords();
+  board.push();
+}, repos: items.repos, offerModelChoices,
+  checkSkills: parentSkillCheck() });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
@@ -608,7 +660,7 @@ const { server, endStreams } = createBoardServer({
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
     if (read.availability !== 'available') throw new Error('T3 unavailable');
   },
-  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null), readSoon, ready: () => firstGhCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf), readSoon, ready: () => firstGhCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input),

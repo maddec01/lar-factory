@@ -7,8 +7,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import type { TestContext } from 'vite-plus/test';
-import { isSkillCheckRequest } from '@lar-factory/shared';
-import type { BoardData, DriftChoice, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, isSkillCheckRequest, normalizeItems, readBuilds, refKey } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, Item, RawItem, Searched, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
+import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
+import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
@@ -48,6 +50,39 @@ export function writeRepositoryList(home: string, repos: readonly string[]): voi
 }
 
 /**
+ * Records the work each issue the board used to show is: its title, its labels' kind and Status, or Done once closed
+ * as done, its ticket, its parent and a build's slices. An issue with no status in an `optedIn` repository, one done before the board's
+ * week of Done, a slice and an issue closed as not planned are no work of their own. Returns each issue's work ID by its `owner/name#number`.
+ */
+async function recordIssues(home: string, raws: readonly RawItem[], optedIn: readonly string[] = [], searched: Searched = {}): Promise<Map<string, string>> {
+  const ids = new Map<string, string>();
+  if (!raws.length) return ids;
+  const records = await openWorkRecords(workRecordsPath(boardDataDir(home, {})));
+  try {
+    const recent = (item: Item) => item.status !== 'Done' || Date.now() - Date.parse(item.closedAt ?? item.updatedAt) <= DONE_WINDOW_MS;
+    const items = normalizeItems([...raws], { ...searched, builds: new Set([...readBuilds([...raws]), ...searched.builds ?? []]) }).filter((item) => recent(item) && (item.statuses.length || item.status === 'Done' || !optedIn.includes(item.repo)));
+    for (const item of items) {
+      const ticket = `${item.repo}#${item.number}`;
+      ids.set(ticket, records.importTicket({ title: item.title, repository: item.repo, kind: item.kind, status: item.status, ticket }).record.workId);
+    }
+    // A sub-issue whose kinds a work record allows, such as a concept's build, keeps its parent; other structure stays on GitHub.
+    for (const item of items) {
+      const parent = item.parent && ids.get(`${item.parent.repo}#${item.parent.number}`);
+      const workId = ids.get(`${item.repo}#${item.number}`)!;
+      if (parent) try { records.setParent(workId, records.read(workId).revision, parent); } catch { /* a parent of another kind */ }
+      if (item.kind !== 'build') continue;
+      for (const slice of item.slices) {
+        const status = slice.progress === 'done' ? 'Done' : slice.progress === 'active' ? 'In progress' : 'List';
+        let made = records.importTicket({ title: slice.title, repository: slice.repo, kind: 'slice', status, ticket: `${slice.repo}#${slice.number}` }).record;
+        made = records.setParent(made.workId, made.revision, workId);
+        if (slice.progress === 'blocked') records.setNeedsYou(made.workId, made.revision, 'The implementer could not finish it.');
+      }
+    }
+  } finally { records.close(); }
+  return ids;
+}
+
+/**
  * Lists TEST_REPOSITORIES under `home` with `repo` still onboarding, its PR open. Its default branch has no
  * .lar-factory.json yet, as NOT_LANDED tells the fake gh, or the board finishes the onboarding with the file.
  */
@@ -83,12 +118,23 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const home = env.HOME ?? dir;
   const { repositories = TEST_REPOSITORIES } = options as { repositories?: readonly string[] | null };
   if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'))) writeRepositoryList(home, repositories);
+  // Only recorded work is on the board, so each fake issue starts recorded, unless `recorded: false` says none is.
+  type Ref = { number: number; repository: { nameWithOwner: string } };
+  const { items: issues = [], repoIssues = {}, repoConfigs = {}, builds = [], active = [], blocked = [], recorded = true } = options as {
+    items?: RawItem[]; repoIssues?: Record<string, RawItem['content'][]>; repoConfigs?: Record<string, { show?: string } | null>;
+    builds?: Ref[]; active?: Ref[]; blocked?: Ref[]; recorded?: boolean };
+  // The fake gh's issue searches, which tell a build sub-issue from a slice and a slice's progress, as a read does.
+  const keys = (refs: Ref[]) => new Set(refs.map((r) => refKey(r.repository.nameWithOwner, r.number)));
+  const optedIn = Object.entries(repoConfigs).filter(([, config]) => config?.show === 'opted-in').map(([repo]) => repo);
+  const listed = [...issues, ...Object.values(repoIssues).flat().map((content): RawItem => ({ id: content!.id, updatedAt: content!.updatedAt, content }))];
+  const workIds = recorded ? await recordIssues(home, listed, optedIn, { builds: keys(builds), active: keys(active), blocked: keys(blocked) })
+    : new Map<string, string>();
   const port = 'BOARD_PORT' in env ? env.BOARD_PORT : String(await freePort());
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', new URL('./project-discovery-fixture.ts', import.meta.url).href,
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),
     // A home of its own keeps a live board's record out of the real one.
-    env: { ...testEnv(), HOME: dir, BOARD_PORT: port, GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
+    env: { ...Object.fromEntries(Object.entries(testEnv()).filter(([key]) => key !== DATA_DIR_ENV)), HOME: dir, BOARD_PORT: port, GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname, SHELL: new URL('./fake-shell.sh', import.meta.url).pathname,
       FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, T3_SERVER_RUNTIME: runtimeFile, BOARD_DATA_FILE: fixture ? SAMPLE_DATA : '',
       ...(fixture ? SAMPLE_MODELS : {}), ...env },
@@ -164,6 +210,10 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   if (!response.ok) throw new Error(`Board answered ${response.status}: ${logs}`);
   return {
     url,
+    /** The work ID of the fake issue `number` in `repo`, as startBoard recorded it. */
+    id: (number: number, repo = 'maddec01/lar-factory') => workIds.get(`${repo}#${number}`) ?? `unrecorded ${repo}#${number}`,
+    /** The folder holding the board's work-record database. */
+    dataDir: boardDataDir(home, {}),
     pid: child.pid!,
     stop,
     update: (value: object) => writeFile(stateFile, JSON.stringify(value)),

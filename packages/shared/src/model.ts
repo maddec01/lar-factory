@@ -96,15 +96,15 @@ export interface IssueRef {
   azure?: AzureWorkItem;
 }
 
-/** An issue blocking an item, by GitHub's blocked-by link. */
-export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'>;
+/** Work blocking an item: closed once that work is complete. A record's blocker names its work ID and title; its number is 0 without a ticket. */
+export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'> & { workId?: string; title?: string };
 
 /** The issues the item is blocked by that are still open: what holds its start, its badge and Start after. */
 export const openBlockers = (item: Pick<Item, 'blockers'>): Blocker[] => item.blockers.filter((b) => b.state === 'open');
 
 /** A blocker as `#n`, or as `owner/repo#n` when another repository's; `short` drops the owner, to fit on a button. */
-export const blockerRef = (item: Pick<Item, 'repo'>, b: Pick<Blocker, 'number' | 'repo'>, short = false): string =>
-  b.repo === item.repo ? `#${b.number}` : `${short ? b.repo.slice(b.repo.indexOf('/') + 1) : b.repo}#${b.number}`;
+export const blockerRef = (item: Pick<Item, 'repo'>, b: Pick<Blocker, 'number' | 'repo' | 'title'>, short = false): string =>
+  !b.number ? b.title ?? 'untracked work' : b.repo === item.repo ? `#${b.number}` : `${short ? b.repo.slice(b.repo.indexOf('/') + 1) : b.repo}#${b.number}`;
 
 /** The item's open blockers, each as blockerRef gives it. */
 export const openBlockerRefs = (item: Pick<Item, 'blockers' | 'repo'>, short = false): string[] =>
@@ -205,8 +205,7 @@ export function itemTotal(item: Item, items: readonly Item[]): ItemStats | 'unav
 }
 
 function isSubIssueOf(child: Item, parent: Item): boolean {
-  return child.parent !== null && parent.repo !== null && child.parent.number === parent.number &&
-    child.parent.repo.toLowerCase() === parent.repo.toLowerCase();
+  return child.parentId === parent.id;
 }
 
 function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): number {
@@ -214,16 +213,25 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 }
 
 export interface Item {
-  /** The node id of the issue or Azure work item. */
+  /**
+   * The board item's work ID, from its work record. An item source's read, before it joins a record, holds its ticket's
+   * node id here, which the provider reads and writes it by.
+   */
   id: string;
-  /** The status the board places it by: Done once it closed as done, else the first of `statuses` in flow order, else List. */
+  /** Its work record's revision, which a move names; 0 on an item source's read. */
+  revision: number;
+  /** Its work record's Status. An item source's read places it by labels: Done once closed as done, else the first of `statuses`, else List. */
   status: Status;
-  /** Every status the item carries on its provider, in flow order; empty when it has none. Never Done, which is never stored. */
+  /** Every status the item carries, in flow order; empty when it has none. A work record carries its one Status. Never Done. */
   statuses: Status[];
+  /** Its work record's kind, or on an item source's read the kind its labels give. */
+  kind: Kind;
   /** A ticket is a repository issue or an Azure work item. */
   content: 'ticket';
+  /** Its ticket's number, or 0 for work with no ticket. */
   number: number;
   title: string;
+  /** Its ticket's URL, or null for work with no ticket. */
   url: string | null;
   repo: string;
   /**
@@ -241,7 +249,9 @@ export interface Item {
   /** How a closed item closed: `done` when completed or merged, `not-planned` otherwise; null while open. */
   closedAs: 'done' | 'not-planned' | null;
   parent: IssueRef | null;
-  /** GitHub's sub-issue counts; a build counts only its `build` sub-issues, not its slices. */
+  /** The work ID of the record that owns it, or null while it has no parent. */
+  parentId: string | null;
+  /** Its child work's counts; on an item source's read, GitHub's sub-issue counts, a build counting only its `build` sub-issues. */
   subIssues: { total: number; completed: number };
   /** The team's current sprint and its direct children in that sprint; absent when no sprint is current. */
   currentSprint?: { name: string; childNumbers: number[] };
@@ -592,10 +602,11 @@ export function decisionType(item: Item): string | null {
   return label ? label.slice('decision-'.length) : null;
 }
 
-export function kindOf(item: Item): Kind {
-  const has = (l: string) => item.labels.includes(l);
+/** The kind a ticket's labels give it. */
+export function labelKind(labels: readonly string[]): Kind {
+  const has = (l: string) => labels.includes(l);
   if (has('concept')) return 'concept';
-  if (decisionType(item)) return 'decision';
+  if (labels.some((l) => l.startsWith('decision-'))) return 'decision';
   if (has('bug')) return 'bug';
   if (has('feature')) return 'feature';
   if (has('improvement')) return 'improvement';
@@ -610,9 +621,9 @@ export function isBuild(item: Pick<Item, 'labels'>): boolean {
 }
 
 export function kindLabel(item: Item): string {
-  const kind = kindOf(item);
-  if (kind === 'decision') return `decision-${decisionType(item)}`;
-  return kind;
+  const { kind } = item;
+  const type = decisionType(item);
+  return kind === 'decision' && type ? `decision-${type}` : kind;
 }
 
 // ---------- checks ----------
@@ -741,7 +752,7 @@ export function workMessage(item: Item): string {
  * title, lowercase and hyphen-joined, accents dropped and anything but a-z and 0-9 left out.
  */
 export function buildBranch(item: Item): string {
-  const kind = kindOf(item);
+  const { kind } = item;
   const prefix = kind === 'bug' ? 'fix' : kind === 'feature' || kind === 'improvement' ? 'feat' : 'chore';
   const words = item.title.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/['’]/g, '')
     .split(/[^a-z0-9]+/).filter(Boolean).slice(0, 5);

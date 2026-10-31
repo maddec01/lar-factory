@@ -35,7 +35,7 @@ test("a sprint read lists requirement-level items with Task counts, a Completed 
   assert.deepEqual(shown(read.items), [[1, 'Shaping', null], [2, 'Done', null], [5, 'Queued', null], [6, 'List', null]]);
   const seek = read.items[0]!;
   assert.deepEqual({ ...seek, parent: undefined }, {
-    sourceOrder: 0, azure: { type: 'User Story', state: 'Active', assignee: null }, id: 'azure:contoso/1', status: 'Shaping', statuses: ['Shaping'], content: 'ticket', number: 1, title: 'Seek',
+    sourceOrder: 0, azure: { type: 'User Story', state: 'Active', assignee: null }, id: 'azure:contoso/1', status: 'Shaping', statuses: ['Shaping'], content: 'ticket', revision: 0, kind: 'issue', parentId: null, number: 1, title: 'Seek',
     url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/1', repo: REPO, untaggedFor: [REPO], labels: ['area-api'], state: 'open', closedAs: null,
     currentSprint: { name: 'Sprint 12', childNumbers: [11, 12, 13] },
     parent: undefined, subIssues: { total: 2, completed: 1 },
@@ -109,7 +109,7 @@ test('a repository showing Opted-in items hides an item with no status tag', asy
 
 /** A source for another repository that lists one item. */
 const otherRepo: ItemSource = {
-  read: async () => ({ title: 'maddec01/lar-apple', items: [{ id: 'I_1', status: 'List', statuses: [], content: 'ticket', number: 1, title: 'Apple', url: null,
+  read: async () => ({ title: 'maddec01/lar-apple', items: [{ id: 'I_1', status: 'List', statuses: [], content: 'ticket', revision: 0, kind: 'issue', parentId: null, number: 1, title: 'Apple', url: null,
     repo: 'maddec01/lar-apple', labels: [], state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
     updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [] }] }),
   setStatus: async () => null, statusRefusal: () => null, addLabel: async () => null,

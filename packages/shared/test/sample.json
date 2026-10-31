@@ -40,10 +40,12 @@
   "items": [
     {
       "id": "I_sample01",
+      "revision": 1,
       "status": "List",
       "statuses": [
         "List"
       ],
+      "kind": "feature",
       "content": "ticket",
       "number": 61,
       "title": "Arr instances, catalog bindings and content requests",
@@ -57,6 +59,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -69,10 +72,12 @@
     },
     {
       "id": "I_sample02",
+      "revision": 1,
       "status": "List",
       "statuses": [
         "List"
       ],
+      "kind": "bug",
       "content": "ticket",
       "number": 114,
       "title": "Verify VideoToolbox 8-bit HEVC decoding during hardware detection",
@@ -85,6 +90,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -97,10 +103,12 @@
     },
     {
       "id": "I_sample03",
+      "revision": 1,
       "status": "List",
       "statuses": [
         "List"
       ],
+      "kind": "feature",
       "content": "ticket",
       "number": 12,
       "title": "Remember the last subtitle language per show",
@@ -115,6 +123,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -127,10 +136,12 @@
     },
     {
       "id": "I_sample04",
+      "revision": 1,
       "status": "List",
       "statuses": [
         "List"
       ],
+      "kind": "improvement",
       "content": "ticket",
       "number": 900004,
       "title": "Shared playback history across devices",
@@ -142,6 +153,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -154,10 +166,12 @@
     },
     {
       "id": "I_sample05",
+      "revision": 1,
       "status": "Queued",
       "statuses": [
         "Queued"
       ],
+      "kind": "improvement",
       "content": "ticket",
       "number": 129,
       "title": "Run more than one 4K HDR to 1080p stream at a time",
@@ -169,6 +183,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -181,10 +196,12 @@
     },
     {
       "id": "I_sample06",
+      "revision": 1,
       "status": "Queued",
       "statuses": [
         "Queued"
       ],
+      "kind": "bug",
       "content": "ticket",
       "number": 20,
       "title": "Player controls stay visible after scrubbing <on tvOS>",
@@ -196,6 +213,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -208,10 +226,12 @@
     },
     {
       "id": "I_sample21",
+      "revision": 1,
       "status": "Queued",
       "statuses": [
         "Queued"
       ],
+      "kind": "improvement",
       "content": "ticket",
       "number": 900021,
       "title": "Offline downloads on watchOS",
@@ -223,6 +243,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -235,10 +256,12 @@
     },
     {
       "id": "I_sample07",
+      "revision": 1,
       "status": "Shaping",
       "statuses": [
         "Shaping"
       ],
+      "kind": "bug",
       "content": "ticket",
       "number": 130,
       "title": "Show cold bitmap subtitles within 3 s before preparation finishes",
@@ -250,6 +273,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -276,10 +300,12 @@
     },
     {
       "id": "I_sample08",
+      "revision": 1,
       "status": "Shaping",
       "statuses": [
         "Shaping"
       ],
+      "kind": "feature",
       "content": "ticket",
       "number": 22,
       "title": "Continue watching row on the home screen",
@@ -297,6 +323,7 @@
         "repo": "maddec01/lar-apple",
         "state": "open"
       },
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -323,10 +350,12 @@
     },
     {
       "id": "I_sample09",
+      "revision": 1,
       "status": "Shaping",
       "statuses": [
         "Shaping"
       ],
+      "kind": "concept",
       "content": "ticket",
       "number": 200,
       "title": "lar cloud: website sign-in and relay",
@@ -338,6 +367,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 6,
         "completed": 2
@@ -370,10 +400,12 @@
     },
     {
       "id": "I_sample10",
+      "revision": 1,
       "status": "Shaping",
       "statuses": [
         "Shaping"
       ],
+      "kind": "decision",
       "content": "ticket",
       "number": 201,
       "title": "Relay: broker only or full TURN?",
@@ -391,6 +423,7 @@
         "repo": "maddec01/lar-server",
         "state": "open"
       },
+      "parentId": "I_sample09",
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -423,10 +456,12 @@
     },
     {
       "id": "I_sample11",
+      "revision": 1,
       "status": "Needs you",
       "statuses": [
         "Needs you"
       ],
+      "kind": "improvement",
       "content": "ticket",
       "number": 23,
       "title": "Faster library sync on large collections",
@@ -444,6 +479,7 @@
         "repo": "maddec01/lar-apple",
         "state": "open"
       },
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -462,10 +498,12 @@
     },
     {
       "id": "I_sample12",
+      "revision": 1,
       "status": "Needs you",
       "statuses": [
         "Needs you"
       ],
+      "kind": "decision",
       "content": "ticket",
       "number": 202,
       "title": "Sign-in screen",
@@ -483,6 +521,7 @@
         "repo": "maddec01/lar-server",
         "state": "open"
       },
+      "parentId": "I_sample09",
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -509,10 +548,12 @@
     },
     {
       "id": "I_sample13",
+      "revision": 1,
       "status": "Ready",
       "statuses": [
         "Ready"
       ],
+      "kind": "build",
       "content": "ticket",
       "number": 140,
       "title": "Owner accounts",
@@ -530,6 +571,7 @@
         "repo": "maddec01/lar-server",
         "state": "open"
       },
+      "parentId": "I_sample09",
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -581,10 +623,12 @@
     },
     {
       "id": "I_sample22",
+      "revision": 1,
       "status": "In progress",
       "statuses": [
         "In progress"
       ],
+      "kind": "feature",
       "content": "ticket",
       "number": 150,
       "title": "Relay for streaming away from home",
@@ -597,6 +641,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -736,10 +781,12 @@
     },
     {
       "id": "I_sample14",
+      "revision": 1,
       "status": "In progress",
       "statuses": [
         "In progress"
       ],
+      "kind": "feature",
       "content": "ticket",
       "number": 30,
       "title": "Chapter markers in the scrubber",
@@ -751,6 +798,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -792,10 +840,12 @@
     },
     {
       "id": "I_sample23",
+      "revision": 1,
       "status": "In progress",
       "statuses": [
         "In progress"
       ],
+      "kind": "feature",
       "content": "ticket",
       "number": 180,
       "title": "Resume playback across devices",
@@ -807,6 +857,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 2,
         "completed": 2
@@ -865,10 +916,12 @@
     },
     {
       "id": "I_sample15",
+      "revision": 1,
       "status": "Review",
       "statuses": [
         "Review"
       ],
+      "kind": "bug",
       "content": "ticket",
       "number": 141,
       "title": "Transcoder leaks a file handle on cancel",
@@ -880,6 +933,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -921,10 +975,12 @@
     },
     {
       "id": "I_sample16",
+      "revision": 1,
       "status": "Verify",
       "statuses": [
         "Verify"
       ],
+      "kind": "feature",
       "content": "ticket",
       "number": 31,
       "title": "New artwork grid layout",
@@ -936,6 +992,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -964,10 +1021,12 @@
     },
     {
       "id": "I_sample26",
+      "revision": 1,
       "status": "Verify",
       "statuses": [
         "Verify"
       ],
+      "kind": "improvement",
       "content": "ticket",
       "number": 900026,
       "title": "Bump FFmpeg to 7.1",
@@ -979,6 +1038,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -1006,10 +1066,12 @@
     },
     {
       "id": "I_sample27",
+      "revision": 1,
       "status": "Verify",
       "statuses": [
         "Verify"
       ],
+      "kind": "feature",
       "content": "ticket",
       "number": 34,
       "title": "Swipe between episodes",
@@ -1021,6 +1083,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -1048,10 +1111,12 @@
     },
     {
       "id": "I_sample28",
+      "revision": 1,
       "status": "Verify",
       "statuses": [
         "Verify"
       ],
+      "kind": "improvement",
       "content": "ticket",
       "number": 147,
       "title": "Fall back to software transcoding when the GPU is busy",
@@ -1063,6 +1128,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -1084,10 +1150,12 @@
     },
     {
       "id": "I_sample17",
+      "revision": 1,
       "status": "Ready to merge",
       "statuses": [
         "Ready to merge"
       ],
+      "kind": "improvement",
       "content": "ticket",
       "number": 142,
       "title": "Cache probe results between restarts",
@@ -1099,6 +1167,7 @@
       "state": "open",
       "closedAs": null,
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -1131,8 +1200,10 @@
     },
     {
       "id": "I_sample18",
+      "revision": 1,
       "status": "Done",
       "statuses": [],
+      "kind": "decision",
       "content": "ticket",
       "number": 203,
       "title": "Hosting cost of the relay",
@@ -1150,6 +1221,7 @@
         "repo": "maddec01/lar-server",
         "state": "open"
       },
+      "parentId": "I_sample09",
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -1176,8 +1248,10 @@
     },
     {
       "id": "I_sample19",
+      "revision": 1,
       "status": "Done",
       "statuses": [],
+      "kind": "bug",
       "content": "ticket",
       "number": 5,
       "title": "Crash when a server goes offline mid-playback",
@@ -1190,6 +1264,7 @@
       "state": "closed",
       "closedAs": "done",
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -1222,8 +1297,10 @@
     },
     {
       "id": "I_sample24",
+      "revision": 1,
       "status": "Done",
       "statuses": [],
+      "kind": "build",
       "content": "ticket",
       "number": 181,
       "title": "Store the playback position per device",
@@ -1241,6 +1318,7 @@
         "repo": "maddec01/lar-server",
         "state": "open"
       },
+      "parentId": "I_sample23",
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -1284,8 +1362,10 @@
     },
     {
       "id": "I_sample25",
+      "revision": 1,
       "status": "Done",
       "statuses": [],
+      "kind": "build",
       "content": "ticket",
       "number": 40,
       "title": "Resume from the stored position",
@@ -1303,6 +1383,7 @@
         "repo": "maddec01/lar-server",
         "state": "open"
       },
+      "parentId": "I_sample23",
       "subIssues": {
         "total": 0,
         "completed": 0
@@ -1352,8 +1433,10 @@
     },
     {
       "id": "I_sample20",
+      "revision": 1,
       "status": "Done",
       "statuses": [],
+      "kind": "improvement",
       "content": "ticket",
       "number": 100,
       "title": "Old cleanup task",
@@ -1365,6 +1448,7 @@
       "state": "closed",
       "closedAs": "done",
       "parent": null,
+      "parentId": null,
       "subIssues": {
         "total": 0,
         "completed": 0

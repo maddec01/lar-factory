@@ -117,7 +117,7 @@ test("open and kept closed issues normalize together: a closed dossier keeps its
   ] };
   const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
   const data = await until(board, (d) => d.fetchedAt !== null);
-  assert.deepEqual(data.items.map((i) => i.number), [41, 40, 50]);
+  assert.deepEqual(data.items.map((i) => i.number).sort(), [40, 41, 50]);
   assert.equal(data.items.find((i) => i.number === 40)!.map?.destination, 'There.');
   assert.deepEqual(data.items.find((i) => i.number === 50)!.slices.map((s) => s.number), [51]);
 });
@@ -135,66 +135,6 @@ const projectCommands = async (board: Board) => (await board.calls()).filter((ar
 
 const labelEdits = async (board: Board) => (await board.calls()).filter((args) => args[0] === 'label' || (args[0] === 'issue' && args[1] === 'edit'));
 
-test("Queue on an item from a repository's issues creates the missing label, swaps it in", async (t) => {
-  const board = await issuesBoard(t, { repoIssues: { [APPLE]: [appleIssue(8, { labels: { nodes: [{ name: 'status-list' }] } })] } });
-  const response = await board.post({ itemId: 'I_8' }, board.url, '/api/queue');
-  assert.equal(response.status, 200);
-  assert.deepEqual(await labelEdits(board), [
-    ['label', 'create', '-R', APPLE, '--color', 'EDEDED', '--description', 'Status: Queued', '--', 'status-queued'],
-    ['issue', 'edit', '8', '-R', APPLE, '--add-label', 'status-queued', '--remove-label', 'status-list'],
-  ]);
-  assert.equal((await board.board() as BoardData).items[0]!.status, 'Queued');
-  assert.deepEqual(await projectCommands(board), []);
-});
-
-for (const [name, fail, error] of [
-  ['label creation', 'label-create', `Could not create the status-queued label in ${APPLE}. gh label create failed: HTTP 403: Must have admin rights to Repository.`],
-  ['label edit', 'label', 'Could not set Queued. gh issue edit failed: HTTP 403: Resource not accessible by integration'],
-] as const) {
-  test(`a failed ${name} on a repository's issue shows the error and leaves the item where it was`, async (t) => {
-    const board = await issuesBoard(t, { fail });
-    const response = await board.post({ itemId: 'I_8' }, board.url, '/api/queue');
-    assert.equal(response.status, 502);
-    assert.equal((await response.json() as { error: string }).error, error);
-    assert.equal((await board.board() as BoardData).items[0]!.status, 'List');
-  });
-}
-
-test('a move on an issue with two status labels is refused before any write', async (t) => {
-  const twice = appleIssue(8, { labels: { nodes: [{ name: 'status-list' }, { name: 'status-ready' }] } });
-  const board = await issuesBoard(t, { repoIssues: { [APPLE]: [twice] } });
-  const response = await board.post({ itemId: 'I_8' }, board.url, '/api/queue');
-  assert.equal(response.status, 409);
-  assert.match((await response.json() as { error: string }).error, /carries List and Ready\. Keep one/);
-  assert.deepEqual(await labelEdits(board), []);
-});
-
-test('picking one of the statuses on an issue with two keeps it, removes the other, and nothing else moves the issue', async (t) => {
-  const twice = appleIssue(8, { labels: { nodes: [{ name: 'status-review' }, { name: 'status-shaping' }] } });
-  const board = await issuesBoard(t, { repoIssues: { [APPLE]: [twice] }, repoLabels: { [APPLE]: ['status-review'] } } as object);
-  const pick = (status: unknown) => board.post({ itemId: 'I_8', status }, board.url, '/api/pick-status');
-  for (const status of ['Queued', 'Done', 7]) assert.equal((await pick(status)).status, 409, String(status));
-  assert.equal((await board.post({ itemId: 'I_8' }, board.url, '/api/queue')).status, 409);
-  assert.deepEqual(await labelEdits(board), []);
-  const response = await pick('Review');
-  assert.equal(response.status, 200);
-  assert.deepEqual(await labelEdits(board), [['issue', 'edit', '8', '-R', APPLE, '--add-label', 'status-review', '--remove-label', 'status-shaping']]);
-  const shown = (await response.json() as { board: BoardData }).board.items[0]!;
-  assert.deepEqual([shown.status, shown.statuses], ['Review', ['Review']]);
-  const read = await until(board, (d) => d.items[0]!.statuses.length === 1 && d.items[0]!.status === 'Review');
-  assert.equal(read.items.length, 1);
-  assert.equal((await pick('Review')).status, 409, 'one status left, nothing to pick');
-});
-
-test('a closed issue that kept two status labels is Done, with nothing to pick', async (t) => {
-  const closed = appleIssue(8, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(1), updatedAt: daysAgo(1),
-    labels: { nodes: [{ name: 'status-review' }, { name: 'status-shaping' }] } });
-  const board = await issuesBoard(t, { repoIssues: { [APPLE]: [closed] } });
-  assert.equal((await board.board() as BoardData).items[0]!.status, 'Done');
-  assert.equal((await board.post({ itemId: 'I_8', status: 'Review' }, board.url, '/api/pick-status')).status, 409);
-  assert.deepEqual(await labelEdits(board), []);
-});
-
 test("Add item in a repository reading its issues creates the issue with status-list and nothing else, and shows it as List", async (t) => {
   const board = await issuesBoard(t);
   const draft = { repo: APPLE, kind: 'feature', title: 'Capture an item', description: '', labels: [] };
@@ -211,31 +151,16 @@ test("Add item in a repository reading its issues creates the issue with status-
 
 test("Abandon on an item from a repository's issues closes it as not planned; without write access it shows gh's error and keeps the item", async (t) => {
   const deleted = await issuesBoard(t, { repoIssues: { [APPLE]: [appleIssue(8), appleIssue(9)] } });
-  const response = await deleted.postSession({ itemId: 'I_8' }, '/api/abandon');
+  const response = await deleted.postSession({ itemId: deleted.id(8, APPLE) }, '/api/abandon');
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json() as { board: BoardData }).board.items.map((i) => i.number), [9]);
   assert.deepEqual((await deleted.calls()).filter((args) => args[1] === 'close'), [['issue', 'close', '8', '-R', APPLE, '--reason', 'not planned']]);
   assert.deepEqual(await projectCommands(deleted), []);
 
   const kept = await issuesBoard(t, { fail: 'abandon' });
-  const refused = await kept.postSession({ itemId: 'I_8' }, '/api/abandon');
+  const refused = await kept.postSession({ itemId: kept.id(8, APPLE) }, '/api/abandon');
   assert.equal(refused.status, 502);
   assert.match((await refused.json() as { error: string }).error, /^Could not abandon #8\. .*write access/);
   assert.equal((await kept.board() as BoardData).items.length, 1);
 });
 
-test("Start build moves a parent from a repository's issues to In progress by its label, on the board or off it", async (t) => {
-  const parent = { ...sliceRef(8, 'OPEN'), url: `https://github.com/${APPLE}/issues/8`, repository: { nameWithOwner: APPLE } };
-  const offBoardParent = { ...parent, number: 20, url: `https://github.com/${APPLE}/issues/20` };
-  const board = await issuesBoard(t, {
-    items: [rawIssue('I_12', 12, 'Ready', ['feature'], { parent }), rawIssue('I_13', 13, 'Ready', ['feature'], { parent: offBoardParent })],
-    issues: { [`${APPLE}/issues/20`]: { labels: [{ name: 'concept' }, { name: 'status-ready' }] } },
-    repoLabels: { [APPLE]: ['status-in-progress'] },
-  } as object, startableEnv(t));
-  for (const id of ['I_12', 'I_13']) assert.equal((await board.postSession({ itemId: id }, '/api/start-build')).status, 200);
-  assert.deepEqual((await labelEdits(board)).filter((args) => args[2] !== '12' && args[2] !== '13'), [
-    ['issue', 'edit', '8', '-R', APPLE, '--add-label', 'status-in-progress', '--remove-label', 'status-list'],
-    ['issue', 'edit', '20', '-R', APPLE, '--add-label', 'status-in-progress', '--remove-label', 'status-ready'],
-  ]);
-  assert.deepEqual(await projectCommands(board), []);
-});

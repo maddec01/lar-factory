@@ -18,6 +18,7 @@ import { readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
+import { createCapture } from './items/capture.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
 import { recordItems, ticketsByReference } from './items/record-items.ts';
@@ -645,16 +646,16 @@ const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
 /** Onboarding's Clash agent runs, kept while the board runs so closing the dialog leaves a run going. */
 const clashRuns = createClashRuns(offerModelChoices);
-const commands = createItemCommands({ board, items, records, reread: (added = []) => {
-  tickets = [...tickets.filter((t) => !added.some((a) => a.id === t.id)), ...added];
+const reread = () => {
   showRecords();
   board.push();
-}, repos: items.repos, offerModelChoices,
-  checkSkills: parentSkillCheck() });
+};
+const commands = createItemCommands({ board, items, records, reread, offerModelChoices, checkSkills: parentSkillCheck() });
+const adding = createCapture({ board, items, records, reread, repos: items.repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
-  board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  board, commands, capture: adding, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   reauthorizeT3: async () => {
     const read = await reauthorizeRepositoryProjects();
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });

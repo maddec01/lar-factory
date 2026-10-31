@@ -111,11 +111,11 @@ A label the factory needs in every repository: a kind, a decision method, build,
 _Avoid_: system label, default tag
 
 **Custom label**:
-A label the user chooses for one repository so Add item can offer it, such as the part of the product an item touches.
+A label the user chooses for one repository, such as the part of the product an item touches.
 _Avoid_: area label, applicability
 
 **Label group**:
-The Custom labels that share the text before ": ", such as `app: music` and `app: video` in the group "app". Add item shows each group as one section.
+The Custom labels that share the text before ": ", such as `app: music` and `app: video` in the group "app".
 _Avoid_: label category, label section
 
 **Work record**:

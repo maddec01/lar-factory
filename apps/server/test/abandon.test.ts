@@ -49,20 +49,17 @@ test('an abandoned item does not come back while GitHub still reports it', async
   assert.ok(!has(data, board.id(12)));
 });
 
-test('an item this board just created does not come back after Abandon', async (t) => {
+test('Abandon sets captured work aside and closes no ticket, as it has none', async (t) => {
   const board = await startBoard(t, { items: [] }, false, true);
   await onboarded(board);
   const created = await board.postSession({ requestId: '00000000-0000-4000-8000-000000000001',
-    draft: { repo: 'maddec01/lar-server', kind: 'bug', title: 'Throwaway', description: '', labels: [] } }, '/api/items');
+    draft: { repo: 'maddec01/lar-server', kind: 'bug', title: 'Throwaway', description: '' } }, '/api/items');
   assert.equal(created.status, 200);
-  // GitHub has not reported the new item yet, so only its work record holds it.
   const { id } = (await created.json() as { item: { id: string } }).item;
   assert.equal((await abandon(board, id)).status, 200);
   await reads(board, 2);
   assert.ok(!has(await board.board(), id));
-  await board.update({ items: [boardIssue(900001, 'List', 'maddec01/lar-server')] });
-  await reads(board, 3);
-  assert.ok(!has(await board.board(), id), 'its work record is set aside');
+  assert.deepEqual(await writes(board), []);
 });
 
 test('Abandon only removes List and Queued items', async (t) => {

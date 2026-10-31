@@ -5,7 +5,7 @@
 
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { carriesTwoStatuses, openBlockerRefs, openBlockers, ref, startHold, startRequest } from '@lar-factory/shared';
+import { carriesTwoStatuses, openBlockerRefs, openBlockers, itemName, ref, startHold, startRequest } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ICON, kind as buttonKind } from '../buttons/button-kinds.tsx';
@@ -70,7 +70,7 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
   return (
     <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
       <DropdownMenu.Trigger asChild>
-        <Button {...buttonKind('start')} leftIcon={ICON.play} className={SHRINKS} data-start-after={item.id} aria-label={`Start ${ref(item)} ${item.title} after ${after}`}
+        <Button {...buttonKind('start')} leftIcon={ICON.play} className={SHRINKS} data-start-after={item.id} aria-label={`Start ${itemName(item)} after ${after}`}
           title={`Starts by itself once ${waitsFor(item)}`} {...(data.capture?.enabled === false ? {} : writes)}><span className="truncate">Start after {label}</span> ▾</Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} after ${after} with`} {...opensOnChecked}>

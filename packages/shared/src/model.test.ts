@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, keepOneText, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -88,6 +88,13 @@ test("a blocker's ref is #n for the item's repository, and names another reposit
   assert.deepEqual([blockerRef(own, { number: 3, repo: own.repo! }), blockerRef(own, { number: 3, repo: own.repo! }, true)], ['#3', '#3']);
   assert.deepEqual([blockerRef(own, { number: 4, repo: 'maddec01/lar-apple' }), blockerRef(own, { number: 4, repo: 'maddec01/lar-apple' }, true)],
     ['maddec01/lar-apple#4', 'lar-apple#4']);
+});
+
+test('an item with a ticket goes by its number, and captured work with none by its title, never #0', () => {
+  const ticketed = item('List', [], { number: 12, title: 'Index files' });
+  const captured = item('List', [], { number: 0, title: 'Index files' });
+  assert.deepEqual([ref(ticketed), itemName(ticketed)], ['#12', '#12 Index files']);
+  assert.deepEqual([ref(captured), itemName(captured)], ['Index files', 'Index files']);
 });
 
 test("a repository's project hint is found whatever the case, and is null once T3 has its project or before any read", () => {
@@ -388,30 +395,16 @@ test("a repository's owner/name matches whatever its case, as GitHub's does, so 
   assert.deepEqual(groups.map((g) => [g.repo, g.items.map((i) => i.id)]), [['Maddec01/lar', ['a']], ['fabrikam/lar', ['b']]]);
 });
 
-test("Add item accepts only the chosen repository's custom labels, which may hold a colon", () => {
-  const repos = [{ repo: 'maddec01/lar-apple', role: 'app', labels: ['app: music', 'os: ios'] }, { repo: 'maddec01/lar-factory', role: 'factory', labels: [] }];
-  const draft = { repo: 'maddec01/lar-apple', kind: 'bug', title: 't', description: '', labels: ['app: music', 'app: music'] };
-  assert.deepEqual(validateDraft(draft, repos).labels, ['app: music']);
-  assert.throws(() => validateDraft({ ...draft, labels: ['area: web'] }, repos), /custom labels/);
-  assert.throws(() => validateDraft({ ...draft, labels: ['bug'] }, repos), /custom labels/, 'a workflow label is no custom label');
-  assert.throws(() => validateDraft({ ...draft, repo: 'maddec01/lar-factory' }, repos), /custom labels/, 'a repository with no labels takes none');
-  assert.deepEqual(validateDraft({ ...draft, repo: 'maddec01/lar-factory', labels: [] }, repos).labels, []);
+test('Add item keeps the title trimmed and the description as written, and nothing else the page sends', () => {
+  const draft = { repo: 'maddec01/lar-server', kind: 'feature', title: ' Index files ', description: '## Why\nSearch.', labels: ['bug'] };
+  assert.deepEqual(validateDraft(draft, sample.repos), { repo: 'maddec01/lar-server', kind: 'feature', title: 'Index files', description: '## Why\nSearch.' });
 });
 
-test('Add item keeps Only for <repo> on an Azure repository and refuses it on a GitHub one', () => {
-  const repos = [...sample.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'azure-board' as const, team: 'Web', show: 'all' as const, labels: [] }];
-  const draft = { repo: 'contoso/Fabrikam/web', kind: 'feature', title: 'Export', description: '', labels: [] };
-  assert.equal(validateDraft(draft, repos).onlyFor, undefined, 'unticked, the draft is for every repository reading the source');
-  assert.equal(validateDraft({ ...draft, onlyFor: true }, repos).onlyFor, true);
-  assert.throws(() => validateDraft({ ...draft, repo: 'maddec01/lar-server', onlyFor: true }, repos), /Azure DevOps/);
-});
-
-test('Add item refuses an unlisted repository, an unknown kind, a blank title and labels from another repository', () => {
-  const draft = { repo: 'maddec01/lar-server', kind: 'feature', title: 'Index files', description: '', labels: [] };
+test('Add item refuses an unlisted repository, an unknown kind and a blank title', () => {
+  const draft = { repo: 'maddec01/lar-server', kind: 'feature', title: 'Index files', description: '' };
   for (const input of [
     null, { ...draft, repo: 'other/repo' }, { ...draft, kind: 'concept' },
     { ...draft, title: ' \n ' }, { ...draft, title: 12 }, { ...draft, description: {} },
-    { ...draft, labels: ['app: music'] }, { ...draft, labels: ['area: server', 'anything'] },
   ]) {
     assert.throws(() => validateDraft(input, sample.repos), /./, JSON.stringify(input));
   }

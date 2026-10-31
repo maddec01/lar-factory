@@ -16,7 +16,8 @@ const unlisted: ItemSource = {
   setStatus: async () => NOT_ONBOARDED,
   statusRefusal: () => NOT_ONBOARDED,
   addLabel: async () => NOT_ONBOARDED,
-  create: async () => ({ item: null, issueUrl: null, error: NOT_ONBOARDED }),
+  searchTickets: async () => { throw new Error(NOT_ONBOARDED); },
+  readTicket: async () => { throw new Error(NOT_ONBOARDED); },
   setParentStatus: async () => NOT_ONBOARDED,
   abandon: async () => NOT_ONBOARDED,
 };
@@ -315,7 +316,8 @@ export function mergeSources(byRepo: ReadonlyMap<string, ItemSource>, optedIn: r
     setStatus: (item, status) => sourceOf(item).setStatus(item, status),
     statusRefusal: (item) => ('id' in item ? sourceOf(item) : forRepo(item.repo)).statusRefusal(item),
     addLabel: (item, label) => sourceOf(item).addLabel(item, label),
-    create: (draft, progress) => forRepo(draft.repo).create(draft, progress),
+    searchTickets: (repo, query) => forRepo(repo).searchTickets(repo, query),
+    readTicket: (repo, number) => forRepo(repo).readTicket(repo, number),
     setParentStatus: (parent, status) => forRepo(parent.repo).setParentStatus(parent, status),
     abandon: (item) => sourceOf(item).abandon(item),
   };
@@ -374,7 +376,8 @@ export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = 
     setStatus: (item, status) => current.setStatus(item, status),
     statusRefusal: (item) => current.statusRefusal(item),
     addLabel: (item, label) => current.addLabel(item, label),
-    create: (draft, progress) => current.create(draft, progress),
+    searchTickets: (repo, query) => current.searchTickets(repo, query),
+    readTicket: (repo, number) => current.readTicket(repo, number),
     setParentStatus: (parent, status) => current.setParentStatus(parent, status),
     abandon: (item) => current.abandon(item),
   };

@@ -73,15 +73,19 @@ new build or `src/` change.
   or the next attempt succeeds. Warnings such as stale data or an available
   update stay while their cause lasts. Closing is per page: a reload shows
   again whatever still holds.
-- **Add item** creates an issue in a configured repository and adds it to List.
-  Choose its kind and any of the repository's custom labels, the `labels` in its
-  `.lar-factory.json`. The form keeps your draft while the board refreshes. If a confirmed issue needs another step, **Retry this submission** finishes the same issue.
+- **Add item** records work in an onboarded repository and adds it to List. It
+  creates no ticket: the title and description go into a work record on this
+  machine, and the board shows the work without a ticket number. **Pick a ticket**
+  searches the repository's open tickets by title words or `#12`, and records the
+  one you pick with its text as the record's initial context. Picking a ticket
+  that is already on the board opens its item. The item dialog of work without a
+  ticket offers **Attach a ticket**, which keeps the work's ID. The form keeps
+  your draft while the board refreshes.
 
-Creation and Queue use the same local `gh` login as reads and need permission
-to create issues and edit their labels. Start runs the local `t3` CLI and
-needs T3 Code running. If a response is lost, retry the current submission. An
-uncertain GitHub creation or a board restart asks you to check the repository
-issues before starting another item.
+The ticket search and a pick read tickets through the same local `gh` or `az`
+login as reads, and write nothing to them. Start runs the local `t3` CLI and
+needs T3 Code running. If a response is lost, retry the current submission. A
+board restart asks you to check List before adding the work again.
 
 At startup the board looks up `t3`, `gh` and `az` the way T3 Code does, so it
 finds them when opened with a bare PATH. For each tool it tries the override

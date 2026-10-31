@@ -1,23 +1,20 @@
-// The title bar's Add item button and its dialog: a form that creates an issue in a configured repo
-// and adds it to List. ⌘N opens it too. The store keeps the form's values as they're edited, so a half-written draft
-// survives a close. A large title and the description editor sit on the left; the side panel holds the repository, the
-// kind, Only for <repo> on an Azure repository, and the custom labels by Label group.
+// The title bar's Add item button and its dialog, in two panes. New work is a form that records work in an onboarded
+// repository and adds it to List, creating no ticket: a large title and the description editor on the left, the
+// repository and kind in the side panel. Pick a ticket searches a repository's open tickets and records the one picked.
+// ⌘N opens it too. The store keeps the form's values as they're edited, so a half-written draft survives a close.
 
 import { useEffect, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
-import { Check, SquarePen } from 'lucide-react';
+import { SquarePen } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { ITEM_KINDS, noneOnboarded, onAzure, repoName } from '@lar-factory/shared';
-import type { RepoConfig } from '@lar-factory/shared';
+import { ITEM_KINDS, noneOnboarded, repoName } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
-import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Fieldset } from '@lar-factory/ui/fieldset';
 import { NativeSelect } from '@lar-factory/ui/native-select';
 import { FormResult } from '../notices/form-result.tsx';
-import { itemNoun, useAddItemStore } from './add-item-store.ts';
-import type { DraftValues, ResultMessage } from './add-item-store.ts';
-import { labelGroups } from './label-groups.ts';
+import { useAddItemStore } from './add-item-store.ts';
+import type { AddItemPane, DraftValues } from './add-item-store.ts';
+import { TicketPicker } from './ticket-picker.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -37,67 +34,26 @@ function PanelSection({ heading, htmlFor, children }: { heading: string; htmlFor
   );
 }
 
-/** The repo's custom labels, or tags on Azure DevOps, as toggle chips by Label group, none when it has none; `picked`
- *  start ticked. Clear unticks them all, then `onClear` lets the form keep its values. */
-function CustomLabels({ repo, picked, onClear }: { repo: RepoConfig; picked: readonly string[]; onClear: () => void }) {
-  const [ticked, setTicked] = useState(picked);
-  if (!repo.labels.length) return null;
-  const groups = labelGroups(repo.labels);
-  const clear = () => {
-    flushSync(() => setTicked([]));
-    onClear();
-  };
-  return (
-    <Fieldset unstyled className="custom-labels relative grid gap-3">
-      <legend className="float-left m-0 p-0 text-xs font-medium text-base-content">{onAzure(repo.repo) ? 'Tags' : 'Labels'}</legend>
-      {ticked.length > 0 && <button type="button" onClick={clear}
-        className="absolute end-0 top-0 rounded-sm text-xs text-(--muted-foreground) outline-none hover:text-base-content focus-visible:ring-2 focus-visible:ring-primary">Clear</button>}
-      {groups.map(({ heading, prefix, options }) => (
-        <div key={prefix === null ? 'unprefixed' : `prefix-${prefix}`} role="group" aria-label={heading} className="grid gap-1.5">
-          <span aria-hidden className={SMALL_HEADING}>{heading}</span>
-          <div className="flex flex-wrap gap-1.5">
-            {options.map(({ label, text }) => {
-              const on = ticked.includes(label);
-              return (
-                <label key={label} className={`inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2.5 text-xs transition-colors has-focus-visible:ring-2 has-focus-visible:ring-primary has-disabled:cursor-default has-disabled:opacity-60 ${on ? 'border-primary/60 bg-primary/8 text-primary' : 'border-base-300 bg-base-100 text-base-700 hover:border-base-400 hover:text-base-content'}`}>
-                  <input type="checkbox" name="labels" value={label} checked={on} className="sr-only"
-                    onChange={(event) => setTicked(event.currentTarget.checked ? [...ticked, label] : ticked.filter((each) => each !== label))} />
-                  {on && <Check aria-hidden className="-ms-0.5 size-3" />}{text}
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </Fieldset>
-  );
-}
-
-/** Only for <repo> on an Azure repository: unticked, the new work item shows in every List that reads its item source. */
-function OnlyFor({ repo, name, ticked }: { repo: RepoConfig; name: string; ticked: boolean }) {
-  if (repo.items !== 'azure-board') return null;
-  return (
-    <div className="grid gap-1 pt-1">
-      <Checkbox name="onlyFor" value="true" label={`Only for ${name}`} defaultChecked={ticked} aria-describedby="item-only-for-hint" />
-      <p className={`${HINT} ps-6`} id="item-only-for-hint">Unticked, it appears for every repository that reads the {repo.team} team's backlog and current sprint.</p>
-    </div>
-  );
-}
-
 /** The form's values and the editor's `description`, for the store to keep. */
 function valuesOf(form: HTMLFormElement, description: string): DraftValues {
   const values = new FormData(form);
   const value = (name: string) => String(values.get(name) ?? '');
-  return { repo: value('repo'), kind: value('kind'), title: value('title'), description,
-    labels: values.getAll('labels').map(String), onlyFor: values.get('onlyFor') === 'true' };
+  return { repo: value('repo'), kind: value('kind'), title: value('title'), description };
 }
 
-function Result({ message }: { message: ResultMessage }) {
-  return (
-    <FormResult id="item-result" text={message.text}>
-      {message.url && <a href={message.url} target="_blank" rel="noopener">{message.label}</a>}
-    </FormResult>
-  );
+/** The repository select both panes start with, and the hint when none is onboarded. */
+function RepoSelect({ id, repo, onRepo }: { id: string; repo: string; onRepo?: (repo: string) => void }) {
+  const data = useBoardStore((state) => state.data);
+  const hint = noneOnboarded(data);
+  return (<>
+    {/* Uncontrolled and read on input: the form's onInput re-renders before the select's change
+        event, and a controlled select would be set back to the old repo. */}
+    <NativeSelect id={id} name="repo" required defaultValue={repo} onInput={(event) => onRepo?.(event.currentTarget.value)}
+      aria-describedby={hint ? `${id}-hint` : undefined}>
+      {data.repos.map((r) => <option value={r.repo} key={r.repo}>{repoName(r.repo, data.repos)}</option>)}
+    </NativeSelect>
+    {hint && <p className={HINT} id={`${id}-hint`}>No repository is onboarded. <AddingARepository /></p>}
+  </>);
 }
 
 function AddItemForm() {
@@ -105,15 +61,11 @@ function AddItemForm() {
   const { submission, message, submit, edit, keep, reset, setOpen } = useAddItemStore();
   // Read once: the fields are uncontrolled and start from the kept draft.
   const [kept] = useState(() => useAddItemStore.getState().values);
-  const [repo, setRepo] = useState(kept?.repo ?? data.repos[0]?.repo ?? '');
   const form = useRef<HTMLFormElement>(null);
   // The editor is no form field, so its Markdown is kept here.
   const description = useRef(kept?.description ?? '');
   const { phase } = submission;
   const locked = phase !== 'editing';
-  // Opened before the repositories arrived, repo matches none: the select then shows the first.
-  const selected = data.repos.find((r) => r.repo === repo) ?? data.repos[0];
-  const hint = noneOnboarded(data);
   const keepForm = () => keep(valuesOf(form.current!, description.current));
   // An edit in the editor counts as one in the form.
   const onDescription = (markdown: string) => {
@@ -126,8 +78,7 @@ function AddItemForm() {
     event.preventDefault();
     const form = event.currentTarget;
     const values = new FormData(form);
-    void submit({ repo: values.get('repo'), kind: values.get('kind'), title: values.get('title'),
-      description: description.current, labels: values.getAll('labels'), onlyFor: values.get('onlyFor') === 'true' }).then(() => {
+    void submit({ repo: values.get('repo'), kind: values.get('kind'), title: values.get('title'), description: description.current }).then(() => {
       if (useAddItemStore.getState().submission.phase === 'editing' && form.isConnected) form.reportValidity();
     });
   };
@@ -143,19 +94,11 @@ function AddItemForm() {
               className="w-full shrink-0 border-0 bg-transparent p-0 text-xl font-semibold tracking-tight text-base-content outline-none placeholder:font-medium placeholder:text-(--muted-foreground)" />
             <DescriptionEditor label="Description" placeholder="Add a description… - for a list, 1. for steps, # for a heading"
               value={kept?.description ?? ''} onChange={onDescription} disabled={locked} fill="wide" />
-            <Result message={message} />
+            <FormResult id="item-result" text={message} />
           </div>
           <aside aria-label="Details" className="grid content-start gap-5 overflow-y-auto border-l border-base-300 bg-base-50/60 px-4 py-4 @max-[40rem]:overflow-visible @max-[40rem]:border-l-0 @max-[40rem]:border-t">
             <PanelSection heading="Repository" htmlFor="item-repo">
-              {/* Uncontrolled and read on input: the form's onInput re-renders before the select's change
-                  event, and a controlled select would be set back to the old repo. */}
-              <NativeSelect id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}
-                aria-describedby={hint ? 'item-repo-hint' : undefined}>
-                {data.repos.map((r) => <option value={r.repo} key={r.repo}>{repoName(r.repo, data.repos)}</option>)}
-              </NativeSelect>
-              {hint && <p className={HINT} id="item-repo-hint">No repository is onboarded. <AddingARepository /></p>}
-              {selected && <OnlyFor repo={selected} name={repoName(selected.repo, data.repos)} ticked={selected.repo === kept?.repo && kept.onlyFor}
-                key={`only-${selected.repo}`} />}
+              <RepoSelect id="item-repo" repo={kept?.repo ?? data.repos[0]?.repo ?? ''} />
             </PanelSection>
             <PanelSection heading="Kind" htmlFor="item-kind">
               <NativeSelect id="item-kind" name="kind" required defaultValue={kept?.kind ?? ''}>
@@ -163,11 +106,6 @@ function AddItemForm() {
                 {ITEM_KINDS.map((kind) => <option value={kind} key={kind}>{kind}</option>)}
               </NativeSelect>
             </PanelSection>
-            {/* Keyed by repo, so another repo's labels start unchecked. */}
-            {selected?.labels.length ? <>
-              <div className="h-px bg-base-300/70" />
-              <CustomLabels repo={selected} picked={selected.repo === kept?.repo ? kept.labels : []} onClear={() => { edit(); keepForm(); }} key={selected.repo} />
-            </> : null}
           </aside>
         </Fieldset>
       </div>
@@ -183,27 +121,67 @@ function AddItemForm() {
   );
 }
 
-/** What the dialog creates, in the repository the form has picked: the kept draft's, else the first. */
+/** Pick a ticket: the repository, then the ticket picker for it. Picking closes the dialog. */
+function PickTicketPane() {
+  const data = useBoardStore((state) => state.data);
+  const { pick, setOpen } = useAddItemStore();
+  const [repo, setRepo] = useState(() => useAddItemStore.getState().values?.repo ?? data.repos[0]?.repo ?? '');
+  // Opened before the repositories arrived, repo matches none: the select then shows the first.
+  const selected = data.repos.find((r) => r.repo === repo) ?? data.repos[0];
+  const disabled = data.capture?.enabled === false || !selected;
+  return (<>
+    <div className="grid min-h-0 content-start gap-4 overflow-y-auto border-t border-base-300 px-5 pb-5 pt-4 sm:px-6" id="pick-ticket">
+      <PanelSection heading="Repository" htmlFor="pick-repo">
+        <RepoSelect id="pick-repo" repo={repo} onRepo={setRepo} />
+      </PanelSection>
+      <TicketPicker id="pick" repo={selected?.repo ?? ''} disabled={disabled} key={selected?.repo} onPick={(ticket) => pick(selected!.repo, ticket)} />
+      {data.capture?.enabled === false && <p className={HINT}>Picking tickets is disabled in sample mode.</p>}
+    </div>
+    <Modal.Footer>
+      <Button {...kind('other')} onClick={() => setOpen(false)}>Cancel</Button>
+    </Modal.Footer>
+  </>);
+}
+
+/** New work or Pick a ticket, as two buttons, the shown pane's pressed. */
+function PaneSwitch() {
+  const { pane, setPane } = useAddItemStore();
+  const choice = (to: AddItemPane, label: string) => (
+    <button type="button" data-pane={to} aria-pressed={pane === to} onClick={() => setPane(to)}
+      className={`h-7 rounded-md px-2.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary ${pane === to ? 'bg-base-100 text-base-content shadow-sm' : 'text-(--muted-foreground) hover:text-base-content'}`}>{label}</button>
+  );
+  return (
+    <div role="group" aria-label="Add" className="flex gap-0.5 rounded-lg bg-base-200 p-0.5">
+      {choice('new', 'New work')}{choice('pick', 'Pick a ticket')}
+    </div>
+  );
+}
+
+/** What the shown pane does, in the repository the form has picked: the kept draft's, else the first. */
 function useDescription(): string {
   const repos = useBoardStore((state) => state.data.repos);
-  const picked = useAddItemStore((state) => state.values?.repo);
-  const selected = repos.find((r) => r.repo === picked) ?? repos[0];
-  return `Create ${itemNoun(selected?.repo) === 'issue' ? 'an issue' : 'a work item'}${selected ? ` in ${repoName(selected.repo, repos)}` : ''} and add it to List.`;
+  const { pane, values } = useAddItemStore();
+  const selected = repos.find((r) => r.repo === values?.repo) ?? repos[0];
+  const where = selected ? ` in ${repoName(selected.repo, repos)}` : '';
+  return pane === 'pick' ? `Pick an open ticket${where} and add it to List.` : `Record work${where} and add it to List.`;
 }
+
+/** Pick a ticket's pane is short, so the dialog keeps its width but takes the pane's height; a long result list scrolls inside it. */
+const FITS_CONTENT = { height: 'auto' };
 
 /** The open dialog; each opening starts at the normal size. */
 function AddItemDialog() {
-  const { draft, setOpen } = useAddItemStore();
+  const { draft, pane, setOpen } = useAddItemStore();
   const [expanded, toggleExpanded] = useExpand();
   const description = useDescription();
   return (
     <Modal onClose={() => setOpen(false)}>
       {/* ninna-ui's Modal drops the description from aria-describedby, so a hidden copy of it describes the dialog. */}
       <Modal.Content id="add-item-dialog" title="Add item" description={description} aria-describedby="add-item-description"
-        presentation="paned" style={expanded ? EXPANDED : undefined} headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />}>
+        presentation="paned" style={expanded ? EXPANDED : pane === 'pick' ? FITS_CONTENT : undefined} headerActions={<><PaneSwitch /><ExpandButton expanded={expanded} toggle={toggleExpanded} /></>}>
         <span id="add-item-description" hidden>{description}</span>
         {/* A new draft remounts the form, which clears its fields. */}
-        <AddItemForm key={draft} />
+        {pane === 'pick' ? <PickTicketPane /> : <AddItemForm key={draft} />}
       </Modal.Content>
     </Modal>
   );

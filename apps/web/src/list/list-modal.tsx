@@ -64,7 +64,7 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
         <span className="block truncate text-sm font-medium leading-[18px] text-base-content">{item.title}</span>
         <AzureFields azure={item.azure} />
         <span className="block truncate text-xs leading-4 tabular-nums text-base-700">
-          {showRepo && `${repoName(repoKey(item), repos)} · `}{ref(item)} · {shortAgo(item.updatedAt, now)}
+          {showRepo && `${repoName(repoKey(item), repos)} · `}{item.number ? `${ref(item)} · ` : ''}{shortAgo(item.updatedAt, now)}
         </span>
       </span>
     </button>

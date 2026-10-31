@@ -125,18 +125,29 @@ test('a Done write is refused before any call', async () => {
   assert.deepEqual(gh.calls, []);
 });
 
-test('Add item gives the new issue status-list, creating the label first', async () => {
-  const gh = fakeGh((args) => {
-    if (args[1] === `repos/${REPO}/labels/status-list`) throw new Error('HTTP 404');
-    if (args[2] === 'POST') return JSON.stringify({ number: 81, node_id: 'I_81', html_url: `https://github.com/${REPO}/issues/81`, updated_at: '2026-10-21T10:00:00Z' });
-    return '{}';
-  });
-  const result = await repoIssues(REPO, gh.run).create({ repo: REPO, kind: 'bug', title: 'Stall', description: '', labels: ['os: ios'] }, {});
-  assert.equal(result.error, null);
-  assert.deepEqual(result.item?.statuses, ['List']);
-  assert.deepEqual(gh.calls.map((c) => c[0] === 'label' ? [...c.slice(0, 2), c.at(-1)] : c.slice(0, 3)),
-    [['api', `repos/${REPO}/labels/status-list`], ['label', 'create', 'status-list'], ['api', '--method', 'POST']]);
-  assert.deepEqual(gh.calls[2]!.filter((a) => a.startsWith('labels[]')), ['labels[]=bug', 'labels[]=os: ios', 'labels[]=status-list']);
+test("a ticket search lists the repository's open issues matching the words, and a number reads that issue alone", async () => {
+  const gh = fakeGh((args) => args[1] === 'list'
+    ? JSON.stringify([{ number: 8, title: 'Stall on seek', url: `https://github.com/${REPO}/issues/8` }])
+    : JSON.stringify({ number: 12, title: 'Seek', url: `https://github.com/${REPO}/issues/12`, body: '', labels: [], state: 'OPEN' }));
+  const issues = repoIssues(REPO, gh.run);
+  assert.deepEqual(await issues.searchTickets(REPO, 'stall'), [{ number: 8, title: 'Stall on seek', url: `https://github.com/${REPO}/issues/8` }]);
+  assert.deepEqual(await issues.searchTickets(REPO, '#12'), [{ number: 12, title: 'Seek', url: `https://github.com/${REPO}/issues/12` }]);
+  assert.deepEqual(gh.calls, [
+    ['issue', 'list', '-R', REPO, '--state', 'open', '--limit', '20', '--json', 'number,title,url', '--search', 'stall'],
+    ['issue', 'view', '12', '-R', REPO, '--json', 'number,title,url,body,labels,state'],
+  ]);
+});
+
+test("a ticket read gives an open issue's text and kind, and nothing for a closed or missing one", async () => {
+  const answers: Record<string, () => string> = {
+    7: () => JSON.stringify({ number: 7, title: 'Stall', url: `https://github.com/${REPO}/issues/7`, body: '## Steps', labels: [{ name: 'bug' }], state: 'OPEN' }),
+    8: () => JSON.stringify({ number: 8, title: 'Old', url: `https://github.com/${REPO}/issues/8`, body: '', labels: [], state: 'CLOSED' }),
+    9: () => { throw new Error('gh issue view failed: GraphQL: Could not resolve to an issue or pull request with the number of 9.'); },
+  };
+  const issues = repoIssues(REPO, fakeGh((args) => answers[args[2]!]!()).run);
+  assert.deepEqual(await issues.readTicket(REPO, 7), { number: 7, title: 'Stall', url: `https://github.com/${REPO}/issues/7`, text: '## Steps', kind: 'bug' });
+  assert.equal(await issues.readTicket(REPO, 8), null);
+  assert.equal(await issues.readTicket(REPO, 9), null);
 });
 
 test("a change check lists the issues and PRs updated since, and can't tell once every one it lists changed", async () => {

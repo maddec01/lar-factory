@@ -10,7 +10,7 @@
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, ref, shortAgo } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, itemName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -33,6 +33,7 @@ import { useDescriptionEdit } from './use-description-edit.ts';
 import type { DescriptionEdit } from './use-description-edit.ts';
 import { ItemProgress } from './item-progress.tsx';
 import { useItemDetails } from './use-item-details.ts';
+import { AttachTicket } from './attach-ticket.tsx';
 
 /** The one thing the item's status asks of you; an item carrying more than one status asks you to keep one. */
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {
@@ -88,7 +89,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
   const fill = expanded && edit.editing;
   const rows = fill ? 'min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]' : aside ? '@min-[45rem]:grid-rows-[auto_1fr]' : '';
   return (
-    <Modal.Content title={`${ref(item)} ${item.title}`} presentation="workspace" data-item-dialog style={expanded ? EXPANDED : undefined}
+    <Modal.Content title={`${itemName(item)}`} presentation="workspace" data-item-dialog style={expanded ? EXPANDED : undefined}
       headerActions={<>
         <AgentWork item={item} className="whitespace-nowrap text-xs text-base-700 @max-[40rem]:hidden" />
         <ExpandButton expanded={expanded} toggle={toggleExpanded} />
@@ -100,7 +101,9 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
           <span className="min-w-0 truncate @max-[30rem]:hidden">· updated {shortAgo(item.updatedAt, now)}</span>
           {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {openBlockers(item).length}</span>}
         </div>
-        {item.parent && <p className="m-0 min-w-0 wrap-anywhere" data-item-parent>Part of <a href={item.parent.url} target="_blank" rel="noopener" className="underline">#{item.parent.number} {item.parent.title}</a></p>}
+        {item.parent && <p className="m-0 min-w-0 wrap-anywhere" data-item-parent>Part of {item.parent.url
+          ? <a href={item.parent.url} target="_blank" rel="noopener" className="underline">{itemName(item.parent)}</a> : itemName(item.parent)}</p>}
+        <AttachTicket item={item} />
       </div>
       <Modal.Body layout={fill ? 'fill' : 'scroll'}>
         {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}

@@ -62,7 +62,7 @@ function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<
       return null;
     },
   } as unknown as ItemSource;
-  const commands = createItemCommands({ board, items: source, records: records ?? null, reread, repos: () => [], offerModelChoices: () => [],
+  const commands = createItemCommands({ board, items: source, records: records ?? null, reread, offerModelChoices: () => [],
     showThread, projectOf: async (repo) => ({ projectId: repo }),
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);

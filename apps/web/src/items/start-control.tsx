@@ -7,7 +7,7 @@
 import { useId, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { ref, highlightedChoice, repoName, startRepo, storedChoice } from '@lar-factory/shared';
+import { itemName, ref, highlightedChoice, repoName, startRepo, storedChoice } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -141,7 +141,7 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
       {stopped && <><span className="basis-full">Run stopped.</span><OpenThread item={item} data={data} threadId={observed.id} /></>}
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
-          <Button {...buttonKind(main ? 'main' : 'start')} leftIcon={start?.phase !== 'pending' && !main && ICON.play} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
+          <Button {...buttonKind(main ? 'main' : 'start')} leftIcon={start?.phase !== 'pending' && !main && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}>
             {verb}{start?.phase !== 'pending' && ' ▾'}
           </Button>
         </DropdownMenu.Trigger>

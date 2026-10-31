@@ -17,7 +17,7 @@ const twoStatuses = (item: { statuses: readonly Status[]; state: 'open' | 'close
   (carriesTwoStatuses(item) ? keepOneText(item.statuses) : null);
 
 /** `what` failed in `project`, with the failure's message and fix. */
-export function writeFailure(what: string, project: string, err: unknown): string {
+function writeFailure(what: string, project: string, err: unknown): string {
   if (err instanceof ReadProblem) return `${what} ${err.message}${err.fix ? ` Run ${err.fix}, then try again.` : ''}`;
   const text = err instanceof Error ? err.message : String(err);
   if (/TF401289|permissions? to create tags/i.test(text)) {

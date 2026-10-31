@@ -123,16 +123,16 @@ function CheckNode({ check, width, after }: { check: EndToEndCheck; width: numbe
 
 /** The map of `parts`, ending in `check`; a dossier with no check written ends in a note saying so. */
 export function WorkMap({ parts, check, data, now }: { parts: Part[]; check: EndToEndCheck | undefined; data: BoardData; now: number }) {
-  const { ref, width } = useWidth();
+  const { ref: box, width } = useWidth();
   const [hover, setHover] = useState<string | null>(null);
   const marker = useId().replace(/[^a-zA-Z0-9]/g, '');
   const m = layout(parts, data, width);
   const at = new Map(m.placed.map((p) => [p.key, p]));
   const near = (key: string) => !hover || key === hover || m.edges.some((e) => (e.from === hover && e.to === key) || (e.to === hover && e.from === key));
-  const builds = parts.filter((p) => p.kind === 'build').map((p) => `#${p.item.number}`).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  const builds = parts.filter((p) => p.kind === 'build').map((p) => ref(p.item)).join(', ').replace(/, ([^,]*)$/, ' and $1');
   const inCol = (c: number) => m.placed.filter((p) => p.col === c && p.part).length;
   return (
-    <div ref={ref} className="overflow-x-auto rounded-lg border border-(--border) bg-(--background)" data-work-map>
+    <div ref={box} className="overflow-x-auto rounded-lg border border-(--border) bg-(--background)" data-work-map>
       <div className="relative" style={{ width: m.width, height: m.height }}>
         {m.bands.map((b, n) => (
           <div key={b.lane} className={`absolute left-0 border-t border-(--border) ${n % 2 ? 'bg-[color-mix(in_srgb,var(--muted)_50%,transparent)]' : ''}`} style={{ top: b.top, height: b.height, width: m.width }}>

@@ -1,10 +1,10 @@
 // The repository issues item source: reads and writes one repository's issues through github.ts.
 // An issue keeps its status as a status-<name> label, and each move swaps the old label for the new one.
 
-import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
+import { carriesTwoStatuses, keepOneText, labelStatuses } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
-import { DONE_REFUSED, type ItemSource } from '../items/item-source.ts';
-import { addIssueLabel, changedSince, createIssue, createStatusLabel, abandonIssue, fetchIssues, fetchRepoIssues, getIfChanged, issueLabels, message, setStatusLabel } from './github.ts';
+import { DONE_REFUSED, TICKET_MATCHES, ticketNumberOf, type ItemSource } from '../items/item-source.ts';
+import { addIssueLabel, changedSince, createStatusLabel, abandonIssue, fetchIssues, fetchRepoIssues, getIfChanged, issueLabels, message, findIssues, readIssue, setStatusLabel } from './github.ts';
 
 /** How many of the latest updated issues and PRs a change check lists; when all of them changed, the whole source reads. */
 const CHANGES_PAGE = 30;
@@ -54,11 +54,13 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     setStatus: (item, status) => write(item.number!, item.statuses, status),
     statusRefusal: (item) => ('statuses' in item ? twoStatuses(item) : null),
     addLabel: (item, label) => addIssueLabel(item.repo!, item.number!, label, run),
-    // The new issue gets status-list, so it shows on a repository that shows only Items with a status.
-    create: (draft, progress) => createIssue({ ...draft, labels: [...draft.labels, statusLabel('List')] }, progress, run, async () => {
-      const error = await ensureLabel('List');
-      if (error) throw new Error(error);
-    }),
+    async searchTickets(_repo, query) {
+      const number = ticketNumberOf(query);
+      if (number === null) return findIssues(repo, query, TICKET_MATCHES, run);
+      const issue = await readIssue(repo, number, run);
+      return issue ? [{ number: issue.number, title: issue.title, url: issue.url }] : [];
+    },
+    readTicket: (_repo, number) => readIssue(repo, number, run),
     async setParentStatus(parent, status) {
       if (status === 'Done') return DONE_REFUSED;
       try {

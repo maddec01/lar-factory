@@ -1,7 +1,7 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
 // Abandon asks.
 
-import { STATUSES, inRepo, isRecentlyDone, onAzure, ref, repoKey, repoName, sameRepo } from './model.ts';
+import { STATUSES, inRepo, isRecentlyDone, onAzure, itemName, repoKey, repoName, sameRepo } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
 import { slug } from './format.ts';
 
@@ -93,9 +93,9 @@ export const UNREADABLE = 'The T3 Code database could not be read';
 /** What Abandon asks, and how the provider keeps the issue recoverable. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
   const azure = onAzure(item.repo ?? '');
-  return { question: `Abandon ${ref(item)} ${item.title}?`, confirm: 'Abandon',
+  return { question: `Abandon ${itemName(item)}?`, confirm: 'Abandon',
     detail: azure ? 'This moves the work item to Removed in Azure DevOps. You can reactivate it in Azure DevOps.'
       : 'This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.',
-    done: azure ? `Moved ${ref(item)} ${item.title} to Removed.` : `Closed ${ref(item)} ${item.title} as "not planned".`,
+    done: azure ? `Moved ${itemName(item)} to Removed.` : `Closed ${itemName(item)} as "not planned".`,
   };
 }

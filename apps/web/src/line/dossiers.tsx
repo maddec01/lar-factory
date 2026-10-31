@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
+import { blockerRef, plural, prLabel, itemName, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -46,7 +46,7 @@ function Refs({ text, find }: { text: string; find: FindRef }) {
 }
 
 /** What a part waits on, as plain muted text: `waits on #305, #306`. */
-const waitsOn = (part: Part) => `waits on ${openWaits(part).map((b) => `#${b.number}`).join(', ')}`;
+const waitsOn = (part: Part) => `waits on ${openWaits(part).map((b) => blockerRef(part.item, b)).join(', ')}`;
 
 /** A part's thread, its title and state; before it has one, what its start waits on. */
 function ThreadLine({ thread, waits }: { thread: ItemThread | undefined; waits: string[] }) {
@@ -96,7 +96,7 @@ function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void })
 /** A part as a link to its item dialog: its status and its title, up to two lines. */
 function PartLink({ part }: { part: Part }) {
   return (
-    <button type="button" onClick={(e) => { e.stopPropagation(); open(part.item); }} title={`${ref(part.item)} ${part.item.title}`}
+    <button type="button" onClick={(e) => { e.stopPropagation(); open(part.item); }} title={`${itemName(part.item)}`}
       className="flex min-w-0 items-start gap-1.5 rounded text-left text-[13px] hover:underline">
       <span className="mt-0.5 inline-flex"><ItemStatusGlyph item={part.item} className="size-3.5" /></span>
       <span className="line-clamp-2"><ItemTitle item={part.item} /></span>
@@ -127,9 +127,9 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
     { key: 'decisions', label: 'Open decisions', tone: 'text-(--primary)',
       entries: ahead.filter((p) => DECISION_KINDS.includes(p.kind)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={`${p.kind} · ${p.item.status}`} />) },
     { key: 'blocked', label: 'Blocked slices', tone: 'text-(--st-review)',
-      entries: blocked.map(({ part, slice }) => (
-        <Entry key={`${slice.repo}#${slice.number}`}
-          main={<span className="flex min-w-0 items-start gap-1.5 text-[13px]"><Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" /><span className="line-clamp-2"><span className="tabular-nums text-(--muted-foreground)">#{slice.number}</span> {slice.title}</span></span>}
+      entries: blocked.map(({ part, slice }, i) => (
+        <Entry key={i}
+          main={<span className="flex min-w-0 items-start gap-1.5 text-[13px]"><Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" /><span className="line-clamp-2">{slice.number > 0 && <><span className="tabular-nums text-(--muted-foreground)">#{slice.number}</span> </>}{slice.title}</span></span>}
           side={<>slice of <button type="button" onClick={() => open(part.item)} title={part.item.title} className="rounded px-0.5 font-medium tabular-nums text-(--primary) hover:bg-(--accent)">{ref(part.item)}</button> · waits on a re-slice</>} />
       )) },
     { key: 'waiting', label: 'Waiting', tone: 'text-(--muted-foreground)',
@@ -190,7 +190,7 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
         {s && <Figures s={s} />}
         <AzureFields azure={item.azure} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
-        <span className="min-w-0 empty:hidden"><ThreadLine thread={part.thread} waits={waits.map((b) => `#${b.number}`)} /></span>
+        <span className="min-w-0 empty:hidden"><ThreadLine thread={part.thread} waits={waits.map((b) => blockerRef(item, b))} /></span>
       </span>
       {item.slices.length > 0 && <span className="col-span-2 pl-3.5"><SliceBar item={item} /></span>}
       {(item.status === 'Ready' || item.status === 'Queued') && (
@@ -260,7 +260,7 @@ function PartsBar({ m }: { m: Moving }) {
   return (
     <ol className="m-0 flex min-w-0 list-none gap-[2px] p-0" title={`${m.done}/${m.count} parts done`} data-part-bar>
       {order.map((p) => (
-        <li key={p.item.id} title={`${ref(p.item)} ${p.item.title}: ${p.item.status}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${p.item.status === 'In progress' ? 'status-pulse' : ''}`}
+        <li key={p.item.id} title={`${itemName(p.item)}: ${p.item.status}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${p.item.status === 'In progress' ? 'status-pulse' : ''}`}
           style={{ background: isDone(p.item) ? 'var(--st-done)' : p.item.status === 'Queued' || p.item.status === 'List' ? 'var(--soft)' : STATUS_COLOR[p.item.status] }} />
       ))}
       {Array.from({ length: Math.max(0, unread) }, (_, n) => <li key={`u${n}`} className="h-1.5 min-w-[3px] flex-1 rounded-full border border-dashed border-(--input)" />)}
@@ -271,9 +271,9 @@ function PartsBar({ m }: { m: Moving }) {
 /** The one thing to say next: what waits on you (a part in Needs you first), else what can start, else what's moving. */
 function nextOf(m: Moving): { tone: 'you' | 'start' | 'moving' | 'none'; part?: Part; text: string } {
   const yours = m.needsYou[0] ?? m.yours[0];
-  if (yours) return { tone: 'you', part: yours, text: `${ref(yours.item)} ${yours.item.title}` };
-  if (m.ready[0]) return { tone: 'start', part: m.ready[0], text: `${ref(m.ready[0].item)} ${m.ready[0].item.title}` };
-  if (m.active[0]) return { tone: 'moving', part: m.active[0], text: `${ref(m.active[0].item)} ${m.active[0].item.title}` };
+  if (yours) return { tone: 'you', part: yours, text: `${itemName(yours.item)}` };
+  if (m.ready[0]) return { tone: 'start', part: m.ready[0], text: `${itemName(m.ready[0].item)}` };
+  if (m.active[0]) return { tone: 'moving', part: m.active[0], text: `${itemName(m.active[0].item)}` };
   return { tone: 'none', text: m.count > m.parts.length ? 'Some parts are outside the board' : 'Nothing waits on you' };
 }
 

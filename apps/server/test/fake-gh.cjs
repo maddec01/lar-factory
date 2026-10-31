@@ -191,6 +191,22 @@ const main = async () => {
     }
     throw new Error('Unexpected fake GraphQL query');
   }
+  // The ticket picker's search and a pick's read, of options.repoIssues: open issues whose title has every word, and one issue by number.
+  if (args[0] === 'issue' && (args[1] === 'list' || args[1] === 'view')) {
+    const issues = options.repoIssues?.[args[args.indexOf('-R') + 1]] ?? [];
+    if (args[1] === 'view') {
+      const issue = issues.find((i) => i.number === Number(args[2]));
+      if (!issue) {
+        process.stderr.write(`GraphQL: Could not resolve to an issue or pull request with the number of ${args[2]}.`);
+        process.exitCode = 1;
+        return;
+      }
+      return output({ number: issue.number, title: issue.title, url: issue.url, body: issue.body ?? '', labels: issue.labels?.nodes ?? [], state: issue.state });
+    }
+    const words = (args.includes('--search') ? args[args.indexOf('--search') + 1] : '').toLowerCase().split(/\s+/).filter(Boolean);
+    return output(issues.filter((i) => i.state === 'OPEN' && words.every((w) => i.title.toLowerCase().includes(w)))
+      .map((i) => ({ number: i.number, title: i.title, url: i.url })));
+  }
   if (options.fail === 'abandon' && args[1] === 'close') {
     process.stderr.write('HTTP 403: Must have write access to Repository.');
     process.exitCode = 1;
@@ -305,7 +321,6 @@ const main = async () => {
     return output({});
   }
   if (args[0] === 'api') {
-    if (options.createDelay) await new Promise((r) => setTimeout(r, options.createDelay));
     const repo = args[3].slice('repos/'.length, -'/issues'.length);
     return output({ number: 900001, node_id: 'I_900001', html_url: `https://github.com/${repo}/issues/900001`, updated_at: '2026-10-21T10:00:00Z' });
   }

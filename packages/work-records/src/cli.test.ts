@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -23,7 +23,7 @@ async function larWork(dataDir: string, ...args: string[]) {
     const { stdout, stderr } = await promisify(execFile)(process.execPath, ['--disable-warning=ExperimentalWarning', CLI, ...args, '--data-dir', dataDir], {
       cwd, env: { ...process.env, HOME: cwd },
     });
-    return { code: 0, stdout, stderr, record: stdout.startsWith('Usage:') ? null : JSON.parse(stdout) };
+    return { code: 0, stdout, stderr, record: /^[[{]/.test(stdout) ? JSON.parse(stdout) : null };
   } catch (error) {
     const { code, stdout, stderr } = error as { code: number; stdout: string; stderr: string };
     return { code, stdout, stderr, record: null };
@@ -83,6 +83,38 @@ describe('lar-work', { timeout: 30_000 }, () => {
     expect((await larWork(data, 'clear-parent', slice, '--revision', '4')).record).toMatchObject({ parentId: null });
   });
 
+  it('writes and reads a brief, a phase, a PR and a review round with no board running', async () => {
+    const data = tempDir();
+    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'build')).record;
+    const brief = join(tempDir(), 'brief.md');
+    writeFileSync(brief, '## What\n\nAdd it.\n');
+    expect((await larWork(data, 'set-body', workId, '--revision', '1', '--body', 'brief', '--file', brief)).record).toMatchObject({ revision: 2 });
+    expect(await larWork(data, 'body', workId, '--body', 'brief')).toMatchObject({ code: 0, stdout: '## What\n\nAdd it.\n' });
+    expect(await larWork(data, 'body', workId, '--body', 'map')).toMatchObject({ code: 1, stderr: `lar-work: The work record ${workId} has no map.\n` });
+
+    expect((await larWork(data, 'set-phase', workId, '--revision', '2', '--phase', 'review')).record).toMatchObject({ buildPhase: 'review' });
+    expect((await larWork(data, 'set-pr', workId, '--revision', '3', '--pr', 'maddec01/lar#9')).record).toMatchObject({ pullRequest: 'maddec01/lar#9' });
+    const round = join(tempDir(), 'round.json');
+    writeFileSync(round, JSON.stringify({ base: 'c8890a1a', reviewers: [{ axis: 'code', verdict: 'changes', findings: [{ severity: 'should', summary: 'Spec: a.ts:1: x.', disposition: 'open' }] }] }));
+    expect((await larWork(data, 'record-review-round', workId, '--revision', '4', '--file', round)).record).toMatchObject({ revision: 5 });
+    await larWork(data, 'set-disposition', workId, '--revision', '5', '--round', '1', '--axis', 'code', '--finding', '1', '--disposition', 'rejected', '--reason', 'Out of scope.');
+    expect((await larWork(data, 'review-rounds', workId)).record).toMatchObject([{ round: 1, reviewers: [{ axis: 'code', findings: [{ disposition: 'rejected', reason: 'Out of scope.' }] }] }]);
+  });
+
+  it('records a launch intent and resolves it to a thread with no board running', async () => {
+    const data = tempDir();
+    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'feature')).record;
+    const { intent } = (await larWork(data, 'record-intent', workId, '--revision', '1', '--purpose', 'shape')).record;
+    expect((await larWork(data, 'intents', '--unresolved')).record).toEqual([intent]);
+
+    const resolved = await larWork(data, 'resolve-intent', workId, '--revision', '2', '--intent', intent.intentId, '--thread', 'thread-1');
+    expect(resolved.record).toMatchObject({ record: { revision: 3 }, intent: { outcome: 'started', threadId: 'thread-1' } });
+    expect((await larWork(data, 'intents', '--unresolved')).record).toEqual([]);
+    expect((await larWork(data, 'threads', workId)).record).toMatchObject([{ threadId: 'thread-1', purpose: 'shape' }]);
+    expect(await larWork(data, 'resolve-intent', workId, '--revision', '3', '--intent', intent.intentId, '--failure', 'x')).toMatchObject({ code: 1, stderr: expect.stringContaining('already resolved') });
+    expect(await larWork(data, 'resolve-intent', workId, '--revision', '3', '--intent', intent.intentId)).toMatchObject({ code: 2, stderr: expect.stringContaining('--thread or --failure') });
+  });
+
   it('reports usage mistakes before opening the database', async () => {
     const data = join(tempDir(), 'unused');
     expect(await larWork(data, 'frobnicate')).toMatchObject({ code: 2, stderr: expect.stringContaining('Unknown command "frobnicate"') });
@@ -93,6 +125,6 @@ describe('lar-work', { timeout: 30_000 }, () => {
   it('explains identifiers, reads, changes, structure and errors in its help', async () => {
     const help = await larWork(tempDir(), '--help');
     expect(help.code).toBe(0);
-    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
+    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Content', 'Threads and launch intents', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
   });
 });

@@ -227,3 +227,115 @@ test("Start build moves the build's concept record to In progress and writes no 
   assert.equal(records.read(concept.workId).status, 'In progress');
   assert.ok(log.every((line) => !line.startsWith('status')), log.join('; '));
 });
+
+/**
+ * Commands on the board of `records`, where each item shows the threads `shown` gives for its recorded thread IDs, as
+ * T3 shows them. Starts record their messages in `started`, and `recover` plays T3's answer to a reconciliation.
+ */
+function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids.map((id) => ({ id, title: 't', state: 'running' as const, updated: '2026-10-31T00:00:00Z' })),
+  recover = async (): Promise<{ threadId: string; title: string } | 'absent' | 'unknown'> => 'absent', lookup = async (): Promise<'live' | 'deleted' | 'unknown'> => 'unknown',
+  skills = [] as string[], during = () => {} }: { shown?: (ids: string[]) => Item['threads']; recover?: () => Promise<{ threadId: string; title: string } | 'absent' | 'unknown'>;
+  lookup?: () => Promise<'live' | 'deleted' | 'unknown'>; skills?: string[]; during?: () => void } = {}) {
+  const board = createBoardState({ items: [], repos: [], modelChoices: [] } as unknown as BoardData);
+  const reread = () => board.update({ items: recordItems(records, [], [WEB]).map((item) => {
+    const ids = records.threads(item.id).map((t) => t.threadId);
+    return ids.length ? { ...item, threads: shown(ids) } : item;
+  }) });
+  reread();
+  const started: string[] = [];
+  const commands = createItemCommands({ board, items: {} as ItemSource, records, reread, offerModelChoices: () => [],
+    showThread: lookup, projectOf: async (repo) => ({ projectId: repo }), recoverThread: recover, skillsOf: () => skills,
+    startThread: async (_project, message) => {
+      during();
+      started.push(message);
+      return { thread: { threadId: `thread-${started.length}`, title: 't' }, error: null };
+    } });
+  return { board, commands, started, reread };
+}
+
+test('Start writes a launch intent before it asks T3, and records the thread T3 starts', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Tidy the docs', repository: WEB, kind: 'improvement', status: 'Queued' });
+  let unresolved = -1;
+  const { commands, started } = recordedCommands(records, { during: () => { unresolved = records.launchIntents({ workId: work.workId, unresolved: true }).length; } });
+  assert.equal((await commands.start(work.workId, undefined)).status, 200);
+  assert.equal(unresolved, 1, 'the intent is on the record while T3 starts the thread');
+  assert.deepEqual(started, [`Tidy the docs\n$lar-shape ${work.workId}`]);
+  assert.deepEqual(records.threads(work.workId).map((t) => [t.threadId, t.purpose]), [['thread-1', 'shape']]);
+  assert.deepEqual(records.launchIntents({ workId: work.workId }).map((i) => [i.outcome, i.threadId]), [['started', 'thread-1']]);
+});
+
+test('after a restart, an unresolved start records the thread T3 shows for it and starts no second one', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  records.recordLaunchIntent(work.workId, work.revision, 'shape');
+  const { commands, started } = recordedCommands(records, { recover: async () => ({ threadId: 'late', title: 'Work' }) });
+  const reply = await commands.start(work.workId, undefined);
+  assert.deepEqual([reply.status, (reply.body as { thread: { threadId: string } }).thread.threadId], [200, 'late']);
+  assert.deepEqual(started, []);
+  assert.deepEqual(records.threads(work.workId).map((t) => t.threadId), ['late']);
+  assert.equal((await commands.start(work.workId, undefined)).status, 200);
+  assert.deepEqual(started, [], 'the recorded running thread is the start');
+});
+
+test('after a restart, an unresolved start T3 shows no thread for sets Needs you, and one T3 cannot answer for waits', async () => {
+  vi.useFakeTimers();
+  try {
+    vi.setSystemTime(Date.parse('2026-10-31T10:00:00Z'));
+    const records = await openRecords();
+    const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+    records.recordLaunchIntent(work.workId, work.revision, 'shape');
+    let answer: 'absent' | 'unknown' = 'unknown';
+    const { commands, started } = recordedCommands(records, { recover: async () => answer });
+    const waiting = await commands.start(work.workId, undefined);
+    assert.deepEqual([waiting.status, (waiting.body as { uncertain?: boolean }).uncertain], [502, true]);
+    answer = 'absent';
+    assert.equal((await commands.start(work.workId, undefined)).status, 502, 'T3 may not show a new thread yet');
+    vi.setSystemTime(Date.parse('2026-10-31T10:01:00Z'));
+    const refused = await commands.start(work.workId, undefined);
+    assert.equal(refused.status, 409);
+    assert.match((refused.body as { error: string }).error, /Needs you/);
+    assert.match(records.read(work.workId).needsYou ?? '', /no thread/);
+    assert.deepEqual(started, []);
+    assert.equal((await commands.start(work.workId, undefined)).status, 409, 'Start waits until the user clears Needs you');
+    const record = records.read(work.workId);
+    records.clearNeedsYou(work.workId, record.revision);
+    assert.equal((await commands.start(work.workId, undefined)).status, 200);
+    assert.equal(started.length, 1);
+  } finally { vi.useRealTimers(); }
+});
+
+test('a recorded thread T3 confirms deleted releases Start, and one T3 cannot be read for keeps it', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  records.addThread(work.workId, work.revision, 'gone', 'shape');
+  const unavailable = recordedCommands(records, { shown: () => 'unavailable', lookup: async () => 'deleted' });
+  await unavailable.commands.reconcileStarts(unavailable.board.snapshot().items);
+  const kept = await unavailable.commands.start(work.workId, undefined);
+  assert.deepEqual([kept.status, (kept.body as { thread: { threadId: string } }).thread.threadId], [200, 'gone']);
+  assert.deepEqual(unavailable.started, [], 'an unavailable thread may still run');
+  const deleted = recordedCommands(records, { shown: () => [], lookup: async () => 'deleted' });
+  await deleted.commands.reconcileStarts(deleted.board.snapshot().items);
+  assert.equal((await deleted.commands.start(work.workId, undefined)).status, 200);
+  assert.equal(deleted.started.length, 1);
+});
+
+test('a finished T3 turn moves no Status', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  const { commands, board } = recordedCommands(records, { shown: (ids) => ids.map((id) => ({ id, title: 't', state: 'done', updated: '2026-10-31T00:00:00Z' })) });
+  await commands.start(work.workId, undefined);
+  await commands.reconcileStarts(board.snapshot().items);
+  assert.equal(records.read(work.workId).status, 'Queued');
+  assert.equal(board.find(work.workId)?.status, 'Queued');
+});
+
+test("Start build snapshots the repository's selected project skills on the record and names the work ID", async () => {
+  const records = await openRecords();
+  const build = records.create({ title: 'Fix login', repository: WEB, kind: 'build', status: 'Ready' });
+  const { commands, started } = recordedCommands(records, { skills: ['code-review', 'web-deploy'] });
+  assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
+  assert.deepEqual(records.read(build.workId).skills, ['code-review', 'web-deploy']);
+  assert.match(started[0]!, new RegExp(`^Build ${build.workId}\\. Read `));
+  assert.deepEqual(records.threads(build.workId).map((t) => t.purpose), ['build']);
+});

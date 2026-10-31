@@ -1,5 +1,5 @@
 import { executionStats } from './execution-stats.ts';
-import { isRecord, type ItemThread } from '@lar-factory/shared';
+import type { ItemThread, StartedThread } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
 import { boardProjects } from './board-projects.ts';
 import { readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead } from './execution-protocol.ts';
@@ -111,6 +111,22 @@ export function protocolThreadByTitle(projectId: string, title: string): { threa
   const messages = protocolThreadById(shell.id).observation?.projection.messages
     .filter(message => message.role === 'assistant').sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   return { threadId: shell.id, latest: typeof messages?.[0]?.text === 'string' ? messages[0].text : null };
+}
+
+/**
+ * The one root thread in `projectId` whose first user message is `message`, leaving out the `known` thread IDs, as the
+ * protocol shows it now; null when none or more than one does. Unavailable observations throw.
+ */
+export function protocolStartedThread(projectId: string, message: string, known: readonly string[]): StartedThread | null {
+  protocolItemThreads([]);
+  if (!current?.available) throw Error('T3 execution unavailable');
+  const matches = (current.shells ?? []).filter((shell) => shell.projectId === projectId && !shell.deletedAt && typeof shell.id === 'string'
+    && !known.includes(shell.id) && shell.title === message.split('\n')[0]).filter((shell) => {
+    const first = current!.reads?.get(String(shell.id))?.observation?.projection.messages
+      .filter((entry) => entry.role === 'user').sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))[0];
+    return first?.text === message;
+  });
+  return matches.length === 1 ? { threadId: String(matches[0]!.id), title: String(matches[0]!.title) } : null;
 }
 
 /** Thread-ID lookup for the future switch/import; retained facts never imply availability. */

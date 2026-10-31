@@ -52,6 +52,10 @@ const main = async () => {
   } else if (options.fail === 'killed') process.kill(process.pid, 'SIGKILL');
   else if (options.fail === 'garbage') process.stdout.write('not json');
   // Like T3, title the thread from the first line of its first message.
-  else process.stdout.write(JSON.stringify({ threadId: 'thread-1', runId: 'run-1', title: options.untitled ? undefined : args[3].split('\n')[0] }));
+  else {
+    // Each start opens a new thread, numbered from thread-1.
+    const starts = fs.readFileSync(process.env.FAKE_GH_STATE + '.t3calls', 'utf8').trim().split('\n').filter((line) => JSON.parse(line)[1] === 'start').length;
+    process.stdout.write(JSON.stringify({ threadId: `thread-${starts}`, runId: 'run-1', title: options.untitled ? undefined : args[3].split('\n')[0] }));
+  }
 };
 main();

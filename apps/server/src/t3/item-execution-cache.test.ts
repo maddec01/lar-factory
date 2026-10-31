@@ -34,3 +34,19 @@ it('loads history once, refreshes changed threads and keeps timestamped last obs
   publish();
   await vi.waitFor(() => expect(protocolItemThreads(['one', 'archive'])).toHaveLength(2));
 });
+
+it('finds the one started thread whose first message is the start message, leaving out recorded ones', async () => {
+  const { protocolItemThreads, protocolStartedThread } = await import('./item-execution.ts');
+  const observedAt = '2026-10-31T12:00:00Z';
+  const message = 'Build w1. Read builder.md and follow it.';
+  fixture.read.mockImplementation(async id => ({ availability: 'available', observation: { observedAt,
+    projection: { thread: { id }, messages: [{ role: 'user', text: message, createdAt: observedAt }] } } }));
+  protocolItemThreads([]);
+  expect(() => protocolStartedThread('p', message, [])).toThrow('unavailable');
+  const shell = (id: string) => ({ id, projectId: 'p', title: message, updatedAt: observedAt });
+  fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [shell('old'), shell('new')], archivedThreads: [] } } });
+  await vi.waitFor(() => expect(protocolItemThreads(['new'])).toHaveLength(1));
+  expect(protocolStartedThread('p', message, ['old'])).toEqual({ threadId: 'new', title: message });
+  expect(protocolStartedThread('p', message, []), 'two matches establish nothing').toBeNull();
+  expect(protocolStartedThread('other', message, [])).toBeNull();
+});

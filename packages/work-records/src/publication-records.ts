@@ -559,7 +559,14 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       const sections = plan.tickets.map((ticket) => {
         const extra = plan.operations.filter((op) => op.ticketWorkId === ticket.workId && op.kind !== 'append' && op.kind !== 'replace' && 'content' in op && op.content !== ticket.body)
           .map((op) => 'content' in op ? op.content : '');
-        return [`# ${ticket.title}`, ticket.body, ...extra].join('\n\n');
+        const record = find(ticket.workId);
+        const relations = [...record.parentId ? [{ workId: record.parentId, text: 'Part of' }] : [],
+          ...db.prepare('SELECT blocker_id FROM blockers WHERE work_id = ? ORDER BY blocker_id').all(ticket.workId).map((blocker) => ({ workId: String(blocker.blocker_id), text: 'Depends on' }))];
+        const links = relations.flatMap((relation) => {
+          const related = plan.tickets.find((item) => item.workId === relation.workId);
+          return related ? [`${relation.text} ${receipt(plan, related.workId)?.url ?? related.title}`] : [];
+        });
+        return [`# ${ticket.title}`, ticket.body, ...new Set([...extra, ...links])].join('\n\n');
       });
       return `${sections.join('\n\n---\n\n')}\n`;
     }),

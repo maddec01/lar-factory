@@ -225,9 +225,7 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'] }, items }, false, true, { T3_STATE_DB: db });
   const [item] = await readLiveStats(board);
   assert.deepEqual(item?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
-  const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
-  for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
-  const [edit] = await edits();
+  const edit = await board.untilCalled((args) => args[2] === 'PATCH');
   assert.equal(edit?.[3], 'repos/maddec01/lar-factory/pulls/41');
   assert.equal(edit?.[5], 'body=PR 41\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":0} -->\n<!-- /lar-stats -->');
 });

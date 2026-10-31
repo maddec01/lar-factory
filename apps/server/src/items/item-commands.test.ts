@@ -8,7 +8,7 @@ import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
 import { createItemCommands } from './item-commands.ts';
 import type { ItemSource } from './item-source.ts';
-import { recordItems } from './record-items.ts';
+import { archivedItems, recordItems } from './record-items.ts';
 
 const WEB = 'contoso/Fabrikam/web';
 const API = 'contoso/Fabrikam/api';
@@ -35,11 +35,14 @@ async function openRecords(): Promise<WorkRecords> {
 
 /**
  * Commands on a board holding `items`, whose source records each write it gets and fails a tag when `failTag` is set.
- * Given `records`, the board shows their items and reads them again after each write.
+ * Given `records`, the board shows their items and Archive with `tickets` as the source read them, and reads them
+ * again after each write.
  */
-function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords) {
+function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = []) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
-  const reread = () => { if (records) board.update({ items: recordItems(records, [], [WEB]) }); };
+  const reread = () => {
+    if (records) board.update({ items: recordItems(records, tickets, [WEB]), archive: archivedItems(records, tickets, [WEB], new Set()) });
+  };
   reread();
   const log: string[] = [];
   const branches: (string | undefined)[] = [];
@@ -115,7 +118,7 @@ test('Start on a tagged item writes no tag and ignores a repository sent with it
 test('Abandon sets the work aside on this Mac and leaves its ticket alone, which only its own close closes', async () => {
   const records = await openRecords();
   const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
-  const { board, commands, log } = commandsOn([], undefined, undefined, records);
+  const { board, commands, log } = commandsOn([], undefined, undefined, records, [queued(7)]);
   assert.deepEqual((await commands.closeTicket(work.workId)).status, 409, 'work Abandon never set aside has no ticket to close');
   assert.equal(commands.abandon(work.workId).status, 200);
   assert.equal(records.read(work.workId).setAside, true);
@@ -123,15 +126,34 @@ test('Abandon sets the work aside on this Mac and leaves its ticket alone, which
   assert.deepEqual(log, [], 'Abandon writes nothing to the provider');
   const [first, second] = await Promise.all([commands.closeTicket(work.workId), commands.closeTicket(work.workId)]);
   assert.deepEqual([first.status, second.status], [200, 200]);
-  assert.deepEqual(log, ['abandon 7'], 'two presses close the ticket once');
+  assert.equal((await commands.closeTicket(work.workId)).status, 200);
+  assert.deepEqual(log, ['abandon 7'], 'three presses close the ticket once');
 });
 
-test('a ticket close on an item whose abandonRefusal says why refuses with it, though Abandon set the item aside', async () => {
+test("Archive offers a set-aside ticket's close after the board restarts, and Restore brings the work back in its Status", async () => {
+  const records = await openRecords();
+  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
+  records.setAside(work.workId, work.revision);
+  const { board, commands, log } = commandsOn([], undefined, undefined, records, [queued(7)]);
+  assert.equal((await commands.closeTicket(work.workId)).status, 200);
+  assert.deepEqual(log, ['abandon 7']);
+  assert.equal(commands.restore(work.workId).status, 200);
+  assert.deepEqual([board.find(work.workId)?.status, board.snapshot().archive], ['Queued', []]);
+  const again = commands.restore(work.workId);
+  assert.deepEqual([again.status, (again.body as { error: string }).error], [409, "That work isn't set aside in Archive, so there is nothing to restore."]);
+});
+
+test("a ticket close refuses work whose abandonRefusal says why, and work whose ticket the board doesn't see open", async () => {
   const refusal = "Issue has no Removed state in Fabrikam, so the board can't abandon it. Close or delete it in Azure DevOps.";
-  const { commands, log } = commandsOn([queued(7, { abandonRefusal: refusal })]);
-  assert.equal(commands.abandon('azure:contoso/7').status, 200);
-  const refused = await commands.closeTicket('azure:contoso/7');
-  assert.deepEqual([refused.status, (refused.body as { error: string }).error], [409, refusal]);
+  const records = await openRecords();
+  const refused = records.importTicket({ title: 'Refused', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
+  const closed = records.importTicket({ title: 'Closed', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#8` }).record;
+  const { commands, log } = commandsOn([], undefined, undefined, records, [queued(7, { abandonRefusal: refusal }), queued(8, { state: 'closed' })]);
+  assert.equal(commands.abandon(refused.workId).status, 200);
+  assert.equal(commands.abandon(closed.workId).status, 200);
+  const answers = await Promise.all([commands.closeTicket(refused.workId), commands.closeTicket(closed.workId)]);
+  assert.deepEqual(answers.map((a) => [a.status, (a.body as { error: string }).error]), [[409, refusal],
+    [409, "The board doesn't see that work's ticket open, so it closes nothing. Check it in its provider."]]);
   assert.deepEqual(log, []);
 });
 

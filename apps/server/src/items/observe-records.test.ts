@@ -57,6 +57,17 @@ test('a merged PR finishes the build and makes it Done', async () => {
   assert.ok(records.completion(workId).complete);
 });
 
+test('a finished record keeps its ticket observed until retention hides it, and then takes no provider read', async () => {
+  const records = await open();
+  const { workId } = build(records);
+  const { reads, asked } = provider({ pr: 'merged', ticket: { state: 'closed' } });
+  await observeRecords(records, [REPO], reads);
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(asked, [`pr ${REPO}#40`, `ticket ${REPO}#12`, `ticket ${REPO}#12`]);
+  await observeRecords(records, [REPO], reads, new Set([workId]));
+  assert.equal(asked.length, 3);
+});
+
 test('a PR closed unmerged sets Needs you once, leaving the Status as it was', async () => {
   const records = await open();
   const { workId } = build(records, 'Review', null);
@@ -116,7 +127,7 @@ test('a confirmed not-found sets the work aside, and the record can be restored'
   const record = records.read(workId);
   assert.equal(record.setAside, true);
   assert.equal(record.status, 'List');
-  assert.match(record.needsYou!, /wasn't found in its provider, so the board set the work aside\. Run `lar-work restore/);
+  assert.match(record.needsYou!, /wasn't found in its provider, so the board set the work aside\. Restore it from Settings › Archive/);
   assert.equal(records.restore(workId, record.revision).setAside, false);
 });
 

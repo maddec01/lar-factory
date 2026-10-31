@@ -23,7 +23,8 @@ import { createCapture } from './items/capture.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
-import { recordItems, ticketsByReference } from './items/record-items.ts';
+import { createRetention } from './items/retention.ts';
+import { archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
@@ -90,6 +91,9 @@ if (!fixture) {
     board.update({ error: settings.problem ?? recordsProblem });
   }
 }
+/** This Mac's retention setting, which hides finished and set-aside work in Archive and runs the timed delete Settings chose. */
+// A saved change shows at once; `reread` is defined below, before any request arrives.
+const retention = createRetention({ records, changed: () => reread() });
 /** The tickets the item sources read last, which give the records their ticket context. */
 let tickets: Item[] = [];
 let ticketsByRef = new Map<string, Item>();
@@ -97,12 +101,19 @@ let ticketsByRef = new Map<string, Item>();
 let unread: string[] = [];
 /** The ticket item a board item's record names, as the item sources read it last; undefined for work with no ticket. */
 const ticketOf = (item: Item): Item | undefined => (item.number ? ticketsByRef.get(refKey(item.repo, item.number).toLowerCase()) : undefined);
-/** The board items: the onboarded repositories' work records, as they are now, with `read`'s tickets, kept for later. */
+/**
+ * The board items: the onboarded repositories' work records, as they are now, with `read`'s tickets, kept for later,
+ * less the work in Archive, which goes to the board data with the retention setting.
+ */
 function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tickets, waiting: unread }): Item[] {
   if (read.items !== tickets) ticketsByRef = ticketsByReference(read.items);
   tickets = read.items;
   unread = read.waiting ?? [];
-  return records ? recordItems(records, tickets, items.repos().map((r) => r.repo), unread) : [];
+  if (!records) return [];
+  const repos = items.repos().map((r) => r.repo);
+  const hidden = retention.hidden();
+  board.update({ archive: archivedItems(records, tickets, repos, hidden), retention: retention.state() });
+  return recordItems(records, tickets, repos, unread, hidden);
 }
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
@@ -644,9 +655,11 @@ async function observeProviders(): Promise<void> {
       ticket: (repo, number) => items.observeTicket(repo, number),
       pr: async (repo, number) => toState[await prHost(repo).prState(prUrl(repo, number))],
       known: (repo, number) => knownTicket(repo, number),
-    });
+    }, retention.hidden());
     // After the PR reads, so a concept whose last build merged finishes in the same pass.
     finishCompleted(records, repos);
+    // The timed delete, once Settings turned it on, runs at the same idle pace.
+    retention.deleteDue();
   } finally {
     observing = false;
   }
@@ -701,7 +714,7 @@ const adding = createCapture({ board, items, records, reread, repos: items.repos
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
-  board, commands, capture: adding, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  board, commands, capture: adding, startAfter, retention, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   reauthorizeT3: async () => {
     const read = await reauthorizeRepositoryProjects();
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });

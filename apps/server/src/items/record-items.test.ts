@@ -167,3 +167,15 @@ test('publication eligibility follows finished refinement through Status changes
   assert.ok(items.get(concept.workId)!.publication!.reasons.includes('The concept still has Fog.'));
   assert.ok(items.get(unfinished.workId)!.publication!.reasons.some((reason) => reason.includes('no current passing gate')));
 });
+
+test('publication history remains recoverable when a changed brief no longer has a passing gate', async () => {
+  const records = await open();
+  let build = records.create({ title: 'Search', repository: REPO, kind: 'build', status: 'Ready' });
+  build = records.setBody(build.workId, build.revision, 'brief', 'Passed brief.');
+  records.recordGate(build.workId, build.revision, { briefDigest: records.gate(build.workId).briefDigest!, approvedBy: 'reviewer', evidence: 'Passed.' });
+  records.proposePublication(build.workId, build.revision, { tickets: [{ workId: build.workId, destination: { provider: 'github', repository: REPO }, vocabulary: {}, typeResolution: { candidates: [], selected: null }, title: 'Find searches', body: 'Find saved searches.' }],
+    operations: [{ operationId: 'create', ticketWorkId: build.workId, kind: 'create', dependsOn: [] }], sources: records.publicationReadiness(build.workId).sources.map(({ workId, revision }) => ({ workId, revision })) });
+  records.setBody(build.workId, build.revision, 'brief', 'Changed brief.');
+  assert.equal(recordItems(records, [], [REPO])[0]!.publication!.eligible, false);
+  assert.equal(recordItems(records, [], [REPO])[0]!.publication!.recoverable, true);
+});

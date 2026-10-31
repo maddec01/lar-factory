@@ -9,6 +9,7 @@ import { createBoardState } from '../board/board-state.ts';
 import { createItemCommands } from './item-commands.ts';
 import type { ItemSource } from './item-source.ts';
 import { archivedItems, recordItems } from './record-items.ts';
+import { observeRecords } from './observe-records.ts';
 
 const WEB = 'contoso/Fabrikam/web';
 
@@ -58,8 +59,35 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
       log.push(`start ${project} ${message.split('\n')[1]}`);
       return { thread: { threadId: `thread-${branches.length}`, title: 't' }, error: null };
     } });
-  return { board, commands, log, branches, archive };
+  return { board, commands, log, branches, archive, reread };
 }
+
+for (const failed of [false, true]) test(`Abandon uses the current record after a provider ${failed ? 'failure' : 'observation'} while another ticket still reads`, async () => {
+  const records = await openRecords();
+  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'List', ticket: `${WEB}#7` }).record;
+  records.importTicket({ title: 'Other work', repository: WEB, kind: 'bug', status: 'List', ticket: `${WEB}#8` });
+  const { commands, reread } = commandsOn([], undefined, records, [queued(7), queued(8)]);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const pending = observeRecords(records, [WEB], {
+    ticket: async (_repo, number) => {
+      if (number === 8) await held;
+      if (failed) throw new Error('Provider unavailable.');
+      return { state: 'open' };
+    },
+    pr: async () => 'open',
+  }, new Set(), reread);
+  try {
+    // Let the first observation finish while the second stays held, without a timer or a provider refresh.
+    await new Promise(setImmediate);
+    const response = commands.abandon(work.workId);
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(records.read(work.workId).setAside, true);
+  } finally {
+    release();
+    await pending;
+  }
+});
 
 test('Abandon sets the work aside on this Mac and leaves its ticket alone, which only its own close closes', async () => {
   const records = await openRecords();

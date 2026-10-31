@@ -355,10 +355,11 @@ async function checkQuota(): Promise<void> {
 /**
  * Shows the work records as they are now, which threads may have changed, with T3's threads and every LOCAL_STATS_MS
  * its stats, pushing only when they changed, and starts the armed parts a record's change unblocked. Before the first
- * read lands, there are no records to show yet.
+ * read lands, there are no records to show yet. `recordsChanged` publishes the board's own observation writes,
+ * already copied into its snapshot, even while a provider read runs.
  */
-function refreshLocal(): void {
-  if (refreshing) return;
+function refreshLocal(recordsChanged = false): void {
+  if (refreshing && !recordsChanged) return;
   void t3Availability().then(source => {
     board.update({ t3Availability: source });
     board.push();
@@ -371,7 +372,7 @@ function refreshLocal(): void {
   const finished = after.some((item) => running(before.find((b) => b.id === item.id) ?? item) && !running(item));
   if (finished) board.update({ items: after = withT3Reads(after) });
   void commands.reconcileStarts(after);
-  if (JSON.stringify(after) === JSON.stringify(before)) return;
+  if (!recordsChanged && JSON.stringify(after) === JSON.stringify(before)) return;
   board.push();
   void syncPrStats(after);
   // A blocker completes from local facts, as a decision's answer the shaping session records, without any ticket read.
@@ -632,7 +633,7 @@ async function observeProviders(): Promise<void> {
       ticket: (repo, number) => items.observeTicket(repo, number),
       pr: async (repo, number) => toState[await prHost(repo).prState(prUrl(repo, number))],
       known: (repo, number) => knownTicket(repo, number),
-    }, retention.hidden());
+    }, retention.hidden(), showRecords);
     // After the PR reads, so a concept whose last build merged finishes in the same pass.
     finishCompleted(records, repos);
     // The timed delete, once Settings turned it on, runs at the same idle pace.
@@ -640,7 +641,7 @@ async function observeProviders(): Promise<void> {
   } finally {
     observing = false;
   }
-  refreshLocal();
+  refreshLocal(true);
 }
 
 let offeredAt = -Infinity;

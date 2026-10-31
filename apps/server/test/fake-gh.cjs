@@ -191,6 +191,8 @@ const main = async () => {
     }
     throw new Error('Unexpected fake GraphQL query');
   }
+  // A work record's observation of its ticket: open with no one assigned.
+  if (args[0] === 'issue' && args[1] === 'view' && args.includes('state,assignees')) return output({ state: 'OPEN', assignees: [] });
   // The ticket picker's search and a pick's read, of options.repoIssues: open issues whose title has every word, and one issue by number.
   if (args[0] === 'issue' && (args[1] === 'list' || args[1] === 'view')) {
     const issues = options.repoIssues?.[args[args.indexOf('-R') + 1]] ?? [];

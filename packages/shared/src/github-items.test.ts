@@ -65,6 +65,13 @@ test('an item blocked by nothing has no blockers', () => {
   assert.deepEqual(normalizeItem(rawIssue('I_4', 4, 'List', ['feature']))?.blockers, []);
 });
 
+test("an issue's assignees become its assignee, sorted and joined as a work record observes them; null when it has none", () => {
+  const assigned = rawIssue('I_5', 5, 'List', ['feature'], { assignees: { nodes: [{ login: 'pedro' }, { login: 'ana' }] } });
+  assert.equal(normalizeItem(assigned)?.assignee, 'ana, pedro');
+  assert.equal(normalizeItem(rawIssue('I_6', 6, 'List', ['feature'], { assignees: { nodes: [] } }))?.assignee, null);
+  assert.equal(normalizeItem(rawIssue('I_7', 7, 'List', ['feature']))?.assignee, undefined, 'a read without assignees says nothing about them');
+});
+
 test("a concept's body becomes its map, and no other item keeps the body", () => {
   const body = '## Destination\nThere.\n\n## Fog\n- Why?\n';
   const concept = normalizeItem(rawIssue('I_6', 6, 'Shaping', ['concept'], { body }));

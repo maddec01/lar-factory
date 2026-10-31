@@ -25,18 +25,21 @@ function fakeSource(title: string, items: Item[], writes: string[]): ItemSource 
     addLabel: async (i, label) => write(`${i.id} ${label}`)(),
     searchTickets: async (repo, query) => { writes.push(`${title} search ${repo} ${query}`); return []; },
     readTicket: async (repo, number) => { writes.push(`${title} read ${repo}#${number}`); return null; },
+    observeTicket: async (repo, number) => { writes.push(`${title} observe ${repo}#${number}`); return { state: 'open' }; },
     setParentStatus: async (parent, status) => write(`${parent.repo}#${parent.number} ${status}`)(),
     abandon: async (i) => write(`abandon ${i.id}`)(),
   };
 }
 
-test("a ticket search and a ticket read go to the repository's own source, and an unlisted repository's refuse", async () => {
+test("a ticket search, read and observation go to the repository's own source, and an unlisted repository's refuse", async () => {
   const writes: string[] = [];
   const source = mergeSources(new Map([['maddec01/lar-server', fakeSource('lar', [], writes)], ['maddec01/lar-apple', fakeSource('apple', [], writes)]]));
   await source.searchTickets('maddec01/lar-apple', 'seek');
   await source.readTicket('Maddec01/Lar-Server', 7);
-  assert.deepEqual(writes, ['apple search maddec01/lar-apple seek', 'lar read Maddec01/Lar-Server#7']);
+  await source.observeTicket('maddec01/lar-apple', 8);
+  assert.deepEqual(writes, ['apple search maddec01/lar-apple seek', 'lar read Maddec01/Lar-Server#7', 'apple observe maddec01/lar-apple#8']);
   await assert.rejects(source.searchTickets('maddec01/other', 'seek'), /isn't onboarded/);
+  await assert.rejects(source.observeTicket('maddec01/other', 8), /isn't onboarded/);
 });
 
 test('a source with no opted-in repositories lists every item it read', async () => {

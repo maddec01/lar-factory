@@ -35,6 +35,7 @@ const CHECKS = `statusCheckRollup {
 const ISSUE_FIELDS = `id number title url state stateReason closedAt updatedAt
   repository { nameWithOwner }
   labels(first: 20) { nodes { name } }
+  assignees(first: 20) { nodes { login } }
   parent { number title url state repository { nameWithOwner } }
   subIssuesSummary { total completed }
   subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state stateReason repository { nameWithOwner } } }

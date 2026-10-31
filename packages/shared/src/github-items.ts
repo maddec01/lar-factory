@@ -50,6 +50,7 @@ interface RawContent {
   closedAt?: string | null;
   repository: { nameWithOwner: string };
   labels?: RawLabelConn;
+  assignees?: { nodes: { login: string }[] };
   parent?: RawIssueRef | null;
   subIssuesSummary?: { total: number; completed: number };
   subIssues?: { nodes: RawIssueRef[] };
@@ -229,6 +230,7 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
     slices: normalizeSlices(rawSlices(raw, builds), active, blocked),
   };
+  if (c.assignees) item.assignee = c.assignees.nodes.map((a) => a.login).sort().join(', ') || null;
   if (isRawConcept(raw)) {
     const map = bodyMap(c.body);
     if (map) item.map = map;

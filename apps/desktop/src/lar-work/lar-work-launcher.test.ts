@@ -9,7 +9,11 @@ import * as Effect from "effect/Effect";
 import electron from "electron";
 import { build } from "vite-plus/pack";
 
-import { tempDir } from "../../test/support.ts";
+import { boardDataDir } from "@lar-factory/shared/data-dir";
+import { defaultTargets, installSkills } from "@lar-factory/shared/install-skills";
+import { installTargets } from "@lar-factory/shared/install-targets";
+
+import { makeBundle, tempDir } from "../../test/support.ts";
 import { larWorkPack } from "../../vite.config.ts";
 import * as LarWorkLauncher from "./lar-work-launcher.ts";
 
@@ -25,16 +29,12 @@ beforeAll(async () => {
   commandFile = NodePath.join(outDir, "lar-work.mjs");
 }, 60_000);
 
-/** Runs `file` with `args` from a new empty folder, outside any repository. */
-const runFrom = (file: string, args: ReadonlyArray<string>) =>
-  NodeChildProcess.spawnSync(file, args, {
-    cwd: tempDir("no-factory-files-"),
-    encoding: "utf8",
-    env: { PATH: "/usr/bin:/bin", HOME: tempDir("lar-work-home-") },
-  });
+/** Runs `file` with `args` from `cwd`, a new empty folder outside any repository by default, with `home` as HOME. */
+const runFrom = (file: string, args: ReadonlyArray<string>, { cwd = tempDir("no-factory-files-"), home = tempDir("lar-work-home-") } = {}) =>
+  NodeChildProcess.spawnSync(file, args, { cwd, encoding: "utf8", env: { PATH: "/usr/bin:/bin", HOME: home } });
 
-const install = (home: string, file = commandFile) =>
-  LarWorkLauncher.install({ home, executablePath: ELECTRON, commandFile: file });
+const install = (home: string, file = commandFile, dataDir = boardDataDir(home)) =>
+  LarWorkLauncher.install({ home, executablePath: ELECTRON, commandFile: file, dataDir });
 
 describe("the bundled command", () => {
   it("prints its help and creates then reads a record with Electron's Node", () => {
@@ -71,6 +71,37 @@ describe("install", () => {
     const read = runFrom(LarWorkLauncher.launcherPath(home), ["read", JSON.parse(created.stdout).workId, "--data-dir", dataDir]);
     assert.strictEqual(read.status, 0, read.stderr);
     assert.strictEqual(JSON.parse(read.stdout).kind, "concept");
+  });
+
+  it("gives Claude Code and Codex threads the board's database whatever their HOME and folder", () => {
+    const appHome = tempDir("app-home-");
+    const dataDir = boardDataDir(appHome, {});
+    install(appHome, commandFile, dataDir);
+    const agents = [
+      { driver: "claudeAgent", home: tempDir("claude-home-") },
+      { driver: "codex", home: tempDir("codex-home-") },
+    ];
+
+    // Claude Code makes its home folder; the app installs only where one exists.
+    NodeFS.mkdirSync(NodePath.join(agents[0]!.home, ".claude"));
+    const targets = agents.map(({ driver, home }) => installTargets(driver, appHome, { environment: [{ name: "HOME", value: home }] })[0]!);
+    // As the app installs: into the fallback targets and those of T3's instances.
+    installSkills(appHome, makeBundle(), "1.0.0", { targets: [...defaultTargets(appHome), ...targets] });
+
+    const workIds = agents.map(({ driver, home }, index) => {
+      assert.isTrue(NodeFS.existsSync(NodePath.join(targets[index]!.path, "lar-work/SKILL.md")));
+      const created = runFrom(LarWorkLauncher.launcherPath(appHome), ["create", "--title", driver, "--repository", "maddec01/lar", "--kind", "build"], {
+        cwd: tempDir("worktree-"), home,
+      });
+      assert.strictEqual(created.status, 0, created.stderr);
+      return JSON.parse(created.stdout).workId as string;
+    });
+
+    for (const [index, workId] of workIds.entries()) {
+      const read = runFrom(LarWorkLauncher.launcherPath(appHome), ["read", workId, "--data-dir", dataDir]);
+      assert.strictEqual(read.status, 0, read.stderr);
+      assert.strictEqual(JSON.parse(read.stdout).title, agents[index]!.driver);
+    }
   });
 
   it("leaves a current launcher as it is", () => {
@@ -118,7 +149,7 @@ describe("onLaunch", () => {
   it.effect("installs nothing in a dev run", () =>
     Effect.gen(function* () {
       const home = tempDir("lar-work-home-");
-      yield* LarWorkLauncher.onLaunch({ isPackaged: false, home, executablePath: ELECTRON, commandFile });
+      yield* LarWorkLauncher.onLaunch({ isPackaged: false, home, executablePath: ELECTRON, commandFile, dataDir: boardDataDir(home) });
       assert.isFalse(NodeFS.existsSync(LarWorkLauncher.launcherPath(home)));
     }));
 
@@ -128,7 +159,7 @@ describe("onLaunch", () => {
       const path = LarWorkLauncher.launcherPath(home);
       NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
       NodeFS.writeFileSync(path, "mine\n");
-      yield* LarWorkLauncher.onLaunch({ isPackaged: true, home, executablePath: ELECTRON, commandFile });
+      yield* LarWorkLauncher.onLaunch({ isPackaged: true, home, executablePath: ELECTRON, commandFile, dataDir: boardDataDir(home) });
       assert.strictEqual(NodeFS.readFileSync(path, "utf8"), "mine\n");
     }));
 });

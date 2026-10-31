@@ -94,12 +94,11 @@ test('a read of more than 200 ids reads their fields in batches of at most 200',
   for (const call of calls) assert.ok(call[call.indexOf('--api-version') + 1], call.join(' '));
 });
 
-test('status tags give the statuses and every other tag is a label; an item carrying two refuses a move with the two-status warning', async () => {
+test('status tags give the statuses and every other tag is a label', async () => {
   const sprint = azureSprint([REPO], TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run);
   const read = await sprint.read();
   const two = read.items.find((i) => i.number === 5)!;
   assert.deepEqual([two.statuses, two.labels], [['Queued', 'Review'], []]);
-  assert.equal(sprint.statusRefusal(two), 'This issue carries Queued and Review. Keep one to move it again.');
 });
 
 test('a repository showing Opted-in items hides an item with no status tag', async () => {
@@ -112,8 +111,7 @@ const otherRepo: ItemSource = {
   read: async () => ({ title: 'maddec01/lar-apple', items: [{ id: 'I_1', status: 'List', statuses: [], content: 'ticket', revision: 0, kind: 'issue', parentId: null, number: 1, title: 'Apple', url: null,
     repo: 'maddec01/lar-apple', labels: [], state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
     updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [] }] }),
-  setStatus: async () => null, statusRefusal: () => null, addLabel: async () => null,
-  searchTickets: async () => [], readTicket: async () => null, observeTicket: async () => ({ state: 'open' }), setParentStatus: async () => null, abandon: async () => null,
+  searchTickets: async () => [], readTicket: async () => null, observeTicket: async () => ({ state: 'open' }), abandon: async () => null,
 };
 
 test("a logged-out az and a missing azure-devops extension each name their fix, and another repository's items still show", async () => {

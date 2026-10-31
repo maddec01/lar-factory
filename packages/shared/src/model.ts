@@ -238,7 +238,7 @@ export interface Item {
   repo: string;
   /**
    * An Azure work item with no repository tag: every repository reading its item source, whose Lists all show it, and
-   * one of which Start tags it for. `repo` is the first of them. Absent on every other item.
+   * one of which Start runs in. `repo` is the first of them. Absent on every other item.
    */
   untaggedFor?: string[];
   /** Why Abandon can't run on the item, which its greyed-out Abandon shows: an Azure work item whose type has no Removed state. Absent when it can. */
@@ -351,7 +351,7 @@ export interface ModelChoice {
 export interface ArmedStart {
   /** None leaves it to T3 ("T3 default"). */
   model?: ModelChoice;
-  /** The repository an untagged Azure work item is for, which the start tags it for; absent on other items. */
+  /** The repository an untagged Azure work item is for, which the start runs in; absent on other items. */
   repo?: string;
 }
 

@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import type { IssueRef, Item, Status } from '@lar-factory/shared';
+import type { Item, Status } from '@lar-factory/shared';
 import { repoIssues } from './repo-issues.ts';
 
 const REPO = 'maddec01/lar-apple';
@@ -11,119 +11,12 @@ const item = (statuses: Status[]): Item => ({
   updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [],
 });
 
-const parent: IssueRef = { number: 5, title: 'Parent', url: `https://github.com/${REPO}/issues/5`, repo: REPO, state: 'open' };
-
 /** A fake gh: records each call, and answers it from `reply`, which throws to fail the call. */
 function fakeGh(reply: (args: string[]) => string = () => '{}') {
   const calls: string[][] = [];
   const run = async (args: string[]) => { calls.push(args); return reply(args); };
   return { calls, run };
 }
-
-test('a move swaps every status label the issue carries for the new one in one edit', async () => {
-  const gh = fakeGh();
-  const issues = repoIssues(REPO, gh.run);
-  assert.equal(await issues.setStatus(item(['Queued']), 'Shaping'), null);
-  assert.deepEqual(gh.calls, [
-    ['api', `repos/${REPO}/labels/status-shaping`],
-    ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-shaping', '--remove-label', 'status-queued'],
-  ]);
-});
-
-test('Start, Queue and Back to List each add their label, and an issue with no status label only gets one added', async () => {
-  const gh = fakeGh();
-  const issues = repoIssues(REPO, gh.run);
-  await issues.setStatus(item([]), 'Queued');
-  await issues.setStatus(item(['Ready']), 'In progress');
-  await issues.setStatus(item(['Queued']), 'List');
-  assert.deepEqual(gh.calls.filter((c) => c[0] === 'issue'), [
-    ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-queued'],
-    ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-in-progress', '--remove-label', 'status-ready'],
-    ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-list', '--remove-label', 'status-queued'],
-  ]);
-});
-
-test('a missing label is created once, then used', async () => {
-  const gh = fakeGh((args) => {
-    if (args[0] === 'api') throw new Error('gh api failed: HTTP 404: Not Found');
-    return '{}';
-  });
-  const issues = repoIssues(REPO, gh.run);
-  assert.equal(await issues.setStatus(item(['List']), 'Shaping'), null);
-  assert.equal(await issues.setStatus(item(['List']), 'Shaping'), null);
-  assert.deepEqual(gh.calls, [
-    ['api', `repos/${REPO}/labels/status-shaping`],
-    ['label', 'create', '-R', REPO, '--color', 'EDEDED', '--description', 'Status: Shaping', '--', 'status-shaping'],
-    ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-shaping', '--remove-label', 'status-list'],
-    ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-shaping', '--remove-label', 'status-list'],
-  ]);
-});
-
-test("a failed label creation names the label and the repository, and edits nothing", async () => {
-  const gh = fakeGh((args) => {
-    if (args[0] === 'api') throw new Error('gh: Not Found (HTTP 404)');
-    if (args[0] === 'label') throw new Error('HTTP 403: Must have admin rights');
-    return '{}';
-  });
-  const error = await repoIssues(REPO, gh.run).setStatus(item(['List']), 'Shaping');
-  assert.equal(error, `Could not create the status-shaping label in ${REPO}. HTTP 403: Must have admin rights`);
-  assert.equal(gh.calls.some((c) => c[0] === 'issue'), false);
-});
-
-test("a label lookup that fails for another reason than a missing label gives its own error, and creates and edits nothing", async () => {
-  const gh = fakeGh((args) => {
-    if (args[0] === 'api') throw new Error('gh: Bad credentials (HTTP 401)');
-    return '{}';
-  });
-  const error = await repoIssues(REPO, gh.run).setStatus(item(['List']), 'Shaping');
-  assert.equal(error, `Could not look up the status-shaping label in ${REPO}. gh: Bad credentials (HTTP 401)`);
-  assert.deepEqual(gh.calls, [['api', `repos/${REPO}/labels/status-shaping`]]);
-});
-
-test('a failed edit gives the status it could not set and gh\'s message', async () => {
-  const gh = fakeGh((args) => {
-    if (args[0] === 'issue') throw new Error('gh issue edit failed: HTTP 502');
-    return '{}';
-  });
-  assert.equal(await repoIssues(REPO, gh.run).setStatus(item(['List']), 'Queued'), 'Could not set Queued. gh issue edit failed: HTTP 502');
-});
-
-test('a move on an issue with two status labels is refused before it runs', () => {
-  const issues = repoIssues(REPO, fakeGh().run);
-  assert.match(issues.statusRefusal(item(['Shaping', 'Ready'])) ?? '', /This issue carries Shaping and Ready\. Keep one to move it again\./);
-  assert.equal(issues.statusRefusal(item(['Shaping'])), null);
-  assert.equal(issues.statusRefusal({ ...item(['Shaping', 'Ready']), state: 'closed', closedAs: 'done' }), null);
-  assert.equal(issues.statusRefusal(parent), null);
-});
-
-test('a status write adds the new label and removes every other status label the issue carries', async () => {
-  const gh = fakeGh();
-  const issues = repoIssues(REPO, gh.run);
-  assert.equal(await issues.setStatus(item(['Shaping', 'Review']), 'Review'), null);
-  assert.deepEqual(gh.calls.at(-1), ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-review', '--remove-label', 'status-shaping']);
-  assert.equal(await issues.setStatus(item(['Shaping', 'Review']), 'Queued'), null);
-  assert.deepEqual(gh.calls.at(-1), ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-queued', '--remove-label', 'status-shaping', '--remove-label', 'status-review']);
-});
-
-test("a parent's move reads its labels first, swaps them, and is refused when it carries two", async () => {
-  let labels = ['bug', 'status-ready'];
-  const gh = fakeGh((args) => (args[1] === `repos/${REPO}/issues/5` ? JSON.stringify({ labels: labels.map((name) => ({ name })) }) : '{}'));
-  const issues = repoIssues(REPO, gh.run);
-  assert.equal(await issues.setParentStatus(parent, 'In progress'), null);
-  assert.deepEqual(gh.calls.at(-1), ['issue', 'edit', '5', '-R', REPO, '--add-label', 'status-in-progress', '--remove-label', 'status-ready']);
-  labels = ['status-ready', 'status-verify'];
-  gh.calls.length = 0;
-  assert.match(await issues.setParentStatus(parent, 'In progress') ?? '', /Keep one/);
-  assert.equal(gh.calls.some((c) => c[0] === 'issue'), false);
-});
-
-test('a Done write is refused before any call', async () => {
-  const gh = fakeGh();
-  const issues = repoIssues(REPO, gh.run);
-  assert.match(await issues.setStatus(item(['Verify']), 'Done') ?? '', /Could not set Done/);
-  assert.match(await issues.setParentStatus(parent, 'Done') ?? '', /Could not set Done/);
-  assert.deepEqual(gh.calls, []);
-});
 
 test("a ticket search lists the repository's open issues matching the words, and a number reads that issue alone", async () => {
   const gh = fakeGh((args) => args[1] === 'list'

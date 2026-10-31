@@ -3,8 +3,8 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
-import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, Status, TicketMatch } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches } from '@lar-factory/shared';
+import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
 import type { TicketObservation } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -459,17 +459,6 @@ export async function fetchRepoIssues(repo: string, now = Date.now(), { searchRa
 /** An error's message, for a write's error text. */
 export const message = (err: unknown) => (err instanceof Error ? err.message : 'GitHub request failed.');
 
-/** Adds a label to an issue; returns the error, or null when GitHub accepted it. */
-export async function addIssueLabel(repo: string, number: number, label: string,
-  run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  try {
-    await run(['issue', 'edit', String(number), '-R', repo, '--add-label', label]);
-    return null;
-  } catch (err) {
-    return `Could not add the ${label} label. ${message(err)}`;
-  }
-}
-
 /** Replaces an issue's body, written to a file for gh's --body-file. */
 export async function editIssueBody(repo: string, number: number, body: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), 'lar-body-'));
@@ -480,56 +469,6 @@ export async function editIssueBody(repo: string, number: number, body: string, 
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}
-
-/**
- * Creates a status's label in a repository when GitHub answers that it has none (HTTP 404), as status.sh does; returns
- * the error, or null. A lookup that fails for another reason gives its own error and creates nothing.
- */
-export async function createStatusLabel(repo: string, status: Exclude<Status, 'Done'>,
-  run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  const label = STATUS_LABELS.find((l) => l.name === statusLabel(status))!;
-  try {
-    await run(['api', `repos/${repo}/labels/${label.name}`]);
-    return null;
-  } catch (err) {
-    if (!/HTTP 404\b/.test(message(err))) return `Could not look up the ${label.name} label in ${repo}. ${message(err)}`;
-  }
-  try {
-    await createLabel(repo, label, run);
-    return null;
-  } catch (err) {
-    return `Could not create the ${label.name} label in ${repo}. ${message(err)}`;
-  }
-}
-
-/**
- * Creates a label in a repository, with its colour and description when it has them; GitHub picks a colour otherwise.
- * The name comes after `--`, so one that starts with - is no gh flag.
- */
-async function createLabel(repo: string, label: { name: string; color?: string; description?: string },
-  run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['label', 'create', '-R', repo, ...label.color ? ['--color', label.color] : [],
-    ...label.description ? ['--description', label.description] : [], '--', label.name]);
-}
-
-/** Swaps the status labels an issue carries for `status`'s in one edit; returns the error, or null when GitHub accepted it. */
-export async function setStatusLabel(repo: string, number: number, status: Exclude<Status, 'Done'>, carried: readonly Status[],
-  run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  const removed = carried.filter((s): s is Exclude<Status, 'Done'> => s !== status && s !== 'Done').map(statusLabel);
-  try {
-    await run(['issue', 'edit', String(number), '-R', repo, '--add-label', statusLabel(status),
-      ...removed.flatMap((label) => ['--remove-label', label])]);
-    return null;
-  } catch (err) {
-    return `Could not set ${status}. ${message(err)}`;
-  }
-}
-
-/** An issue's labels as GitHub has them now. */
-export async function issueLabels(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<string[]> {
-  const issue = JSON.parse(await run(['api', `repos/${repo}/issues/${number}`])) as { labels?: { name: string }[] };
-  return (issue.labels ?? []).map((l) => l.name);
 }
 
 /** A PR's REST path, `repos/<owner>/<repo>/pulls/<n>`, from its URL. */

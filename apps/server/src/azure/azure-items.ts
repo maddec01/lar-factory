@@ -137,10 +137,10 @@ export const workItemUrl = (organization: string, encodedProject: string, id: nu
 /** The ids a work item's links of `rel` point at: the last part of each link's URL. */
 export const linked = (raw: RawWorkItem, rel: string) => (raw.relations ?? []).filter((r) => r.rel === rel).map((r) => Number(r.url.split('/').at(-1)));
 /** The work item's tags, from System.Tags's "a; b". */
-export const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';').map((t) => t.trim()).filter(Boolean);
+const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';').map((t) => t.trim()).filter(Boolean);
 const STATUS_TAGS = new Set(STATUSES.flatMap((s) => (s === 'Done' ? [] : [statusLabel(s)])));
 /** Whether the tag records a work item's repository; Azure keeps a tag's case, so the board ignores it. */
-export const isRepoTag = (tag: string) => tag.toLowerCase().startsWith('repo-');
+const isRepoTag = (tag: string) => tag.toLowerCase().startsWith('repo-');
 
 /** Where a work item shows: for its tagged repository, untagged for each of the source's, or nowhere (null). */
 type Placement = Pick<Item, 'repo' | 'untaggedFor'> | null;

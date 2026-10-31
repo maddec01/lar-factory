@@ -34,11 +34,10 @@ async function openRecords(): Promise<WorkRecords> {
 }
 
 /**
- * Commands on a board holding `items`, whose source records each write it gets and fails a tag when `failTag` is set.
- * Given `records`, the board shows their items and Archive with `tickets` as the source read them, and reads them
+ * Commands on a board holding `items`, whose source records each abandon it gets. Given `records`, the board shows their items and Archive with `tickets` as the source read them, and reads them
  * again after each write.
  */
-function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = []) {
+function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = []) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
   const reread = () => {
     if (records) board.update({ items: recordItems(records, tickets, [WEB]) });
@@ -48,19 +47,6 @@ function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<
   const log: string[] = [];
   const branches: (string | undefined)[] = [];
   const source = {
-    statusRefusal: () => null,
-    setStatus: async (item: Item, status: string) => {
-      log.push(`status ${item.number} ${status}`);
-      return null;
-    },
-    setParentStatus: async (parent: Item, status: string) => {
-      log.push(`status ${parent.number} ${status}`);
-      return null;
-    },
-    addLabel: async (item: Item, label: string) => {
-      log.push(`tag ${item.number} ${label}`);
-      return failTag ?? null;
-    },
     abandon: async (item: Item) => {
       log.push(`abandon ${item.number}`);
       return null;
@@ -76,19 +62,17 @@ function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<
   return { board, commands, log, branches, archive };
 }
 
-test('Start on an untagged item tags it for the repository picked, then starts shaping in that repository', async () => {
-  const { board, commands, log } = commandsOn([queued(7, { untaggedFor: [WEB, API] })]);
+test('Start on an untagged item starts shaping in the repository picked, writing no tag', async () => {
+  const { commands, log } = commandsOn([queued(7, { untaggedFor: [WEB, API] })]);
   const reply = await commands.start('azure:contoso/7', undefined, 'Contoso/Fabrikam/API');
   assert.equal(reply.status, 200);
-  assert.deepEqual(log, ['tag 7 repo-api', `start ${API} $lar-shape azure:contoso/7`]);
-  const shown = board.find('azure:contoso/7')!;
-  assert.deepEqual([shown.repo, shown.untaggedFor], [API, undefined]);
+  assert.deepEqual(log, [`start ${API} $lar-shape azure:contoso/7`]);
 });
 
-test('Start on an untagged item that only one repository reads tags it for that one without asking', async () => {
+test('Start on an untagged item that only one repository reads starts in that one without asking', async () => {
   const { commands, log } = commandsOn([queued(7, { untaggedFor: [WEB] })]);
   assert.equal((await commands.start('azure:contoso/7', undefined)).status, 200);
-  assert.deepEqual(log, ['tag 7 repo-web', `start ${WEB} $lar-shape azure:contoso/7`]);
+  assert.deepEqual(log, [`start ${WEB} $lar-shape azure:contoso/7`]);
 });
 
 test('Start on an untagged item two repositories read asks which, and refuses one that does not read it', async () => {
@@ -100,16 +84,6 @@ test('Start on an untagged item two repositories read asks which, and refuses on
   assert.deepEqual(log, []);
 });
 
-test('a failed tag write starts nothing, and Start may run again', async () => {
-  const { commands, log } = commandsOn([queued(7, { untaggedFor: [WEB, API] })], 'Could not add the repo-web tag.');
-  const reply = await commands.start('azure:contoso/7', undefined, WEB);
-  assert.equal(reply.status, 502);
-  assert.equal((reply.body as { error: string }).error, 'Could not add the repo-web tag.');
-  assert.deepEqual(log, ['tag 7 repo-web']);
-  await commands.start('azure:contoso/7', undefined, WEB);
-  assert.equal(log.length, 2);
-});
-
 test('Start on a tagged item writes no tag and ignores a repository sent with it', async () => {
   const { commands, log } = commandsOn([queued(7)]);
   assert.equal((await commands.start('azure:contoso/7', undefined, API)).status, 200);
@@ -119,7 +93,7 @@ test('Start on a tagged item writes no tag and ignores a repository sent with it
 test('Abandon sets the work aside on this Mac and leaves its ticket alone, which only its own close closes', async () => {
   const records = await openRecords();
   const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
-  const { board, commands, log } = commandsOn([], undefined, undefined, records, [queued(7)]);
+  const { board, commands, log } = commandsOn([], undefined, records, [queued(7)]);
   assert.deepEqual((await commands.closeTicket(work.workId)).status, 409, 'work Abandon never set aside has no ticket to close');
   assert.equal(commands.abandon(work.workId).status, 200);
   assert.equal(records.read(work.workId).setAside, true);
@@ -135,7 +109,7 @@ test("Archive offers a set-aside ticket's close after the board restarts, and Re
   const records = await openRecords();
   const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
   records.setAside(work.workId, work.revision);
-  const { board, commands, log, archive } = commandsOn([], undefined, undefined, records, [queued(7)]);
+  const { board, commands, log, archive } = commandsOn([], undefined, records, [queued(7)]);
   assert.equal((await commands.closeTicket(work.workId)).status, 200);
   assert.deepEqual(log, ['abandon 7']);
   assert.equal(commands.restore(work.workId).status, 200);
@@ -149,7 +123,7 @@ test("a ticket close refuses work whose abandonRefusal says why, and work whose 
   const records = await openRecords();
   const refused = records.importTicket({ title: 'Refused', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
   const closed = records.importTicket({ title: 'Closed', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#8` }).record;
-  const { commands, log } = commandsOn([], undefined, undefined, records, [queued(7, { abandonRefusal: refusal }), queued(8, { state: 'closed' })]);
+  const { commands, log } = commandsOn([], undefined, records, [queued(7, { abandonRefusal: refusal }), queued(8, { state: 'closed' })]);
   assert.equal(commands.abandon(refused.workId).status, 200);
   assert.equal(commands.abandon(closed.workId).status, 200);
   const answers = await Promise.all([commands.closeTicket(refused.workId), commands.closeTicket(closed.workId)]);
@@ -166,7 +140,7 @@ async function closedPrBuild() {
   record = records.addThread(created.workId, record.revision, 'thread-0', 'build');
   record = records.observe(created.workId, record.revision, { of: 'pr', state: 'closed' });
   records.setNeedsYou(created.workId, record.revision, 'Its PR closed without merging.');
-  return { records, workId: created.workId, ...commandsOn([], undefined, undefined, records) };
+  return { records, workId: created.workId, ...commandsOn([], undefined, records) };
 }
 
 test('reopening a closed PR from Needs you reopens it in its provider and clears the reason', async () => {
@@ -203,7 +177,7 @@ test('reopening Done work from Needs you moves it back to List', async () => {
   const records = await openRecords();
   const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Done', ticket: `${WEB}#7` }).record;
   records.setNeedsYou(work.workId, records.observe(work.workId, work.revision, { of: 'ticket', state: 'open' }).revision, 'Its ticket reopened.');
-  const { commands } = commandsOn([], undefined, undefined, records);
+  const { commands } = commandsOn([], undefined, records);
   assert.equal((await commands.resolveNeedsYou(work.workId, 'reopen-work')).status, 200);
   assert.deepEqual([records.read(work.workId).needsYou, records.read(work.workId).status], [null, 'List']);
 });
@@ -223,7 +197,7 @@ test('Start build reuses a live start, but a confirmed stopped build can start a
 
 for (const build of [false, true]) test(`deleted ${build ? 'build' : 'refining'} Start releases and concurrent retries create one thread`, async () => {
   const item = queued(7, { threads: [], ...(build ? { status: 'Ready', statuses: ['Ready'], labels: ['build'] } as Partial<Item> : {}) });
-  const { commands, board, branches } = commandsOn([item], undefined, async () => 'deleted');
+  const { commands, board, branches } = commandsOn([item], async () => 'deleted');
   const start = () => build ? commands.startBuild(item.id, undefined) : commands.start(item.id, undefined);
   await start();
   await commands.reconcileStarts([item]);
@@ -236,7 +210,7 @@ for (const build of [false, true]) test(`deleted ${build ? 'build' : 'refining'}
 test('unknown lookup retains protection and warns without concurrent duplicate checks', async () => {
   const item = queued(7, { threads: [] });
   let calls = 0;
-  const { commands, board, branches } = commandsOn([item], undefined, async () => { calls++; return 'unknown'; });
+  const { commands, board, branches } = commandsOn([item], async () => { calls++; return 'unknown'; });
   await commands.start(item.id, undefined);
   await Promise.all([commands.reconcileStarts([item]), commands.reconcileStarts([item])]);
   await commands.start(item.id, undefined);
@@ -253,7 +227,7 @@ for (const build of [false, true]) for (const outcome of ['live', 'deleted', 're
       vi.setSystemTime(0);
       const item = queued(7, { threads: [], ...(build ? { status: 'Ready', statuses: ['Ready'], labels: ['build'] } as Partial<Item> : {}) });
       let calls = 0;
-      const { commands, board } = commandsOn([item], undefined, async () => {
+      const { commands, board } = commandsOn([item], async () => {
         calls++;
         return calls === 1 ? 'unknown' : outcome === 'deleted' ? 'deleted' : 'live';
       });
@@ -282,7 +256,7 @@ for (const build of [false, true]) for (const outcome of ['live', 'deleted', 're
 test('Queue and Back to List move the work record and write nothing to its ticket', async () => {
   const records = await openRecords();
   const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', ticket: `${WEB}#7` }).record;
-  const { board, commands, log } = commandsOn([], undefined, undefined, records);
+  const { board, commands, log } = commandsOn([], undefined, records);
   assert.equal((await commands.queue(work.workId)).status, 200);
   assert.equal(records.read(work.workId).status, 'Queued');
   assert.equal(board.find(work.workId)?.status, 'Queued', 'the board reads the record again at once');
@@ -294,7 +268,7 @@ test('Queue and Back to List move the work record and write nothing to its ticke
 test('a move on a record a thread changed since the board read it is refused, and the board reads it again', async () => {
   const records = await openRecords();
   const work = records.create({ title: 'Work', repository: WEB, kind: 'feature' });
-  const { board, commands } = commandsOn([], undefined, undefined, records);
+  const { board, commands } = commandsOn([], undefined, records);
   records.update(work.workId, work.revision, { kind: 'bug' });
   const refused = await commands.queue(work.workId);
   assert.equal(refused.status, 409);
@@ -309,7 +283,7 @@ test("Start build moves the build's concept record to In progress and writes no 
   const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Shaping' });
   const made = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
   const build = records.setParent(made.workId, made.revision, concept.workId);
-  const { commands, log } = commandsOn([], undefined, undefined, records);
+  const { commands, log } = commandsOn([], undefined, records);
   assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
   assert.equal(records.read(concept.workId).status, 'In progress');
   assert.ok(log.every((line) => !line.startsWith('status')), log.join('; '));

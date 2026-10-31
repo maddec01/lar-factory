@@ -5,7 +5,7 @@
 
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isDriftChoice, isOnboarding, pickRepoText, repoTag, sameRepo, startRepo, workMessage } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isDriftChoice, isOnboarding, pickRepoText, sameRepo, startRepo, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, Item, ModelChoice, ModelGroup, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
 import type { BoardState } from '../board/board-state.ts';
@@ -39,8 +39,8 @@ export interface ItemCommands {
   /**
    * Starts a T3 thread for a Queued item that nothing open blocks, once unless its recorded thread stopped or was
    * deleted. It writes a launch intent on the work record before it asks T3, and settles an unresolved one through T3
-   * before starting again. An untagged Azure work item is tagged first for `repo`, one of the repositories reading it,
-   * or for the only one that does.
+   * before starting again. An untagged Azure work item starts in `repo`, one of the repositories reading it, or in
+   * the only one that does, and gets no tag.
    */
   start(itemId: string, model: unknown, repo?: unknown): Promise<Reply>;
   /**
@@ -508,12 +508,6 @@ export function createItemCommands({ board, items, records, reread, archive, off
       return async () => {
         const repoProject = await projectOf(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
-        // The tag comes first, so an item that fails to take it starts nothing; the board never tags an item by itself.
-        if (listed.untaggedFor) {
-          const error = await items.addLabel(listed, repoTag(repo));
-          if (error) return { thread: null, error };
-          board.showChanged(item);
-        }
         return launch(item, 'started', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice));
       };
     }),

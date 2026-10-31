@@ -97,16 +97,6 @@ test('a ticket observation reads a work item open or not, with its assignee, and
   assert.deepEqual(await source.observeTicket(API, 99), { state: 'not-found' });
 });
 
-test('a repository tag goes on an untagged item, and an item tagged for another repository refuses a second', async () => {
-  const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 2, type: 'User Story', state: 'New', tags: 'repo-web' }] });
-  const source = azureBoard([WEB, API], TEAM, az.run);
-  const [one, two] = (await source.read()).items as [Item, Item];
-  assert.equal(await source.addLabel(one, 'repo-web'), null);
-  assert.match((await source.addLabel(two, 'repo-Web Api'))!, /already tagged for web/);
-  assert.equal(await source.addLabel(two, 'repo-WEB'), null, 'its own tag in another case is already there');
-  assert.deepEqual(az.patches.map((p) => [p.id, (p.ops[1] as { value: string }).value]), [[1, 'repo-web']]);
-});
-
 /** A source that lists every work item the fake has, on a clock the test moves. */
 const clocked = (az: ReturnType<typeof fakeAz>, clock: { now: number }) =>
   azureItems([WEB], TEAM, async ({ workItems }) => ({ title: 'Sprint', items: await workItems([1, 2]), completed: true }), az.run, () => clock.now);

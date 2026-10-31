@@ -72,6 +72,13 @@ in this order, so completion reads it as complete:
    drafts in Domain docs, the cleared fog removed and the Map redrawn. Once no
    Fog is left, record it with `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
+After saving the map, run `lar-work publication-readiness <concept work ID>`.
+Once every decision is settled, Fog is gone and all active briefs passed their
+current gates, offer [publication](shared/issue-tracker/publication.md). It
+publishes the concept's destination and decision gists as a parent and one
+ticket per build. Decisions and slices stay private. Publication can finish
+before implementation and changes neither Ready nor Start build.
+
 Start each new research decision at once, as in step 3; every other new
 decision waits in Queued as in step 4, and each build in Ready for the board's
 Start build ([5. Start the build](start-build.md)). `lar-work completion` on

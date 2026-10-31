@@ -32,6 +32,20 @@ az devops invoke --area wit --resource comments --organization "$org" \
   --query 'comments[].{by: createdBy.displayName, date: createdDate, text: text}'
 ```
 
-Status, kind, structure and blockers live in the record, never in tags, State,
-child Tasks or Predecessor links. An old `repo-<repository>` tag only places
-existing work when onboarding imports it.
+Status and shaping or build progress live in the record. Finished refinement
+may publish as work items with approved team types, tags and native
+relationships through [publication](publication.md). Decisions and slices
+stay private. An old `repo-<repository>` tag only places existing work when
+onboarding imports it; publication adds no repository tag.
+
+The common engine preserves raw HTML and Repro Steps when updating an existing
+item. It keeps body and comment consent separate and uses a revision guard for
+body and relationship PATCH. A refusal needs a separately approved fallback;
+uncertainty needs reconciliation before retry. Read-only handover is available
+without write consent.
+
+Build PRs use the native work-item relationship through
+[PR delivery](publication-pr.md), regardless of the repository's link style.
+The user's PR completion settings decide whether Azure transitions the linked
+work item. Keep those settings as they are. The factory never calls a State
+transition to close publication work.

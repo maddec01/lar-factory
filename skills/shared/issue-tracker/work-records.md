@@ -8,7 +8,7 @@ the `--revision` from your last read; when the record moved on, the change
 writes nothing, so read it again and redo the change.
 
 Factory progress stays on this machine. No step edits a ticket's body,
-comments, labels, tags or Azure State to record shaping, Status, structure or
+comments, labels, tags or Azure State to record shaping, Status or
 build progress.
 
 ## Picking
@@ -63,14 +63,17 @@ A decision is complete once its answer and domain drafts are recorded and its
 concept's map is written after them. A concept is complete once its Fog is
 recorded gone (`lar-work set-fog`) and every decision and build it owns is
 complete. A Status, a closed ticket or an ended thread completes nothing, and no
-step closes a ticket.
+step changes Azure State to complete publication work. A delivery PR uses the
+provider's closing relationship independently of local completion.
 
 ## Publication
 
-Publishing work as tickets arrives in a later Lar Factory release. Until then
-no step creates a ticket, and slices and decisions are never published. If the
-user asks to publish, say it isn't available yet and keep the work in its
-record.
+Offer publication of finished refinement and handle later publication requests
+through [publication](publication.md). It uses the common command and journal
+with the board closed. Ready and Start build remain separate choices. Publish
+only concepts and builds, with team terms and exact approval. Decisions,
+slices and progress stay in records. Opening a build's PR follows
+[PR delivery](publication-pr.md), including ticketless work.
 
 ## Providers
 

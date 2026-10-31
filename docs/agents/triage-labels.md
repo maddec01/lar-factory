@@ -2,7 +2,8 @@
 
 Lar Factory keeps an item's kind and Status in its work record (see
 `docs/agents/issue-tracker.md`). The repository needs no factory labels, and
-the factory adds none to its issues. A kind is one of `bug`, `feature`,
+publication uses only approved mappings to the team's types and labels.
+A kind is one of `bug`, `feature`,
 `improvement` or `concept`. Optional Repository config (`.lar-factory.json`)
 lists the repository's custom `labels`, which mark the part of the product an
 item touches.

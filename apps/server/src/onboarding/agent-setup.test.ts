@@ -96,4 +96,13 @@ for (const provider of ['GitHub', 'Azure DevOps'] as const) {
     assert.match(text, /no step writes it to an? (issue|work item)/);
     assert.doesNotMatch(text, /status-|retag|sub-issue|child Task|--add-label|slice\.sh|`(active|blocked|build|decision-\w+)`/);
   });
+
+  test(`${provider} guidance routes optional publication through exact approval and keeps native workflow authoritative`, () => {
+    const text = agentSetupWrites({}, provider).map(({ content }) => content).join('\n');
+    assert.match(text, /shared\/issue-tracker\/publication\.md/);
+    assert.match(text, /exact[\s\S]*approval/);
+    assert.match(text, /Decisions and slices stay private/);
+    assert.match(text, /native.*completion/);
+    assert.doesNotMatch(text, /publishing isn't available|arrives in a later Lar Factory release/);
+  });
 }

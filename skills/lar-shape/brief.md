@@ -4,6 +4,11 @@ Write the brief to a file, then save it in the record with
 `lar-work set-body <work ID> --revision N --body brief --file <file>`. The
 user's original text stays in the record's initial context.
 
+This private brief is the builder's handover. Editing it invalidates its prior
+gate evidence. Run [Gate](gate.md) on the final text before marking it Ready.
+The optional [publication](shared/issue-tracker/publication.md) is a separate
+team-language projection. A provider edit never rewrites this brief.
+
 ```markdown
 ## What
 <the change, in the user's domain language>

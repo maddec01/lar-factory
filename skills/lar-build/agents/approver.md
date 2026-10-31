@@ -23,7 +23,9 @@ from the brief's **Domain docs** are part of the change.
    without pushing and report the conflict or the failing check to the
    builder. When the push is refused (no write access to the branch or fork),
    stop and report what refused it.
-2. Open the PR with `gh pr create`, following the repository's PR rules
+2. Read [PR delivery](../shared/issue-tracker/publication-pr.md) to obtain this
+   build's current published ticket and prepare its provider closing
+   relationship. Open the PR with `gh pr create`, following the repository's PR rules
    (its template, title format and required links) per `project-rules.md`
    and citing other-repo work per `../shared/cross-repo-citations.md`. Where
    the repository sets no title format, use a conventional title naming the
@@ -32,8 +34,9 @@ from the brief's **Domain docs** are part of the change.
    report that rule to the builder. The body, written with the
    `<lar-build>/write-pr.md` skill inside any template the repository sets,
    holds:
-   - the outcome the brief's **What** describes and each decision's gist from
-     its **Confirmed**, so a reader with no ticket knows what changed and why;
+   - the outcome the brief's **What** describes and each decision's gist and
+     reason from its **Confirmed**, so a reader with no ticket knows what
+     changed and why;
    - a text summary of the UI reviewer's checks and results, per
      `../screenshots.md` (relative to this file);
    - an `## Open findings` section when any finding is still open after
@@ -45,15 +48,25 @@ from the brief's **Domain docs** are part of the change.
      the user to review before merge (when there is one);
    - an `## Out of scope` section with the builder's notes on work another
      repository needs, when any;
-   - when the record holds a ticket, a line naming it the way the
-     repository's PR rules link tickets, or `Refs <ticket>` where they set no
-     way; then the attribution line the repo's agents use.
+   - this build's GitHub closing reference from `publication-pr-body`, even
+     when the repository sets no link style, alongside any other required
+     links; then the attribution line the repo's agents use. A concept's
+     parent ticket is separate from the build's closing target.
 
    On Azure Repos, open it with `az repos pr create --repository <repo>
    --source-branch <branch> --target-branch main --title "<title>"
    --description "$(cat <body-file>)" --project <project> --organization <org>`,
-   adding `--work-items <id>` for the record's ticket only when the
-   repository's PR rules ask for linked work items.
+   using the native PR work-item link through the shared delivery command
+   after creation. Keep the team's PR completion settings as they are. Never
+   change Azure State or enable completion behavior to close publication work.
+
+   Record the PR on the build immediately with `lar-work set-pr`, then prepare,
+   inspect and approve its delivery plan as [PR delivery](../shared/issue-tracker/publication-pr.md)
+   directs. The shared command records success, refusal or uncertainty in
+   the publication journal. Reconcile a lost response before any retry and
+   ask before retrying or writing a fallback. Report an unresolved link with
+   the PR result. A ticketless PR still has the complete outcome, decisions
+   and reasons above. Its recorded merge makes the build Done.
 3. Recommend the status for once required checks pass:
    - **Verify** when the change is visible on screen, the brief says Verify,
      it touches auth, permissions, migrations

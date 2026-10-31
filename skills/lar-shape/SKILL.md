@@ -30,3 +30,7 @@ Never merge or push to main. Follow the repository's commit rules and
 3. Read [Brief](brief.md) once its questions are settled.
 4. Read [Gate](gate.md) before marking a build Ready.
 5. Read [Start the build](start-build.md) when explaining the board handover.
+
+When refinement finishes or the user later asks to publish, read
+[publication](shared/issue-tracker/publication.md). Publication keeps its own
+approval and recovery journal and leaves Ready and Start build separate.

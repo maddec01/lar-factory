@@ -63,8 +63,19 @@ makes it Done.
 
 ## When a skill says "publish to the issue tracker"
 
-Publishing work as ${ticket}s arrives in a later Lar Factory release. Keep the work
-in its record and tell the user publishing isn't available yet.
+Offer optional publication once refinement finishes, and later on request,
+through the lar skill's \`shared/issue-tracker/publication.md\`. Use \`lar-work\`
+and its journal with the board open or closed. Show exact text, destination,
+mapped team terms and operations for approval. Recheck before writes, resume
+recorded outcomes and reconcile uncertainty before an approved retry or fallback.
+Decisions and slices stay private. Publication, Ready and Start build are
+separate choices. Provider edits never rewrite private refinement.
+
+A build's PR uses its own published ticket's closing relationship, even when
+the repository sets no link style, per \`shared/issue-tracker/publication-pr.md\`.
+Keep the project's other PR rules and a complete outcome, decisions and reasons
+for ticketless PRs. Azure uses native links and native PR completion settings;
+the factory never changes State or enables completion behavior to close work.
 
 ## When a skill says "fetch the relevant ticket"
 
@@ -80,7 +91,8 @@ function triageLabels(provider: Provider): string {
 
 Lar Factory keeps an item's kind and Status in its work record (see
 \`docs/agents/issue-tracker.md\`). The repository needs no factory ${label}s, and
-the factory adds none to its ${azure ? 'work items' : 'issues'}. A kind is one of \`bug\`, \`feature\`,
+publication uses only approved mappings to the team's types and ${label}s.
+A kind is one of \`bug\`, \`feature\`,
 \`improvement\` or \`concept\`. Optional Repository config (\`.lar-factory.json\`)
 lists the repository's custom \`labels\`, which mark the part of the product an
 item touches.

@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { blockerRef, plural, prLabel, itemName, ref, repoKey, repoName } from '@lar-factory/shared';
+import { blockerGroups, blockerRef, plural, prLabel, itemName, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -49,8 +49,13 @@ function Refs({ text, find }: { text: string; find: FindRef }) {
 const waitsOn = (part: Part) => `waits on ${openWaits(part).map((b) => blockerRef(part.item, b)).join(', ')}`;
 
 /** A part's thread, its title and state; before it has one, what its start waits on. */
-function ThreadLine({ thread, waits }: { thread: ItemThread | undefined; waits: string[] }) {
-  if (!thread) return waits.length ? <span>Thread starts when {waits.join(', ')} {waits.length > 1 ? 'are' : 'is'} done</span> : null;
+function ThreadLine({ part }: { part: Part }) {
+  const { thread } = part;
+  if (!thread) {
+    const { work, dependencies } = blockerGroups(part.item, openWaits(part));
+    const waits = [...work ? [`${work.names} ${work.many ? 'are' : 'is'} done`] : [], ...dependencies ? [`you mark ${dependencies.names} met`] : []];
+    return waits.length ? <span>Thread starts when {waits.join(' and ')}</span> : null;
+  }
   return (
     <span className="flex min-w-0 items-center gap-1.5" title={thread.title}>
       <StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />
@@ -190,7 +195,7 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
         {s && <Figures s={s} />}
         <AzureFields azure={item.azure} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
-        <span className="min-w-0 empty:hidden"><ThreadLine thread={part.thread} waits={waits.map((b) => blockerRef(item, b))} /></span>
+        <span className="min-w-0 empty:hidden"><ThreadLine part={part} /></span>
       </span>
       {item.slices.length > 0 && <span className="col-span-2 pl-3.5"><SliceBar item={item} /></span>}
       {(item.status === 'Ready' || item.status === 'Queued') && (

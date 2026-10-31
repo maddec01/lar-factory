@@ -1,13 +1,12 @@
 // Start on a Queued item, or Start build on a Ready one, as a menu button: Start opens a menu on
 // the highlighted entry, arrow keys move, Enter or a click picks and starts, and Escape, Tab or a
-// click outside closes it. On an untagged Azure work item that several repositories read, with the Scope on All,
-// the menu first asks which repository it's for.
+// click outside closes it.
 // Once a thread starts or may have started, a tag takes Start's place.
 
 import { useId, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { itemName, ref, highlightedChoice, repoName, startRepo, storedChoice } from '@lar-factory/shared';
+import { itemName, ref, highlightedChoice, storedChoice } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -20,7 +19,6 @@ import { startItem } from './start-item.ts';
 import { useStart, useStartStore } from './start-store.ts';
 import type { StartKind, StartState } from './start-store.ts';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
-import { useScopeStore } from '../board/scope-store.ts';
 
 /**
  * The T3 thread Start opened for the item, from this page, another one or the board server's Start after. The
@@ -36,49 +34,24 @@ export function useStartHolds(item: Item, data: BoardData): boolean {
   return Boolean(startedThread(item, data, start, 'refine')) || start?.phase === 'uncertain' || start?.phase === 'pending';
 }
 
-/**
- * "T3 default", then each provider instance's models, with the remembered choice checked. Sample mode shows them but
- * starts nothing. An untagged Azure work item goes to the repository the Scope picks, or its only one; else the menu
- * lists the repositories reading it first, and a model starts only once one is picked. `onPick` gets the repository for
- * an untagged item.
- */
-export function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onPick: (choice: ModelChoice | undefined, repo?: string) => void }) {
+/** "T3 default", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
+export function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onPick: (choice: ModelChoice | undefined) => void }) {
   const lastChoice = useStartStore((state) => state.lastChoice);
-  const scope = useScopeStore((state) => state.scope);
-  const [picked, setPicked] = useState<string>();
-  const sample = data.capture?.enabled === false;
-  const scoped = startRepo(item, scope ?? undefined);
-  const asks = Boolean(item.untaggedFor) && scoped === undefined;
-  const repo = item.untaggedFor ? scoped ?? picked : undefined;
-  const unpicked = asks && picked === undefined;
   const checked = storedChoice(highlightedChoice(data.modelChoices, lastChoice));
-  const held = sample ? 'Disabled in sample mode' : unpicked ? 'Pick a repository first' : undefined;
-  // Until a repository is picked, a line under the repositories says so, and each model entry points at it.
-  const pickHint = useId();
+  const held = data.capture?.enabled === false ? 'Disabled in sample mode' : undefined;
   const headings = useId();
   const keepOpen = (event: SyntheticEvent | Event) => event.preventDefault();
   const entry = (label: string, choice?: ModelChoice) => (
     // A held entry stays hoverable and focusable rather than disabled, so its title says why; picking it does nothing.
-    <DropdownMenu.RadioItem value={storedChoice(choice)} data-opens-here={(!asks && storedChoice(choice) === checked) || undefined}
-      aria-disabled={held !== undefined || undefined} title={held} aria-describedby={unpicked ? pickHint : undefined}
+    <DropdownMenu.RadioItem value={storedChoice(choice)} data-opens-here={storedChoice(choice) === checked || undefined}
+      aria-disabled={held !== undefined || undefined} title={held}
       data-start-pick={item.id} data-instance-id={choice?.instanceId} data-model={choice?.model}
-      onSelect={(event) => (held === undefined ? onPick(choice, repo) : keepOpen(event))} key={label}>
+      onSelect={(event) => (held === undefined ? onPick(choice) : keepOpen(event))} key={label}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </DropdownMenu.RadioItem>
   );
   return (
     <>
-      {asks && (
-        <DropdownMenu.RadioGroup value={picked ?? ''} onValueChange={(value: string) => setPicked(value)} aria-labelledby={`${headings}-repo`}>
-          <DropdownMenu.Label id={`${headings}-repo`}>For repository</DropdownMenu.Label>
-          {item.untaggedFor!.map((r, i) => (
-            <DropdownMenu.RadioItem value={r} key={r} data-opens-here={i === 0 || undefined} onSelect={keepOpen} data-start-repo={r}>
-              <span className="min-w-0 flex-1 truncate">{repoName(r, data.repos)}</span>
-            </DropdownMenu.RadioItem>
-          ))}
-          {unpicked && <p id={pickHint} className="px-2 py-1 text-base-700 text-xs" data-start-pick-hint>Pick a repository first.</p>}
-        </DropdownMenu.RadioGroup>
-      )}
       <DropdownMenu.RadioGroup value={checked} aria-labelledby={`${headings}-with`}>
         <DropdownMenu.Label id={`${headings}-with`}>Start with</DropdownMenu.Label>
         {entry('T3 default')}
@@ -94,8 +67,7 @@ export function StartEntries({ item, data, onPick }: { item: Item; data: BoardDa
 }
 
 /**
- * Spread on a Start menu's content, it opens the menu on its checked entry, or on the first repository while it asks
- * for one, not on the menu itself. ninna-ui passes Radix's onOpenAutoFocus through to the menu but leaves it out of its
+ * Spread on a Start menu's content, it opens the menu on its checked entry, not on the menu itself. ninna-ui passes Radix's onOpenAutoFocus through to the menu but leaves it out of its
  * props type, which a spread doesn't check.
  */
 export const opensOnChecked = {
@@ -131,10 +103,10 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
   // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
   const state = data.capture?.enabled === false ? {} : start?.phase === 'pending' ? { 'aria-disabled': true as const } : writeState(data, action);
   const held = Boolean(state['aria-disabled']);
-  const pick = (choice: ModelChoice | undefined, repo?: string) => {
+  const pick = (choice: ModelChoice | undefined) => {
     // Close first, so focus is back on Start before it relabels.
     flushSync(() => setOpen(false));
-    void startItem(item.id, choice, kind, repo);
+    void startItem(item.id, choice, kind);
   };
   return (
     <span className="start-group">

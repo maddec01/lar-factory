@@ -225,54 +225,6 @@ test('in sample mode, Start still opens its menu, and no entry in it starts anyt
   expect(posted()).toEqual([]);
 });
 
-const WEB = 'contoso/Fabrikam/web';
-const API = 'contoso/Fabrikam/api';
-/** The Queued #129 as an untagged Azure work item that `untaggedFor` read. */
-const untagged = (untaggedFor: string[]): BoardData => ({
-  ...withChoices,
-  repos: [...withChoices.repos, { repo: WEB, role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }, { repo: API, role: 'api', items: 'azure-board', team: 'Web', show: 'all', labels: [] }],
-  items: withChoices.items.map((i) => (i.id === 'I_sample05' ? { ...i, repo: WEB, untaggedFor } : i)),
-});
-const repoEntries = () => $$('[role="menu"] [data-start-repo]');
-
-test('with the Scope on All, Start on an untagged item two repositories read asks which repository first', async () => {
-  await mountItem(untagged([WEB, API]));
-  await open();
-  expect(repoEntries().map((e) => [text(e), e.getAttribute('aria-checked')])).toEqual([['web', 'false'], ['api', 'false']]);
-  expect(document.activeElement, 'focus is on the first repository').toBe(repoEntries()[0]);
-  expect(entries().filter((e) => e.dataset.startPick).every((e) => e.getAttribute('aria-disabled') === 'true' && e.title === 'Pick a repository first')).toBe(true);
-  const hint = $('[role="menu"] [data-start-pick-hint]')!;
-  expect(text(hint), 'a visible line says why the models wait').toBe('Pick a repository first.');
-  expect(entries().filter((e) => e.dataset.startPick).every((e) => e.getAttribute('aria-describedby') === hint.id)).toBe(true);
-  await press(entries().find((e) => e.dataset.startPick)!);
-  expect(posted(), 'no model starts before a repository is picked').toEqual([]);
-  await press(repoEntries()[1]!);
-  expect(menu(), 'picking a repository keeps the menu open').not.toBeNull();
-  expect(repoEntries()[1]!.getAttribute('aria-checked')).toBe('true');
-  expect($('[role="menu"] [data-start-pick-hint]'), 'the line goes once a repository is picked').toBeNull();
-  await press(entries().find((e) => e.dataset.startPick)!);
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', repo: API }]]);
-});
-
-test("Start on an untagged item that only one repository reads asks nothing", async () => {
-  await mountItem(untagged([WEB]));
-  await open();
-  expect(repoEntries()).toEqual([]);
-  await press(entries()[0]!);
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', repo: WEB }]]);
-});
-
-test('with the Scope on a repository that reads an untagged item, Start starts it there without asking', async () => {
-  const { useScopeStore } = await import('../board/scope-store.ts');
-  await mountItem(untagged([WEB, API]));
-  await settle(() => useScopeStore.getState().setScope(API));
-  await open();
-  expect(repoEntries()).toEqual([]);
-  await press(entries()[0]!);
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', repo: API }]]);
-  await settle(() => useScopeStore.getState().setScope(null));
-});
-
 test('local Started clears after its observed server record disappears', async () => {
   await mountItem(withChoices, 'I_sample05');
   await press(start());

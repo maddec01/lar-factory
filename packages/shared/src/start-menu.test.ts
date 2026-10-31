@@ -9,10 +9,6 @@ test('picking "T3 default" posts no model choice; picking a model posts its inst
     { session: 's1', itemId: 'I_1', model: { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5[1m]' } });
 });
 
-test('a start for an untagged Azure work item posts the repository it is for', () => {
-  assert.deepEqual(startRequest('s1', 'azure:contoso/7', undefined, 'contoso/Fabrikam/web'), { session: 's1', itemId: 'azure:contoso/7', repo: 'contoso/Fabrikam/web' });
-});
-
 test('an entry missing its instance or its model is "T3 default"', () => {
   assert.equal(choiceOf({ instanceId: 'codex' }), undefined);
   assert.equal(choiceOf({ model: 'gpt-5.5' }), undefined);

@@ -338,8 +338,6 @@ export interface ModelChoice {
 export interface ArmedStart {
   /** None leaves it to T3 ("T3 default"). */
   model?: ModelChoice;
-  /** The repository an untagged Azure work item is for, which the start runs in; absent on other items. */
-  repo?: string;
 }
 
 /** Whether `groups` offer `choice`: its instance is there with that model. */
@@ -702,16 +700,6 @@ export const stillReading = (data: Pick<BoardData, 'firstRead'>, repo: string): 
 export const inRepo = (item: Pick<Item, 'repo' | 'untaggedFor'>, repo: string): boolean =>
   sameRepo(repoKey(item), repo) || Boolean(item.untaggedFor?.some((r) => sameRepo(r, repo)));
 
-/**
- * The repository a start on the item runs in: its own, or for an untagged Azure work item the one of its `untaggedFor`
- * that `picked` names, whatever the case, else its only one; undefined while the user must pick one.
- */
-export function startRepo(item: Pick<Item, 'repo' | 'untaggedFor'>, picked?: unknown): string | null | undefined {
-  if (!item.untaggedFor) return item.repo;
-  const named = typeof picked === 'string' ? item.untaggedFor.find((r) => sameRepo(r, picked)) : undefined;
-  return named ?? (item.untaggedFor.length === 1 ? item.untaggedFor[0] : undefined);
-}
-
 /** The repositories an item shows as its own: every one an untagged Azure work item that several read is for, else its own. */
 export const itemRepos = (item: Pick<Item, 'repo' | 'untaggedFor'>): string[] =>
   (item.untaggedFor && item.untaggedFor.length > 1 ? [...item.untaggedFor] : [repoKey(item)]);
@@ -719,10 +707,6 @@ export const itemRepos = (item: Pick<Item, 'repo' | 'untaggedFor'>): string[] =>
 /** The names of the item's repositories as the board shows them, such as `web or api` for an untagged item both read. */
 export const itemRepoNames = (item: Pick<Item, 'repo' | 'untaggedFor'>, repos: readonly RepoConfig[]): string =>
   itemRepos(item).map((r) => repoName(r, repos)).join(' or ');
-
-/** What a start on an untagged Azure work item asks while no repository is picked. */
-export const pickRepoText = (data: Pick<BoardData, 'repos'>, item: Item): string =>
-  `Pick which repository ${ref(item)} is for: ${itemRepoNames(item, data.repos)}.`;
 
 /** Whether a repository is on Azure DevOps: organization/project/repository, not GitHub's owner/name. */
 export const onAzure = (repo: string): boolean => repo.split('/').length === 3;

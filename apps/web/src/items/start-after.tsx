@@ -31,10 +31,10 @@ function waitsFor(item: Item): string {
 }
 
 /** Arms the item's start on `choice`, or disarms it with `null`; a refusal shows as a toast. */
-async function setArmed(item: Item, choice: ModelChoice | undefined | null, repo?: string): Promise<void> {
+async function setArmed(item: Item, choice: ModelChoice | undefined | null): Promise<void> {
   const session = useBoardStore.getState().data.capture?.session;
   const result = choice === null ? await postAction('/api/disarm', { session, itemId: item.id })
-    : await postAction('/api/arm', startRequest(session, item.id, choice, repo));
+    : await postAction('/api/arm', startRequest(session, item.id, choice));
   flushSync(() => {
     receive(result);
     if (result.error) notify({ verb: 'Failed', item, message: result.error });
@@ -51,9 +51,9 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
   const armed = !!data.armed?.[item.id];
   const writes = pending ? { 'aria-disabled': true as const } : writeState(data);
   const held = Boolean(writes['aria-disabled']);
-  const run = async (choice: ModelChoice | undefined | null, repo?: string) => {
+  const run = async (choice: ModelChoice | undefined | null) => {
     setPending(true);
-    try { await setArmed(item, choice, repo); } finally { setPending(false); }
+    try { await setArmed(item, choice); } finally { setPending(false); }
   };
   if (armed) {
     return (
@@ -62,9 +62,9 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
         onClick={() => !held && void run(null)}><span className="truncate">Starts after {label}</span> ✓</Button>
     );
   }
-  const pick = (choice: ModelChoice | undefined, repo?: string) => {
+  const pick = (choice: ModelChoice | undefined) => {
     flushSync(() => setOpen(false));
-    void run(choice, repo);
+    void run(choice);
   };
   // Sample mode keeps the menu open-able, so the model choices can be seen; its entries arm nothing.
   return (

@@ -70,7 +70,7 @@ export function App() {
         <ItemDialog />
         <SettingsDialog />
         <AbandonDialog />
-        <DriftChoiceDialog start={(itemId, choice, drift) => void startItem(itemId, choice, 'build', undefined, drift)} />
+        <DriftChoiceDialog start={(itemId, choice, drift) => void startItem(itemId, choice, 'build', drift)} />
         <WizardDialog />
         <EditDialog />
         <LoadingScreen />

@@ -11,7 +11,6 @@ import type { ItemSource } from './item-source.ts';
 import { archivedItems, recordItems } from './record-items.ts';
 
 const WEB = 'contoso/Fabrikam/web';
-const API = 'contoso/Fabrikam/api';
 
 const queued = (id: number, extra: Partial<Item> = {}): Item => ({
   id: `azure:contoso/${id}`, revision: 1, status: 'Queued', statuses: ['Queued'], kind: 'issue', content: 'ticket', number: id, title: `Item ${id}`,
@@ -61,34 +60,6 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
     } });
   return { board, commands, log, branches, archive };
 }
-
-test('Start on an untagged item starts shaping in the repository picked, writing no tag', async () => {
-  const { commands, log } = commandsOn([queued(7, { untaggedFor: [WEB, API] })]);
-  const reply = await commands.start('azure:contoso/7', undefined, 'Contoso/Fabrikam/API');
-  assert.equal(reply.status, 200);
-  assert.deepEqual(log, [`start ${API} $lar-shape azure:contoso/7`]);
-});
-
-test('Start on an untagged item that only one repository reads starts in that one without asking', async () => {
-  const { commands, log } = commandsOn([queued(7, { untaggedFor: [WEB] })]);
-  assert.equal((await commands.start('azure:contoso/7', undefined)).status, 200);
-  assert.deepEqual(log, [`start ${WEB} $lar-shape azure:contoso/7`]);
-});
-
-test('Start on an untagged item two repositories read asks which, and refuses one that does not read it', async () => {
-  const { commands, log } = commandsOn([queued(7, { untaggedFor: [WEB, API] })]);
-  const asked = await commands.start('azure:contoso/7', undefined);
-  assert.equal(asked.status, 409);
-  assert.match((asked.body as { error: string }).error, /Pick which repository/);
-  assert.equal((await commands.start('azure:contoso/7', undefined, 'contoso/Fabrikam/docs')).status, 409);
-  assert.deepEqual(log, []);
-});
-
-test('Start on a tagged item writes no tag and ignores a repository sent with it', async () => {
-  const { commands, log } = commandsOn([queued(7)]);
-  assert.equal((await commands.start('azure:contoso/7', undefined, API)).status, 200);
-  assert.deepEqual(log, [`start ${WEB} $lar-shape azure:contoso/7`]);
-});
 
 test('Abandon sets the work aside on this Mac and leaves its ticket alone, which only its own close closes', async () => {
   const records = await openRecords();

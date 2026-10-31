@@ -67,11 +67,12 @@ const url = (value: unknown): string => {
 function location(value: unknown): PublicationLocation {
   const item = object(value);
   if (item.kind === 'body') {
-    keys(item, ['kind', 'start', 'end']);
+    keys(item, ['kind', 'start', 'end', 'field']);
+    const field = item.field === undefined ? undefined : oneOf(item.field, ['System.Description', 'Microsoft.VSTS.TCM.ReproSteps']);
     const start = integer(item.start, 'body start', 0);
     const end = integer(item.end, 'body end', 0);
     if (end < start) invalid('The body boundary ends before it starts.');
-    return { kind: 'body', start, end };
+    return { kind: 'body', start, end, ...(field ? { field } : {}) };
   }
   keys(item, ['kind', 'commentId']);
   oneOf(item.kind, ['comment']);
@@ -272,7 +273,7 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
     for (const item of list(content.operations)) {
       const op = object(item);
       const kind = oneOf(op.kind, ['create', 'append', 'replace', 'comment', 'replace-comment', 'relationship', 'textual-relationship', 'pr-closing-reference']);
-      const extras = { create: [], append: ['content', 'location', 'expectedText'], replace: ['content', 'location', 'expectedText'], comment: ['content'], 'replace-comment': ['content', 'location', 'expectedText'],
+      const extras = { create: [], append: ['content', 'location', 'expectedText', 'expected'], replace: ['content', 'location', 'expectedText', 'expected'], comment: ['content', 'purpose'], 'replace-comment': ['content', 'location', 'expectedText'],
         relationship: ['relatedWorkId', 'relationship'], 'textual-relationship': ['relatedWorkId', 'relationship', 'content'], 'pr-closing-reference': ['pullRequest', 'content'] };
       keys(op, ['operationId', 'kind', 'ticketWorkId', 'dependsOn', ...extras[kind]]);
       const id = filled(op.operationId, 'operation ID');
@@ -293,8 +294,17 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       } else {
         if (!target.destination.ticket && !created.has(target.workId)) invalid('An operation needs an existing ticket or an earlier creation.');
       }
+      if (op.purpose !== undefined) oneOf(op.purpose, ['notice']);
       if ('content' in op) publicText(op.content, 'operation content');
       if (kind === 'append' || kind === 'replace') {
+        if (op.expected !== undefined) {
+          keys(op.expected, ['body', 'format', 'revision', 'assigned', 'linkedPullRequest', 'field']);
+          const snapshot = object(op.expected);
+          if (typeof snapshot.body !== 'string' || typeof snapshot.assigned !== 'boolean' || typeof snapshot.linkedPullRequest !== 'boolean') invalid('Expected the exact raw body and notification facts.');
+          if (snapshot.field !== undefined) oneOf(snapshot.field, ['System.Description', 'Microsoft.VSTS.TCM.ReproSteps']);
+          oneOf(snapshot.format, ['markdown', 'html', 'unsupported']);
+          if (snapshot.revision !== undefined) integer(snapshot.revision, 'provider revision');
+        }
         const boundary = location(op.location);
         if (boundary.kind !== 'body' || typeof op.expectedText !== 'string') invalid('Body writes require a body boundary and exact expected text.');
         if (boundary.kind === 'body' && boundary.end - boundary.start !== String(op.expectedText).length) invalid('The expected text must match the boundary length.');
@@ -356,7 +366,7 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
         if (publishedLocation && ['create', 'append', 'replace'].includes(op.kind)) {
           if (publishedLocation.kind !== 'body' || publishedLocation.end - publishedLocation.start !== text!.length) invalid('A body outcome needs the exact published text boundary.');
           if (publishedLocation.kind === 'body' && op.kind === 'create' && publishedLocation.start !== 0) invalid('A created body starts at zero.');
-          if (publishedLocation.kind === 'body' && (op.kind === 'append' || op.kind === 'replace') && publishedLocation.start !== op.location.start) invalid('The body outcome starts outside the approved boundary.');
+          if (publishedLocation.kind === 'body' && (op.kind === 'append' || op.kind === 'replace') && (publishedLocation.start !== op.location.start || publishedLocation.field !== op.location.field)) invalid('The body outcome starts outside the approved boundary.');
         }
       } else if (success.location !== undefined) invalid('This operation has no published text location.');
     }
@@ -366,7 +376,7 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       location: publishedLocation, ...(op.kind === 'create' && status === 'successful' && !publishedLocation ? { verification: { status: 'pending' as const, evidence: 'The ticket was created; stored content and terms still need inspection.' } } : {}), resolvedBy: 'resolvedBy' in actor ? filled(actor.resolvedBy, 'resolution identity') : null, recordedAt };
     writeAttempt(plan.planId, operationId, next);
     evidence(plan.planId, operationId, `${next.resolvedBy ? `Resolved by ${next.resolvedBy}: ` : ''}${status}: ${proof}`);
-    if (text !== null && target && publishedLocation) {
+    if (text !== null && target && publishedLocation && !(op.kind === 'comment' && op.purpose === 'notice')) {
       db.prepare('INSERT INTO published_text (plan_id, operation_id, work_id, ticket, url, text, location, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
         .run(plan.planId, operationId, op.ticketWorkId, target.ticket, target.url, text, JSON.stringify(publishedLocation), recordedAt);
     }
@@ -509,18 +519,18 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
     }),
     lastPublished: (workId) => database.read(() => {
       find(workId);
-      return db.prepare(`SELECT p.* FROM published_text p WHERE work_id = ? AND NOT EXISTS (
+      return db.prepare(`SELECT p.*, plans.content FROM published_text p JOIN publication_plans plans ON plans.plan_id = p.plan_id WHERE p.work_id = ? AND NOT EXISTS (
         SELECT 1 FROM published_text newer WHERE newer.work_id = p.work_id AND newer.ticket = p.ticket AND json_extract(newer.location, '$.kind') = json_extract(p.location, '$.kind')
-        AND coalesce(json_extract(newer.location, '$.start'), json_extract(newer.location, '$.commentId')) =
-            coalesce(json_extract(p.location, '$.start'), json_extract(p.location, '$.commentId'))
+        AND (json_extract(p.location, '$.kind') = 'body' OR json_extract(newer.location, '$.commentId') = json_extract(p.location, '$.commentId'))
         AND newer.rowid > p.rowid
       ) ORDER BY p.rowid`).all(workId).map((item): PublishedText => ({ planId: String(item.plan_id), operationId: String(item.operation_id), workId,
+        operationKind: (JSON.parse(String(item.content)) as PublicationContent).operations.find((op) => op.operationId === item.operation_id)!.kind,
         ticket: String(item.ticket), url: String(item.url), text: String(item.text), location: JSON.parse(String(item.location)) as PublicationLocation, recordedAt: String(item.recorded_at) }));
     }),
     publicationHandover: (workId, planId) => database.read(() => {
       const plan = load(workId, planId);
       const sections = plan.tickets.map((ticket) => {
-        const extra = plan.operations.filter((op) => op.ticketWorkId === ticket.workId && 'content' in op && op.content !== ticket.body)
+        const extra = plan.operations.filter((op) => op.ticketWorkId === ticket.workId && op.kind !== 'append' && op.kind !== 'replace' && 'content' in op && op.content !== ticket.body)
           .map((op) => 'content' in op ? op.content : '');
         return [`# ${ticket.title}`, ticket.body, ...extra].join('\n\n');
       });
@@ -541,7 +551,10 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       if (!plan.tickets.some((item) => item.workId === workId)) invalid('The publication does not contain this work.');
       if (!ref.startsWith(`${record.repository}#`)) invalid('The ticket must belong to the work\'s repository.');
       const known = receipt(plan, workId);
-      if (known && (known.ticket !== ref || known.url !== link)) invalid('The attached URL differs from the publication result.');
+      if (known) {
+        const expectedPage = new URL(known.url); const postedPage = new URL(link);
+        if (known.ticket !== ref || expectedPage.origin !== postedPage.origin || expectedPage.pathname !== postedPage.pathname) invalid('The attached URL differs from the publication result.');
+      }
       if (record.ticket && record.ticket !== ref) invalid('The work already has another ticket.');
       const holder = db.prepare('SELECT work_id FROM work_records WHERE ticket = ? AND work_id <> ?').get(ref, workId);
       if (holder) throw new WorkRecordError('ticket-taken', `The ticket ${ref} already belongs to ${String(holder.work_id)}.`);

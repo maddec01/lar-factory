@@ -1,110 +1,50 @@
 # Retro capture
 
-Use after the builder's retro selection, or when Pick up finds an unfinished
-capture record. Capture selected work as issues; shaping and implementation
-come later. Keep the source issue's final status throughout, including
-clarification questions and failures. On resume, reuse the existing plan and IDs.
+Use after the builder's retro selection. Capture selected work as List records
+on this machine; shaping and implementation come later. Capture writes no
+ticket. Keep the source build's final Status throughout, including
+clarification questions and failures.
 
 ## Select and route
 
 1. Resolve replies against the numbered list per [Retro picks](questions.md#retro-picks).
    Capture only the user's explicit picks; “all” selects the whole list. Clarify
-   ambiguous, conflicting or partly unclear replies in chat before creating
-   or updating any destination issue, even when other picks are clear. Wait
-   for clarification; uncertainty or silence never means “none”. An explicit
-   “none”, or no suggestions, completes the no-picks path: post a one-line
-   `Retro capture: complete — no picks` on the source issue and finish without
-   follow-ups. With no suggestions, ask no selection question.
+   ambiguous, conflicting or partly unclear replies in chat before capturing
+   anything, even when other picks are clear. Wait for clarification;
+   uncertainty or silence never means “none”. An explicit “none”, or no
+   suggestions, ends capture with nothing made. With no suggestions, ask no
+   selection question.
 2. Route each selected suggestion to the repository that owns the change: its
    product code, `AGENTS.md`, CI or local tooling → that repository; the
    factory workflow or board, shared skills and instructions, and machine-wide
-   setup without a clear owner → the factory repository. One suggestion
-   needing changes across repositories → one factory concept listing them;
-   prefer a matching open concept.
-3. Before drafting titles, bodies, context comments or the source record, read
-   the destination's issue conventions and visibility/redaction rules.
-   Read each destination's visibility (`gh repo view --json visibility`, or on
-   Azure DevOps `az devops project show --project <project> --organization <org> --query visibility`). Every
-   public surface, a Factory source record included, stays public-safe: no
-   private logs, credentials, private hostnames, or sensitive paths or details.
-   Source links, and destinations/URLs that expose private work, appear only
-   where safe for the audience; identifying provenance and any needed private
-   mapping live in an access-appropriate private record, linked only where
-   safe. Public destinations reached from private work get opaque capture IDs
-   that encode no private repository names, issue numbers or details.
+   setup without a clear owner → the factory repository,
+   `maddec01/lar-factory`. One suggestion needing changes across repositories →
+   one factory concept per [Capture-only concepts](issue-tracker/capture-only-concepts.md).
+   A destination must be on the board: `repo-config.sh --list` lists the
+   onboarded repositories. Report a pick whose repository isn't, and suggest
+   onboarding it.
 
-## Persist the plan
+## Capture
 
-Before creating issues or posting destination context, successfully post one
-source-issue comment headed `Retro capture: pending`, in place of the generic
-answers comment. Generate an opaque batch ID once (a UUID, say), then a stable
-selection ID per pick (`retro-capture:<batch-id>:<index>`). Reuse these exact
-IDs on retries; never regenerate them from rewritten suggestion text.
+Generate an opaque batch ID once (a UUID, say), then a stable selection ID per
+pick (`retro-capture:<batch-id>:<index>`). Reuse these exact IDs on reruns;
+never regenerate them from rewritten suggestion text.
 
-Record enough public-safe context to resume from this comment alone:
+For each selection, in order:
 
-```text
-Retro capture: pending
-Batch: <opaque ID>
-Source final status: <status; preserve it>
-- Selection: <stable selection ID>
-  Suggestion: <selected work and useful context>
-  Destination: <owner/repo; affected repositories for a concept>
-  Issue: pending | <created/reused URL and which>
-  Context: pending | recorded (new issue body or reused issue comment)
-  Board: pending | List confirmed (new) | preserve (reused)
-  Remaining: <unfinished creation/context/board step or failure>
-```
+1. Look for a record that already holds it: the destination's records
+   (`lar-work list --repository <repo>`) whose initial context
+   (`lar-work context`) carries the exact selection ID. A rerun after a failure
+   finds what the first run made this way.
+2. Reuse an unfinished record that already covers the suggestion, keeping its
+   Status. Tell the user which one, so they add the new context when shaping
+   it.
+3. Otherwise make one record:
+   `lar-work create --title "<actionable title>" --repository <repo> --kind <bug|feature|improvement> --status List --file <context>`.
+   The context holds the selected improvement, useful context, the source
+   build's work ID and the exact selection ID. Capture text is not a passing
+   brief.
 
-Repeat the selection entry for every pick. Keep the comment's URL/ID so updates
-edit that record. If posting the plan fails, report capture pending and stop
-before destination mutations. When redaction needs a private companion record,
-persist it before mutation too, and keep both records' progress consistent.
-
-## Capture and reconcile
-
-Run these steps in order for each selection, updating its record as each
-succeeds. Persist every returned URL before the next mutation. If a record
-update fails, stop and report the pending step; on resume, reconcile rather
-than repeat a possibly successful mutation.
-
-1. Use the record's retained URL first. Without one, reconcile the destination
-   against the exact selection ID in issue bodies and comments, then clearly
-   matching **open issues in that destination repository**, inspecting each
-   candidate: search results alone prove neither absence nor a match. This
-   capture may have created an issue whose URL never reached the record;
-   recover it by its marker before creating anything. If the outcome can't be
-   established, leave it pending and report the uncertainty. A recovered
-   creation stays **new** for board placement and a recovered reuse stays
-   **reused**; continue its unfinished steps as such.
-2. Reuse a clearly matching open issue (a concept for cross-repository work).
-   Add the new source/context with the selection ID, first checking existing
-   comments for that exact ID; on retry, an existing marked comment counts as
-   recorded. Keep the issue's status; call no `status.sh` for reuse.
-3. Otherwise create one issue with an actionable title, the selected
-   improvement, useful context, safe provenance and the exact selection ID in
-   its body. An Azure DevOps destination gets a work item with
-   tags for labels and no label setup ([Azure DevOps](issue-tracker/azure-devops.md#azure-devops)).
-   On GitHub, first follow [label setup](issue-tracker/label-setup.md#label-setup) for the
-   **destination** repository, including the factory repository for a
-   cross-repository concept captured from another repository. Do this after persisting the
-   source plan; if setup fails, leave capture pending and retry setup before
-   creating the issue. Follow destination label conventions (`bug`, `feature`,
-   `improvement` as fits); capture text is not a passing brief. A
-   cross-repository concept gets the `concept` label and the sections in
-   [Concepts](../concepts.md): Destination (with affected repositories), Decisions
-   so far (confirmed choices only), Fog (unshaped decomposition), Out of scope,
-   Map (no sub-issues yet). Capture creates no decisions or sub-issues and
-   starts no shaping or build.
-4. For a **new** issue only, after retaining its URL, run
-   `bash <this skill>/shared/scripts/status.sh <issue-url> "List"`. Creation and board
-   placement are separate: a failure leaves that URL with `Board: pending`;
-   retry placement on the same issue, never create a replacement. Recovered
-   creations still need their pending placement.
-5. When every selection has a URL, recorded context and, for new issues,
-   confirmed List placement, edit the heading to `Retro capture: complete` and
-   clear the remaining steps. Otherwise leave it pending with the exact
-   unfinished steps and errors. Report created/reused links (respecting
-   visibility) and pending failures to the user. Resume with
-   `/lar-shape <source-owner/repo#n>`; Pick up finishes capture only, even when
-   the source already has a passing brief.
+Report each made or reused record's title and work ID, and each pick that
+failed with its error. Rerun capture in the same thread for the failed picks;
+step 1 keeps a rerun from making a second record.

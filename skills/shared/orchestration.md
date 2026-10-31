@@ -27,8 +27,8 @@ options against the request; report a capability mismatch, never downgrade.
 - Top-level threads are a different thing: the board starts shaping, decision
   and build threads, and a thread uses `t3_thread_launch` only for its own
   handoff.
-- Every prompt carries the factory report rule: ≤300 words, no whole files,
-  logs or screenshots.
+- Every prompt names the work ID it serves and carries the factory report
+  rule: ≤300 words, no whole files, logs or screenshots.
 
 ## Roles
 
@@ -37,7 +37,8 @@ options against the request; report a capability mismatch, never downgrade.
   gives it.
 - **Prototype**: worktree child task; its local commit may be stale, so it
   first runs `git fetch origin main` and
-  `git switch -c prototype/<n>-<slug> origin/main`. It returns each variant's start command (or
+  `git switch -c prototype/<slug> origin/main`, the slug a few words of
+  the question. It returns each variant's start command (or
   HTML path), the worktree path, the branch and a preferred port, and leaves no
   server running ([SKILL.md 2. Size up](../size-up.md)).
 - **Planner, reviewers, checks** and every other role: native subagent, unless

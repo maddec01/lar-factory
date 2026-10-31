@@ -73,10 +73,9 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
 **Needs you** means it's waiting on you: a question, a prototype choice or a
 review.
 
-Before using the workflow in a destination repository, follow
-[issue-tracking setup](skills/shared/issue-tracker/label-setup.md) to create
-missing workflow labels while preserving existing ones. [Native relationships](skills/shared/issue-tracker/native-relationships.md) covers
-parent/sub-issue and blocked-by commands. Status stays on each issue as a `status-<name>` label.
+Factory progress stays in work records on your machine, never on tickets.
+[Work records](skills/shared/issue-tracker/work-records.md) covers picking
+tickets, Status, structure and completion.
 
 Every thread starts small: steps hand over through the issue and the PR, never
 through a long conversation, and subagents return summaries instead of files.

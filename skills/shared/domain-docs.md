@@ -4,6 +4,10 @@ Ported from mattpocock/skills (skills/engineering/domain-modeling/SKILL.md); see
 
 Actively build and sharpen the project's domain model as you design. This is the *active* discipline: challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. (Merely *reading* `GLOSSARY.md` for vocabulary is not this skill: that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.)
 
+## Where domain docs live
+
+`repo-config.sh <repository>` prints the repository's `domainDocs`. `{"kind": "repository", "glossary": ..., "adrs": ...}` names its glossary file and ADR folder; read and write those paths in place of `GLOSSARY.md` and `docs/adr/` below. `{"kind": "private"}` means its drafts stay in work records on this machine: read the repository's glossary and ADRs where they exist, and the build PR writes no domain docs.
+
 ## File structure
 
 Most repos have a single context:
@@ -56,7 +60,7 @@ When the user states how something works, check whether the code agrees. If you 
 
 ### Capture domain docs
 
-Shaping, concept and decision threads draft each resolved entry in the batch's answers comment, then in the brief or map's Domain docs. They leave the checkout as found. The builder writes those drafts in the build PR. Capture each term as it settles. Use the format in [glossary-format.md](./glossary-format.md).
+Shaping, concept and decision threads draft each resolved entry in the work record: a decision's domain drafts (`lar-work set-body --body domain-drafts`), then the brief's or map's Domain docs. They leave the checkout as found. The builder writes those drafts in the build PR unless the drafts are private. An entry or ADR that cites where it came from names the published ticket, or the build PR when there is none, never a work ID or local path. Capture each term as it settles. Use the format in [glossary-format.md](./glossary-format.md).
 
 `GLOSSARY.md` should be totally devoid of implementation details. Do not treat `GLOSSARY.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
 

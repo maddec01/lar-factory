@@ -3,7 +3,7 @@
 Ask the user ordinary questions with the question UI (`AskUserQuestion`), so T3
 shows the thread as waiting: Size up, grilling rounds, the prototype pick,
 Gate assumptions, Doubt findings, Concepts,
-`decision-grill`, and the builder's stops. Retro picks and their
+grill decisions, and the builder's stops. Retro picks and their
 clarifications use [chat](#retro-picks).
 If the tool is deferred, load it with `ToolSearch`; if it isn't available, ask
 in chat with each numbered question, its title and body, followed by the
@@ -13,8 +13,9 @@ recommended answer. Separate questions with a horizontal rule. Word each so
 Every ordinary question batch runs these once, however many calls it takes:
 
 1. Set **Needs you**, then make the calls; each blocks.
-2. After the last call, comment the answers on the issue in one comment
-   (summarised; never secrets, tokens or private hostnames).
+2. After the last call, keep the answers for the record: a decision's answer
+   body, or the brief's or map's **Confirmed** and Domain docs when you write
+   them. Never write them to a ticket.
 3. Set the status back to the step's: Shaping while shaping, In progress or
    Review in a build.
 
@@ -47,5 +48,5 @@ feature. With no suggestions, skip the selection question.
 
 Follow [Retro capture](retro-capture.md#select-and-route) to resolve the reply
 and capture explicit picks. It is the answers record for this chat exchange;
-skip steps 1–3 above and preserve the source issue's final status throughout
+skip steps 1–3 above and keep the source build's final Status throughout
 selection, clarification, capture, retries and failure reporting.

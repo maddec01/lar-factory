@@ -33,10 +33,10 @@ const main = async () => {
       process.stderr.write('Thread thread-1 is no longer available.');
       process.exitCode = 1;
     } else {
-      // The thread's first message is the one the board sent with its start.
+      // The thread's first message is the one the board sent with its start, or `firstMessage` for one an earlier board sent.
       const started = fs.readFileSync(process.env.FAKE_GH_STATE + '.t3calls', 'utf8').trim().split('\n').map((line) => JSON.parse(line))
         .find((call) => call[1] === 'start');
-      process.stdout.write(JSON.stringify({ thread: { threadId: 'thread-1' }, messages: [{ role: 'user', text: started?.[3] ?? '' }] }));
+      process.stdout.write(JSON.stringify({ thread: { threadId: 'thread-1' }, messages: [{ role: 'user', text: options.firstMessage ?? started?.[3] ?? '' }] }));
     }
     return;
   }

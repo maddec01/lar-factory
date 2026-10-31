@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
-import { openWorkRecords, type WorkRecords } from './work-records.ts';
+import { openWorkRecords, type WorkKind, type WorkRecords } from './work-records.ts';
 
 const dirs: string[] = [];
 const opened: WorkRecords[] = [];
@@ -127,3 +127,116 @@ describe('work records', () => {
     expect(records.list({})).toEqual([]);
   });
 });
+
+describe('work-record structure', () => {
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ repository: 'maddec01/lar', kind });
+
+  it('puts decisions and builds under a concept and slices under a build', async () => {
+    const records = await open();
+    const concept = lar(records, 'concept');
+    const decision = lar(records, 'decision');
+    const build = lar(records, 'build');
+    const slice = lar(records, 'slice');
+
+    expect(records.setParent(decision.workId, 1, concept.workId)).toMatchObject({ parentId: concept.workId, revision: 2 });
+    records.setParent(build.workId, 1, concept.workId);
+    records.setParent(slice.workId, 1, build.workId);
+    expect(records.read(concept.workId).revision).toBe(3);
+    expect(records.children(concept.workId).map((r) => r.workId)).toEqual([decision.workId, build.workId]);
+    expect(records.children(build.workId).map((r) => r.workId)).toEqual([slice.workId]);
+  });
+
+  it('refuses a parent whose kind does not own the child, or a second parent, and changes nothing', async () => {
+    const records = await open();
+    const concept = lar(records, 'concept');
+    const build = lar(records, 'build');
+    const decision = lar(records, 'decision');
+    const slice = lar(records, 'slice');
+    records.setParent(build.workId, 1, concept.workId);
+    const before = records.list({});
+
+    expect(() => records.setParent(decision.workId, 1, build.workId)).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('A build owns only slice records') }));
+    expect(() => records.setParent(slice.workId, 1, concept.workId)).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(() => records.setParent(build.workId, 2, lar(records, 'concept').workId)).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('already has the parent') }));
+    expect(() => records.setParent(slice.workId, 1, 'nope')).toThrow(expect.objectContaining({ code: 'not-found' }));
+    expect(records.list({}).slice(0, 4)).toEqual(before);
+  });
+
+  it('refuses a kind change that its parent or children would not allow', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    const slice = lar(records, 'slice');
+    records.setParent(slice.workId, 1, build.workId);
+    expect(() => records.update(slice.workId, 2, { kind: 'decision' })).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(() => records.update(build.workId, 2, { kind: 'feature' })).toThrow(expect.objectContaining({ code: 'invalid' }));
+  });
+
+  it('clears a parent, bumping both records', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    const slice = lar(records, 'slice');
+    records.setParent(slice.workId, 1, build.workId);
+    expect(records.clearParent(slice.workId, 2)).toMatchObject({ parentId: null, revision: 3 });
+    expect(records.read(build.workId).revision).toBe(3);
+    expect(records.children(build.workId)).toEqual([]);
+    expect(() => records.clearParent(slice.workId, 3)).toThrow(expect.objectContaining({ code: 'invalid' }));
+  });
+
+  it('records blockers and lists them from both ends', async () => {
+    const records = await open();
+    const [a, b, c] = [lar(records, 'feature'), lar(records, 'bug'), lar(records, 'build')];
+    expect(records.addBlocker(a.workId, 1, b.workId).revision).toBe(2);
+    records.addBlocker(a.workId, 2, c.workId);
+    expect(records.read(b.workId).revision).toBe(2);
+    expect(records.blockers(a.workId).map((r) => r.workId)).toEqual([b.workId, c.workId]);
+    expect(records.dependents(b.workId).map((r) => r.workId)).toEqual([a.workId]);
+
+    expect(records.removeBlocker(a.workId, 3, b.workId).revision).toBe(4);
+    expect(records.blockers(a.workId).map((r) => r.workId)).toEqual([c.workId]);
+    expect(() => records.removeBlocker(a.workId, 4, b.workId)).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(() => records.addBlocker(a.workId, 4, c.workId)).toThrow(expect.objectContaining({ code: 'invalid' }));
+  });
+
+  it('refuses a self-blocker and an edge that closes a cycle', async () => {
+    const records = await open();
+    const [a, b, c] = [lar(records, 'feature'), lar(records, 'bug'), lar(records, 'build')];
+    expect(() => records.addBlocker(a.workId, 1, a.workId)).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining("can't block itself") }));
+    records.addBlocker(a.workId, 1, b.workId);
+    records.addBlocker(b.workId, 2, c.workId);
+    const before = records.list({});
+    expect(() => records.addBlocker(c.workId, 2, a.workId)).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('cycle') }));
+    expect(records.list({})).toEqual(before);
+    expect(records.blockers(c.workId)).toEqual([]);
+  });
+
+  it('keeps parents and blockers across close and reopen', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    const slice = lar(first, 'slice');
+    const other = lar(first, 'slice');
+    first.setParent(slice.workId, 1, build.workId);
+    first.addBlocker(slice.workId, 2, other.workId);
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.read(slice.workId).parentId).toBe(build.workId);
+    expect(reopened.children(build.workId).map((r) => r.workId)).toEqual([slice.workId]);
+    expect(reopened.blockers(slice.workId).map((r) => r.workId)).toEqual([other.workId]);
+  });
+
+  it('refuses a relationship change with a stale revision while a concurrent one succeeds', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const board = await open(path);
+    const thread = await open(path);
+    const build = lar(board, 'build');
+    const slice = lar(board, 'slice');
+    const blocker = lar(board, 'slice');
+
+    expect(board.setParent(slice.workId, 1, build.workId).revision).toBe(2);
+    expect(() => thread.addBlocker(slice.workId, 1, blocker.workId)).toThrow(expect.objectContaining({ code: 'stale-revision' }));
+    expect(thread.blockers(slice.workId)).toEqual([]);
+    expect(thread.read(blocker.workId).revision).toBe(1);
+  });
+});
+

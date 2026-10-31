@@ -58,6 +58,8 @@ it('retains observations across disconnect and requests a fresh snapshot', async
   first.dispatchEvent(new Event('open'));
   const project = { id: 'one', title: 'One', workspaceRoot: '/one' };
   first.chunk([{ kind: 'snapshot', snapshot: { snapshotSequence: 3, projects: [project] } }]);
+  first.chunk([{ kind: 'snapshot', resolvedRepositoryIdentityRoots: [], snapshot: { snapshotSequence: 3, projects: [] } }]);
+  expect(changed.mock.calls.at(-1)![0].observation.projects).toEqual([project]);
   const observation = changed.mock.calls.at(-1)![0].observation;
   first.chunk([{ kind: 'project.removed', sequence: 2, projectId: 'one' }]);
   first.close();

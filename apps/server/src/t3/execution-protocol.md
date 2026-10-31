@@ -25,7 +25,10 @@ not count tokens. Association, transcript mapping and timing use protocol observ
 Reconnect obtains a fresh ticket and snapshot. Unknown or incremental execution
 events request a fresh snapshot by reconnecting rather than guessing reducers.
 Failures retain the observation and its time. Stale snapshots are ignored;
-equal-sequence projection fragments retain entities by ID.
+marked `resolvedRepositoryIdentityRoots` snapshots update metadata for existing
+projects only, at the same or a later sequence. They preserve other projects,
+active threads and archived threads and do not advance the membership event
+cursor. Unmarked snapshots replace membership, so deletions remain effective.
 
 Runtime evidence on 2026-10-31, local server port 3773: the board's separate
 Keychain session authenticated two thread subscriptions with a forced disconnect

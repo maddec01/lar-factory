@@ -45,7 +45,6 @@ export interface HttpDeps {
   ready(): Promise<void> | undefined;
   /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
   projectChoices(): Promise<ProjectChoice[]>;
-  readProjectTeams(input: Record<string, unknown>): Promise<{ teams: string[] } | Refused>;
   /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
   keepOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
   /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
@@ -142,7 +141,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
   detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
@@ -296,13 +295,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         board.update({ onboarding: kept.onboarding });
         board.push();
         return { status: 200, body: withBoard({ error: null }) };
-      },
-    },
-    '/api/onboarding/teams': {
-      what: 'the repository whose teams to load', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const answer = await readProjectTeams(input);
-        return 'error' in answer ? { status: answer.status, body: { error: answer.error } } : { status: 200, body: answer };
       },
     },
     '/api/onboarding/detect': {

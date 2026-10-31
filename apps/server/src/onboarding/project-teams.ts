@@ -1,4 +1,4 @@
-// Read-only team discovery for onboarding and the repository settings dialog.
+// Read-only team discovery for onboarding's setup detection.
 import { decodePart, onAzure } from '@lar-factory/shared';
 import { az, type Az } from '../azure/azure-items.ts';
 import { isRepo } from '../config/repository-config.ts';

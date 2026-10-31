@@ -32,7 +32,6 @@ import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import { createPrOpener, previewOnboardingPr } from './onboarding/onboarding-pr.ts';
-import { readProjectTeams } from './onboarding/project-teams.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { detectSetup } from './onboarding/detect-setup.ts';
 import { importTickets, importableTickets } from './onboarding/import-tickets.ts';
@@ -706,7 +705,6 @@ const { server, endStreams } = createBoardServer({
     if ('imported' in imported) reread();
     return imported;
   },
-  readProjectTeams,
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input),
   openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),
   changeRepositorySettings: (input) => changeRepositorySettings(input),

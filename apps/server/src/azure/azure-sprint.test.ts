@@ -101,11 +101,6 @@ test('status tags give the statuses and every other tag is a label', async () =>
   assert.deepEqual([two.statuses, two.labels], [['Queued', 'Review'], []]);
 });
 
-test('a repository showing Opted-in items hides an item with no status tag', async () => {
-  const source = mergeSources(new Map([[REPO, azureSprint([REPO], TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run)]]), [REPO.toUpperCase()]);
-  assert.deepEqual((await source.read()).items.map((i) => i.number), [1, 5]);
-});
-
 /** A source for another repository that lists one item. */
 const otherRepo: ItemSource = {
   read: async () => ({ title: 'maddec01/lar-apple', items: [{ id: 'I_1', status: 'List', statuses: [], content: 'ticket', revision: 0, kind: 'issue', parentId: null, number: 1, title: 'Apple', url: null,

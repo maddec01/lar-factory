@@ -180,7 +180,7 @@ test('detection and saving refuse a body they cannot use', async (t) => {
 
 test('the sample board detects nothing, saves no setup and imports no ticket', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/teams', '/api/onboarding/detect', '/api/onboarding/setup', '/api/onboarding/import/tickets', '/api/onboarding/import']) {
+  for (const path of ['/api/onboarding/detect', '/api/onboarding/setup', '/api/onboarding/import/tickets', '/api/onboarding/import']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }

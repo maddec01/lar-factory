@@ -13,6 +13,18 @@ export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './da
 export const WORK_KINDS = ['bug', 'feature', 'improvement', 'concept', 'decision', 'build', 'slice', 'issue'] as const;
 export type WorkKind = (typeof WORK_KINDS)[number];
 
+/** The stages of the lar-build workflow (`skills/lar-build/agents/builder.md`): Build's plan, implement, domain docs and
+ * full check suite steps, then Review, Approve, Checks and Retro. A Small build skips plan. */
+export const BUILD_PHASES = ['plan', 'implement', 'domain-docs', 'full-checks', 'review', 'approve', 'checks', 'retro'] as const;
+export type BuildPhase = (typeof BUILD_PHASES)[number];
+
+/** A record's private markdown: a concept's map, a decision's text, or any other record's brief. */
+export const BODIES = ['brief', 'decision', 'map'] as const;
+export type Body = (typeof BODIES)[number];
+
+/** The kinds that never become a PR of their own, so hold no build phase or PR. */
+const UNBUILT_KINDS: readonly WorkKind[] = ['concept', 'decision', 'slice'];
+
 /** The kinds each kind may own as a structural parent. */
 const CHILD_KINDS: Partial<Record<WorkKind, readonly WorkKind[]>> = { concept: ['decision', 'build'], build: ['slice'] };
 
@@ -29,6 +41,10 @@ export interface WorkRecord {
   ticket: string | null;
   /** The work ID of the record that owns it, or null while it has no parent. */
   parentId: string | null;
+  /** Where its build stands, or null before it starts. */
+  buildPhase: BuildPhase | null;
+  /** The PR its build delivers through, `owner/name#number`, or null before one is recorded. */
+  pullRequest: string | null;
   /** Whether it is set aside, which leaves its Status as it was. */
   setAside: boolean;
   /** Counts the record's changes; every change names the revision it read. */
@@ -69,6 +85,13 @@ export interface WorkRecords {
   /** Records that the work waits on `blockerId`. Refuses a self-blocker and an edge that would close a cycle. */
   addBlocker(workId: string, revision: number, blockerId: string): WorkRecord;
   removeBlocker(workId: string, revision: number, blockerId: string): WorkRecord;
+  /** Writes the record's `body`, replacing any earlier one. A concept holds a map, a decision its text, others a brief. */
+  setBody(workId: string, revision: number, body: Body, markdown: string): WorkRecord;
+  /** The record's `body`, or null while it has none. */
+  body(workId: string, body: Body): string | null;
+  setBuildPhase(workId: string, revision: number, phase: BuildPhase): WorkRecord;
+  /** Records the PR the build delivers through, replacing an earlier one. */
+  setPullRequest(workId: string, revision: number, pullRequest: string): WorkRecord;
   /** The records it owns, in the order they were made. */
   children(workId: string): WorkRecord[];
   /** The records it waits on. */
@@ -86,6 +109,8 @@ interface Row {
   queue_order: number | null;
   ticket: string | null;
   parent_id: string | null;
+  build_phase: BuildPhase | null;
+  pull_request: string | null;
   set_aside_at: string | null;
   revision: number;
   created_at: string;
@@ -100,6 +125,8 @@ const fromRow = (row: Row): WorkRecord => ({
   queueOrder: row.queue_order,
   ticket: row.ticket,
   parentId: row.parent_id,
+  buildPhase: row.build_phase,
+  pullRequest: row.pull_request,
   setAside: row.set_aside_at !== null,
   revision: row.revision,
   createdAt: row.created_at,
@@ -123,9 +150,37 @@ function checkStatus(status: unknown): Status {
   return status as Status;
 }
 
-function checkTicket(ticket: unknown): string {
-  if (typeof ticket !== 'string' || !/^[^\s/#]+(\/[^\s/#]+)+#[1-9]\d*$/.test(ticket)) throw invalid(`The ticket "${String(ticket)}" isn't a ticket reference like owner/name#12.`);
-  return ticket;
+/** Throws unless `reference` names a ticket or PR: `owner/name#12`. */
+function checkReference(reference: unknown, what: 'ticket' | 'PR'): string {
+  if (typeof reference !== 'string' || !/^[^\s/#]+(\/[^\s/#]+)+#[1-9]\d*$/.test(reference)) {
+    throw invalid(`The ${what} "${String(reference)}" isn't a ${what} reference like owner/name#12.`);
+  }
+  return reference;
+}
+
+const checkTicket = (ticket: unknown): string => checkReference(ticket, 'ticket');
+
+function checkBody(body: unknown): Body {
+  if (!BODIES.includes(body as Body)) throw invalid(`The body "${String(body)}" isn't one of ${BODIES.join(', ')}.`);
+  return body as Body;
+}
+
+/** Throws unless a record of `kind` holds `body`. */
+function checkHolds(kind: WorkKind, body: Body): void {
+  const holder: WorkKind | undefined = body === 'map' ? 'concept' : body === 'decision' ? 'decision' : undefined;
+  if (holder ? kind !== holder : kind === 'concept' || kind === 'decision') {
+    throw invalid(holder ? `Only a ${holder} holds a ${body}; this record is a ${kind}.` : `A ${kind} holds no brief.`);
+  }
+}
+
+/** Throws unless a record of `kind` can be built. */
+function checkBuilt(kind: WorkKind): void {
+  if (UNBUILT_KINDS.includes(kind)) throw invalid(`A ${kind} is never built, so it has no build phase or PR.`);
+}
+
+function checkText(text: unknown, what: string): string {
+  if (typeof text !== 'string') throw invalid(`The ${what} isn't text.`);
+  return text;
 }
 
 /** Throws unless a `parent` may own a `child`. */
@@ -160,6 +215,9 @@ function workRecords(database: Database): WorkRecords {
   const waitsOn = db.prepare(`WITH RECURSIVE waiting (id) AS (SELECT ? UNION SELECT b.blocker_id FROM blockers b JOIN waiting ON b.work_id = waiting.id)
     SELECT 1 FROM waiting WHERE id = ?`);
   const bump = db.prepare('UPDATE work_records SET revision = revision + 1, updated_at = ? WHERE work_id = ?');
+  const bodyNames = db.prepare('SELECT body FROM bodies WHERE work_id = ?');
+  const bodyText = db.prepare('SELECT markdown FROM bodies WHERE work_id = ? AND body = ?');
+  const writeBody = db.prepare('INSERT INTO bodies (work_id, body, markdown) VALUES (?, ?, ?) ON CONFLICT DO UPDATE SET markdown = excluded.markdown');
   const nextQueueOrder = db.prepare('SELECT coalesce(max(queue_order), 0) + 1 AS next FROM work_records WHERE repository = ?');
 
   const find = (workId: string): Row => {
@@ -206,9 +264,10 @@ function workRecords(database: Database): WorkRecords {
       }
       const touched: string[] = [];
       const next = { ...row, ...apply(row, touched), revision: row.revision + 1, updated_at: new Date().toISOString() };
-      db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, set_aside_at = ?, revision = ?, updated_at = ?
-        WHERE work_id = ? AND revision = ?`)
-        .run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.set_aside_at, next.revision, next.updated_at, workId, expected);
+      db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?, pull_request = ?,
+        set_aside_at = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`)
+        .run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.build_phase, next.pull_request, next.set_aside_at,
+          next.revision, next.updated_at, workId, expected);
       for (const id of touched) bump.run(next.updated_at, id);
       return fromRow(find(workId));
     });
@@ -234,6 +293,9 @@ function workRecords(database: Database): WorkRecords {
           const child = { work_id: row.work_id, kind: nextKind };
           if (row.parent_id) checkOwns(find(row.parent_id), child);
           for (const owned of childRows.all(workId) as unknown as Row[]) checkOwns({ ...row, kind: nextKind }, owned);
+          // The new kind must hold what the record already holds.
+          if (row.build_phase || row.pull_request) checkBuilt(nextKind);
+          for (const { body } of bodyNames.all(workId)) checkHolds(nextKind, body as Body);
         }
         const moved = nextStatus ?? row.status;
         return {
@@ -298,6 +360,29 @@ function workRecords(database: Database): WorkRecords {
       touched.push(blockerId);
       return {};
     }),
+    setBody: (workId, revision, body, markdown) => {
+      const name = checkBody(body);
+      const text = checkText(markdown, name);
+      return change(workId, revision, (row) => {
+        checkHolds(row.kind, name);
+        writeBody.run(workId, name, text);
+        return {};
+      });
+    },
+    body: (workId, body) => database.read(() => {
+      const name = checkBody(body);
+      find(workId);
+      const row = bodyText.get(workId, name);
+      return row ? String(row.markdown) : null;
+    }),
+    setBuildPhase: (workId, revision, phase) => {
+      if (!BUILD_PHASES.includes(phase)) throw invalid(`The build phase "${String(phase)}" isn't one of ${BUILD_PHASES.join(', ')}.`);
+      return change(workId, revision, (row) => (checkBuilt(row.kind), { build_phase: phase }));
+    },
+    setPullRequest: (workId, revision, pullRequest) => {
+      const reference = checkReference(pullRequest, 'PR');
+      return change(workId, revision, (row) => (checkBuilt(row.kind), { pull_request: reference }));
+    },
     children: (workId) => related(childRows, workId),
     blockers: (workId) => related(blockerRows, workId),
     dependents: (workId) => related(dependentRows, workId),

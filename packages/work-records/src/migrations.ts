@@ -32,4 +32,16 @@ export const MIGRATIONS: readonly Migration[] = [
     ) STRICT;
     CREATE INDEX blockers_by_blocker ON blockers (blocker_id);
   `),
+  (db) => db.exec(`
+    -- Where a build stands in the lar-build workflow, and the PR it delivers through.
+    ALTER TABLE work_records ADD COLUMN build_phase TEXT;
+    ALTER TABLE work_records ADD COLUMN pull_request TEXT;
+    -- Private markdown: a brief, a decision's text or a concept's map. Nothing here is written to a provider.
+    CREATE TABLE bodies (
+      work_id TEXT NOT NULL REFERENCES work_records (work_id),
+      body TEXT NOT NULL,
+      markdown TEXT NOT NULL,
+      PRIMARY KEY (work_id, body)
+    ) STRICT;
+  `),
 ];

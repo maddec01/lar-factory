@@ -7,6 +7,7 @@ import type { RawWorkItem } from './azure-items.ts';
 /** A pull request as az repos pr show prints it. */
 export interface AzurePr {
   pullRequestId: number;
+  lastMergeSourceCommit?: { commitId: string };
   status: 'active' | 'completed' | 'abandoned';
   isDraft?: boolean;
   mergeStatus?: string;
@@ -33,6 +34,7 @@ export const prIds = (raw: RawWorkItem): number[] => (raw.relations ?? []).flatM
 export function linkedPr(pr: AzurePr): LinkedPr {
   const state = prStateOf(pr);
   return {
+    ...pr.lastMergeSourceCommit?.commitId && { sourceRevision: pr.lastMergeSourceCommit.commitId },
     number: pr.pullRequestId, url: `${pr.repository.webUrl}/pullrequest/${pr.pullRequestId}`, state, isDraft: pr.isDraft === true,
     body: pr.description ?? '', mergedAt: state === 'merged' ? pr.closedDate ?? null : null, checks: null, mergeState: mergeStateOf(pr.mergeStatus),
   };

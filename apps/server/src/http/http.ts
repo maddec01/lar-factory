@@ -14,6 +14,7 @@ import type { ItemDetailsReader } from '../item-details/item-details.ts';
 import type { BuiltPage } from '../page/page.ts';
 import type { StartAfter } from '../start-after/start-after.ts';
 import { log } from '../log.ts';
+import { readAzureReadiness } from '../azure/azure-readiness.ts';
 
 export interface HttpDeps {
   board: BoardState;
@@ -193,6 +194,21 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
 
   /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
   const WRITES: Record<string, Write> = {
+    '/api/pr-readiness': {
+      what: 'the linked PR to read', disabled: 'Azure readiness is unavailable in sample mode.',
+      async run({ itemId, number }) {
+        const item = board.snapshot().items.find((i) => i.id === itemId);
+        const pr = item?.linkedPrs.find((p) => p.number === number);
+        if (!item || !pr || !item.azure) return { status: 404, body: { error: 'That Azure PR is not on the board.' } };
+        if (board.snapshot().itemSourceProblems?.some((p) => p.repo === item.repo)) return { status: 503, body: { error: 'The Azure source is disconnected.' } };
+        // Resolve arguments from the board's provider link, never arbitrary client arguments.
+        const match = /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)$/i.exec(pr.url);
+        if (!match || Number(match[4]) !== number) return { status: 400, body: { error: 'This Azure PR link is unsupported.' } };
+        const evidence = await readAzureReadiness(match[1]!, decodeURIComponent(match[2]!), decodeURIComponent(match[3]!), Number(number));
+        if (board.snapshot().itemSourceProblems?.some((p) => p.repo === item.repo)) return { status: 503, body: { error: 'The Azure source is disconnected.' } };
+        return { status: 200, body: { evidence: evidence.available ? evidence : { available: false, reason: 'Azure evidence is unavailable. Check the provider connection and refresh.' }, error: null } };
+      },
+    },
     '/api/items': {
       what: 'item details', disabled: 'Adding items is disabled in sample mode.',
       restarted: () => ({ uncertain: true, error: 'The board restarted. Check your items in GitHub or Azure DevOps before starting a new item.' }),

@@ -142,3 +142,13 @@ test('sample mode saves no description', async (t) => {
   const response = await save(board, { itemId: 'I_sample13', body: 'x' });
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Saving descriptions is disabled in sample mode.' }]);
 });
+
+test('readiness refuses foreign origins and sample mode without running Azure', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const input = { itemId: 'I_sample01', number: 1, organization: 'untrusted' };
+  const foreign = await fetch(`${board.url}/api/pr-readiness`, { method: 'POST', headers: { Origin: 'https://foreign.example', 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+  assert.equal(foreign.status, 403);
+  const sample = await fetch(`${board.url}/api/pr-readiness`, { method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+  assert.equal(sample.status, 403);
+  assert.equal((await board.calls()).length, 0);
+});

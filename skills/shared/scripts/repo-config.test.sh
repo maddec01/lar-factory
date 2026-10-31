@@ -62,7 +62,7 @@ chmod +x "$bin/gh" "$bin/az"
 export FAKE_AZ_LOG="$bin/az-log"
 export PATH="$bin:$PATH" HOME="$bin/home"
 data="$HOME/Library/Application Support/Lar Factory"
-list_file="$data/repositories.json"
+list_file="$data/repository-settings.json"
 
 # file <owner/name> <json>: puts .lar-factory.json on that repository's default branch.
 file() { mkdir -p "$FAKE_FILES/${1%/*}"; printf '%s' "$2" >"$FAKE_FILES/$1"; }
@@ -92,7 +92,7 @@ refuses() {
 # --list
 
 run --list
-check "with no repositories.json, --list prints []" '[]'
+check "with no repository-settings.json, --list prints []" '[]'
 
 mkdir -p "$data"
 echo '{"repositories":[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":{"step":"setup","done":["project"],"answers":{"projectId":"lar-server"}}}]}' >"$list_file"
@@ -102,17 +102,29 @@ check "--list prints the repositories array, an entry still onboarding with its 
 FAKE_LOGGED_OUT=1 run --list
 check "--list doesn't need gh" '[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":{"step":"setup","done":["project"],"answers":{"projectId":"lar-server"}}}]'
 
-echo '{"repositories":[{"repo":"maddec01/lar-web","resetting":{"prUrl":"https://github.com/maddec01/lar-web/pull/14"}},{"repo":"maddec01/lar-factory"}]}' >"$list_file"
+entry='{"repo":"maddec01/lar-web","settings":{"overrides":{"role":"web"},"consent":["open-pr"]}}'
+echo "{\"repositories\":[$entry,{\"repo\":\"maddec01/lar-old\",\"resetting\":{\"prUrl\":\"https://github.com/maddec01/lar-old/pull/14\"}}]}" >"$list_file"
 run --list
-check "--list leaves out an entry resetting" '[{"repo":"maddec01/lar-factory"}]'
+check "--list prints each entry with its local settings, leaving out an entry resetting" "[$entry]"
+
+old="$data/repositories.json"
+echo '{"repositories":[{"repo":"maddec01/lar-old"}]}' >"$old"
+run --list
+check "--list never reads the old repositories.json" "[$entry]"
+
+LAR_FACTORY_DATA_DIR="$bin/elsewhere" run --list
+check "--list reads the data folder LAR_FACTORY_DATA_DIR names" '[]'
+LAR_FACTORY_DATA_DIR=relative run --list
+check "a relative LAR_FACTORY_DATA_DIR is ignored" "[$entry]"
+rm "$old"
 
 echo '{"repositories": [' >"$list_file"
 run --list
-refuses "a repositories.json that isn't JSON names the file" "$list_file isn't valid JSON"
+refuses "a repository-settings.json that isn't JSON names the file" "$list_file isn't valid JSON"
 
 echo '[]' >"$list_file"
 run --list
-refuses "a repositories.json that isn't an object names the file and the problem" "$list_file: expected an object with a repositories array"
+refuses "a repository-settings.json that isn't an object names the file and the problem" "$list_file: expected an object with a repositories array"
 
 echo '{"repositories":{}}' >"$list_file"
 run --list
@@ -150,16 +162,18 @@ done
 
 # <owner/repo>
 
+rm "$list_file"
+
 file maddec01/lar-factory '{"role":"factory"}'
 run maddec01/lar-factory
-check "fills in the defaults" '{"version":1,"role":"factory","itemSource":{"kind":"issues"},"show":"all","labels":[]}'
+check "fills in the defaults" '{"version":1,"role":"factory","itemSource":{"kind":"issues"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
 
-file maddec01/lar-server '{"version":1,"role":"server","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"]}'
+file maddec01/lar-server '{"version":1,"role":"server","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"private"},"skills":[]}'
 run maddec01/lar-server
-check "keeps the fields the file sets" '{"version":1,"role":"server","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"]}'
+check "keeps the fields the file sets" '{"version":1,"role":"server","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"private"},"skills":[]}'
 
 run maddec01/lar-apple
-refuses "a 404 names the repository and the missing file" "maddec01/lar-apple: no .lar-factory.json on its default branch"
+refuses "a repository with neither local settings nor .lar-factory.json says it isn't onboarded" "maddec01/lar-apple isn't onboarded on this Mac and has no .lar-factory.json on its default branch"
 
 file maddec01/broken '{"role": '
 run maddec01/broken
@@ -171,11 +185,11 @@ refuses "a file that isn't an object names the repository" "maddec01/broken: .la
 
 file maddec01/broken '{"show":"all"}'
 run maddec01/broken
-refuses "a file without role names the repository and role" "maddec01/broken: .lar-factory.json field role"
+refuses "a file without role, and no local role, names the missing role" "maddec01/broken has no role in its local overrides or .lar-factory.json"
 
 file maddec01/broken '{"role":"factory","itemSource":{"kind":"azure-boards"}}'
 run maddec01/broken
-refuses "an unknown item source kind names itemSource.kind" "maddec01/broken: .lar-factory.json has an unsupported item source. Run onboarding again."
+refuses "an unknown item source kind asks for onboarding" "maddec01/broken has an unsupported item source. Run onboarding again."
 
 file maddec01/broken '{"role":"factory","show":"some"}'
 run maddec01/broken
@@ -207,7 +221,7 @@ refuses "no argument shows the usage" "usage: repo-config.sh"
 
 sprint='{"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all"}'
 file contoso/Fabrikam/web "$sprint"
-want='{"version":1,"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all","labels":[]}'
+want='{"version":1,"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
 for origin in https://dev.azure.com/contoso/Fabrikam/_git/web https://contoso@dev.azure.com/contoso/Fabrikam/_git/web \
     git@ssh.dev.azure.com:v3/contoso/Fabrikam/web https://contoso.visualstudio.com/Fabrikam/_git/web contoso/Fabrikam/web; do
     : >"$FAKE_AZ_LOG"
@@ -222,14 +236,14 @@ check "passes a percent-encoded project name to az as its name" "$want"
 
 file contoso/Fabrikam/api '{"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"opted-in","labels":["area-api"]}'
 run contoso/Fabrikam/api
-check "keeps a combined Azure board source" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"opted-in","labels":["area-api"]}'
+check "keeps a combined Azure board source" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"private"},"skills":[]}'
 
 file contoso/Fabrikam/board '{"role":"api","itemSource":{"kind":"azure-board","team":"API"}}'
 run contoso/Fabrikam/board
-check "reads the combined Azure board" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"all","labels":[]}'
+check "reads the combined Azure board" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
 
 run contoso/Fabrikam/missing
-refuses "Azure's missing item names the repository and the missing file" "contoso/Fabrikam/missing: no .lar-factory.json on its default branch"
+refuses "an Azure repository with neither local settings nor a file says it isn't onboarded" "contoso/Fabrikam/missing isn't onboarded on this Mac and has no .lar-factory.json on its default branch"
 
 file contoso/Fabrikam/broken '{"role": '
 run contoso/Fabrikam/broken
@@ -237,24 +251,22 @@ refuses "an Azure file that doesn't parse names the repository" "contoso/Fabrika
 
 file contoso/Fabrikam/broken '{"role":"web"}'
 run contoso/Fabrikam/broken
-refuses "an Azure repository has no default item source" ".lar-factory.json has an unsupported item source. Run onboarding again."
+refuses "an Azure repository has no default item source" "contoso/Fabrikam/broken has an unsupported item source. Run onboarding again."
 
 file contoso/Fabrikam/broken '{"role":"web","itemSource":{"kind":"issues"}}'
 run contoso/Fabrikam/broken
-refuses "an Azure repository can't read GitHub issues" ".lar-factory.json has an unsupported item source. Run onboarding again."
+refuses "an Azure repository can't read GitHub issues" "contoso/Fabrikam/broken has an unsupported item source. Run onboarding again."
 
-for kind in azure-board; do
-    file contoso/Fabrikam/broken "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\"}}"
-    run contoso/Fabrikam/broken
-    refuses "an $kind without team names itemSource.team" "contoso/Fabrikam/broken: .lar-factory.json field itemSource.team must name the team for an $kind"
-    file contoso/Fabrikam/broken "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\",\"team\":\"\"}}"
-    run contoso/Fabrikam/broken
-    refuses "an $kind with an empty team names itemSource.team" "field itemSource.team must name the team"
-done
+file contoso/Fabrikam/broken '{"role":"web","itemSource":{"kind":"azure-board"}}'
+run contoso/Fabrikam/broken
+refuses "an azure-board without team names itemSource.team" "contoso/Fabrikam/broken has no itemSource.team to name the team for an azure-board"
+file contoso/Fabrikam/broken '{"role":"web","itemSource":{"kind":"azure-board","team":""}}'
+run contoso/Fabrikam/broken
+refuses "an azure-board with an empty team names itemSource.team" "has no itemSource.team to name the team"
 
 file maddec01/broken '{"role":"factory","itemSource":{"kind":"azure-board","team":"Web"}}'
 run maddec01/broken
-refuses "a GitHub repository can't read an Azure sprint" ".lar-factory.json has an unsupported item source. Run onboarding again."
+refuses "a GitHub repository can't read an Azure sprint" "maddec01/broken has an unsupported item source. Run onboarding again."
 
 FAKE_LOGGED_OUT=1 run contoso/Fabrikam/web
 refuses "with az logged out, says to run az login" "az is logged out. Run az login"
@@ -272,8 +284,41 @@ for kind in github-project azure-sprint azure-backlog unknown; do
     for repo in maddec01/broken contoso/Fabrikam/broken; do
         file "$repo" "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\",\"team\":\"Team\"}}"
         run "$repo"
-        refuses "removed or unknown $kind asks for onboarding on $repo" "$repo: .lar-factory.json has an unsupported item source. Run onboarding again."
+        refuses "removed or unknown $kind asks for onboarding on $repo" "$repo has an unsupported item source. Run onboarding again."
     done
 done
+
+# Local overrides over optional shared defaults
+
+rm -rf "$FAKE_FILES"
+echo '{"repositories":[{"repo":"maddec01/no-files","settings":{"projectId":"p1","overrides":{"role":"app","show":"opted-in"}}}]}' >"$list_file"
+run maddec01/no-files
+check "a repository with local overrides and no .lar-factory.json works from them" '{"version":1,"role":"app","itemSource":{"kind":"issues"},"show":"opted-in","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
+
+file maddec01/no-files '{"role":"shared role","show":"all","labels":["area-api"],"skills":["tdd"],"domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"}}'
+run maddec01/no-files
+check "each local override replaces its shared default, and the rest inherit" '{"version":1,"role":"app","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"},"skills":["tdd"]}'
+
+echo '{"repositories":[{"repo":"maddec01/no-files","settings":{"overrides":{"show":"opted-in"}}}]}' >"$list_file"
+run maddec01/no-files
+check "removing a local override inherits the shared default again" '{"version":1,"role":"shared role","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"},"skills":["tdd"]}'
+
+rm -rf "$FAKE_FILES"
+run maddec01/no-files
+refuses "local overrides without a role, and no file, name the missing role" "maddec01/no-files has no role in its local overrides or .lar-factory.json"
+
+echo '{"repositories":[{"repo":"maddec01/no-files","settings":{"overrides":{"role":"app","labels":"x"}}}]}' >"$list_file"
+run maddec01/no-files
+refuses "a bad local override names the settings file and the field" "maddec01/no-files: its local overrides in $list_file: field labels"
+
+echo '{"repositories":[{"repo":"contoso/Fabrikam/local","settings":{"overrides":{"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"}}}}]}' >"$list_file"
+run https://dev.azure.com/contoso/Fabrikam/_git/local
+check "an Azure repository with local overrides and no file works from them" '{"version":1,"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
+
+echo '{"repositories": [' >"$list_file"
+file maddec01/lar-factory '{"role":"factory"}'
+run maddec01/lar-factory
+refuses "a settings file that isn't JSON stops a repository read too" "$list_file isn't valid JSON"
+rm "$list_file"
 
 ((failures == 0))

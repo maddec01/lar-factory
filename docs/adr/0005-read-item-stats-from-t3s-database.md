@@ -5,3 +5,5 @@
 Amended by [ADR 0007](0007-count-item-tokens-like-t3s-usage-page.md): item tokens now come from provider transcripts, counted as T3's usage page counts them.
 
 Partially superseded by [ADR 0035](0035-the-board-reads-t3-through-its-first-party-protocol.md): protocol observations replace covered project, thread, timing and transcript-session reads. Only the documented historical Codex pricing selection query remains a production SQLite read.
+
+Amended by [ADR 0037](0037-work-has-a-local-identity-and-t3-owns-execution.md): stats cover the T3 thread IDs recorded on a work record. First-message matching remains only in onboarding's one-time import and in recovering an uncertain launch.

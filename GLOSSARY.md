@@ -8,14 +8,15 @@ the user merges. This vocabulary describes its work, roles and board statuses.
 ### Work and handover
 
 **Brief**:
-The issue's build handover: what to change, how to tell it is done, confirmed
-assumptions, builder notes, domain docs drafts and whether the user needs to
-verify it.
+A build's handover, kept in its work record: what to change, how to tell it is
+done, confirmed assumptions, builder notes, domain docs drafts and whether the
+user needs to verify it.
 _Avoid_: Specification (when referring to the factory's brief)
 
 **Domain docs**:
-A project's glossary and ADRs. Shaping drafts changes to them in the brief, and
-the builder writes them in the build PR.
+A project's glossary and ADRs. Shaping drafts changes to them in the work
+record, and the builder writes them in the build PR, unless the repository
+keeps its domain docs as private drafts.
 
 **Prototype**:
 A throwaway variant built by a Prototype child task to answer one design
@@ -31,18 +32,21 @@ The check before a brief becomes Ready, combining a fresh-context doubt review
 with the user's answers to remaining assumptions or findings.
 
 **Concept**:
-Work too broad or unclear for a single brief, represented by a map issue with
-decision and build sub-issues. Spanning several repositories doesn't by itself
-make work a concept.
+Work too broad or unclear for a single brief, refined in its work record
+through decisions and builds. Once fully refined it can publish as a parent
+ticket with one child ticket per build. Spanning several repositories doesn't
+by itself make work a concept.
 
 **Map**:
-A concept's account of its destination, decisions so far, remaining fog,
-out-of-scope work, domain docs drafts and relationships between sub-issues.
+A concept's account, kept in its work record, of its destination, decisions so
+far, remaining fog, out-of-scope work, domain docs drafts and relationships
+between its parts. Publication carries its destination and decision gists,
+never the map itself.
 
 **Build**:
-An issue in one repository that changes only that repository and becomes one
-PR there, delivered through its slices, or by the builder alone when it's a
-Small build.
+Work in one repository that delivers one standalone PR, recorded on its work
+record, through its slices or by the builder alone when it's a Small build.
+Parts that only work together are one build.
 _Avoid_: build issue
 
 **Small build**:
@@ -51,9 +55,8 @@ or every part touches the same files.
 _Avoid_: quick build, unsliced build
 
 **Slice**:
-A small, independently testable piece of a build, recorded as a sub-issue of
-its build and implemented by one implementer. Slices stay off the lar
-board. A sub-issue labelled `build` is a build, never a slice.
+A small, independently testable piece of a build, kept in the build's work
+record and implemented by one implementer. Slices are never published.
 _Avoid_: ticket, chunk, task
 
 **Active slice**:
@@ -61,8 +64,8 @@ A slice an implementer is working on right now.
 _Avoid_: in-progress slice, current slice
 
 **Blocked slice**:
-A slice an implementer couldn't finish, waiting for a re-slice; it carries the
-`blocked` label. Not a slice with an open blocked-by link.
+A slice an implementer couldn't finish, waiting for a re-slice. Not a slice
+that waits on other work.
 _Avoid_: failed slice, stuck slice
 
 **Re-slice**:
@@ -71,7 +74,7 @@ slices that aren't active.
 _Avoid_: re-plan
 
 **Work message**:
-The two-line text the board sends to a new shaping or decision thread: `#<n> <title>`, then `$lar-work <owner/repo>#<n>`.
+The two-line text the board sends to a new shaping or decision thread: the item's name, then `$lar-shape <work ID>`.
 _Avoid_: work command, `/lar-work` command
 
 **Model choice**:
@@ -79,7 +82,7 @@ The provider instance and model a new thread runs on, picked at Start; "T3 defau
 _Avoid_: model selection, provider setup
 
 **Repository project**:
-The T3 project whose folder is a repository's main checkout, recognised by its git origin; an issue's threads run in its repository's project.
+The T3 project whose folder is a repository's main checkout, recognised by its git origin; a work record's threads run in its repository's project.
 _Avoid_: lar project, factory project (for where threads run)
 
 **Repository role**:
@@ -87,24 +90,20 @@ A one-line description of what a repository is to the others, such as the API se
 _Avoid_: relationship, repo type
 
 **Repository config**:
-One repository's factory settings (its role, item source, show setting and labels), kept in that repository so everyone who onboards it gets the same setup.
+Optional team-shared defaults for one repository's factory setup. Each user can override defaults locally and chooses their own write consent.
 _Avoid_: onboarding config, project config, board config
 
 **Onboarding**:
-Setting up one repository for the factory: its T3 project, hosting service, board settings, labels, domain docs and cleanup.
+Setting up one repository for the user's factory, including its access, local settings and optional shared settings or repository additions.
 _Avoid_: initialization, setup
 
 **Clash**:
-Something in a repository or an agent's skills folder that makes agents work against the factory, such as a rule to push to main, another tracker's setup, or a project or User skill named like a lar skill.
+A rule or skill setup that prevents factory work from meeting the agreed factory workflow and the project's coding or PR requirements. A different project workflow alone is not a Clash.
 _Avoid_: conflict
 
 **Kind**:
-The type of an item: bug, feature, improvement or concept, carried as a label on every provider.
+The type of an item: bug, feature, improvement or concept, kept in its work record.
 _Avoid_: type, work item type
-
-**Workflow label**:
-A label the factory needs in every repository: a kind, a decision method, build, active or blocked. On Azure DevOps it is a tag.
-_Avoid_: system label, default tag
 
 **Custom label**:
 A label the user chooses for one repository, such as the part of the product an item touches.
@@ -120,11 +119,6 @@ _Avoid_: personal layer, local state, item for ticketless work
 
 **Launch intent**:
 A work record's note that the board asked T3 to start a thread, kept until T3's thread ID is recorded, so the board can find that thread after a crash instead of starting a second one.
-
-**Overlay**:
-The board's temporary view of successful item creations and status changes
-while GitHub catches up; GitHub remains authoritative.
-_Avoid_: Source of truth (for the overlay)
 
 **Active work**:
 An item whose provider data an agent, a check or the board is changing now. In an Azure DevOps team, which
@@ -143,13 +137,14 @@ The person who keeps lar-factory itself: syncs the skill Copies and Ports with u
 _Avoid_: owner, author
 
 **Shaping thread**:
-The conversation in the issue's repository project that resolves an issue's open
+The conversation in the work's repository project that resolves its open
 decisions and produces a passing brief, then stops at Ready. Its build thread
 archives it once the build starts, unless it is running or needs you.
 
 **Decision thread**:
-A top-level thread, started from the board, running `/lar-work` on one `decision-*` sub-issue of a map,
-in the repo's main checkout, writing only to issues.
+A top-level thread, started from the board, running `lar-shape` on one decision
+a concept's work record owns, in the repository's main checkout, writing only to
+work records.
 _Avoid_: Decision session
 
 **Build thread**:
@@ -158,8 +153,8 @@ own worktree, that takes a passing brief through implementation, review and PR
 checks.
 
 **Item thread**:
-A T3 thread whose first message names the item, before any other issue. Its
-state is running, needs you, stopped or done.
+A T3 thread recorded on a work record, whose state is running, needs you,
+stopped or done.
 
 **Planner**:
 The agent a build thread starts to split its build into slices or to re-slice a
@@ -192,7 +187,7 @@ _Avoid_: Merger (for the approver)
 ### Board statuses
 
 **Status**:
-An item's place in the factory's flow, one of the board statuses, kept on the item itself in the form its item source allows. Done is never stored; it follows from the item closing.
+An item's place in the user's factory workflow, kept in its work record on that user's machine. A team's ticket state and a PR's state are separate facts the factory can read.
 _Avoid_: column, state, stage
 
 **List**:
@@ -200,7 +195,7 @@ Captured work that has not yet been selected to start.
 _Avoid_: Queued (for unselected work)
 
 **Queued**:
-Work selected for pickup by lar-work, by the user or by its concept's shaping,
+Work selected for pickup by lar-shape, by the user or by its concept's shaping,
 awaiting a start from the board.
 _Avoid_: In progress (for work awaiting pickup)
 
@@ -233,11 +228,13 @@ Reviewed work whose required checks have passed, with no outstanding findings
 or hand checks, awaiting the user's merge.
 
 **Done**:
-Completed work, reached when its item closes or its PR merges.
+Completed factory work. A build reaches it when its recorded PR merges, a
+decision when its confirmed answer is captured, and a concept when its decisions
+are settled, its Fog is gone and all its builds are Done.
 
 **Abandon**:
-Setting aside a List or Queued item by closing it as not planned or moving it
-to Removed, so it can be reopened in its provider.
+Setting work aside on the user's machine, keeping its work record for restoring.
+The board offers to close the ticket, which waits for the user's OK.
 _Avoid_: Cancel, Close (for discarded work)
 
 ### Item stats
@@ -252,11 +249,11 @@ _Avoid_: elapsed time, calendar time, active time
 
 **Item stats**:
 An item's agent time, wall time, total tokens and API cost, shown as four plain figures.
-They cover the threads whose first message names this item before any other issue, with those threads' child tasks and subagents.
+They cover the T3 threads recorded on its work record, with those threads' child tasks and subagents.
 _Avoid_: usage, metrics
 
 **Item total**:
-An item's stats plus the item total of each of its sub-issues on the board.
+An item's stats plus the item total of each of its parts on the board.
 _Avoid_: report total, aggregate, rollup
 
 **API cost**:
@@ -312,19 +309,11 @@ The service that hosts a repository and its tickets: GitHub or Azure DevOps. A t
 _Avoid_: platform, board provider, host
 
 **Item source**:
-Where the board finds one repository's items: the repository's GitHub issues or an Azure DevOps team's backlog and current sprint together. It lists the items that can show.
+Where the board finds one repository's tickets: the repository's GitHub issues or an Azure DevOps team's backlog and current sprint together. It supplies the tickets the user can pick and their context.
 _Avoid_: list source, board source, project
 
 **Azure board**:
 An Azure DevOps team's open backlog and current sprint together, with each work item shown once. It keeps completed sprint work and reads the backlog alone when no sprint is current.
-
-**Show setting**:
-A repository's choice of which items the board shows: All items, every item its item source lists, or Items with a status, only those that carry a status.
-_Avoid_: filter, visibility
-
-**Opt-in**:
-A repository's choice to show only items that carry a status, instead of every open item its item source lists.
-_Avoid_: filter, allowlist
 
 **Scope**:
 The repository the board shows, picked in the title bar or the List modal, or all repositories.
@@ -338,7 +327,7 @@ _Avoid_: inbox, queue
 The board's view of the work moving through the factory: the Queue, the dossiers, and everything else in flight on one stage track.
 
 **Dossier**:
-A concept, or an item with sub-issues, shown on the line. Collapsed, it is two lines of progress and what's next. Expanded, it shows what needs the user, what is blocked or ready, the remaining fog of its map, its threads, and its Work map or parts list. The full map is in its item dialog.
+A concept, or other work with parts, shown on the line. Collapsed, it is two lines of progress and what's next. Expanded, it shows what needs the user, what is blocked or ready, the remaining fog of its map, its threads, and its Work map or parts list. The full map is in its item dialog.
 _Avoid_: concept card
 
 **Work map**:
@@ -346,7 +335,7 @@ A dossier's diagram of its parts: one lane per repository plus a Decisions lane,
 _Avoid_: map (that is the concept's written account), graph
 
 **Item dialog**:
-The board page's view of one item, with what its provider shows: description, comments, people, labels, dates, relations and linked PRs. Its description is the one thing the user can edit there.
+The board page's view of one item: its work record's brief, map or decision, with its ticket's description, comments, people, labels, dates, relations and linked PRs as context. The description is the one thing the user can edit there.
 _Avoid_: detail modal, issue view, ticket view
 
 **Refining**:

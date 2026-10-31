@@ -189,6 +189,8 @@ export interface ConceptMap {
   fog: string[];
   /** Absent when the body has no End-to-end check section. */
   check?: EndToEndCheck;
+  /** The unmet Dependencies holding the concept's builds, the Map's bullets; absent when it lists none. */
+  dependencies?: string[];
 }
 
 /** Where a build's slice stands; see `sliceProgress`. */

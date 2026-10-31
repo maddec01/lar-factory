@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./publication": "./src/publication.ts",
     "./data-dir": "./src/data-dir.ts",
     "./install-skills": "./src/install-skills.ts",
     "./install-targets": "./src/install-targets.ts",

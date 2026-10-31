@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import type { Status } from '@lar-factory/shared';
+import type { PublicationContent, PublicationOutcome, PublicationProposal, Status } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
 import {
   openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
@@ -117,6 +117,68 @@ Content
                                     Change what became of the axis's Kth finding.
   review-rounds <work-id>           Print the build's review rounds.
 
+Publication
+  gate <work-id>                    Print the current brief digest and gate history.
+  record-gate <work-id> --revision N --digest H --identity I --evidence E
+                                    Attest that this exact brief passed its gate.
+                                    N is the work revision. This writes no Status.
+  publication-readiness <work-id>   Print eligibility and all source revisions.
+                                    Concepts require settled decisions, no Fog and
+                                    current passing briefs, regardless of PR merge.
+  propose-publication <work-id> --revision N --file F
+                                    Store immutable PublicationProposal JSON. N is
+                                    the root work revision. sources lists every
+                                    {workId, revision}; tickets gives each destination,
+                                    effective vocabulary, explicit typeResolution,
+                                    title and body; operations lists ordered writes.
+                                    A replacement names replaces, the current plan ID.
+                                    Operation kinds are create, append, replace,
+                                    comment, replace-comment, relationship,
+                                    textual-relationship and pr-closing-reference.
+                                    Body offsets count JavaScript UTF-16 code units.
+                                    Replacements include exact expectedText and location.
+                                    Relationships name an internal relatedWorkId and
+                                    child or blocked-by. Closing references name the
+                                    work's recorded pullRequest and exact content.
+  publication <work-id> --plan P    Print the exact plan, digest, approval and outcomes.
+  publications <work-id>            Print all plans, including superseded plans.
+  approve-publication <work-id> --plan P --revision N --digest H --identity I
+                                    Approve the exact digest printed by inspection.
+  pending-publication <work-id> --plan P [--file F]
+                                    Print source validity, next operation, successful,
+                                    failed and uncertain operation IDs. F is current
+                                    PublicationContent JSON with tickets and operations.
+  claim-publication <work-id> --plan P --revision N --digest H --identity I --file F
+                                    Atomically claim the next operation, returning
+                                    plan, operation and claimToken. F must contain
+                                    content prepared from current settings and reads.
+                                    Claim records uncertainty before provider dispatch.
+                                    A crash never returns the operation to pending.
+  record-publication-outcome <work-id> --plan P --revision N --operation O
+                             --claim C --file F
+  resolve-publication-outcome <work-id> --plan P --revision N --operation O
+                              --identity I --file F
+                                    F holds {status, evidence, ticket?, url?, location?}.
+                                    status is successful, failed or uncertain. A success
+                                    needs the exact body boundary or comment ID for
+                                    text writes. Creation also needs ticket and url.
+                                    Resolution requires successful or failed evidence
+                                    from reconciliation. Retry needs a new approval.
+  record-publication-evidence <work-id> --plan P --revision N --operation O --evidence E
+  publication-evidence <work-id> --plan P
+  last-published <work-id>          Print exact published texts and their locations.
+  publication-handover <work-id> --plan P
+                                    Print team-facing markdown for manual posting.
+  attach-publication-url <work-id> --revision N --plan P --ticket T --url U
+                                    Attach a result or manually posted handover URL.
+                                    N is the work revision. Local identity stays.
+  publication-attachment <work-id> Print the attached ticket URL and its plan.
+  Other publication changes use the plan revision, separate from work revisions.
+  They never queue work, start builds, or complete work. --file - reads stdin.
+  Empty operations makes a handover-only proposal. Required writes, destinations,
+  mapping and exact text are fixed in each plan. Failed work needs a replacement;
+  resolve uncertain work before replacing it. Completed results remain recorded.
+
 Provider observations
   An observation is the last read of the record's ticket or current PR from its
   provider, kept with the time it was read. A newer read replaces it. A failed
@@ -186,10 +248,20 @@ class UsageError extends Error {}
 const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
   'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
-  'review-rounds', 'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
+  'review-rounds', 'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
+  'gate', 'record-gate', 'publication-readiness', 'propose-publication', 'publication', 'publications', 'approve-publication',
+  'pending-publication', 'claim-publication', 'record-publication-outcome', 'resolve-publication-outcome', 'record-publication-evidence',
+  'publication-evidence', 'last-published', 'publication-handover', 'attach-publication-url', 'publication-attachment'];
 const COMMANDS = ['create', 'import', 'list', 'intents', 'retention', 'hidden', 'delete-expired', ...TAKES_WORK_ID];
 
 const OPTIONS = {
+  plan: { type: 'string' },
+  digest: { type: 'string' },
+  identity: { type: 'string' },
+  evidence: { type: 'string' },
+  operation: { type: 'string' },
+  claim: { type: 'string' },
+  url: { type: 'string' },
   title: { type: 'string' },
   repository: { type: 'string' },
   kind: { type: 'string' },
@@ -244,6 +316,16 @@ function readInput(values: Values): string {
   }
 }
 
+/** A publication request in JSON, validated by the database writer. */
+function readJson(values: Values): unknown {
+  try {
+    return JSON.parse(readInput(values)) as unknown;
+  } catch (error) {
+    if (error instanceof WorkRecordError) throw error;
+    throw new WorkRecordError('invalid', `The publication input in ${values.file} isn't JSON.`);
+  }
+}
+
 /** The review round in the JSON `--file` holds. */
 function readRound(values: Values): NewReviewRound {
   try {
@@ -279,6 +361,40 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
     context: values.file === undefined ? undefined : readInput(values),
   });
   switch (command) {
+    case 'gate':
+      return records.gate(workId!);
+    case 'record-gate':
+      return records.recordGate(workId!, revision(), { briefDigest: need(values, 'digest'), approvedBy: need(values, 'identity'), evidence: need(values, 'evidence') });
+    case 'publication-readiness':
+      return records.publicationReadiness(workId!);
+    case 'propose-publication':
+      return records.proposePublication(workId!, revision(), readJson(values) as PublicationProposal);
+    case 'publication':
+      return records.publication(workId!, need(values, 'plan'));
+    case 'publications':
+      return records.publications(workId!);
+    case 'approve-publication':
+      return records.approvePublication(workId!, need(values, 'plan'), revision(), need(values, 'digest'), need(values, 'identity'));
+    case 'pending-publication':
+      return records.pendingPublication(workId!, need(values, 'plan'), values.file === undefined ? undefined : readJson(values) as PublicationContent);
+    case 'claim-publication':
+      return records.claimPublication(workId!, need(values, 'plan'), revision(), need(values, 'digest'), readJson(values) as PublicationContent, need(values, 'identity'));
+    case 'record-publication-outcome':
+      return records.recordPublicationOutcome(workId!, need(values, 'plan'), revision(), need(values, 'operation'), need(values, 'claim'), readJson(values) as PublicationOutcome);
+    case 'resolve-publication-outcome':
+      return records.resolvePublicationOutcome(workId!, need(values, 'plan'), revision(), need(values, 'operation'), need(values, 'identity'), readJson(values) as PublicationOutcome);
+    case 'record-publication-evidence':
+      return records.recordPublicationEvidence(workId!, need(values, 'plan'), revision(), need(values, 'operation'), need(values, 'evidence'));
+    case 'publication-evidence':
+      return records.publicationEvidence(workId!, need(values, 'plan'));
+    case 'last-published':
+      return records.lastPublished(workId!);
+    case 'publication-handover':
+      return records.publicationHandover(workId!, need(values, 'plan'));
+    case 'publication-attachment':
+      return records.publicationAttachment(workId!);
+    case 'attach-publication-url':
+      return records.attachPublicationUrl(workId!, revision(), need(values, 'plan'), need(values, 'ticket'), need(values, 'url'));
     case 'create':
       return records.create({ ...captured(), ticket: values.ticket });
     case 'import':

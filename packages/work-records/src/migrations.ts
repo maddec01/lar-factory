@@ -100,6 +100,10 @@ export const MIGRATIONS: readonly Migration[] = [
     -- The title and context a record was captured or imported with. A later ticket edit never changes them.
     ALTER TABLE work_records ADD COLUMN title TEXT NOT NULL DEFAULT '';
     ALTER TABLE work_records ADD COLUMN initial_context TEXT NOT NULL DEFAULT '';
+    -- Why the record waits on the user, set and cleared by the board; null when it doesn't.
+    ALTER TABLE work_records ADD COLUMN needs_you TEXT;
+    -- The project skills selected when the build started, as a JSON list; null before it starts.
+    ALTER TABLE work_records ADD COLUMN skills TEXT;
     -- The delivery PRs a record held before its current one, kept as history.
     CREATE TABLE replaced_pull_requests (
       work_id TEXT NOT NULL REFERENCES work_records (work_id),

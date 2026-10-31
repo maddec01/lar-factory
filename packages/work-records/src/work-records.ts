@@ -167,6 +167,10 @@ export interface WorkRecord {
   pullRequest: string | null;
   /** Whether it is set aside, which leaves its Status as it was. */
   setAside: boolean;
+  /** Why it waits on the user, such as a closed unmerged PR; null when it doesn't. Its Status stays as it was. */
+  needsYou: string | null;
+  /** The project skills selected when its build started, or null before it starts. Later selections never change it. */
+  skills: string[] | null;
   /** When its work was finished, as its delivery PR showed, or null while unfinished. A Status never implies it. */
   finishedAt: string | null;
   /** Counts the record's changes; every change names the revision it read. */
@@ -212,6 +216,11 @@ export interface WorkRecords {
   /** The record holding `ticket`, made first when none does yet. An existing record keeps its title and context. */
   importTicket(record: NewWorkRecord & { ticket: string }): { record: WorkRecord; created: boolean };
   setAside(workId: string, revision: number): WorkRecord;
+  /** Records why the work waits on the user, replacing an earlier reason. */
+  setNeedsYou(workId: string, revision: number, reason: string): WorkRecord;
+  clearNeedsYou(workId: string, revision: number): WorkRecord;
+  /** Records the project skills selected as the build starts. A build snapshots its skills once. */
+  snapshotSkills(workId: string, revision: number, skills: readonly string[]): WorkRecord;
   restore(workId: string, revision: number): WorkRecord;
   /** Puts the record under `parentId`, whose kind must own the record's kind. Clear a parent before setting another. */
   setParent(workId: string, revision: number, parentId: string): WorkRecord;
@@ -282,6 +291,8 @@ interface Row {
   build_phase: BuildPhase | null;
   pull_request: string | null;
   set_aside_at: string | null;
+  needs_you: string | null;
+  skills: string | null;
   finished_at: string | null;
   revision: number;
   created_at: string;
@@ -300,6 +311,8 @@ const fromRow = (row: Row): WorkRecord => ({
   buildPhase: row.build_phase,
   pullRequest: row.pull_request,
   setAside: row.set_aside_at !== null,
+  needsYou: row.needs_you,
+  skills: row.skills === null ? null : JSON.parse(row.skills) as string[],
   finishedAt: row.finished_at,
   revision: row.revision,
   createdAt: row.created_at,
@@ -373,7 +386,7 @@ function checkHolds(kind: WorkKind, body: Body): void {
 
 /** Throws unless a record of `kind` can be built. */
 function checkBuilt(kind: WorkKind): void {
-  if (UNBUILT_KINDS.includes(kind)) throw invalid(`A ${kind} is never built, so it has no build phase, PR or review rounds.`);
+  if (UNBUILT_KINDS.includes(kind)) throw invalid(`A ${kind} is never built, so it has no build phase, PR, skills or review rounds.`);
 }
 
 function checkTitle(title: unknown): string {
@@ -389,6 +402,15 @@ function checkText(text: unknown, what: string): string {
 function checkFilled(text: unknown, what: string): string {
   if (typeof text !== 'string' || !text.trim()) throw invalid(`The ${what} is empty or isn't text.`);
   return text;
+}
+
+function checkSkills(skills: unknown): string[] {
+  if (!Array.isArray(skills)) throw invalid("The skills aren't a list.");
+  for (const [index, skill] of skills.entries()) {
+    if (typeof skill !== 'string' || !/^\S+$/.test(skill)) throw invalid(`The skill "${String(skill)}" is empty or has spaces.`);
+    if (skills.indexOf(skill) !== index) throw invalid(`The skills list ${skill} twice.`);
+  }
+  return skills as string[];
 }
 
 function checkThreadId(threadId: unknown): string {
@@ -505,7 +527,7 @@ function workRecords(database: Database): WorkRecords {
   };
 
   const updateRow = db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
-    pull_request = ?, set_aside_at = ?, finished_at = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
+    pull_request = ?, set_aside_at = ?, needs_you = ?, skills = ?, finished_at = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
   /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. Records `apply`
    * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. When
    * `apply` returns null the record already holds the change, so nothing is written or bumped. */
@@ -521,7 +543,7 @@ function workRecords(database: Database): WorkRecords {
       if (patch === null) return fromRow(row);
       const next = { ...row, ...patch, revision: row.revision + 1, updated_at: new Date().toISOString() };
       updateRow.run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.build_phase, next.pull_request, next.set_aside_at,
-        next.finished_at, next.revision, next.updated_at, workId, expected);
+        next.needs_you, next.skills, next.finished_at, next.revision, next.updated_at, workId, expected);
       for (const id of touched) bump.run(next.updated_at, id);
       return fromRow(find(workId));
     });
@@ -568,7 +590,7 @@ function workRecords(database: Database): WorkRecords {
           if (row.parent_id) checkOwns(find(row.parent_id), child);
           for (const owned of childRows.all(workId) as unknown as Row[]) checkOwns({ ...row, kind: nextKind }, owned);
           // The new kind must hold what the record already holds.
-          if (row.build_phase || row.pull_request || hasRounds.get(workId)) checkBuilt(nextKind);
+          if (row.build_phase || row.pull_request || row.skills || hasRounds.get(workId)) checkBuilt(nextKind);
           for (const { body } of bodyNames.all(workId)) checkHolds(nextKind, body as Body);
         }
         const moved = nextStatus ?? row.status;
@@ -606,6 +628,19 @@ function workRecords(database: Database): WorkRecords {
       if (!row.set_aside_at) throw invalid(`The work record ${workId} isn't set aside.`);
       return { set_aside_at: null };
     }),
+    setNeedsYou: (workId, revision, reason) => {
+      const why = checkFilled(reason, 'Needs you reason');
+      return change(workId, revision, (row) => (row.needs_you === why ? null : { needs_you: why }));
+    },
+    clearNeedsYou: (workId, revision) => change(workId, revision, (row) => (row.needs_you === null ? null : { needs_you: null })),
+    snapshotSkills: (workId, revision, skills) => {
+      const snapshot = JSON.stringify(checkSkills(skills));
+      return change(workId, revision, (row) => {
+        checkBuilt(row.kind);
+        if (row.skills !== null) throw invalid(`The build ${workId} already snapshotted its skills when it started.`);
+        return { skills: snapshot };
+      });
+    },
     setParent: (workId, revision, parentId) => change(workId, revision, (row, touched) => {
       const parent = find(parentId);
       if (row.parent_id) throw invalid(`The work record ${workId} already has the parent ${row.parent_id}; clear it first.`);

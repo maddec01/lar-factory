@@ -118,6 +118,13 @@ _Avoid_: area label, applicability
 The Custom labels that share the text before ": ", such as `app: music` and `app: video` in the group "app". Add item shows each group as one section.
 _Avoid_: label category, label section
 
+**Work record**:
+The factory's record, on the user's machine, of one piece of work the user put on the board: its Status, structure, briefs and decisions, and references to its ticket, T3 threads and PRs. It exists with or without a published ticket.
+_Avoid_: personal layer, local state, item for ticketless work
+
+**Launch intent**:
+A work record's note that the board asked T3 to start a thread, kept until T3's thread ID is recorded, so the board can find that thread after a crash instead of starting a second one.
+
 **Overlay**:
 The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.

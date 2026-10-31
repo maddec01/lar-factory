@@ -1,32 +1,24 @@
-// Edit in Settings › Repositories: loads an onboarded repository's .lar-factory.json with the repository's labels, and
-// saves new values through a PR. Save first creates the custom labels the repository lacks, then commits only
-// .lar-factory.json, at CONFIG_VERSION, through the repository's prHost. With no Edit PR open the commit goes on the default
-// branch's head, lar-factory/edit-config moves to it and the PR opens. While an Edit PR is open, Edit loads the file
-// from its branch and Save adds the commit to that branch, so the open PR carries the new values. The board keeps
-// reading the default branch, so the values change there once the PR merges. The config update notice's PR goes the
-// same way, writing the file's own values in the app's shape and CONFIG_VERSION.
-// On Azure DevOps the labels are the project's tags, read through az, and Save creates none: the board writes a tag the
-// first time a work item needs it.
+// The config update notice's PR in Settings › Repositories: it rewrites an onboarded repository's .lar-factory.json in
+// the app's shape at CONFIG_VERSION, keeping the file's values, through the repository's prHost. With no PR open from
+// lar-factory/edit-config the commit goes on the default branch's head, the branch moves to it and the PR opens. While
+// that PR is open the commit goes on its branch, so the open PR carries the change. The board keeps reading the default
+// branch, so the file changes there once the PR merges. Shared settings change only through such a PR.
 
-import { CONFIG_VERSION, missingCustomLabels, onAzure, onboardingConfigFile, sameRepo, type RepositoryConfigAnswers } from '@lar-factory/shared';
+import { CONFIG_VERSION, onAzure, onboardingConfigFile, sameRepo, type RepositoryConfigAnswers } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { listTags } from '../azure/azure-tags.ts';
-import { createLabel, listLabels, message } from '../github/github.ts';
+import { message } from '../github/github.ts';
 import { prHost } from './pr-host.ts';
-import { findRepositoryConfig, isConfigAnswers, isRepo, readRepositoryList } from './repository-config.ts';
+import { findRepositoryConfig, isRepo, readRepositoryList } from './repository-config.ts';
 
 const EDIT_BRANCH = 'lar-factory/edit-config';
-const TITLE = "chore: edit Lar Factory's Repository config";
 const UPDATE_TITLE = "chore: update Lar Factory's Repository config to version";
-const BODY = 'This PR changes `.lar-factory.json`, the Repository config Lar Factory reads for this repository, as Edit in the board\'s '
-  + 'Settings › Repositories saved it. The board keeps the default branch\'s values until this PR merges.';
 const updateBody = (version: number) => `This PR rewrites \`.lar-factory.json\`, the Repository config Lar Factory reads for this repository, `
   + `with the same values in the shape Lar Factory writes at version ${version}. Until it merges the board reads the older file, with defaults.`;
 
 type Run = (args: string[]) => Promise<string>;
 export type Refused = { status: number; error: string };
 
-/** The repository's .lar-factory.json on `branch`, or its default branch without one, with its version, or why Edit can't use it. */
+/** The repository's .lar-factory.json on `branch`, or its default branch without one, with its version, or why the config update PR can't use it. */
 async function currentConfig(repo: string, run?: Run, branch?: string): Promise<(RepositoryConfigAnswers & { version: number }) | Refused> {
   const found = await findRepositoryConfig(repo, run, branch);
   if (!found) return { status: 409, error: `${repo} has no .lar-factory.json on ${branch ?? 'its default branch'}.` };
@@ -36,7 +28,7 @@ async function currentConfig(repo: string, run?: Run, branch?: string): Promise<
 }
 
 /**
- * Why Edit, its Save and the config update notice can't touch `repo`: it is off this Mac's list, still onboarding or
+ * Why Settings and the config update notice can't change `repo`: it is off this Mac's list, still onboarding or
  * resetting, or the list can't be read; null for an onboarded repository.
  */
 export function notEditable(repo: string, dir = boardDataDir()): Refused | null {
@@ -52,9 +44,6 @@ export function notEditable(repo: string, dir = boardDataDir()): Refused | null 
 /** The URL of the repository's open Edit PR, the open PR from lar-factory/edit-config, or null when it has none. */
 const editPrOf = (repo: string, run?: Run) => prHost(repo).openPrFrom(repo, EDIT_BRANCH, run);
 
-/** The repository's labels, or its project's tags on Azure DevOps. */
-const labelsOf = (repo: string, run?: Run) => (onAzure(repo) ? listTags : listLabels)(repo, run);
-
 /** "labels", or "tags" on Azure DevOps. */
 const labelNoun = (repo: string) => (onAzure(repo) ? 'tags' : 'labels');
 
@@ -68,53 +57,6 @@ export async function readEditPrs(repos: readonly string[], run?: Run, failed: (
     return [repo, null];
   })));
   return new Map(found.filter((entry): entry is [string, string] => entry[1] !== null));
-}
-
-/**
- * The body's repository's .lar-factory.json values and the repository's labels; or why Edit can't load them. The
- * values come from the open Edit PR's branch, named as `editPr`, while there is one, else from the default branch.
- * Refuses a repository in `dir`'s list that isn't onboarded, as notEditable says.
- */
-export async function readEditConfig(input: Record<string, unknown>, run?: Run, dir = boardDataDir()):
-  Promise<{ config: RepositoryConfigAnswers; labels: string[]; editPr?: string } | Refused> {
-  const { repo } = input;
-  if (!isRepo(repo)) return { status: 400, error: 'Send the repository to edit.' };
-  const refused = notEditable(repo, dir);
-  if (refused) return refused;
-  try {
-    const open = await editPrOf(repo, run);
-    const [current, labels] = await Promise.all([currentConfig(repo, run, open ? EDIT_BRANCH : undefined), labelsOf(repo, run)]);
-    if ('error' in current) return current;
-    const { version: _, ...config } = current;
-    return { config, labels, ...open && { editPr: open } };
-  } catch (err) {
-    return { status: 502, error: `Can't read ${repo}'s .lar-factory.json and ${labelNoun(repo)}: ${message(err)}` };
-  }
-}
-
-/**
- * Saves the body's `config` for its `repo`: creates each custom label the repository lacks, none on Azure DevOps, then
- * commits .lar-factory.json at CONFIG_VERSION, as writeConfig does. Answers the PR's URL, or the status and problem with
- * gh's or az's message; a label that can't be created commits nothing. Refuses a repository that isn't onboarded, as notEditable says.
- */
-export async function openEditPr(input: Record<string, unknown>, run?: Run, dir = boardDataDir()): Promise<{ prUrl: string } | Refused> {
-  const { repo, config } = input;
-  if (!isRepo(repo) || !isConfigAnswers(config)) return { status: 400, error: "Send the repository and its .lar-factory.json's values." };
-  const refused = notEditable(repo, dir);
-  if (refused) return refused;
-  const labels = config.labels.map((l) => l.trim());
-  return writeConfig(repo, run, { title: TITLE, body: BODY }, async () => {
-    const content = onboardingConfigFile({ ...config, role: config.role.trim(), labels });
-    if (onAzure(repo)) return content;
-    let present;
-    try { present = await listLabels(repo, run); }
-    catch (err) { return { status: 502, error: `Can't read ${repo}'s .lar-factory.json, labels and Edit branch: ${message(err)}` }; }
-    for (const name of missingCustomLabels(present, labels)) {
-      try { await createLabel(repo, { name }, run); }
-      catch (err) { return { status: 502, error: `Couldn't create ${name} in ${repo}: ${message(err)}` }; }
-    }
-    return content;
-  });
 }
 
 /**

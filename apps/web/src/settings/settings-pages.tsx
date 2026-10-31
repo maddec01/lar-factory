@@ -11,7 +11,7 @@ import { RepoTag } from '../items/item-parts.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
-import { useResetStore } from '../repositories/reset-store.ts';
+import { SetupNotice } from '../repositories/setup-notice.tsx';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { TargetProgress } from './target-progress.tsx';
 import { TargetReaders } from './target-readers.tsx';
@@ -116,32 +116,27 @@ function onboardingDescription(progress: OnboardingProgress): string {
 
 /**
  * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting,
- * Edit, which opens Edit's dialog, Reset, which opens Reset's confirmation, and the config update notice while it has one, one still onboarding with what it has answered, the step it stopped at, Resume and
- * Reset, which opens Reset's confirmation, and one resetting with its PR until it merges or closes. Add repository opens the onboarding dialog. The board
- * reads GitHub repositories and Azure DevOps sprints.
+ * Edit, which opens Edit's dialog once the board has its setup, the notice of a changed setup that pauses work and the
+ * config update notice while it has them; one still onboarding with what it has answered, the step it stopped at and
+ * Resume; and one resetting with its PR until it merges or closes. Add repository opens the onboarding dialog. The
+ * board reads GitHub repositories and Azure DevOps sprints.
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
     id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)} · {SHOWN[r.show ?? 'all']}
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
-    below: <ConfigUpdateNotice repo={r} />,
-    control: custom(() => <span className="flex items-center gap-2">
-      <Button {...kind('other')} onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>
-      <Button {...kind('other')} onClick={() => useResetStore.getState().open(r.repo)}>Reset</Button>
-    </span>),
+    below: <><SetupNotice repo={r} /><ConfigUpdateNotice repo={r} /></>,
+    control: custom(() => r.setup ? <Button {...kind('other')} onClick={() => useEditStore.getState().open(r.repo)}>Edit</Button> : null),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
     id: `repo-${repo}`, title: shownRepo(repo), description: onboardingDescription(progress),
-    control: custom(() => <span className="flex items-center gap-2">
-      <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>
-      <Button {...kind('other')} onClick={() => useResetStore.getState().open(repo)}>Reset</Button>
-    </span>),
+    control: custom(() => <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>),
   }));
   const resetting: Row[] = (data.resetting ?? []).map(({ repo, prUrl }) => ({
     id: `repo-${repo}`, title: shownRepo(repo), description: 'Resetting. Merge the PR to finish.',
     control: custom(() => <a className="inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline" href={prUrl} target="_blank" rel="noopener"><ExternalLink className="size-3.5" />Open PR</a>),
   }));
-  return { title: 'Repositories', description: "Each repository's Repository config lives in its own .lar-factory.json; this Mac keeps only the list.",
+  return { title: 'Repositories', description: "Each repository works from this Mac's settings, over the shared defaults in its .lar-factory.json when it has one.",
     rows: [...onboarded, ...onboarding, ...resetting],
     footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add repository</Button> };
 }

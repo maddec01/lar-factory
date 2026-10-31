@@ -12,7 +12,7 @@ import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate } from './config/config-update.ts';
-import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
+import { openConfigUpdatePr, readEditPrs } from './config/edit-config.ts';
 import { onTheBoard, readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { prHost, prUrl } from './config/pr-host.ts';
 import { changeRepositorySettings, readDismissedUpdates, readOnboardedConfigs } from './config/repository-settings.ts';
@@ -708,7 +708,6 @@ const { server, endStreams } = createBoardServer({
   },
   readProjectTeams,
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input),
-  readEditConfig: (input) => readEditConfig(input), openEditPr: (input) => openEditPr(input),
   openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),
   changeRepositorySettings: (input) => changeRepositorySettings(input),
 });

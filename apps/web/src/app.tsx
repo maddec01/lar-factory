@@ -27,7 +27,6 @@ import { OnboardingCards } from './onboarding/onboarding-cards.tsx';
 import { OnboardingOffers } from './onboarding/onboarding-offers.tsx';
 import { WizardDialog } from './onboarding/wizard-dialog.tsx';
 import { EditDialog } from './repositories/edit-dialog.tsx';
-import { ResetDialog } from './repositories/reset-dialog.tsx';
 import { SettingsDialog } from './settings/settings.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
 
@@ -74,7 +73,6 @@ export function App() {
         <DriftChoiceDialog start={(itemId, choice, drift) => void startItem(itemId, choice, 'build', undefined, drift)} />
         <WizardDialog />
         <EditDialog />
-        <ResetDialog />
         <LoadingScreen />
       </div>
     </TooltipProvider>

@@ -1,127 +1,105 @@
-// Edit in Settings › Repositories: the onboarded repository it edits, its .lar-factory.json values and labels as the
-// server reads them from its open Edit PR's branch or else the default branch, and the answers the user gives in
-// onboarding's setup fields and custom label picker. Add only picks a typed label; Save asks the server to create the
-// custom labels the repository lacks and open the PR on .lar-factory.json, or add to the open one, keeping the dialog
-// and its answers open with gh's message when that fails.
+// Edit in Settings › Repositories: the onboarded repository whose settings it edits, and the text the user typed for
+// each setting. The setup itself comes from the board, so the dialog shows the latest read. Save posts one setting as a
+// local override, Use shared default removes it, Recheck access forgets what the credentials allowed, and Accept, on
+// the repository's row, accepts a changed item source or domain-doc location. The board sent back shows each change.
 
 import { create } from 'zustand';
-import { customLabelChoices, labelPlan, shownRepo, type RepositoryConfigAnswers, type SetupAnswers } from '@lar-factory/shared';
+import type { RepositorySetup, SharedRepositorySettings, SharedSetting } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
-import { showPrToast } from '../notices/toasts.tsx';
-import { answerSetup, setupItemSource, setupProblems, type SetupChange } from '../onboarding/setup-answers.ts';
 
-/** The answers Edit starts from: the file's values, with its show setting picked, so a new item source keeps it. */
-function setupOf( { itemSource, show, role }: RepositoryConfigAnswers): SetupAnswers {
-  return { itemSource: itemSource.kind, ...'team' in itemSource && { team: itemSource.team }, show, showPicked: true, role };
+/** The text of each field the dialog edits, by field. */
+export interface Drafts {
+  role: string;
+  team: string;
+  show: string;
+  labels: string;
+  skills: string;
+  /** `private` or `repository`. */
+  domainDocs: string;
+  glossary: string;
+  adrs: string;
 }
 
-/** The editing form, once the repository's values loaded. */
-export interface EditForm {
-  /** The values the file has, on the open Edit PR's branch or else the default branch, which Save compares against. */
-  loaded: RepositoryConfigAnswers;
-  /** The URL of the open Edit PR whose branch the values come from; null when they come from the default branch. */
-  editPr: string | null;
-  /** The repository's labels a custom label can be. */
-  offered: string[];
-  setup: SetupAnswers;
-  picked: string[];
-  typed: string;
-  saving: boolean;
-  /** Why the last Save failed, with gh's message. */
-  error: string | null;
+/** The fields that make each setting's value. */
+const FIELDS: Record<SharedSetting, (keyof Drafts)[]> = {
+  role: ['role'], itemSource: ['team'], show: ['show'], labels: ['labels'], skills: ['skills'], domainDocs: ['domainDocs', 'glossary', 'adrs'],
+};
+
+/** The fields' text for the setup's values; a repository's own domain docs start at the usual paths. */
+function draftsOf(setup: RepositorySetup): Drafts {
+  const docs = setup.domainDocs.kind === 'repository' ? setup.domainDocs : { kind: 'private', glossary: 'GLOSSARY.md', adrs: 'docs/adr' };
+  return { role: setup.role, team: setup.itemSource?.kind === 'azure-board' ? setup.itemSource.team : '', show: setup.show,
+    labels: setup.labels.join(', '), skills: setup.skills.join(', '), domainDocs: docs.kind, glossary: docs.glossary, adrs: docs.adrs };
 }
 
-interface Edit {
-  repo: string;
-  form: { state: 'loading' } | { state: 'failed'; error: string } | ({ state: 'loaded' } & EditForm);
+const list = (text: string) => text.split(',').map((part) => part.trim()).filter(Boolean);
+
+/** The fields' text, typed or else from the setup. */
+export const shownDrafts = (setup: RepositorySetup, typed: Partial<Drafts>): Drafts => ({ ...draftsOf(setup), ...typed });
+
+/** The value `key`'s fields make, or null while one is empty that the value needs. */
+export function valueOf(key: SharedSetting, drafts: Drafts): SharedRepositorySettings[SharedSetting] | null {
+  switch (key) {
+    case 'role': return drafts.role.trim();
+    case 'itemSource': return drafts.team.trim() ? { kind: 'azure-board', team: drafts.team.trim() } : null;
+    case 'show': return drafts.show as SharedRepositorySettings['show'];
+    case 'labels': return list(drafts.labels);
+    case 'skills': return list(drafts.skills);
+    case 'domainDocs':
+      if (drafts.domainDocs === 'private') return { kind: 'private' };
+      return drafts.glossary.trim() && drafts.adrs.trim() ? { kind: 'repository', glossary: drafts.glossary.trim(), adrs: drafts.adrs.trim() } : null;
+  }
 }
 
-/** The .lar-factory.json values the form saves; null while a field has a problem. */
-function configOf(form: EditForm): RepositoryConfigAnswers | null {
-  if (Object.keys(setupProblems(form.setup, 'Save')).length) return null;
-  return { itemSource: setupItemSource(form.setup), show: form.setup.show, role: form.setup.role.trim(), labels: form.picked };
+/** Whether `key`'s fields make a value other than the setup's, so Save has something to set. */
+export function canSave(key: SharedSetting, setup: RepositorySetup, typed: Partial<Drafts>): boolean {
+  const value = valueOf(key, shownDrafts(setup, typed));
+  return value !== null && JSON.stringify(value) !== JSON.stringify(setup[key]);
 }
 
-/** Whether every field is fine and each value is the loaded file's, so Save has nothing to send. */
-export function unchanged(form: EditForm): boolean {
-  const config = configOf(form);
-  return !!config && JSON.stringify(config) === JSON.stringify(form.loaded);
-}
-
-/** Whether Save can go: no field has a problem, a value differs from the loaded file's, and no Save is running. */
-export function canSave(form: EditForm): boolean {
-  return !!configOf(form) && !form.saving && !unchanged(form);
-}
+/** A call to the board: one setting's Save or removal, Recheck access, or Accept. */
+type Running = SharedSetting | 'recheck' | 'accept';
 
 interface EditState {
-  edit: Edit | null;
-  open: (repo: string) => Promise<void>;
+  /** The repository whose dialog is open. */
+  repo: string | null;
+  typed: Partial<Drafts>;
+  running: Running | null;
+  /** Why the last call failed, by the repository it was for. */
+  errors: Record<string, string>;
+  open: (repo: string) => void;
   close: () => void;
-  retry: () => Promise<void>;
-  answer: (change: SetupChange) => void;
-  toggle: (name: string) => void;
-  type: (typed: string) => void;
-  add: () => void;
-  save: () => Promise<void>;
+  type: (field: keyof Drafts, text: string) => void;
+  save: (repo: string, key: SharedSetting, setup: RepositorySetup) => Promise<void>;
+  useShared: (repo: string, key: SharedSetting) => Promise<void>;
+  recheck: (repo: string) => Promise<void>;
+  accept: (repo: string) => Promise<void>;
 }
 
 export const useEditStore = create<EditState>()((set, get) => {
-  /** The loaded form of `repo`'s Edit, while it is still the one open. */
-  const formOf = (repo: string) => {
-    const { edit } = get();
-    return edit?.repo === repo && edit.form.state === 'loaded' ? edit.form : null;
-  };
-  const change = (patch: (form: EditForm) => Partial<EditForm>) => {
-    const { edit } = get();
-    if (edit?.form.state === 'loaded') set({ edit: { ...edit, form: { ...edit.form, ...patch(edit.form) } } });
-  };
-  const load = async (repo: string) => {
-    set({ edit: { repo, form: { state: 'loading' } } });
-    const read = await postAction<{ config: RepositoryConfigAnswers; labels: string[]; editPr?: string }>('/api/repositories/config', { repo });
-    if (get().edit?.repo !== repo) return;
-    if (!read.config || !read.labels) return set({ edit: { repo, form: { state: 'failed', error: read.error ?? 'The board sent no Repository config.' } } });
-    const { config, labels } = read;
-    set({ edit: { repo, form: {
-      state: 'loaded', loaded: config, editPr: read.editPr ?? null, offered: customLabelChoices(labelPlan(labels)), setup: setupOf(config),
-      picked: config.labels, typed: '', saving: false, error: null,
-    } } });
-  };
+  /** Posts the change for `repo`; once it lands, `key`'s typed text gives way to the setup the board sent back. */
+  async function call(repo: string, running: Running, change: object, key?: SharedSetting): Promise<void> {
+    if (get().running) return;
+    const { [repo]: _, ...errors } = get().errors;
+    set({ running, errors });
+    const result = await postAction('/api/repositories/settings', { repo, ...change });
+    receive(result);
+    const typed = { ...get().typed };
+    if (key && !result.error) for (const field of FIELDS[key]) delete typed[field];
+    set({ running: null, typed, errors: result.error ? { ...get().errors, [repo]: result.error } : get().errors });
+  }
   return {
-    edit: null,
-    open: (repo) => load(repo),
-    // A Save that is running keeps the dialog, and its answers, open until it answers.
-    close: () => {
-      const { edit } = get();
-      if (edit?.form.state !== 'loaded' || !edit.form.saving) set({ edit: null });
+    repo: null, typed: {}, running: null, errors: {},
+    open: (repo) => set({ repo, typed: {} }),
+    // A call that is running keeps the dialog open until it answers.
+    close: () => { if (!get().running) set({ repo: null, typed: {} }); },
+    type: (field, text) => set({ typed: { ...get().typed, [field]: text } }),
+    save: (repo, key, setup) => {
+      const value = valueOf(key, shownDrafts(setup, get().typed));
+      return value === null ? Promise.resolve() : call(repo, key, { change: 'override', key, value }, key);
     },
-    retry: async () => {
-      const { edit } = get();
-      if (edit) await load(edit.repo);
-    },
-    // A Save that is running holds the answers it sends.
-    answer: (setup) => change((form) => form.saving ? {} : { setup: answerSetup(form.setup, setup) }),
-    toggle: (name) => change((form) => form.saving ? {} : { picked: form.picked.includes(name) ? form.picked.filter((n) => n !== name) : [...form.picked, name] }),
-    type: (typed) => change(() => ({ typed })),
-    // A label the repository has, or one picked already, under another case, is picked under its own name.
-    add: () => change((form) => {
-      const typed = form.typed.trim();
-      const same = (name: string) => name.toLowerCase() === typed.toLowerCase();
-      const name = form.offered.find(same) ?? form.picked.find(same) ?? typed;
-      return { typed: '', picked: form.picked.includes(name) ? form.picked : [...form.picked, name] };
-    }),
-    save: async () => {
-      const { edit } = get();
-      if (edit?.form.state !== 'loaded' || !canSave(edit.form)) return;
-      const { repo, form: { editPr } } = edit;
-      change(() => ({ saving: true, error: null }));
-      const opened = await postAction<{ prUrl: string }>('/api/repositories/config/pr', { repo, config: configOf(edit.form) });
-      if (!formOf(repo)) return;
-      if (!opened.prUrl) return change(() => ({ saving: false, error: opened.error ?? 'The board sent no PR.' }));
-      // The board sent back shows the Edit PR on the repository's row.
-      receive(opened);
-      set({ edit: null });
-      showPrToast({ slot: 'edit', what: ` Edit PR for ${shownRepo(repo)}`, prUrl: opened.prUrl, label: `${shownRepo(repo)}'s Edit PR`,
-        ...editPr ? { before: 'Added the new values to ' } : { after: '. The board keeps the current values until it merges.' } });
-    },
+    useShared: (repo, key) => call(repo, key, { change: 'override', key }, key),
+    recheck: (repo) => call(repo, 'recheck', { change: 'recheck' }),
+    accept: (repo) => call(repo, 'accept', { change: 'accept' }),
   };
 });

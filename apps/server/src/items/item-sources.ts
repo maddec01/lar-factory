@@ -340,7 +340,7 @@ export interface OnboardedSources extends MergedSource {
  * items of each repository whose config `load` couldn't read or that is resetting, which a shared Azure source may still list, and
  * so does each read so far it reports as landed. A write goes through the source the last read built.
  */
-export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = configuredSources): OnboardedSources {
+export function onboardedSources(load: () => Promise<Omit<OnboardedConfigs, 'setups'>>, build = configuredSources): OnboardedSources {
   let configs: RepositoryConfig[] = [];
   let current = build(configs);
   let key = JSON.stringify(configs);

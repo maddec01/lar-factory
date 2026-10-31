@@ -1,192 +1,130 @@
-// Edit in Settings › Repositories: the dialog loads the repository's .lar-factory.json values and labels into
-// onboarding's setup fields and custom label picker, holds Save while a field has a problem or nothing changed, saying
-// so then, and Save opens the PR, keeping the dialog and its answers with gh's message when that fails.
+// Edit in Settings › Repositories: the dialog shows each of the repository's settings with where it comes from, saves
+// a local override or removes it so the shared default applies again, says why a Repository config can't be used while
+// the last usable setup stays, and rechecks access. A changed item source or domain-doc location names the work it
+// pauses on the repository's row, with Accept.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, checkedOf, fetchMock, mountPage, sample, settle, text, toast } from '../../test/support.ts';
-import { WORKFLOW_LABELS, type BoardData } from '@lar-factory/shared';
+import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
+import type { BoardData, RepositorySetup } from '@lar-factory/shared';
 
 const REPO = 'maddec01/lar-server';
-const PR = 'https://github.com/maddec01/lar-server/pull/21';
-const CONFIG = { itemSource: { kind: 'issues' }, show: 'all', role: 'Backend API server', labels: ['area: server'] };
-const LABELS = [...WORKFLOW_LABELS.map((l) => l.name), 'area: server', 'area: web', 'status-list'];
 
-type Answer = { status?: number; body: object };
+const SETUP: RepositorySetup = {
+  repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, show: 'all', labels: ['area: server'],
+  domainDocs: { kind: 'private' }, skills: [],
+  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused' },
+  consent: ['push-branch'], paused: [],
+  sources: { role: 'shared', itemSource: 'default', show: 'default', labels: 'local', domainDocs: 'default', skills: 'default' },
+  shared: { role: 'Backend API server', labels: ['area: web'] },
+};
 
-/**
- * Serves the sample as the board, `load` for Edit's load and `pr` for its Save, once it settles, and returns the bodies
- * each got.
- */
-function serve(load: Answer = { body: { config: CONFIG, labels: LABELS, error: null } }, pr: Answer | Promise<Answer> = { body: { prUrl: PR, error: null } },
-  board: BoardData = sample) {
-  const sent: Record<string, object[]> = {};
+/** The sample board with `change` made to lar-server's setup. */
+function boardWith(change: Partial<RepositorySetup> = {}, items = sample.items): BoardData {
+  return { ...sample, items, repos: [{ ...sample.repos[0]!, setup: { ...SETUP, ...change } }, sample.repos[1]!] };
+}
+
+/** Serves `board`, and `answer` for each settings change, whose bodies it returns. */
+function serve(board: BoardData, answer: (body: Record<string, unknown>) => { status?: number; body: object } = () => ({ body: { board, error: null } })) {
+  const sent: Record<string, unknown>[] = [];
   fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
-    if (url === '/api/onboarding/teams') return new Response(JSON.stringify({ teams: ['Fabrikam Team', 'API Team'] }));
-    const pending = url === '/api/repositories/config' ? load : url === '/api/repositories/config/pr' ? pr : null;
-    if (!pending) return new Response(JSON.stringify(board));
-    (sent[url] ??= []).push(JSON.parse(String(init?.body)));
-    const answer = await pending;
-    return new Response(JSON.stringify(answer.body), { status: answer.status ?? 200 });
+    if (url !== '/api/repositories/settings') return new Response(JSON.stringify(board));
+    const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    sent.push(body);
+    const reply = answer(body);
+    return new Response(JSON.stringify(reply.body), { status: reply.status ?? 200 });
   }) as typeof fetchMock);
   return sent;
 }
 
+const row = () => $(`.settings-row[data-row="repo-${REPO}"]`)!;
 const dialog = () => $('[data-edit-dialog]');
-const save = () => $<HTMLButtonElement>('[data-edit-dialog] [data-save]')!;
-const input = (field: string) => $<HTMLInputElement>(`[data-edit-dialog] [data-field="${field}"] input`)!;
-const checked = (selector: string) => checkedOf($(`[data-edit-dialog] ${selector}`)!);
+const setting = (key: string) => $(`[data-edit-dialog] [data-setting="${key}"]`)!;
+const buttonIn = (el: Element, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label);
 
 async function type(into: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(into, value);
   await settle(() => into.dispatchEvent(new Event('input', { bubbles: true })));
 }
 
-/** Presses `key` on `el`, as a keyboard does. */
-async function press(el: Element, key: string): Promise<void> {
-  await settle(() => el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
-  await settle(() => el.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true })));
-}
-
-/** Opens Settings › Repositories over `board` and presses `repo`'s Edit. */
-async function openEdit(repo = REPO, board: BoardData = sample): Promise<void> {
+async function openRepositories(board: BoardData): Promise<void> {
   await mountPage(board);
   await settle(() => $<HTMLButtonElement>('.open-settings')!.click());
   await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Repositories')!.click());
-  const row = $(`.settings-row[data-row="repo-${repo}"]`)!;
-  await settle(() => [...row.querySelectorAll('button')].find((b) => text(b) === 'Edit')!.click());
   await settle(() => vi.advanceTimersByTime(50));
 }
 
-test("Edit opens with the default branch's item source, show setting, role and custom labels, and the labels the repository has", async () => {
-  const warnings = vi.spyOn(console, 'warn');
-  const sent = serve();
-  await openEdit();
-  expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual([]);
-  expect(sent['/api/repositories/config']).toEqual([{ repo: REPO }]);
+async function openEdit(board: BoardData): Promise<void> {
+  await openRepositories(board);
+  await settle(() => buttonIn(row(), 'Edit')!.click());
+}
+
+test('Edit shows each setting with where it comes from, and Settings offers no Reset', async () => {
+  const board = boardWith();
+  serve(board);
+  await openRepositories(board);
+  expect(buttonIn(row(), 'Reset')).toBeUndefined();
+  await settle(() => buttonIn(row(), 'Edit')!.click());
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Edit ${REPO}`);
-  expect(text(document.getElementById(dialog()!.getAttribute('aria-labelledby')!)), 'the title names the dialog').toBe(`Edit ${REPO}`);
-  expect(text($('[data-edit-dialog] [data-item-source]'))).toContain("This repository's GitHub issues.");
-  expect($('[data-edit-dialog] [data-choice="issues"]')).toBeNull();
-  expect(input('role').value).toBe('Backend API server');
-  expect(input('project-owner')).toBeNull();
-  expect(checked('[data-choice="all"] [role="radio"]')).toBe('true');
-  expect($$('[data-edit-dialog] [data-custom]').map((li) => [li.getAttribute('data-custom'), checkedOf(li.querySelector('input[type="checkbox"]')!)]))
-    .toEqual([['area: server', 'true'], ['area: web', 'false']]);
-  expect(save().disabled, 'nothing changed yet').toBe(true);
-  expect(text(dialog()!.querySelector('[data-no-changes]'))).toBe('No changes yet');
-  await type(input('role'), 'API server');
-  expect(dialog()!.querySelector('[data-no-changes]')).toBeNull();
-  await type(input('role'), 'Backend API server');
-  expect(text(dialog()!.querySelector('[data-no-changes]')), 'back to the file\'s values').toBe('No changes yet');
+  expect(text(setting('role').querySelector('[data-source]'))).toBe('Shared default');
+  expect(text(setting('labels').querySelector('[data-source]'))).toBe('Set on this Mac');
+  expect(text(setting('domainDocs').querySelector('[data-source]'))).toBe('Factory default');
+  expect(text(setting('itemSource'))).toContain("This repository's GitHub issues.");
+  expect(text(setting('labels').querySelector('[data-shared]'))).toBe('Shared default: area: web');
+  expect(setting('role').querySelector<HTMLInputElement>('input')!.value).toBe('Backend API server');
 });
 
-test('a field problem holds Save as it holds Next in onboarding', async () => {
-  serve();
-  await openEdit();
-  await type(input('role'), ' ');
-  expect(save().disabled).toBe(true);
-  expect(text($('[data-edit-dialog] [data-field="role"] [data-problem]'))).toBe('Describe what this repository does to continue with Save.');
-  await type(input('role'), 'API server');
-  expect(save().disabled).toBe(false);
+test('Save sets a local override and the board sent back shows it; Use shared default removes it', async () => {
+  const saved = boardWith({ role: 'My API', sources: { ...SETUP.sources, role: 'local' } });
+  const sent = serve(boardWith(), (body) => ({ body: { board: body.value === undefined ? boardWith() : saved, error: null } }));
+  await openEdit(boardWith());
+  expect(buttonIn(setting('role'), 'Save')!.disabled, 'nothing changed yet').toBe(true);
+  expect(buttonIn(setting('role'), 'Use shared default'), 'no override to remove').toBeUndefined();
+  await type(setting('role').querySelector('input')!, 'My API');
+  await settle(() => buttonIn(setting('role'), 'Save')!.click());
+  expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'role', value: 'My API' }]);
+  expect(text(setting('role').querySelector('[data-source]'))).toBe('Set on this Mac');
+  await settle(() => buttonIn(setting('labels'), 'Use shared default')!.click());
+  expect(sent[1]).toEqual({ repo: REPO, change: 'override', key: 'labels' });
 });
 
-test('Save sends the answers with the labels picked and typed, then closes, says where the PR is and shows it on the row', async () => {
-  const sent = serve(undefined, { body: { prUrl: PR, error: null, board: { ...sample, repos: sample.repos.map((r) => r.repo === REPO ? { ...r, editPr: PR } : r) } } });
-  await openEdit();
-  await settle(() => $('[data-edit-dialog] [data-custom="area: web"] input[type="checkbox"]')!.click());
-  await type($<HTMLInputElement>('[data-edit-dialog] [data-new-custom]')!, 'area: docs');
-  await settle(() => $<HTMLButtonElement>('[data-edit-dialog] [data-add-custom]')!.click());
-  expect(sent['/api/onboarding/labels/custom'], 'Add creates nothing until Save').toBeUndefined();
-  await settle(() => save().click());
-  expect(sent['/api/repositories/config/pr']).toEqual([{ repo: REPO, config: {
-    itemSource: CONFIG.itemSource, show: 'all', role: 'Backend API server', labels: ['area: server', 'area: web', 'area: docs'] } }]);
-  await settle(() => vi.advanceTimersByTime(500));
-  expect(dialog()).toBeNull();
-  expect(toast()!.querySelector('a')!.getAttribute('href')).toBe(PR);
-  expect($(`.settings-row[data-row="repo-${REPO}"] [data-edit-pr]`)!.getAttribute('href')).toBe(PR);
+test('a list setting saves its comma-separated values, and a refused change keeps the dialog with why', async () => {
+  const sent = serve(boardWith(), () => ({ status: 400, body: { error: `${REPO}: field labels must be an array of strings.` } }));
+  await openEdit(boardWith());
+  await type(setting('labels').querySelector('input')!, 'area: server, area: api ,');
+  await settle(() => buttonIn(setting('labels'), 'Save')!.click());
+  expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'labels', value: ['area: server', 'area: api'] }]);
+  expect(text(dialog()!.querySelector('[role="alert"]'))).toContain('field labels must be an array of strings.');
+  expect(setting('labels').querySelector<HTMLInputElement>('input')!.value).toBe('area: server, area: api ,');
 });
 
-test("Edit with an Edit PR open says its values come from that PR, and Save says it added them to it", async () => {
-  serve({ body: { config: CONFIG, labels: LABELS, editPr: PR, error: null } });
-  await openEdit();
-  const note = dialog()!.querySelector('[data-edit-pr]')!;
-  expect(text(note)).toBe('These values come from maddec01/lar-server#21, its open Edit PR. Save adds a commit to that PR.');
-  expect(note.querySelector('a')!.getAttribute('href')).toBe(PR);
-  await type(input('role'), 'API server');
-  await settle(() => save().click());
-  await settle(() => vi.advanceTimersByTime(500));
-  expect(text(toast()!)).toContain("Added the new values to maddec01/lar-server's Edit PR.");
-  expect(toast()!.querySelector('a')!.getAttribute('href')).toBe(PR);
+test("a Repository config that can't be used says why while the last usable setup stays", async () => {
+  const board = boardWith({ sharedProblem: ".lar-factory.json isn't valid JSON." });
+  serve(board);
+  await openEdit(board);
+  expect(text(dialog()!.querySelector('[data-shared-problem]'))).toContain(".lar-factory.json isn't valid JSON.");
+  expect(text(dialog()!.querySelector('[data-shared-problem]'))).toContain('last usable');
+  expect(setting('role').querySelector<HTMLInputElement>('input')!.value).toBe('Backend API server');
 });
 
-test('while Save runs, the fields, choices, custom labels and Cancel are disabled and Esc keeps the dialog open', async () => {
-  let answer!: (answer: Answer) => void;
-  serve(undefined, new Promise<Answer>((resolve) => { answer = resolve; }));
-  await openEdit();
-  await type(input('role'), 'API server');
-  await settle(() => save().click());
-  const cancel = [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === 'Cancel')!;
-  expect([input('role').matches(':disabled'), $<HTMLInputElement>('[data-edit-dialog] [data-new-custom]')!.matches(':disabled'), cancel.disabled])
-    .toEqual([true, true, true]);
-  await press($('[data-edit-dialog] [data-choice="opted-in"] [role="radio"]')!, ' ');
-  await press($('[data-edit-dialog] [data-custom="area: web"] input[type="checkbox"]')!, ' ');
-  expect([checked('[data-choice="all"] [role="radio"]'), checked('[data-custom="area: web"] input[type="checkbox"]')], 'the answers Save sends stay').toEqual(['true', 'false']);
-  await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  await settle(() => vi.advanceTimersByTime(500));
-  expect(dialog()).not.toBeNull();
-  await settle(() => answer({ body: { prUrl: PR, error: null } }));
-  await settle(() => vi.advanceTimersByTime(500));
-  expect(dialog()).toBeNull();
+test('Recheck access forgets what the credentials allowed, after they changed', async () => {
+  const sent = serve(boardWith());
+  await openEdit(boardWith());
+  const access = $('[data-edit-dialog] [data-access]')!;
+  expect(text(access.querySelector('[data-operation="tag-ticket"]'))).toContain('Refused');
+  expect(text(access.querySelector('[data-operation="push-branch"]'))).toContain('Allowed');
+  await settle(() => buttonIn(access, 'Recheck access')!.click());
+  expect(sent).toEqual([{ repo: REPO, change: 'recheck' }]);
 });
 
-test("a Save that fails shows gh's message and keeps the dialog open with the answers", async () => {
-  serve(undefined, { status: 502, body: { error: "Couldn't create area: docs in maddec01/lar-server: HTTP 403" } });
-  await openEdit();
-  await type(input('role'), 'API server');
-  await settle(() => save().click());
-  expect(text(dialog()!.querySelector('[role="alert"]'))).toContain('HTTP 403');
-  expect(input('role').value).toBe('API server');
-  expect(save().disabled, 'Save can go again').toBe(false);
-});
-
-test("a load that fails shows the server's problem, and Retry reads again", async () => {
-  const sent = serve({ status: 409, body: { error: 'maddec01/lar-server has no .lar-factory.json on its default branch.' } });
-  await openEdit();
-  expect(text(dialog()!.querySelector('[role="alert"]'))).toContain('has no .lar-factory.json');
-  expect(save().disabled).toBe(true);
-  await settle(() => [...dialog()!.querySelectorAll('button')].find((b) => text(b) === 'Retry')!.click());
-  expect(sent['/api/repositories/config']).toHaveLength(2);
-});
-
-test('Edit on an Azure DevOps repository offers the team\'s sprint and backlog with its Team, and custom tags, which Save doesn\'t create', async () => {
-  const azure = 'contoso/Fabrikam%20Fiber/lar-api';
-  const board: BoardData = { ...sample, repos: [...sample.repos, { ...sample.repos[0]!, repo: azure, role: 'API', labels: [] }] };
-  serve({ body: { config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['app: music'] },
-    labels: ['app: music', 'status-list', 'repo-lar-api', 'web'], error: null } }, undefined, board);
-  await openEdit(azure, board);
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Edit contoso/Fabrikam Fiber/lar-api');
-  expect($('[data-edit-dialog] [data-custom="repo-lar-api"]'), 'a repo- tag routes items; it is no custom tag').toBeNull();
-  expect(text($('[data-edit-dialog] [data-item-source]'))).toContain("The team's backlog and current sprint");
-  expect($('[data-edit-dialog] [data-choice="issues"]')).toBeNull();
-  expect($<HTMLSelectElement>('[data-edit-dialog] [data-field="team"] select')!.value).toBe('Fabrikam Team');
-  expect(text($('[data-edit-dialog] [data-custom-labels] h4'))).toBe('Custom tags');
-  expect(text(dialog()!.querySelector('#edit-description'))).not.toMatch(/creates the custom labels/);
-  await settle(() => $('[data-edit-dialog] [data-custom="web"] input[type="checkbox"]')!.click());
-  await settle(() => save().click());
-  await settle(() => vi.advanceTimersByTime(500));
-  expect(text(toast()!)).toContain("contoso/Fabrikam Fiber/lar-api's Edit PR");
-});
-
-
-test('Edit can change the team on a combined Azure board without offering a source choice', async () => {
-  const config = { ...CONFIG, itemSource: { kind: 'azure-board', team: 'Fabrikam Team' } };
-  const repo = 'contoso/Fabrikam/api';
-  const board: BoardData = { ...sample, repos: [{ repo, role: 'API', items: 'azure-board', team: 'Fabrikam Team', labels: [] }] };
-  const sent = serve({ body: { config, labels: LABELS, error: null } }, undefined, board);
-  await openEdit(repo, board);
-  expect($('[data-choice="azure-board"]')).toBeNull();
-  const team = $<HTMLSelectElement>('[data-edit-dialog] [data-field="team"] select')!;
-  await settle(() => { team.value = 'API Team'; team.dispatchEvent(new Event('change', { bubbles: true })); });
-  await settle(() => save().click());
-  expect(sent['/api/repositories/config/pr']).toEqual([{ repo, config: { ...config, itemSource: { kind: 'azure-board', team: 'API Team' } } }]);
+test("a changed shared item source names the work it pauses on the repository's row, and Accept lets that work go on", async () => {
+  const why = "Its repository's item source changed. Accept the change in Settings › Repositories to go on.";
+  const items = sample.items.map((item) => item.id === 'I_sample01' ? { ...item, paused: why } : item);
+  const sent = serve(boardWith({ paused: ['itemSource'] }, items), () => ({ body: { board: boardWith(), error: null } }));
+  await openRepositories(boardWith({ paused: ['itemSource'] }, items));
+  const notice = row().querySelector('[data-setup-paused]')!;
+  expect(text(notice)).toContain('Its item source changed');
+  expect(text(notice)).toContain('Arr instances, catalog bindings and content requests');
+  await settle(() => buttonIn(notice, 'Accept')!.click());
+  expect(sent).toEqual([{ repo: REPO, change: 'accept' }]);
+  expect(row().querySelector('[data-setup-paused]')).toBeNull();
 });

@@ -1,7 +1,7 @@
 // The repository issues item source: reads one repository's issues through github.ts, and closes one on Abandon's close.
 
 import { TICKET_MATCHES, ticketNumberOf, type ItemSource } from '../items/item-source.ts';
-import { changedSince, abandonIssue, fetchIssues, fetchRepoIssues, getIfChanged, findIssues, observeIssue, readIssue, legacyIssueChildren } from './github.ts';
+import { changedSince, abandonIssue, fetchIssues, fetchRepoIssues, getIfChanged, findIssues, observeIssue, readIssue } from './github.ts';
 
 /** How many of the latest updated issues and PRs a change check lists; when all of them changed, the whole source reads. */
 const CHANGES_PAGE = 30;
@@ -38,7 +38,6 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
       return issue ? [{ number: issue.number, title: issue.title, url: issue.url }] : [];
     },
     readTicket: (_repo, number) => readIssue(repo, number, run),
-    legacyChildren: (_repo, number) => legacyIssueChildren(repo, number, run),
     observeTicket: (_repo, number) => observeIssue(repo, number, run),
     abandon: (item) => abandonIssue(item, run),
   };

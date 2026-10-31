@@ -1,10 +1,8 @@
-// Each repository's local settings, kept as `settings` in its entry of the repository list, and the setup they make
-// with the shared defaults of its optional .lar-factory.json. A local override wins over a shared default, and removing
-// it inherits the default again. Credentials and write consent are only ever local.
+// Repository settings live in this machine's repository list. Repository files are never configuration.
 
 import { join } from 'node:path';
 import {
-  CONFIG_VERSION, VOCABULARY_KEYS, effectiveVocabulary, isVocabularyMapping, type VocabularyKey, type VocabularyTerm, REPOSITORY_OPERATIONS, SHARED_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
+  VOCABULARY_KEYS, effectiveVocabulary, isVocabularyMapping, type VocabularyKey, type VocabularyTerm, REPOSITORY_OPERATIONS, structureSyncOperations, SHARED_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
   type LocalSetupAnswers, type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
@@ -12,37 +10,29 @@ import {
   connectedTo, isItemSource, readListFile, writeListFile,
 } from './repository-list.ts';
 
-/** The settings that pause the work depending on them when they change. */
-type PausingSetting = RepositorySetup['paused'][number];
-
 /** One repository's local settings as its list entry keeps them. */
 interface LocalSettings {
   structureSync?: boolean;
   projectId?: string;
-  /** The shared settings the user set on this Mac, each in place of Repository config's. */
+  /** Values the user set on this machine. */
   overrides?: SharedRepositorySettings;
   /** What the credentials were found to allow; an operation it leaves out is unverified. */
   access?: Partial<Record<RepositoryOperation, Exclude<OperationAccess, 'unverified'>>>;
   /** The operations the user allows the factory to offer, whatever the credentials allow. */
   consent?: RepositoryOperation[];
-  /** Repository config's defaults as last read while usable. */
-  shared?: SharedRepositorySettings;
-  /** Why the latest read of Repository config couldn't be used. */
-  sharedProblem?: string;
-  /** The pausing settings as the user last accepted them. */
-  accepted?: { itemSource: RepositoryItemSource | null; domainDocs: DomainDocLocation };
-  /** The app's Repository config version at which the user dismissed the notice offering the update PR. */
-  dismissedUpdate?: number;
+
 }
 
 const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 const isOperation = (value: unknown): value is RepositoryOperation => REPOSITORY_OPERATIONS.includes(value as RepositoryOperation);
 
-const isDomainDocs = (value: unknown): value is DomainDocLocation => isRecord(value)
-  && (value.kind === 'private' || value.kind === 'repository' && typeof value.glossary === 'string' && typeof value.adrs === 'string');
+const isDocPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && !/[\\\0]/.test(value) && !value.startsWith('/') && value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
 
-/** What is wrong with a shared setting's value, or null when nothing is. An Azure DevOps repository's item source names a team. */
-function sharedProblemOf(raw: Record<string, unknown>, azure: boolean): string | null {
+const isDomainDocs = (value: unknown): value is DomainDocLocation => isRecord(value)
+  && (value.kind === 'private' || value.kind === 'repository' && isDocPath(value.glossary) && isDocPath(value.adrs));
+
+/** What is wrong with a local setting's value, or null when nothing is. An Azure DevOps repository's item source names a team. */
+function settingsProblemOf(raw: Record<string, unknown>, azure: boolean): string | null {
   const source = raw.itemSource;
   if ('version' in raw && (typeof raw.version !== 'number' || !Number.isFinite(raw.version))) return 'field version must be a number';
   if ('role' in raw && typeof raw.role !== 'string') return 'field role must be a string';
@@ -56,22 +46,9 @@ function sharedProblemOf(raw: Record<string, unknown>, azure: boolean): string |
   return null;
 }
 
-/**
- * The shared settings `raw` holds, every field optional, leaving out anything else, such as credentials, consent or
- * the old `show` setting.
- */
-function sharedSettingsOf(raw: Record<string, unknown>): SharedRepositorySettings {
-  const { role, itemSource, labels, domainDocs, skills, vocabulary } = raw as SharedRepositorySettings;
-  return {
-    ...role !== undefined && { role }, ...itemSource !== undefined && { itemSource },
-    ...labels !== undefined && { labels }, ...domainDocs !== undefined && { domainDocs }, ...skills !== undefined && { skills }, ...vocabulary !== undefined && { vocabulary },
-  };
-}
-
-/** A parsed .lar-factory.json's shared defaults, or the problem that keeps them from use. */
-export function sharedDefaultsOf(raw: Record<string, unknown>, azure: boolean): { defaults: SharedRepositorySettings } | { problem: string } {
-  const problem = sharedProblemOf(raw, azure);
-  return problem ? { problem: `.lar-factory.json ${problem}.` } : { defaults: sharedSettingsOf(raw) };
+/** Checks local repository settings at the HTTP boundary. */
+export function validateRepositorySettings(raw: Record<string, unknown>, azure: boolean): string | null {
+  return settingsProblemOf(raw, azure);
 }
 
 const isAccess = (value: unknown) => isRecord(value)
@@ -80,14 +57,9 @@ const isAccess = (value: unknown) => isRecord(value)
 /** Whether an entry's `settings` has its shape, for a repository on Azure DevOps or not. */
 function isLocalSettings(value: unknown, azure: boolean): value is LocalSettings {
   if (!isRecord(value)) return false;
-  const shared = (v: unknown) => v === undefined || isRecord(v) && sharedProblemOf(v, azure) === null;
-  const accepted = value.accepted;
-  return (value.structureSync === undefined || typeof value.structureSync === 'boolean')
-    && (value.projectId === undefined || typeof value.projectId === 'string') && shared(value.overrides) && shared(value.shared)
-    && (value.access === undefined || isAccess(value.access)) && (value.consent === undefined || Array.isArray(value.consent) && value.consent.every(isOperation))
-    && (value.sharedProblem === undefined || typeof value.sharedProblem === 'string')
-    && (value.dismissedUpdate === undefined || typeof value.dismissedUpdate === 'number')
-    && (accepted === undefined || isRecord(accepted) && (accepted.itemSource === null || isItemSource(accepted.itemSource)) && isDomainDocs(accepted.domainDocs));
+  const settings = (v: unknown) => v === undefined || isRecord(v) && settingsProblemOf(v, azure) === null;
+  return (value.structureSync === undefined || typeof value.structureSync === 'boolean') && (value.projectId === undefined || typeof value.projectId === 'string') && settings(value.overrides)
+    && (value.access === undefined || isAccess(value.access)) && (value.consent === undefined || Array.isArray(value.consent) && value.consent.every(isOperation));
 }
 
 /** The list's entries with their checked local settings; throws, naming the entry, for settings it can't use. */
@@ -104,22 +76,18 @@ function readSettings(dir: string) {
 
 /** The setup that the repository's local settings and its Connections make. */
 function setupOf(repo: string, local: LocalSettings, connections: string[] = []): RepositorySetup {
-  const pick = <K extends keyof SharedRepositorySettings>(key: K) => local.overrides?.[key] ?? local.shared?.[key];
+  const pick = <K extends keyof SharedRepositorySettings>(key: K) => local.overrides?.[key];
   const accessOf = (op: RepositoryOperation): OperationAccess => local.access?.[op] ?? 'unverified';
   const itemSource = pick('itemSource') ?? (onAzure(repo) ? null : { kind: 'issues' as const });
   const domainDocs = pick('domainDocs') ?? { kind: 'private' as const };
-  const changed = (key: PausingSetting, now: unknown) => local.accepted !== undefined && JSON.stringify(local.accepted[key]) !== JSON.stringify(now);
   return {
-    repo, ...local.structureSync !== undefined && { structureSync: local.structureSync }, ...local.projectId !== undefined && { projectId: local.projectId },
+    repo, structureSync: local.structureSync ?? true, ...local.projectId !== undefined && { projectId: local.projectId },
     role: pick('role') ?? '', itemSource, labels: pick('labels') ?? [], domainDocs, skills: pick('skills') ?? [],
-    ...effectiveVocabulary(local.overrides?.vocabulary, local.shared?.vocabulary),
+    ...effectiveVocabulary(local.overrides?.vocabulary),
     access: Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, accessOf(op)])) as RepositorySetup['access'],
     consent: (local.consent ?? []).filter((op) => accessOf(op) !== 'refused'),
-    paused: (['itemSource', 'domainDocs'] as const).filter((key) => changed(key, key === 'itemSource' ? itemSource : domainDocs)),
-    ...local.sharedProblem !== undefined && { sharedProblem: local.sharedProblem },
     sources: Object.fromEntries(SHARED_SETTINGS.map((key) => [key,
-      local.overrides?.[key] !== undefined ? 'local' : local.shared?.[key] !== undefined ? 'shared' : 'default'])) as RepositorySetup['sources'],
-    shared: local.shared ?? {},
+      local.overrides?.[key] !== undefined ? 'local' : 'default'])) as RepositorySetup['sources'],
     connections,
   };
 }
@@ -131,9 +99,7 @@ export function readRepositorySetups(dir = boardDataDir()): RepositorySetup[] {
 }
 
 /**
- * Writes the repository's local settings as `change` makes them from the saved ones and the setup they make, first
- * accepting the pausing settings as they are when the user never accepted any. Throws for a repository the list
- * doesn't name.
+ * Updates local settings only for a listed repository.
  */
 function updateSettings(repo: string, dir: string, change: (local: LocalSettings, setup: RepositorySetup) => LocalSettings): void {
   const { raw, list, settings } = readSettings(dir);
@@ -141,31 +107,14 @@ function updateSettings(repo: string, dir: string, change: (local: LocalSettings
   if (at < 0) throw new Error(`${repo} is not on this Mac's list.`);
   const saved = settings[at]!;
   const setup = setupOf(list[at]!.repo, saved);
-  const { itemSource, domainDocs } = setup;
-  const changed = change({ ...saved, accepted: saved.accepted ?? { itemSource, domainDocs } }, setup);
-  // Naming an Azure DevOps repository's first team changes no work, as none could read its items before.
-  const next = changed.accepted?.itemSource === null
-    ? { ...changed, accepted: { ...changed.accepted, itemSource: setupOf(list[at]!.repo, changed).itemSource } } : changed;
-  // Each refresh applies the shared defaults again, so an unchanged setup leaves the file alone.
+  const next = change(saved, setup);
   if (JSON.stringify(next) === JSON.stringify(saved)) return;
   writeListFile(dir, { ...raw, repositories: raw.repositories.map((e, i) => i === at ? { ...e, settings: next } : e) });
 }
 
-/**
- * Keeps the latest read of the repository's .lar-factory.json: its defaults when usable, nothing when the repository
- * has none, or, for a file that is wrong or can't be read, the last usable defaults with the problem.
- */
-export function applySharedDefaults(repo: string, read: { defaults: SharedRepositorySettings } | { problem: string } | null, dir = boardDataDir()): void {
-  updateSettings(repo, dir, ({ shared, sharedProblem: _, ...local }) => {
-    if (read === null) return local;
-    if ('problem' in read) return { ...local, ...shared && { shared }, sharedProblem: read.problem };
-    return { ...local, shared: read.defaults };
-  });
-}
-
-/** Sets the repository's local override of a shared setting, or removes it with undefined, so the shared default applies again. */
+/** Sets a local value, or resets it to the factory default with undefined. */
 export function setOverride<K extends keyof SharedRepositorySettings>(repo: string, key: K, value: SharedRepositorySettings[K] | undefined, dir = boardDataDir()): void {
-  const problem = value === undefined ? null : sharedProblemOf({ [key]: value }, onAzure(repo));
+  const problem = value === undefined ? null : settingsProblemOf({ [key]: value }, onAzure(repo));
   if (problem) throw new Error(`${repo}: ${problem}.`);
   updateSettings(repo, dir, ({ overrides = {}, ...local }) => {
     const { [key]: _, ...others } = overrides;
@@ -182,44 +131,14 @@ export function setVocabularyOverride(repo: string, key: VocabularyKey, value: V
   });
 }
 
-/** Accepts the repository's item source and domain-doc location as they are now, so the work depending on them goes on. */
-export function acceptSetup(repo: string, dir = boardDataDir()): void {
-  updateSettings(repo, dir, (local, { itemSource, domainDocs }) => ({ ...local, accepted: { itemSource, domainDocs } }));
-}
-
-/** Records the repository's config update notice dismissed at the app's Repository config `version`. */
-export function recordDismissedUpdate(repo: string, version: number, dir = boardDataDir()): void {
-  updateSettings(repo, dir, (local) => ({ ...local, dismissedUpdate: version }));
-}
-
-/** Each repository whose config update notice was dismissed, with the app version it was dismissed at. */
-export function readDismissedUpdates(dir = boardDataDir()): Map<string, number> {
-  const { list, settings } = readSettings(dir);
-  return new Map(list.flatMap(({ repo }, index) => {
-    const at = settings[index]!.dismissedUpdate;
-    return at === undefined ? [] : [[repo, at] as const];
-  }));
-}
-
 /** The access an onboarding's detection found, each operation it left unverified out. */
 type FoundAccess = NonNullable<LocalSettings['access']>;
 
-/**
- * Saves onboarding's answers as the repository's local settings over the latest read of its .lar-factory.json, with
- * the access its detection found. An answer equal to the shared default inherits it, so a later shared change applies;
- * any other answer is a local override. The setup it makes is accepted, so no work waits on it.
- */
-export function saveLocalSetup(repo: string, answers: LocalSetupAnswers, access: FoundAccess, read: SharedRead, dir = boardDataDir()): void {
-  const { projectId, consent, ...answered } = answers;
-  updateSettings(repo, dir, ({ shared, sharedProblem: _, overrides: previousOverrides, ...local }) => {
-    const kept: LocalSettings = read === null ? local : 'problem' in read
-      ? { ...local, ...shared && { shared }, sharedProblem: read.problem } : { ...local, shared: read.defaults };
-    const overrides = { ...previousOverrides?.vocabulary !== undefined && { vocabulary: previousOverrides.vocabulary }, ...Object.fromEntries(Object.entries(answered)
-      .filter(([key, value]) => JSON.stringify(kept.shared?.[key as keyof SharedRepositorySettings]) !== JSON.stringify(value))) };
-    const saved = { ...kept, projectId, overrides, access, consent: [...consent] };
-    const { itemSource, domainDocs } = setupOf(repo, saved);
-    return { ...saved, accepted: { itemSource, domainDocs } };
-  });
+/** Saves onboarding answers and access on this machine. */
+export function saveLocalSetup(repo: string, answers: LocalSetupAnswers, access: FoundAccess, dir = boardDataDir()): void {
+  const { projectId, consent, structureSync = true, ...answered } = answers;
+  const operations = structureSync ? [...new Set([...consent, ...structureSyncOperations(repo)] as RepositoryOperation[])] : [...consent];
+  updateSettings(repo, dir, (local) => ({ ...local, projectId, structureSync, overrides: { ...local.overrides, ...answered }, access, consent: operations }));
 }
 
 /** Sets the operations the user allows the factory to offer for the repository. */
@@ -241,27 +160,19 @@ export function changeConsent(repo: string, consent: readonly RepositoryOperatio
   });
 }
 
+/** Changes whether concepts and cross-repository links are saved to issues. */
+export function setStructureSync(repo: string, enabled: boolean, dir = boardDataDir()): void {
+  updateSettings(repo, dir, (local) => ({ ...local, structureSync: enabled, consent: enabled ? [...new Set([...(local.consent ?? []), ...structureSyncOperations(repo)] as RepositoryOperation[])] : local.consent }));
+}
+
+/** Replaces the saved result of the read-only access check. */
+export function replaceAccess(repo: string, access: FoundAccess, dir = boardDataDir()): void {
+  updateSettings(repo, dir, (local) => ({ ...local, access }));
+}
+
 /** Records what an attempted operation found the credentials allow. */
 export function recordAccess(repo: string, op: RepositoryOperation, access: Exclude<OperationAccess, 'unverified'>, dir = boardDataDir()): void {
   updateSettings(repo, dir, (local) => ({ ...local, access: { ...local.access, [op]: access } }));
 }
-
-/** Forgets what the credentials allowed, after they changed, so each operation is checked again when next needed. */
-export function recheckAccess(repo: string, dir = boardDataDir()): void {
-  updateSettings(repo, dir, ({ access: _, ...local }) => local);
-}
-
-type SharedRead = Parameters<typeof applySharedDefaults>[1];
-
-/** A .lar-factory.json's text as applySharedDefaults takes it, with its version. */
-export function sharedConfigOf(text: string, azure: boolean): { read: Exclude<SharedRead, null>; version: number } {
-  let raw: unknown;
-  try { raw = JSON.parse(text); }
-  catch { return { read: { problem: ".lar-factory.json isn't valid JSON." }, version: CONFIG_VERSION }; }
-  if (!isRecord(raw)) return { read: { problem: ".lar-factory.json isn't a JSON object." }, version: CONFIG_VERSION };
-  const read = sharedDefaultsOf(raw, azure);
-  return { read, version: 'defaults' in read && typeof raw.version === 'number' ? raw.version : CONFIG_VERSION };
-}
-
 
 export * from "./repository-list.ts";

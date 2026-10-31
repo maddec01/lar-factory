@@ -34,6 +34,7 @@ test('the board listens before a slow login shell answers, and its data waits fo
   writeFileSync(shell, '#!/bin/sh\nsleep 1\nexec /bin/sh -c "$2"\n', { mode: 0o755 });
   const board = await startBoard(t, {}, false, false, { SHELL: shell, GH_PATH: '/nowhere/gh' });
   assert.deepEqual(results((await checked(board)).tools), ghMissing);
+  await board.untilLogged('gh was not found');
   const logs = board.logs();
   assert.ok(logs.indexOf('board on ') < logs.indexOf('gh was not found'), logs);
 });
@@ -119,12 +120,14 @@ test('a gh older than 2.94.0 shows its notice and the board still reads GitHub',
   const data = await afterRead(board);
   assert.ok(data.fetchedAt, 'the board reads GitHub');
   assert.deepEqual(data.tools?.gh, { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' });
+  await board.untilLogged('gh is older than 2.94.0');
   assert.match(board.logs(), /gh is older than 2\.94\.0/);
 });
 
 test('a missing gh names its override', async (t) => {
   const board = await startBoard(t, {}, false, false, { GH_PATH: '/nowhere/gh' });
   assert.deepEqual(results((await checked(board)).tools), ghMissing);
+  await board.untilLogged('gh was not found at GH_PATH=/nowhere/gh; az ');
   assert.match(board.logs(), /t3 at \S+; gh was not found at GH_PATH=\/nowhere\/gh; az /);
 });
 
@@ -148,6 +151,7 @@ test('a missing jq, git or curl has its check but doesn\'t stop the board readin
     git: { result: 'missing', override: 'GIT_PATH=/nowhere/git', fix: 'brew install git' },
     jq: { result: 'missing', override: 'JQ_PATH=/nowhere/jq', fix: 'brew install jq' },
     curl: { result: 'missing', override: 'CURL_PATH=/nowhere/curl', fix: 'brew install curl' } });
+  await board.untilLogged('curl was not found');
   assert.match(board.logs(), /git was not found at GIT_PATH=\/nowhere\/git; jq was not found at JQ_PATH=\/nowhere\/jq; curl was not found/);
 });
 
@@ -218,6 +222,7 @@ test('T3 Code not running has its check but doesn\'t stop the board reading GitH
   const data = await afterRead(board);
   assert.ok(data.fetchedAt, 'the board reads GitHub');
   assert.deepEqual(results(data.tools), { ...allOk, t3: { result: 'not-running', version: '0.1.4-nightly.1' } });
+  await board.untilLogged('T3 Code is not running');
   assert.match(board.logs(), /T3 Code is not running/);
   writeFileSync(runtime, JSON.stringify({ version: 1, pid: process.pid, port: 3773, origin: 'http://127.0.0.1:3773' }));
   assert.deepEqual((await (await recheck(board)).json()).board.tools.t3, { result: 'ok', version: '0.1.4-nightly.1' });
@@ -249,7 +254,6 @@ function azureHome(t: TestContext, held: boolean) {
   checkouts(home, { 'lar-api': 'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api' });
   const log = join(home, 'az-calls');
   const go = join(home, 'az.go');
-  const config = JSON.stringify({ path: '/.lar-factory.json', content: JSON.stringify({ role: 'API', itemSource: { kind: 'azure-board', team: 'Team' } }) });
   const az = join(home, 'az');
   writeFileSync(az, `#!/bin/sh
 echo "$*" >> '${log}'
@@ -258,7 +262,7 @@ if [ "$1" = version ]; then
   echo '{"azure-cli": "2.67.0"}'; exit 0
 fi
 [ "$1" = account ] || [ "$1" = extension ] && exit 0
-case "$*" in *"--resource items"*) printf '%s' '${config}'; exit 0;; boards*) echo '[]'; exit 0;; esac
+case "$*" in boards*) echo '[]'; exit 0;; esac
 echo 'ERROR: offline' >&2; exit 1
 `, { mode: 0o755 });
   /** The az calls that read items, not the check or the config. */
@@ -268,7 +272,8 @@ echo 'ERROR: offline' >&2; exit 1
   return { home, env, itemReads, release: () => writeFileSync(go, '') };
 }
 
-const mixed = { items: [boardIssue(1, 'List', 'maddec01/lar-factory')], repositories: ['maddec01/lar-factory', 'contoso/Fabrikam/lar-api'] };
+const mixed = { items: [boardIssue(1, 'List', 'maddec01/lar-factory')], repositories: ['maddec01/lar-factory', 'contoso/Fabrikam/lar-api'],
+  localSetups: { 'contoso/Fabrikam/lar-api': { role: 'API', itemSource: { kind: 'azure-board', team: 'Team' } } } };
 
 test('a slow az check holds up neither the page nor the GitHub read, and the Azure DevOps read waits for it', async (t) => {
   const azure = azureHome(t, true);

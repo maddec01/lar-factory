@@ -9,7 +9,7 @@ import { onAzure } from '@lar-factory/shared';
 import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails, RecordDetails } from '@lar-factory/shared';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { exportMarkdown } from '@lar-factory/work-records/export';
-import type { Refused } from '../config/edit-config.ts';
+import type { Refused } from '../config/editable-repository.ts';
 import { readAzureItemDetails, readAzureOlderComments } from '../azure/azure-details.ts';
 import { saveAzureDescription } from '../azure/azure-writes.ts';
 import { readGithubItemDetails, readGithubOlderComments, saveGithubDescription } from '../github/github-details.ts';

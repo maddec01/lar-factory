@@ -46,12 +46,12 @@ test('a t3 override that points nowhere is named', async () => {
 
 test('a missing or logged-out gh shows its own notice, and other read failures show none', async () => {
   await mountPage(withTools({ gh: { result: 'missing', fix: 'brew install gh' } }, failed));
-  const warnings = () => $$('[data-slot="toaster"] [data-toast-color="warning"]');
+  const warnings = () => $$('[data-slot="notice"]');
   expect(warnings().length).toBe(1);
-  expect(warnings()[0]!.getAttribute('role')).toBe('status');
+  expect(warnings()[0]!.closest('[data-slot="toaster"]')).toBeNull();
   expect(warningText(warnings()[0]!)).toEqual(['GitHub CLI not found.', 'The board reads GitHub through gh. Install it with brew install gh Copy, '
     + 'then press Recheck. The board also looks again every 10 seconds. Recheck']);
-  expect(warnings()[0]!.dataset.toastColor).toBe('warning');
+  expect(warnings()[0]!.closest('[data-board-notices]')).not.toBeNull();
   expect(warnings()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install gh');
 
   await push(withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } }, failed));
@@ -68,7 +68,7 @@ test('a missing or logged-out gh shows its own notice, and other read failures s
 
 test('a gh older than 2.94.0 shows its warning with brew upgrade gh, and the board still shows', async () => {
   await mountPage(withTools({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }));
-  expect($$('[data-slot="toaster"] [data-toast-color="warning"]').map(warningText)).toEqual([['GitHub CLI is older than 2.94.0.', "lar-shape's scripts need the --parent, "
+  expect($$('[data-slot="notice"]').map(warningText)).toEqual([['GitHub CLI is older than 2.94.0.', "lar-shape's scripts need the --parent, "
     + '--add-sub-issue and --blocked-by flags that gh 2.94.0 added, and this gh is 2.93.1. Run brew upgrade gh Copy in a terminal, '
     + 'then press Recheck. Recheck']]);
   expect($('.desk')).not.toBeNull();
@@ -131,7 +131,7 @@ test('a Recheck note answers only the tool problems it found, and goes once they
 
 test('a missing git, jq or curl shows a warning with its install command and Recheck, and the board still shows', async () => {
   await mountPage(withTools({ jq: { result: 'missing', fix: 'brew install jq' } }));
-  const warnings = () => $$('[data-slot="toaster"] [data-toast-color="warning"]');
+  const warnings = () => $$('[data-slot="notice"]');
   expect(warnings().map(warningText)).toEqual([['jq not found.', "lar-shape's scripts read gh's answers with jq. Install it with brew install jq Copy, "
     + 'then press Recheck. Recheck']]);
   expect(warnings()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install jq');
@@ -148,7 +148,7 @@ test('an az that fails its check shows a warning with its fix, and the board sti
   holdRecheck();
   const loggedOut = withTools({ az: { result: 'logged-out', version: '2.67.0', fix: 'az login' } });
   await mountPage(loggedOut);
-  const warnings = () => $$('[data-slot="toaster"] [data-toast-color="warning"]');
+  const warnings = () => $$('[data-slot="notice"]');
   expect(warnings().map(warningText)).toEqual([['Azure CLI is logged out.', 'The board reads repositories on Azure DevOps through az. '
     + 'Run az login Copy in a terminal, then press Recheck. Recheck']]);
   expect($('.desk')).not.toBeNull();
@@ -170,7 +170,7 @@ test('T3 Code not running shows a warning with its fix and Recheck, and the boar
   holdRecheck();
   const closed = withTools({ t3: { result: 'not-running', version: '0.1.3-nightly.1' } });
   await mountPage(closed);
-  expect($$('[data-slot="toaster"] [data-toast-color="warning"]').map(warningText)).toEqual([['T3 Code is not running.', 'The board starts threads through T3 Code, which has to be open. '
+  expect($$('[data-slot="notice"]').map(warningText)).toEqual([['T3 Code is not running.', 'The board starts threads through T3 Code, which has to be open. '
     + 'Open T3 Code, then press Recheck. The board also looks again every 10 seconds. Recheck']]);
   expect($('.tool-missing'), 'only a missing t3 fills the main area').toBeNull();
   expect($('.desk')).not.toBeNull();
@@ -179,5 +179,5 @@ test('T3 Code not running shows a warning with its fix and Recheck, and the boar
   await answer(board(closed));
   expect(note()!.textContent).toBe('Still not running.');
   await push(withTools({}));
-  expect($$('[data-slot="toaster"] [data-toast-color="warning"]')).toEqual([]);
+  expect($$('[data-slot="notice"]')).toEqual([]);
 });

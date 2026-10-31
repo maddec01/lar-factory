@@ -16,7 +16,7 @@ function home(t: TestContext): string {
 }
 
 const choice = (id: string, folder: string): ProjectChoice =>
-  ({ id, name: id, folder, repo: `maddec01/${id}`, provider: 'GitHub', hasConfig: false, onBoard: false });
+  ({ id, name: id, folder, repo: `maddec01/${id}`, provider: 'GitHub', onBoard: false });
 
 test('adds the folder to T3 and answers with T3\'s projects and the new one\'s id', async (t) => {
   const dir = home(t);

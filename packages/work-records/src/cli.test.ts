@@ -229,12 +229,12 @@ describe('lar-work', { timeout: 30_000 }, () => {
   it('explains identifiers, reads, changes, structure and errors in its help', async () => {
     const help = await larWork(tempDir(), '--help');
     expect(help.code).toBe(0);
-    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Completion', 'Content', 'Publication', 'Provider observations', 'Dependencies', 'Threads and launch intents', 'Retention and export', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
+    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Completion', 'Content', 'Brief gate', 'Provider observations', 'Dependencies', 'Threads and launch intents', 'Retention and export', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
   });
 });
 
 
-it('inspects, approves, claims, reconciles and attaches a publication through lar-work', { timeout: 30_000 }, async () => {
+it('keeps the brief gate local and refuses removed refinement publication commands', { timeout: 30_000 }, async () => {
   const data = tempDir();
   const records = await openWorkRecords(join(data, 'work-records.db'));
   const made = records.create({ title: 'Search', repository: 'team/app', kind: 'build' });
@@ -244,37 +244,5 @@ it('inspects, approves, claims, reconciles and attaches a publication through la
   expect(gate.record).toMatchObject({ current: false, briefDigest: expect.any(String) });
   expect(await larWork(data, 'record-gate', work.workId, '--revision', String(work.revision), '--digest', gate.record.briefDigest, '--identity', 'reviewer', '--evidence', 'Passed.')).toMatchObject({ code: 0 });
   expect((await larWork(data, 'gate', work.workId)).record.current).toBe(true);
-  const readiness = (await larWork(data, 'publication-readiness', work.workId)).record;
-  expect(readiness.eligible).toBe(true);
-  const content = {
-    tickets: [{ workId: work.workId, destination: { provider: 'github', repository: 'team/app' }, vocabulary: {}, typeResolution: { candidates: [], selected: null }, title: 'Search', body: 'Find saved searches.' }],
-    operations: [{ kind: 'create', operationId: 'create', ticketWorkId: work.workId, dependsOn: [] },
-      { kind: 'comment', operationId: 'comment', ticketWorkId: work.workId, dependsOn: ['create'], content: 'Search is ready.' }],
-  };
-  const file = join(tempDir(), 'request.json');
-  writeFileSync(file, JSON.stringify({ ...content, sources: readiness.sources.map(({ workId, revision }: { workId: string; revision: number }) => ({ workId, revision })) }));
-  const proposed = (await larWork(data, 'propose-publication', work.workId, '--revision', String(work.revision), '--file', file)).record;
-  expect(proposed).toMatchObject({ revision: 1, approval: null });
-  const planArgs = [work.workId, '--plan', proposed.planId];
-  expect((await larWork(data, 'publication', ...planArgs)).record).toEqual(proposed);
-  expect((await larWork(data, 'publications', work.workId)).record).toEqual([proposed]);
-  expect(await larWork(data, 'approve-publication', ...planArgs, '--revision', '1', '--digest', 'wrong', '--identity', 'pedro')).toMatchObject({ code: 1 });
-  expect((await larWork(data, 'approve-publication', ...planArgs, '--revision', '1', '--digest', proposed.digest, '--identity', 'pedro')).record).toMatchObject({ revision: 2, approval: { approvedBy: 'pedro' } });
-  writeFileSync(file, JSON.stringify(content));
-  expect((await larWork(data, 'pending-publication', ...planArgs, '--file', file)).record).toMatchObject({ current: true, next: { operationId: 'create' } });
-  const claimed = (await larWork(data, 'claim-publication', ...planArgs, '--revision', '2', '--digest', proposed.digest, '--identity', 'board', '--file', file)).record;
-  expect(claimed).toMatchObject({ plan: { revision: 3 }, operation: { kind: 'create' }, claimToken: expect.any(String) });
-  writeFileSync(file, JSON.stringify({ status: 'uncertain', evidence: 'Timed out after dispatch.' }));
-  expect((await larWork(data, 'record-publication-outcome', ...planArgs, '--revision', '3', '--operation', 'create', '--claim', claimed.claimToken, '--file', file)).record).toMatchObject({ revision: 4 });
-  expect((await larWork(data, 'record-publication-evidence', ...planArgs, '--revision', '4', '--operation', 'create', '--evidence', 'Searched the fixture provider.')).record).toMatchObject({ revision: 5 });
-  writeFileSync(file, JSON.stringify({ status: 'successful', evidence: 'Found the created ticket.', ticket: 'team/app#12', url: 'https://example.test/issues/12', location: { kind: 'body', start: 0, end: 20 } }));
-  expect((await larWork(data, 'resolve-publication-outcome', ...planArgs, '--revision', '5', '--operation', 'create', '--identity', 'pedro', '--file', file)).record).toMatchObject({ revision: 6 });
-  expect((await larWork(data, 'publication-evidence', ...planArgs)).record).toHaveLength(4);
-  expect((await larWork(data, 'last-published', work.workId)).record).toMatchObject([{ text: 'Find saved searches.', location: { kind: 'body', start: 0, end: 20 } }]);
-  expect((await larWork(data, 'publication-handover', ...planArgs)).stdout).toBe('# Search\n\nFind saved searches.\n\nSearch is ready.\n');
-  expect((await larWork(data, 'attach-publication-url', ...planArgs, '--revision', String(work.revision), '--ticket', 'team/app#12', '--url', 'https://example.test/issues/12')).record).toMatchObject({ workId: work.workId, ticket: 'team/app#12', status: 'List' });
-  expect((await larWork(data, 'publication-attachment', work.workId)).record).toMatchObject({ planId: proposed.planId, ticket: 'team/app#12', url: 'https://example.test/issues/12' });
-  expect((await larWork(data, 'pending-publication', ...planArgs)).record).toMatchObject({ current: true, next: { operationId: 'comment' } });
-  writeFileSync(file, 'not JSON');
-  expect(await larWork(data, 'record-publication-outcome', ...planArgs, '--revision', '6', '--operation', 'comment', '--claim', 'no-claim', '--file', file)).toMatchObject({ code: 1, stderr: expect.stringContaining("isn't JSON") });
+  expect(await larWork(data,'execute-publication',work.workId)).toMatchObject({code:2,stderr:expect.stringContaining('Unknown command')});
 });

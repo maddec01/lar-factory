@@ -1,96 +1,67 @@
-import { effectiveVocabulary } from '@lar-factory/shared';
-import { test, type TestContext } from 'vite-plus/test';
-import assert from 'node:assert/strict';
+import { test, expect, type TestContext } from 'vite-plus/test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRepositoryList, saveOnboarding } from '../config/repository-config.ts';
+import { REPOSITORY_OPERATIONS } from '@lar-factory/shared';
+import { readRepositoryList } from '../config/repository-config.ts';
 import { readRepositorySetups, setOverride } from '../config/repository-settings.ts';
-import { type SaveReads, saveSetup } from './save-setup.ts';
+import { saveSetup, type SaveReads } from './save-setup.ts';
 
-const ANSWERS = {
-  projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: ['web-review'],
-  consent: ['push-branch', 'open-pr', 'tag-ticket'],
-};
-
-async function dataDir(t: TestContext): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'lar save setup test '));
+const repo = 'team/app';
+const answers = { repo, projectId: 'app', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [], consent: [] };
+const allowed: SaveReads = { access: async () => Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, 'allowed'])) };
+async function folder(t: TestContext) {
+  const dir = await mkdtemp(join(tmpdir(), 'local-setup-'));
   t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   return dir;
 }
 
-/** Reads that find no .lar-factory.json and push access without triage, unless `parts` say otherwise. */
-const reads = (parts: Partial<SaveReads> = {}): SaveReads => ({
-  shared: async () => null, access: async () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed', 'tag-ticket': 'refused' }), ...parts,
+test('onboarding saves local settings, optional purpose and sharing on by default', async (t) => {
+  const dir = await folder(t);
+  expect(await saveSetup(answers, dir, allowed)).toEqual({ onboarding: [] });
+  expect(readRepositorySetups(dir)[0]).toMatchObject({ repo, role: '', structureSync: true, domainDocs: { kind: 'private' } });
+  const file = JSON.parse(await readFile(join(dir, 'repository-settings.json'), 'utf8'));
+  expect(file.repositories[0].settings.structureSync).toBe(true);
+  expect(file.repositories[0].settings).not.toHaveProperty('shared');
+  setOverride(repo, 'domainDocs', { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' }, dir);
+  setOverride(repo, 'domainDocs', undefined, dir);
+  expect(readRepositorySetups(dir)[0]?.domainDocs).toEqual({ kind: 'private' });
 });
 
-test("saving onboarding's answers puts the repository on the board with them as its local settings, and no work paused", async (t) => {
-  const dir = await dataDir(t);
-  saveOnboarding({ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } } }, null, dir);
-  assert.deepEqual(await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS }, dir, reads()), { onboarding: [] });
-  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web' }]);
-  assert.deepEqual(readRepositorySetups(dir), [{
-    repo: 'maddec01/lar-web', projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, labels: [],
-    domainDocs: { kind: 'private' }, skills: ['web-review'], ...effectiveVocabulary(),
-    access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
-    consent: ['push-branch', 'open-pr'], paused: [], shared: {}, connections: [],
-    sources: { role: 'local', itemSource: 'local', labels: 'default', domainDocs: 'local', skills: 'local', vocabulary: 'default' },
-  }]);
+test('GitHub sharing checks creation, comments and its discovery label before saving', async (t) => {
+  const dir = await folder(t);
+  const result = await saveSetup(answers, dir, { access: async () => ({ 'publish-ticket': 'allowed', 'edit-ticket': 'refused' }) });
+  expect(result).toMatchObject({ status: 403, error: expect.stringContaining('post comments, set issue labels') });
+  expect(readRepositoryList(dir)).toEqual([]);
+  expect(await saveSetup({ ...answers, structureSync: false }, dir, { access: async () => ({}) })).toEqual({ onboarding: [] });
+  expect(readRepositorySetups(dir)[0]?.structureSync).toBe(false);
 });
 
-test('an answer equal to the shared default inherits it, so removing nothing and a later shared change apply', async (t) => {
-  const dir = await dataDir(t);
-  const shared = { defaults: { role: 'Web client', domainDocs: { kind: 'repository' as const, glossary: 'GLOSSARY.md', adrs: 'docs/adr' } } };
-  await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS }, dir, reads({ shared: async () => shared }));
-  const [setup] = readRepositorySetups(dir);
-  assert.deepEqual([setup!.role, setup!.domainDocs], ['Web client', { kind: 'private' }]);
-  // The role is inherited, so clearing the domain-doc override shows the shared location; the role was never an override.
-  setOverride('maddec01/lar-web', 'domainDocs', undefined, dir);
-  setOverride('maddec01/lar-web', 'role', undefined, dir);
-  assert.deepEqual(readRepositorySetups(dir)[0]!.domainDocs, shared.defaults.domainDocs);
-  assert.equal(readRepositorySetups(dir)[0]!.role, 'Web client');
+test('failed access checks block sharing but allow local shaping when sharing is off', async (t) => {
+  const dir = await folder(t);
+  const reads: SaveReads = { access: async () => { throw new Error('Not signed in'); } };
+  expect(await saveSetup(answers, dir, reads)).toMatchObject({ status: 403 });
+  expect(await saveSetup({ ...answers, structureSync: false }, dir, reads)).toEqual({ onboarding: [] });
+  expect(readRepositorySetups(dir)[0]?.access['push-branch']).toBe('unverified');
 });
 
-test('an Azure DevOps repository saves its team, and an answer that does not fit the provider is refused with no write', async (t) => {
-  const dir = await dataDir(t);
-  const repo = 'contoso/Retail/shop';
-  const wrong = await saveSetup({ repo, ...ANSWERS }, dir, reads());
-  assert.deepEqual(wrong, { status: 400, error: 'contoso/Retail/shop: field itemSource must name the Azure DevOps team whose board the board reads.' });
-  assert.deepEqual(readRepositoryList(dir), []);
-  await saveSetup({ repo, ...ANSWERS, itemSource: { kind: 'azure-board', team: 'Retail Team' } }, dir, reads());
-  assert.deepEqual(readRepositorySetups(dir)[0]!.itemSource, { kind: 'azure-board', team: 'Retail Team' });
-});
-
-test('a body missing an answer is a 400, and a read that fails or a repository onboarded already writes nothing', async (t) => {
-  const dir = await dataDir(t);
-  const refused = { status: 400, error: 'Send the repository, its T3 project, role, item source, domain-doc location, skills and write consent.' };
-  for (const body of [{ ...ANSWERS }, { repo: 'maddec01/lar-web', ...ANSWERS, consent: ['merge'] }, { repo: 'maddec01/lar-web', ...ANSWERS, skills: 'all' },
-    { repo: 'maddec01/lar-web', ...ANSWERS, domainDocs: { kind: 'repository' } }, { repo: 'maddec01/lar-web', ...ANSWERS, projectId: undefined }]) {
-    assert.deepEqual(await saveSetup(body, dir, reads()), refused, JSON.stringify(body));
+test('invalid source, consent or sharing values change no local settings', async (t) => {
+  const dir = await folder(t);
+  for (const change of [{ structureSync: 'yes' }, { consent: ['merge'] }, { domainDocs: { kind: 'repository' } }, { itemSource: { kind: 'azure-board', team: 'Team' } }]) {
+    expect(await saveSetup({ ...answers, ...change }, dir, allowed)).toMatchObject({ status: 400 });
   }
-  const failed = await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS }, dir, reads({ shared: async () => { throw new Error('gh auth login'); } }));
-  assert.deepEqual(failed, { status: 502, error: "Can't read maddec01/lar-web's .lar-factory.json: gh auth login" });
-  assert.deepEqual(readRepositoryList(dir), []);
-  await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS }, dir, reads());
-  assert.deepEqual(await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS, role: 'API' }, dir, reads()), { status: 409, error: 'maddec01/lar-web is onboarded already.' });
-  assert.equal(readRepositorySetups(dir)[0]!.role, 'Web client');
+  expect(readRepositoryList(dir)).toEqual([]);
 });
 
-test("an access read that fails saves the setup with every operation unverified", async (t) => {
-  const dir = await dataDir(t);
-  await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS }, dir, reads({ access: async () => { throw new Error('HTTP 502'); } }));
-  assert.deepEqual(readRepositorySetups(dir)[0]!.consent, ['push-branch', 'open-pr', 'tag-ticket']);
+test('Azure onboarding saves its selected team without writing to Azure', async (t) => {
+  const dir = await folder(t);
+  expect(await saveSetup({ ...answers, repo: 'org/project/app', structureSync: false, itemSource: { kind: 'azure-board', team: 'App Team' } }, dir, { access: async () => ({}) })).toEqual({ onboarding: [] });
+  expect(readRepositorySetups(dir)[0]?.itemSource).toEqual({ kind: 'azure-board', team: 'App Team' });
 });
 
-test("saving onboarding's Connections pairs the repository with each other onboarded repository, once, on this Mac only", async (t) => {
-  const dir = await dataDir(t);
-  await saveSetup({ repo: 'maddec01/lar-api', ...ANSWERS, projectId: 'lar-api', role: 'API server', connections: [] }, dir, reads());
-  await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS, connections: ['maddec01/lar-api', 'maddec01/lar-ios'] }, dir, reads());
-  const connections = () => readRepositorySetups(dir).map((s) => [s.repo, s.connections]);
-  assert.deepEqual(connections(), [['maddec01/lar-api', ['maddec01/lar-web']], ['maddec01/lar-web', ['maddec01/lar-api']]]);
-  const file = JSON.parse(await readFile(join(dir, 'repository-settings.json'), 'utf8')) as { connections: unknown; repositories: { settings: object }[] };
-  assert.deepEqual(file.connections, [['maddec01/lar-api', 'maddec01/lar-web']]);
-  assert.ok(file.repositories.every((e) => !JSON.stringify(e.settings).includes('connections')), 'no Connection goes in the shared or local settings');
-  assert.deepEqual(await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS, connections: 'all' }, dir, reads()),
-    { status: 400, error: 'Send the repository, its T3 project, role, item source, domain-doc location, skills and write consent.' });
+test('a refused list read stops onboarding before saving anything', async (t) => {
+  const dir = await folder(t);
+  const result = await saveSetup({ ...answers, structureSync: false }, dir, { ...allowed, source: async () => { throw new Error('Read work items denied'); } });
+  expect(result).toEqual({ status: 403, error: "Can't read the selected issue list. Read work items denied" });
+  expect(readRepositoryList(dir)).toEqual([]);
 });

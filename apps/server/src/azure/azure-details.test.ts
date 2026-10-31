@@ -128,6 +128,65 @@ test('the oldest page answers no token', async () => {
   assert.deepEqual([page.comments.map((c) => c.id), page.olderCursor], [['2', '1'], null]);
 });
 
+const managed = (id: number) => comment(id, { text: id % 2 ? '<!-- lar-factory:chunk version=1 -->\nc2VjcmV0LWJhc2U2NA==' : '<!-- lar-factory:structure\n{}\n-->' });
+const commentCalls = (az: ReturnType<typeof fakeAz>) => az.calls.filter((args) => args.includes('comments'));
+
+test('details and older pages skip managed-only history to its end without exposing transport comments', async () => {
+  for (const older of [false, true]) {
+    const az = fakeAz({ items: [workItem({ description: 'Human description.\n\n<!-- lar-factory:structure\n{}\n-->', comments: Array.from({ length: 125 }, (_, i) => managed(i + 1)) })] });
+    const page = older ? await readAzureOlderComments(item(5), '0', az.run) : await readAzureItemDetails(item(5), az.run);
+    assert.ok(!('error' in page));
+    assert.deepEqual([page.comments, page.olderCursor], [[], null]);
+    if ('hasOlderComments' in page && 'body' in page) assert.deepEqual([page.hasOlderComments, page.body], [false, 'Human description.']);
+    assert.equal(commentCalls(az).length, 3);
+    assert.doesNotMatch(JSON.stringify(page), /lar-factory:|c2VjcmV0/);
+  }
+});
+
+test('managed-only leading pages reveal all ordinary discussion from the larger lookahead page', async () => {
+  const human = Array.from({ length: 30 }, (_, i) => comment(i + 1));
+  for (const older of [false, true]) {
+    const az = fakeAz({ items: [workItem({ comments: [...human, ...Array.from({ length: 15 }, (_, i) => managed(i + 31))] })] });
+    const page = older ? await readAzureOlderComments(item(5), '0', az.run) : await readAzureItemDetails(item(5), az.run);
+    assert.ok(!('error' in page));
+    assert.deepEqual(page.comments.map((c) => c.id), human.map((c) => String(c.id)).reverse());
+    assert.equal(page.olderCursor, null);
+    assert.equal(commentCalls(az).length, 2);
+  }
+});
+
+test('large managed histories stop after three comments calls and preserve a continuation token', async () => {
+  const az = fakeAz({ items: [workItem({ comments: [comment(1), ...Array.from({ length: 999 }, (_, i) => managed(i + 2))] })] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual([details.comments, details.hasOlderComments, details.olderCursor, commentCalls(az).length], [[], true, '210', 3]);
+  let cursor = details.olderCursor;
+  while (cursor !== null) {
+    const before = commentCalls(az).length;
+    const page = await readAzureOlderComments(item(5), cursor, az.run);
+    assert.ok(!('error' in page));
+    assert.ok(commentCalls(az).length - before <= 3);
+    cursor = page.olderCursor;
+    if (cursor === null) assert.deepEqual(page.comments.map((c) => c.id), ['1']);
+  }
+});
+
+test('ordinary history keeps ten-comment pages in order without gaps or duplicate comments', async () => {
+  const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 23 }, (_, i) => comment(i + 1)) })] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  const ids = details.comments.map((c) => c.id);
+  let cursor = details.olderCursor;
+  while (cursor !== null) {
+    const page = await readAzureOlderComments(item(5), cursor, az.run);
+    assert.ok(!('error' in page));
+    ids.push(...page.comments.map((c) => c.id));
+    cursor = page.olderCursor;
+  }
+  assert.deepEqual(ids, Array.from({ length: 23 }, (_, i) => String(23 - i)));
+  assert.equal(commentCalls(az).length, 3);
+});
+
 test('older comments of a repository not on Azure DevOps, or of a failed az, answer the error', async () => {
   assert.deepEqual(await readAzureOlderComments({ id: 'I_1', content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo: 'maddec01/lar', number: 5 } as Item, '10', fakeAz({ items: [] }).run), { status: 404, error: 'That item is not an Azure DevOps work item.' });
   const failing = async () => { throw new Error('az exploded'); };

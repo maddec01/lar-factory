@@ -25,13 +25,13 @@ const statsLookup = (reader: ItemStatsReader): T3Reads['stats'] => (threadIds) =
 const every = <T>(value: T) => (): T => value;
 
 /** The stats and their residual usage pricing; item threads read apart, through protocolItemThreads. */
-export function loadT3Reads(sources: StatsSources, now: number, withStats = true): T3Reads {
+export function loadT3Reads(sources: StatsSources, now: number, withStats = true, threadIds?: readonly string[]): T3Reads {
   if (!withStats) return { stats: every(undefined), statsUnavailable: false, priced: null };
   if (!existsSync(sources.db)) return { stats: every('unavailable'), statsUnavailable: true, priced: null };
   const unavailable = { stats: every('unavailable' as const), statsUnavailable: true, priced: null };
   try {
     return readT3Db(sources.db, (db) => {
-      const { rows, sessions } = protocolStatsInputs();
+      const { rows, sessions } = protocolStatsInputs(threadIds);
       let stats: ItemStatsReader;
       try { stats = itemStats(db, rows, sources, now, sessions); }
       catch { return unavailable; }
@@ -47,11 +47,11 @@ export function loadT3Reads(sources: StatsSources, now: number, withStats = true
  * how many: the first stats read reads every transcript, seconds of work the board shouldn't stop for. A database that
  * can't be read leaves it to the stats read to say so.
  */
-export async function warmT3Stats(sources: StatsSources): Promise<number> {
+export async function warmT3Stats(sources: StatsSources, threadIds?: readonly string[]): Promise<number> {
   if (!existsSync(sources.db)) return 0;
   let files;
   try {
-    files = readT3Db(sources.db, (db) => transcriptsToRead(db, sources, protocolStatsInputs().sessions));
+    files = readT3Db(sources.db, (db) => transcriptsToRead(db, sources, protocolStatsInputs(threadIds).sessions));
   } catch {
     return 0;
   }

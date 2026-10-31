@@ -8,13 +8,15 @@ import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
-import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
+import { OPEN_ITEM_DIALOG, useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { notify } from '../notices/notices.tsx';
 import { refocus } from '../notices/toasts.tsx';
 
 export interface ActionResult {
   error: string | null;
   board?: BoardData;
+  /** Queueing an issue from the list creates its local work ID. */
+  itemId?: string;
 }
 
 /** Posts an item action and returns the server's answer, or a message when the server can't be reached. */
@@ -83,12 +85,13 @@ async function runAction(itemId: string, kind: ItemAction['kind'], body: object,
 export async function queueItem(itemId: string): Promise<void> {
   if (!ready(itemId, 'data-queue')) return;
   const result = await runAction(itemId, 'queue', { itemId }, (result) => {
-    const item = itemOf(itemId);
+    const currentId = result.itemId ?? itemId;
+    const item = itemOf(currentId);
     if (result.error || !item) return result.error ?? 'The item left the board.';
-    notify({ verb: 'Moved', item, to: 'Queued' });
+    if (useItemDialogStore.getState().itemId === itemId && currentId !== itemId) useItemDialogStore.getState().open(currentId);
   });
   // The item stays on show, Queued, so focus goes to its Start.
-  if (!result.error) refocus([by('data-start', itemId), by('data-back-to-list', itemId)]);
+  if (!result.error) refocus([by('data-start', result.itemId ?? itemId), by('data-back-to-list', result.itemId ?? itemId)]);
 }
 
 export async function backToList(itemId: string): Promise<void> {

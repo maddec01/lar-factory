@@ -1,9 +1,11 @@
+import { isStructureComment, stripTrackerStructure, writeTrackerStructure } from '@lar-factory/shared';
 // An issue's description and comments, which the item dialog reads when it opens.
 // The board-wide read in github.ts leaves them out.
 
 import type { IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
-import type { Refused } from '../config/edit-config.ts';
-import { editIssueBody, graphql, message } from './github.ts';
+import type { Refused } from '../config/editable-repository.ts';
+import { skipEmptyCommentPages } from '../item-details/comment-pages.ts';
+import { editIssueBody, readIssue, graphql, message } from './github.ts';
 
 /** Comments read per open; older ones are paged by their cursor. */
 const COMMENT_LIMIT = 10;
@@ -37,6 +39,9 @@ export const OLDER_COMMENTS_QUERY = `query($id: ID!, $before: String!) {
     ... on Issue { ${comments(`last: ${COMMENT_LIMIT}, before: $before`)} }
   }
 }`;
+
+/** Larger reads cross factory comment batches without one CLI call per ten transport comments. */
+const COMMENT_LOOKAHEAD_QUERY = OLDER_COMMENTS_QUERY.replace('last: 10,', 'last: 100,');
 
 interface RawLogin {
   login: string;
@@ -78,39 +83,54 @@ export async function readGithubItemDetails(item: Item, run?: (args: string[]) =
   try { node = (await graphql<{ data: { node: RawDetails | null } }>(ITEM_DETAILS_QUERY, { id: item.id }, run)).data.node; }
   catch (err) { return { status: 502, error: message(err) }; }
   if (!node) return { status: 404, error: 'GitHub has no such item.' };
-  const { comments } = node;
-  const older = olderCursor(comments);
+  const discussion = await skipEmptyCommentPages(commentPage(node.comments), (before) => readGithubCommentPage(item, before, COMMENT_LOOKAHEAD_QUERY, run));
+  if ('error' in discussion) return discussion;
   return {
-    body: node.body ?? '',
+    body: stripTrackerStructure(node.body ?? ''),
     format: 'markdown',
     author: node.author?.login ?? null,
     assignees: node.assignees?.nodes.map((a) => a.login) ?? [],
     createdAt: node.createdAt ?? null,
     ...(node.milestone ? { milestone: node.milestone.title } : {}),
     subTickets: node.subIssues?.nodes.map(subTicket) ?? [],
-    // GitHub lists the last 10 oldest first; the dialog reads newest first.
-    comments: (comments?.nodes ?? []).map(toComment).reverse(),
-    hasOlderComments: older !== null,
-    olderCursor: older,
+    ...discussion,
+    hasOlderComments: discussion.olderCursor !== null,
   };
 }
 
 /** Where the next older page starts; null when GitHub has none before this one. */
 const olderCursor = (comments: RawComments | undefined): string | null => (comments?.pageInfo.hasPreviousPage ? comments.pageInfo.startCursor : null);
 
+/** GitHub lists each page oldest first; the dialog reads newest first. */
+const commentPage = (comments: RawComments | undefined): ItemCommentsPage => ({
+  comments: (comments?.nodes ?? []).filter((comment) => !isStructureComment(comment.body)).map(toComment).reverse(),
+  olderCursor: olderCursor(comments),
+});
+
 /** Reads the 10 comments before `before` on one item, newest first, or says why it can't. */
 export async function readGithubOlderComments(item: Item, before: string, run?: (args: string[]) => Promise<string>): Promise<ItemCommentsPage | Refused> {
+  const first = await readGithubCommentPage(item, before, OLDER_COMMENTS_QUERY, run);
+  if ('error' in first) return first;
+  return skipEmptyCommentPages(first, (cursor) => readGithubCommentPage(item, cursor, COMMENT_LOOKAHEAD_QUERY, run));
+}
+
+async function readGithubCommentPage(item: Item, before: string, query: string, run?: (args: string[]) => Promise<string>): Promise<ItemCommentsPage | Refused> {
   let node: RawDetails | null;
-  try { node = (await graphql<{ data: { node: RawDetails | null } }>(OLDER_COMMENTS_QUERY, { id: item.id, before }, run)).data.node; }
+  try { node = (await graphql<{ data: { node: RawDetails | null } }>(query, { id: item.id, before }, run)).data.node; }
   catch (err) { return { status: 502, error: message(err) }; }
   if (!node?.comments) return { status: 404, error: 'GitHub has no such item.' };
-  return { comments: node.comments.nodes.map(toComment).reverse(), olderCursor: olderCursor(node.comments) };
+  return commentPage(node.comments);
 }
 
 /** Saves `body` as the issue's markdown body. Returns null, or the refusal: 403 when GitHub refuses the edit, else 502 with gh's message. */
 export async function saveGithubDescription(item: Item, body: string, run?: (args: string[]) => Promise<string>): Promise<Refused | null> {
   if (!item.repo || item.number === null) return { status: 404, error: 'That item is not a GitHub issue.' };
   try {
+    if (item.tracker) {
+      const current = await readIssue(item.repo,item.number,run);
+      if (!current?.tracker) return {status:409,error:'The saved issue structure changed. Open the latest description before editing.'};
+      body = writeTrackerStructure(body,current.tracker);
+    }
     await editIssueBody(item.repo, item.number, body, run);
     return null;
   } catch (err) {

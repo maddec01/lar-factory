@@ -80,7 +80,7 @@ test('the List modal starts on the board\'s scope', async () => {
 test('under All repositories a row names its repository', async () => {
   await mountPage();
   await open();
-  const meta = (id: string) => text($(`[data-list-modal] button[data-item="${id}"] span span:last-child`));
+  const meta = (id: string) => text($(`[data-list-modal] button[data-item="${id}"] .tabular-nums`));
   expect(meta('I_sample03')).toMatch(/^lar-apple · /);
   expect(meta('I_sample04')).toMatch(/^lar-server · /);
 });

@@ -2,10 +2,19 @@
 // and carrying the buttons for its next action; and the line's heading below it.
 
 import { expect, test } from 'vite-plus/test';
-import type { BoardData, Item } from '@lar-factory/shared';
+import type { BoardData, Item, RepositorySetup } from '@lar-factory/shared';
 import { $, $$, mountPage, pressMenu, sample, settle, text } from '../../test/support.ts';
 
 const cards = () => $$('.desk-card');
+test('known missing delivery access disables Start build without blocking the rest of the board', async () => {
+  const data = noBlockers();
+  data.repos = data.repos.map(repo => ({ ...repo, setup: { ...repo.setup, access: { ...repo.setup?.access, 'push-branch': 'refused', 'open-pr': 'allowed' } } as RepositorySetup }));
+  await mountPage(data);
+  const start = $<HTMLButtonElement>('[data-build-unavailable="I_sample13"]')!;
+  expect(start.disabled).toBe(true);
+  expect(start.title).toContain('push branches');
+  expect($('[data-onboard]')).toBeNull();
+});
 const card = (id: string) => $(`.desk-card[data-item="${id}"]`)!;
 /** A card's buttons and links, as their text, an icon button's name in brackets, with a disabled one's title. */
 const controls = (id: string) => [...card(id).querySelectorAll('.desk-actions :is(button, a)')]
@@ -68,14 +77,14 @@ const NO_THREAD = 'No T3 thread has worked on this yet';
 const NO_PROJECT = 'T3 Code has no project for maddec01/lar-server';
 
 test.each<[string, BoardData, string, string, string[]]>([
-  ['Needs you with no thread', sample, 'I_sample11', 'Answer in its T3 thread', [`Open thread (disabled: ${NO_THREAD})`]],
-  ['Needs you', sample, 'I_sample12', 'Answer in its T3 thread', ['Open thread']],
-  ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', 'Answer in its T3 thread', ['Open thread']],
+  ['Needs you with no thread', sample, 'I_sample11', 'Answer in T3', [`Open thread (disabled: ${NO_THREAD})`]],
+  ['Needs you', sample, 'I_sample12', 'Answer in T3', ['Open thread']],
+  ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', 'Answer in T3', ['Open thread']],
   ['Ready with a thread at work on it', withItem('I_sample13', { threads: liveThread }), 'I_sample13', 'A thread is at work on it', ['Open thread']],
   ['Ready held by open blockers', withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 9, repo: 'maddec01/lar-apple', state: 'open' }, { number: 7, repo: 'maddec01/lar-server', state: 'closed' }] }),
     'I_sample13', 'Waits on #202, lar-apple#9', ['Start after lar-apple#9 ▾', '[Open thread]']],
   ['Ready held by its repository', { ...noBlockers(), repositoryProjects: { 'maddec01/lar-server': NO_PROJECT } }, 'I_sample13', NO_PROJECT, [`Start build (disabled: ${NO_PROJECT})`, '[Open thread]']],
-  ['Ready with nothing holding it', noBlockers(), 'I_sample13', 'Ready to build', ['Start build ▾', '[Open thread]']],
+  ['Ready with nothing holding it', noBlockers(), 'I_sample13', 'Brief ready', ['Start build ▾', '[Open thread]']],
   ['Verify', sample, 'I_sample16', 'can merge · 1 passed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
   ['Ready to merge', sample, 'I_sample17', 'can merge · 4 passed · 1 failed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
   ['Verify with no PR', withItem('I_sample16', { linkedPrs: [] }), 'I_sample16', 'Test it with the steps in the PR, then merge',
@@ -143,4 +152,54 @@ test('the line follows the desk under its heading', async () => {
   await mountPage();
   expect(text($('#line-h'))).toBe('The line');
   expect($('.desk')!.compareDocumentPosition($('.line')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+const questionBoard = (child: Partial<Item> = {}, concept: Partial<Item> = {}): BoardData => ({ ...sample, items: sample.items.map((item) =>
+  item.id === 'I_sample09' ? { ...item, status: 'Needs you', threads: [{ id: 'concept-question', title: 'Concept question', state: 'needs you', updated: '2026-10-21T09:00:00.000Z' }], ...concept }
+    : item.id === 'I_sample12' ? { ...item, status: 'Needs you', parentId: 'I_sample09', threads: [], ...child } : item) });
+
+test('a decision with no thread answers in its concept thread without inheriting its thread association or usage', async () => {
+  const data = questionBoard({ stats: undefined });
+  await mountPage(data);
+  const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+  expect([text(action), action.href]).toEqual(['Answer in concept thread', 't3code://threads/sample-environment/concept-question']);
+  expect(nextLine('I_sample12')).toBe('Answer in T3');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const child = useBoardStore.getState().data.items.find((item) => item.id === 'I_sample12')!;
+  expect(child.threads).toEqual([]);
+  expect(child.stats).toBeUndefined();
+  await settle(() => card('I_sample12').click());
+  expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in concept thread');
+});
+
+test('a decision keeps its own thread even when its concept has a waiting thread', async () => {
+  await mountPage(questionBoard({ threads: [{ id: 'own-decision', title: 'Decision', state: 'stopped', updated: '2026-10-21T09:00:00.000Z' }] }));
+  const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+  expect(action.href).toBe('t3code://threads/sample-environment/own-decision');
+  expect(text(action)).toBe('Open thread');
+});
+
+test.each([
+  ['unavailable child observations', { threads: 'unavailable' }, {}],
+  ['unavailable concept observations', {}, { threads: 'unavailable' }],
+  ['retained concept observations', {}, { threads: [{ id: 'stale-concept', title: 'Old question', state: 'needs you', updated: '2026-10-21T09:00:00.000Z', observedAt: '2026-10-21T09:01:00.000Z' }] }],
+  ['a finished concept thread', {}, { threads: [{ id: 'done-concept', title: 'Finished', state: 'done', updated: '2026-10-21T09:00:00.000Z' }] }],
+  ['a missing parent', { parentId: 'missing' }, {}],
+  ['a parent cycle', { parentId: 'I_sample12' }, {}],
+  ['an unrelated repository thread', { parentId: null }, {}],
+] satisfies [string, Partial<Item>, Partial<Item>][])('a decision does not borrow an unrelated question for %s', async (_name, child, concept) => {
+  await mountPage(questionBoard(child, concept));
+  const action = card('I_sample12').querySelector<HTMLButtonElement>('[data-open-thread]')!;
+  expect(action.tagName).toBe('BUTTON');
+  expect(action.disabled).toBe(true);
+  expect(action.getAttribute('href')).toBeNull();
+});
+
+test('a ready item appears once on the desk while its concept family remains available', async () => {
+  await mountPage();
+  expect(card('I_sample13')).not.toBeNull();
+  expect($('[data-in-flight] [data-item="I_sample13"]')).toBeNull();
+  const expand = $<HTMLButtonElement>('[data-dossier="I_sample09"] button[aria-expanded]')!;
+  if (expand.getAttribute('aria-expanded') === 'false') await settle(() => expand.click());
+  expect($('[data-dossier="I_sample09"] [data-map-part="I_sample13"], [data-dossier="I_sample09"] [data-part="I_sample13"]')).not.toBeNull();
 });

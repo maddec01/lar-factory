@@ -1,5 +1,3 @@
-import { createPublication } from './publication/publication.ts';
-import { publicationVocabulary } from './publication/vocabulary.ts';
 import { repositoryProjects, reauthorizeRepositoryProjects } from './t3/repository-project-discovery.ts';
 // The board server: reads each item source through `gh` or `az` at its own pace, every 15 s while it holds active work
 // and every 5 min while idle, refreshes T3's threads and stats every 2 s without either, keeps the last good copy in
@@ -11,13 +9,12 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
+import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
+import { syncStructures } from '@lar-factory/work-records/tracker-sync';
 import { createBoardState } from './board/board-state.ts';
-import { configUpdateOf, dismissConfigUpdate } from './config/config-update.ts';
-import { openConfigUpdatePr, readEditPrs } from './config/edit-config.ts';
-import { onTheBoard, readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
+import { readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { observePr } from './config/pr-host.ts';
-import { changeRepositorySettings, readDismissedUpdates, readOnboardedConfigs } from './config/repository-settings.ts';
+import { changeRepositorySettings, readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, observeIssue, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
@@ -25,18 +22,16 @@ import { createCapture } from './items/capture.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
+import { createPrObserver } from './items/pr-observer.ts';
 import { createRetention } from './items/retention.ts';
 import { archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
-import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
-import { createPrOpener, previewOnboardingPr } from './onboarding/onboarding-pr.ts';
-import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
+import { projectChoices } from './onboarding/project-choices.ts';
 import { detectSetup } from './onboarding/detect-setup.ts';
-import { importTickets, importableTickets } from './onboarding/import-tickets.ts';
 import { saveSetup } from './onboarding/save-setup.ts';
 import { loadBuild } from './page/page.ts';
 import { recordBoard } from './port/board-record.ts';
@@ -81,6 +76,30 @@ const board = createBoardState({
  */
 let records: WorkRecords | null = null;
 let recordsProblem: string | null = null;
+let localUpdatesBlocked = false;
+let localFailureCode: string | undefined;
+
+/** A newer CLI may upgrade the shared database while this process still serves its last good view. */
+function localFailure(error: unknown): void {
+  const code = error instanceof WorkRecordError ? error.code : 'local-refresh-failed';
+  if (localUpdatesBlocked && code !== 'schema-too-new') return;
+  const restart = code === 'schema-too-new';
+  if (restart) localUpdatesBlocked = true;
+  const problem = restart ? 'Restart Lar Factory to continue.' : 'Local work could not refresh. The board will retry.';
+  if (restart) recordsProblem = problem;
+  if (localFailureCode === code) return;
+  localFailureCode = code;
+  log(`local work paused: ${code}`);
+  board.update({ localProblem: problem, ...restart && { error: problem } });
+  board.push();
+}
+
+/** Periodic local work must not turn an expected database-version refusal into an unhandled rejection. */
+function runLocal(work: () => unknown): void {
+  if (localUpdatesBlocked) return;
+  try { void Promise.resolve(work()).catch(localFailure); }
+  catch (error) { localFailure(error); }
+}
 if (!fixture) {
   try { records = await openWorkRecords(); }
   catch (err) {
@@ -131,29 +150,15 @@ const items = onboardedSources(async () => {
     board.update({ repos: [], repositoryConfigProblems: [], onboarding: [] });
     throw err;
   }
-  // A repository still onboarding has no local settings until it saves them, so it stays off the board. Each refresh
-  // asks gh for every open Edit PR, so its row's mark survives a restart and goes once the PR merges or closes. A file below the app's Repository config
-  // version gets the notice offering its update PR, unless this Mac dismissed it at that version.
-  const onboarded = onTheBoard(list);
-  const [read, editPrs] = await Promise.all([readOnboardedConfigs(list),
-    readEditPrs(onboarded.map((e) => e.repo), undefined, (repo, problem) => log(`can't read ${repo}'s Edit PR: ${problem}`))]);
-  const dismissed = readDismissedUpdates();
+  const read = await readOnboardedConfigs(list);
   board.update({
-    repos: read.configs.map((config, index) => {
-      const configUpdate = configUpdateOf(config, dismissed);
-      return { ...repoView(config), version: config.version, ...editPrs.has(config.repo) && { editPr: editPrs.get(config.repo) },
-        ...configUpdate !== undefined && { configUpdate }, setup: read.setups[index]! };
-    }),
+    repos: read.configs.map((config, index) => ({ ...repoView(config), setup: read.setups[index]! })),
     repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list),
   });
   moveFirstRead({ step: 'items' });
   return read;
 });
-/** Each repository's .lar-factory.json answer for onboarding, kept until Recheck. */
-const configChecks = createConfigChecks();
-/** T3's projects as onboarding offers them, as the list is now. */
-const choices = () => projectChoices(onboarded(), configChecks.configOf);
-const offersUnavailable = flipLog("no onboarding offers: can't read T3 Code's projects", 'onboarding offers readable again');
+const choices = () => projectChoices(onboarded());
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;
@@ -220,7 +225,7 @@ const settleFirstRead = () => {
   moveFirstRead({ running: [], waiting: undefined, settled: true });
   if (warming || fixture) return;
   warming = true;
-  void warmT3Stats(statsSources).finally(() => {
+  void warmT3Stats(statsSources, recordedThreadIds(board.snapshot().items)).finally(() => {
     transcriptsRead = true;
     refreshLocal();
     // The first read had no fresh stats to write to the builds' open PRs; they have now.
@@ -246,7 +251,7 @@ function flipLog(whenSet: string, whenCleared: string): (set: boolean) => void {
   };
 }
 
-const statsUnavailable = flipLog(`item stats unavailable: can't read ${statsSources.db}`, `item stats readable again from ${statsSources.db}`);
+const statsUnavailable = flipLog('usage totals are waiting for T3 details', 'usage totals are current');
 const pricingUnavailable = flipLog(`API cost unavailable: can't read rates from ${statsSources.rates}`, `API cost readable again from ${statsSources.rates}`);
 const modelsUnavailable = flipLog(`only T3 default offered: no models read from ${statsSources.settings} and ${modelManifest}`, 'model choices readable again');
 
@@ -256,6 +261,13 @@ const modelsUnavailable = flipLog(`only T3 default offered: no models read from 
  */
 let transcriptsRead = false;
 
+/** Only board work and its slices need usage reads; unrelated T3 threads are outside this board. */
+function recordedThreadIds(items: readonly Item[]): string[] {
+  if (!records) return [];
+  const workIds = items.filter(item => item.recorded !== false).flatMap(item => [item.id, ...item.slices.flatMap(slice => slice.workId ?? [])]);
+  return [...new Set(workIds.flatMap(workId => records.threads(workId).map(thread => thread.threadId)))];
+}
+
 /**
  * Attaches each item's stats and T3 threads, from one read of T3 Code's database. Stats are those frozen in its
  * latest merged linked PR's block once no linked PR is open, else read afresh from the database and transcripts once
@@ -263,10 +275,16 @@ let transcriptsRead = false;
  */
 function withT3Reads(items: Item[], withStats = true): Item[] {
   const now = Date.now();
-  const fresh = withStats && transcriptsRead;
+  const needed = recordedThreadIds(items);
+  const fresh = withStats && transcriptsRead && needed.length > 0;
   const threadIds = (workId: string | undefined) => (workId && records ? records.threads(workId).map((t) => t.threadId) : []);
-  const threads = (workId: string | undefined) => protocolItemThreads(threadIds(workId));
-  const { stats, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, fresh);
+  const threads = (workId: string | undefined) => {
+    const observed = protocolItemThreads(threadIds(workId));
+    if (!Array.isArray(observed) || !workId || !records) return observed;
+    const purposes = new Map(records.threads(workId).map(thread => [thread.threadId, thread.purpose]));
+    return observed.map(thread => ({ ...thread, purpose: purposes.get(thread.id) }));
+  };
+  const { stats, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, fresh, needed);
   if (fresh) {
     statsReadAt = now;
     statsUnavailable(unreadable);
@@ -274,6 +292,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   }
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
   return items.map((item) => {
+    if (item.recorded === false) return item;
     const known = retainStats(previousStats.get(item.id), item.stats);
     const live = fresh ? stats(threadIds(item.id)) : item.stats;
     const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item.id) };
@@ -361,6 +380,10 @@ async function checkQuota(): Promise<void> {
  * already copied into its snapshot, even while a provider read runs.
  */
 function refreshLocal(recordsChanged = false): void {
+  runLocal(() => refreshLocalNow(recordsChanged));
+}
+
+function refreshLocalNow(recordsChanged: boolean): void {
   if (refreshing && !recordsChanged) return;
   void t3Availability().then(source => {
     board.update({ t3Availability: source });
@@ -373,12 +396,12 @@ function refreshLocal(recordsChanged = false): void {
   // A run can finish between stats reads. Read its final turn before writing the settled PR block.
   const finished = after.some((item) => running(before.find((b) => b.id === item.id) ?? item) && !running(item));
   if (finished) board.update({ items: after = withT3Reads(after) });
-  void commands.reconcileStarts(after);
+  runLocal(() => commands.reconcileStarts(after));
   if (!recordsChanged && JSON.stringify(after) === JSON.stringify(before)) return;
   board.push();
   void syncPrStats(after);
   // A blocker completes from local facts, as a decision's answer the shaping session records, without any ticket read.
-  void startAfter.startUnblocked();
+  runLocal(() => startAfter.startUnblocked());
 }
 
 /** Shows the work records as they are now with the last tickets read, and their T3 threads; stats only when `withStats`. */
@@ -467,8 +490,6 @@ function showToolChecks(checks: ToolChecks): void {
  */
 async function recheckTools(rereadLoginPath = true, asked: { gh?: boolean; az?: boolean } = {}, ghChecked = () => {}): Promise<void> {
   while (checkingTools) await checkingTools;
-  // Recheck asks each repository for its .lar-factory.json again; the timed retry keeps the answers.
-  if (rereadLoginPath) configChecks.clear();
   const { tools: before } = board.snapshot();
   const ghBlocked = before !== undefined && ghStopsRead(before);
   checkingTools = (async () => {
@@ -534,7 +555,7 @@ function ghStopsRead(checks: ToolChecks | undefined): boolean {
  * a tick with no source due reads nothing.
  */
 async function refresh(): Promise<void> {
-  if (refreshing) return;
+  if (refreshing || localUpdatesBlocked) return;
   // Every source reads with a tool the first lookup finds; each waits for its own provider's check through the pace.
   if (!lookedUp) return;
   refreshing = true;
@@ -565,6 +586,7 @@ async function refresh(): Promise<void> {
     // board keeps showing no read, as before it. After one, a source its tool blocks keeps its last read, which stays fresh.
     if (fetchedAt === null && repos.length > 0 && repos.every((repo) => snapshot.waiting?.includes(repo.repo) || blockedByTool(itemSource(repo)))) return;
     const recovered = error !== null && error !== (settings.problem ?? recordsProblem) || fetchedAt === null;
+    await prObserver?.known(snapshot.items.filter(item => items.readAfresh(item)));
     board.applyRead(recordedItems(snapshot), readRevision, withT3Reads, items.readAfresh);
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting });
     board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? recordsProblem, itemSourceProblems: snapshot.problems ?? [],
@@ -572,6 +594,7 @@ async function refresh(): Promise<void> {
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;
   } catch (err) {
+    if (err instanceof WorkRecordError) { localFailure(err); return; }
     // While a listed repository is on GitHub, probe gh, so a gh that went missing or logged out shows its notice instead
     // of Stale; a cooling gh calls nothing. An Azure DevOps source names its own az problems.
     const checks = board.snapshot().tools ?? {};
@@ -586,22 +609,18 @@ async function refresh(): Promise<void> {
     refreshing = false;
     // A source still waiting for its provider's first check reads once it lands, which asks for the read that settles
     // the first read then.
-    if (!readAgain && !items.repos().some((repo) => unchecked.has(providerTool(itemSource(repo))))) settleFirstRead();
+    if (!localUpdatesBlocked && !readAgain && !items.repos().some((repo) => unchecked.has(providerTool(itemSource(repo))))) settleFirstRead();
     // A read asked for during this one starts once this one ends, though it read nothing.
-    if (readAgain) queueMicrotask(() => void refresh());
+    if (readAgain && !localUpdatesBlocked) queueMicrotask(() => runLocal(() => refresh()));
   }
   board.push();
   // Repositories not answered yet take a gh call each, so the offers follow the read instead of holding it up, at the idle
   // pace or after a read request naming no item, not after each read of active work.
-  if (read && (offersAsked || Date.now() - offeredAt >= idleMs())) {
-    offersAsked = false;
-    offeredAt = Date.now();
-    void offerOnboarding().then(() => board.push());
-  }
+
   // PR edits take a gh call or two each, and a start runs t3; the board doesn't wait for them.
   if (read) void syncPrStats(board.snapshot().items);
-  if (read) void startAfter.startUnblocked();
-  if (read) void observeProviders();
+  if (read) runLocal(() => startAfter.startUnblocked());
+  if (read) runLocal(() => observeProviders());
 }
 
 /**
@@ -618,6 +637,14 @@ function knownTicket(repo: string, number: number): TicketObservation | undefine
 /** When the records' tickets and PRs were last observed, which runs at the idle pace as each record takes a call or two. */
 let observedAt = -Infinity;
 let observing = false;
+const prObserver = records ? createPrObserver(records, {
+  repositories: () => items.repos().map(repo => repo.repo), hidden: () => retention.hidden(),
+  waits: repo => quotaLow && !onAzure(repo) || waitsForTool(onAzure(repo) ? 'azure-board' : 'issues') || blockedByTool(onAzure(repo) ? 'azure-board' : 'issues'),
+  changed: () => {
+    finishCompleted(records, items.repos().map(repo => repo.repo));
+    refreshLocal(true);
+  },
+}) : null;
 
 /**
  * Records what each onboarded repository's tickets and PRs show now, then finishes the decisions and concepts now
@@ -648,20 +675,6 @@ async function observeProviders(): Promise<void> {
   refreshLocal(true);
 }
 
-let offeredAt = -Infinity;
-let offersAsked = false;
-
-/** Offers to onboard each T3 project whose repository has .lar-factory.json and isn't on the list; none while T3's projects can't be read. */
-async function offerOnboarding(): Promise<void> {
-  try {
-    board.update({ onboardingOffers: onboardingOffers(await choices()) });
-    offersUnavailable(false);
-  } catch {
-    board.update({ onboardingOffers: [] });
-    offersUnavailable(true);
-  }
-}
-
 /**
  * Reads the source listing the item at `url` now, or every source after loading the configs again when there is none;
  * or once more after the running read, so a change made during that read is read too.
@@ -669,7 +682,6 @@ async function offerOnboarding(): Promise<void> {
 function readSoon(url?: string): void {
   if (url === undefined) {
     items.reload();
-    offersAsked = true;
   } else items.invalidate(url);
   readNow();
 }
@@ -704,22 +716,6 @@ const { server, endStreams } = createBoardServer({
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   detectSetup: (input) => detectSetup(input), saveSetup: (input) => saveSetup(input),
-  importableTickets: (input) => importableTickets(input, records),
-  importTickets: async (input) => {
-    const imported = await importTickets(input, records);
-    if ('imported' in imported) reread();
-    return imported;
-  },
-  openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input),
-  openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),
-  publicationVocabulary,
-  publication: createPublication(records, { allowed: (repo) => items.repos().some((row) => sameRepo(row.repo, repo)), changed: reread,
-    settings: async (repo) => {
-      const result = await publicationVocabulary(repo);
-      if ('error' in result) throw new Error(result.error);
-      return result;
-    },
-  }),
   changeRepositorySettings: (input) => changeRepositorySettings(input),
 });
 
@@ -758,10 +754,16 @@ if (fixture) {
 }
 // Each tick only checks whether a source is due; refresh reads nothing when none is.
 const timer = setInterval(() => {
-  if (!fixture) void refresh();
+  if (!fixture) runLocal(() => refresh());
 }, 1_000);
 const localTimer = setInterval(() => {
-  if (!fixture) refreshLocal();
+  if (!fixture) {
+    runLocal(() => {
+      refreshLocal();
+      runLocal(() => prObserver?.poll());
+      if (records?.trackerPending().length) runLocal(() => syncStructures(records));
+    });
+  }
 }, LOCAL_REFRESH_MS);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

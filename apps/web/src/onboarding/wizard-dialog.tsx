@@ -13,19 +13,12 @@ import { StepBody } from './steps.tsx';
 import { STEP_TITLES, type StepId } from './wizard-choices.ts';
 import { type Run, pickedProject, runSteps, stepReady, useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
+import { useSettingsStore } from '../settings/settings-store.ts';
 
 const STEP_HELP: Record<StepId, string> = {
-  project: 'Choose the repository folder where agents will work.',
-  detect: 'Read from the repository and your access, with no test write. Nothing here is a question.',
-  source: "Choose the team whose work the board shows.",
-  import: 'Ticked tickets with a status label or tag become private work with that Status. Their labels and tags stay as they are.',
-  role: 'Say what this repository is to the others, such as the API server a client app uses.',
-  connections: 'Tick the other onboarded repositories this one works with, so refinement can propose work across them.',
-  consent: 'Choose what the factory may write for you, within what your access allows.',
-  docs: 'Choose where the glossary and ADRs that builds write go.',
-  skills: "Choose the repository's skills that guide how builds write code.",
-  files: 'This repository has files from an earlier Lar Factory setup. Keep or drop each one.',
-  edits: 'Review the pull request that drops the files you unticked.',
+  project: 'Choose where agents will work.',
+  work: 'Choose what to show and what builds may save.',
+  access: 'Check the access the factory needs.',
 };
 
 /**
@@ -39,17 +32,17 @@ function closedFocus(opener: HTMLElement | null): HTMLElement | null {
 
 /** Back, then Next, or on the last step Finish; once Finish saved, Go to the board. */
 function Nav({ run }: { run: Run }) {
-  const { projects, detection, tickets, changes, approved, finish, next, back, save, close } = useWizardStore();
-  if (finish.state === 'done') return <Button {...kind('main')} leftIcon={<Check />} onClick={close}>Go to the board</Button>;
+  const { projects, detection, finish, next, back, save, close } = useWizardStore();
+  if (finish.state === 'done') return <Button {...kind('main')} leftIcon={<Check />} onClick={() => { close(); useSettingsStore.getState().setOpen(false); }}>Go to the board</Button>;
   const steps = runSteps(run, detection);
   const at = steps.indexOf(run.step);
-  const ready = stepReady(run, projects, detection, tickets, changes, approved);
+  const ready = stepReady(run, projects, detection);
   return (
     <>
       {at > 0 && <Button {...kind('other')} disabled={finish.state === 'saving'} onClick={back}>Back</Button>}
       {at === steps.length - 1
-        ? <Button {...kind('main')} disabled={!ready} loading={finish.state === 'saving'} leftIcon={<Check />} onClick={() => void save()}>Finish</Button>
-        : <Button {...kind('main')} disabled={!ready} loading={!!tickets?.importing} rightIcon={<ArrowRight />} onClick={() => void next()}>Next</Button>}
+        ? <Button {...kind('main')} disabled={!ready} loading={finish.state === 'saving'} leftIcon={<Check />} onClick={() => void save()}>Add repository</Button>
+        : <Button {...kind('main')} disabled={!ready} rightIcon={<ArrowRight />} onClick={() => void next()}>Next</Button>}
     </>
   );
 }
@@ -84,15 +77,15 @@ function WizardModal({ run }: { run: Run }) {
   const steps = runSteps(run, detection);
   const at = steps.indexOf(run.step);
   const doneCount = finished ? steps.length : at;
-  const done = finished ? 'Ready' : `${doneCount} of ${steps.length} done`;
+  const done = finished ? 'Ready' : `Step ${at + 1} of ${steps.length}`;
   return (
     <Modal onClose={close}>
       {/* ninna-ui's Modal drops the description from aria-describedby, so the step's place names itself. */}
-      <Modal.Content ref={dialog} data-onboarding-dialog title={finished ? 'Onboarded' : STEP_TITLES[run.step]} aria-describedby="onboarding-place"
+      <Modal.Content ref={dialog} data-onboarding-dialog title={finished ? 'Repository added' : STEP_TITLES[run.step]} aria-describedby="onboarding-place"
         description={finished ? undefined : STEP_HELP[run.step]} focusFirstField={false}>
         <div className="grid shrink-0 gap-2 px-5 pb-4 sm:px-6">
           <Text id="onboarding-place" tone="muted">
-            Set up {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'}.{!finished && ` Step ${at + 1} of ${steps.length}.`}
+            Set up {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'}.
           </Text>
           <Progress value={doneCount} max={steps.length} caption={done} aria-label={done} />
         </div>

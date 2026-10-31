@@ -53,24 +53,6 @@ test('only another repository on the board can be connected', () => {
   assert.deepEqual(readConnections(WEB, dir), [API]);
 });
 
-test('restoring an onboarding keeps its pairs once', () => {
-  const dir = dataDir();
-  saveConnections(WEB, [API], dir);
-  saveOnboarding({ repo: WEB, progress: { step: 'role', done: [], answers: { projectId: 'p' } } }, null, dir, { replaceUnusableConfig: true });
-  saveOnboarded(WEB, null, dir);
-  saveConnections(WEB, [API], dir);
-  assert.deepEqual(saved(dir).connections, [[API, WEB]]);
-});
-
-test('a repository that leaves the list takes its Connections with it', () => {
-  const dir = dataDir();
-  saveConnections(WEB, [API, IOS], dir);
-  saveOnboarding({ repo: WEB, progress: { step: 'role', done: [], answers: { projectId: 'p' } } }, null, dir, { replaceUnusableConfig: true });
-  saveOnboarding({ repo: 'maddec01/lar-cli', progress: { step: 'role', done: [], answers: { projectId: 'p' } } }, WEB, dir);
-  assert.deepEqual(saved(dir).connections, []);
-  assert.deepEqual(readConnections(API, dir), []);
-});
-
 test('a pair naming a repository removed from the file by hand reads as gone', () => {
   const dir = dataDir([WEB, API]);
   writeFileSync(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: [{ repo: WEB }], connections: [[API, WEB], [WEB, 7]] }));

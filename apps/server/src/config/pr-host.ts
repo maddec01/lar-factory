@@ -1,14 +1,13 @@
-// The calls that open and follow the board's PRs on a repository, onboarding's and Edit's: az's on Azure
-// DevOps, gh's on GitHub, each named and shaped alike.
+// Repository metadata and PR observation through the provider's local login.
 
 import { onAzure } from '@lar-factory/shared';
 import type { PullRequestState } from '@lar-factory/work-records';
 import { AZURE_REPOS, prUrl as azurePrUrl } from '../azure/azure-repos.ts';
 import {
-  branchExists, branchHead, closePr, commitTree, createPr, defaultBranchHead, editPrBody, openPrFrom, prState, pushCommit, readBlob, reopenPr,
+  branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr,
 } from '../github/github.ts';
 
-const GITHUB = { branchExists, branchHead, closePr, commitTree, createPr, defaultBranchHead, editPrBody, openPrFrom, prState, pushCommit, readBlob, reopenPr };
+const GITHUB = { branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr };
 
 /** The calls that open and follow the repository's PRs. A caller's `run` stands in for that tool. */
 export const prHost = (repo: string): typeof GITHUB => (onAzure(repo) ? AZURE_REPOS : GITHUB);

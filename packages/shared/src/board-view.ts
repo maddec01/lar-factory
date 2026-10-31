@@ -60,7 +60,7 @@ export function boardSections(data: BoardData, now: number): BoardSections {
   return {
     needsYou: inStatus('Ready', 'Needs you', 'Verify', 'Ready to merge').filter(notConcept),
     inFlight: inStatus('Shaping', 'Ready', 'In progress', 'Review').filter(notConcept),
-    concepts: items.filter((i) => i.kind === 'concept' && i.status !== 'Done'),
+    concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),
     list,
     listGroups,
@@ -88,7 +88,7 @@ export function prLabel(pr: LinkedPr): string {
   return `PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'open' ? '' : ` (${pr.state})`}`;
 }
 
-export const UNREADABLE = 'The T3 Code database could not be read';
+export const UNREADABLE = 'Usage details are unavailable.';
 
 /** What Abandon asks: it sets the work aside on this Mac, and leaves a ticket for closeTicketPrompt to ask about. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {

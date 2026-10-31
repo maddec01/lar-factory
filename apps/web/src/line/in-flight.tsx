@@ -1,14 +1,13 @@
 // Everything else in flight: every item past the Queue and short of Done that no dossier shows, furthest along first.
 // Each row reads as a collapsed dossier on the same two lines and line 2 columns, so its slice bar sits under a
 // dossier's part bar: line 1 the status glyph, title and meta, line 2 a build's slice bar, slice count, first blocked or
-// active slice and the agent figures, with the side action across both lines. Ready items keep Start build here as well
-// as on the desk. Items in Needs you, Verify or Ready to merge show where they are but take no action here: you act on
-// them from the desk.
+// active slice and the agent figures, with the side action across both lines. Items already on Your desk stay there;
+// dossiers retain their family context.
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight, GitPullRequest } from 'lucide-react';
-import { blockedText, itemName, openBlockers, prLabel, repoKey, repoName } from '@lar-factory/shared';
+import { boardSections, blockedText, itemName, openBlockers, prLabel, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -92,9 +91,10 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
 
 /** `items` are the line's items in the main area's scope; those a dossier shows are left out. */
 export function InFlight({ items }: { items: Item[] }) {
-  const { data } = useBoardStore();
+  const { data, now } = useBoardStore();
   const shown = inDossiers(dossiersOf(items, data.items));
-  const rows = items.filter((i) => stageOf(i.status) >= 0 && i.status !== 'Done' && !shown.has(i.id)).sort((a, b) => stageOf(b.status) - stageOf(a.status));
+  const deskIds = new Set(boardSections({ ...data, items }, now).needsYou.map((item) => item.id));
+  const rows = items.filter((i) => stageOf(i.status) >= 0 && i.status !== 'Done' && !shown.has(i.id) && !deskIds.has(i.id)).sort((a, b) => stageOf(b.status) - stageOf(a.status));
   return (
     <div className="overflow-hidden rounded-xl border border-(--border) bg-(--card)" data-in-flight>
       <div className="border-b border-(--border) px-3 py-1.5 text-[11px] font-medium text-(--muted-foreground)" data-in-flight-title>Everything else in flight · {rows.length}</div>

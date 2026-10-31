@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { boardSections, clock, failedCheck, isStale, repoName, shortAgo } from '@lar-factory/shared';
+import { boardSections, clock, failedCheck, inMacApp, isStale, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -154,7 +154,7 @@ export function TitleBar() {
   const data = useBoardStore((state) => state.data);
   const inset = useWindowControlsInset();
   return (
-    <div className={`title-bar shrink-0 select-none border-b border-base-300 ${inset} ${DRAG}`}>
+    <div data-native-window={inMacApp() || undefined} className={`title-bar shrink-0 select-none border-b border-base-300 ${inset} ${DRAG}`}>
       <TrafficLights />
       {/* The brand is hidden from screen readers, so the page's heading is here, for them only. A closing dialog whose
           opener went away puts focus on it. The missing-t3 notice has its own. */}

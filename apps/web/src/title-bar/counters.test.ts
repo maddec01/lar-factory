@@ -23,7 +23,7 @@ test('the counters show need you, building over the limit of 2, queued, shipped 
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
     'need you: 8 items only you can move',
     'building: 1 over the in-flight limit',
-    'queued: 3 items ready to build, 4 more in List',
+    'queued: 3 items ready to shape, 4 more in List',
     'shipped: Done in the last 7 days',
     'spend: Agent cost on open and recent items, an API estimate',
   ]);

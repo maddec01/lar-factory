@@ -4,10 +4,10 @@ import { vi } from 'vite-plus/test';
 import { $, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
 import type { BoardData, ProjectChoice, SetupDetection } from '@lar-factory/shared';
 
-export const empty: BoardData = { ...sample, repos: [], items: [], repositoryConfigProblems: [], error: null };
+export const empty: BoardData = { ...sample, repos: [], items: [], error: null };
 
 export const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
-  id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
+  id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', onBoard: false, ...parts,
 });
 
 /** A board answer to an onboarding call: a body, or one made from the call's body; an `error` answers 502 unless it's a Response. */
@@ -38,8 +38,8 @@ export const posted = (url: string) => (fetchMock.mock.calls as unknown as [stri
 /** A GitHub repository the login owns, with no domain docs, factory files, shared config or project skills. */
 export const detection = (parts: Partial<SetupDetection> = {}): SetupDetection => ({
   repo: 'maddec01/lar-web', provider: 'GitHub', checkout: { found: '/Users/me/Developer/lar-web' }, itemSources: { found: [{ kind: 'issues' }] },
-  access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
-  domainDocs: { found: { kind: 'private' } }, factoryFiles: { found: [] }, sharedConfig: { found: null }, projectSkills: { found: [] }, ...parts,
+  access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed', 'comment-ticket': 'allowed', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
+  domainDocs: { found: { kind: 'private' } }, projectSkills: { found: [] }, ...parts,
 });
 
 export const dialog = () => $('[data-onboarding-dialog]');

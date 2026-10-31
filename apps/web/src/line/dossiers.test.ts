@@ -271,7 +271,7 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
   await pressMenu(startIn(ready)!);
   expect(dialogTitle(), 'Start opens its menu, not the dialog').toBe('');
   await press(entries()[1]!);
-  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+  expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
 });
 
 test('the Ready to start row and the header agree on what can start: a Queued decision can, a part with a live thread cannot', async () => {
@@ -373,7 +373,7 @@ test('once its blockers complete, Start build sends the build, and the header of
   await pressMenu(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
   await press(entries()[1]!);
-  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+  expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   await answer({ thread: null, error: 'T3 is down.' }, 502);
   expect(text(dossier().querySelector('p.start [role="alert"]')), 'its error shows under its row').toBe('T3 is down.');
 });
@@ -525,4 +525,21 @@ test('a concept with no map has no fog row', async () => {
   const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: 'A concept written as ordinary prose.' });
   await mountPage({ ...sample, items: normalizeItems([concept]) });
   expect([dossier('I_700').querySelector('[data-attention]'), dossier('I_700').querySelector('[data-about]')]).toEqual([null, null]);
+});
+
+test('unlabelled local decision parts show the decision lane and completed answer facts without changing their Status',async()=>{
+  vi.stubGlobal('ResizeObserver',class{observe(){}disconnect(){}});
+  const complete:Item={...sample.items.find(item=>item.id==='I_sample10')!,recorded:true,kind:'decision',labels:[],status:'Shaping',completion:{complete:true,reasons:[]},threads:undefined};
+  const pending:Item={...sample.items.find(item=>item.id==='I_sample12')!,recorded:true,kind:'decision',labels:[],status:'Shaping',completion:{complete:false,reasons:['No answer.']},threads:undefined};
+  const parent:Item={...c200,subIssues:{total:2,completed:1}};
+  await mountPage({...sample,items:[parent,complete,pending]});
+  expect(text(line(2).children[1])).toBe('1/2 parts');
+  await press(button(dossier(),'Work map'));
+  const map=dossier().querySelector('[data-work-map]')!;
+  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research']);
+  const doneNode=map.querySelector(`[data-map-part="${complete.id}"]`)!;
+  const pendingNode=map.querySelector(`[data-map-part="${pending.id}"]`)!;
+  expect(text(doneNode)).toContain('decision');expect(text(doneNode)).toContain('Complete');expect(text(doneNode)).not.toContain('Shaping');expect(text(doneNode)).not.toContain('build');
+  expect(text(pendingNode)).toContain('decision');expect(text(pendingNode)).toContain('Shaping');
+  expect(complete.status).toBe('Shaping');expect(pending.status).toBe('Shaping');
 });

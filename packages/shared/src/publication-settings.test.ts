@@ -40,22 +40,22 @@ test('the command reads the board settings while it is closed and detects mappin
   const { mkdtemp, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
-  const { writeListFile, setVocabularyOverride, setOverride, applySharedDefaults } = await import('./repository-settings.ts');
+  const { writeListFile, setVocabularyOverride, setOverride } = await import('./repository-settings.ts');
   const { readPublicationSettings } = await import('./publication-settings.ts');
   const dir = await mkdtemp(join(tmpdir(), 'publication settings '));
   t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   const repo = 'org/project/repo';
   writeListFile(dir, { repositories: [{ repo }] });
-  applySharedDefaults(repo, { defaults: { vocabulary: { build: { type: 'User Story', labels: ['backend'] } } } }, dir);
+  setVocabularyOverride(repo, 'build', { type: 'User Story', labels: ['backend'] }, dir);
   const first = await readPublicationSettings(repo, { dir, reads: available });
-  expect(first.setup.vocabularySources.build).toBe('shared');
+  expect(first.setup.vocabularySources.build).toBe('local');
   setVocabularyOverride(repo, 'build', { type: null, labels: [] }, dir);
   const local = await readPublicationSettings(repo, { dir, reads: available });
   expect(local.setup.vocabulary.build).toEqual({ type: null, labels: [] });
   expect(local.setup.vocabularySources.build).toBe('local');
   expect(local.snapshot).not.toBe(first.snapshot);
   setVocabularyOverride(repo, 'build', undefined, dir);
-  expect((await readPublicationSettings(repo, { dir, reads: available })).snapshot).toBe(first.snapshot);
+  expect((await readPublicationSettings(repo, { dir, reads: available })).setup.vocabulary.build.type).toBeNull();
   setOverride(repo, 'itemSource', { kind: 'azure-board', team: 'Platform' }, dir);
   expect((await readPublicationSettings(repo, { dir, reads: available })).snapshot).not.toBe(first.snapshot);
 });
@@ -66,31 +66,6 @@ test('Azure excludes disabled work item types and reads the documented tags enve
     : [{ count: 1, value: [{ name: 'backend' }] }] });
   expect(found.types).toEqual({ state: 'available', choices: ['Bug'] });
   expect(found.labels).toEqual({ state: 'available', choices: ['backend'] });
-});
-
-test('a command recheck refreshes shared defaults and keeps the last usable config after a refused or malformed read', async (t) => {
-  const { mkdtemp, rm } = await import('node:fs/promises');
-  const { tmpdir } = await import('node:os');
-  const { join } = await import('node:path');
-  const { writeListFile } = await import('./repository-settings.ts');
-  const { readPublicationSettings } = await import('./publication-settings.ts');
-  const dir = await mkdtemp(join(tmpdir(), 'publication shared recheck '));
-  t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
-  writeListFile(dir, { repositories: [{ repo: 'org/repo' }] });
-  let text = JSON.stringify({ vocabulary: { build: { type: 'Task', labels: [] } } });
-  const reads = { ...available, sharedConfig: async () => text };
-  const first = await readPublicationSettings('org/repo', { dir, reads });
-  expect(first.setup.vocabulary.build.type).toBe('Task');
-  text = JSON.stringify({ vocabulary: { build: { type: 'Bug', labels: [] } } });
-  const changed = await readPublicationSettings('org/repo', { dir, reads });
-  expect(changed.snapshot).not.toBe(first.snapshot);
-  text = '{ malformed';
-  const malformed = await readPublicationSettings('org/repo', { dir, reads });
-  expect(malformed.setup.vocabulary.build.type).toBe('Bug');
-  expect(malformed.setup.sharedProblem).toMatch(/valid JSON/);
-  const refused = await readPublicationSettings('org/repo', { dir, reads: { ...reads, sharedConfig: async () => { throw new Error('HTTP 403: Refused'); } } });
-  expect(refused.setup.vocabulary.build.type).toBe('Bug');
-  expect(refused.setup.sharedProblem).toMatch(/Refused/);
 });
 
 test('Azure metadata uses the extension login and only a GET, including encoded project names', async () => {

@@ -6,6 +6,7 @@ import { Check, GitPullRequest } from 'lucide-react';
 import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { useBoardStore } from '../board/board-store.ts';
 import { PrReadiness } from './pr-readiness.tsx';
 import { STATUS_COLOR } from './status-glyph.tsx';
 
@@ -142,5 +143,24 @@ export function AgentWork({ item, className = '' }: { item: Item; className?: st
 /** The line that says why there are no agent work figures: no T3 thread worked on the item, or T3's database can't be read. */
 export function AgentWorkNote({ item }: { item: Item }) {
   const s = item.stats;
-  return s && s !== 'unavailable' ? null : <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : 'No T3 thread has worked on this yet.'}</p>;
+  const hasThread = Array.isArray(item.threads) && item.threads.length > 0;
+  return s && s !== 'unavailable' ? null : <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : 'No T3 thread has worked on this yet.'}</p>;
+}
+
+/** Kind and relationships remain visible before an issue is queued. */
+export function ItemKind({ item }: { item: Item }) {
+  const words: string[] = [];
+  if (item.kind) words.push(item.kind === 'bug' ? 'Bug' : item.kind === 'feature' ? 'Feature' : item.kind === 'improvement' ? 'Improvement' : item.kind === 'concept' ? 'Concept' : item.kind === 'decision' ? 'Decision' : 'Work');
+  const parentKind = useBoardStore((state) => state.data.items.find((parent) => Boolean(item.parentId && parent.id === item.parentId || item.parent?.url && parent.url === item.parent.url))?.kind);
+  const parentIsConcept = item.tracker?.parent?.kind === 'concept' || parentKind === 'concept';
+  if (parentIsConcept) words.push('Part of a concept');
+  else if (item.parent) words.push('Part of another issue');
+  if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Cross-repository');
+  return words.length ? <span data-item-kind className="inline-flex flex-wrap gap-1">{words.map((word) => <Badge key={word}>{word}</Badge>)}</span> : null;
+}
+
+export function StructureSync({ item }: { item: Item }) {
+  if (!item.sync || item.sync.state === 'saved') return null;
+  return <span data-structure-sync title={item.sync.message} role={item.sync.state === 'error' || item.sync.state === 'conflict' ? 'status' : undefined}
+    className="text-xs text-base-700">{item.sync.state === 'pending' ? 'Saving concept links…' : item.sync.state === 'conflict' ? 'Concept links changed on another machine' : 'Concept links could not save'}{item.sync.message && `. ${item.sync.message}`}</span>;
 }

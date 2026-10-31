@@ -1,5 +1,4 @@
-// The page, the control room: the title bar, then a card for each repository still onboarding, the offers to onboard
-// T3 projects that have a Repository config, Your desk and the line, scoped to the repository the title
+// The board shows onboarding in progress, Your desk and the line, scoped to the repository the title
 // bar or the List modal picked; a repository whose items the first read hasn't landed yet says it's reading instead
 // of an empty desk and line. While no t3 is found, the notice replaces the content and the title bar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
@@ -13,11 +12,8 @@ import { useBoardStore } from './board/board-store.ts';
 import { useScopeStore } from './board/scope-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
-import { PublicationDialog } from './publication/publication-dialog.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
 import { AbandonDialog } from './items/abandon-dialog.tsx';
-import { DriftChoiceDialog } from './items/drift-choice.tsx';
-import { startItem } from './items/start-item.ts';
 import { Line } from './line/line.tsx';
 import { LoadingScreen } from './loading/loading-screen.tsx';
 import { Warnings } from './notices/warnings.tsx';
@@ -25,7 +21,6 @@ import { T3Missing } from './notices/tool-notices.tsx';
 import { NotificationStack } from './notices/toasts.tsx';
 import { EmptyState } from './onboarding/empty-state.tsx';
 import { OnboardingCards } from './onboarding/onboarding-cards.tsx';
-import { OnboardingOffers } from './onboarding/onboarding-offers.tsx';
 import { WizardDialog } from './onboarding/wizard-dialog.tsx';
 import { EditDialog } from './repositories/edit-dialog.tsx';
 import { SettingsDialog } from './settings/settings.tsx';
@@ -39,7 +34,6 @@ function Content() {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="grid gap-7 px-6 py-5">
         <OnboardingCards />
-        <OnboardingOffers />
         {scope && stillReading(data, scope)
           ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Reading {repoName(scope, data.repos)}…</p>
           : <>
@@ -62,17 +56,15 @@ export function App() {
       <div className="fixed inset-0 flex flex-col bg-(--background) text-(--foreground)">
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TitleBar />
+          <Warnings />
           {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
         </main>
         {/* Outside main, so the announcement sits apart from the page. */}
         <CopyStatus />
         <NotificationStack />
-        <Warnings />
         <ItemDialog />
-        <PublicationDialog />
         <SettingsDialog />
         <AbandonDialog />
-        <DriftChoiceDialog start={(itemId, choice, drift) => void startItem(itemId, choice, 'build', drift)} />
         <WizardDialog />
         <EditDialog />
         <LoadingScreen />

@@ -18,7 +18,7 @@ import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-syst
 import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemKind, StructureSync, repoTone } from '../items/item-parts.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { matchesSearch } from './list-search.ts';
@@ -62,6 +62,7 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
       <StatusGlyph status={item.status} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-[18px] text-base-content">{item.title}</span>
+        <span className="my-1 flex flex-wrap gap-1"><ItemKind item={item} /><StructureSync item={item} /></span>
         <AzureFields azure={item.azure} />
         <span className="block truncate text-xs leading-4 tabular-nums text-base-700">
           {showRepo && `${repoName(repoKey(item), repos)} · `}{item.number ? `${ref(item)} · ` : ''}{shortAgo(item.updatedAt, now)}

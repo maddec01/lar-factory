@@ -23,11 +23,9 @@ and open it with T3 Code running. In Settings > Repositories, choose Add reposit
 3. Review access and add the repository. The saved access choices apply to later
    work, so routine actions need no repeated permission prompt.
 
-The configured source supplies the repository List. There is no per-ticket
-import step, setup PR or repository configuration to merge. The factory neither
-reads nor writes nor detects `.lar-factory.json`, and never offers it. Existing
-project instructions are optional. The factory honors project conventions and
-uses package scripts, manifests, CI and nearby tests when instructions are absent.
+The configured source supplies the repository List. Settings stay on this machine.
+The factory uses existing project conventions, package scripts, manifests, CI and
+nearby tests. Repositories need no factory configuration or guidance files.
 
 ## Shape first, build when ready
 
@@ -36,9 +34,12 @@ then choose Start. Shaping reads the issue and code, investigates uncertainties,
 and asks you for missing decisions. It produces a Ready brief or a concept map
 with parts and relationships. Any issue can be shaped independently of a build.
 Ready commits you to no implementation.
+Prototypes stay on their prototype branch as references for a later build.
+Shaping implements no product changes.
 
 Choose Start build later for a Ready item you want implemented. It opens an
-isolated worktree, plans and builds the change, runs project checks and reviews,
+isolated worktree from the repository's resolved default branch or the chosen PR
+target, plans and builds the change, runs project checks and reviews,
 and opens a PR. Visible or risky work goes to Verify with steps for you to check;
 otherwise it goes to Ready to merge. You merge it. Needs you means the work is
 waiting for a decision, an answer or verification.
@@ -58,13 +59,23 @@ structure local too and causes no later publish prompt.
 
 Local structural changes enter an outbox that drains automatically while sync is
 ON. `lar-work sync-structure <work ID>` requests structural sync explicitly.
-The app saves this local option as `settings.structureSync`. The local-settings
-helper also accepts `progressSync` as a compatibility spelling. Both mean
-structural sync only.
+The app and local-settings helper use only `structureSync` for this local option,
+stored as `settings.structureSync`.
+
+GitHub saves managed projections, manifests and compressed chunks in immutable
+comments. The `linked-work` label makes them discoverable. The factory creates
+the label if absent when structure is first used and preserves existing labels.
+It never patches authored GitHub issue bodies. Azure saves a managed description
+block with revision checks and stores compressed chunks in Markdown comments.
+Onboarding checks the access each provider needs before enabling sync.
+
+Conflicting versions stop sync and retain both copies. There is no conflict
+resolution UI yet. Read [the structural protocol](skills/shared/issue-tracker/publication.md#storage-and-conflicts)
+for save, recovery and detach behavior.
 
 On a fresh installation, add the repository and add the saved concept or
 multi-repository work from List. This restores kind, map, parts and relationships,
-including Connections and Dependencies. Queue and Status start fresh. Tracker
+including Connections and Dependencies. Restored items start in List. Tracker
 sync does not restore ordinary briefs, decisions, slices or build progress.
 
 ## Domain docs
@@ -95,6 +106,11 @@ guidance.
 [Work records](skills/shared/issue-tracker/work-records.md) describes the workflow
 commands. [UPSTREAM.md](UPSTREAM.md) credits Copies and Ports. Copies update through
 this checkout's `/skill-sync`; lar-owned steps can change directly.
+
+The board shows T3 shell status immediately. It observes active unfinished local
+PRs every 15 seconds with conditional ETag reads, including builds without a
+ticket. Usage totals cover board thread families only. Manage skill maintenance
+in Settings > Skills.
 
 ## Develop the app
 

@@ -1,41 +1,22 @@
 // Node entry used by the installed command and the board. Discovery only reads provider metadata.
 import { providerCommand as commandOutput } from './provider-command.ts';
 import { decodePart, isRecord, onAzure, sameRepo, type RepositorySetup } from './index.ts';
-import { applySharedDefaults, isRepo, readRepositorySetups, sharedConfigOf } from './repository-settings.ts';
+import { isRepo, readRepositorySetups } from './repository-settings.ts';
 import { publicationSettingsSnapshot, type VocabularyCapability, type VocabularyDiscovery } from './vocabulary.ts';
 
 /** Authenticated GETs. GitHub list reads include every page; Azure reads return its JSON envelope. */
 export interface VocabularyReads {
   github(path: string): Promise<unknown>;
   azure(repo: string, resource: 'workitemtypes' | 'tags'): Promise<unknown>;
-  /** Fresh default-branch config text, or null when absent. Omit only when using the last usable cache. */
-  sharedConfig?(repo: string): Promise<string | null>;
+
 }
 
 async function jsonCommand(command: 'gh' | 'az', args: string[]): Promise<unknown> {
   return JSON.parse(await commandOutput(command, args));
 }
 
-/** Reads .lar-factory.json from the default branch with the provider CLI, as the board's file reader does. */
-async function sharedConfig(repo: string): Promise<string | null> {
-  try {
-    if (!onAzure(repo)) return await commandOutput('gh', ['api', `repos/${repo}/contents/.lar-factory.json`, '-H', 'Accept: application/vnd.github.raw']);
-    const [organization, project, repository] = repo.split('/');
-    const raw = await jsonCommand('az', ['devops', 'invoke', '--area', 'git', '--resource', 'items', '--route-parameters',
-      `project=${decodePart(project!)}`, `repositoryId=${decodePart(repository!)}`, '--query-parameters', 'path=/.lar-factory.json', 'includeContent=true',
-      '--api-version', '7.1', '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json']);
-    if (!isRecord(raw) || typeof raw.content !== 'string') throw new Error('The provider returned no config content.');
-    return raw.content;
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    if (onAzure(repo) ? /TF401174/.test(reason) : /HTTP 404/.test(reason)) return null;
-    throw err;
-  }
-}
-
 /** Uses each provider CLI's existing local login, without reading or persisting its credentials. */
 export const vocabularyReads: VocabularyReads = {
-  sharedConfig,
   github: (path) => jsonCommand('gh', ['api', '--method', 'GET', path, '--paginate', '--slurp']),
   azure: (repo, resource) => readAzureVocabulary(repo, resource),
 };
@@ -95,21 +76,13 @@ export interface PublicationSettings {
   snapshot: string;
 }
 
-/** Refreshes shared defaults through the same settings parser and writer, even while the board is closed. */
+/** Reads local settings and provider vocabulary without changing either. */
 export async function readPublicationSettings(repo: string, options: { dir?: string; reads?: VocabularyReads } = {}): Promise<PublicationSettings> {
   const listed = readRepositorySetups(options.dir).find((s) => sameRepo(s.repo, repo));
   if (!listed) throw new Error(`${repo} is not on this Mac's list.`);
   const reads = options.reads ?? vocabularyReads;
-  if (reads.sharedConfig) {
-    try {
-      const text = await reads.sharedConfig(listed.repo);
-      applySharedDefaults(listed.repo, text === null ? null : sharedConfigOf(text, onAzure(listed.repo)).read, options.dir);
-    } catch (err) {
-      applySharedDefaults(listed.repo, { problem: `Could not read .lar-factory.json. ${err instanceof Error ? err.message : String(err)}` }, options.dir);
-    }
-  }
   const setup = readRepositorySetups(options.dir).find((s) => sameRepo(s.repo, repo))!;
   return { setup, discovery: await discoverVocabulary(setup.repo, reads), snapshot: publicationSettingsSnapshot(setup) };
 }
 
-export { readRepositorySetups, setOverride, setVocabularyOverride, sharedConfigOf, applySharedDefaults } from './repository-settings.ts';
+export { readRepositorySetups, setOverride, setVocabularyOverride, validateRepositorySettings } from './repository-settings.ts';

@@ -35,7 +35,7 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   const parent = inDialog<HTMLAnchorElement>('[data-item-parent] a')!;
   expect([text(parent), parent.href]).toEqual(['#200 lar cloud: website sign-in and relay', 'https://github.com/maddec01/lar-server/issues/200']);
   expect(steps()).toHaveLength(10);
-  expect(text(inDialog('[data-meta]'))).toContain('No T3 thread has worked on this yet.');
+  expect(text(inDialog('[data-meta]'))).toContain('Usage totals are still loading.');
   expect(text(inDialog('[data-labels]'))).toBe('build');
 });
 
@@ -109,7 +109,7 @@ test('the dialog shows the hint, each pull request with its checks, and the agen
   await mountPage();
   await openItem('I_sample14');
   const work = inDialog('header [data-agent-work]')!;
-  expect(text(inDialog('[data-item-summary]'))).toBe('lar-apple In progress· updated 25m ago');
+  expect(text(inDialog('[data-item-summary]'))).toBe('lar-apple In progress· updated 25m agoFeature');
   expect(text(inDialog('header'))).toBe('#30 Chapter markers in the scrubber$24.18 · 2h 14m · 16.6M tokens · 1h 20m wall');
   expect(work.title).toBe('Cost $24.18 · Agent time 2h 14m · Tokens 16.6M · Wall time 1h 20m');
   expect(inDialog('[data-meta] [data-agent-work]')!.className, 'a narrow dialog shows them in the meta area instead').toContain('@min-[40rem]:hidden');
@@ -120,7 +120,7 @@ test('the dialog shows the hint, each pull request with its checks, and the agen
   await openItem('I_sample16');
   expect(text(inDialog('[data-item-body] > div:nth-child(2)')), 'the hint').toBe('Test it with the steps in the PR, then merge');
   expect(inDialog('[data-agent-work]'), 'no figures').toBeNull();
-  expect(text(inDialog('[data-meta]')), 'unreadable stats say so').toContain('The T3 Code database could not be read');
+  expect(text(inDialog('[data-meta]')), 'unreadable stats say so').toContain('Usage details are unavailable.');
 });
 
 /** The footer's buttons and links, left to right, as their text, with " (disabled: <title>)" on a disabled one. */
@@ -129,7 +129,7 @@ const footerControls = () => [...footer().querySelectorAll<HTMLElement>('button,
 
 test.each([
   ['List', 'I_sample01', ['Abandon', 'GitHub', 'Queue']],
-  ['Queued', 'I_sample05', ['Back to List', 'Abandon', 'GitHub', 'Start refining ▾']],
+  ['Queued', 'I_sample05', ['Back to List', 'Abandon', 'GitHub', 'Shape issue ▾']],
     ['Shaping', 'I_sample07', ['GitHub', 'Open thread']],
   ['Needs you', 'I_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
   ['blocked Ready', 'I_sample13', ['GitHub', 'Start after #202 ▾']],
@@ -206,26 +206,26 @@ test.each([
   expect(footerControls()).toEqual(['GitHub', `Open thread (disabled: ${reason})`]);
 });
 
-test("a Queued item has Start refining disabled in the footer until onboarding's PR merges while its repository is still onboarding", async () => {
+test("a Queued item has Shape issue disabled in the footer until onboarding's PR merges while its repository is still onboarding", async () => {
   await mountPage({ ...sample, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
   await openItem('I_sample05');
-  expect(footerControls()).toEqual(['Back to List', 'Abandon', 'GitHub', "Start refining (disabled: Waits for onboarding to finish)"]);
+  expect(footerControls()).toEqual(['Back to List', 'Abandon', 'GitHub', "Shape issue (disabled: Waits for onboarding to finish)"]);
 });
 
-test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Start refining, and neither Back to List nor Abandon', async (state) => {
+test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Shape issue, and neither Back to List nor Abandon', async (state) => {
   await mountPage(withThreads('I_sample05', [thread('live', state)]));
   await openItem('I_sample05');
   expect(footerControls()).toEqual(['GitHub', 'Open thread']);
   expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/live');
 });
 
-test('a Queued item whose threads are all done still offers Start refining', async () => {
+test('a Queued item whose threads are all done still offers Shape issue', async () => {
   await mountPage(withThreads('I_sample05', [thread('old', 'done')]));
   await openItem('I_sample05');
-  expect(footerControls().at(-1)).toBe('Start refining ▾');
+  expect(footerControls().at(-1)).toBe('Shape issue ▾');
 });
 
-test('Queue in the dialog shows it in flight, then shows the item Queued, says so, and moves focus to Start refining', async () => {
+test('Queue in the dialog shows it in flight, then shows the item Queued, says so, and moves focus to Shape issue', async () => {
   holdPosts();
   await mountPage();
   await openItem('I_sample01');
@@ -235,7 +235,7 @@ test('Queue in the dialog shows it in flight, then shows the item Queued, says s
 
   await answer({ error: null, board: moved('I_sample01', 'Queued') });
   expect(text(inDialog('[data-item-summary]'))).toMatch(/ Queued· /);
-  expect(text(toast())).toBe(`Moved #61 ${sample.items[0]!.title} to Queued. View item`);
+  expect(toast()).toBeNull();
   expect(document.activeElement).toBe(button('start', 'I_sample01'));
 });
 
@@ -264,7 +264,7 @@ test("Abandon is greyed out with the reason on an item whose type can't be aband
   expect(abandon.getAttribute('aria-describedby')).toBe(reason.id);
 });
 
-test('Start refining opens the model menu, and picking a model starts the item and tags it Started', async () => {
+test('Shape issue opens the model menu, and picking a model starts the item and tags it Started', async () => {
   const withChoices: BoardData = { ...sample, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] };
   holdPosts(withChoices);
   await mountPage(withChoices);
@@ -310,52 +310,9 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
   await pressMenu(button('start', 'I_sample13'));
   await settle(() => vi.advanceTimersByTime(20));
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
-  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13' }]]);
+  expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13' }]]);
   await answer({ thread: { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' }, error: null });
   expect(text(inDialog('[data-start-result="I_sample13"]'))).toBe('Started');
-});
-
-const DRIFT = { thread: null, error: 'lar-build changed since Lar Factory installed it. Replace and start, or start anyway.', drift: ['lar-build'] };
-
-test.each([['Replace and start', 'replace'], ['Start anyway', 'keep']] as const)(
-  'Start build with Drift asks first, and %s sends the build again with that choice', async (label, drift) => {
-    holdPosts(readyBuild);
-    await mountPage(readyBuild);
-    await openItem('I_sample13');
-    await pressMenu(button('start', 'I_sample13'));
-    await settle(() => vi.advanceTimersByTime(20));
-    await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
-    await answer(DRIFT, 409);
-    const dialog = $('#drift-choice')!;
-    expect(dialog.getAttribute('role')).toBe('alertdialog');
-    expect(text(dialog)).toContain('lar-build changed since Lar Factory installed it.');
-    expect($$('#drift-choice [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Start anyway', 'Replace and start']);
-    expect($('#drift-choice [type="submit"]')!.textContent, 'Replace and start is the default').toBe('Replace and start');
-    await settle(() => vi.advanceTimersByTime(50));
-    expect(document.activeElement, 'focus starts on the default').toBe($('#drift-choice [type="submit"]'));
-    expect(inDialog('p.start [role="alert"]'), 'the question is no failure').toBeNull();
-    await settle(() => $$<HTMLButtonElement>('#drift-choice [data-slot="modal-footer"] button').find((b) => text(b) === label)!.click());
-    expect($('#drift-choice')).toBeNull();
-    expect(posted()).toEqual([
-      ['/api/start-build', { session: 's1', itemId: 'I_sample13' }],
-      ['/api/start-build', { session: 's1', itemId: 'I_sample13', drift }],
-    ]);
-    await answer({ thread: { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' }, error: null });
-    expect(text(inDialog('[data-start-result="I_sample13"]'))).toBe('Started');
-  });
-
-test('Cancel on the Drift question starts nothing and leaves Start build', async () => {
-  holdPosts(readyBuild);
-  await mountPage(readyBuild);
-  await openItem('I_sample13');
-  await pressMenu(button('start', 'I_sample13'));
-  await settle(() => vi.advanceTimersByTime(20));
-  await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
-  await answer(DRIFT, 409);
-  await settle(() => $$<HTMLButtonElement>('#drift-choice [data-slot="modal-footer"] button')[0]!.click());
-  expect($('#drift-choice')).toBeNull();
-  expect(posted()).toHaveLength(1);
-  expect(text(button('start', 'I_sample13'))).toBe('Start build ▾');
 });
 
 test('a build the board started, through Start after or from another page, shows Started at once', async () => {
@@ -587,4 +544,33 @@ test('work that needs nothing from you shows no reason', async () => {
   await mountPage();
   await openItem('I_sample05');
   expect(inDialog('[data-needs-you-reason]')).toBeNull();
+});
+
+test('stopped shaping offers Resume shaping and starts through the existing model menu', async () => {
+  const stopped = { ...thread('stopped-shape', 'stopped'), purpose: 'shape' };
+  const older = { ...thread('older-shape', 'done'), purpose: 'shape' };
+  const data: BoardData = { ...withThreads('I_sample05', [stopped, older]), capture: { session: 's1', enabled: true },
+    started: { I_sample05: { threadId: older.id, title: older.title } } };
+  data.items = data.items.map((item) => item.id === 'I_sample05' ? { ...item, status: 'Shaping' } : item);
+  holdPosts(data);
+  await mountPage(data);
+  await openItem('I_sample05');
+  expect(text(button('start', 'I_sample05'))).toBe('Resume shaping ▾');
+  expect(inDialog('[data-open-thread="I_sample05"]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/stopped-shape');
+  await pressMenu(button('start', 'I_sample05'));
+  await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
+  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05' }]]);
+  await answer({ thread: { threadId: 'resumed', title: 'Resume shaping' }, error: null,
+    board: { ...data, started: { I_sample05: { threadId: 'resumed', title: 'Resume shaping' } } } });
+  expect(text(inDialog('[data-start-result="I_sample05"]'))).toBe('Started');
+  expect(inDialog('[data-start="I_sample05"]')).toBeNull();
+});
+
+test.each(['Shaping', 'Queued'] as const)('a stopped parent with an active child keeps Open thread in %s', async (status) => {
+  const data = withThreads('I_sample05', [{ ...thread('parent', 'stopped'), purpose: 'shape', hasLiveChildren: true }]);
+  data.items = data.items.map((item) => item.id === 'I_sample05' ? { ...item, status } : item);
+  await mountPage(data);
+  await openItem('I_sample05');
+  expect(inDialog('[data-start="I_sample05"]')).toBeNull();
+  expect(text(inDialog('[data-open-thread="I_sample05"]'))).toBe('Open thread');
 });

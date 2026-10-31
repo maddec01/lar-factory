@@ -27,7 +27,7 @@ test("a ticket search lists the repository's open issues matching the words, and
   assert.deepEqual(await issues.searchTickets(REPO, '#12'), [{ number: 12, title: 'Seek', url: `https://github.com/${REPO}/issues/12` }]);
   assert.deepEqual(gh.calls, [
     ['issue', 'list', '-R', REPO, '--state', 'open', '--limit', '20', '--json', 'number,title,url', '--search', 'stall'],
-    ['issue', 'view', '12', '-R', REPO, '--json', 'number,title,url,body,labels,state'],
+    ['api', `repos/${REPO}/issues/12`],
   ]);
 });
 
@@ -37,7 +37,7 @@ test("a ticket read gives an open issue's text and kind, and nothing for a close
     8: () => JSON.stringify({ number: 8, title: 'Old', url: `https://github.com/${REPO}/issues/8`, body: '', labels: [], state: 'CLOSED' }),
     9: () => { throw new Error('gh issue view failed: GraphQL: Could not resolve to an issue or pull request with the number of 9.'); },
   };
-  const issues = repoIssues(REPO, fakeGh((args) => answers[args[2]!]!()).run);
+  const issues = repoIssues(REPO, fakeGh((args) => answers[args[1]!.split('/').at(-1)!]!()).run);
   assert.deepEqual(await issues.readTicket(REPO, 7), { number: 7, title: 'Stall', url: `https://github.com/${REPO}/issues/7`, text: '## Steps', kind: 'bug' });
   assert.equal(await issues.readTicket(REPO, 8), null);
   assert.equal(await issues.readTicket(REPO, 9), null);

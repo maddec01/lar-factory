@@ -35,7 +35,7 @@ test("a sprint read lists requirement-level items with Task counts, a Completed 
   assert.deepEqual(shown(read.items), [[1, 'Shaping', null], [2, 'Done', null], [5, 'Queued', null], [6, 'List', null]]);
   const seek = read.items[0]!;
   assert.deepEqual({ ...seek, parent: undefined }, {
-    sourceOrder: 0, azure: { type: 'User Story', state: 'Active', assignee: null }, id: 'azure:contoso/1', status: 'Shaping', statuses: ['Shaping'], content: 'ticket', revision: 0, kind: 'issue', parentId: null, number: 1, title: 'Seek',
+    sourceOrder: 0, azure: { type: 'User Story', state: 'Active', assignee: null }, id: 'azure:contoso/1', status: 'Shaping', statuses: ['Shaping'], content: 'ticket', revision: 0, kind: 'feature', parentId: null, number: 1, title: 'Seek',
     url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/1', repo: REPO, untaggedFor: [REPO], labels: ['area-api'], state: 'open', closedAs: null,
     currentSprint: { name: 'Sprint 12', childNumbers: [11, 12, 13] },
     parent: undefined, subIssues: { total: 2, completed: 1 },

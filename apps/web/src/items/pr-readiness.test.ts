@@ -63,3 +63,32 @@ test.each([
   await act(async () => root.unmount());
   vi.unstubAllGlobals();
 });
+
+test('unrelated board refreshes neither restart an evidence read nor withdraw its result', async () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  useBoardStore.setState({ data: { fetchedAt: 'first' } as never, clientError: null });
+  const pending: ((response: Response) => void)[] = [];
+  const fetch = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)));
+  vi.stubGlobal('fetch', fetch);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  await act(async () => root.render(createElement(PrReadiness, { item, pr })));
+  await act(async () => host.querySelector('button')!.click());
+  for (const fetchedAt of ['second', 'third', 'fourth']) {
+    await act(async () => {
+      useBoardStore.setState({ data: { fetchedAt } as never });
+      root.render(createElement(PrReadiness, { item: { ...item }, pr: { ...pr } }));
+    });
+  }
+  expect(fetch).toHaveBeenCalledTimes(1);
+  await act(async () => pending[0]!(success('one')));
+  expect(host.textContent).toContain('Ready to merge based on this observation.');
+  await act(async () => useBoardStore.setState({ data: { fetchedAt: 'fifth' } as never }));
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(host.textContent).toContain('Ready to merge based on this observation.');
+  await act(async () => root.render(createElement(PrReadiness, { item, pr: { ...pr, checks: { passed: 0, failed: 0, running: 1, total: 1, since: 'now' } } })));
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(host.textContent).toContain('Refreshing current revision. Previous evidence is stale.');
+  await act(async () => root.unmount());
+  vi.unstubAllGlobals();
+});

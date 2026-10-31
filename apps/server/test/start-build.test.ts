@@ -1,8 +1,9 @@
+import {buildMessage,type Item} from '@lar-factory/shared';
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
-import { NOT_LANDED, readsRepositoryConfig, recordBlockers, SAMPLE_MODELS, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { testFactoryContext, NOT_LANDED, readsRepositoryConfig, recordBlockers, SAMPLE_MODELS, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, DriftChoice, RawItem, SkillCheckOutcome } from '@lar-factory/shared';
@@ -23,8 +24,8 @@ async function buildBoard(t: TestContext, items: object[], options: object = {},
 const startBuild = (board: Board, itemId: string, model?: unknown, origin = board.url, drift?: unknown) =>
   board.postSession({ itemId, model, drift }, '/api/start-build', origin);
 
-const message = (home: string, workId: string) =>
-  `Build ${workId}. Read ${home}/.agents/skills/lar-build/agents/builder.md and follow it.`;
+const message = (home: string, workId: string, dataDir?: string) =>
+  buildMessage({id:workId} as Item,`${home}/.agents/skills/lar-build`,{...testFactoryContext(home),...dataDir ? {dataDir}: {}});
 
 /** The issue edits Start build might make, which it never does: its work records hold the moves. */
 const writes = async (board: Board) => (await board.calls())
@@ -99,7 +100,7 @@ test('without a bundle Start build asks for no skill check', async (t) => {
 test('the build message names lar-build under LAR_FACTORY_INSTALL_ROOT when it is set', async (t) => {
   const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { LAR_FACTORY_INSTALL_ROOT: '/tmp/lar-root' });
   assert.equal((await startBuild(board, board.id(12))).status, 200);
-  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message('/tmp/lar-root', board.id(12))]);
+  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message('/tmp/lar-root', board.id(12),board.dataDir)]);
 });
 
 test('Start build runs the thread on the picked model choice', async (t) => {

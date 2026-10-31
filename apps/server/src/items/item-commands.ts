@@ -6,8 +6,9 @@
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
-import type { BoardData, DriftChoice, Item, ModelChoice, ModelGroup, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, buildAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, FactoryThreadContext, Item, ModelChoice, ModelGroup, OperationAccess, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
+import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
 import type { BoardState } from '../board/board-state.ts';
@@ -21,6 +22,7 @@ import { findModelChoice } from '../t3/model-choices.ts';
 import { protocolStartedThread } from '../t3/item-execution.ts';
 import { findStartedThread, lookupThread, startThread } from '../t3/t3.ts';
 import type { ItemSource } from './item-source.ts';
+import { importPickedTicket } from './import-ticket.ts';
 
 /** A command's answer: the HTTP status and the JSON body. */
 export interface Reply {
@@ -34,7 +36,7 @@ export interface ItemCommands {
    * available thread read. A thread's state never moves Status.
    */
   reconcileStarts(items: Item[]): Promise<void>;
-  queue(itemId: string): Reply;
+  queue(itemId: string): Promise<Reply>;
   backToList(itemId: string): Reply;
   /**
    * Starts a T3 thread for a Queued item that nothing open blocks, once unless its recorded thread stopped or was
@@ -75,6 +77,8 @@ export interface ItemCommands {
 }
 
 export interface ItemCommandsDeps {
+  /** Exact installation/data handoff. Null is reserved for deterministic protocol tests. */
+  factoryContext?: FactoryThreadContext | null;
   board: BoardState;
   /** Where the commands write changes to tickets. */
   items: ItemSource;
@@ -94,6 +98,9 @@ export interface ItemCommandsDeps {
   checkSkills?: (drift?: DriftChoice) => Promise<SkillCheckOutcome>;
   /** The repository's T3 project as the onboarded repositories are now; tests stand in for it. */
   projectOf?: (repo: string) => Promise<RepositoryProject>;
+  /** The provider's default branch, resolved before changing or launching the build. */
+  baseOf?: (repo: string) => Promise<string>;
+  buildAccessOf?: (repo: string) => Partial<Record<'push-branch' | 'open-pr', OperationAccess>>;
   /** Starts a T3 thread; tests stand in for t3. */
   startThread?: typeof startThread;
   showThread?: typeof lookupThread;
@@ -142,6 +149,7 @@ function track<T>(inFlight: Map<string, Promise<T>>, key: string, work: Promise<
 
 /** Where lar-build is installed, for the build message: under the board app's install root, else the home. */
 const larBuild = () => join(installHome(), '.agents/skills/lar-build');
+const currentFactoryContext = (): FactoryThreadContext => ({dataDir:boardDataDir(),bin:join(installHome(),'.local/bin'),shapeSkill:join(installHome(),'.agents/skills/lar-shape/SKILL.md'),azureReadOnly:process.env.LAR_FACTORY_AZURE_READ_ONLY==='1'});
 
 /** The repository project for an onboarded repository as the list is now, so a repository onboarded after a refusal starts on the next Start. */
 async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
@@ -177,7 +185,9 @@ const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Ch
 const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code, then clear Needs you to start again.";
 
 export function createItemCommands({ board, items, records, reread, archive, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
-  showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, skillsOf = selectedSkills,
+  baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
+  buildAccessOf = (repo) => readRepositorySetups().find(setup => sameRepo(setup.repo, repo))?.access ?? {},
+  showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
   reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)) }: ItemCommandsDeps): ItemCommands {
   const retryBuilds = new Set<string>();
   /** Thread lookups by thread ID: one in flight, or when the next may run. */
@@ -269,7 +279,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
     }
     const previous = pending && finishedStarts.get(pending);
     if (previous && Array.isArray(item?.threads) && item.threads.some((t) => t.id === previous && t.state === 'stopped')
-      && !item.threads.some((t) => t.state === 'running' || t.state === 'needs you')) {
+      && !item.threads.some((t) => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)) {
       runs.delete(itemId);
       pending = undefined;
     }
@@ -351,7 +361,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
     for (const { threadId } of records!.threads(item.id).filter((t) => t.purpose === purpose).reverse()) {
       if (deleted.has(threadId)) continue;
       const shown = Array.isArray(item.threads) ? item.threads.find((t) => t.id === threadId) : undefined;
-      if (shown?.state === 'stopped') continue;
+      if (shown?.state === 'stopped' && !shown.hasLiveChildren) continue;
       return { threadId, title: shown?.title ?? item.title };
     }
     return null;
@@ -369,8 +379,6 @@ export function createItemCommands({ board, items, records, reread, archive, off
     if (unresolved) return settle(item, unresolved, projectId, message);
     const needsYou = records.read(item.id).needsYou;
     if (needsYou) return { thread: null, error: `Needs you: ${needsYou}`, refused: true };
-    const paused = (board.find(item.id) ?? item).paused;
-    if (paused) return { thread: null, error: `Paused: ${paused}`, refused: true };
     // A build whose PR closed unmerged starts a replacement, so the thread that opened that PR holds no start.
     const held = record === 'startedBuilds' && prClosed(item.id) ? null : heldThread(board.find(item.id) ?? item, purpose);
     const shown = board.snapshot()[record]?.[item.id];
@@ -399,7 +407,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
       const record: StartRecord = intent.purpose === PURPOSES.startedBuilds ? 'startedBuilds' : 'started';
       const repoProject = await projectOf(item.repo);
       if (repoProject.error !== undefined) continue;
-      const message = record === 'startedBuilds' ? buildMessage(item, larBuild()) : workMessage(item);
+      const message = record === 'startedBuilds' ? buildMessage(item, larBuild(), factoryContext) : workMessage(item, factoryContext);
       const { thread } = await settle(item, intent, repoProject.projectId, message);
       if (thread) board.update({ [record]: { ...board.snapshot()[record], [item.id]: thread } } satisfies Partial<BoardData>);
       board.push();
@@ -476,20 +484,36 @@ export function createItemCommands({ board, items, records, reread, archive, off
         board.push();
       }), ...currentItems.map((item) => settleIntents(item))]);
     },
-    queue: (itemId) => move(itemId, QUEUE),
+    async queue(itemId) {
+      const item = board.find(itemId);
+      if (!item || item.recorded !== false) return move(itemId, QUEUE);
+      if (!records) return withBoard(409, {error: 'The board has no work records to queue.'});
+      try {
+        const ticket = await items.readTicket(item.repo, item.number);
+        if (!ticket) return withBoard(404, {error: 'This issue is no longer open.'});
+        const {record} = await importPickedTicket(records, item.repo, ticket);
+        reread();
+        const result = move(record.workId, QUEUE);
+        return {...result, body: {...result.body, itemId: record.workId, item: board.find(record.workId) ?? null}};
+      } catch (error) { return withBoard(502, {error:(error as Error).message}); }
+    },
     backToList: (itemId) => move(itemId, BACK_TO_LIST),
 
     start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {
-      if (item.status !== 'Queued') return reply(409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
+      if (item.status !== 'Queued' && !canResumeShaping(item)) return reply(409, { error: `Only Queued items or stopped shaping sessions can be started; this one is in ${item.status}.` });
       const busy = busyReason(itemId, 'start');
       if (busy) return withBoard(409, { error: busy });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
-      const message = workMessage(item);
+      const message = workMessage(item, factoryContext);
       const repo = item.repo;
       return async () => {
         const repoProject = await projectOf(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
+        if (item.status === 'Shaping' && (!canResumeShaping(board.find(item.id) ?? item) || records && records.read(item.id).status !== 'Shaping')) {
+          reread();
+          return { thread: null, error: 'Shaping changed while the thread was starting. Check the updated item.', refused: true };
+        }
         return launch(item, 'started', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice));
       };
     }),
@@ -497,11 +521,15 @@ export function createItemCommands({ board, items, records, reread, archive, off
     startBuild: (itemId, model, drift) => startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
       if (drift !== undefined && !isDriftChoice(drift)) return reply(422, { error: 'Choose Replace and start or Start anyway.' });
       if (item.status !== 'Ready') return reply(409, { error: `Only Ready items can start a build; this one is in ${item.status}.` });
+      let accessProblem: string | null;
+      try { accessProblem = buildAccessProblem(buildAccessOf(item.repo)); }
+      catch { accessProblem = 'Could not read repository access. Recheck it in Settings.'; }
+      if (accessProblem) return withBoard(403, { error: accessProblem });
       const busy = busyReason(itemId, 'start');
       if (busy) return withBoard(409, { error: busy });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
-      const message = buildMessage(item, larBuild());
+      const message = buildMessage(item, larBuild(), factoryContext);
       const previous = board.snapshot().startedBuilds?.[itemId];
       const retry = retryBuilds.has(itemId) || previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped')
         || recordedThreads(itemId).some((t) => t.purpose === PURPOSES.startedBuilds) || prClosed(itemId);
@@ -513,13 +541,16 @@ export function createItemCommands({ board, items, records, reread, archive, off
         if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true, ...skills.drift && { drift: skills.drift } };
         const repoProject = await projectOf(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
+        let base: string;
+        try { base = await baseOf(repo); }
+        catch { return { thread: null, error: 'Could not read the repository’s default branch. Retry after checking access.', refused: true }; }
         const error = parentInProgress(item);
         if (error) return { thread: null, error };
         // A build snapshots its skills once, so a retry keeps the selection its first start saw.
         const snapshot = () => {
           if (records!.read(item.id).skills === null) write(item.id, (revision) => records!.snapshotSkills(item.id, revision, skillsOf(repo)));
         };
-        return launch(item, 'startedBuilds', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice, { base: 'main', branch }), snapshot);
+        return launch(item, 'startedBuilds', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice, { base, branch }), snapshot);
       };
     }),
 

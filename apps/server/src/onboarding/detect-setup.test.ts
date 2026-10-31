@@ -13,9 +13,8 @@ function reads(files: Record<string, string> = {}, parts: Partial<DetectReads> =
     checkouts: async () => [WEB, AZURE],
     tree: async () => ({
       tree: { sha: 'tree0', files: new Map(Object.keys(files).map((path) => [path, { mode: '100644', sha: path }])) },
-      read: async (sha) => files[sha]!,
     }),
-    github: async () => ({ push: true, triage: true, issues: true }),
+    github: async () => ({ push: true, triage: true, issues: true, tokenWrites: true }),
     azurePush: async () => true,
     teams: async () => ['Retail Team', 'Platform'],
     ...parts,
@@ -27,54 +26,22 @@ const detect = async (files?: Record<string, string>, parts?: Partial<DetectRead
   return (answer as { detection: SetupDetection }).detection;
 };
 
-test('a repository with no factory files detects issues, private domain docs, no shared config and full access', async () => {
-  assert.deepEqual(await detect({ 'README.md': '# Web\n' }), {
-    repo: 'maddec01/lar-web', provider: 'GitHub', checkout: { found: '/Users/me/Developer/lar-web' },
-    itemSources: { found: [{ kind: 'issues' }] },
-    access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
-    domainDocs: { found: { kind: 'private' } }, factoryFiles: { found: [] }, sharedConfig: { found: null }, projectSkills: { found: [] },
-  });
-});
-
-test('existing domain docs, factory files, shared config and project skills are detected from the default branch', async () => {
-  const detection = await detect({
-    'CONTEXT.md': '# Terms\n', 'docs/adr/0001-use-node.md': '# Use node\n',
-    '.lar-factory.json': JSON.stringify({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, skills: ['web-review'] }),
-    'AGENTS.md': '# Web\n\n## Agent skills\n\nUse lar-shape.\n', 'CLAUDE.md': '# Claude\n',
-    'docs/agents/domain.md': '# Domain\n', 'docs/agents/notes.md': '# Notes\n',
-    '.claude/skills/web-review/SKILL.md': '---\nname: web-review\n---\n', '.agents/skills/web-review/SKILL.md': '', '.agents/skills/deploy/SKILL.md': '',
-  });
-  assert.deepEqual(detection.domainDocs, { found: { kind: 'repository', glossary: 'CONTEXT.md', adrs: 'docs/adr' } });
-  assert.deepEqual(detection.factoryFiles, { found: [
-    { kind: 'config', paths: ['.lar-factory.json'] }, { kind: 'agent-skills', paths: ['AGENTS.md'] }, { kind: 'agent-docs', paths: ['docs/agents/domain.md'] },
-  ] });
-  assert.deepEqual(detection.sharedConfig, { found: { defaults: { role: 'Web client', itemSource: { kind: 'issues' }, skills: ['web-review'] } } });
-  assert.deepEqual(detection.projectSkills, { found: ['deploy', 'web-review'] });
-});
-
-test('a shared config that is wrong is detected with its problem', async () => {
-  assert.deepEqual((await detect({ '.lar-factory.json': '{' })).sharedConfig, { found: { problem: ".lar-factory.json isn't valid JSON." } });
-  assert.deepEqual((await detect({ '.lar-factory.json': '{"labels": "area"}' })).sharedConfig,
-    { found: { problem: '.lar-factory.json field labels must be an array of strings.' } });
-  assert.deepEqual((await detect({ '.lar-factory.json': '{"role": "API", "show": "some"}' })).sharedConfig,
-    { found: { defaults: { role: 'API' } } }, 'the old show setting is ignored, whatever its value');
-});
-
-test('an Agent skills section in a file CLAUDE.md links to is found once, at the file it links to', async () => {
-  const files = { 'AGENTS.md': '## Agent skills\n', 'CLAUDE.md': 'AGENTS.md' };
-  const detection = await detectSetup({ repo: 'maddec01/lar-web', projectId: 'web' }, reads(files, {
-    tree: async () => ({
-      tree: { sha: 'tree0', files: new Map([['AGENTS.md', { mode: '100644', sha: 'AGENTS.md' }], ['CLAUDE.md', { mode: '120000', sha: 'CLAUDE.md' }]]) },
-      read: async (sha) => files[sha as keyof typeof files],
-    }),
-  })) as { detection: SetupDetection };
-  assert.deepEqual(detection.detection.factoryFiles, { found: [{ kind: 'agent-skills', paths: ['AGENTS.md'] }] });
+test('detection reads doc and skill paths without reading factory configuration or instructions', async () => {
+  const found = reads({ 'GLOSSARY.md': '', 'docs/adr/one.md': '', '.agents/skills/local/SKILL.md': '', 'AGENTS.md': '', '.lar-factory.json': '' });
+  const tree = found.tree;
+  found.tree = async (repo) => ({ ...await tree(repo), read: async () => { throw new Error('No file content should be read'); } });
+  const result = await detectSetup({ repo: 'maddec01/lar-web', projectId: 'web' }, found) as { detection: SetupDetection };
+  assert.deepEqual(result.detection.domainDocs, { found: { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' } });
+  assert.deepEqual(result.detection.projectSkills, { found: ['local'] });
+  assert.ok(!('factoryFiles' in result.detection));
+  assert.ok(!('sharedConfig' in result.detection));
+  assert.ok(Object.values(result.detection.access).every((access) => access === 'allowed'));
 });
 
 test("a login without push or triage access marks those operations Refused and leaves what it can't settle unverified", async () => {
   const detection = await detect({}, { github: async () => ({ push: false, triage: false, issues: true }) });
   assert.deepEqual(detection.access,
-    { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
+    { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
 });
 
 test("a repository with issues turned off has its issues Refused, and one the login can't read Refuses every fact it reads", async () => {
@@ -85,8 +52,8 @@ test("a repository with issues turned off has its issues Refused, and one the lo
     tree: async () => { throw new Error('HTTP 404: Not Found'); },
   });
   const refused = { refused: "Can't read maddec01/lar-web with gh: HTTP 404: Not Found" };
-  assert.deepEqual([blocked.itemSources, blocked.domainDocs, blocked.factoryFiles, blocked.sharedConfig, blocked.projectSkills],
-    [refused, refused, refused, refused, refused]);
+  assert.deepEqual([blocked.itemSources, blocked.domainDocs, blocked.projectSkills],
+    [refused, refused, refused]);
   assert.deepEqual(Object.values(blocked.access), ['unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified']);
 });
 
@@ -96,10 +63,10 @@ test("an Azure DevOps repository detects its teams' boards and push access, with
   assert.deepEqual([detection.provider, detection.checkout, detection.itemSources], ['Azure DevOps', { found: '/Users/me/shop' },
     { found: [{ kind: 'azure-board', team: 'Retail Team' }, { kind: 'azure-board', team: 'Platform' }] }]);
   assert.deepEqual(detection.access,
-    { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
+    { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
   const refused = await detect({}, { azurePush: async () => false, teams: async () => { throw new Error('TF400813: not authorized'); } }, { repo, projectId: 'shop' });
   assert.deepEqual([refused.access['push-branch'], refused.access['open-pr'], refused.itemSources],
-    ['refused', 'refused', { refused: "Can't read contoso/Retail/shop's teams with az: TF400813: not authorized" }]);
+    ['refused', 'unverified', { refused: "Can't read contoso/Retail/shop's teams with az: TF400813: not authorized" }]);
 });
 
 test("the checkout is Refused with its fix for another origin, a second checkout or T3's projects unread", async () => {
@@ -114,4 +81,10 @@ test("the checkout is Refused with its fix for another origin, a second checkout
 
 test('detection refuses a body without a repository and T3 project', async () => {
   assert.deepEqual(await detectSetup({ repo: 'nope' }, reads()), { status: 400, error: 'Choose a repository and its T3 project before detecting its setup.' });
+});
+
+test('a push-capable user with an unverified token gets no positive write access', async () => {
+  const detection = await detect({}, { github: async () => ({ push: true, triage: true, issues: true }) });
+  assert.ok(Object.values(detection.access).every((access) => access === 'unverified'));
+  assert.deepEqual(detection.itemSources, { found: [{ kind: 'issues' }] });
 });

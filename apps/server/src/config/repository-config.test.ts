@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fakeAzRepos } from '../azure/fake-az.ts';
 import {
-  findRepositoryConfig, isItemSource, isRepo, readBoardSettings, readRepositoryList, saveOnboarded,
+  isItemSource, isRepo, readBoardSettings, readRepositoryList, saveOnboarded,
   saveOnboarding, stillOnboarding,
 } from './repository-config.ts';
 
@@ -14,17 +13,6 @@ async function dataDir(t: TestContext, files: Record<string, string> = {}): Prom
   t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   for (const [name, text] of Object.entries(files)) await writeFile(join(dir, name), text);
   return dir;
-}
-
-/** A gh that answers the contents call for each repository in `files`, and 404s for any other. */
-function ghWith(files: Record<string, unknown>): (args: string[]) => Promise<string> {
-  return async (args) => {
-    const repo = /^repos\/([^/]+\/[^/]+)\/contents\/\.lar-factory\.json$/.exec(args[1] ?? '')?.[1];
-    assert.ok(args.includes('Accept: application/vnd.github.raw') && !args.some((a) => a.includes('ref')), args.join(' '));
-    if (!repo || !(repo in files)) throw new Error(`gh api ${args[1]} failed: gh: Not Found (HTTP 404)`);
-    const file = files[repo];
-    return typeof file === 'string' ? file : JSON.stringify(file);
-  };
 }
 
 const progress = (step = 'setup', projectId = 'lar-apple') => ({ step, done: ['project'], answers: { projectId } });
@@ -158,56 +146,10 @@ test("a list file that isn't JSON, or whose refresh interval isn't a positive nu
   }
 });
 
-test("a repository's config comes from its default branch, with each missing field taking its default", async () => {
-  const project = { kind: 'issues' };
-  const gh = ghWith({ 'maddec01/lar-factory': { version: 1, role: 'The factory', itemSource: project, show: 'opted-in', labels: ['area'] },
-    'maddec01/lar-apple': { role: 'Apple client' } });
-  assert.deepEqual(await findRepositoryConfig('maddec01/lar-factory', gh),
-    { repo: 'maddec01/lar-factory', version: 1, role: 'The factory', itemSource: project, labels: ['area'] }, 'the old show setting is left out');
-  assert.deepEqual(await findRepositoryConfig('maddec01/lar-apple', gh),
-    { repo: 'maddec01/lar-apple', version: 1, role: 'Apple client', itemSource: { kind: 'issues' }, labels: [] });
-});
-
-test("an Azure DevOps repository's config is read from its default branch with one az call, and a missing file is no config", async () => {
-  const file = { role: 'API', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'opted-in' };
-  const az = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify(file) } });
-  assert.deepEqual(await findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', az.run),
-    { repo: 'contoso/Fabrikam%20Fiber/lar-api', version: 1, role: 'API', itemSource: file.itemSource, labels: [] });
-  assert.deepEqual(az.calls, [['devops', 'invoke', '--area', 'git', '--resource', 'items', '--route-parameters', 'project=Fabrikam Fiber', 'repositoryId=lar-api',
-    '--query-parameters', 'path=/.lar-factory.json', 'includeContent=true', '--api-version', '7.1', '--org', 'https://dev.azure.com/contoso', '--detect', 'false', '--output', 'json']]);
-  assert.equal(await findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', fakeAzRepos().run), null);
-  const loggedOut = fakeAzRepos({ fail: () => new Error('az devops invoke failed: Please run az login to setup account.') });
-  await assert.rejects(findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', loggedOut.run), /az login/);
-});
-
-test('a gh failure other than a 404 passes through', async () => {
-  const gh = async () => { throw new Error('gh api failed: To get started with GitHub CLI, please run:  gh auth login'); };
-  await assert.rejects(findRepositoryConfig('maddec01/lar-factory', gh), /gh auth login/);
-});
-
 test('only issues and a combined Azure board are item sources', () => {
   assert.equal(isItemSource({ kind: 'issues' }), true);
   assert.equal(isItemSource({ kind: 'azure-board', team: 'Team' }), true);
   for (const source of [null, {}, { kind: 'azure-board' }, { kind: 'azure-board', team: '' }, { kind: 'unknown' }]) assert.equal(isItemSource(source), false);
-});
-
-test('removed and unknown sources ask for onboarding again, without migration', async () => {
-  for (const kind of ['github-project', 'azure-sprint', 'azure-backlog', 'unknown']) {
-    for (const repo of ['maddec01/lar-factory', 'contoso/Fabrikam/api']) {
-      const raw = JSON.stringify({ role: 'API', itemSource: { kind, owner: 'maddec01', number: 1, team: 'Team' } });
-      const run = async () => repo.split('/').length === 3 ? JSON.stringify({ content: raw }) : raw;
-      assert.deepEqual(await findRepositoryConfig(repo, run), { problem: '.lar-factory.json has an unsupported item source. Run onboarding again.' });
-    }
-  }
-});
-
-test('malformed configs still name their problem', async () => {
-  const gh = ghWith({ 'maddec01/broken': '{ broken', 'maddec01/no-role': {}, 'maddec01/some': { role: 'x', labels: 'area' } });
-  assert.equal(await findRepositoryConfig('maddec01/missing', gh), null);
-  for (const [repo, problem] of Object.entries({ broken: ".lar-factory.json isn't valid JSON.",
-    'no-role': '.lar-factory.json field role is missing or not a string.', some: '.lar-factory.json field labels must be an array of strings.' })) {
-    assert.deepEqual(await findRepositoryConfig(`maddec01/${repo}`, gh), { problem });
-  }
 });
 
 test('removed-source onboarding entries do not break healthy repositories or later saves', async (t) => {

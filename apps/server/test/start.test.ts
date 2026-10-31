@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { NOT_LANDED, recordBlockers, SAMPLE_MODELS, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
+import { shapePrompt, NOT_LANDED, recordBlockers, SAMPLE_MODELS, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue, rawIssue } from '@lar-factory/shared/test/raw-items';
 import { checkouts } from './repo-support.ts';
@@ -14,7 +14,7 @@ import type { FixtureProject } from './stats-db.ts';
 import type { BoardData } from '@lar-factory/shared';
 
 /** The work message for issue 12's work record on `board`. */
-const message = (board: Board) => `#12 Issue 12\n$lar-shape ${board.id(12)}`;
+const message = (board: Board) => shapePrompt(board,'#12 Issue 12',board.id(12));
 
 /** A temporary home with git checkouts of the given origins under ~/Developer/lar. */
 function home(t: TestContext, origins: Record<string, string | null>): string {
@@ -60,7 +60,7 @@ test("Start begins one lar-shape thread in the card's repository project and lea
   assert.equal((await start(board, board.id(30, 'maddec01/lar-server'))).status, 200);
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', message(board), '--json'],
-    ['thread', 'start', 'project-server', `#30 Issue 30\n$lar-shape ${board.id(30, 'maddec01/lar-server')}`, '--json'],
+    ['thread', 'start', 'project-server', shapePrompt(board,'#30 Issue 30',board.id(30,'maddec01/lar-server')), '--json'],
   ]);
   assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
 });

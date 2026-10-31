@@ -1,11 +1,12 @@
+import { structureProvider } from '@lar-factory/work-records/tracker-sync';
 // Reads repository issues and linked PRs through the local `gh` CLI (`gh api graphql`).
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DONE_WINDOW_MS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey } from '@lar-factory/shared';
+import { mapConcurrent, STRUCTURE_LABEL, DONE_WINDOW_MS, buildSubIssueSearches, readTrackerStructure, trackerKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey } from '@lar-factory/shared';
 import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
-import { AccessLost, NotFound, type LegacyChild, type TicketObservation } from '../items/item-source.ts';
+import { AccessLost, NotFound, type TicketObservation } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -32,7 +33,7 @@ const CHECKS = `statusCheckRollup {
   }`;
 
 /** The fields the board reads of a repository issue. */
-const ISSUE_FIELDS = `id number title url state stateReason closedAt updatedAt
+const ISSUE_FIELDS = `id number title url body issueType { name } state stateReason closedAt updatedAt
   repository { nameWithOwner }
   labels(first: 20) { nodes { name } }
   assignees(first: 20) { nodes { login } }
@@ -208,29 +209,33 @@ export async function getIfChanged<T>(path: string, etag: string | undefined, ru
   return { etag: /^etag:\s*(.+?)\s*$/im.exec(head)?.[1], body: JSON.parse(split ? out.slice(split.index + split[0].length) : out) as T };
 }
 
-/**
- * A file's text on the branch, or on the repository's default branch when there is none, read through the contents
- * API; null when the branch has no such file.
- */
-export async function readBranchFile(repo: string, path: string, branch?: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  const ref = branch === undefined ? '' : `?ref=${encodeURIComponent(branch)}`;
-  try {
-    return await run(['api', `repos/${repo}/contents/${path}${ref}`, '-H', 'Accept: application/vnd.github.raw']);
-  } catch (err) {
-    if (/HTTP 404/.test(message(err))) return null;
-    throw err;
-  }
+/** Check list access without loading issue bodies, history or PR evidence. */
+export async function checkIssueListAccess(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  await run(['api', `repos/${repo}/issues?state=open&per_page=1`, '--jq', 'length']);
 }
 
-/** An authenticated GET of all pages of provider metadata. */
-export async function githubJson(path: string, run: (args: string[]) => Promise<string> = gh): Promise<unknown> {
-  return JSON.parse(await run(['api', '--method', 'GET', path, '--paginate', '--slurp']));
+/** Repository role and separate evidence of the authenticated token's write scopes. */
+export interface RepositoryAccess {
+  push: boolean;
+  triage: boolean;
+  issues: boolean;
+  /** Undefined for tokens whose fine-grained permissions this read cannot establish. */
+  tokenWrites?: boolean;
 }
 
-/** What gh's login may do in the repository, as its `permissions` say, and whether it has issues turned on. */
-export async function repositoryAccess(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<{ push: boolean; triage: boolean; issues: boolean }> {
-  const { push, triage, issues } = JSON.parse(await run(['api', `repos/${repo}`, '--jq', '{push: .permissions.push, triage: .permissions.triage, issues: .has_issues}'])) as Record<string, unknown>;
-  return { push: push === true, triage: triage === true, issues: issues === true };
+/** A user's repository role does not establish the scopes granted to their token. */
+export async function repositoryAccess(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<RepositoryAccess> {
+  const out = await run(['api', `repos/${repo}`, '--include', '--jq', '{push: .permissions.push, triage: .permissions.triage, issues: .has_issues, private: .private}']);
+  const split = /\r?\n\r?\n/.exec(out);
+  const headers = split ? out.slice(0, split.index) : '';
+  const raw = JSON.parse(split ? out.slice(split.index + split[0].length) : out) as Record<string, unknown>;
+  const scopeHeader = /^x-oauth-scopes:[ \t]*([^\r\n]*)/im.exec(headers)?.[1]?.trim();
+  // Classic OAuth scopes are exposed by GitHub. Fine-grained PATs and apps do not expose equivalent proof here.
+  // https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
+  const scopes = scopeHeader ? scopeHeader.split(',').map((scope) => scope.trim()) : null;
+  const tokenWrites = scopes ? scopes.includes('repo') || raw.private === false && scopes.includes('public_repo') : undefined;
+  return { push: raw.push === true, triage: raw.triage === true, issues: raw.issues === true,
+    ...tokenWrites !== undefined && { tokenWrites } };
 }
 
 /** Reads up to `maxPages` pages, each after the cursor the one before ended at; throws `tooMany` when there are more. */
@@ -301,6 +306,7 @@ async function searchBuilds(raws: RawItem[], search: LabelSearch): Promise<Searc
  * dossiers alone.
  */
 async function readDossierBodies(raws: RawItem[], searched: Promise<Searched>): Promise<void> {
+  if (raws.every(raw => !raw.content || raw.content.body !== undefined)) return;
   const contentOf = (dossiers: RawItem[]) => new Map(dossiers.flatMap((raw) => (raw.content ? [[raw.content.id, raw.content]] : [])));
   const everySubIssue = new Set(raws.flatMap((raw) => raw.content?.subIssues?.nodes ?? []).map((s) => refKey(s.repository.nameWithOwner, s.number)));
   const [bodies, found] = await Promise.all([
@@ -341,6 +347,11 @@ export async function fetchIssues(ids: readonly string[]): Promise<Item[]> {
 
 /** The board's items from raw items, once all are read, without slices and with each dossier's map. */
 async function boardItems(raws: RawItem[], search = searchOnce()): Promise<Item[]> {
+  await mapConcurrent(raws.filter(raw=>raw.content?.labels?.nodes.some(label=>label.name===STRUCTURE_LABEL)),async raw=>{
+    const content=raw.content!;
+    try {content.body=(await structureProvider().read(content.repository.nameWithOwner,content.number)).body;}
+    catch(error){content.trackerError=message(error);}
+  });
   // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
   // decide which sub-issues are slices, so the dossiers, items with sub-issues on the board, are known once they land.
   const searching = searchBuilds(raws, search);
@@ -509,52 +520,8 @@ export async function commitTree(repo: string, commit: string, run: (args: strin
   return { sha, files: new Map(tree.filter((entry) => entry.type === 'blob').map((entry) => [entry.path, { mode: entry.mode, sha: entry.sha }])) };
 }
 
-/** A blob's text, by its SHA. */
-export async function readBlob(repo: string, sha: string, run: (args: string[]) => Promise<string> = gh): Promise<string> {
-  return run(['api', `repos/${repo}/git/blobs/${sha}`, '-H', 'Accept: application/vnd.github.raw']);
-}
-
-/** A file a new tree writes with its text, keeps at a blob, or deletes when its `sha` is null. */
-export type TreeEntry = { path: string; mode: string } & ({ content: string } | { sha: string | null });
-
-/** Makes a tree on GitHub from `base` with the entries changed, and returns its SHA. */
-export async function createTree(repo: string, base: string, entries: TreeEntry[],
-  run: (args: string[], input?: string) => Promise<string> = gh): Promise<string> {
-  const input = JSON.stringify({ base_tree: base, tree: entries.map((entry) => ({ ...entry, type: 'blob' })) });
-  return (await run(['api', `repos/${repo}/git/trees`, '--method', 'POST', '--input', '-', '--jq', '.sha'], input)).trim();
-}
-
-/** Makes a commit on GitHub of the tree with one parent, and returns its SHA. */
-export async function createCommit(repo: string, message: string, tree: string, parent: string,
-  run: (args: string[]) => Promise<string> = gh): Promise<string> {
-  return (await run(['api', `repos/${repo}/git/commits`, '--method', 'POST', '-f', `message=${message}`, '-f', `tree=${tree}`,
-    '-f', `parents[]=${parent}`, '--jq', '.sha'])).trim();
-}
-
-/** Moves a branch on GitHub to the commit, even when the commit doesn't follow from it. */
-export async function moveBranch(repo: string, branch: string, sha: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['api', `repos/${repo}/git/refs/heads/${branch}`, '--method', 'PATCH', '-f', `sha=${sha}`, '-F', 'force=true']);
-}
-
-/** Makes a branch on GitHub at the commit, leaving every checkout alone. */
-export async function createBranch(repo: string, branch: string, sha: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['api', `repos/${repo}/git/refs`, '--method', 'POST', '-f', `ref=refs/heads/${branch}`, '-f', `sha=${sha}`]);
-}
-
-/**
- * Makes one commit on `parent` with the entries changed, with the Git data API, and puts `branch` on it: the branch is
- * made there, or moved there from its head whether or not the commit follows from it. azure-repos.ts's pushCommit does
- * the same on Azure Repos.
- */
-export async function pushCommit(repo: string, branch: string, commit: { message: string; parent: string; entries: TreeEntry[] },
-  run: (args: string[], input?: string) => Promise<string> = gh): Promise<void> {
-  const [head, tree] = await Promise.all([branchHead(repo, branch, run), commitTree(repo, commit.parent, run)]);
-  const sha = await createCommit(repo, commit.message, await createTree(repo, tree.sha, commit.entries, run), commit.parent, run);
-  await (head === null ? createBranch : moveBranch)(repo, branch, sha, run);
-}
-
 /** The commit at the head of the repository's branch on GitHub, or null when it has no such branch. */
-export async function branchHead(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+async function branchHead(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
   try {
     return (await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha'])).trim();
   } catch (err) {
@@ -566,21 +533,6 @@ export async function branchHead(repo: string, branch: string, run: (args: strin
 /** Whether the repository has the branch on GitHub. */
 export async function branchExists(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<boolean> {
   return await branchHead(repo, branch, run) !== null;
-}
-
-/** The URL of the open PR from the branch, or null when it has none. */
-export async function openPrFrom(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  const url = (await run(['pr', 'list', '-R', repo, '--head', branch, '--state', 'open', '--json', 'url', '--jq', '.[0].url // empty'])).trim();
-  return url || null;
-}
-
-/** Opens a PR from `head` into `base` and returns its URL. */
-export async function createPr(repo: string, pr: { base: string; head: string; title: string; body: string },
-  run: (args: string[]) => Promise<string> = gh): Promise<string> {
-  const out = await run(['pr', 'create', '-R', repo, '--base', pr.base, '--head', pr.head, '--title', pr.title, '--body', pr.body]);
-  const url = out.trim().split('\n').at(-1) ?? '';
-  if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(url)) throw new Error(`gh pr create sent no PR URL: ${out.trim()}`);
-  return url;
 }
 
 /**
@@ -633,47 +585,17 @@ export async function findIssues(repo: string, query: string, limit: number, run
 
 /** An open issue's title, body and kind; null when `repo` has no issue `number` or it is closed. */
 export async function readIssue(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<PickedTicket | null> {
-  let issue: { number: number; title: string; url: string; body: string; labels: { name: string }[]; state: string };
+  let issue: { number: number; title: string; url: string; html_url?: string; body: string; labels: { name: string }[]; state: string; type?: {name: string} | null };
   try {
-    issue = JSON.parse(await run(['issue', 'view', String(number), '-R', repo, '--json', 'number,title,url,body,labels,state']));
+    issue = JSON.parse(await run(['api', `repos/${repo}/issues/${number}`]));
   } catch (err) {
     if (/Could not resolve to an issue/.test(message(err))) return null;
     throw err;
   }
-  if (issue.state !== 'OPEN') return null;
-  return { number: issue.number, title: issue.title, url: issue.url, text: issue.body, kind: labelKind(issue.labels.map((l) => l.name)) };
-}
-
-/** Closed native parts preserve a selected concept's history without picking its unselected open work. */
-export async function legacyIssueChildren(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<LegacyChild[]> {
-  const pages = JSON.parse(await run(['api', '--paginate', '--slurp', `repos/${repo}/issues/${number}/sub_issues?per_page=100`])) as {
-    number: number; title: string; html_url: string; body: string | null; state: string; state_reason: string | null; labels: { name: string }[];
-  }[][];
-  const children: LegacyChild[] = [];
-  for (const child of pages.flat()) {
-    const labels = child.labels.map(label => label.name);
-    if (child.state !== 'closed' || !labels.some(label => label === 'build' || label.startsWith('decision-'))) continue;
-    if (child.html_url.toLowerCase() !== `https://github.com/${repo}/issues/${child.number}`.toLowerCase()) {
-      throw new Error(`A closed part belongs to another repository (${child.html_url}); pick that repository's work separately.`);
-    }
-    const part: LegacyChild = { number: child.number, title: child.title, url: child.html_url, text: child.body ?? '', kind: labelKind(labels), labels,
-      state: 'closed', notPlanned: child.state_reason === 'not_planned' };
-    if (labels.includes('build') && !part.notPlanned) {
-      const closing = JSON.parse(await run(['issue', 'view', String(child.number), '-R', repo, '--json', 'closedByPullRequestsReferences'])) as {
-        closedByPullRequestsReferences: { url: string }[];
-      };
-      if (closing.closedByPullRequestsReferences.length === 1) {
-        const url = closing.closedByPullRequestsReferences[0]!.url;
-        const pr = JSON.parse(await run(['pr', 'view', url, '--json', 'state,url'])) as { state: string; url: string };
-        if (pr.state === 'MERGED') {
-          const matched = pr.url.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)$/);
-          if (matched) part.mergedPr = `${matched[1]}#${matched[2]}`;
-        }
-      }
-    }
-    children.push(part);
-  }
-  return children;
+  if (issue.state.toUpperCase() !== 'OPEN') return null;
+  if(issue.labels.some(label=>label.name===STRUCTURE_LABEL))issue.body=(await structureProvider().read(repo,number)).body;
+  const tracker = readTrackerStructure(issue.body ?? '');
+  return { number: issue.number, title: issue.title, url: issue.html_url ?? issue.url, text: issue.body ?? '', kind: tracker?.kind ?? trackerKind(issue.labels.map((l) => l.name), issue.type?.name), ...(tracker && { tracker }) };
 }
 
 /** An issue's state and assignees as a work record observes them; not-found when `repo` has no issue `number`. */

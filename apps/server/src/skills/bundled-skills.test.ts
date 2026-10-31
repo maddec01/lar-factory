@@ -1,4 +1,3 @@
-import { agentSetupWrites } from '../onboarding/agent-setup.ts';
 import { readFileSync, readdirSync } from 'node:fs';
 import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
@@ -89,17 +88,4 @@ test('without a manifest, or with one it can’t read, no skill has a state', as
 test('LAR_FACTORY_INSTALL_ROOT names the install home; the user’s home is the default', () => {
   assert.equal(installHome({ LAR_FACTORY_INSTALL_ROOT: '/tmp/lar' }, '/Users/me'), '/tmp/lar');
   assert.equal(installHome({}, '/Users/me'), '/Users/me');
-});
-
-test('generated provider guidance points to files in the assembled skill', () => {
-  const root = fileURLToPath(BUNDLE_URL);
-  for (const provider of ['GitHub', 'Azure DevOps'] as const) {
-    const content = agentSetupWrites({}, provider).map((file) => file.content).join('\n');
-    for (const match of content.matchAll(/(?:lar-shape\/|<lar-shape>\/)([\w/.-]+\.(?:md|sh))/g)) {
-      assert.ok(readFileSync(join(root, 'skills', 'lar-shape', match[1]!)).length);
-    }
-    for (const match of content.matchAll(/(?:shared\/)?scripts\/[\w-]+\.sh/g)) {
-      assert.ok(readFileSync(join(root, 'skills', 'lar-shape', match[0])).length);
-    }
-  }
 });

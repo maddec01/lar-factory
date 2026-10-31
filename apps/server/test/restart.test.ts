@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import type { BoardData } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import { checkouts } from './repo-support.ts';
-import { larWork, startBoard, until, writesRepository, type Board } from './server-support.ts';
+import { shapePrompt, larWork, startBoard, until, writesRepository, type Board } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 
 /** A home and T3 database that outlive each board started on them, as this Mac's do across a restart. */
@@ -30,6 +31,27 @@ async function intents(board: Board, workId: string) {
   try { return records.launchIntents({ workId }).map(({ threadId, failure, resolvedAt }) => ({ threadId, failure: !!failure, resolved: !!resolvedAt })); }
   finally { records.close(); }
 }
+
+test('a database upgraded by another process keeps the board alive with its cached view and one restart notice', { timeout: 20_000 }, async (t) => {
+  const board = await machine(t)({}, true);
+  const before = await until(board, data => data.fetchedAt !== null && data.firstRead.settled && data.items.some(item => item.id === board.id(12)));
+  // Simulate a newer lar-work process after this server has opened the database. No live user data is involved.
+  const external = new DatabaseSync(workRecordsPath(board.dataDir));
+  try {
+    const version = Number(external.prepare('PRAGMA user_version').get()!.user_version);
+    external.exec(`PRAGMA user_version = ${version + 1000}`);
+  } finally { external.close(); }
+  const after = await until(board, data => data.localProblem === 'Restart Lar Factory to continue.');
+  assert.deepEqual(after.items, before.items, 'a failed local read preserves the last successful items');
+  assert.equal(after.error, 'Restart Lar Factory to continue.');
+  assert.equal((await fetch(`${board.url}/healthz`)).status, 200);
+  assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
+  // Two more local ticks must neither crash the process nor repeat the sanitized diagnostic.
+  await new Promise(resolve => setTimeout(resolve, 4200));
+  assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
+  assert.equal(board.logs().split('local work paused: schema-too-new').length - 1, 1);
+  assert.doesNotMatch(board.logs(), /WorkRecordError:|schema version \d+, which is newer/);
+});
 
 test('a lar-work write while the board is closed shows after its restart, beside the records it held', { timeout: 30_000 }, async (t) => {
   const boardOn = machine(t);
@@ -87,7 +109,7 @@ test('an uncertain start stays unresolved across a restart: T3 is read before an
   const before = await boardOn({ t3: { fail: 'garbage' } }, true);
   const workId = before.id(12);
   await until(before, (d) => d.items.some((i) => i.id === workId));
-  const message = `#12 Issue 12\n$lar-shape ${workId}`;
+  const message = shapePrompt(before,'#12 Issue 12',workId);
   assert.equal((await (await start(before, workId)).json()).uncertain, true);
   await before.stop();
 

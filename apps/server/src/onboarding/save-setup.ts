@@ -1,31 +1,39 @@
-// Onboarding's last step: its answers become the repository's local settings, and the repository goes on the board.
-// Nothing is written to the repository; the shared .lar-factory.json, when there is one, is only read, so an answer
-// equal to its default inherits it.
-
-import { REPOSITORY_OPERATIONS, isRecord, onAzure, type LocalSetupAnswers, type OnboardingRepository, type RepositoryOperation } from '@lar-factory/shared';
+import { REPOSITORY_OPERATIONS, structureSyncOperations, isRecord, onAzure, type LocalSetupAnswers, type OnboardingRepository, type RepositoryOperation, type RepositoryItemSource } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { isRepo, saveConnections, saveOnboarded, stillOnboarding } from '../config/repository-config.ts';
-import { readSharedDefaults, saveLocalSetup, sharedDefaultsOf } from '../config/repository-settings.ts';
-import { message } from '../github/github.ts';
+import { saveLocalSetup, validateRepositorySettings } from '../config/repository-settings.ts';
+import { checkIssueListAccess, message } from '../github/github.ts';
+import { checkAzureSourceAccess } from './azure-source-access.ts';
 import { detectAccess } from './detect-setup.ts';
 
-/** What saving reads: the repository's .lar-factory.json, and what the login's permissions allow. */
+/** Access checks never make test writes. */
 export interface SaveReads {
-  shared(repo: string): Promise<Parameters<typeof saveLocalSetup>[3]>;
+  source?(repo: string, source: RepositoryItemSource): Promise<void>;
   access(repo: string): Promise<Parameters<typeof saveLocalSetup>[2]>;
 }
 
-const saveReads: SaveReads = { shared: async (repo) => (await readSharedDefaults(repo)).read, access: (repo) => detectAccess(repo) };
+const saveReads: SaveReads = {
+  access: (repo) => detectAccess(repo),
+  source: async (repo, source) => {
+    if (source.kind === 'issues') {
+      // Prove list access without loading every issue and its PR evidence during Add.
+      await checkIssueListAccess(repo);
+      return;
+    }
+    await checkAzureSourceAccess(repo, source.team);
+  },
+};
 
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
 /** The body's answers, or null when one is missing or has the wrong shape. */
-function answersOf({ projectId, role, itemSource, domainDocs, skills, consent }: Record<string, unknown>): LocalSetupAnswers | null {
+function answersOf({ projectId, role, itemSource, domainDocs, skills, consent, structureSync }: Record<string, unknown>): LocalSetupAnswers | null {
   const docs = isRecord(domainDocs) && (domainDocs.kind === 'private'
     || domainDocs.kind === 'repository' && typeof domainDocs.glossary === 'string' && typeof domainDocs.adrs === 'string');
-  if (typeof projectId !== 'string' || typeof role !== 'string' || !isRecord(itemSource) || !docs || !strings(skills)
+  if (structureSync !== undefined && typeof structureSync !== 'boolean') return null;
+  if (typeof projectId !== 'string' || role !== undefined && typeof role !== 'string' || !isRecord(itemSource) || !docs || !strings(skills)
     || !Array.isArray(consent) || !consent.every((op) => REPOSITORY_OPERATIONS.includes(op as RepositoryOperation))) return null;
-  return { projectId, role: role.trim(), itemSource, domainDocs, skills, consent } as LocalSetupAnswers;
+  return { projectId, structureSync: structureSync !== false, role: typeof role === 'string' ? role.trim() : '', itemSource, domainDocs, skills, consent } as LocalSetupAnswers;
 }
 
 const ANSWERS = 'Send the repository, its T3 project, role, item source, domain-doc location, skills and write consent.';
@@ -43,15 +51,19 @@ export async function saveSetup(input: Record<string, unknown>, dir = boardDataD
     return { status: 400, error: ANSWERS };
   }
   const { role, itemSource, domainDocs, skills } = answers;
-  const fits = sharedDefaultsOf({ role, itemSource, domainDocs, skills }, onAzure(repo));
-  if ('problem' in fits) return { status: 400, error: `${repo}: ${fits.problem.replace(/^\.lar-factory\.json /, '')}` };
-  let shared;
-  try { shared = await reads.shared(repo); }
-  catch (err) { return { status: 502, error: `Can't read ${repo}'s .lar-factory.json: ${message(err)}` }; }
-  const access = await reads.access(repo).catch(() => ({}));
+  const fits = validateRepositorySettings({ role, itemSource, domainDocs, skills }, onAzure(repo));
+  if (fits) return { status: 400, error: `${repo}: ${fits}.` };
+  try { await reads.source?.(repo, answers.itemSource); }
+  catch (err) { return { status: 403, error: `Can't read the selected issue list. ${message(err)}` }; }
+  const access = await reads.access(repo).catch(() => ({} as Awaited<ReturnType<SaveReads['access']>>));
+  if (answers.structureSync !== false) {
+    const needed = { 'publish-ticket': 'create issues or work items', 'edit-ticket': 'edit issues or work items', 'comment-ticket': 'post comments', 'tag-ticket': 'set issue labels' } as const;
+    const missing = structureSyncOperations(repo).filter((op) => access[op] !== 'allowed').map((op) => needed[op as keyof typeof needed]);
+    if (missing.length) return { status: 403, error: `Saving concepts and links needs verified permission to ${missing.join(', ')}. ${onAzure(repo) ? 'Grant work item write and comment access.' : 'GitHub needs Issues: Read and write. This read-only check cannot verify fine-grained token permissions; sign in with a classic token or gh OAuth login with repo scope.'} Recheck access or turn off sharing concepts and links.` };
+  }
   try {
     const list = saveOnboarded(repo, replaces ?? null, dir);
-    saveLocalSetup(repo, answers, access, shared, dir);
+    saveLocalSetup(repo, answers, access, dir);
     if (connections) saveConnections(repo, connections, dir);
     return { onboarding: stillOnboarding(list) };
   } catch (err) {

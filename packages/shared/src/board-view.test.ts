@@ -1,9 +1,19 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { abandonPrompt, closeTicketPrompt } from './board-view.ts';
-import type { Item } from './model.ts';
+import { abandonPrompt, boardSections, closeTicketPrompt } from './board-view.ts';
+import type { BoardData, Item } from './model.ts';
 
 const ticketed = (repo: string) => ({ content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo, number: 7, title: 'Keep history' } as Item);
+
+test('a discovered concept stays in List until it has been added locally', () => {
+  const concept = { ...ticketed('owner/repo'), id: 'concept', kind: 'concept', status: 'List', recorded: false } as Item;
+  const data = { items: [concept], repos: [] } as unknown as BoardData;
+  const fresh = boardSections(data, Date.now());
+  assert.equal(fresh.list[0]?.id, concept.id);
+  assert.deepEqual([fresh.concepts.length, fresh.queued.length, fresh.inFlight.length], [0, 0, 0]);
+  data.items = [{ ...concept, recorded: true }];
+  assert.equal(boardSections(data, Date.now()).concepts[0]?.id, concept.id);
+});
 
 test('Abandon sets work aside on this Mac and says whether the board asks about its ticket next', () => {
   assert.deepEqual(abandonPrompt(ticketed('owner/repo')), {

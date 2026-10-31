@@ -4,7 +4,7 @@
 import { expect, test } from 'vite-plus/test';
 import type { Item } from '@lar-factory/shared';
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
-import { DECISION_KINDS, dossiersOf, inDossiers, openWaits, partKind, partWaves, partsOf } from './dossier-parts.ts';
+import { DECISION_KINDS, dossiersOf, inDossiers, isDone, openWaits, partKind, partWaves, partsOf } from './dossier-parts.ts';
 
 const items = (sampleJson as unknown as { items: Item[] }).items;
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
@@ -33,8 +33,8 @@ test('parts follow dependency waves, then kind, with each kind from its labels',
   expect(partsOf(byNumber(180), items).map((p) => [p.item.number, p.kind])).toEqual([[181, 'build'], [40, 'build']]);
   expect(partKind({ ...byNumber(201), labels: ['decision-task'] }), 'a task decision is a decision').toBe('task');
   expect(DECISION_KINDS).toContain('task');
-  expect(partKind({ ...byNumber(201), labels: ['decision-wayfind'] }), 'an unknown decision builds').toBe('build');
-  expect(partKind({ ...byNumber(201), labels: [['decision:', 'grill'].join(' ')] }), 'the old decision label builds').toBe('build');
+  expect(partKind({ ...byNumber(201), labels: ['decision-wayfind'] }), 'an unlabelled decision method stays a decision').toBe('decision');
+  expect(partKind({ ...byNumber(201), labels: [['decision:', 'grill'].join(' ')] }), 'the local decision kind remains authoritative').toBe('decision');
 });
 
 test("each part carries its blocked-by issues and its newest thread", () => {
@@ -74,4 +74,13 @@ test('ticketless parts are told apart by their work IDs, and wait on each other 
   const third = ticketless('W_third', [{ repo: 'owner/a', number: 0, state: 'open', workId: 'W_second' }]);
   expect(partsOf(parent, [third, second, first]).map((p) => p.item.id)).toEqual(['W_first', 'W_second', 'W_third']);
   expect(Object.fromEntries(partWaves(partsOf(parent, [third, second, first])))).toEqual({ W_first: 0, W_second: 1, W_third: 2 });
+});
+
+test('recorded decisions need no factory labels, and local completion facts override the displayed Status',()=>{
+  const parent=byNumber(200);
+  const complete=child(0,parent,{id:'W_decided',recorded:true,kind:'decision',status:'Shaping',labels:[],completion:{complete:true,reasons:[]}});
+  const pending=child(0,parent,{id:'W_pending',recorded:true,kind:'decision',status:'List',labels:[],completion:{complete:false,reasons:['Its confirmed answer is not recorded.']}});
+  const build=child(0,parent,{id:'W_build',recorded:true,kind:'build',status:'Ready',labels:['decision-grill'],completion:{complete:false,reasons:['No merged PR.']}});
+  expect(partsOf(parent,[complete,pending,build]).map(part=>part.kind)).toEqual(['decision','decision','build']);
+  expect(isDone(complete)).toBe(true);expect(complete.status).toBe('Shaping');expect(isDone(pending)).toBe(false);expect(isDone(build)).toBe(false);
 });

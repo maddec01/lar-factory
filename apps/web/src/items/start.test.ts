@@ -1,4 +1,4 @@
-// Start refining on a Queued item, in the item dialog: its menu of model choices, how keys and clicks move through it,
+// Shape issue on a Queued item, in the item dialog: its menu of model choices, how keys and clicks move through it,
 // and what a start shows in the dialog and in a toast. Ported from the Start cases of test/render.test.ts.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
@@ -54,10 +54,10 @@ beforeEach(() => {
   holdPosts(withChoices);
 });
 
-test("Start refining opens a menu: 'T3 default' first, then each provider instance with its models", async () => {
+test("Shape issue opens a menu: 'T3 default' first, then each provider instance with its models", async () => {
   await mountItem(withChoices);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-expanded'), start().getAttribute('aria-label')])
-    .toEqual(['Start refining ▾', 'menu', 'false', `Start refining #129 ${sample.items.find((i) => i.id === 'I_sample05')!.title}`]);
+    .toEqual(['Shape issue ▾', 'menu', 'false', `Shape issue #129 ${sample.items.find((i) => i.id === 'I_sample05')!.title}`]);
   expect(menu()).toBeNull();
   await open();
   expect(start().getAttribute('aria-expanded')).toBe('true');
@@ -185,7 +185,7 @@ test('a failed Start shows in the dialog, keeps Back to List and the last choice
   close.focus();
   await settle(() => close.click());
   expect(card().querySelector('p.start')).toBeNull();
-  expect(text(start())).toBe('Start refining ▾');
+  expect(text(start())).toBe('Shape issue ▾');
   expect(document.activeElement).toBe(card().querySelector('[data-back-to-list]'));
 });
 

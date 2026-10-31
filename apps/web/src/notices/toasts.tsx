@@ -159,7 +159,7 @@ export function clearToast(slot: string): void {
 }
 
 /** Gives a successful notification five seconds after hover and keyboard focus leave it. */
-export function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClose: () => void): void {
+function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClose: () => void): void {
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {

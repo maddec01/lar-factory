@@ -1,4 +1,4 @@
-// The item dialog's "Load 10 more": it shows when older comments exist, appends the next page in the details' order,
+// The item dialog's "Load older comments": it shows when older comments exist, appends the next page in the details' order,
 // hides at the end, keeps the comments already shown when a load fails and lets the button retry, keeps the pages
 // loaded while the dialog reopens on an unchanged item, and starts over at the latest comments once it changed.
 
@@ -13,7 +13,7 @@ const OLDER = (sampleDetailsJson as unknown as { $older: Record<string, ItemComm
 const dialog = () => $('[data-item-dialog]')!;
 const authors = () => $$('[data-comments] li').map((li) => text(li.querySelector('.font-medium')));
 const bodies = () => $$('[data-comments] li [data-slot="rich-text"]').map(text);
-const loadMore = () => [...dialog().querySelectorAll<HTMLButtonElement>('[data-comments] button')].find((b) => /Load 10 more/.test(text(b)));
+const loadMore = () => [...dialog().querySelectorAll<HTMLButtonElement>('[data-comments] button')].find((b) => /Load older comments/.test(text(b)));
 const errorText = () => text(dialog().querySelector('[data-comments] [role="alert"]'));
 /** The older-comment reads the page made, as the parameters each carried. */
 const pageReads = () => (fetchMock.mock.calls as unknown as [string][]).map(([url]) => url).filter((url) => url.startsWith('/api/item-comments'))
@@ -50,17 +50,40 @@ function serveOlder(): { fail: (count: number) => void; hold: () => (() => Promi
   };
 }
 
-test('an item with older comments shows Load 10 more under its comments, and an item without shows none', async () => {
+test('an item with older comments shows Load older comments under its comments, and an item without shows none', async () => {
   await mountPage();
   await openItem('I_sample13');
-  expect(text(loadMore())).toBe('Load 10 more');
+  expect(text(loadMore())).toBe('Load older comments');
   expect(authors()).toEqual(['maddec01', 'claude-bot', 'reviewer-anne']);
   await closeItem();
   await openItem('I_sample26');
   expect(loadMore()).toBeUndefined();
 });
 
-test('Load 10 more reads the page before the details\' cursor and appends it in order, then the last page hides the button', async () => {
+test('an unresolved empty discussion offers older comments and only claims no comments after reaching the end', async () => {
+  const original = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string) => {
+    if (url.startsWith('/api/item-details') && new URL(url, 'http://board').searchParams.get('itemId') === 'I_sample13') {
+      const response = await original(url);
+      const body = await response.json();
+      body.details.comments = [];
+      body.details.hasOlderComments = true;
+      body.details.olderCursor = 'unknown';
+      return new Response(JSON.stringify(body));
+    }
+    if (url.startsWith('/api/item-comments')) return new Response(JSON.stringify({ page: { comments: [], olderCursor: null } }));
+    return original(url);
+  });
+  await mountPage();
+  await openItem('I_sample13');
+  expect(text($('[data-comments]'))).toBe('CommentsLoad older comments');
+  expect(authors()).toHaveLength(0);
+  await settle(() => loadMore()!.click());
+  expect(text($('[data-comments]'))).toBe('CommentsNo comments.');
+  expect(loadMore()).toBeUndefined();
+});
+
+test('Load older comments reads the page before the details\' cursor and appends it in order, then the last page hides the button', async () => {
   const server = serveOlder();
   await mountPage();
   await openItem('I_sample13');

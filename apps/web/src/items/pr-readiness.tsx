@@ -28,8 +28,8 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
   const [loading, setLoading] = useState(false);
   const sequence = useRef(0);
   const disconnected = useBoardStore((s) => s.clientError || s.data.itemSourceProblems?.find((p) => p.repo === item.repo)?.problem);
-  const updated = useBoardStore((s) => s.data.fetchedAt);
-  const key = JSON.stringify([item.id, pr.number, pr.url, pr.sourceRevision, updated, attempt]);
+  const key = JSON.stringify([item.id, pr.number, pr.url, pr.sourceRevision, pr.state, pr.isDraft, pr.mergeState,
+    pr.checks?.passed, pr.checks?.failed, pr.checks?.running, pr.checks?.total, pr.checks?.since, attempt]);
   const stale = loading || settledKey !== key;
   useEffect(() => {
     const request = ++sequence.current;
@@ -46,7 +46,7 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
         if (sequence.current === request) { setEvidence({ available: false, reason: 'Azure evidence is unavailable. Refresh to try again.' }); setSettledKey(key); setLoading(false); }
       });
     return () => { ++sequence.current; controller.abort(); };
-  }, [open, attempt, item.id, pr.number, pr.url, updated, disconnected, pr.sourceRevision, key]);
+  }, [open, item.id, pr.number, disconnected, key]);
   if (!item.azure) return null;
   return <div className="basis-full text-xs text-(--muted-foreground)">
     <Button {...kind('other')} aria-expanded={open} aria-controls={detailsId} onClick={() => { setLoading(true); setOpen(!open); }}>Readiness details</Button>

@@ -3,24 +3,25 @@ import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle, strea
 import type { BoardData } from '@lar-factory/shared';
 
 const healthy: BoardData = { ...sample, tools: toolChecks(), repositoryConfigProblems: [], itemSourceProblems: [] };
-const warning = (key: string) => $(`[data-warning="${key}"]`)?.closest<HTMLElement>('[data-slot="toast"]') ?? null;
+const warning = (key: string) => $(`[data-warning="${key}"]`)?.closest<HTMLElement>('[data-slot="notice"]') ?? null;
 const closeWarning = (key: string) => settle(() => warning(key)!.querySelector<HTMLButtonElement>('.dismiss')!.click());
 
 test('a tool warning stays amber in the shared stack until its condition clears', async () => {
   await mountPage({ ...sample, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) });
-  const warning = $('[data-slot="toaster"] [data-toast-color="warning"]')!;
+  const warning = $('[data-slot="notice"]')!;
   expect(warning).not.toBeNull();
   expect(warning.textContent).toContain('GitHub CLI not found.');
   expect(warning.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: GitHub CLI not found.');
   expect($('main .banner, main .banners')).toBeNull();
   await settle(() => stream().onopen!());
   await settle(() => vi.advanceTimersByTime(60_000));
-  expect($$('[data-toast-color="warning"]')).toEqual([warning]);
+  expect($$('[data-slot="notice"]')).toEqual([warning]);
   await push({ ...sample, tools: toolChecks() });
-  expect($('[data-toast-color="warning"]')).toBeNull();
+  expect($('[data-slot="notice"]')).toBeNull();
 });
 
 const conditions: { key: string; failed: Partial<BoardData>; changed: Partial<BoardData> }[] = [
+  { key: 'local-work', failed: { localProblem: 'Restart Lar Factory to continue.' }, changed: { localProblem: 'Restart Lar Factory to continue.' } },
   { key: 't3', failed: { tools: toolChecks({ t3: { result: 'not-running' } }) }, changed: { tools: toolChecks({ t3: { result: 'not-running', version: '1.0.0' } }) } },
   { key: 'gh', failed: { tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) }, changed: { tools: toolChecks({ gh: { result: 'logged-out', fix: 'gh auth login' } }) } },
   ...(['git', 'jq', 'curl'] as const).map((name) => ({
@@ -29,14 +30,21 @@ const conditions: { key: string; failed: Partial<BoardData>; changed: Partial<Bo
     changed: { tools: toolChecks({ [name]: { result: 'missing', fix: `brew install ${name}`, override: `${name.toUpperCase()}_PATH=/missing/${name}` } }) },
   })),
   { key: 'az', failed: { tools: toolChecks({ az: { result: 'missing', fix: 'brew install azure-cli' } }) }, changed: { tools: toolChecks({ az: { result: 'logged-out', fix: 'az login' } }) } },
-  { key: 'repository-config:owner/repo', failed: { repositoryConfigProblems: [{ repo: 'owner/repo', problem: 'no config' }] }, changed: { repositoryConfigProblems: [{ repo: 'Owner/Repo', problem: 'invalid config' }] } },
   { key: 'item-source:owner/repo', failed: { itemSourceProblems: [{ repo: 'owner/repo', problem: 'no source' }] }, changed: { itemSourceProblems: [{ repo: 'Owner/Repo', problem: 'source unavailable' }] } },
 ];
+
+test('a newer local database asks for a restart inline while preserving the board', async () => {
+  await mountPage({ ...healthy, localProblem: 'Restart Lar Factory to continue.' });
+  expect($('[data-board-notices] summary')?.textContent).toBe('Restart Lar Factory to continue.');
+  expect(warningText(warning('local-work')!)).toEqual(['Restart Lar Factory to continue.', 'Your last view is still shown.']);
+  expect($('[data-board-notices] details')?.hasAttribute('open')).toBe(false);
+  expect($('main')).not.toBeNull();
+});
 
 test.each(conditions)('$key stays closed through refreshes and changed details, then shows after clearing and recurring', async ({ key, failed, changed }) => {
   await mountPage({ ...healthy, ...failed });
   const entry = warning(key)!;
-  expect(entry.dataset.toastColor).toBe('warning');
+  expect(entry.dataset.slot).toBe('notice');
   expect(entry.querySelector('.dismiss')!.getAttribute('aria-label')).toMatch(/^Dismiss: .+/);
   await settle(() => stream().onopen!());
   await settle(() => vi.advanceTimersByTime(60_000));
@@ -95,28 +103,6 @@ test('a successful Recheck restores a closed server warning as well as successfu
   expect(warning('client-error')).not.toBeNull();
 });
 
-test('dismissal is independent across tools, repositories and warning kinds', async () => {
-  const data: BoardData = { ...healthy,
-    tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' }, git: { result: 'missing', fix: 'brew install git' } }),
-    repositoryConfigProblems: [{ repo: 'owner/one', problem: 'no config' }, { repo: 'owner/two', problem: 'no config' }],
-    itemSourceProblems: [{ repo: 'owner/one', problem: 'unavailable' }, { repo: 'owner/two', problem: 'unavailable' }],
-  };
-  await mountPage(data);
-  await closeWarning('gh');
-  await closeWarning('repository-config:owner/one');
-  await closeWarning('item-source:owner/two');
-  const keys = () => $$('[data-warning]').map((entry) => entry.dataset.warning);
-  expect(keys()).toEqual(['git', 'repository-config:owner/two', 'item-source:owner/one']);
-  await push({ ...data, repositoryConfigProblems: [{ repo: 'Owner/One', problem: 'invalid config' }, data.repositoryConfigProblems![1]!] });
-  expect(keys()).toEqual(['git', 'repository-config:owner/two', 'item-source:owner/one']);
-  // Clearing another kind and repository leaves each closed condition suppressed.
-  await push({ ...data, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }),
-    repositoryConfigProblems: [data.repositoryConfigProblems![0]!], itemSourceProblems: [data.itemSourceProblems![1]!] });
-  expect(keys()).toEqual([]);
-  await push(data);
-  expect(keys()).toEqual(['git', 'repository-config:owner/two', 'item-source:owner/one']);
-});
-
 test('a closed tool warning stays closed across scope, empty state and T3 Code missing screen changes', async () => {
   const data: BoardData = { ...healthy, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) };
   await mountPage(data);
@@ -171,7 +157,7 @@ test('warning details update in place among toasts without changing age, scrolli
   expect(warning('gh')!.dataset.toastId).toBe(id);
   expect(document.activeElement).toBe(recheck);
   expect(warningText(entry!)[0]).toBe('GitHub CLI is logged out.');
-  expect($$('[data-slot="toaster"] [data-slot="toast"]').map((el) => el.dataset.toastColor)).toEqual(['success', 'warning', 'danger']);
+  expect($$('[data-slot="toaster"] [data-slot="toast"]').map((el) => el.dataset.toastColor)).toEqual(['success', 'danger']);
   expect(viewport.scrollTop).toBe(25);
   await settle(() => recheck.blur());
   await settle(() => vi.advanceTimersByTime(200));
@@ -192,7 +178,7 @@ test('unchanged warnings make no live-region mutations on refreshes and clock ti
   const data: BoardData = { ...healthy, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) };
   await mountPage(data);
   const entry = warning('gh')!;
-  expect(entry.getAttribute('aria-live')).toBe('polite');
+  expect(entry.closest('[data-board-notices]')).not.toBeNull();
   const mutations: MutationRecord[] = [];
   const observer = new MutationObserver((records) => mutations.push(...records));
   observer.observe(entry, { subtree: true, childList: true, characterData: true, attributes: true });
@@ -213,15 +199,15 @@ test('more warnings and toasts than fit remain in one bounded scrolling viewport
   Object.defineProperty(viewport, 'scrollHeight', { value: 1_000 });
   const { showToast } = await import('./toasts.tsx');
   await settle(() => showToast({ slot: 'success', what: 'Saved', body: 'Saved' }));
-  await push({ ...healthy, repositoryConfigProblems: Array.from({ length: 7 }, (_, index) => ({ repo: `owner/repo${index}`, problem: 'invalid config' })) });
+  await push({ ...healthy, itemSourceProblems: Array.from({ length: 7 }, (_, index) => ({ repo: `owner/repo${index}`, problem: 'Could not read issues' })) });
   await settle(() => showToast({ slot: 'failure', failed: true, what: 'Failed', body: 'Failed' }));
   expect($$('[data-slot="toaster"]')).toEqual([viewport]);
-  expect($$('[data-slot="toaster"] [data-slot="toast"]')).toHaveLength(9);
-  expect($$('[data-slot="toaster"] [data-slot="toast"]').map((el) => el.dataset.toastColor)).toEqual(['success', ...Array<string>(7).fill('warning'), 'danger']);
-  expect(viewport.scrollTop).toBe(1_000);
+  expect($$('[data-slot="toaster"] [data-slot="toast"]')).toHaveLength(2);
+  expect($$('[data-slot="toaster"] [data-slot="toast"]').map((el) => el.dataset.toastColor)).toEqual(['success', 'danger']);
+  expect($$('[data-board-notices] [data-slot="notice"]')).toHaveLength(7);
   expect(getComputedStyle(viewport).overflowY).toBe('auto');
   expect(getComputedStyle(viewport).maxHeight).toBe('calc(100dvh - var(--spacing) * 13 - var(--notice-edge) * 2)');
-  expect($$('[data-toast-color="warning"]').every((entry) => getComputedStyle(entry).flexShrink === '0')).toBe(true);
+  expect($$('[data-slot="toaster"] [data-slot="notice"]')).toEqual([]);
 });
 
 test('closing a focused warning on the T3 Code missing screen returns focus to Settings', async () => {

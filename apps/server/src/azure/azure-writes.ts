@@ -1,10 +1,11 @@
+import { writeTrackerStructure } from '@lar-factory/shared';
 // Writes to Azure DevOps work items through az: Abandon's confirmed close moves State to the type's Removed-category
 // state, in one JSON patch that fails if the work item changed since the board read it.
 // A description save writes the field the item dialog read, as markdown, failing if the work item changed since the dialog read it.
 
 import { decodePart, onAzure } from '@lar-factory/shared';
 import type { AzureBodyField, Item } from '@lar-factory/shared';
-import type { Refused } from '../config/edit-config.ts';
+import type { Refused } from '../config/editable-repository.ts';
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
 import { az, field, problemOf, withFile, workItemPatch, type Az, type AzureCalls, type RawWorkItem } from './azure-items.ts';
 
@@ -34,6 +35,7 @@ export async function saveAzureDescription(item: Item, { body, bodyField, revisi
   const [organization, encoded] = item.repo.split('/') as [string, string];
   const project = decodePart(encoded);
   const id = item.number;
+  if (item.tracker && bodyField === 'System.Description') body = writeTrackerStructure(body,item.tracker);
   const ops: Operation[] = [
     { op: 'test', path: '/rev', value: revision },
     { op: 'replace', path: `/fields/${bodyField}`, value: body },

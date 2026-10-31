@@ -1,9 +1,10 @@
 // Repository issues as GitHub's GraphQL API returns them, and the rules that turn them into the
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
-import { isBuild, labelKind, labelStatuses, sliceProgress } from './model.ts';
+import { isBuild, labelStatuses, sliceProgress } from './model.ts';
 import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice, Status } from './model.ts';
 import { parseConceptMap } from './concept-map.ts';
+import { readTrackerStructure, trackerKind, trackerReference } from './tracker-structure.ts';
 
 interface RawLabelConn {
   nodes: { name: string }[];
@@ -37,6 +38,8 @@ interface RawContent {
   id: string;
   /** Read for concepts only, in a query of its own. */
   body?: string;
+  issueType?: { name: string } | null;
+  trackerError?:string;
   title: string;
   updatedAt: string;
   number: number;
@@ -210,7 +213,7 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
     revision: 0,
     status: closed.closedAs === 'done' ? 'Done' : statuses[0] ?? 'List',
     statuses,
-    kind: labelKind(rawLabels(raw)),
+    kind: trackerKind(rawLabels(raw), c.issueType?.name),
     content: 'ticket',
     number: c.number,
     title: c.title,
@@ -227,8 +230,22 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
     slices: normalizeSlices(rawSlices(raw, builds)),
   };
+  try {
+    const tracker = readTrackerStructure(c.body ?? '');
+    if (tracker) {
+      item.tracker = tracker; item.kind = tracker.kind;
+      if (tracker.map) item.map = parseConceptMap(tracker.map);
+      if (tracker.parent) {
+        const parent = trackerReference(tracker.parent.url)!;
+        item.parent = { number: parent.number, repo: tracker.parent.repository ?? parent.repository, title: tracker.parent.title, url: tracker.parent.url, state: 'open' };
+      }
+      if (tracker.parts) item.subIssues = { total: tracker.parts.length, completed: 0 };
+      item.blockers = tracker.blockers?.map(blocker => { const ref = trackerReference(blocker.url)!; return { number: ref.number, repo: ref.repository, title: blocker.title, state: 'open' as const }; }) ?? item.blockers;
+    }
+  } catch (error) { item.sync = { state: 'error', message: (error as Error).message }; }
   if (c.assignees) item.assignee = c.assignees.nodes.map((a) => a.login).sort().join(', ') || null;
-  if (isRawConcept(raw)) {
+  if(c.trackerError)item.sync={state:'error',message:c.trackerError};
+  if (!item.map && item.kind==='concept') {
     const map = bodyMap(c.body);
     if (map) item.map = map;
   }

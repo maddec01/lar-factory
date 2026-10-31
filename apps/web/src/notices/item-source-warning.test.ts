@@ -10,13 +10,13 @@ const problems = [
 
 test("each repository whose items can't be read gets a warning naming it as the List modal does, why and its fix, which clears once it reads", async () => {
   await mountPage({ ...sample, itemSourceProblems: problems });
-  const warnings = () => $$('[data-slot="toaster"] [data-toast-color="warning"]');
+  const warnings = () => $$('[data-slot="notice"]');
   expect(warnings().map(warningText)).toEqual([
     ["lar-api's items are off the board.", 'az is logged out. Run az login Copy in a terminal. The board reads it again on each refresh.'],
     ["lar-web's items are off the board.", 'Team Web has no current iteration in contoso/Fabrikam. Give the team a sprint whose dates cover today in its project settings. '
       + 'The board reads it again on each refresh.'],
   ]);
-  expect(warnings()[0]!.dataset.toastColor).toBe('warning');
+  expect(warnings()[0]!.closest('[data-board-notices]')).not.toBeNull();
 
   await push({ ...sample, itemSourceProblems: [] });
   expect(warnings()).toEqual([]);
@@ -24,5 +24,5 @@ test("each repository whose items can't be read gets a warning naming it as the 
 
 test("a repository whose problem the failed az check's fix covers shows no warning of its own beside the az warning", async () => {
   await mountPage({ ...sample, tools: toolChecks({ az: { result: 'logged-out', fix: 'az login' } }), itemSourceProblems: problems });
-  expect($$('[data-slot="toaster"] [data-toast-color="warning"]').map((b) => warningText(b)[0])).toEqual(['Azure CLI is logged out.', "lar-web's items are off the board."]);
+  expect($$('[data-slot="notice"]').map((b) => warningText(b)[0])).toEqual(['Azure CLI is logged out.', "lar-web's items are off the board."]);
 });

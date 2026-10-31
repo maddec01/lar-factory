@@ -6,7 +6,7 @@
 // or clears its mark.
 
 import { sameRepo } from '@lar-factory/shared';
-import type { DependencyObservationKind, NewObservation, Observation, Observed, PullRequestState, WorkRecord, WorkRecords } from '@lar-factory/work-records';
+import { WorkRecordError, type DependencyObservationKind, type NewObservation, type Observation, type Observed, type PullRequestState, type WorkRecord, type WorkRecords } from '@lar-factory/work-records';
 import { log } from '../log.ts';
 import { AccessLost, NotFound, type TicketObservation } from './item-source.ts';
 
@@ -68,6 +68,11 @@ async function observeOne(records: WorkRecords, workId: string, of: Observed, re
   if (next.of === 'pr' && next.state === 'merged' && record.status !== 'Done') record = records.update(workId, record.revision, { status: 'Done' });
   if (next.of === 'ticket' && next.state === 'not-found') record = records.setAside(workId, record.revision);
   if (reason) records.setNeedsYou(workId, record.revision, reason);
+}
+
+/** Apply a current PR read through the same completion and Needs you rules as the idle observer. */
+export async function observePullRequest(records: WorkRecords, workId: string, read: () => Promise<PullRequestState>): Promise<void> {
+  await observeOne(records, workId, 'pr', async () => ({ of: 'pr', state: await read() }));
 }
 
 /** The kinds a ticket or PR read open again was last read as, which make it reopened. */
@@ -133,6 +138,7 @@ export async function observeRecords(records: WorkRecords, repos: readonly strin
         }
       }
     } catch (err) {
+      if (err instanceof WorkRecordError && err.code === 'schema-too-new') throw err;
       log(`can't record what ${workId}'s provider shows: ${(err as Error).message}`);
     }
   };
@@ -151,6 +157,7 @@ export function finishCompleted(records: WorkRecords, repos: readonly string[]):
       const done = record.status === 'Done' ? record : records.update(record.workId, record.revision, { status: 'Done' });
       records.recordFinished(record.workId, done.revision);
     } catch (err) {
+      if (err instanceof WorkRecordError && err.code === 'schema-too-new') throw err;
       log(`can't finish ${record.workId}: ${(err as Error).message}`);
     }
   }

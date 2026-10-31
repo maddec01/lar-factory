@@ -1,4 +1,4 @@
-// The settings rows the board app's bridge answers: a switch per Install target, which installs the app's skills
+// The settings rows the board app's bridge answers: a switch per Skill folder, which installs the app's skills
 // there or stops installing them, locked on for a target T3 Code needs, the update channel, and the version with what the updater last found
 // and the update pill's step, Download or Restart to update, or else Check now. Each group's note says what the last
 // call did.

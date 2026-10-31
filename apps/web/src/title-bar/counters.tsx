@@ -149,7 +149,7 @@ export function Counters() {
         </Counter>
 
         <Counter label="queued" value={s.queued.length} icon={glyph('Queued')} hideBelow="hidden @min-[54rem]:inline-flex"
-          hint={`${s.queued.length ? `${plural(s.queued.length, 'item')} ready to build` : 'Nothing queued'}, ${s.list.length} more in List`}>
+          hint={`${s.queued.length ? `${plural(s.queued.length, 'item')} ready to shape` : 'Nothing queued'}, ${s.list.length} more in List`}>
           <PopHead icon={glyph('Queued')} title="Queued" sub={s.queued.length} />
           {s.queued.length ? <List items={s.queued}>{(i) => row(i)}</List> : <Empty>Nothing queued.</Empty>}
           <PopFoot>{s.list.length ? `${plural(s.list.length, 'item')} more in List, not yet queued.` : 'List is empty.'}</PopFoot>

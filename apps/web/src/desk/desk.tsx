@@ -1,4 +1,3 @@
-import { PublishButton } from '../publication/publication-dialog.tsx';
 // Your desk: the items only you can move, Ready, Needs you, Verify and Ready to merge, as cards in one row that scrolls
 // sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the same five
 // rows at the same heights, so they line up across cards: status, repository and age; the title; the next step; the
@@ -23,9 +22,9 @@ const startsBuild = (item: Item) => item.status === 'Ready' && !hasLiveThread(it
 
 /** What a Ready card waits on: the open blockers Start after names, what holds its repository, or nothing. */
 function readyStep(item: Item, data: BoardData): string {
-  if (!startsBuild(item)) return hasLiveThread(item) ? 'A thread is at work on it' : 'Ready to build';
+  if (!startsBuild(item)) return hasLiveThread(item) ? 'A thread is at work on it' : 'Brief ready';
   if (showsStartAfter(item, data)) return `Waits on ${openBlockerRefs(item, true).join(', ')}`;
-  return startHold(data, item.repo) ?? 'Ready to build';
+  return startHold(data, item.repo) ?? 'Brief ready';
 }
 
 /** Whether the card's action is Open PR: a Verify or Ready to merge item. Only that card reads its PR's merge state and checks. */
@@ -51,7 +50,7 @@ function NextStep({ item, data }: { item: Item; data: BoardData }) {
       </>
     );
   }
-  return <span className="truncate">{item.status === 'Ready' ? readyStep(item, data) : HINTS[item.status]}</span>;
+  return <span className="truncate">{item.status === 'Ready' ? readyStep(item, data) : item.status === 'Needs you' ? 'Answer in T3' : HINTS[item.status]}</span>;
 }
 
 /** One row: the card's action on the left, and Open thread as a square icon in the right corner unless it is the action. */
@@ -86,7 +85,6 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
         <span className="pt-1"><StepTrack status={item.status} /></span>
       </button>
       <Actions item={item} data={data} />
-      {item.publication?.eligible && <KeepClicks className="cursor-auto"><PublishButton item={item} data={data} /></KeepClicks>}
       {item.status === 'Ready' && <KeepClicks className="desk-start cursor-auto empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
     </div>
   );

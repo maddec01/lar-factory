@@ -110,9 +110,18 @@ describe('Dependencies', () => {
     expect(records.observeDependency(id, 4, { subject: 'acme/auth#9', kind: 'merged' }).needsReview).toBe(false);
     const changed = records.observeDependency(id, 5, { subject: 'acme/auth#9', kind: 'reopened' });
     expect(changed).toMatchObject({ met: { by: 'pedro' }, needsReview: true });
-    expect(changed.observations).toEqual([{ subject: 'acme/auth#9', kind: 'reopened', detail: null, observedAt: expect.any(String) }]);
+    expect(changed.observations).toEqual([{ subject: 'acme/auth#9', kind: 'reopened', detail: null, observedAt: expect.any(String), lastGood: null }]);
     expect(records.waitingOn(build.workId)).toEqual([]);
     expect(records.markDependencyMet(id, 6, 'pedro')).toMatchObject({ needsReview: false });
+  });
+
+  it('leaves a met Dependency unflagged by the first read of a subject, even after a read that failed', async () => {
+    const { records, dependency } = await blockedBuild();
+    const id = dependency.dependencyId;
+    records.markDependencyMet(id, 2, 'pedro');
+    expect(records.observeDependency(id, 3, { subject: 'acme/auth#5', kind: 'closed' }).needsReview).toBe(false);
+    records.observeDependency(id, 4, { subject: 'acme/auth#9', kind: 'read-failed', detail: 'HTTP 502' });
+    expect(records.observeDependency(id, 5, { subject: 'acme/auth#9', kind: 'merged' }).needsReview).toBe(false);
   });
 
   it('keeps the Dependency and its handover through a failed read or lost access, and keeps each kind distinct', async () => {
@@ -128,6 +137,26 @@ describe('Dependencies', () => {
     expect(records.observeDependency(id, 4, { subject: 'acme/auth#5', kind: 'deleted' }).observations[0]).toMatchObject({ kind: 'deleted', detail: null });
     expect(() => records.observeDependency(id, 5, { subject: 'acme/auth#5', kind: 'gone' as never })).toThrow(expect.objectContaining({ code: 'invalid' }));
     expect(() => records.observeDependency(id, 5, { subject: 'acme/other#1', kind: 'open' })).toThrow("isn't the Dependency's ticket or one of its PRs");
+  });
+
+  it('keeps the last good read beside a failed one, and leaves a met Dependency unflagged through an outage', async () => {
+    const { records, dependency } = await blockedBuild();
+    const id = dependency.dependencyId;
+    const merged = records.observeDependency(id, 2, { subject: 'acme/auth#9', kind: 'merged' }).observations[0]!;
+    records.markDependencyMet(id, 3, 'pedro');
+    const lastGood = { kind: 'merged', observedAt: merged.observedAt };
+
+    const outage = records.observeDependency(id, 4, { subject: 'acme/auth#9', kind: 'read-failed', detail: 'HTTP 502' });
+    expect(outage).toMatchObject({ met: { by: 'pedro' }, needsReview: false });
+    expect(outage.observations).toEqual([{ subject: 'acme/auth#9', kind: 'read-failed', detail: 'HTTP 502', observedAt: expect.any(String), lastGood }]);
+    expect(records.observeDependency(id, 5, { subject: 'acme/auth#9', kind: 'read-failed', detail: 'HTTP 503' }).observations[0]!.lastGood).toEqual(lastGood);
+    const back = records.observeDependency(id, 6, { subject: 'acme/auth#9', kind: 'merged' });
+    expect(back).toMatchObject({ met: { by: 'pedro' }, needsReview: false });
+    expect(back.observations[0]!.lastGood).toBeNull();
+
+    const lost = records.observeDependency(id, 7, { subject: 'acme/auth#9', kind: 'access-lost', detail: 'HTTP 403' });
+    expect(lost).toMatchObject({ met: { by: 'pedro' }, needsReview: true });
+    expect(lost.observations[0]!.lastGood).toMatchObject({ kind: 'merged' });
   });
 
   it('swaps its blocker references on every dependent build for a named build in one transaction', async () => {

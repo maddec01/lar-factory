@@ -242,6 +242,9 @@ export const MIGRATIONS: readonly Migration[] = [
       kind TEXT NOT NULL,
       detail TEXT,
       observed_at TEXT NOT NULL,
+      -- The last read that answered, kept beside a read that failed or lost access; null after a read that answered.
+      last_good_kind TEXT,
+      last_good_at TEXT,
       PRIMARY KEY (dependency_id, subject)
     ) STRICT;
   `),

@@ -85,8 +85,8 @@ test("a blocker's ref is #n for the item's repository, and names another reposit
 /** A Dependency on the server team's blocker, met when `met` is, its ticket last read as `kind`. */
 function dependency(kind: DependencyObservationKind, met = false, change: Partial<DependencyHold> = {}): Blocker {
   const hold: DependencyHold = { dependencyId: 'd1', revision: 2, owner: 'server team', need: 'An export endpoint', ticket: 'maddec01/lar-server#40',
-    evidence: 'The endpoint answers in staging', met: met ? { by: 'pedro', at: '2026-10-30T10:00:00Z' } : null, needsReview: false,
-    observation: { subject: 'maddec01/lar-server#40', kind, detail: null, observedAt: '2026-10-30T09:00:00Z' }, ...change };
+    named: [], evidence: 'The endpoint answers in staging', met: met ? { by: 'pedro', at: '2026-10-30T10:00:00Z' } : null, needsReview: false,
+    observation: { subject: 'maddec01/lar-server#40', kind, detail: null, observedAt: '2026-10-30T09:00:00Z', lastGood: null }, ...change };
   return { number: 40, repo: 'maddec01/lar-server', state: met ? 'closed' : 'open', title: hold.need, dependency: hold };
 }
 
@@ -106,7 +106,7 @@ test('a Dependency goes by its owner, never its ticket number', () => {
 
 test('a closed ticket or merged PR suggests marking it met, and a changed observation after the mark asks for a review', () => {
   assert.equal(dependencyNotice(dependency('closed').dependency!), 'Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.');
-  assert.equal(dependencyNotice(dependency('merged', false, { observation: { subject: 'maddec01/lar-server#41', kind: 'merged', detail: null, observedAt: '2026-10-30T09:00:00Z' } }).dependency!),
+  assert.equal(dependencyNotice(dependency('merged', false, { observation: { subject: 'maddec01/lar-server#41', kind: 'merged', detail: null, observedAt: '2026-10-30T09:00:00Z', lastGood: null } }).dependency!),
     'Its PR maddec01/lar-server#41 is merged. Mark it met once the change is delivered.');
   assert.equal(dependencyNotice(dependency('open').dependency!), null);
   assert.equal(dependencyNotice(dependency('closed', true).dependency!), null, 'a met Dependency needs no suggestion');

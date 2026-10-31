@@ -2,17 +2,30 @@
 // read the ticket. The record owns Status, kind, title, structure, blockers, Dependencies and slices; the ticket adds its URL, labels,
 // PRs and provider fields, so a ticket edit never moves, retitles, restructures or blocks work.
 
-import { parseConceptMap, refKey, sameRepo } from '@lar-factory/shared';
+import { onAzure, parseConceptMap, refKey, sameRepo } from '@lar-factory/shared';
 import type { Blocker, DependencyHold, IssueRef, Item, NeedsYouOffer, RepositorySetup, Slice, SliceProgress } from '@lar-factory/shared';
 import type { Dependency, WorkRecord, WorkRecords } from '@lar-factory/work-records';
+import { workItemUrl } from '../azure/azure-items.ts';
+import { prUrl } from '../config/pr-host.ts';
 
 /** The number in a ticket reference, `owner/name#12`. */
 const ticketNumber = (ticket: string | null): number => (ticket ? Number(ticket.slice(ticket.lastIndexOf('#') + 1)) : 0);
 
+/** The page of a ticket or PR reference: a GitHub issue or PR, or an Azure DevOps work item or PR. */
+function referenceUrl(reference: string, pr: boolean): string {
+  const repo = reference.slice(0, reference.lastIndexOf('#'));
+  const number = ticketNumber(reference);
+  if (pr) return prUrl(repo, number);
+  const [organization, project] = repo.split('/');
+  return onAzure(repo) ? workItemUrl(organization!, project!, number) : `https://github.com/${repo}/issues/${number}`;
+}
+
 /** A Dependency as the blocker it is for each build it holds: open until the user marks it met, which no observation decides. */
 function dependencyBlocker(d: Dependency): Blocker {
   const observation = d.observations.reduce<DependencyHold['observation']>((latest, o) => (!latest || o.observedAt > latest.observedAt ? o : latest), null);
-  const hold: DependencyHold = { dependencyId: d.dependencyId, revision: d.revision, owner: d.owner, need: d.need, ticket: d.ticket,
+  const named = [...d.ticket ? [{ reference: d.ticket, url: referenceUrl(d.ticket, false) }] : [],
+    ...d.pullRequests.map((pr) => ({ reference: pr, url: referenceUrl(pr, true) }))];
+  const hold: DependencyHold = { dependencyId: d.dependencyId, revision: d.revision, owner: d.owner, need: d.need, ticket: d.ticket, named,
     evidence: d.evidence, met: d.met, needsReview: d.needsReview, observation };
   return { number: ticketNumber(d.ticket), repo: d.ticket ? d.ticket.slice(0, d.ticket.lastIndexOf('#')) : d.owner, state: d.met ? 'closed' : 'open',
     title: d.need, dependency: hold };

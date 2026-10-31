@@ -88,6 +88,10 @@ export interface IssueRef {
 /** What the latest read of a Dependency's ticket or PR showed. A read that failed or lost access is a kind of its own. */
 export const DEPENDENCY_OBSERVATION_KINDS = ['open', 'closed', 'merged', 'reopened', 'deleted', 'access-lost', 'read-failed'] as const;
 export type DependencyObservationKind = (typeof DEPENDENCY_OBSERVATION_KINDS)[number];
+/** Each kind of read as the board says it. */
+export const DEPENDENCY_OBSERVATION_WORDS: Record<DependencyObservationKind, string> = {
+  open: 'open', closed: 'closed', merged: 'merged', reopened: 'reopened', deleted: 'deleted', 'access-lost': 'access lost', 'read-failed': 'read failed',
+};
 
 /** A Dependency holding a build: a change the team or repository that owns it delivers. Only the user's met mark releases it. */
 export interface DependencyHold {
@@ -98,13 +102,19 @@ export interface DependencyHold {
   owner: string;
   need: string;
   ticket: string | null;
+  /** Its ticket, then each of its PRs, with the page that shows it; empty when it names neither and is a handover only. */
+  named: { reference: string; url: string }[];
   /** What will establish that the change was delivered; empty until agreed. */
   evidence: string;
   met: { by: string; at: string } | null;
   /** Whether an observation changed after it was marked met. */
   needsReview: boolean;
   /** The most recent read of its ticket or one of its PRs, or null before any. It never sets or clears the mark. */
-  observation: { subject: string; kind: DependencyObservationKind; detail: string | null; observedAt: string } | null;
+  observation: {
+    subject: string; kind: DependencyObservationKind; detail: string | null; observedAt: string;
+    /** The last read that answered, kept beside a read that failed or lost access; null after a read that answered. */
+    lastGood: { kind: DependencyObservationKind; observedAt: string } | null;
+  } | null;
 }
 
 /**
@@ -160,7 +170,7 @@ export function dependencyNotice(d: DependencyHold): string | null {
   const seen = d.observation;
   if (!seen) return null;
   const subject = `Its ${seen.subject === d.ticket ? 'ticket' : 'PR'} ${seen.subject}`;
-  if (d.met) return d.needsReview ? `${subject} changed to ${seen.kind} after you marked it met. Review the mark.` : null;
+  if (d.met) return d.needsReview ? `${subject} changed to ${DEPENDENCY_OBSERVATION_WORDS[seen.kind]} after you marked it met. Review the mark.` : null;
   return seen.kind === 'closed' || seen.kind === 'merged' ? `${subject} is ${seen.kind}. Mark it met once the change is delivered.` : null;
 }
 

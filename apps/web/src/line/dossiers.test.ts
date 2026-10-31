@@ -343,7 +343,7 @@ test('a part with no thread yet says when its thread starts', async () => {
 });
 
 test('a part held by a Dependency says its thread starts once you mark the Dependency met', async () => {
-  const dependency: DependencyHold = { dependencyId: 'dep-1', revision: 1, owner: 'server team', need: 'An export endpoint', ticket: null, evidence: '',
+  const dependency: DependencyHold = { dependencyId: 'dep-1', revision: 1, owner: 'server team', need: 'An export endpoint', ticket: null, named: [], evidence: '',
     met: null, needsReview: false, observation: null };
   await mountPage(withItem('I_sample13', { threads: [], blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' },
     { number: 0, repo: 'server team', state: 'open', title: dependency.need, dependency }] }));

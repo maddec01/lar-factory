@@ -16,7 +16,12 @@ interface DependencyObservation {
   /** What the provider said, such as why a read failed; null when it said nothing more. */
   detail: string | null;
   observedAt: string;
+  /** The last read that answered, kept beside a read that failed or lost access; null after a read that answered. */
+  lastGood: { kind: DependencyObservationKind; observedAt: string } | null;
 }
+
+/** The kinds of a read that didn't answer, which keep the last read that did. */
+const FAILED_READS: readonly DependencyObservationKind[] = ['access-lost', 'read-failed'];
 
 export interface Dependency {
   dependencyId: string;
@@ -84,8 +89,9 @@ export interface DependencyRecords {
   /** Records that the Dependency holds `buildId`, a build in the same work tree. Bumps the build. */
   addDependencyBlock(dependencyId: string, revision: number, buildId: string): Dependency;
   removeDependencyBlock(dependencyId: string, revision: number, buildId: string): Dependency;
-  /** Records the latest read of its ticket or one of its PRs, replacing the last read of that subject. Never changes
-   * the met mark; flags a met Dependency for review when the kind changed. */
+  /** Records the latest read of its ticket or one of its PRs, replacing the last read of that subject but keeping the last
+   * read that answered beside a failed one. Never changes the met mark; flags a met Dependency for review when the kind
+   * changed from the last one that wasn't a temporary read failure, which an outage or a subject's first read never is. */
   observeDependency(dependencyId: string, revision: number, observation: NewDependencyObservation): Dependency;
   /** Records the user's decision that it is met, clearing any review flag. */
   markDependencyMet(dependencyId: string, revision: number, by: string): Dependency;
@@ -190,9 +196,10 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
   const deleteBlock = db.prepare('DELETE FROM dependency_blocks WHERE dependency_id = ? AND build_id = ?');
   const deleteBlocks = db.prepare('DELETE FROM dependency_blocks WHERE dependency_id = ?');
   const observationRows = db.prepare('SELECT * FROM dependency_observations WHERE dependency_id = ? ORDER BY subject <> ?, rowid');
-  const observationKind = db.prepare('SELECT kind FROM dependency_observations WHERE dependency_id = ? AND subject = ?');
-  const writeObservation = db.prepare(`INSERT INTO dependency_observations (dependency_id, subject, kind, detail, observed_at) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT DO UPDATE SET kind = excluded.kind, detail = excluded.detail, observed_at = excluded.observed_at`);
+  const observationRow = db.prepare('SELECT * FROM dependency_observations WHERE dependency_id = ? AND subject = ?');
+  const writeObservation = db.prepare(`INSERT INTO dependency_observations (dependency_id, subject, kind, detail, observed_at, last_good_kind, last_good_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO UPDATE SET kind = excluded.kind, detail = excluded.detail, observed_at = excluded.observed_at,
+    last_good_kind = excluded.last_good_kind, last_good_at = excluded.last_good_at`);
   const deleteObservation = db.prepare('DELETE FROM dependency_observations WHERE dependency_id = ? AND subject = ?');
   const insertRow = db.prepare(`INSERT INTO dependencies (dependency_id, work_id, need, owner, contract, evidence, ticket, pull_requests, handover,
     revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`);
@@ -241,6 +248,8 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
       kind: observation.kind as DependencyObservationKind,
       detail: observation.detail as string | null,
       observedAt: String(observation.observed_at),
+      lastGood: observation.last_good_kind
+        ? { kind: observation.last_good_kind as DependencyObservationKind, observedAt: String(observation.last_good_at) } : null,
     })),
     revision: row.revision,
     createdAt: row.created_at,
@@ -345,8 +354,13 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
           throw invalid(`${subject} isn't the Dependency's ticket or one of its PRs.`);
         }
         const now = new Date().toISOString();
-        const changed = observationKind.get(dependencyId, subject)?.kind !== observation.kind;
-        writeObservation.run(dependencyId, subject, observation.kind, detail, now);
+        const last = observationRow.get(dependencyId, subject);
+        const answered = last && !FAILED_READS.includes(last.kind as DependencyObservationKind);
+        const lastGood = !FAILED_READS.includes(observation.kind) ? null
+          : answered ? { kind: last.kind, at: last.observed_at } : { kind: last?.last_good_kind ?? null, at: last?.last_good_at ?? null };
+        writeObservation.run(dependencyId, subject, observation.kind, detail, now, lastGood?.kind ?? null, lastGood?.at ?? null);
+        const settled = last?.kind === 'read-failed' ? last.last_good_kind : last?.kind;
+        const changed = observation.kind !== 'read-failed' && settled != null && settled !== observation.kind;
         return row.met_at && changed && !row.needs_review_at ? { needs_review_at: now } : {};
       });
     },

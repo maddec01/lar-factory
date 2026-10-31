@@ -110,9 +110,9 @@ test('the badge counts the blocked-by issues still open', async () => {
 
 test('a Dependency holds the badge until it is marked met, whatever its ticket shows, and the badge names it', async () => {
   const dependency = (met: boolean) => ({ number: 40, repo: 'maddec01/lar-server', state: met ? 'closed' as const : 'open' as const, title: 'An export endpoint',
-    dependency: { dependencyId: 'dep-1', revision: 2, owner: 'server team', need: 'An export endpoint', ticket: 'maddec01/lar-server#40', evidence: '',
+    dependency: { dependencyId: 'dep-1', revision: 2, owner: 'server team', need: 'An export endpoint', ticket: 'maddec01/lar-server#40', named: [], evidence: '',
       met: met ? { by: 'pedro', at: '2026-10-21T08:00:00Z' } : null, needsReview: false,
-      observation: { subject: 'maddec01/lar-server#40', kind: 'closed' as const, detail: null, observedAt: '2026-10-21T09:00:00Z' } } });
+      observation: { subject: 'maddec01/lar-server#40', kind: 'closed' as const, detail: null, observedAt: '2026-10-21T09:00:00Z', lastGood: null } } });
   await mountPage(withItem('I_sample13', { blockers: [dependency(false)] }, loose));
   const badge = [...meta('I_sample13').children].find((el) => text(el).startsWith('blocked by 1')) as HTMLElement;
   expect(badge.title).toBe('Blocked by the Dependency on server team until you mark it met');

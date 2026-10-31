@@ -76,6 +76,8 @@ export interface DependencyRecords {
   dependency(dependencyId: string): Dependency;
   /** The Dependencies the record holds, in the order they were added. */
   dependencies(workId: string): Dependency[];
+  /** The Dependencies holding the build, met or not, in the order they were added to it. */
+  blockingDependencies(buildId: string): Dependency[];
   /** The unmet Dependencies holding the build. */
   unmetDependencies(buildId: string): Dependency[];
   updateDependency(dependencyId: string, revision: number, change: DependencyChange): Dependency;
@@ -175,6 +177,8 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
   const { db } = database;
   const select = db.prepare('SELECT * FROM dependencies WHERE dependency_id = ?');
   const ownedRows = db.prepare('SELECT * FROM dependencies WHERE work_id = ? ORDER BY rowid');
+  const blockingRows = db.prepare(`SELECT d.* FROM dependency_blocks b JOIN dependencies d ON d.dependency_id = b.dependency_id
+    WHERE b.build_id = ? ORDER BY b.rowid`);
   const unmetRows = db.prepare(`SELECT d.* FROM dependency_blocks b JOIN dependencies d ON d.dependency_id = b.dependency_id
     WHERE b.build_id = ? AND d.met_at IS NULL ORDER BY b.rowid`);
   const blockingRow = db.prepare('SELECT dependency_id FROM dependency_blocks WHERE build_id = ? ORDER BY rowid LIMIT 1');
@@ -282,6 +286,10 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
     dependencies: (workId) => database.read(() => {
       findRecord(workId);
       return (ownedRows.all(workId) as unknown as Row[]).map(fromRow);
+    }),
+    blockingDependencies: (buildId) => database.read(() => {
+      findRecord(buildId);
+      return (blockingRows.all(buildId) as unknown as Row[]).map(fromRow);
     }),
     unmetDependencies: (buildId) => database.read(() => {
       findRecord(buildId);

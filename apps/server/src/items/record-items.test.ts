@@ -108,6 +108,29 @@ test("only the record's blockers hold it: its ticket's provider blockers never d
   assert.deepEqual(item!.blockers, []);
 });
 
+test('a Dependency blocking a build is one of its blockers, open until the user marks it met, whatever its ticket shows', async () => {
+  const records = await open();
+  const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept', status: 'Shaping' });
+  const build = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'Ready' });
+  records.setParent(build.workId, build.revision, concept.workId);
+  let dependency = records.addDependency(concept.workId, { need: 'An export endpoint', owner: 'server team', evidence: 'It answers in staging',
+    ticket: 'maddec01/lar-server#40', pullRequests: ['maddec01/lar-server#41'] });
+  dependency = records.addDependencyBlock(dependency.dependencyId, dependency.revision, build.workId);
+  dependency = records.observeDependency(dependency.dependencyId, dependency.revision, { subject: 'maddec01/lar-server#41', kind: 'open' });
+  dependency = records.observeDependency(dependency.dependencyId, dependency.revision, { subject: 'maddec01/lar-server#40', kind: 'closed' });
+  const shown = () => recordItems(records, [], [REPO]).find((i) => i.id === build.workId)!.blockers;
+  const [blocker] = shown();
+  assert.deepEqual({ ...blocker, dependency: { ...blocker!.dependency, observation: { ...blocker!.dependency!.observation, observedAt: '' } } }, {
+    number: 40, repo: 'maddec01/lar-server', state: 'open', title: 'An export endpoint', dependency: {
+      dependencyId: dependency.dependencyId, revision: dependency.revision, owner: 'server team', need: 'An export endpoint',
+      ticket: 'maddec01/lar-server#40', evidence: 'It answers in staging', met: null, needsReview: false,
+      observation: { subject: 'maddec01/lar-server#40', kind: 'closed', detail: null, observedAt: '' } } });
+  dependency = records.markDependencyMet(dependency.dependencyId, dependency.revision, 'pedro');
+  assert.deepEqual(shown().map((b) => [b.state, b.dependency!.met?.by]), [['closed', 'pedro']]);
+  records.observeDependency(dependency.dependencyId, dependency.revision, { subject: 'maddec01/lar-server#40', kind: 'reopened' });
+  assert.deepEqual(shown().map((b) => [b.state, b.dependency!.needsReview]), [['closed', true]], 'a changed observation asks for a review and keeps the mark');
+});
+
 test("in a repository whose source hasn't read yet, only a record with a ticket waits for it", async () => {
   const records = await open();
   records.importTicket({ title: 'Unread', repository: REPO, kind: 'bug', ticket: `${REPO}#40` });

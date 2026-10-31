@@ -1,15 +1,22 @@
 #!/bin/bash
 # Usage: repo-config.sh <owner/repo> | <Azure repository> | --list
-# <owner/repo> prints the GitHub repository's Repository config: .lar-factory.json
-# read from its default branch with gh, never from a checkout, with defaults filled
-# in (version 1, itemSource {"kind": "issues"}, show "all", labels []). role has no default.
+# <owner/repo> prints the GitHub repository's settings: its local overrides on this
+# Mac over its optional .lar-factory.json, the shared defaults read from its default
+# branch with gh, never from a checkout, over the built-in defaults (version 1,
+# itemSource {"kind": "issues"}, show "all", labels [], domainDocs {"kind":
+# "private"}, skills []). role has no default. The local overrides are settings.overrides
+# in the repository's entry of the list --list reads, as the board writes it; each
+# replaces its shared default, and an absent one inherits it. A repository with local
+# overrides needs no .lar-factory.json.
 # An Azure repository is its origin URL or <org>/<project>/<repo>; its file is read
 # with az the same way. Its itemSource names the team’s backlog and current sprint
 # together: {"kind": "azure-board", "team": ...}.
-# --list prints the onboarded repositories, the repositories array of
-# ~/Library/Application Support/Lar Factory/repositories.json, the file the board
-# server reads. A missing file means none: []. It leaves out each entry still
-# resetting, so lar-work never reads a repository being reset as onboarded.
+# --list prints the onboarded repositories with their local settings, the
+# repositories array of repository-settings.json in the board's data folder
+# (LAR_FACTORY_DATA_DIR when it names an absolute folder, else
+# ~/Library/Application Support/Lar Factory). A missing file means none: []. It
+# leaves out each entry still resetting, so lar-work never reads a repository being
+# reset as onboarded.
 # Each error exits nonzero with its reason on stderr.
 set -euo pipefail
 
@@ -21,15 +28,19 @@ repo_form='^(?!\.\.?/)[A-Za-z0-9._-]+/(?!\.\.?\z)[A-Za-z0-9._-]+\z'
 azure_form='^(?!\.\.?/)[A-Za-z0-9._%~-]+/(?!\.\.?/)[A-Za-z0-9._%~-]+/(?!\.\.?\z)[A-Za-z0-9._%~-]+\z'
 arg=${1:-}
 
-if [[ $arg == --list ]]; then
-    list_file="$HOME/Library/Application Support/Lar Factory/repositories.json"
+data_dir="$HOME/Library/Application Support/Lar Factory"
+[[ ${LAR_FACTORY_DATA_DIR:-} != /* ]] || data_dir=$LAR_FACTORY_DATA_DIR
+list_file="$data_dir/repository-settings.json"
+# list: prints the repositories array of list_file, [] when it is missing.
+list() {
+    local problem
     if [[ ! -e $list_file ]]; then
         echo '[]'
-        exit 0
+        return 0
     fi
     if ! jq empty "$list_file" 2>/dev/null; then
         echo "$list_file isn't valid JSON." >&2
-        exit 1
+        return 1
     fi
     problem=$(jq -r '
         if type != "object" or (.repositories | type) != "array" then
@@ -42,9 +53,13 @@ if [[ $arg == --list ]]; then
         end' --arg repo_form "$repo_form" --arg azure_form "$azure_form" "$list_file")
     if [[ -n $problem ]]; then
         echo "$list_file: $problem." >&2
-        exit 1
+        return 1
     fi
     jq '[.repositories[] | select(has("resetting") | not)]' "$list_file"
+}
+
+if [[ $arg == --list ]]; then
+    list
     exit 0
 fi
 
@@ -58,12 +73,12 @@ if jq -en --arg repo "$arg" --arg repo_form "$repo_form" '$repo | test($repo_for
     if ((read_status != 0)); then
         if [[ $read_status == 4 || $(cat "$err") == *"gh auth login"* ]]; then
             echo "gh is logged out. Run gh auth login, then rerun." >&2
-        elif [[ $(cat "$err") == *"HTTP 404"* ]]; then
-            echo "$repo: no .lar-factory.json on its default branch." >&2
-        else
+            exit 1
+        elif [[ $(cat "$err") != *"HTTP 404"* ]]; then
             echo "$repo: could not read .lar-factory.json. $(cat "$err")" >&2
+            exit 1
         fi
-        exit 1
+        raw=null
     fi
 else
     # shellcheck source-path=SCRIPTDIR source=azure.sh
@@ -80,14 +95,12 @@ else
         --api-version 7.1 --output json 2>"$err") || read_status=$?
     if ((read_status != 0)); then
         # TF401174 is Azure's "item could not be found".
-        if [[ $(cat "$err") == *TF401174* ]]; then
-            echo "$repo: no .lar-factory.json on its default branch." >&2
-        else
+        if [[ $(cat "$err") != *TF401174* ]]; then
             echo "$repo: $(az_failure "could not read .lar-factory.json" "$(cat "$err")")" >&2
+            exit 1
         fi
-        exit 1
-    fi
-    if ! raw=$(jq -er '.content | strings' <<<"$raw" 2>/dev/null); then
+        raw=null
+    elif ! raw=$(jq -er '.content | strings' <<<"$raw" 2>/dev/null); then
         echo "$repo: could not read .lar-factory.json. az returned no file content." >&2
         exit 1
     fi
@@ -97,22 +110,48 @@ if ! jq empty <<<"$raw" 2>/dev/null; then
     echo "$repo: .lar-factory.json isn't valid JSON." >&2
     exit 1
 fi
-problem=$(jq -r '
+repositories=$(list)
+local_settings=$(jq --arg repo "$repo" 'first(.[] | select(.repo | ascii_downcase == ($repo | ascii_downcase))) // null
+    | if . == null then null else .settings.overrides // {} end' <<<"$repositories")
+if [[ $raw == null && $local_settings == null ]]; then
+    echo "$repo isn't onboarded on this Mac and has no .lar-factory.json on its default branch." >&2
+    exit 1
+fi
+# problem: why one source's fields can't be settings, or nothing when they can.
+fields='def problem:
     if type != "object" then "isn'"'"'t a JSON object"
     elif has("version") and (.version | type) != "number" then "field version must be a number"
-    elif (.role | type) != "string" or .role == "" then "field role is missing or not a string"
+    elif has("role") and ((.role | type) != "string" or .role == "") then "field role must be a non-empty string"
     elif has("itemSource") and (.itemSource | type) != "object" then "field itemSource must be an object"
-    elif ($provider == "github" and has("itemSource") and .itemSource.kind != "issues")
-        or ($provider == "azure" and .itemSource.kind != "azure-board") then
-        "has an unsupported item source. Run onboarding again"
-    elif $provider == "azure" and ((.itemSource.team | type) != "string" or .itemSource.team == "") then
-        "field itemSource.team must name the team for an azure-board"
     elif has("show") and (.show | IN("all", "opted-in") | not) then "field show must be \"all\" or \"opted-in\""
     elif has("labels") and ((.labels | type) != "array" or any(.labels[]; type != "string")) then
         "field labels must be an array of strings"
-    else empty end' --arg provider "$provider" <<<"$raw")
+    elif has("domainDocs") and (.domainDocs | type != "object" or (.kind != "private"
+        and (.kind != "repository" or (.glossary | type) != "string" or (.adrs | type) != "string"))) then
+        "field domainDocs must be {\"kind\": \"private\"} or name the repository'"'"'s glossary and adrs paths"
+    elif has("skills") and ((.skills | type) != "array" or any(.skills[]; type != "string")) then
+        "field skills must be an array of strings"
+    else empty end;'
+problem=$(jq -rn --argjson shared "$raw" --argjson local "$local_settings" --arg list_file "$list_file" "$fields"'
+    if $shared != null and ($shared | problem) then ".lar-factory.json \($shared | problem)"
+    elif $local != null and ($local | problem) then "its local overrides in \($list_file): \($local | problem)"
+    else empty end')
 if [[ -n $problem ]]; then
-    echo "$repo: .lar-factory.json $problem." >&2
+    echo "$repo: $problem." >&2
     exit 1
 fi
-jq '{version: 1, role: .role, itemSource: {kind: "issues"}, show: "all", labels: []} + .' <<<"$raw"
+settings=$(jq -n --argjson shared "$raw" --argjson local "$local_settings" '
+    {version: 1, role: null, itemSource: {kind: "issues"}, show: "all", labels: [], domainDocs: {kind: "private"}, skills: []}
+    + ($shared // {}) + ($local // {} | with_entries(select(.key | IN("role", "itemSource", "show", "labels", "domainDocs", "skills"))))')
+problem=$(jq -r --arg provider "$provider" '
+    if (.role | type) != "string" then "no role in its local overrides or .lar-factory.json"
+    elif ($provider == "github" and .itemSource.kind != "issues") or ($provider == "azure" and .itemSource.kind != "azure-board") then
+        "an unsupported item source. Run onboarding again"
+    elif $provider == "azure" and ((.itemSource.team | type) != "string" or .itemSource.team == "") then
+        "no itemSource.team to name the team for an azure-board"
+    else empty end' <<<"$settings")
+if [[ -n $problem ]]; then
+    echo "$repo has $problem." >&2
+    exit 1
+fi
+echo "$settings"

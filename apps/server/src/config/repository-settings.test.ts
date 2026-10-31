@@ -39,7 +39,8 @@ test('a repository with no Repository config and no local settings works from th
   assert.deepEqual(setupOf(dir), {
     repo: REPO, role: '', itemSource: { kind: 'issues' }, show: 'all', labels: [], domainDocs: { kind: 'private' }, skills: [],
     access: { 'push-branch': 'unverified', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified' },
-    consent: [], paused: [],
+    consent: [], paused: [], shared: {},
+    sources: { role: 'default', itemSource: 'default', show: 'default', labels: 'default', domainDocs: 'default', skills: 'default' },
   });
   // An Azure DevOps repository has no item source until a team is named.
   assert.equal(setupOf(dir, AZURE).itemSource, null);
@@ -56,6 +57,17 @@ test('shared defaults sit beneath local overrides, and removing an override inhe
   assert.deepEqual(setupOf(dir).skills, []);
   setOverride(REPO, 'role', undefined, dir);
   assert.equal(setupOf(dir).role, 'The Apple app');
+});
+
+test("each setting names where it comes from, and the setup keeps Repository config's defaults beside the overrides", async (t) => {
+  const dir = await dataDir(t);
+  applySharedDefaults(REPO, { defaults: { role: 'Apple app', labels: ['area'] } }, dir);
+  setOverride(REPO, 'role', 'My Apple client', dir);
+  const { sources, shared } = setupOf(dir);
+  assert.deepEqual(sources, { role: 'local', itemSource: 'default', show: 'default', labels: 'shared', domainDocs: 'default', skills: 'default' });
+  assert.deepEqual(shared, { role: 'Apple app', labels: ['area'] });
+  setOverride(REPO, 'role', undefined, dir);
+  assert.equal(setupOf(dir).sources.role, 'shared');
 });
 
 test('an invalid or unreadable Repository config keeps the last usable shared defaults and says why; a removed one drops them', async (t) => {

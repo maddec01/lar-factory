@@ -159,19 +159,21 @@ test('a repository is owner/name on GitHub or organization/project/repository on
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'contoso/Fabrikam%20Fiber/lar-api' }]);
 });
 
-test('the settings file sets the refresh interval; a missing file or field takes 300 seconds', async (t) => {
-  assert.deepEqual(readBoardSettings(await dataDir(t, { 'settings.json': '{ "refreshSeconds": 30 }' })), { refreshSeconds: 30 });
-  assert.deepEqual(readBoardSettings(await dataDir(t, { 'settings.json': '{}' })), { refreshSeconds: 300 });
+test("the repository list file sets the refresh interval, and the old settings.json doesn't; a missing file or field takes 300 seconds", async (t) => {
+  const list = (extra: object) => ({ 'repository-settings.json': JSON.stringify({ repositories: [], ...extra }) });
+  assert.deepEqual(readBoardSettings(await dataDir(t, list({ refreshSeconds: 30 }))), { refreshSeconds: 30 });
+  assert.deepEqual(readBoardSettings(await dataDir(t, list({}))), { refreshSeconds: 300 });
+  assert.deepEqual(readBoardSettings(await dataDir(t, { 'settings.json': '{ "refreshSeconds": 30 }' })), { refreshSeconds: 300 });
   assert.deepEqual(readBoardSettings(await dataDir(t)), { refreshSeconds: 300 });
 });
 
-test("a settings file that isn't JSON, or whose refresh interval isn't a positive number, takes the default, naming its path and the problem", async (t) => {
-  const broken = await dataDir(t, { 'settings.json': '{ broken' });
-  assert.deepEqual(readBoardSettings(broken), { refreshSeconds: 300, problem: `${join(broken, 'settings.json')} isn't valid JSON.` });
+test("a list file that isn't JSON, or whose refresh interval isn't a positive number, takes the default, naming its path and the problem", async (t) => {
+  const broken = await dataDir(t, { 'repository-settings.json': '{ broken' });
+  assert.deepEqual(readBoardSettings(broken), { refreshSeconds: 300, problem: `${join(broken, 'repository-settings.json')} isn't valid JSON.` });
   for (const text of ['[]', '{ "refreshSeconds": "30" }', '{ "refreshSeconds": 0 }']) {
-    const dir = await dataDir(t, { 'settings.json': text });
+    const dir = await dataDir(t, { 'repository-settings.json': text });
     assert.deepEqual(readBoardSettings(dir),
-      { refreshSeconds: 300, problem: `${join(dir, 'settings.json')}: expected an object with a positive refreshSeconds, like {"refreshSeconds": 300}.` }, text);
+      { refreshSeconds: 300, problem: `${join(dir, 'repository-settings.json')}: expected an object with a positive refreshSeconds, like {"refreshSeconds": 300}.` }, text);
   }
 });
 

@@ -52,8 +52,8 @@ test("a list that isn't valid JSON stops the read with the board's read error, n
   assert.deepEqual(data.items, []);
 });
 
-test("a settings file that isn't valid JSON leaves the board on its defaults, with the board's read error naming the file", async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'lar-broken-settings-'));
+test("the old settings.json neither sets the refresh interval nor fails the board", async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-old-settings-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
   const dir = join(home, 'Library/Application Support/Lar Factory');
   mkdirSync(dir, { recursive: true });
@@ -61,7 +61,7 @@ test("a settings file that isn't valid JSON leaves the board on its defaults, wi
   const board = await startBoard(t, { repositories: [FACTORY], repoConfigs: { [FACTORY]: { role: 'The factory', itemSource: LAR } },
     items: [boardIssue(1, 'Queued', FACTORY)] }, false, false, { HOME: home });
   const data = await until(board, (d) => d.fetchedAt !== null);
-  assert.equal(data.error, `${join(dir, 'settings.json')} isn't valid JSON.`);
+  assert.equal(data.error, null);
   assert.equal(data.refreshSeconds, 300);
   assert.deepEqual(data.items.map((i) => i.number), [1]);
 });

@@ -458,3 +458,71 @@ it('claims a shared build creation only once across a concept plan and a standal
   });
   expect(records.pendingPublication(concept.workId, parent.planId)).toMatchObject({ current: false, next: null });
 });
+
+it('projects publication eligibility and existence without loading plans or source text', async () => {
+  const records = await open(); const build = await passingBuild(records);
+  const concept = records.create({ title: 'Search', repository: 'team/app', kind: 'concept' });
+  records.setParent(build.workId, build.revision, concept.workId);
+  records.setBody(concept.workId, records.read(concept.workId).revision, 'map', 'Destination.');
+  records.setFogGone(concept.workId, records.read(concept.workId).revision, true);
+  const projected = records.publicationSummaries();
+  expect(projected.get(build.workId)).toEqual({ eligible: true, reasons: [] });
+  expect(projected.get(concept.workId)).toEqual({ eligible: true, reasons: [] });
+  records.setBody(build.workId, records.read(build.workId).revision, 'brief', 'Changed brief.');
+  expect(records.publicationSummaries().get(concept.workId)).toMatchObject({ eligible: false, reasons: [expect.stringContaining('no current passing gate')] });
+  records.setBody(build.workId, records.read(build.workId).revision, 'brief', 'Find a saved search.');
+  expect(records.publicationSummaries().get(concept.workId)?.eligible).toBe(true);
+});
+
+it('keeps projection query cost constant as briefs and publication history grow', async () => {
+  const { openDatabase } = await import('./database.ts');
+  const { publicationRecords } = await import('./publication-records.ts');
+  const path = join(tempDir(), 'records.db'); const records = await open(path);
+  const database = await openDatabase(path);
+  try {
+    const queries: string[] = [];
+    const measured = publicationRecords({ ...database, db: new Proxy(database.db, { get(target, key) {
+      if (key === 'prepare') return (sql: string) => { queries.push(sql); return target.prepare(sql); };
+      return Reflect.get(target, key);
+    } }) }, (id) => records.read(id));
+    const build = await passingBuild(records);
+    measured.publicationSummaries();
+    const smallQueries = queries.splice(0).length;
+    let previous: string | undefined;
+    for (let i = 0; i < 20; i++) {
+      const plan = records.proposePublication(build.workId, records.read(build.workId).revision, { ...proposal(records, build.workId), ...(previous ? { replaces: previous } : {}),
+        tickets: [{ ...proposal(records, build.workId).tickets[0]!, body: 'Large approved team content. '.repeat(10_000) }] });
+      previous = plan.planId;
+    }
+    for (let i = 0; i < 30; i++) {
+      const work = records.create({ title: 'Another search', repository: 'team/app', kind: 'build' });
+      records.setBody(work.workId, work.revision, 'brief', 'Private source text. '.repeat(10_000));
+    }
+    const summary = measured.publicationSummaries();
+    expect(summary.get(build.workId)).toEqual({ eligible: true, reasons: [], recoverable: true });
+    expect(summary.size).toBe(31);
+    expect(queries.length).toBeLessThanOrEqual(3);
+    expect(queries.length).toBe(smallQueries);
+    expect(queries.join('\n')).not.toMatch(/\b(?:markdown|content|sources|attempt)\b|SELECT\s+\*/i);
+  } finally { database.close(); }
+});
+
+it('backfills lightweight eligibility from existing briefs and exact gate evidence', async () => {
+  const { createHash } = await import('node:crypto');
+  const { openDatabase } = await import('./database.ts');
+  const { MIGRATIONS } = await import('./migrations.ts');
+  const path = join(tempDir(), 'records.db');
+  const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+  const briefDigest = createHash('sha256').update(JSON.stringify('Known brief.')).digest('hex');
+  for (const [id, brief] of [['passed', 'Known brief.'], ['changed', 'Changed brief.']]) {
+    old.db.prepare('INSERT INTO work_records (work_id, repository, kind, status, revision, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)').run(id!, 'team/app', 'build', 'List', '', '');
+    old.db.prepare('INSERT INTO bodies (work_id, body, markdown, written) VALUES (?, ?, ?, 1)').run(id!, 'brief', brief!);
+    old.db.prepare('INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at) VALUES (?, ?, 1, ?, ?, ?, ?)').run(id!, id!, briefDigest, 'person', 'Passed.', '');
+  }
+  old.close();
+  const records = await open(path);
+  expect(records.publicationSummaries().get('passed')).toEqual({ eligible: true, reasons: [] });
+  expect(records.publicationSummaries().get('changed')).toEqual({ eligible: false, reasons: ['The brief for changed has no current passing gate.'] });
+  expect(records.publicationReadiness('passed').eligible).toBe(true);
+  expect(records.publicationReadiness('changed').eligible).toBe(false);
+});

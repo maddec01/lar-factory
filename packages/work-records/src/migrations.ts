@@ -1,5 +1,6 @@
 // The work-record database's schema, one step per entry. Never edit a released step: add one.
 
+import { createHash } from 'node:crypto';
 import type { Migration } from './database.ts';
 
 export const MIGRATIONS: readonly Migration[] = [
@@ -192,4 +193,15 @@ export const MIGRATIONS: readonly Migration[] = [
       recorded_at TEXT NOT NULL
     ) STRICT;
   `),
+  (db) => {
+    db.exec('ALTER TABLE bodies ADD COLUMN has_content INTEGER NOT NULL DEFAULT 0; ALTER TABLE bodies ADD COLUMN has_passing_gate INTEGER NOT NULL DEFAULT 0');
+    const update = db.prepare(`UPDATE bodies SET has_content = ?, has_passing_gate = EXISTS (
+      SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ?
+    ) WHERE work_id = ? AND body = ?`);
+    for (const row of db.prepare('SELECT work_id, body, markdown FROM bodies').all()) {
+      const markdown = String(row.markdown);
+      const digest = row.body === 'brief' && markdown.trim() ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex') : '';
+      update.run(Number(Boolean(markdown.trim())), String(row.work_id), digest, String(row.work_id), String(row.body));
+    }
+  },
 ];

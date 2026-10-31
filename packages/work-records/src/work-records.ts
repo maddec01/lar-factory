@@ -2,7 +2,7 @@
 // first and runs in one transaction, so a refused or failed change leaves every record as it was. Every change names
 // the revision it read; a stale revision changes nothing, so the board and threads never overwrite each other's work.
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { StatementSync } from 'node:sqlite';
 import { STATUSES, type Status } from '@lar-factory/shared';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
@@ -500,8 +500,13 @@ function workRecords(database: Database): WorkRecords {
   const disposeFinding = db.prepare('UPDATE review_findings SET disposition = ?, reason = ? WHERE work_id = ? AND round = ? AND axis = ? AND finding = ?');
   const bodyNames = db.prepare('SELECT body FROM bodies WHERE work_id = ?');
   const bodyText = db.prepare('SELECT markdown FROM bodies WHERE work_id = ? AND body = ?');
-  const writeBody = db.prepare(`INSERT INTO bodies (work_id, body, markdown, written) VALUES (?, ?, ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies))
-    ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written`);
+  const writeBodyRow = db.prepare(`INSERT INTO bodies (work_id, body, markdown, written, has_content, has_passing_gate)
+    VALUES (?, ?, ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ?))
+    ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written, has_content = excluded.has_content, has_passing_gate = excluded.has_passing_gate`);
+  const writeBody = (workId: string, body: Body, markdown: string) => {
+    const digest = body === 'brief' && markdown.trim() ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex') : '';
+    writeBodyRow.run(workId, body, markdown, Number(Boolean(markdown.trim())), workId, digest);
+  };
   const bodyWrittenRow = db.prepare('SELECT written FROM bodies WHERE work_id = ? AND body = ?');
   /** When the body was last written, in the order of every body write; undefined while it has none. */
   const bodyWritten = (workId: string, body: Body): number | undefined => (bodyWrittenRow.get(workId, body)?.written as number | undefined);
@@ -732,7 +737,7 @@ function workRecords(database: Database): WorkRecords {
       const text = checkText(markdown, name);
       return change(workId, revision, (row) => {
         checkHolds(row.kind, name);
-        writeBody.run(workId, name, text);
+        writeBody(workId, name, text);
         return {};
       });
     },
@@ -757,7 +762,7 @@ function workRecords(database: Database): WorkRecords {
           insertBlocker.run(workId, blockerId);
           if (!touched.includes(blockerId)) touched.push(blockerId);
         }
-        writeBody.run(workId, body, markdown);
+        writeBody(workId, body, markdown);
         return { parent_id: parentId };
       });
     },

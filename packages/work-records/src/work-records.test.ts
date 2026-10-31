@@ -415,3 +415,62 @@ describe('work-record content', () => {
     expect(records.read(build.workId)).toEqual(reviewed);
   });
 });
+
+describe('work-record threads and launch intents', () => {
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ repository: 'maddec01/lar', kind });
+
+  it('records thread IDs and a PR that stay on the same work ID when a ticket is attached', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    first.addThread(build.workId, 1, 'thread-shape-1', 'shape');
+    first.addThread(build.workId, 2, 'thread-build-1', 'build');
+    first.setPullRequest(build.workId, 3, 'maddec01/lar#90');
+    first.attachTicket(build.workId, 4, 'maddec01/lar#89');
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.read(build.workId)).toMatchObject({ ticket: 'maddec01/lar#89', pullRequest: 'maddec01/lar#90', revision: 5 });
+    expect(reopened.threads(build.workId).map((t) => [t.threadId, t.purpose])).toEqual([['thread-shape-1', 'shape'], ['thread-build-1', 'build']]);
+    expect(() => reopened.addThread(lar(reopened, 'bug').workId, 1, 'thread-build-1', 'build')).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining(build.workId) }));
+    expect(() => reopened.addThread(build.workId, 5, 'has space', 'build')).toThrow(expect.objectContaining({ code: 'invalid' }));
+  });
+
+  it('finds an unresolved launch intent after reopening and resolves it to a thread ID exactly once', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    const { record, intent } = first.recordLaunchIntent(build.workId, 1, 'build');
+    expect(record.revision).toBe(2);
+    expect(intent).toMatchObject({ workId: build.workId, purpose: 'build', outcome: null, threadId: null, resolvedAt: null });
+    first.close();
+
+    const board = await open(path);
+    const thread = await open(path);
+    expect(board.launchIntents({ unresolved: true })).toEqual([intent]);
+    const resolved = board.resolveLaunchIntent(build.workId, 2, intent.intentId, { threadId: 'thread-9' });
+    expect(resolved.intent).toMatchObject({ outcome: 'started', threadId: 'thread-9' });
+    expect(resolved.record.revision).toBe(3);
+    expect(board.threads(build.workId).map((t) => [t.threadId, t.purpose])).toEqual([['thread-9', 'build']]);
+
+    expect(() => thread.resolveLaunchIntent(build.workId, 3, intent.intentId, { threadId: 'thread-10' })).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('already resolved') }));
+    expect(thread.launchIntents({ unresolved: true })).toEqual([]);
+    expect(thread.launchIntents({ workId: build.workId })).toEqual([resolved.intent]);
+    expect(thread.threads(build.workId)).toHaveLength(1);
+  });
+
+  it('resolves an intent to a failure without recording a thread', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    const other = records.create({ repository: 'maddec01/other', kind: 'bug' });
+    const { intent } = records.recordLaunchIntent(build.workId, 1, 'build');
+    records.recordLaunchIntent(other.workId, 1, 'shape');
+    expect(records.launchIntents({ repository: 'maddec01/lar', unresolved: true })).toEqual([intent]);
+
+    expect(() => records.resolveLaunchIntent(build.workId, 2, intent.intentId, { failure: ' ' })).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(() => records.resolveLaunchIntent(other.workId, 2, intent.intentId, { failure: 'T3 refused.' })).toThrow(expect.objectContaining({ code: 'not-found' }));
+    const failed = records.resolveLaunchIntent(build.workId, 2, intent.intentId, { failure: 'T3 refused the start.' });
+    expect(failed.intent).toMatchObject({ outcome: 'failed', failure: 'T3 refused the start.', threadId: null });
+    expect(records.threads(build.workId)).toEqual([]);
+  });
+});

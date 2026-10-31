@@ -77,6 +77,35 @@ export interface FindingRef {
   finding: number;
 }
 
+export interface RecordedThread {
+  /** T3's thread ID. */
+  threadId: string;
+  /** What the thread does for the record, such as `shape` or `build`. */
+  purpose: string;
+  recordedAt: string;
+}
+
+/** A start the board asked T3 for. This module only stores it and its outcome; it never launches or checks a thread. */
+export interface LaunchIntent {
+  intentId: string;
+  workId: string;
+  /** What the thread will do, as a recorded thread's purpose. */
+  purpose: string;
+  requestedAt: string;
+  /** `started` with T3's thread ID, `failed` with the reason, or null while unresolved. */
+  outcome: 'started' | 'failed' | null;
+  threadId: string | null;
+  failure: string | null;
+  resolvedAt: string | null;
+}
+
+export interface LaunchIntentFilter {
+  repository?: string;
+  workId?: string;
+  /** Only the intents still waiting for their outcome. */
+  unresolved?: boolean;
+}
+
 /** The kinds that never become a PR of their own, so hold no build phase or PR. */
 const UNBUILT_KINDS: readonly WorkKind[] = ['concept', 'decision', 'slice'];
 
@@ -153,6 +182,16 @@ export interface WorkRecords {
   setFindingDisposition(workId: string, revision: number, finding: FindingRef, disposition: FindingDisposition, reason?: string): WorkRecord;
   /** The build's review rounds, oldest first. */
   reviewRounds(workId: string): ReviewRound[];
+  /** Records a T3 thread that works on the record. A thread works on one record only. */
+  addThread(workId: string, revision: number, threadId: string, purpose: string): WorkRecord;
+  /** Its recorded threads, oldest first. */
+  threads(workId: string): RecordedThread[];
+  /** Records that the board is about to ask T3 for a thread, before it asks. */
+  recordLaunchIntent(workId: string, revision: number, purpose: string): { record: WorkRecord; intent: LaunchIntent };
+  /** The matching intents in the order they were recorded. */
+  launchIntents(filter: LaunchIntentFilter): LaunchIntent[];
+  /** Resolves an unresolved intent once: to T3's thread ID, which it records as the record's thread, or to a failure. */
+  resolveLaunchIntent(workId: string, revision: number, intentId: string, outcome: { threadId: string } | { failure: string }): { record: WorkRecord; intent: LaunchIntent };
   /** The records it owns, in the order they were made. */
   children(workId: string): WorkRecord[];
   /** The records it waits on. */
@@ -192,6 +231,27 @@ const fromRow = (row: Row): WorkRecord => ({
   revision: row.revision,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+});
+
+interface IntentRow {
+  intent_id: string;
+  work_id: string;
+  purpose: string;
+  requested_at: string;
+  thread_id: string | null;
+  failure: string | null;
+  resolved_at: string | null;
+}
+
+const fromIntentRow = (row: IntentRow): LaunchIntent => ({
+  intentId: row.intent_id,
+  workId: row.work_id,
+  purpose: row.purpose,
+  requestedAt: row.requested_at,
+  outcome: row.thread_id ? 'started' : row.failure ? 'failed' : null,
+  threadId: row.thread_id,
+  failure: row.failure,
+  resolvedAt: row.resolved_at,
 });
 
 const invalid = (message: string) => new WorkRecordError('invalid', message);
@@ -241,6 +301,16 @@ function checkText(text: unknown, what: string): string {
 function checkFilled(text: unknown, what: string): string {
   if (typeof text !== 'string' || !text.trim()) throw invalid(`The ${what} is empty or isn't text.`);
   return text;
+}
+
+function checkThreadId(threadId: unknown): string {
+  if (typeof threadId !== 'string' || !/^\S+$/.test(threadId)) throw invalid(`The thread ID "${String(threadId)}" is empty or has spaces.`);
+  return threadId;
+}
+
+function checkPurpose(purpose: unknown): string {
+  if (typeof purpose !== 'string' || !/^[a-z][a-z0-9-]*$/.test(purpose)) throw invalid(`The purpose "${String(purpose)}" isn't a lowercase word like build.`);
+  return purpose;
 }
 
 /** A finding's disposition and the reason a rejection needs. */
@@ -347,6 +417,19 @@ function workRecords(database: Database): WorkRecords {
       for (const id of touched) bump.run(next.updated_at, id);
       return fromRow(find(workId));
     });
+
+  const selectIntent = db.prepare('SELECT * FROM launch_intents WHERE intent_id = ?');
+  const insertIntent = db.prepare('INSERT INTO launch_intents (intent_id, work_id, purpose, requested_at) VALUES (?, ?, ?, ?)');
+  const resolveIntent = db.prepare('UPDATE launch_intents SET thread_id = ?, failure = ?, resolved_at = ? WHERE intent_id = ?');
+  const threadHolder = db.prepare('SELECT work_id FROM threads WHERE thread_id = ?');
+  const threadRows = db.prepare('SELECT * FROM threads WHERE work_id = ? ORDER BY rowid');
+  const addThreadRow = db.prepare('INSERT INTO threads (thread_id, work_id, purpose, recorded_at) VALUES (?, ?, ?, ?)');
+  const intent = (intentId: string) => fromIntentRow(database.read(() => selectIntent.get(intentId)) as unknown as IntentRow);
+  const insertThread = (workId: string, threadId: string, purpose: string) => {
+    const holder = threadHolder.get(threadId);
+    if (holder) throw invalid(`The thread ${threadId} is already recorded on the work record ${String(holder.work_id)}.`);
+    addThreadRow.run(threadId, workId, purpose, new Date().toISOString());
+  };
 
   const related = (query: StatementSync, workId: string): WorkRecord[] => database.read(() => {
     find(workId);
@@ -512,6 +595,43 @@ function workRecords(database: Database): WorkRecords {
         })),
       }));
     }),
+    addThread: (workId, revision, threadId, purpose) => {
+      const id = checkThreadId(threadId);
+      const checked = checkPurpose(purpose);
+      return change(workId, revision, () => (insertThread(workId, id, checked), {}));
+    },
+    threads: (workId) => database.read(() => {
+      find(workId);
+      return threadRows.all(workId)
+        .map((row) => ({ threadId: String(row.thread_id), purpose: String(row.purpose), recordedAt: String(row.recorded_at) }));
+    }),
+    recordLaunchIntent: (workId, revision, purpose) => {
+      const checked = checkPurpose(purpose);
+      const intentId = randomUUID();
+      const record = change(workId, revision, () => {
+        insertIntent.run(intentId, workId, checked, new Date().toISOString());
+        return {};
+      });
+      return { record, intent: intent(intentId) };
+    },
+    launchIntents: (filter) => database.read(() => (filtered('SELECT i.* FROM launch_intents i JOIN work_records r ON r.work_id = i.work_id', 'ORDER BY i.rowid', [
+      ['r.repository = ?', filter.repository === undefined ? undefined : checkRepository(filter.repository)],
+      ['i.work_id = ?', filter.workId],
+      ['i.resolved_at IS NULL', filter.unresolved || undefined],
+    ]) as unknown as IntentRow[]).map(fromIntentRow)),
+    resolveLaunchIntent: (workId, revision, intentId, outcome) => {
+      const threadId = 'threadId' in outcome ? checkThreadId(outcome.threadId) : null;
+      const failure = threadId === null ? checkFilled((outcome as { failure: unknown }).failure, 'launch failure') : null;
+      const record = change(workId, revision, () => {
+        const row = selectIntent.get(intentId) as IntentRow | undefined;
+        if (row?.work_id !== workId) throw new WorkRecordError('not-found', `The work record ${workId} has no launch intent "${intentId}".`);
+        if (row.resolved_at) throw invalid(`The launch intent ${intentId} is already resolved.`);
+        if (threadId) insertThread(workId, threadId, row.purpose);
+        resolveIntent.run(threadId, failure, new Date().toISOString(), intentId);
+        return {};
+      });
+      return { record, intent: intent(intentId) };
+    },
     children: (workId) => related(childRows, workId),
     blockers: (workId) => related(blockerRows, workId),
     dependents: (workId) => related(dependentRows, workId),

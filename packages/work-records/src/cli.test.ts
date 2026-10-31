@@ -34,7 +34,7 @@ async function larWork(dataDir: string, ...args: string[]) {
 describe('lar-work', { timeout: 30_000 }, () => {
   it('creates, reads and updates a record in a data folder with no board running', async () => {
     const data = join(tempDir(), 'Lar Factory');
-    const created = await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'feature');
+    const created = await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'feature');
     expect(created).toMatchObject({ code: 0, record: { repository: 'maddec01/lar', status: 'List', revision: 1 } });
     const { workId } = created.record;
 
@@ -47,21 +47,31 @@ describe('lar-work', { timeout: 30_000 }, () => {
 
   it('imports a ticket once and attaches tickets without changing the work ID', async () => {
     const data = tempDir();
-    const first = await larWork(data, 'import', '--repository', 'maddec01/lar', '--kind', 'bug', '--ticket', 'maddec01/lar#5');
-    const again = await larWork(data, 'import', '--repository', 'maddec01/lar', '--kind', 'bug', '--ticket', 'maddec01/lar#5');
+    const first = await larWork(data, 'import', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug', '--ticket', 'maddec01/lar#5');
+    const again = await larWork(data, 'import', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug', '--ticket', 'maddec01/lar#5');
     expect(first.record.created).toBe(true);
     expect(again.record).toEqual({ record: first.record.record, created: false });
 
-    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'concept')).record;
+    const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'concept')).record;
     const linked = await larWork(data, 'attach-ticket', workId, '--revision', '1', '--ticket', 'maddec01/lar#6');
     expect(linked.record).toMatchObject({ workId, ticket: 'maddec01/lar#6' });
     expect((await larWork(data, 'set-aside', workId, '--revision', '2')).record).toMatchObject({ setAside: true });
     expect((await larWork(data, 'restore', workId, '--revision', '3')).record).toMatchObject({ setAside: false });
   });
 
+  it('captures a title and initial context and prints the context as markdown', async () => {
+    const data = tempDir();
+    const context = join(tempDir(), 'context.md');
+    writeFileSync(context, 'The board is too bright.\n');
+    const { record } = await larWork(data, 'create', '--title', 'Add dark mode', '--repository', 'maddec01/lar', '--kind', 'feature', '--file', context);
+    expect(record).toMatchObject({ title: 'Add dark mode' });
+    expect(await larWork(data, 'context', record.workId)).toMatchObject({ code: 0, stdout: 'The board is too bright.\n' });
+    expect(await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'feature')).toMatchObject({ code: 2, stderr: expect.stringContaining('--title is required') });
+  });
+
   it('reports a stale revision on stderr and changes nothing', async () => {
     const data = tempDir();
-    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'bug')).record;
+    const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug')).record;
     await larWork(data, 'update', workId, '--revision', '1', '--status', 'Shaping');
     const stale = await larWork(data, 'update', workId, '--revision', '1', '--status', 'Ready');
     expect(stale).toMatchObject({ code: 1, stdout: '', stderr: `lar-work: The work record ${workId} is at revision 2, not 1; read it again and retry.\n` });
@@ -70,7 +80,7 @@ describe('lar-work', { timeout: 30_000 }, () => {
 
   it('sets a parent and a blocker in a data folder with no board running', async () => {
     const data = tempDir();
-    const create = async (kind: string) => (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', kind)).record.workId;
+    const create = async (kind: string) => (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', kind)).record.workId;
     const [build, slice, other] = [await create('build'), await create('slice'), await create('slice')];
 
     expect((await larWork(data, 'set-parent', slice, '--revision', '1', '--parent', build)).record).toMatchObject({ parentId: build, revision: 2 });
@@ -85,7 +95,7 @@ describe('lar-work', { timeout: 30_000 }, () => {
 
   it('writes and reads a brief, a phase, a PR and a review round with no board running', async () => {
     const data = tempDir();
-    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'build')).record;
+    const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')).record;
     const brief = join(tempDir(), 'brief.md');
     writeFileSync(brief, '## What\n\nAdd it.\n');
     expect((await larWork(data, 'set-body', workId, '--revision', '1', '--body', 'brief', '--file', brief)).record).toMatchObject({ revision: 2 });
@@ -103,7 +113,7 @@ describe('lar-work', { timeout: 30_000 }, () => {
 
   it('records a launch intent and resolves it to a thread with no board running', async () => {
     const data = tempDir();
-    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'feature')).record;
+    const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'feature')).record;
     const { intent } = (await larWork(data, 'record-intent', workId, '--revision', '1', '--purpose', 'shape')).record;
     expect((await larWork(data, 'intents', '--unresolved')).record).toEqual([intent]);
 
@@ -118,8 +128,8 @@ describe('lar-work', { timeout: 30_000 }, () => {
   it("saves this machine's retention setting and hides and deletes set-aside records with it", async () => {
     const data = tempDir();
     expect((await larWork(data, 'retention')).record).toEqual({ hideAfterDays: 7, deleteAfterDays: null });
-    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'feature')).record;
-    const kept = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'bug')).record;
+    const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'feature')).record;
+    const kept = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug')).record;
     await larWork(data, 'set-aside', workId, '--revision', '1');
     expect((await larWork(data, 'hidden')).record).toEqual([]);
 
@@ -135,7 +145,7 @@ describe('lar-work', { timeout: 30_000 }, () => {
 
   it('exports a brief as markdown to a folder and refuses a missing folder', async () => {
     const data = tempDir();
-    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'build')).record;
+    const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')).record;
     const brief = join(tempDir(), 'brief.md');
     writeFileSync(brief, '# Add it\n');
     await larWork(data, 'set-body', workId, '--revision', '1', '--body', 'brief', '--file', brief);

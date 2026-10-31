@@ -96,4 +96,9 @@ export const MIGRATIONS: readonly Migration[] = [
     -- When the work was finished, recorded from its delivery PR. Retention counts from it; Status never sets it.
     ALTER TABLE work_records ADD COLUMN finished_at TEXT;
   `),
+  (db) => db.exec(`
+    -- The title and context a record was captured or imported with. A later ticket edit never changes them.
+    ALTER TABLE work_records ADD COLUMN title TEXT NOT NULL DEFAULT '';
+    ALTER TABLE work_records ADD COLUMN initial_context TEXT NOT NULL DEFAULT '';
+  `),
 ];

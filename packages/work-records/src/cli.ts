@@ -26,17 +26,21 @@ Identifiers
 
 Reads
   read <work-id>                    Print one record.
+  context <work-id>                 Print the markdown the record began with.
   list [--repository R] [--status S] [--kind K]
                                     Print matching records, Queued ones in Queue order.
 
 Changes
   Each change except create and import needs --revision, the revision you last
   read. When the record has moved on, the change fails and nothing is written.
-  create --repository R --kind K [--status S] [--ticket T]
-                                    Make a record. Status defaults to List.
-  import --repository R --kind K --ticket T [--status S]
+  create --title X --repository R --kind K [--status S] [--ticket T] [--file F]
+                                    Make a record titled X, a single line, with the
+                                    markdown in F as its initial context. Status
+                                    defaults to List.
+  import --title X --repository R --kind K --ticket T [--status S] [--file F]
                                     Print the record holding T, making it first if
-                                    none does. Repeating it never makes a second one.
+                                    none does. Repeating it never makes a second one
+                                    and never changes the title or initial context.
   update <work-id> --revision N [--status S] [--kind K]
   attach-ticket <work-id> --revision N --ticket T
   set-aside <work-id> --revision N  Set the record aside. Its Status stays.
@@ -133,12 +137,13 @@ Errors
 
 class UsageError extends Error {}
 
-const TAKES_WORK_ID = ['read', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
+const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
   'children', 'blockers', 'dependents', 'set-body', 'body', 'set-phase', 'set-pr', 'record-review-round', 'set-disposition', 'review-rounds',
   'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
 const COMMANDS = ['create', 'import', 'list', 'intents', 'retention', 'hidden', 'delete-expired', ...TAKES_WORK_ID];
 
 const OPTIONS = {
+  title: { type: 'string' },
   repository: { type: 'string' },
   kind: { type: 'string' },
   status: { type: 'string' },
@@ -217,13 +222,19 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
   const revision = () => Number(need(values, 'revision'));
   const status = values.status as Status | undefined;
   const kind = values.kind as WorkKind | undefined;
+  const captured = () => ({
+    title: need(values, 'title'), repository: need(values, 'repository'), kind: need(values, 'kind') as WorkKind, status,
+    context: values.file === undefined ? undefined : readInput(values),
+  });
   switch (command) {
     case 'create':
-      return records.create({ repository: need(values, 'repository'), kind: need(values, 'kind') as WorkKind, status, ticket: values.ticket });
+      return records.create({ ...captured(), ticket: values.ticket });
     case 'import':
-      return records.importTicket({ repository: need(values, 'repository'), kind: need(values, 'kind') as WorkKind, ticket: need(values, 'ticket'), status });
+      return records.importTicket({ ...captured(), ticket: need(values, 'ticket') });
     case 'read':
       return records.read(workId!);
+    case 'context':
+      return records.initialContext(workId!);
     case 'list':
       return records.list({ repository: values.repository, status, kind });
     case 'update':

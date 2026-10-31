@@ -117,6 +117,8 @@ const CHILD_KINDS: Partial<Record<WorkKind, readonly WorkKind[]>> = { concept: [
 export interface WorkRecord {
   /** The record's local identity, fixed for its life whether or not it has a ticket. */
   workId: string;
+  /** The title it was captured or imported with; empty on a record made before titles were kept. */
+  title: string;
   /** The repository the work belongs to, as the board names it: `owner/name`. */
   repository: string;
   kind: WorkKind;
@@ -142,6 +144,10 @@ export interface WorkRecord {
 }
 
 export interface NewWorkRecord {
+  /** One line. Capture or import sets it, and a later ticket edit never overwrites it. */
+  title: string;
+  /** The markdown the work began with, such as its ticket's text. Empty by default; never overwritten. */
+  context?: string;
   repository: string;
   kind: WorkKind;
   status?: Status;
@@ -164,12 +170,14 @@ export interface WorkRecords {
   create(record: NewWorkRecord): WorkRecord;
   /** Throws `not-found` when no record has `workId`. */
   read(workId: string): WorkRecord;
+  /** The markdown the record began with, or an empty string. */
+  initialContext(workId: string): string;
   /** The matching records, Queued ones in Queue order first, then the rest in the order they were made. */
   list(filter: WorkRecordFilter): WorkRecord[];
   update(workId: string, revision: number, change: { status?: Status; kind?: WorkKind }): WorkRecord;
   /** Gives a ticketless record its ticket. The work ID stays; a record can't swap one ticket for another. */
   attachTicket(workId: string, revision: number, ticket: string): WorkRecord;
-  /** The record holding `ticket`, made first when none does yet. */
+  /** The record holding `ticket`, made first when none does yet. An existing record keeps its title and context. */
   importTicket(record: NewWorkRecord & { ticket: string }): { record: WorkRecord; created: boolean };
   setAside(workId: string, revision: number): WorkRecord;
   restore(workId: string, revision: number): WorkRecord;
@@ -222,6 +230,8 @@ export interface WorkRecords {
 
 interface Row {
   work_id: string;
+  title: string;
+  initial_context: string;
   repository: string;
   kind: WorkKind;
   status: Status;
@@ -239,6 +249,7 @@ interface Row {
 
 const fromRow = (row: Row): WorkRecord => ({
   workId: row.work_id,
+  title: row.title,
   repository: row.repository,
   kind: row.kind,
   status: row.status,
@@ -322,6 +333,11 @@ function checkHolds(kind: WorkKind, body: Body): void {
 /** Throws unless a record of `kind` can be built. */
 function checkBuilt(kind: WorkKind): void {
   if (UNBUILT_KINDS.includes(kind)) throw invalid(`A ${kind} is never built, so it has no build phase, PR or review rounds.`);
+}
+
+function checkTitle(title: unknown): string {
+  if (typeof title !== 'string' || !title.trim() || /[\r\n]/.test(title)) throw invalid(`The title "${String(title)}" is empty, isn't text or has more than one line.`);
+  return title;
 }
 
 function checkText(text: unknown, what: string): string {
@@ -416,17 +432,19 @@ function workRecords(database: Database): WorkRecords {
     return statement.all(...used.flatMap(([, value]) => (typeof value === 'string' ? [value] : [])));
   };
 
-  const insertRow = db.prepare(`INSERT INTO work_records (work_id, repository, kind, status, queue_order, ticket, set_aside_at, revision, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)`);
+  const insertRow = db.prepare(`INSERT INTO work_records (work_id, title, initial_context, repository, kind, status, queue_order, ticket, set_aside_at,
+    revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, ?, ?)`);
   const insert = (record: NewWorkRecord): WorkRecord => {
     const repository = checkRepository(record.repository);
     const kind = checkKind(record.kind);
     const status = checkStatus(record.status ?? 'List');
     const ticket = record.ticket === undefined ? null : checkTicket(record.ticket);
+    const title = checkTitle(record.title);
+    const context = record.context === undefined ? '' : checkText(record.context, 'initial context');
     if (ticket && byTicket.get(ticket)) throw new WorkRecordError('ticket-taken', `Another work record already holds the ticket ${ticket}.`);
     const now = new Date().toISOString();
     const workId = randomUUID();
-    insertRow.run(workId, repository, kind, status, queueOrder(repository, status), ticket, now, now);
+    insertRow.run(workId, title, context, repository, kind, status, queueOrder(repository, status), ticket, now, now);
     return fromRow(find(workId));
   };
 
@@ -479,6 +497,7 @@ function workRecords(database: Database): WorkRecords {
   return {
     create: (record) => database.write(() => insert(record)),
     read: (workId) => database.read(() => fromRow(find(workId))),
+    initialContext: (workId) => database.read(() => find(workId).initial_context),
     list: (filter) => database.read(() => (filtered('SELECT * FROM work_records', 'ORDER BY queue_order IS NULL, queue_order, rowid', [
       ['repository = ?', filter.repository === undefined ? undefined : checkRepository(filter.repository)],
       ['status = ?', filter.status === undefined ? undefined : checkStatus(filter.status)],

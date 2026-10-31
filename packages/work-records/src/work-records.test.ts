@@ -628,6 +628,101 @@ describe('work-record provider observations', () => {
   });
 });
 
+describe('work-record completion', () => {
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+  const at = (records: WorkRecords, workId: string) => records.read(workId).revision;
+  /** Merges a new delivery PR for the build. */
+  const merge = (records: WorkRecords, workId: string, pr: string) => {
+    records.setPullRequest(workId, at(records, workId), pr);
+    records.observe(workId, at(records, workId), { of: 'pr', state: 'merged' });
+  };
+  /** Makes a decision under `concept` complete: answer, domain drafts, then the concept's map. */
+  const settle = (records: WorkRecords, decision: string, concept: string) => {
+    records.setBody(decision, at(records, decision), 'answer', 'Use SQLite.');
+    records.setBody(decision, at(records, decision), 'domain-drafts', 'None.');
+    records.setBody(concept, at(records, concept), 'map', '# Map\n\nSettled.');
+  };
+
+  it('completes a build only once its recorded PR is observed merged', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    expect(records.completion(build.workId)).toEqual({ complete: false, reasons: ['It has no recorded PR.'] });
+    records.setPullRequest(build.workId, 1, 'maddec01/lar#90');
+    records.observe(build.workId, 2, { of: 'pr', state: 'open' });
+    expect(records.completion(build.workId)).toEqual({ complete: false, reasons: ["Its PR maddec01/lar#90 isn't observed merged."] });
+    records.observe(build.workId, 3, { of: 'pr', state: 'closed' });
+    expect(records.completion(build.workId).complete).toBe(false);
+    records.update(build.workId, 4, { status: 'Done' });
+    expect(records.completion(build.workId).complete).toBe(false);
+
+    records.observe(build.workId, 5, { of: 'pr', state: 'merged' });
+    expect(records.completion(build.workId)).toEqual({ complete: true, reasons: [] });
+    records.setPullRequest(build.workId, 6, 'maddec01/lar#91');
+    expect(records.completion(build.workId)).toEqual({ complete: false, reasons: ["Its PR maddec01/lar#91 isn't observed merged."] });
+  });
+
+  it("completes a decision once its answer and domain drafts are recorded and its concept's map is updated after them", async () => {
+    const records = await open();
+    const [concept, decision] = [lar(records, 'concept'), lar(records, 'decision')];
+    records.setParent(decision.workId, 1, concept.workId);
+    records.setBody(concept.workId, 2, 'map', '# Map');
+    expect(records.completion(decision.workId)).toEqual({ complete: false, reasons: ["Its confirmed answer isn't recorded.", "Its domain drafts aren't recorded."] });
+
+    records.setBody(decision.workId, 2, 'answer', 'Use SQLite.');
+    records.setBody(decision.workId, 3, 'domain-drafts', '');
+    expect(records.completion(decision.workId)).toEqual({ complete: false, reasons: [`Its concept ${concept.workId}'s map isn't updated since its answer and domain drafts.`] });
+    records.setBody(concept.workId, 3, 'map', '# Map\n\nSettled.');
+    expect(records.completion(decision.workId)).toEqual({ complete: true, reasons: [] });
+    expect(() => records.setBody(lar(records, 'build').workId, 1, 'answer', 'x')).toThrow('Only a decision holds an answer');
+  });
+
+  it('completes a concept once its Fog is gone, every decision is settled and every build is Done', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const records = await openWorkRecords(path);
+    const [concept, decision, build, dropped] = [lar(records, 'concept'), lar(records, 'decision'), lar(records, 'build'), lar(records, 'build')];
+    for (const child of [decision, build, dropped]) records.setParent(child.workId, 1, concept.workId);
+    records.setAside(dropped.workId, 2);
+    expect(records.completion(concept.workId)).toEqual({ complete: false, reasons: [
+      "Its Fog isn't gone.", `Its decision ${decision.workId} isn't settled.`, `Its build ${build.workId} isn't Done.`,
+    ] });
+
+    expect(records.setFogGone(concept.workId, at(records, concept.workId), true)).toMatchObject({ fogGone: true });
+    settle(records, decision.workId, concept.workId);
+    merge(records, build.workId, 'maddec01/lar#90');
+    records.close();
+    const reopened = await open(path);
+    expect(reopened.completion(concept.workId)).toEqual({ complete: true, reasons: [] });
+    reopened.setFogGone(concept.workId, at(reopened, concept.workId), false);
+    expect(reopened.completion(concept.workId).reasons).toEqual(["Its Fog isn't gone."]);
+    expect(() => reopened.setFogGone(build.workId, at(reopened, build.workId), true)).toThrow(/Only a concept/);
+  });
+
+  it('completes a slice once it is finished', async () => {
+    const records = await open();
+    const slice = lar(records, 'slice');
+    expect(records.completion(slice.workId)).toEqual({ complete: false, reasons: ["It isn't finished."] });
+    records.recordFinished(slice.workId, 1);
+    expect(records.completion(slice.workId).complete).toBe(true);
+  });
+
+  it('lets a dependent start once its blockers are complete, with no ticket closing', async () => {
+    const records = await open();
+    const [concept, decision, build, other] = [lar(records, 'concept'), lar(records, 'decision'), lar(records, 'build'), lar(records, 'build')];
+    records.setParent(decision.workId, 1, concept.workId);
+    records.addBlocker(build.workId, 1, decision.workId);
+    records.addBlocker(build.workId, 2, other.workId);
+    expect(records.waitingOn(build.workId)).toEqual([
+      { workId: decision.workId, reasons: ["Its confirmed answer isn't recorded.", "Its domain drafts aren't recorded."] },
+      { workId: other.workId, reasons: ['It has no recorded PR.'] },
+    ]);
+
+    settle(records, decision.workId, concept.workId);
+    merge(records, other.workId, 'maddec01/lar#90');
+    expect(records.waitingOn(build.workId)).toEqual([]);
+    expect(records.read(build.workId).ticket).toBeNull();
+  });
+});
+
 describe('work-record retention', () => {
   const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind });
   /** `n` days after now. */

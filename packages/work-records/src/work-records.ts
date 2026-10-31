@@ -20,9 +20,14 @@ export type WorkKind = (typeof WORK_KINDS)[number];
 export const BUILD_PHASES = ['plan', 'implement', 'domain-docs', 'full-checks', 'review', 'approve', 'checks', 'retro'] as const;
 export type BuildPhase = (typeof BUILD_PHASES)[number];
 
-/** A record's private markdown: a concept's map, a decision's text, or any other record's brief. */
-export const BODIES = ['brief', 'decision', 'map'] as const;
+/** A record's private markdown: a concept's map; a decision's text, confirmed answer and domain drafts; or any other
+ * record's brief. */
+export const BODIES = ['brief', 'decision', 'map', 'answer', 'domain-drafts'] as const;
 export type Body = (typeof BODIES)[number];
+/** Each body as a sentence names it. */
+const BODY_NAMES: Record<Body, string> = { brief: 'a brief', decision: 'a decision', map: 'a map', answer: 'an answer', 'domain-drafts': 'domain drafts' };
+/** The kind that alone holds each body; a body without one is a brief, which every other kind holds. */
+const BODY_HOLDERS: Partial<Record<Body, WorkKind>> = { map: 'concept', decision: 'decision', answer: 'decision', 'domain-drafts': 'decision' };
 
 /** The lar-build reviewers, one axis each (`skills/lar-build/agents/builder.md`, Review). */
 export const REVIEW_AXES = ['code', 'security', 'ui', 'performance'] as const;
@@ -167,6 +172,8 @@ export interface WorkRecord {
   pullRequest: string | null;
   /** Whether it is set aside, which leaves its Status as it was. */
   setAside: boolean;
+  /** Whether a concept's Fog is recorded gone; always false for other kinds. */
+  fogGone: boolean;
   /** Why it waits on the user, such as a closed unmerged PR; null when it doesn't. Its Status stays as it was. */
   needsYou: string | null;
   /** The project skills selected when its build started, or null before it starts. Later selections never change it. */
@@ -194,6 +201,12 @@ export interface NewWorkRecord {
 export interface Expired {
   deleted: string[];
   kept: { workId: string; reason: string }[];
+}
+
+/** Whether a record's work is complete, and each reason it isn't yet. */
+export interface Completion {
+  complete: boolean;
+  reasons: string[];
 }
 
 export interface WorkRecordFilter {
@@ -273,6 +286,15 @@ export interface WorkRecords {
   children(workId: string): WorkRecord[];
   /** The records it waits on. */
   blockers(workId: string): WorkRecord[];
+  /** Whether the work is complete, from local facts only. A build or other built record completes once its recorded PR
+   * is observed merged, a slice once it is finished, a decision once its answer and domain drafts are recorded and its
+   * concept's map was written after them, and a concept once its Fog is gone and every decision and build it owns,
+   * except set-aside ones, is complete. A Status, a ticket closing or a thread ending never completes work. */
+  completion(workId: string): Completion;
+  /** Its blockers that aren't complete yet, each with the reasons; the work can start once this is empty. */
+  waitingOn(workId: string): { workId: string; reasons: string[] }[];
+  /** Records whether a concept's Fog is gone. */
+  setFogGone(workId: string, revision: number, gone: boolean): WorkRecord;
   /** The records that wait on it. */
   dependents(workId: string): WorkRecord[];
   close(): void;
@@ -291,6 +313,7 @@ interface Row {
   build_phase: BuildPhase | null;
   pull_request: string | null;
   set_aside_at: string | null;
+  fog_gone_at: string | null;
   needs_you: string | null;
   skills: string | null;
   finished_at: string | null;
@@ -311,6 +334,7 @@ const fromRow = (row: Row): WorkRecord => ({
   buildPhase: row.build_phase,
   pullRequest: row.pull_request,
   setAside: row.set_aside_at !== null,
+  fogGone: row.fog_gone_at !== null,
   needsYou: row.needs_you,
   skills: row.skills === null ? null : JSON.parse(row.skills) as string[],
   finishedAt: row.finished_at,
@@ -378,9 +402,9 @@ const checkTicket = (ticket: unknown): string => checkReference(ticket, 'ticket'
 
 /** Throws unless a record of `kind` holds `body`. */
 function checkHolds(kind: WorkKind, body: Body): void {
-  const holder: WorkKind | undefined = body === 'map' ? 'concept' : body === 'decision' ? 'decision' : undefined;
+  const holder = BODY_HOLDERS[body];
   if (holder ? kind !== holder : kind === 'concept' || kind === 'decision') {
-    throw invalid(holder ? `Only a ${holder} holds a ${body}; this record is a ${kind}.` : `A ${kind} holds no brief.`);
+    throw invalid(holder ? `Only a ${holder} holds ${BODY_NAMES[body]}; this record is a ${kind}.` : `A ${kind} holds no brief.`);
   }
 }
 
@@ -473,7 +497,11 @@ function workRecords(database: Database): WorkRecords {
   const disposeFinding = db.prepare('UPDATE review_findings SET disposition = ?, reason = ? WHERE work_id = ? AND round = ? AND axis = ? AND finding = ?');
   const bodyNames = db.prepare('SELECT body FROM bodies WHERE work_id = ?');
   const bodyText = db.prepare('SELECT markdown FROM bodies WHERE work_id = ? AND body = ?');
-  const writeBody = db.prepare('INSERT INTO bodies (work_id, body, markdown) VALUES (?, ?, ?) ON CONFLICT DO UPDATE SET markdown = excluded.markdown');
+  const writeBody = db.prepare(`INSERT INTO bodies (work_id, body, markdown, written) VALUES (?, ?, ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies))
+    ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written`);
+  const bodyWrittenRow = db.prepare('SELECT written FROM bodies WHERE work_id = ? AND body = ?');
+  /** When the body was last written, in the order of every body write; undefined while it has none. */
+  const bodyWritten = (workId: string, body: Body): number | undefined => (bodyWrittenRow.get(workId, body)?.written as number | undefined);
   const writeObservation = db.prepare(`INSERT INTO observations (work_id, observed, subject, state, assignee, observed_at) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT DO UPDATE SET subject = excluded.subject, state = excluded.state, assignee = excluded.assignee, observed_at = excluded.observed_at,
     failed_at = NULL, failure = NULL`);
@@ -527,7 +555,7 @@ function workRecords(database: Database): WorkRecords {
   };
 
   const updateRow = db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
-    pull_request = ?, set_aside_at = ?, needs_you = ?, skills = ?, finished_at = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
+    pull_request = ?, set_aside_at = ?, fog_gone_at = ?, needs_you = ?, skills = ?, finished_at = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
   /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. Records `apply`
    * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. When
    * `apply` returns null the record already holds the change, so nothing is written or bumped. */
@@ -543,7 +571,7 @@ function workRecords(database: Database): WorkRecords {
       if (patch === null) return fromRow(row);
       const next = { ...row, ...patch, revision: row.revision + 1, updated_at: new Date().toISOString() };
       updateRow.run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.build_phase, next.pull_request, next.set_aside_at,
-        next.needs_you, next.skills, next.finished_at, next.revision, next.updated_at, workId, expected);
+        next.fog_gone_at, next.needs_you, next.skills, next.finished_at, next.revision, next.updated_at, workId, expected);
       for (const id of touched) bump.run(next.updated_at, id);
       return fromRow(find(workId));
     });
@@ -565,6 +593,31 @@ function workRecords(database: Database): WorkRecords {
   const checkDays = (days: unknown, what: string): number => {
     if (!Number.isSafeInteger(days) || (days as number) < 0) throw invalid(`The ${what} "${String(days)}" isn't a whole number of days from 0.`);
     return days as number;
+  };
+
+  const prState = db.prepare(`SELECT state FROM observations WHERE work_id = ? AND observed = 'pr'`);
+  /** Each reason the work in `row` isn't complete; none once it is. */
+  const incomplete = (row: Row): string[] => {
+    if (row.kind === 'slice') return row.finished_at ? [] : ["It isn't finished."];
+    if (row.kind === 'decision') {
+      const [answer, drafts] = [bodyWritten(row.work_id, 'answer'), bodyWritten(row.work_id, 'domain-drafts')];
+      const reasons = [];
+      if (answer === undefined) reasons.push("Its confirmed answer isn't recorded.");
+      if (drafts === undefined) reasons.push("Its domain drafts aren't recorded.");
+      if (reasons.length || !row.parent_id) return reasons;
+      const map = bodyWritten(row.parent_id, 'map');
+      return map !== undefined && map > Math.max(answer!, drafts!) ? [] : [`Its concept ${row.parent_id}'s map isn't updated since its answer and domain drafts.`];
+    }
+    if (row.kind === 'concept') {
+      const reasons = row.fog_gone_at ? [] : ["Its Fog isn't gone."];
+      for (const child of childRows.all(row.work_id) as unknown as Row[]) {
+        if (child.set_aside_at || !incomplete(child).length) continue;
+        reasons.push(child.kind === 'decision' ? `Its decision ${child.work_id} isn't settled.` : `Its ${child.kind} ${child.work_id} isn't Done.`);
+      }
+      return reasons;
+    }
+    if (!row.pull_request) return ['It has no recorded PR.'];
+    return prState.get(row.work_id)?.state === 'merged' ? [] : [`Its PR ${row.pull_request} isn't observed merged.`];
   };
 
   const related = (query: StatementSync, workId: string): WorkRecord[] => database.read(() => {
@@ -592,6 +645,7 @@ function workRecords(database: Database): WorkRecords {
           // The new kind must hold what the record already holds.
           if (row.build_phase || row.pull_request || row.skills || hasRounds.get(workId)) checkBuilt(nextKind);
           for (const { body } of bodyNames.all(workId)) checkHolds(nextKind, body as Body);
+          if (row.fog_gone_at && nextKind !== 'concept') throw invalid(`The concept ${workId} has its Fog recorded gone, so it stays a concept.`);
         }
         const moved = nextStatus ?? row.status;
         return {
@@ -869,6 +923,24 @@ function workRecords(database: Database): WorkRecords {
         const at = new Date().toISOString();
         for (const workId of touched) bump.run(at, workId);
         return { deleted, kept };
+      });
+    },
+    completion: (workId) => database.read(() => {
+      const reasons = incomplete(find(workId));
+      return { complete: !reasons.length, reasons };
+    }),
+    waitingOn: (workId) => database.read(() => {
+      find(workId);
+      return (blockerRows.all(workId) as unknown as Row[])
+        .map((blocker) => ({ workId: blocker.work_id, reasons: incomplete(blocker) }))
+        .filter((blocker) => blocker.reasons.length);
+    }),
+    setFogGone: (workId, revision, gone) => {
+      if (typeof gone !== 'boolean') throw invalid(`Whether the Fog is gone "${String(gone)}" isn't true or false.`);
+      return change(workId, revision, (row) => {
+        if (row.kind !== 'concept') throw invalid(`Only a concept has Fog; this record is a ${row.kind}.`);
+        if ((row.fog_gone_at !== null) === gone) return null;
+        return { fog_gone_at: gone ? new Date().toISOString() : null };
       });
     },
     children: (workId) => related(childRows, workId),

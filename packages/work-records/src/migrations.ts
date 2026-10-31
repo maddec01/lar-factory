@@ -104,6 +104,10 @@ export const MIGRATIONS: readonly Migration[] = [
     ALTER TABLE work_records ADD COLUMN needs_you TEXT;
     -- The project skills selected when the build started, as a JSON list; null before it starts.
     ALTER TABLE work_records ADD COLUMN skills TEXT;
+    -- When a concept's Fog was recorded gone; null while some remains.
+    ALTER TABLE work_records ADD COLUMN fog_gone_at TEXT;
+    -- Orders body writes across records, so completion can tell a concept's map was written after a decision's answer.
+    ALTER TABLE bodies ADD COLUMN written INTEGER NOT NULL DEFAULT 0;
     -- The delivery PRs a record held before its current one, kept as history.
     CREATE TABLE replaced_pull_requests (
       work_id TEXT NOT NULL REFERENCES work_records (work_id),

@@ -69,11 +69,29 @@ Structure
   blockers <work-id>                Print the records it waits on.
   dependents <work-id>              Print the records that wait on it.
 
+Completion
+  Completion comes from the records alone; a Status, a ticket closing or a
+  thread ending never completes work. A build, or any other record that becomes
+  a PR, completes once its recorded PR is observed merged. A slice completes once
+  it is finished. A decision completes once its answer and domain drafts are
+  recorded and its concept's map is written after them. A concept completes once
+  its Fog is gone and every decision and build it owns, except set-aside ones, is
+  complete. Work can start once each of its blockers is complete.
+  completion <work-id>              Print whether the record is complete and each
+                                    reason it isn't.
+  waiting-on <work-id>              Print its blockers that aren't complete, with
+                                    the reasons.
+  set-fog <work-id> --revision N --fog gone|remaining
+                                    Record whether a concept's Fog is gone.
+  finish <work-id> --revision N     Record that a slice merged into its build branch.
+
 Content
   A record keeps its markdown here only; nothing is written to a ticket. A
-  concept holds a map, a decision its text, and any other record a brief. A
-  --file of - reads standard input.
-  set-body <work-id> --revision N --body brief|decision|map --file F
+  concept holds a map; a decision holds its text, its confirmed answer and its
+  domain drafts; any other record holds a brief. A --file of - reads standard
+  input.
+  set-body <work-id> --revision N --body brief|decision|map|answer|domain-drafts
+           --file F
                                     Replace the body with the markdown in F.
   body <work-id> --body B           Print the body as markdown.
   set-phase <work-id> --revision N --phase P
@@ -164,9 +182,10 @@ Errors
 
 class UsageError extends Error {}
 
-const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you', 'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
-  'children', 'blockers', 'dependents', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition', 'review-rounds',
-  'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
+const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
+  'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
+  'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
+  'review-rounds', 'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
 const COMMANDS = ['create', 'import', 'list', 'intents', 'retention', 'hidden', 'delete-expired', ...TAKES_WORK_ID];
 
 const OPTIONS = {
@@ -188,6 +207,7 @@ const OPTIONS = {
   disposition: { type: 'string' },
   reason: { type: 'string' },
   skill: { type: 'string', multiple: true },
+  fog: { type: 'string' },
   of: { type: 'string' },
   state: { type: 'string' },
   assignee: { type: 'string' },
@@ -296,6 +316,18 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
       return records.blockers(workId!);
     case 'dependents':
       return records.dependents(workId!);
+    case 'completion':
+      return records.completion(workId!);
+    case 'waiting-on':
+      return records.waitingOn(workId!);
+    case 'set-fog': {
+      const fog = need(values, 'fog');
+      if (fog !== 'gone' && fog !== 'remaining') throw new UsageError('--fog takes gone or remaining.');
+      return records.setFogGone(workId!, revision(), fog === 'gone');
+    }
+    case 'finish':
+      if (records.read(workId!).kind !== 'slice') throw new WorkRecordError('invalid', 'Only a slice is finished by hand; a build finishes when its PR is observed merged.');
+      return records.recordFinished(workId!, revision());
     case 'set-body':
       return records.setBody(workId!, revision(), need(values, 'body') as Body, readInput(values));
     case 'body': {

@@ -136,6 +136,23 @@ describe('lar-work', { timeout: 30_000 }, () => {
     expect(await larWork(data, 'snapshot-skills', workId, '--revision', '4')).toMatchObject({ code: 1, stderr: expect.stringContaining('already snapshotted') });
   });
 
+  it('reports completion and the blockers a record waits on with no board running', async () => {
+    const data = tempDir();
+    const create = async (kind: string) => (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', kind)).record.workId;
+    const [concept, slice, build] = [await create('concept'), await create('slice'), await create('build')];
+    await larWork(data, 'add-blocker', build, '--revision', '1', '--blocker', slice);
+    expect((await larWork(data, 'waiting-on', build)).record).toEqual([{ workId: slice, reasons: ["It isn't finished."] }]);
+    expect((await larWork(data, 'finish', slice, '--revision', '2')).record).toMatchObject({ finishedAt: expect.any(String) });
+    expect((await larWork(data, 'waiting-on', build)).record).toEqual([]);
+    expect(await larWork(data, 'finish', build, '--revision', '2')).toMatchObject({ code: 1, stderr: expect.stringContaining('Only a slice') });
+
+    expect((await larWork(data, 'set-fog', concept, '--revision', '1', '--fog', 'gone')).record).toMatchObject({ fogGone: true });
+    expect((await larWork(data, 'completion', concept)).record).toEqual({ complete: true, reasons: [] });
+    expect((await larWork(data, 'set-fog', concept, '--revision', '2', '--fog', 'remaining')).record).toMatchObject({ fogGone: false });
+    expect((await larWork(data, 'completion', concept)).record).toEqual({ complete: false, reasons: ["Its Fog isn't gone."] });
+    expect(await larWork(data, 'set-fog', concept, '--revision', '3', '--fog', 'thin')).toMatchObject({ code: 2, stderr: expect.stringContaining('--fog takes gone or remaining') });
+  });
+
   it("records a ticket's observations and a failed read with no board running", async () => {
     const data = tempDir();
     const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug', '--ticket', 'maddec01/lar#4')).record;
@@ -186,6 +203,6 @@ describe('lar-work', { timeout: 30_000 }, () => {
   it('explains identifiers, reads, changes, structure and errors in its help', async () => {
     const help = await larWork(tempDir(), '--help');
     expect(help.code).toBe(0);
-    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Content', 'Provider observations', 'Threads and launch intents', 'Retention and export', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
+    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Completion', 'Content', 'Provider observations', 'Threads and launch intents', 'Retention and export', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
   });
 });

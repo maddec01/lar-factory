@@ -123,12 +123,27 @@ test('a Dependency blocking a build is one of its blockers, open until the user 
   assert.deepEqual({ ...blocker, dependency: { ...blocker!.dependency, observation: { ...blocker!.dependency!.observation, observedAt: '' } } }, {
     number: 40, repo: 'maddec01/lar-server', state: 'open', title: 'An export endpoint', dependency: {
       dependencyId: dependency.dependencyId, revision: dependency.revision, owner: 'server team', need: 'An export endpoint',
-      ticket: 'maddec01/lar-server#40', evidence: 'It answers in staging', met: null, needsReview: false,
-      observation: { subject: 'maddec01/lar-server#40', kind: 'closed', detail: null, observedAt: '' } } });
+      ticket: 'maddec01/lar-server#40', named: [{ reference: 'maddec01/lar-server#40', url: 'https://github.com/maddec01/lar-server/issues/40' },
+        { reference: 'maddec01/lar-server#41', url: 'https://github.com/maddec01/lar-server/pull/41' }],
+      evidence: 'It answers in staging', met: null, needsReview: false,
+      observation: { subject: 'maddec01/lar-server#40', kind: 'closed', detail: null, observedAt: '', lastGood: null } } });
   dependency = records.markDependencyMet(dependency.dependencyId, dependency.revision, 'pedro');
   assert.deepEqual(shown().map((b) => [b.state, b.dependency!.met?.by]), [['closed', 'pedro']]);
   records.observeDependency(dependency.dependencyId, dependency.revision, { subject: 'maddec01/lar-server#40', kind: 'reopened' });
   assert.deepEqual(shown().map((b) => [b.state, b.dependency!.needsReview]), [['closed', true]], 'a changed observation asks for a review and keeps the mark');
+});
+
+test("a Dependency's Azure work item and PR link to their pages", async () => {
+  const records = await open();
+  const build = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'Ready' });
+  const API = 'contoso/Fabrikam%20Fiber/Web%20Api';
+  const dependency = records.addDependency(build.workId, { need: 'An export endpoint', owner: API, ticket: `${API}#5`, pullRequests: [`${API}#9`] });
+  records.addDependencyBlock(dependency.dependencyId, dependency.revision, build.workId);
+  const [blocker] = recordItems(records, [], [REPO]).find((i) => i.id === build.workId)!.blockers;
+  assert.deepEqual(blocker!.dependency!.named, [
+    { reference: `${API}#5`, url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/5' },
+    { reference: `${API}#9`, url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/Web%20Api/pullrequest/9' },
+  ]);
 });
 
 test("in a repository whose source hasn't read yet, only a record with a ticket waits for it", async () => {

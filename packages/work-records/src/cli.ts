@@ -287,6 +287,8 @@ Dependencies
                                     of its PRs. K is open, closed, merged, reopened,
                                     deleted, access-lost or read-failed; X is what
                                     the provider said, such as why a read failed.
+                                    A failed read or lost access keeps the last
+                                    read that answered beside it.
   mark-met <dependency-id> --revision N --identity I
                                     Record that you, I, decided it is met.
   clear-met <dependency-id> --revision N

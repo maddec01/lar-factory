@@ -48,6 +48,8 @@ describe('work records', () => {
     const made = records.create({ repository: 'maddec01/lar', kind: 'concept' });
     const linked = records.attachTicket(made.workId, made.revision, 'maddec01/lar#7');
     expect(linked).toMatchObject({ workId: made.workId, ticket: 'maddec01/lar#7', revision: 2 });
+    expect(records.attachTicket(made.workId, 2, 'maddec01/lar#7')).toEqual(linked);
+    expect(() => records.attachTicket(made.workId, 1, 'maddec01/lar#7')).toThrow(expect.objectContaining({ code: 'stale-revision' }));
   });
 
   it('resolves a repeated ticket import to the same record', async () => {
@@ -472,5 +474,86 @@ describe('work-record threads and launch intents', () => {
     const failed = records.resolveLaunchIntent(build.workId, 2, intent.intentId, { failure: 'T3 refused the start.' });
     expect(failed.intent).toMatchObject({ outcome: 'failed', failure: 'T3 refused the start.', threadId: null });
     expect(records.threads(build.workId)).toEqual([]);
+  });
+});
+
+describe('work-record retention', () => {
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ repository: 'maddec01/lar', kind });
+  /** `n` days after now. */
+  const later = (n: number) => new Date(Date.now() + n * 86_400_000);
+  const KEEP = { hideAfterDays: 7, deleteAfterDays: null };
+  const ids = (list: readonly { workId: string }[]) => list.map((record) => record.workId);
+
+  it('records a finish once, as a fact of its own', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    const finished = records.recordFinished(build.workId, 1);
+    expect(finished).toMatchObject({ status: 'List', revision: 2, finishedAt: expect.any(String) });
+    expect(() => records.recordFinished(build.workId, 2)).toThrow('already finished');
+  });
+
+  it('hides a finished or set-aside record after seven days and keeps it by default', async () => {
+    const records = await open();
+    const [finished, setAside, active] = [lar(records, 'build'), lar(records, 'feature'), lar(records, 'bug')];
+    records.recordFinished(finished.workId, 1);
+    records.setAside(setAside.workId, 1);
+
+    expect(records.hidden(KEEP, later(6))).toEqual([]);
+    expect(ids(records.hidden(KEEP, later(8)))).toEqual([finished.workId, setAside.workId]);
+    expect(records.deleteExpired(KEEP, later(800))).toEqual({ deleted: [], kept: [] });
+    expect(ids(records.list({}))).toEqual([finished.workId, setAside.workId, active.workId]);
+  });
+
+  it('deletes a finished record only after the chosen number of days, with its owned data', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    records.setBody(build.workId, 1, 'brief', '# Brief');
+    records.recordReviewRound(build.workId, 2, { base: 'c8890a1a', reviewers: [{ axis: 'code', verdict: 'changes', findings: [{ severity: 'nit', summary: 'x', disposition: 'open' }] }] });
+    records.addThread(build.workId, 3, 'thread-1', 'build');
+    records.recordLaunchIntent(build.workId, 4, 'build');
+    records.recordFinished(build.workId, 5);
+    const setting = { hideAfterDays: 7, deleteAfterDays: 30 };
+
+    expect(records.deleteExpired(setting, later(29))).toEqual({ deleted: [], kept: [] });
+    expect(records.deleteExpired(setting, later(31))).toEqual({ deleted: [build.workId], kept: [] });
+    expect(records.list({})).toEqual([]);
+    expect(records.launchIntents({})).toEqual([]);
+    // The thread ID is free again: no thread row was left behind.
+    const other = lar(records, 'build');
+    expect(records.addThread(other.workId, 1, 'thread-1', 'build')).toMatchObject({ revision: 2 });
+  });
+
+  it('never deletes active or unfinished work, even in Done without a recorded finish', async () => {
+    const records = await open();
+    const made = (['List', 'Queued', 'In progress', 'Done'] as const).map((status) => records.create({ repository: 'maddec01/lar', kind: 'feature', status }));
+    expect(records.deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }, later(10_000))).toEqual({ deleted: [], kept: [] });
+    expect(ids(records.list({})).toSorted()).toEqual(ids(made).toSorted());
+  });
+
+  it('keeps a finished build while it owns an unfinished slice, and says why', async () => {
+    const records = await open();
+    const [build, done, open_] = [lar(records, 'build'), lar(records, 'slice'), lar(records, 'slice')];
+    records.setParent(done.workId, 1, build.workId);
+    records.setParent(open_.workId, 1, build.workId);
+    records.recordFinished(done.workId, 2);
+    records.recordFinished(build.workId, 3);
+
+    const result = records.deleteExpired({ hideAfterDays: 7, deleteAfterDays: 30 }, later(31));
+    expect(result).toEqual({ deleted: [done.workId], kept: [{ workId: build.workId, reason: `It owns the slice ${open_.workId}, which is kept.` }] });
+    expect(records.children(build.workId)).toMatchObject([{ workId: open_.workId }]);
+    expect(records.read(build.workId).revision).toBe(5);
+  });
+
+  it('keeps a finished record another kept record waits on, and deletes both once neither is needed', async () => {
+    const records = await open();
+    const [blocker, waiting] = [lar(records, 'build'), lar(records, 'build')];
+    records.addBlocker(waiting.workId, 1, blocker.workId);
+    records.recordFinished(blocker.workId, 2);
+    const setting = { hideAfterDays: 7, deleteAfterDays: 30 };
+
+    expect(records.deleteExpired(setting, later(31))).toEqual({ deleted: [], kept: [{ workId: blocker.workId, reason: `The build ${waiting.workId}, which is kept, waits on it.` }] });
+    records.recordFinished(waiting.workId, 2);
+    expect(records.deleteExpired(setting, later(31)).deleted.toSorted()).toEqual([blocker.workId, waiting.workId].toSorted());
+    expect(records.list({})).toEqual([]);
   });
 });

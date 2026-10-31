@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkouts } from './repo-support.ts';
-import { readsRepositoryConfig, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
+import { readsRepositoryConfig, SAMPLE_MODELS, startBoard, until, writesRepository } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { BoardData, SetupDetection } from '@lar-factory/shared';
 
@@ -147,9 +147,6 @@ test('the sample board keeps no onboarding', async (t) => {
 });
 
 /** Whether a gh call writes to a repository: a POST, PATCH, PUT or DELETE through the API, or a label, issue or PR change. */
-const writesRepository = (args: string[]) => args.some((a) => /^(POST|PATCH|PUT|DELETE)$/.test(a))
-  || ['label', 'issue', 'pr'].includes(args[0]!) && !['list', 'view'].includes(args[1]!);
-
 const ANSWERS = { projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [], consent: ['push-branch', 'open-pr'] };
 
 test('a repository with no factory files is detected and onboards with no write to it, its answers saved as local settings', async (t) => {

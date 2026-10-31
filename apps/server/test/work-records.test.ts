@@ -1,23 +1,13 @@
 import { execFile } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { BoardData, Item, ItemDetails } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { startBoard, until } from './server-support.ts';
-
-const LAR_WORK = join(dirname(fileURLToPath(import.meta.resolve('@lar-factory/work-records'))), 'cli.ts');
-
-/** Runs lar-work on the board's database as a thread does, and returns the record it printed. */
-async function larWork(dataDir: string, ...args: string[]): Promise<{ workId: string; revision: number }> {
-  const { stdout } = await promisify(execFile)(process.execPath, ['--disable-warning=ExperimentalWarning', LAR_WORK, ...args, '--data-dir', dataDir]);
-  const printed = JSON.parse(stdout) as { workId: string; revision: number } | { record: { workId: string; revision: number } };
-  return 'record' in printed ? printed.record : printed;
-}
+import { LAR_WORK, larWork, startBoard, until } from './server-support.ts';
 
 test('the board lists the records lar-work writes while it runs, and their next change', { timeout: 30_000 }, async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')], recorded: false });

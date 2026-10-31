@@ -1,7 +1,8 @@
 ## 3. Brief
 
-Replace the issue body with the brief; the user's original text goes in a
-collapsed `<details>` block at the end.
+Write the brief to a file, then save it in the record with
+`lar-work set-body <work ID> --revision N --body brief --file <file>`. The
+user's original text stays in the record's initial context.
 
 ```markdown
 ## What
@@ -11,7 +12,7 @@ collapsed `<details>` block at the end.
 - <observable result a reviewer can check>
 
 ## Confirmed
-- <each assumption the user confirmed, and each decision with a link>
+- <each assumption the user confirmed, and each decision with its gist>
 
 ## Notes for the builder
 <where the code is, the failing test to start from, prototype branch to follow>

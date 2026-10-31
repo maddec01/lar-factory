@@ -86,6 +86,8 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
       "!dist-electron/bundle/**/*",
       // Goes to Resources/server/dist below.
       "!dist-electron/server/**/*",
+      // Goes to Resources/work-records below, where the lar-work launcher runs it.
+      "!dist-electron/work-records/**/*",
       // Bundled into dist-electron/main.cjs already.
       "!node_modules/**/*",
     ],
@@ -97,6 +99,7 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
       { from: "dist-electron/server", to: "server/dist" },
       { from: "../web/dist", to: "web/dist" },
       { from: "dist-electron/bundle", to: "bundle" },
+      { from: "dist-electron/work-records", to: "work-records" },
       // The licence notices of the code the app copies, T3 Code's among them.
       { from: "../../THIRD_PARTY_NOTICES.md", to: "THIRD_PARTY_NOTICES.md" },
     ],

@@ -59,6 +59,13 @@ describe("createBuildConfig", () => {
     ]);
   });
 
+  it("ships the bundled lar-work command outside app.asar, where its launcher runs it", () => {
+    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
+
+    expect(config.extraResources).toContainEqual({ from: "dist-electron/work-records", to: "work-records" });
+    expect(config.files).toContain("!dist-electron/work-records/**/*");
+  });
+
   it("ships the bundled server and the built page where the server finds them", () => {
     const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
 

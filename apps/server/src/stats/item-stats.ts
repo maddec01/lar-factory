@@ -12,7 +12,7 @@ import { isRecord } from '@lar-factory/shared';
 import type { ItemStats } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
 import { codexTurnSelections, threadSessions } from '../t3/t3-db.ts';
-import type { CodexTurnSelection, ThreadRows } from '../t3/t3-db.ts';
+import type { CodexTurnSelection, ThreadRows, ThreadSession } from '../t3/t3-db.ts';
 import { readT3Settings } from '../t3/t3-settings.ts';
 import type { InstanceHome, T3Settings, TranscriptDriver } from '../t3/t3-settings.ts';
 import { agentTime } from './agent-time.ts';
@@ -126,12 +126,12 @@ function withCodexServiceTiers(db: DatabaseSync, records: Map<string, UsageRecor
  * the thread's own provider instance. A record counts once across all threads,
  * for the earliest provider thread that has it, as in T3's global dedupe.
  */
-function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Map<string, UsageRecord[]> {
+function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>, sessions = threadSessions(db)): Map<string, UsageRecord[]> {
   const readers = new Map<string, SessionRecordsReader>();
   const keep = firstCopies();
   const read = new Set<string>();
   const records = new Map<string, UsageRecord[]>();
-  for (const { thread, driver, instance, session } of threadSessions(db)) {
+  for (const { thread, driver, instance, session } of sessions) {
     const source = homes.get(instance);
     if (!source || source.driver !== driver) continue;
     const at = `${source.driver}\0${source.home}`;
@@ -150,17 +150,17 @@ function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Ma
 }
 
 /** The transcripts of T3's threads that itemStats would read afresh. */
-export const transcriptsToRead = (db: DatabaseSync, sources: StatsSources): TranscriptFile[] =>
-  transcriptMisses(() => recordsByThread(db, readT3Settings(sources.settings, sources.home).instanceHomes));
+export const transcriptsToRead = (db: DatabaseSync, sources: StatsSources, sessions?: ThreadSession[]): TranscriptFile[] =>
+  transcriptMisses(() => recordsByThread(db, readT3Settings(sources.settings, sources.home).instanceHomes, sessions));
 
 /**
  * An item's stats over the rows T3's database `db` gave, with each item's tokens from its threads' transcripts.
  * Throws when the database can't be read; t3/t3-reads.ts opens it.
  */
-export function itemStats(db: DatabaseSync, rows: ThreadRows, sources: StatsSources, now: number): ItemStatsReader {
+export function itemStats(db: DatabaseSync, rows: ThreadRows, sources: StatsSources, now: number, sessions?: ThreadSession[]): ItemStatsReader {
   const time = agentTime(rows, now);
   const settings = readT3Settings(sources.settings, sources.home);
-  const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(db, settings.instanceHomes)));
+  const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(db, settings.instanceHomes, sessions)));
   const pricing = loadPricing(sources.rates, settings);
   return Object.assign((repo: string, number: number): ItemStats | null => {
     const found = time(repo, number);

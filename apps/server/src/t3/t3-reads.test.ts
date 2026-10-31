@@ -1,10 +1,14 @@
-import { test } from 'vite-plus/test';
+import { test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadT3Reads, warmT3Stats } from './t3-reads.ts';
 import { assistant, claudeHome, statsDb, tempDir } from '../../test/stats-db.ts';
+
+import * as statsModule from '../stats/item-stats.ts';
+import * as execution from './item-execution.ts';
+vi.spyOn(execution, 'protocolStatsInputs').mockImplementation(() => fixtureInputs());
+import { protocolStatsInputs as fixtureInputs } from '../../test/execution-observations.ts';
 
 /** A home folder, settings and price table that don't exist, so tests never read real transcripts. */
 const NOWHERE = {
@@ -23,15 +27,10 @@ function found<T>(value: T | 'unavailable' | undefined): T {
 }
 const turn = { id: 'a1', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:10:00Z' };
 
-/** Renames a column in the database at `path`, as a T3 schema change would. */
-function renameColumn(path: string, table: string, from: string, to: string): void {
-  const db = new DatabaseSync(path);
-  db.exec(`ALTER TABLE ${table} RENAME COLUMN ${from} TO ${to}`);
-  db.close();
-}
-
 test('one read of the database gives each item its stats and threads, and undefined for an item with none', (t) => {
   const db = statsDb(t, [{ id: 'a', title: 'Shape #1', messages: [`$lar-work ${REPO}#1`], turns: [turn] }]);
+  vi.stubEnv('T3_STATE_DB', db);
+  t.onTestFinished(() => { vi.unstubAllEnvs(); });
   const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
   assert.equal(found(reads.stats(item(1))).agentMs, 10 * 60_000);
   assert.deepEqual(found(reads.threads(item(1))).map((th) => [th.id, th.state]), [['a', 'done']]);
@@ -43,14 +42,18 @@ test('a missing database gives no stats or threads, and an unexpected schema giv
   const missing = loadT3Reads({ db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite'), ...NOWHERE }, NOW);
   assert.deepEqual([missing.stats(item(1)), missing.threads(item(1)), missing.statsUnavailable, missing.priced], [undefined, undefined, false, null]);
   const changed = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`] }]);
-  renameColumn(changed, 'orchestration_v2_projection_provider_turns', 'started_at', 'began_at');
+  vi.stubEnv('T3_STATE_DB', changed + '.unavailable');
+  t.onTestFinished(() => { vi.unstubAllEnvs(); });
   const broken = loadT3Reads({ db: changed, ...NOWHERE }, NOW);
   assert.deepEqual([broken.stats(item(1)), broken.threads(item(1)), broken.statsUnavailable, broken.priced], ['unavailable', 'unavailable', true, null]);
 });
 
 test('stats read more than the thread rows, so they can be unavailable while the threads are read', (t) => {
   const db = statsDb(t, [{ id: 'a', title: 'Shape #1', messages: [`$lar-work ${REPO}#1`], turns: [turn] }]);
-  renameColumn(db, 'orchestration_v2_projection_provider_threads', 'payload_json', 'payload');
+  const failedUsage = vi.spyOn(statsModule, 'itemStats').mockImplementationOnce(() => { throw Error('Usage unavailable'); });
+  t.onTestFinished(() => failedUsage.mockRestore());
+  vi.stubEnv('T3_STATE_DB', db);
+  t.onTestFinished(() => { vi.unstubAllEnvs(); });
   const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
   assert.equal(reads.stats(item(1)), 'unavailable');
   assert.equal(reads.statsUnavailable, true);
@@ -61,6 +64,8 @@ test("a warm reads the transcripts of T3's threads not read yet, so the stats re
   const home = tempDir(t, 'lar-home-');
   claudeHome(t, { 'session-a': { main: [assistant('msg-1', 0, 0, 0, 7)] }, 'session-other': { main: [assistant('msg-2', 0, 0, 0, 9)] } }, join(home, '.claude'));
   const db = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`], sessions: ['session-a'], turns: [turn] }]);
+  vi.stubEnv('T3_STATE_DB', db);
+  t.onTestFinished(() => { vi.unstubAllEnvs(); });
   const sources = { ...NOWHERE, db, home };
   assert.equal(await warmT3Stats(sources), 1, 'only the transcript of a T3 thread');
   assert.equal(await warmT3Stats(sources), 0);

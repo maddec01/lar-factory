@@ -1,3 +1,4 @@
+import { PublishButton } from '../publication/publication-dialog.tsx';
 // The item dialog: every item, wherever it's listed, opens here over the page, as the design system's workspace-sized
 // Modal, whose body fades at its scrolled edges. Under its title it shows the item's repository, status and parent, with
 // the agent work figures beside the title. Its body has a progress bar with the slices as an overview, its hint, a meta area of
@@ -147,6 +148,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
       <Modal.Footer leading={<span className="inline-flex items-center gap-3 text-xs"><MoveActions item={item} data={data} /></span>}>
         <span className="inline-flex items-center gap-1.5">
           {item.url && <LinkButton kind="other" href={item.url} target="_blank" rel="noopener">{item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}</LinkButton>}
+          <PublishButton item={item} data={data} />
           <StatusAction item={item} data={data} />
         </span>
       </Modal.Footer>

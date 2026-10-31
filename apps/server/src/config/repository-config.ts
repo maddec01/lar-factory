@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  PROVIDERS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider,
+  PROVIDERS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type OnboardingProgress, type OnboardingRepository, type Provider,
   type RepositoryConfigAnswers, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
@@ -28,14 +28,10 @@ export interface BoardSettings {
   problem?: string;
 }
 
-/**
- * An onboarded repository, an entry of the repository list's `repositories`, with where it stopped while it is still
- * onboarding, or its reset PR while it is resetting.
- */
+/** An onboarded repository, an entry of the repository list's `repositories`, with where it stopped while it is still onboarding. */
 export interface OnboardedRepository {
   repo: string;
   onboarding?: OnboardingProgress;
-  resetting?: { prUrl: string };
 }
 
 /**
@@ -76,22 +72,11 @@ function isSetup(value: unknown): value is SetupAnswers {
     && typeof value.showPicked === 'boolean' && typeof value.role === 'string';
 }
 
-/** Whether the Cleanup step's picks have their shape. */
-function isCleanup(value: unknown): value is CleanupPicks {
-  return isRecord(value) && isRecord(value.ticks) && Object.values(value.ticks).every((tick) => typeof tick === 'boolean')
-    && isRecord(value.skills) && Object.values(value.skills).every((pick) => isRecord(pick)
-      && (pick.kind === 'delete' || pick.kind === 'rename' && typeof pick.name === 'string'));
-}
-
 /** Whether an entry's onboarding is progress the dialog can resume from. */
 export function isProgress(value: unknown): value is OnboardingProgress {
   return isRecord(value) && typeof value.step === 'string' && strings(value.done) && isRecord(value.answers)
     && (value.answers.provider === undefined || PROVIDERS.includes(value.answers.provider as Provider))
-    && typeof value.answers.projectId === 'string' && (value.answers.setup === undefined || isSetup(value.answers.setup))
-    && (value.answers.cleanup === undefined || isCleanup(value.answers.cleanup))
-    && (value.answers.customLabels === undefined || strings(value.answers.customLabels))
-    && (value.prUrl === undefined || typeof value.prUrl === 'string') && (value.prClosed === undefined || value.prClosed === true)
-    && (value.reusesConfig === undefined || value.reusesConfig === true);
+    && typeof value.answers.projectId === 'string' && (value.answers.setup === undefined || isSetup(value.answers.setup));
 }
 
 /**
@@ -116,12 +101,7 @@ export function readListFile(file: string): { raw: Record<string, unknown> & { r
     if (typeof entry !== 'object' || typeof repo !== 'string' || !REPO.test(repo)) {
       throw new Error(`${file}: repositories[${index}] needs a repo of the form owner/name.`);
     }
-    const { onboarding, resetting } = entry as { onboarding?: unknown; resetting?: unknown };
-    if (onboarding !== undefined && resetting !== undefined) throw new Error(`${file}: repositories[${index}] is both onboarding and resetting.`);
-    if (resetting !== undefined) {
-      if (!isRecord(resetting) || typeof resetting.prUrl !== 'string') throw new Error(`${file}: repositories[${index}] has a resetting without its PR's URL.`);
-      return { repo, resetting: { prUrl: resetting.prUrl } };
-    }
+    const { onboarding } = entry as { onboarding?: unknown };
     if (onboarding === undefined) return { repo };
     if (!isProgress(onboarding)) throw new Error(`${file}: repositories[${index}] has an onboarding without its step, done steps and T3 project, or with answers it can't use.`);
     return { repo, onboarding };
@@ -131,7 +111,7 @@ export function readListFile(file: string): { raw: Record<string, unknown> & { r
 
 /**
  * The repository list's entries, `{ "repositories": [{ "repo": "owner/name" }] }`, where an entry still onboarding
- * carries its progress as `onboarding`, and one resetting its reset PR as `resetting`; none when there is no file.
+ * carries its progress as `onboarding`; none when there is no file.
  */
 export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] {
   return readListFile(join(dir, REPOSITORY_LIST_FILE)).list;
@@ -140,14 +120,12 @@ export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] 
 /**
  * Stores where an onboarding stopped in its repository's entry, adding the entry when there is none, and drops the
  * onboarding entry of `replaces`, the repository it was saved under before it picked another T3 project. Keeps every
- * other entry as the file has it, and returns the list. The marks an earlier board kept on its onboarding PR are
- * dropped. `replaceUnusableConfig` allows restarting only the named repository, after the caller has checked its saved
+ * other entry as the file has it, and returns the list. `replaceUnusableConfig` allows restarting only the named repository, after the caller has checked its saved
  * settings. Otherwise throws for a repository that is onboarded already.
  */
 export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir(),
   { replaceUnusableConfig = false } = {}): OnboardedRepository[] {
-  const { prClosed: _, reusesConfig: __, ...sent } = progress;
-  return saveEntry({ repo, onboarding: sent }, replaces, dir, replaceUnusableConfig);
+  return saveEntry({ repo, onboarding: progress }, replaces, dir, replaceUnusableConfig);
 }
 
 /**
@@ -165,7 +143,7 @@ function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: str
   const file = join(dir, REPOSITORY_LIST_FILE);
   const { raw, list } = readListFile(file);
   const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces))
-    && !(replaceUnusableConfig && sameRepo(e.repo, repo) && !e.resetting));
+    && !(replaceUnusableConfig && sameRepo(e.repo, repo)));
   if (onboarded) throw new Error(`${onboarded.repo} is onboarded already.`);
   const at = list.findIndex((e) => sameRepo(e.repo, repo));
   const dropped = (e: OnboardedRepository) => sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces);
@@ -177,8 +155,8 @@ function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: str
   return writeListFile(dir, { ...raw, repositories });
 }
 
-/** The list's repositories on the board: neither still onboarding nor resetting. */
-export const onTheBoard = (list: readonly OnboardedRepository[]) => list.filter((e) => !e.onboarding && !e.resetting);
+/** The list's repositories on the board: those no longer onboarding. */
+export const onTheBoard = (list: readonly OnboardedRepository[]) => list.filter((e) => !e.onboarding);
 
 /** Writes the repository list with `content` and returns its list. */
 export function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {

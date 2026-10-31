@@ -283,20 +283,19 @@ export function sharedConfigOf(text: string, azure: boolean): { read: Exclude<Sh
   return { read, version: 'defaults' in read && typeof raw.version === 'number' ? raw.version : CONFIG_VERSION };
 }
 
-/** The onboarded repositories' configs and setups, why each repository needs attention, and the repositories resetting. */
+/** The onboarded repositories' configs and setups, and why each repository needs attention. */
 export interface OnboardedConfigs {
   configs: RepositoryConfig[];
   /** The setup of each repository in `configs`, in its order. */
   setups: RepositorySetup[];
   problems: RepositoryConfigProblem[];
-  resetting: string[];
 }
 
 /**
  * Each config of the list's repositories on the board, in the list's order, made from its local settings over its
  * optional .lar-factory.json, whose latest read the settings keep. A repository with no item source stays off the board
  * with its problem, and one whose .lar-factory.json is wrong or unreadable keeps its last usable setup with the problem.
- * Repositories resetting read nothing. Throws any other failure, such as a logged-out gh.
+ * Throws any other failure, such as a logged-out gh.
  */
 export async function readOnboardedConfigs(list: readonly OnboardedRepository[], run?: (args: string[]) => Promise<string>,
   dir = boardDataDir()): Promise<OnboardedConfigs> {
@@ -344,5 +343,5 @@ export async function readOnboardedConfigs(list: readonly OnboardedRepository[],
     if (stale.length) guidance.push({ repo: config.repo, kind: 'agent-guidance',
       problem: `${stale.join(', ')} names retired factory skills. Update the Agent skills block to use lar-shape for shaping and lar-build for builds, and replace docs/agents guidance with the current setup from lar-factory's apps/server/src/onboarding/agent-setup.ts. Merge the change into the default branch, then refresh.` });
   }));
-  return { configs, setups: onBoard, problems: [...problems, ...guidance], resetting: list.flatMap((e) => e.resetting ? [e.repo] : []) };
+  return { configs, setups: onBoard, problems: [...problems, ...guidance] };
 }

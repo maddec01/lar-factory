@@ -29,10 +29,9 @@ function ghWith(files: Record<string, unknown>): (args: string[]) => Promise<str
 
 const progress = (step = 'setup', projectId = 'lar-apple') => ({ step, done: ['project'], answers: { projectId } });
 const setup = { itemSource: 'issues', show: 'all', showPicked: false, role: 'Apple app' };
-const cleanup = { ticks: { context: true, scratch: false }, skills: { '.claude/skills/code-review/': { kind: 'rename', name: 'web-review' }, '.agents/skills/tdd/': { kind: 'delete' } } };
 
 test('the list file names the onboarded repositories, each still onboarding with its progress; a missing one names none', async (t) => {
-  const onboarding = { ...progress(), answers: { projectId: 'lar-apple', provider: 'GitHub', setup, cleanup, customLabels: ['app: music'] }, prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
+  const onboarding = { ...progress(), answers: { projectId: 'lar-apple', provider: 'GitHub', setup } };
   const list = { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding }] };
   assert.deepEqual(readRepositoryList(await dataDir(t, { 'repository-settings.json': JSON.stringify(list) })),
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding }]);
@@ -49,29 +48,13 @@ test("an onboarding's setup answers may name an Azure DevOps team's sprint or ba
 
 test("an onboarding that isn't progress is refused, naming its entry", async (t) => {
   for (const onboarding of [true, { step: 'setup', done: ['project'] }, { step: 3, done: [], answers: { projectId: 'x' } },
-    { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} }, { ...progress(), prUrl: 4 }, { ...progress(), prClosed: false },
+    { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} },
     ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { showPicked: 'yes' }, { team: 3 }].map((wrong) =>
-      ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } },
-    { ...progress(), answers: { projectId: 'x', customLabels: 'app: music' } },
-    ...[{ ticks: [] }, { ticks: { context: 'yes' } }, { skills: { tdd: { kind: 'keep' } } }, { skills: { tdd: { kind: 'rename' } } }].map((wrong) =>
-      ({ ...progress(), answers: { projectId: 'x', cleanup: { ...cleanup, ...wrong } } }))]) {
+      ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } }]) {
     const dir = await dataDir(t, { 'repository-settings.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding }] }) });
     assert.throws(() => readRepositoryList(dir), { message: `${join(dir, 'repository-settings.json')}: repositories[0] has an onboarding without its step, done steps and T3 project, or with answers it can't use.` },
       JSON.stringify(onboarding));
   }
-});
-
-const RESET_PR = 'https://github.com/maddec01/lar-apple/pull/9';
-
-test('a resetting entry holds its reset PR, and one without a PR URL is refused, naming its entry', async (t) => {
-  const list = { repositories: [{ repo: 'maddec01/lar-apple', resetting: { prUrl: RESET_PR } }] };
-  assert.deepEqual(readRepositoryList(await dataDir(t, { 'repository-settings.json': JSON.stringify(list) })), [{ repo: 'maddec01/lar-apple', resetting: { prUrl: RESET_PR } }]);
-  for (const resetting of [true, {}, { prUrl: 4 }]) {
-    const dir = await dataDir(t, { 'repository-settings.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', resetting }] }) });
-    assert.throws(() => readRepositoryList(dir), { message: `${join(dir, 'repository-settings.json')}: repositories[0] has a resetting without its PR's URL.` });
-  }
-  const both = await dataDir(t, { 'repository-settings.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding: progress(), resetting: { prUrl: RESET_PR } }] }) });
-  assert.throws(() => readRepositoryList(both), { message: `${join(both, 'repository-settings.json')}: repositories[0] is both onboarding and resetting.` });
 });
 
 test('saving an onboarding adds its repository to the list, or updates its entry, and keeps the other entries as they are', async (t) => {
@@ -107,17 +90,9 @@ test('saving an onboarding makes the list file and its folder when there are non
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-apple', onboarding: progress() }]);
 });
 
-test("an onboarding saved with an earlier board's PR marks keeps its progress without them", async (t) => {
-  const open = { ...progress('pr'), prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
-  const dir = await dataDir(t);
-  assert.deepEqual(saveOnboarding({ repo: 'maddec01/lar-apple', progress: { ...open, prClosed: true, reusesConfig: true } }, null, dir),
-    [{ repo: 'maddec01/lar-apple', onboarding: open }]);
-});
-
-test('the repositories still onboarding are those with progress, leaving out one resetting', () => {
+test('the repositories still onboarding are those with progress', () => {
   const list = [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-docs', onboarding: progress() }];
   assert.deepEqual(stillOnboarding(list), [{ repo: 'maddec01/lar-docs', progress: progress() }]);
-  assert.deepEqual(stillOnboarding([...list, { repo: 'maddec01/lar-web', resetting: { prUrl: RESET_PR } }]), stillOnboarding(list));
 });
 
 test('finishing an onboarding leaves its entry with the repository alone, in place of the entry it was saved under', async (t) => {

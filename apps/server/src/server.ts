@@ -127,12 +127,11 @@ const items = onboardedSources(async () => {
   try { list = readRepositoryList(); }
   catch (err) {
     // A list the board can't read onboards nothing, so no repository or notice of the last good read stays beside its error.
-    board.update({ repos: [], repositoryConfigProblems: [], onboarding: [], resetting: [] });
+    board.update({ repos: [], repositoryConfigProblems: [], onboarding: [] });
     throw err;
   }
-  // A repository still onboarding has no local settings until it saves them, and one resetting from an earlier board is
-  // kept off the board. Each refresh asks gh for every open Edit PR, so
-  // its row's mark survives a restart and goes once the PR merges or closes. A file below the app's Repository config
+  // A repository still onboarding has no local settings until it saves them, so it stays off the board. Each refresh
+  // asks gh for every open Edit PR, so its row's mark survives a restart and goes once the PR merges or closes. A file below the app's Repository config
   // version gets the notice offering its update PR, unless this Mac dismissed it at that version.
   const onboarded = onTheBoard(list);
   const [read, editPrs] = await Promise.all([readOnboardedConfigs(list),

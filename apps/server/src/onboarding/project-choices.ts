@@ -29,7 +29,7 @@ export async function projectChoices(list: readonly OnboardedRepository[], confi
     const repo = provider === 'GitHub' ? githubRepo(origin) : provider === 'Azure DevOps' ? azureRepo(origin!) : null;
     const config: ConfigAnswer = repo ? await configOf(repo) : { hasConfig: null };
     const entry = repo ? listed.get(repo.toLowerCase()) : undefined;
-    return { id, name: title, folder, repo, provider: repo ? provider : null, ...config, onBoard: !!entry && (!config.configProblem || !!entry.onboarding || !!entry.resetting) };
+    return { id, name: title, folder, repo, provider: repo ? provider : null, ...config, onBoard: !!entry && (!config.configProblem || !!entry.onboarding) };
   }));
 }
 

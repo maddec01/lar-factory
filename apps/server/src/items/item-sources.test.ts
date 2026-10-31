@@ -61,7 +61,7 @@ const config = (repo: string, show: RepositoryConfig['show'] = 'all'): Repositor
 test('each read loads the configs first and builds the sources again only when they changed', async () => {
   let configs = [config('maddec01/lar-apple')];
   const built: string[][] = [];
-  const sources = onboardedSources(async () => ({ configs, problems: [], resetting: [] }), (read) => {
+  const sources = onboardedSources(async () => ({ configs, problems: [] }), (read) => {
     built.push(read.map((c) => `${c.repo} ${c.show}`));
     return merged(fakeSource(read.map((c) => c.repo).join(',') || 'none', [], []));
   });
@@ -80,7 +80,7 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
   let fail = false;
   const sources = onboardedSources(async () => {
     if (fail) throw new Error('repository-settings.json isn\'t valid JSON.');
-    return { configs: [config('maddec01/lar-apple')], problems: [], resetting: [] };
+    return { configs: [config('maddec01/lar-apple')], problems: [] };
   }, () => merged(fakeSource('apple', [], writes)));
   await sources.read();
   fail = true;
@@ -93,14 +93,7 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
 test("a read leaves out the items of a repository whose config couldn't be read, though a shared source lists them", async () => {
   const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple'), item('I_3', 'maddec01/LAR-APPLE')];
   const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')],
-    problems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }], resetting: [] }), () => merged(fakeSource('lar', listed, [])));
-  assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
-});
-
-test('a read leaves out the items of a resetting repository, though a shared source lists them', async () => {
-  const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple'), item('I_3', 'maddec01/LAR-APPLE')];
-  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')], problems: [], resetting: ['maddec01/lar-apple'] }),
-    () => merged(fakeSource('lar', listed, [])));
+    problems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }] }), () => merged(fakeSource('lar', listed, [])));
   assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
 });
 
@@ -196,7 +189,7 @@ test("a source whose first read failed, or that its tool blocks, isn't waiting, 
 test('the onboarded sources pass on what has landed, leaving out the repositories they leave out', async () => {
   const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple')];
   const landed: ItemsRead[] = [];
-  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')], problems: [], resetting: ['maddec01/lar-apple'] }),
+  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')], problems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }] }),
     () => ({ ...merged(fakeSource('lar', [], [])), read: async (progress) => {
       progress?.landed?.({ title: 'lar', items: listed, waiting: ['maddec01/lar-factory'] });
       return { title: 'lar', items: listed };
@@ -207,7 +200,7 @@ test('the onboarded sources pass on what has landed, leaving out the repositorie
 
 test('the onboarded sources pass the progress to the sources they build', async () => {
   const events: string[] = [];
-  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-apple')], problems: [], resetting: [] }),
+  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-apple')], problems: [] }),
     () => merged({ ...fakeSource('lar', [], []), name: 'lar' }));
   await sources.read({ started: (name) => events.push(`+${name}`), finished: (name) => events.push(`-${name}`) });
   assert.deepEqual(events, ['+lar', '-lar']);
@@ -271,7 +264,7 @@ test('a source whose read failed is read again, while one that read keeps its re
 
 test('a paced read loads the configs again only every 5 minutes, or after reload', async () => {
   let loads = 0;
-  const sources = onboardedSources(async () => { loads++; return { configs: [config('maddec01/lar-apple')], problems: [], resetting: [] }; },
+  const sources = onboardedSources(async () => { loads++; return { configs: [config('maddec01/lar-apple')], problems: [] }; },
     () => merged(fakeSource('lar', [], [])));
   await sources.read(undefined, pace(0));
   await sources.read(undefined, pace(299_999));

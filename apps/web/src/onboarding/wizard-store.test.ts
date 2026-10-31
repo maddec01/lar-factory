@@ -184,7 +184,7 @@ test('a resumed run that picks another project replaces the onboarding it was ke
 test("a stored step the dialog doesn't have, as an older board's, resumes on the T3 project step", async () => {
   const wizard = await store();
   const { useBoardStore } = await import('../board/board-store.ts');
-  useBoardStore.getState().receive({ ...sample, onboarding: [{ repo: 'maddec01/lar-web', progress: { ...kept('labels'), prUrl: 'https://github.com/maddec01/lar-web/pull/2' } }] });
+  useBoardStore.getState().receive({ ...sample, onboarding: [{ repo: 'maddec01/lar-web', progress: kept('labels') }] });
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
   expect(wizard.getState().run).toMatchObject({ step: 'project', projectId: 'lar-web' });
 });

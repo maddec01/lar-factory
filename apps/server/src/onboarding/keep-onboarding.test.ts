@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { saveOnboarded, saveOnboarding } from '../config/repository-config.ts';
+import { saveOnboarded } from '../config/repository-config.ts';
 import { keepOnboarding } from './keep-onboarding.ts';
 
 const progress = { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } };
@@ -31,16 +31,10 @@ test('a body without a repository of the form owner/name and progress is a 400; 
   assert.deepEqual(await keepOnboarding({ repo: 'maddec01/lar-web', progress }, dir, async () => '{"role":"API"}'), { status: 409, error: 'maddec01/lar-web is onboarded already.' });
 });
 
-test("the body's PR stands only as the board saved it, and a body without one drops it", async (t) => {
+test('only the step, done steps and answers of the body\'s progress are saved', async (t) => {
   const dir = await dataDir(t);
-  const prUrl = 'https://github.com/maddec01/lar-web/pull/7';
   assert.deepEqual(await keepOnboarding({ repo: 'maddec01/lar-web', progress: { ...progress, prUrl: 'https://evil.example/pull/1' } }, dir),
     { onboarding: [{ repo: 'maddec01/lar-web', progress }] });
-  saveOnboarding({ repo: 'maddec01/lar-web', progress: { ...progress, step: 'pr', prUrl } }, null, dir);
-  assert.deepEqual(await keepOnboarding({ repo: 'maddec01/lar-web', progress: { ...progress, step: 'pr', prUrl: '--repo=x' } }, dir),
-    { onboarding: [{ repo: 'maddec01/lar-web', progress: { ...progress, step: 'pr', prUrl } }] });
-  assert.deepEqual(await keepOnboarding({ repo: 'maddec01/lar-web', progress: { ...progress, step: 'pr' } }, dir),
-    { onboarding: [{ repo: 'maddec01/lar-web', progress: { ...progress, step: 'pr' } }] });
 });
 
 test('fresh onboarding can replace listed settings that cannot be used', async (t) => {

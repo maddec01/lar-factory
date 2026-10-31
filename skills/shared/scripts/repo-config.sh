@@ -7,16 +7,16 @@
 # "private"}, skills []). role has no default. The local overrides are settings.overrides
 # in the repository's entry of the list --list reads, as the board writes it; each
 # replaces its shared default, and an absent one inherits it. A repository with local
-# overrides needs no .lar-factory.json.
+# overrides needs no .lar-factory.json. When its .lar-factory.json can't be read or
+# used, it falls back to the last usable copy the board kept, settings.shared, and
+# says why on stderr; a logged-out gh has no fallback.
 # An Azure repository is its origin URL or <org>/<project>/<repo>; its file is read
 # with az the same way. Its itemSource names the team’s backlog and current sprint
 # together: {"kind": "azure-board", "team": ...}.
 # --list prints the onboarded repositories with their local settings, the
 # repositories array of repository-settings.json in the board's data folder
 # (LAR_FACTORY_DATA_DIR when it names an absolute folder, else
-# ~/Library/Application Support/Lar Factory). A missing file means none: []. It
-# leaves out each entry still resetting, so lar-work never reads a repository being
-# reset as onboarded.
+# ~/Library/Application Support/Lar Factory). A missing file means none: [].
 # Each error exits nonzero with its reason on stderr.
 set -euo pipefail
 
@@ -55,7 +55,7 @@ list() {
         echo "$list_file: $problem." >&2
         return 1
     fi
-    jq '[.repositories[] | select(has("resetting") | not)]' "$list_file"
+    jq '.repositories' "$list_file"
 }
 
 if [[ $arg == --list ]]; then
@@ -66,6 +66,8 @@ fi
 err=$(mktemp)
 trap 'rm -f "$err"' EXIT
 read_status=0
+# Why the shared file can't be used, when it can't; the last usable copy stands in for it.
+shared_problem=
 if jq -en --arg repo "$arg" --arg repo_form "$repo_form" '$repo | test($repo_form)' >/dev/null; then
     provider=github repo=$arg
     # Without ref, the contents API reads the default branch.
@@ -75,8 +77,7 @@ if jq -en --arg repo "$arg" --arg repo_form "$repo_form" '$repo | test($repo_for
             echo "gh is logged out. Run gh auth login, then rerun." >&2
             exit 1
         elif [[ $(cat "$err") != *"HTTP 404"* ]]; then
-            echo "$repo: could not read .lar-factory.json. $(cat "$err")" >&2
-            exit 1
+            shared_problem="could not read .lar-factory.json. $(cat "$err")"
         fi
         raw=null
     fi
@@ -96,27 +97,22 @@ else
     if ((read_status != 0)); then
         # TF401174 is Azure's "item could not be found".
         if [[ $(cat "$err") != *TF401174* ]]; then
-            echo "$repo: $(az_failure "could not read .lar-factory.json" "$(cat "$err")")" >&2
-            exit 1
+            shared_problem=$(az_failure "could not read .lar-factory.json" "$(cat "$err")")
         fi
         raw=null
     elif ! raw=$(jq -er '.content | strings' <<<"$raw" 2>/dev/null); then
-        echo "$repo: could not read .lar-factory.json. az returned no file content." >&2
-        exit 1
+        shared_problem="could not read .lar-factory.json. az returned no file content"
+        raw=null
     fi
 fi
 
-if ! jq empty <<<"$raw" 2>/dev/null; then
-    echo "$repo: .lar-factory.json isn't valid JSON." >&2
-    exit 1
+if [[ -z $shared_problem ]] && ! jq empty <<<"$raw" 2>/dev/null; then
+    shared_problem=".lar-factory.json isn't valid JSON"
+    raw=null
 fi
 repositories=$(list)
-local_settings=$(jq --arg repo "$repo" 'first(.[] | select(.repo | ascii_downcase == ($repo | ascii_downcase))) // null
-    | if . == null then null else .settings.overrides // {} end' <<<"$repositories")
-if [[ $raw == null && $local_settings == null ]]; then
-    echo "$repo isn't onboarded on this Mac and has no .lar-factory.json on its default branch." >&2
-    exit 1
-fi
+entry=$(jq --arg repo "$repo" 'first(.[] | select(.repo | ascii_downcase == ($repo | ascii_downcase))) // null' <<<"$repositories")
+local_settings=$(jq 'if . == null then null else .settings.overrides // {} end' <<<"$entry")
 # problem: why one source's fields can't be settings, or nothing when they can.
 fields='def problem:
     if type != "object" then "isn'"'"'t a JSON object"
@@ -132,8 +128,24 @@ fields='def problem:
     elif has("skills") and ((.skills | type) != "array" or any(.skills[]; type != "string")) then
         "field skills must be an array of strings"
     else empty end;'
+if [[ -z $shared_problem ]]; then
+    shared_problem=$(jq -rn --argjson shared "$raw" "$fields"'
+        if $shared != null and ($shared | problem) then ".lar-factory.json \($shared | problem)" else empty end')
+fi
+if [[ -n $shared_problem ]]; then
+    raw=$(jq '.settings.shared // null' <<<"$entry")
+    if [[ $raw == null ]]; then
+        echo "$repo: ${shared_problem%.}." >&2
+        exit 1
+    fi
+    echo "$repo: ${shared_problem%.}. Using the last usable copy on this Mac." >&2
+fi
+if [[ $raw == null && $local_settings == null ]]; then
+    echo "$repo isn't onboarded on this Mac and has no .lar-factory.json on its default branch." >&2
+    exit 1
+fi
 problem=$(jq -rn --argjson shared "$raw" --argjson local "$local_settings" --arg list_file "$list_file" "$fields"'
-    if $shared != null and ($shared | problem) then ".lar-factory.json \($shared | problem)"
+    if $shared != null and ($shared | problem) then "its last usable .lar-factory.json in \($list_file): \($shared | problem)"
     elif $local != null and ($local | problem) then "its local overrides in \($list_file): \($local | problem)"
     else empty end')
 if [[ -n $problem ]]; then

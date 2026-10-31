@@ -80,6 +80,14 @@ check() {
         fail "$1: $status $output / $errors"
     fi
 }
+# falls_back <name> <expected JSON> <text>: passes when the run succeeded, printed that JSON and named the text on stderr.
+falls_back() {
+    if ((status == 0)) && [[ $errors == *"$3"* ]] && jq -e --argjson want "$2" '. == $want' <<<"$output" >/dev/null 2>&1; then
+        pass "$1"
+    else
+        fail "$1: $status $output / $errors"
+    fi
+}
 # refuses <name> <text>: passes when the run failed, printed nothing and named the text on stderr.
 refuses() {
     if ((status != 0)) && [[ -z $output && $errors == *"$2"* ]]; then
@@ -103,9 +111,9 @@ FAKE_LOGGED_OUT=1 run --list
 check "--list doesn't need gh" '[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":{"step":"setup","done":["project"],"answers":{"projectId":"lar-server"}}}]'
 
 entry='{"repo":"maddec01/lar-web","settings":{"overrides":{"role":"web"},"consent":["open-pr"]}}'
-echo "{\"repositories\":[$entry,{\"repo\":\"maddec01/lar-old\",\"resetting\":{\"prUrl\":\"https://github.com/maddec01/lar-old/pull/14\"}}]}" >"$list_file"
+echo "{\"repositories\":[$entry]}" >"$list_file"
 run --list
-check "--list prints each entry with its local settings, leaving out an entry resetting" "[$entry]"
+check "--list prints each entry with its local settings" "[$entry]"
 
 old="$data/repositories.json"
 echo '{"repositories":[{"repo":"maddec01/lar-old"}]}' >"$old"
@@ -203,6 +211,20 @@ file maddec01/broken '{"version":"1","role":"factory"}'
 run maddec01/broken
 refuses "a version that isn't a number names version" "maddec01/broken: .lar-factory.json field version"
 
+# A repository whose .lar-factory.json can't be used falls back to the last usable copy the board kept, and says why.
+echo '{"repositories":[{"repo":"maddec01/broken","settings":{"shared":{"role":"kept","show":"opted-in"},"overrides":{"labels":["web"]}}}]}' >"$list_file"
+kept='{"version":1,"role":"kept","itemSource":{"kind":"issues"},"show":"opted-in","labels":["web"],"domainDocs":{"kind":"private"},"skills":[]}'
+file maddec01/broken '{"role": '
+run maddec01/broken
+falls_back "a file that doesn't parse falls back to the last usable copy, saying why" "$kept" \
+    "maddec01/broken: .lar-factory.json isn't valid JSON. Using the last usable copy on this Mac."
+file maddec01/broken '{"role":"factory","show":"some"}'
+run maddec01/broken
+falls_back "a file with a wrong field falls back to the last usable copy, naming the field" "$kept" "maddec01/broken: .lar-factory.json field show"
+FAKE_LOGGED_OUT=1 run maddec01/broken
+refuses "with gh logged out, there is no fallback" "gh auth login"
+rm "$list_file"
+
 FAKE_LOGGED_OUT=1 run maddec01/lar-factory
 refuses "with gh logged out, says to run gh auth login" "gh auth login"
 
@@ -273,6 +295,13 @@ refuses "with az logged out, says to run az login" "az is logged out. Run az log
 
 FAKE_NO_EXTENSION=1 run contoso/Fabrikam/web
 refuses "without the azure-devops extension, says to add it" "az extension add --name azure-devops"
+
+echo '{"repositories":[{"repo":"contoso/Fabrikam/web","settings":{"shared":{"role":"kept","itemSource":{"kind":"azure-board","team":"Web Team"}}}}]}' >"$list_file"
+FAKE_LOGGED_OUT=1 run contoso/Fabrikam/web
+falls_back "with az logged out, an Azure repository falls back to the last usable copy, saying to run az login" \
+    '{"version":1,"role":"kept","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}' \
+    "az is logged out. Run az login"
+rm "$list_file"
 
 for bad in https://dev.azure.com/contoso/Fabrikam/web https://dev.azure.com/contoso/../_git/web contoso/../web 'contoso/Fabrikam/we b' a/b/c/d \
     contoso/Fabrikam%2F..%2Fx/web contoso/%2E%2E/web contoso/Fabrikam/%5Cweb; do

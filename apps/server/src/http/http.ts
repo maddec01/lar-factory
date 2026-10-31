@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
@@ -62,13 +62,6 @@ export interface HttpDeps {
   openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
   /** What an onboarding's PR would change against its default branch with the body's edits and picks, or why it can't say. */
   previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | Refused>;
-  /**
-   * Edit's load: an onboarded repository's .lar-factory.json values and its labels, or why it can't. The values come
-   * from its open Edit PR's branch, which `editPr` names, while there is one, else from its default branch.
-   */
-  readEditConfig(input: Record<string, unknown>): Promise<{ config: RepositoryConfigAnswers; labels: string[]; editPr?: string } | Refused>;
-  /** Edit's Save: creates the custom labels the repository lacks and opens the PR on its .lar-factory.json, or adds to the open one, returning its URL, or gh's problem. */
-  openEditPr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
   /** The config update notice's PR: rewrites the body's repository's .lar-factory.json at the app's version through Edit's PR, returning its URL, or gh's problem. */
   openConfigUpdatePr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
   /** Records the repository's config update notice dismissed at the app's version, on this Mac, or says why it can't for a repository that isn't onboarded. */
@@ -150,7 +143,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
-  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -355,23 +348,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       async run(input) {
         const previewed = await previewOnboardingPr(input);
         return 'error' in previewed ? { status: previewed.status, body: { error: previewed.error } } : { status: 200, body: { ...previewed, error: null } };
-      },
-    },
-    '/api/repositories/config': {
-      what: 'the repository to edit', disabled: 'Sample mode edits no repository.',
-      async run(input) {
-        const read = await readEditConfig(input);
-        return 'error' in read ? { status: read.status, body: { error: read.error } } : { status: 200, body: { ...read, error: null } };
-      },
-    },
-    '/api/repositories/config/pr': {
-      what: 'the repository and its new values', disabled: 'Sample mode edits no repository.',
-      async run(input) {
-        const opened = await openEditPr(input);
-        if ('error' in opened) return { status: opened.status, body: { error: opened.error } };
-        // The row shows its Edit PR at once.
-        changeRow(input.repo as string, (r) => ({ ...r, editPr: opened.prUrl }));
-        return { status: 200, body: withBoard({ ...opened, error: null }) };
       },
     },
     // A config update PR the notice opened takes the notice's place, as the row's open Edit PR.

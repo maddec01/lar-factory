@@ -5,7 +5,7 @@
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
-import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type InstallOperationResult, type InstallSnapshot, type TargetSnapshot, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
+import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type InstallOperationResult, type InstallSnapshot, type RepositorySetup, type TargetSnapshot, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { dialog, project, serve } from '../onboarding/onboarding-support.ts';
 
@@ -203,10 +203,10 @@ test('Repositories shows the command line tools\' logins and each repository wit
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
   expect(repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual([
-    `${repos[0]!.repo}GitHub · Issues · All itemsEditReset`,
-    `${repos[1]!.repo}GitHub · Issues · Items with a statusEditReset`,
-    'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint · All itemsEditReset',
-    'contoso/Fabrikam/lar-webAzure DevOps · Web Team\'s backlog and current sprint · All itemsEditReset',
+    `${repos[0]!.repo}GitHub · Issues · All items`,
+    `${repos[1]!.repo}GitHub · Issues · Items with a status`,
+    'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint · All items',
+    'contoso/Fabrikam/lar-webAzure DevOps · Web Team\'s backlog and current sprint · All items',
   ]);
 });
 
@@ -220,11 +220,11 @@ test('a repository with an open Edit PR shows it on its row, with its link, unti
   expect(row(`repo-${sample.repos[0]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
 });
 
-test('each onboarded repository has Edit and Reset, and Add repository opens the onboarding dialog over Settings', async () => {
-  serve(sample, [project('lar-web')]);
-  await open('Repositories', sample);
-  expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
-    ...sample.repos.flatMap(() => [['Edit', false], ['Reset', false]]), ['Add repository', false]]);
+test('an onboarded repository whose setup the board read has Edit, one without none, and Add repository opens the onboarding dialog over Settings', async () => {
+  const board = { ...sample, repos: [{ ...sample.repos[0]!, setup: {} as RepositorySetup }, sample.repos[1]!] };
+  serve(board, [project('lar-web')]);
+  await open('Repositories', board);
+  expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([['Edit', false], ['Add repository', false]]);
   const add = $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === 'Add repository')!;
   // A click focuses the button it presses.
   add.focus();
@@ -247,8 +247,8 @@ test('a repository still onboarding is listed with its provider and its step, an
   serve(data, [project('lar-web', { onBoard: true })]);
   await open('Repositories', data);
   expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
-  expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Repository roleResumeReset');
-  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResumeReset');
+  expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Repository roleResume');
+  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResume');
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repository role');

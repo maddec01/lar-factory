@@ -60,11 +60,6 @@ export function isItemSource(value: unknown): value is RepositoryItemSource {
   return value.kind === 'azure-board' && isTeam(value.team);
 }
 
-/** Whether a value is the Repository config's values as onboarding and Edit send them: an item source, a show setting, a role and custom labels. */
-export const isConfigAnswers = (value: unknown): value is RepositoryConfigAnswers => isRecord(value) && isItemSource(value.itemSource)
-  && SHOW_SETTINGS.includes(value.show as ShowSetting) && typeof value.role === 'string' && value.role.trim() !== ''
-  && Array.isArray(value.labels) && value.labels.every((l) => typeof l === 'string');
-
 function readJson(file: string): unknown {
   try { return JSON.parse(readFileSync(file, 'utf8')); }
   catch { throw new Error(`${file} isn't valid JSON.`); }

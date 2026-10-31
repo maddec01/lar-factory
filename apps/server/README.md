@@ -114,17 +114,15 @@ that PR to finish. The board remembers your progress so you can resume from Sett
 
 ### Manual configuration reference
 
-The board reads two files in the board app's data folder, `~/Library/Application Support/Lar Factory/`:
-
-- `repository-settings.json` lists the onboarded repositories, each GitHub one as
-  `owner/name` and each Azure DevOps one as `organization/project/repository`, as
-  its origin URL names them, each with its local settings under `settings`.
-  Without it, the board shows no repository. It replaced `repositories.json`,
-  which the board leaves untouched: nothing migrates, so each repository onboards
-  again.
-- `settings.json` holds the board-wide settings. Today that is `refreshSeconds`,
-  how often the board reads item sources with no active work and the Repository
-  configs, 300 when the file or the field is missing.
+The board reads `repository-settings.json` in the board app's data folder,
+`~/Library/Application Support/Lar Factory/`. Its `repositories` lists the onboarded
+repositories, each GitHub one as `owner/name` and each Azure DevOps one as
+`organization/project/repository`, as its origin URL names them, each with its local
+settings under `settings`. Without the file, the board shows no repository. Its
+`refreshSeconds` sets how often the board reads item sources with no active work and
+the Repository configs, 300 when the field is missing. The file replaced
+`repositories.json` and `settings.json`, which the board leaves untouched. Nothing
+migrates, so each repository onboards again.
 
 A repository may keep its Repository config in `.lar-factory.json` at its root.
 Its fields are shared defaults: a local setting overrides any of them, and removing
@@ -145,8 +143,11 @@ branch. Its fields:
   or `{ "kind": "repository", "glossary": "<path>", "adrs": "<path>" }`.
 - `skills`: the project skills builds use as coding guidance, none by default.
 
-A change to the item source or the domain-doc location pauses the work that depends
-on it until you accept the change.
+Edit in Settings › Repositories shows each setting with its source, sets or removes
+its local override, and rechecks access after a credential change. A change to the
+item source pauses the repository's work with a ticket, and a change to the domain-doc
+location pauses its open work. The repository's row names the paused work until you
+accept the change there.
 
 To add lar-factory, write `repository-settings.json`:
 

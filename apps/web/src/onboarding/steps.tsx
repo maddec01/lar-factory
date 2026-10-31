@@ -426,7 +426,7 @@ function PathAndWhat({ path, what }: { path: string; what: string }) {
 }
 
 /** The PR's place from its URL: `owner/name#n` on GitHub, `organization/project/repository!n` on Azure Repos. */
-export function prName(url: string): string {
+function prName(url: string): string {
   const azure = /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)$/.exec(url);
   if (!azure) return url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
   const [, organization, project, repository, id] = azure;

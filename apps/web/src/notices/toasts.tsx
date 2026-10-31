@@ -152,13 +152,6 @@ export function showToast(toast: Toast): void {
   slots.set(toast.slot, id);
 }
 
-/** Shows a success toast in `slot` that links the PR at `prUrl` as `label`, between `before` and `after`. */
-export function showPrToast({ slot, what, prUrl, label, before = 'Opened ', after = '.' }: {
-  slot: string; what: string; prUrl: string; label: string; before?: string; after?: string;
-}): void {
-  showToast({ slot, what, body: <span>{before}<a href={prUrl} target="_blank" rel="noopener">{label}</a>{after}</span> });
-}
-
 /** Closes whatever toast holds this slot. */
 export function clearToast(slot: string): void {
   const id = slots.get(slot);

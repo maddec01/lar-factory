@@ -503,17 +503,11 @@ export async function createStatusLabel(repo: string, status: Exclude<Status, 'D
   }
 }
 
-/** The names of every label a repository has. */
-export async function listLabels(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<string[]> {
-  const labels = JSON.parse(await run(['label', 'list', '-R', repo, '--limit', '1000', '--json', 'name'])) as { name: string }[];
-  return labels.map((l) => l.name);
-}
-
 /**
  * Creates a label in a repository, with its colour and description when it has them; GitHub picks a colour otherwise.
  * The name comes after `--`, so one that starts with - is no gh flag.
  */
-export async function createLabel(repo: string, label: { name: string; color?: string; description?: string },
+async function createLabel(repo: string, label: { name: string; color?: string; description?: string },
   run: (args: string[]) => Promise<string> = gh): Promise<void> {
   await run(['label', 'create', '-R', repo, ...label.color ? ['--color', label.color] : [],
     ...label.description ? ['--description', label.description] : [], '--', label.name]);

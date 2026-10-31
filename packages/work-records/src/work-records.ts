@@ -243,6 +243,8 @@ export interface WorkRecords {
   removeBlocker(workId: string, revision: number, blockerId: string): WorkRecord;
   /** Writes the record's `body`, replacing any earlier one. A concept holds a map, a decision its text, others a brief. */
   setBody(workId: string, revision: number, body: Body, markdown: string): WorkRecord;
+  /** Restores absent imported refinement and its initial relationships in one transaction. An existing body preserves all local state. */
+  restoreImported(workId: string, revision: number, imported: { body: Body; markdown: string; parentId?: string; blockerIds?: readonly string[] }): WorkRecord;
   /** The record's `body`, or null while it has none. */
   body(workId: string, body: Body): string | null;
   setBuildPhase(workId: string, revision: number, phase: BuildPhase): WorkRecord;
@@ -730,6 +732,31 @@ function workRecords(database: Database): WorkRecords {
         checkHolds(row.kind, name);
         writeBody.run(workId, name, text);
         return {};
+      });
+    },
+    restoreImported: (workId, revision, imported) => {
+      const body = checkOneOf(BODIES, imported.body, 'body');
+      const markdown = checkText(imported.markdown, body);
+      return change(workId, revision, (row, touched) => {
+        checkHolds(row.kind, body);
+        if (bodyText.get(workId, body)) return null;
+        let parentId = row.parent_id;
+        if (imported.parentId && !parentId) {
+          const parent = find(imported.parentId);
+          checkOwns(parent, row);
+          parentId = parent.work_id;
+          touched.push(parentId);
+        }
+        for (const blockerId of new Set(imported.blockerIds ?? [])) {
+          find(blockerId);
+          if (blockerId === workId) throw invalid(`The work record ${workId} can't block itself.`);
+          if (hasBlocker.get(workId, blockerId)) continue;
+          if (waitsOn.get(blockerId, workId)) throw invalid(`The work record ${blockerId} already waits on ${workId}, so blocking ${workId} by it would make a cycle.`);
+          insertBlocker.run(workId, blockerId);
+          if (!touched.includes(blockerId)) touched.push(blockerId);
+        }
+        writeBody.run(workId, body, markdown);
+        return { parent_id: parentId };
       });
     },
     body: (workId, body) => database.read(() => {

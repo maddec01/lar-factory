@@ -215,3 +215,155 @@ test('a source that cannot be read leaves nothing imported and says why', async 
   const answer = await importableTickets({ repo: REPO, itemSource: ISSUES }, records, reads);
   assert.deepEqual(answer, { status: 502, error: `Can't read ${REPO}'s tickets. read failed` });
 });
+
+test('legacy import restores concept maps, build briefs, and selected structure without overwriting local refinement on resume', async (t) => {
+  const records = await workRecords();
+  const concept = { ...issue(10, ['In progress']), kind: 'concept', labels: ['concept'] } as Item;
+  const build = { ...issue(11, ['Ready']), labels: ['feature', 'build'], parent: { repo: REPO, number: 10 }, blockers: [{ repo: REPO, number: 12, state: 'open' }] } as Item;
+  const unpicked = { ...issue(12, ['Ready']), labels: ['build'], parent: { repo: REPO, number: 10 } } as Item;
+  const { source } = issuesSource([concept, build, unpicked]);
+  const answer = done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 11 }, { number: 10 }] }, records, readsOf(t, source)));
+  const conceptRecord = records.list({}).find(r => r.ticket === `${REPO}#10`)!;
+  const buildRecord = records.list({}).find(r => r.ticket === `${REPO}#11`)!;
+  assert.equal(records.body(conceptRecord.workId, 'map'), 'Text of 10');
+  assert.equal(records.body(buildRecord.workId, 'brief'), 'Text of 11');
+  assert.equal(buildRecord.kind, 'build');
+  assert.equal(records.read(buildRecord.workId).parentId, conceptRecord.workId);
+  assert.equal(records.list({}).length, 2, 'the unpicked open child stays off the board');
+  assert.deepEqual(records.blockers(buildRecord.workId), [], 'an unpicked blocker is not imported implicitly');
+  records.setBody(conceptRecord.workId, records.read(conceptRecord.workId).revision, 'map', 'Locally edited map');
+  records.setBody(buildRecord.workId, records.read(buildRecord.workId).revision, 'brief', 'Locally edited brief');
+  done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 10 }, { number: 11 }] }, records, readsOf(t, source)));
+  assert.equal(records.body(conceptRecord.workId, 'map'), 'Locally edited map');
+  assert.equal(records.body(buildRecord.workId, 'brief'), 'Locally edited brief');
+  assert.equal(answer.refused.length, 0);
+});
+
+test('selected concepts recover closed native history without picking unrelated open work or overwriting recovered state', async (t) => {
+  const records = await workRecords();
+  const concept = { ...issue(10, ['In progress']), kind: 'concept', labels: ['concept'] } as Item;
+  const { source } = issuesSource([concept, issue(11, ['Ready'])]);
+  source.legacyChildren = async () => [
+    { number: 20, title: 'Completed build', text: 'Build brief', url: '', kind: 'feature', labels: ['build', 'status-verify'], state: 'closed', notPlanned: false, mergedPr: `${REPO}#30` },
+    { number: 21, title: 'Completed decision', text: 'Decision text', url: '', kind: 'feature', labels: ['decision-grill'], state: 'closed', notPlanned: false },
+  ];
+  const reads = readsOf(t, source, [{ id: 'historical-decision-thread', messages: [`$lar-shape ${REPO}#21`] }]);
+  const answer = done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 10 }] }, records, reads));
+  assert.deepEqual(answer.refused, []);
+  const parent = records.list({}).find(r => r.ticket === `${REPO}#10`)!;
+  const children = records.children(parent.workId);
+  assert.equal(children.length, 2);
+  const build = children.find(r => r.kind === 'build')!;
+  const decision = children.find(r => r.kind === 'decision')!;
+  assert.equal(records.body(build.workId, 'brief'), 'Build brief');
+  assert.equal(records.body(decision.workId, 'decision'), 'Decision text');
+  assert.deepEqual(records.threads(decision.workId).map(thread => thread.threadId), ['historical-decision-thread']);
+  assert.equal(records.completion(build.workId).complete, true, 'a real merged PR observation completes the historical build');
+  assert.equal(records.completion(decision.workId).complete, false, 'ticket closure does not invent a confirmed answer');
+  assert.match(decision.needsYou!, /Confirm its decision completion/);
+  assert.equal(records.list({}).some(r => r.ticket === `${REPO}#11`), false);
+  records.setBody(decision.workId, decision.revision, 'decision', 'Local decision refinement');
+  const before = records.list({}).length;
+  done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 10 }] }, records, reads));
+  assert.equal(records.list({}).length, before);
+  assert.equal(records.body(decision.workId, 'decision'), 'Local decision refinement');
+});
+
+test('a historical part read failure is reported while preserving the imported concept', async (t) => {
+  const records = await workRecords();
+  const concept = { ...issue(10, ['In progress']), kind: 'concept', labels: ['concept'] } as Item;
+  const { source } = issuesSource([concept]);
+  source.legacyChildren = async () => { throw Error('permission refused'); };
+  const answer = done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 10 }] }, records, readsOf(t, source)));
+  assert.equal(answer.imported.length, 1);
+  assert.match(answer.refused[0]!.reason, /closed parts could not all be restored.*permission refused/);
+  assert.equal(records.body(answer.imported[0]!.workId, 'map'), 'Text of 10');
+});
+
+test('historical resume fills absent PR facts while preserving completed decisions and locally removed parent links', async (t) => {
+  const records = await workRecords();
+  const concept = { ...issue(10, ['In progress']), kind: 'concept', labels: ['concept'] } as Item;
+  const { source } = issuesSource([concept]);
+  source.legacyChildren = async () => [
+    { number: 20, title: 'Build', text: 'Provider brief', url: '', kind: 'feature', labels: ['build'], state: 'closed', notPlanned: false, mergedPr: `${REPO}#30` },
+    { number: 21, title: 'Decision', text: 'Provider decision', url: '', kind: 'feature', labels: ['decision-grill'], state: 'closed', notPlanned: false },
+  ];
+  const reads = readsOf(t, source);
+  const first = done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 10 }] }, records, reads));
+  const parent = records.read(first.imported[0]!.workId);
+  const decision = records.children(parent.workId).find(record => record.kind === 'decision')!;
+  records.setBody(decision.workId, decision.revision, 'answer', 'Confirmed local answer');
+  records.setBody(decision.workId, records.read(decision.workId).revision, 'domain-drafts', 'Local domain drafts');
+  await new Promise(resolve => setTimeout(resolve, 2));
+  records.setBody(parent.workId, records.read(parent.workId).revision, 'map', 'Locally repaired map');
+  records.clearNeedsYou(decision.workId, records.read(decision.workId).revision);
+  assert.equal(records.completion(decision.workId).complete, true);
+  records.clearParent(decision.workId, records.read(decision.workId).revision);
+  const partial = records.importTicket({ title: 'Partial build', repository: REPO, kind: 'build', status: 'Verify', ticket: `${REPO}#22`, context: 'Original partial brief' }).record;
+  records.setBody(partial.workId, partial.revision, 'brief', 'Local partial brief');
+  records.setPullRequest(partial.workId, records.read(partial.workId).revision, `${REPO}#32`);
+  records.recordReadFailure(partial.workId, records.read(partial.workId).revision, 'pr', 'provider unavailable');
+  const previouslyOpen = records.children(parent.workId).find(record => record.kind === 'build')!;
+  records.observe(previouslyOpen.workId, previouslyOpen.revision, { of: 'pr', state: 'open' });
+  const history = source.legacyChildren;
+  source.legacyChildren = async (repo, number) => [...await history(repo, number),
+    { number: 22, title: 'Partial build', text: 'Later provider edit', url: '', kind: 'feature', labels: ['build'], state: 'closed', notPlanned: false, mergedPr: `${REPO}#32` }];
+  done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 10 }] }, records, reads));
+  assert.equal(records.read(decision.workId).parentId, null, 'a local removal is not undone');
+  assert.equal(records.read(decision.workId).needsYou, null);
+  assert.equal(records.body(decision.workId, 'answer'), 'Confirmed local answer');
+  assert.equal(records.body(decision.workId, 'domain-drafts'), 'Local domain drafts');
+  assert.equal(records.body(parent.workId, 'map'), 'Locally repaired map');
+  assert.equal(records.body(partial.workId, 'brief'), 'Local partial brief');
+  assert.equal(records.read(partial.workId).pullRequest, `${REPO}#32`);
+  assert.equal(records.completion(partial.workId).complete, true);
+  assert.equal(records.observations(partial.workId).find(observation => observation.of === 'pr')?.failure, null);
+  assert.equal(records.completion(previouslyOpen.workId).complete, true, 'a fresh confirmed merge replaces an older open observation');
+});
+
+test('failed imported relationships roll back refinement and resume restores the body and edges together', async (t) => {
+  const records = await workRecords();
+  const concept = { ...issue(10, ['In progress']), kind: 'concept', labels: ['concept'] } as Item;
+  const first = records.importTicket({ title: 'Build', repository: REPO, kind: 'build', ticket: `${REPO}#11`, context: 'Captured brief' }).record;
+  const blocking = records.importTicket({ title: 'Blocker', repository: REPO, kind: 'build', ticket: `${REPO}#12` }).record;
+  records.addBlocker(blocking.workId, blocking.revision, first.workId);
+  const child = { ...issue(11, ['Ready']), labels: ['build'], parent: { repo: REPO, number: 10 }, blockers: [{ repo: REPO, number: 12 }] } as Item;
+  const { source } = issuesSource([concept, child]);
+  const reads = readsOf(t, source);
+  const failed = done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 10 }, { number: 11 }] }, records, reads));
+  assert.match(failed.refused.find(refused => refused.number === 11)!.reason, /would make a cycle/);
+  assert.equal(records.body(first.workId, 'brief'), null);
+  assert.equal(records.read(first.workId).parentId, null);
+  assert.deepEqual(records.blockers(first.workId), []);
+  records.removeBlocker(blocking.workId, records.read(blocking.workId).revision, first.workId);
+  const resumed = done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 11 }] }, records, reads));
+  assert.deepEqual(resumed.refused, []);
+  assert.equal(records.body(first.workId, 'brief'), 'Captured brief');
+  assert.equal(records.read(first.workId).parentId, records.list({}).find(record => record.ticket === `${REPO}#10`)!.workId);
+  assert.deepEqual(records.blockers(first.workId).map(record => record.workId), [blocking.workId]);
+});
+
+test('an unsupported provider reports missing closed history even when an open child was picked', async (t) => {
+  const records = await workRecords();
+  const concept = { ...issue(10, ['In progress']), kind: 'concept', labels: ['concept'], subIssues: { total: 2, completed: 1 } } as Item;
+  const child = { ...issue(11, ['Ready']), labels: ['build'], parent: { repo: REPO, number: 10 } } as Item;
+  const { source } = issuesSource([concept, child]);
+  const answer = done(await importTickets({ repo: REPO, itemSource: ISSUES, tickets: [{ number: 10 }, { number: 11 }] }, records, readsOf(t, source)));
+  assert.match(answer.refused.find(refused => refused.number === 10)!.reason, /cannot yet restore all closed historical parts/);
+  assert.equal(records.children(answer.imported[0]!.workId).length, 1);
+});
+
+test('Azure import surfaces missing closed history when the concept also has a selected open build', async (t) => {
+  const records = await workRecords();
+  const az = fakeAz({ items: [
+    { id: 10, type: 'User Story', state: 'Active', tags: 'concept; status-in-progress; repo-lar-api', description: '## Destination\nExisting map' },
+    { id: 11, type: 'Task', state: 'New', tags: 'build; status-ready; repo-lar-api', parent: 10, description: 'Open build brief' },
+    { id: 12, type: 'Task', state: 'Closed', tags: 'build; status-verify; repo-lar-api', parent: 10, description: 'Closed build brief' },
+  ], backlog: [10], sprint: [10, 11, 12] });
+  const source = azureBoard([AZURE], TEAM.team, az.run);
+  const answer = done(await importTickets({ repo: AZURE, itemSource: TEAM, tickets: [{ number: 10 }, { number: 11 }] }, records, readsOf(t, source)));
+  assert.match(answer.refused.find(refused => refused.number === 10)!.reason, /cannot yet restore all closed historical parts/);
+  const parent = records.list({}).find(record => record.ticket === `${AZURE}#10`)!;
+  assert.equal(records.children(parent.workId).length, 1);
+  assert.equal(records.body(parent.workId, 'map'), '## Destination\nExisting map');
+});

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DONE_WINDOW_MS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey } from '@lar-factory/shared';
 import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
-import type { TicketObservation } from '../items/item-source.ts';
+import type { LegacyChild, TicketObservation } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -624,6 +624,38 @@ export async function readIssue(repo: string, number: number, run: (args: string
   }
   if (issue.state !== 'OPEN') return null;
   return { number: issue.number, title: issue.title, url: issue.url, text: issue.body, kind: labelKind(issue.labels.map((l) => l.name)) };
+}
+
+/** Closed native parts preserve a selected concept's history without picking its unselected open work. */
+export async function legacyIssueChildren(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<LegacyChild[]> {
+  const pages = JSON.parse(await run(['api', '--paginate', '--slurp', `repos/${repo}/issues/${number}/sub_issues?per_page=100`])) as {
+    number: number; title: string; html_url: string; body: string | null; state: string; state_reason: string | null; labels: { name: string }[];
+  }[][];
+  const children: LegacyChild[] = [];
+  for (const child of pages.flat()) {
+    const labels = child.labels.map(label => label.name);
+    if (child.state !== 'closed' || !labels.some(label => label === 'build' || label.startsWith('decision-'))) continue;
+    if (child.html_url.toLowerCase() !== `https://github.com/${repo}/issues/${child.number}`.toLowerCase()) {
+      throw new Error(`A closed part belongs to another repository (${child.html_url}); pick that repository's work separately.`);
+    }
+    const part: LegacyChild = { number: child.number, title: child.title, url: child.html_url, text: child.body ?? '', kind: labelKind(labels), labels,
+      state: 'closed', notPlanned: child.state_reason === 'not_planned' };
+    if (labels.includes('build') && !part.notPlanned) {
+      const closing = JSON.parse(await run(['issue', 'view', String(child.number), '-R', repo, '--json', 'closedByPullRequestsReferences'])) as {
+        closedByPullRequestsReferences: { url: string }[];
+      };
+      if (closing.closedByPullRequestsReferences.length === 1) {
+        const url = closing.closedByPullRequestsReferences[0]!.url;
+        const pr = JSON.parse(await run(['pr', 'view', url, '--json', 'state,url'])) as { state: string; url: string };
+        if (pr.state === 'MERGED') {
+          const matched = pr.url.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)$/);
+          if (matched) part.mergedPr = `${matched[1]}#${matched[2]}`;
+        }
+      }
+    }
+    children.push(part);
+  }
+  return children;
 }
 
 /** An issue's state and assignees as a work record observes them; not-found when `repo` has no issue `number`. */

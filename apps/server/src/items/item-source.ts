@@ -65,6 +65,14 @@ export const ticketNumberOf = (query: string): number | null => (/^#?\d+$/.test(
 /** A ticket as its provider shows it now: open or closed with its assignees, or a confirmed not-found. */
 export type TicketObservation = Omit<Extract<NewObservation, { of: 'ticket' }>, 'of'>;
 
+/** Closed native parts read only during legacy onboarding import, never ordinary ticket picking. */
+export interface LegacyChild extends PickedTicket {
+  state: 'closed';
+  labels: string[];
+  notPlanned: boolean;
+  mergedPr?: string;
+}
+
 export interface ItemSource {
   /** What a read reports for this source; absent for a source its repositories name, as the merged source then does. */
   name?: string;
@@ -93,6 +101,8 @@ export interface ItemSource {
   searchTickets(repo: string, query: string): Promise<TicketMatch[]>;
   /** One of `repo`'s open tickets as a pick reads it; null when it has none open with that number. Throws when the provider can't answer. */
   readTicket(repo: string, number: number): Promise<PickedTicket | null>;
+  /** Closed native decision/build parts of a selected legacy concept, with their original text. */
+  legacyChildren?(repo: string, number: number): Promise<LegacyChild[]>;
   /** One of `repo`'s tickets, open or not, as a work record observes it. Throws when the provider can't answer. */
   observeTicket(repo: string, number: number): Promise<TicketObservation>;
   /** Closes the item's ticket once the user confirms Abandon's close: the error to show, or null when the provider accepted it. */

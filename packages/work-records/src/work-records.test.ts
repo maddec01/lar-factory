@@ -805,3 +805,27 @@ describe('work-record retention', () => {
     expect(records.list({})).toEqual([]);
   });
 });
+
+it('restores imported refinement and relationships atomically and preserves later local removals', async () => {
+  const records = await open();
+  const concept = records.create({ title: 'Concept', repository: 'team/repo', kind: 'concept' });
+  const build = records.create({ title: 'Build', repository: 'team/repo', kind: 'build' });
+  const blocker = records.create({ title: 'Blocker', repository: 'team/repo', kind: 'build' });
+  expect(() => records.restoreImported(build.workId, build.revision, { body: 'brief', markdown: 'Imported brief', parentId: concept.workId, blockerIds: [blocker.workId, 'missing'] })).toThrow();
+  expect(records.body(build.workId, 'brief')).toBe(null);
+  expect(records.read(build.workId)).toEqual(build);
+  expect(records.children(concept.workId)).toEqual([]);
+  expect(records.blockers(build.workId)).toEqual([]);
+  const restored = records.restoreImported(build.workId, build.revision, { body: 'brief', markdown: 'Imported brief', parentId: concept.workId, blockerIds: [blocker.workId] });
+  expect(records.body(build.workId, 'brief')).toBe('Imported brief');
+  expect(restored.parentId).toBe(concept.workId);
+  expect(records.blockers(build.workId).map(record => record.workId)).toEqual([blocker.workId]);
+  records.clearParent(build.workId, restored.revision);
+  records.removeBlocker(build.workId, records.read(build.workId).revision, blocker.workId);
+  records.setBody(build.workId, records.read(build.workId).revision, 'brief', 'Local brief');
+  const before = records.read(build.workId);
+  expect(records.restoreImported(build.workId, before.revision, { body: 'brief', markdown: 'Provider edit', parentId: concept.workId, blockerIds: [blocker.workId] })).toEqual(before);
+  expect(records.body(build.workId, 'brief')).toBe('Local brief');
+  expect(records.read(build.workId).parentId).toBe(null);
+  expect(records.blockers(build.workId)).toEqual([]);
+});

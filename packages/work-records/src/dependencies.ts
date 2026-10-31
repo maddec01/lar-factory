@@ -173,6 +173,8 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
   /** Why retention keeps the due record: it holds an unmet Dependency or one blocking a record that isn't due, or an
    * unmet Dependency blocks it. Null when no Dependency needs it. */
   retentionReason(workId: string, due: (workId: string) => boolean): string | null;
+  /** Records the ticket that received the Dependency's request, inside the caller's write. Bumps it and its holder. */
+  recordDependencyTicket(dependencyId: string, ticket: string): void;
 } {
   const { db } = database;
   const select = db.prepare('SELECT * FROM dependencies WHERE dependency_id = ?');
@@ -245,6 +247,12 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
     updatedAt: row.updated_at,
   });
 
+  /** Writes `patch` over `row`, bumping it. */
+  const save = (row: Row, patch: Partial<Row>) => {
+    const next = { ...row, ...patch, revision: row.revision + 1, updated_at: new Date().toISOString() };
+    updateRow.run(next.need, next.owner, next.contract, next.evidence, next.ticket, next.pull_requests, next.handover, next.met_by, next.met_at,
+      next.needs_review_at, next.replaced_by, next.revision, next.updated_at, row.dependency_id, row.revision);
+  };
   /** Applies `apply` to the Dependency at `revision`, bumping it; throws when it moved on. */
   const change = (dependencyId: string, revision: number, apply: (row: Row) => Partial<Row>): Dependency => database.write(() => {
     const expected = checkRevision(revision);
@@ -252,11 +260,18 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
     if (row.revision !== expected) {
       throw new WorkRecordError('stale-revision', `The Dependency ${dependencyId} is at revision ${row.revision}, not ${expected}; read it again and retry.`);
     }
-    const next = { ...row, ...apply(row), revision: row.revision + 1, updated_at: new Date().toISOString() };
-    updateRow.run(next.need, next.owner, next.contract, next.evidence, next.ticket, next.pull_requests, next.handover, next.met_by, next.met_at,
-      next.needs_review_at, next.replaced_by, next.revision, next.updated_at, dependencyId, expected);
+    save(row, apply(row));
     return fromRow(find(dependencyId));
   });
+  /** Drops the observations of a ticket or PR that `row` with `patch` no longer names, and returns `patch`. */
+  const keepNamed = (row: Row, patch: Partial<Row>): Partial<Row> => {
+    const next = { ...row, ...patch };
+    const named = new Set([next.ticket, ...JSON.parse(next.pull_requests) as string[]]);
+    for (const observation of observationRows.all(row.dependency_id, '')) {
+      if (!named.has(String(observation.subject))) deleteObservation.run(row.dependency_id, String(observation.subject));
+    }
+    return patch;
+  };
   /** The build `buildId`, checked to be a build. */
   const findBuild = (buildId: string): RecordRow => {
     const build = findRecord(buildId);
@@ -304,14 +319,7 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
       if (update.handover !== undefined) patch.handover = checkText(update.handover, 'handover');
       if (update.ticket !== undefined) patch.ticket = update.ticket === null ? null : checkReference(update.ticket, 'ticket');
       if (update.pullRequests !== undefined) patch.pull_requests = JSON.stringify(checkPullRequests(update.pullRequests));
-      return change(dependencyId, revision, (row) => {
-        const next = { ...row, ...patch };
-        const named = new Set([next.ticket, ...JSON.parse(next.pull_requests) as string[]]);
-        for (const observation of observationRows.all(dependencyId, '')) {
-          if (!named.has(String(observation.subject))) deleteObservation.run(dependencyId, String(observation.subject));
-        }
-        return patch;
-      });
+      return change(dependencyId, revision, (row) => keepNamed(row, patch));
     },
     addDependencyBlock: (dependencyId, revision, buildId) => change(dependencyId, revision, (row) => {
       findBuild(buildId);
@@ -374,6 +382,12 @@ export function dependencyRecords(database: Database, bump: (workId: string) => 
     kindConflict: (buildId) => {
       const block = blockingRow.get(buildId);
       return block ? `The build ${buildId} is blocked by the Dependency ${String(block.dependency_id)}, so it stays a build.` : null;
+    },
+    recordDependencyTicket: (dependencyId, ticket) => {
+      const row = find(dependencyId);
+      if (row.ticket === ticket) return;
+      save(row, keepNamed(row, { ticket: checkReference(ticket, 'ticket') }));
+      bump(row.work_id);
     },
     retentionReason: (workId, due) => {
       const owned = ownedRows.all(workId) as unknown as Row[];

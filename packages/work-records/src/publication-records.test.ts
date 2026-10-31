@@ -484,7 +484,7 @@ it('keeps projection query cost constant as briefs and publication history grow'
     const measured = publicationRecords({ ...database, db: new Proxy(database.db, { get(target, key) {
       if (key === 'prepare') return (sql: string) => { queries.push(sql); return target.prepare(sql); };
       return Reflect.get(target, key);
-    } }) }, (id) => records.read(id));
+    } }) }, (id) => records.read(id), () => {});
     const build = await passingBuild(records);
     measured.publicationSummaries();
     const smallQueries = queries.splice(0).length;

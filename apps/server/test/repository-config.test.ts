@@ -29,7 +29,7 @@ test('each onboarded repository reads its items from the item source its .lar-fa
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(data.error, null);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]), [[FACTORY, 1, 'Queued'], [APPLE, 7, 'Queued'], [FACTORY, 2, 'List']], 'Queued work comes first, in Queue order');
-  assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'issues', show: 'all', labels: [], version: 1 },
+  assert.deepEqual(data.repos.map(({ setup: _, ...row }) => row), [{ repo: FACTORY, role: 'The factory', items: 'issues', show: 'all', labels: [], version: 1 },
     { repo: APPLE, role: 'Apple client', items: 'issues', show: 'opted-in', labels: ['app: music'], version: 1 }]);
 });
 
@@ -86,7 +86,7 @@ test('a change to a .lar-factory.json shows on the next refresh, and the board s
   await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } } });
   const data: BoardData = await until(board, (d) => d.repos[0]?.show === 'all');
   assert.deepEqual(data.items.map((i) => i.number), [1], 'an issue with no work record stays off the board');
-  assert.deepEqual(data.repos, [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all', labels: [], version: 1 }]);
+  assert.deepEqual(data.repos.map(({ setup: _, ...row }) => row), [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all', labels: [], version: 1 }]);
 });
 
 test('a repository without a .lar-factory.json is on the board from its local settings', async (t) => {
@@ -120,13 +120,17 @@ test("the config update notice's Dismiss refuses a repository off this Mac's lis
   assert.deepEqual([response.status, await response.json()], [409, { error: `${APPLE} is not on this Mac's list.` }]);
 });
 
-test("Edit's Save shows the Edit PR on the repository's row at once", async (t) => {
-  const board = await startBoard(t, { repositories: [FACTORY], items: [boardIssue(1, 'Queued', FACTORY)], files: ['.lar-factory.json'] });
-  await until(board, (d) => d.fetchedAt !== null);
-  const config = { itemSource: { kind: 'issues' }, show: 'all', role: 'The factory', labels: [] };
-  const response = await board.post({ repo: FACTORY, config }, board.url, '/api/repositories/config/pr');
-  const { prUrl, board: data } = await response.json() as { prUrl: string; board: BoardData };
+test("a local override shows on the repository's row at once, and a shared domain-doc change pauses work until accepted", async (t) => {
+  const options = { repositories: [FACTORY], repoConfigs: { [FACTORY]: { role: 'The factory', itemSource: LAR } as unknown }, items: [boardIssue(1, 'Queued', FACTORY)] };
+  const board = await startBoard(t, options, false, true);
+  await until(board, (d) => d.items.length === 1);
+  const response = await board.post({ repo: FACTORY, change: 'override', key: 'role', value: 'My factory' }, board.url, '/api/repositories/settings');
+  const { board: data } = await response.json() as { board: BoardData };
   assert.equal(response.status, 200);
-  assert.match(prUrl, /\/pull\/\d+$/);
-  assert.equal(data.repos.find((r) => r.repo === FACTORY)?.editPr, prUrl);
+  assert.deepEqual([data.repos[0]?.setup?.role, data.repos[0]?.setup?.sources.role], ['My factory', 'local']);
+  await board.update({ ...options, repoConfigs: { [FACTORY]: { role: 'The factory', itemSource: LAR, domainDocs: { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' } } } });
+  const paused = await until(board, (d) => !!d.items[0]?.paused);
+  assert.deepEqual(paused.repos[0]?.setup?.paused, ['domainDocs']);
+  await board.post({ repo: FACTORY, change: 'accept' }, board.url, '/api/repositories/settings');
+  await until(board, (d) => d.items.length === 1 && !d.items[0]!.paused);
 });

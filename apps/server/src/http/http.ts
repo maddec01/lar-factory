@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
@@ -73,6 +73,8 @@ export interface HttpDeps {
   openConfigUpdatePr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
   /** Records the repository's config update notice dismissed at the app's version, on this Mac, or says why it can't for a repository that isn't onboarded. */
   dismissConfigUpdate(repo: string): Refused | null;
+  /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
+  changeRepositorySettings(input: Record<string, unknown>): { setup: RepositorySetup } | Refused;
 }
 
 export interface BoardServer {
@@ -148,7 +150,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
-  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -389,6 +391,17 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         const refused = dismissNotice(repo);
         if (refused) return { status: refused.status, body: { error: refused.error } };
         return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+    // The row shows the new setup at once; the read after it shows what the setup changes, such as paused work.
+    '/api/repositories/settings': {
+      what: 'the repository and the change to its settings', disabled: 'Sample mode changes no repository settings.',
+      async run(input) {
+        const changed = changeRepositorySettings(input);
+        if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
+        changeRow(input.repo as string, (r) => ({ ...r, setup: changed.setup }));
+        readSoon();
+        return { status: 200, body: withBoard({ ...changed, error: null }) };
       },
     },
     // Looks the tools up again for the notices' Recheck button and onboarding's detection.

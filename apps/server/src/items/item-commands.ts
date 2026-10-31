@@ -374,7 +374,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
 
   /**
    * Starts the item's thread for `record` through `ask`, guarded by its work record: a held or unresolved start answers
-   * for it, Needs you refuses it, and a launch intent is on the record before `ask` runs. Without records, `ask` alone.
+   * for it, Needs you and a paused setup refuse it, and a launch intent is on the record before `ask` runs. Without records, `ask` alone.
    */
   async function launch(item: Item, record: StartRecord, projectId: string, message: string, ask: () => Promise<StartResult>,
     prepare: () => void = () => {}): Promise<Start> {
@@ -384,6 +384,8 @@ export function createItemCommands({ board, items, records, reread, archive, off
     if (unresolved) return settle(item, unresolved, projectId, message);
     const needsYou = records.read(item.id).needsYou;
     if (needsYou) return { thread: null, error: `Needs you: ${needsYou}`, refused: true };
+    const paused = (board.find(item.id) ?? item).paused;
+    if (paused) return { thread: null, error: `Paused: ${paused}`, refused: true };
     // A build whose PR closed unmerged starts a replacement, so the thread that opened that PR holds no start.
     const held = record === 'startedBuilds' && prClosed(item.id) ? null : heldThread(board.find(item.id) ?? item, purpose);
     const shown = board.snapshot()[record]?.[item.id];

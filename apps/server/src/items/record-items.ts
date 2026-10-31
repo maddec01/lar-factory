@@ -3,7 +3,7 @@
 // PRs and provider fields, so a ticket edit never moves, retitles, restructures or blocks work.
 
 import { parseConceptMap, refKey, sameRepo } from '@lar-factory/shared';
-import type { Blocker, IssueRef, Item, NeedsYouOffer, Slice, SliceProgress } from '@lar-factory/shared';
+import type { Blocker, IssueRef, Item, NeedsYouOffer, RepositorySetup, Slice, SliceProgress } from '@lar-factory/shared';
 import type { WorkRecord, WorkRecords } from '@lar-factory/work-records';
 
 /** The number in a ticket reference, `owner/name#12`. */
@@ -16,15 +16,6 @@ function sliceProgress(record: WorkRecord): SliceProgress {
   if (isDone(record) || record.finishedAt) return 'done';
   if (record.needsYou) return 'blocked';
   return record.status === 'In progress' ? 'active' : 'waiting';
-}
-
-/** The ticket items an item source read, by their lowercase reference, `owner/name#12`, in each repository that lists them. */
-export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> {
-  const byTicket = new Map<string, Item>();
-  for (const ticket of tickets) {
-    for (const repo of [ticket.repo, ...ticket.untaggedFor ?? []]) byTicket.set(refKey(repo, ticket.number).toLowerCase(), ticket);
-  }
-  return byTicket;
 }
 
 /**
@@ -43,8 +34,33 @@ function needsYouOf(records: WorkRecords, record: WorkRecord): Item['needsYou'] 
   return { reason: record.needsYou, offers: [...offers] };
 }
 
-/** Maps records to board items with the ticket items an item source read. */
-function itemMapper(records: WorkRecords, tickets: readonly Item[]) {
+/** Each repository's settings that changed since the user last accepted its setup. */
+type Paused = readonly Pick<RepositorySetup, 'repo' | 'paused'>[];
+
+/**
+ * Why the record waits for its repository's changed setup to be accepted: an item-source change holds work with a
+ * ticket, and a domain-doc-location change holds all work not Done. Undefined when no change affects it.
+ */
+function pausedOf(record: WorkRecord, paused: Paused): string | undefined {
+  const changed = paused.find((p) => sameRepo(p.repo, record.repository))?.paused ?? [];
+  const what = [
+    ...changed.includes('itemSource') && record.ticket !== null && !isDone(record) ? ['item source'] : [],
+    ...changed.includes('domainDocs') && !isDone(record) ? ['domain-doc location'] : [],
+  ];
+  return what.length ? `Its repository's ${what.join(' and ')} changed. Accept the change in Settings › Repositories to go on.` : undefined;
+}
+
+/** The ticket items an item source read, by their lowercase reference, `owner/name#12`, in each repository that lists them. */
+export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> {
+  const byTicket = new Map<string, Item>();
+  for (const ticket of tickets) {
+    for (const repo of [ticket.repo, ...ticket.untaggedFor ?? []]) byTicket.set(refKey(repo, ticket.number).toLowerCase(), ticket);
+  }
+  return byTicket;
+}
+
+/** Maps records to board items with the ticket items an item source read, each paused as `paused` says. */
+function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paused = []) {
   const byTicket = ticketsByReference(tickets);
   const ticketOf = (record: WorkRecord) => (record.ticket ? byTicket.get(record.ticket.toLowerCase()) : undefined);
   const ref = (record: WorkRecord): IssueRef => ({ number: ticketNumber(record.ticket), title: record.title, url: ticketOf(record)?.url ?? '',
@@ -85,6 +101,8 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[]) {
       slices,
     };
     if (map) item.map = map;
+    const pause = pausedOf(record, paused);
+    if (pause) item.paused = pause;
     const needsYou = needsYouOf(records, record);
     if (needsYou) item.needsYou = needsYou;
     return item;
@@ -98,11 +116,12 @@ const listed = (record: WorkRecord, repos: readonly string[]) => record.kind !==
 /**
  * Every board item from the records of `repos`, in the records' order, with the ticket items an item source read,
  * less set-aside work and the work IDs in `hidden`, which retention hides. In a repository of `unread`, whose source
- * hasn't read yet, a record with a ticket waits until its ticket is read.
+ * hasn't read yet, a record with a ticket waits until its ticket is read. Work a repository's changed setup in `paused`
+ * affects says why it waits.
  */
 export function recordItems(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[] = [],
-  hidden: ReadonlySet<string> = new Set()): Item[] {
-  const { ticketOf, toItem } = itemMapper(records, tickets);
+  hidden: ReadonlySet<string> = new Set(), paused: Paused = []): Item[] {
+  const { ticketOf, toItem } = itemMapper(records, tickets, paused);
   const waits = (record: WorkRecord) => record.ticket !== null && !ticketOf(record) && unread.some((repo) => sameRepo(repo, record.repository));
   return records.list({}).filter((r) => !r.setAside && !hidden.has(r.workId) && listed(r, repos) && !waits(r)).map(toItem);
 }

@@ -96,10 +96,11 @@ function EditDescription({ body, format, edit, fill }: { body: string; format: T
 const RELOAD_FAILED = 'Saved; could not reload the details';
 
 /**
- * The description, or the loading state or the error that stands in for it. While `edit` is open the editor takes the
- * description's place, filling the height left when `fill`.
+ * The description, or the loading state or the error that stands in for it. Edit shows when `editable`, as this Mac
+ * lets the factory edit the repository's tickets. While `edit` is open the editor takes the description's place,
+ * filling the height left when `fill`.
  */
-export function ItemDescription({ read, edit, fill, ticketContext = false, className }: { read: ItemDetailsRead; edit: DescriptionEdit; fill: boolean; ticketContext?: boolean; className: string }) {
+export function ItemDescription({ read, edit, editable, fill, ticketContext = false, className }: { read: ItemDetailsRead; edit: DescriptionEdit; editable: boolean; fill: boolean; ticketContext?: boolean; className: string }) {
   if (read.state === 'loading') return <div className={className}><Loading /></div>;
   if (read.state === 'failed') return <p className={`m-0 text-sm text-(--error-foreground) ${className}`} role="alert">Could not load the details: {read.error}</p>;
   const { sections } = read.details;
@@ -111,7 +112,7 @@ export function ItemDescription({ read, edit, fill, ticketContext = false, class
         <h2 className="m-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)">{ticketContext ? 'Ticket description' : 'Description'}</h2>
         {!edit.editing && <span className="flex min-w-0 items-center gap-3">
           {edit.saved !== null && <span className="truncate text-xs text-(--muted-foreground)" role="status" title={RELOAD_FAILED}>{RELOAD_FAILED}</span>}
-          <Button {...kind('other')} leftIcon={<Pencil />} onClick={edit.start}>Edit</Button>
+          {editable && <Button {...kind('other')} leftIcon={<Pencil />} onClick={edit.start}>Edit</Button>}
         </span>}
       </div>
       {edit.editing

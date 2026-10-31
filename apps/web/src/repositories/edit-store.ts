@@ -1,10 +1,11 @@
 // Edit in Settings › Repositories: the onboarded repository whose settings it edits, and the text the user typed for
 // each setting. The setup itself comes from the board, so the dialog shows the latest read. Save posts one setting as a
-// local override, Use shared default removes it, Recheck access forgets what the credentials allowed, and Accept, on
-// the repository's row, accepts a changed item source or domain-doc location. The board sent back shows each change.
+// local override, Use shared default removes it, Recheck access forgets what the credentials allowed, Offer sets the
+// operations offered, and Accept, on the repository's row, accepts a changed item source or domain-doc location. The
+// board sent back shows each change.
 
 import { create } from 'zustand';
-import type { RepositorySetup, SharedRepositorySettings, SharedSetting } from '@lar-factory/shared';
+import { REPOSITORY_OPERATIONS, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings, type SharedSetting } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
 
 /** The text of each field the dialog edits, by field. */
@@ -57,8 +58,8 @@ export function canSave(key: SharedSetting, setup: RepositorySetup, typed: Parti
   return value !== null && JSON.stringify(value) !== JSON.stringify(setup[key]);
 }
 
-/** A call to the board: one setting's Save or removal, Recheck access, or Accept. */
-type Running = SharedSetting | 'recheck' | 'accept';
+/** A call to the board: one setting's Save or removal, Recheck access, Offer, or Accept. */
+type Running = SharedSetting | 'recheck' | 'consent' | 'accept';
 
 interface EditState {
   /** The repository whose dialog is open. */
@@ -73,6 +74,8 @@ interface EditState {
   save: (repo: string, key: SharedSetting, setup: RepositorySetup) => Promise<void>;
   useShared: (repo: string, key: SharedSetting) => Promise<void>;
   recheck: (repo: string) => Promise<void>;
+  /** Offers `op` or stops offering it, keeping the other operations the setup offers. */
+  offer: (repo: string, op: RepositoryOperation, on: boolean, setup: RepositorySetup) => Promise<void>;
   accept: (repo: string) => Promise<void>;
 }
 
@@ -100,6 +103,8 @@ export const useEditStore = create<EditState>()((set, get) => {
     },
     useShared: (repo, key) => call(repo, key, { change: 'override', key }, key),
     recheck: (repo) => call(repo, 'recheck', { change: 'recheck' }),
+    offer: (repo, op, on, setup) => call(repo, 'consent', { change: 'consent',
+      value: REPOSITORY_OPERATIONS.filter((o) => (o === op ? on : setup.consent.includes(o))) }),
     accept: (repo) => call(repo, 'accept', { change: 'accept' }),
   };
 });

@@ -5,7 +5,7 @@
 import { expect, test } from 'vite-plus/test';
 import { $, $$, detailsRead, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
 import { selectAll, selectEnd, typeInto } from '../../test/editor.ts';
-import type { BoardData, Item, ItemDetails } from '@lar-factory/shared';
+import type { BoardData, Item, ItemDetails, RepositorySetup } from '@lar-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
 const inDialog = <T extends Element = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
@@ -55,17 +55,22 @@ const typeAtEnd = async (text: string) => {
   await typeInto(editorArea()!, text);
 };
 
+/** The board with every repository letting the factory edit its tickets, as its Edit dialog's Offer does. */
+const allowEdits = (board: BoardData): BoardData =>
+  ({ ...board, repos: board.repos.map((r) => ({ ...r, setup: { consent: ['edit-ticket'] } as unknown as RepositorySetup })) });
+const editing = allowEdits(sample);
+
 /** An item of the sample re-pointed at an Azure DevOps repository, as a work item is. */
 const azureBoard = (): [BoardData, string] => {
   const id = 'azure:contoso/310';
   const item: Item = { ...sample.items[0]!, id, number: 310, repo: 'contoso/Fabrikam/web', url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/310', labels: ['bug'] };
-  return [{ ...sample, repos: [...sample.repos, { repo: item.repo!, role: 'Web client', items: 'azure-board', team: 'Web', show: 'all', labels: [] }], items: [item, ...sample.items.slice(1)] }, id];
+  return [allowEdits({ ...sample, repos: [...sample.repos, { repo: item.repo!, role: 'Web client', items: 'azure-board', team: 'Web', show: 'all', labels: [] }], items: [item, ...sample.items.slice(1)] }), id];
 };
 const github = sample.items[0]!.id;
 
 test('Edit shows once the details load, opens the editor on the description and focuses it', async () => {
-  serve(sample, { [github]: details('- one\n- two') });
-  await mountPage();
+  serve(editing, { [github]: details('- one\n- two') });
+  await mountPage(editing);
   await openItem(github);
   expect(editButton()).toBeDefined();
   const heading = description().querySelector('h2')!;
@@ -78,9 +83,17 @@ test('Edit shows once the details load, opens the editor on the description and 
   expect(buttonIn(description(), 'Save')!.disabled, 'nothing to save yet').toBe(true);
 });
 
+test("Edit is offered only while this Mac lets the factory edit the repository's tickets", async () => {
+  serve(sample, { [github]: details('Old text.') });
+  await mountPage(sample);
+  await openItem(github);
+  expect(text(description())).toContain('Old text.');
+  expect(editButton()).toBeUndefined();
+});
+
 test('Edit is not offered while the details load', async () => {
   fetchMock.mockImplementation(async (url: string) => (detailsRead(url) ? new Promise<Response>(() => {}) : new Response(JSON.stringify(sample))));
-  await mountPage();
+  await mountPage(editing);
   await openItem(github);
   expect(inDialog('[aria-busy="true"]')).not.toBeNull();
   expect([...dialog()!.querySelectorAll('button')].some((b) => text(b) === 'Edit')).toBe(false);
@@ -88,8 +101,8 @@ test('Edit is not offered while the details load', async () => {
 
 test('Save writes the new Markdown to the GitHub issue, reads the details again and shows the new text', async () => {
   const served = { [github]: details('Old text.') };
-  const board = serve(sample, served);
-  await mountPage();
+  const board = serve(editing, served);
+  await mountPage(editing);
   await openItem(github);
   await press(editButton());
   await typeAtEnd(' More.');
@@ -108,8 +121,8 @@ test('Save writes the new Markdown to the GitHub issue, reads the details again 
 
 test('a save whose reload fails shows the saved text, says so, and Edit opens on the saved text', async () => {
   const served: Record<string, ItemDetails> = { [github]: details('Old text.') };
-  const board = serve(sample, served);
-  await mountPage();
+  const board = serve(editing, served);
+  await mountPage(editing);
   await openItem(github);
   await press(editButton());
   await typeAtEnd(' More.');
@@ -135,8 +148,8 @@ test('a save whose reload fails shows the saved text, says so, and Edit opens on
 
 test('a save whose reload fails drops the cached details, so a reopen reads them again rather than showing the old text', async () => {
   const served: Record<string, ItemDetails> = { [github]: details('Old text.') };
-  const board = serve(sample, served);
-  await mountPage();
+  const board = serve(editing, served);
+  await mountPage(editing);
   await openItem(github);
   await press(editButton());
   await typeAtEnd(' More.');
@@ -155,8 +168,8 @@ test('a save whose reload fails drops the cached details, so a reopen reads them
 });
 
 test('Cancel closes the editor and writes nothing', async () => {
-  const board = serve(sample, { [github]: details('Old text.') });
-  await mountPage();
+  const board = serve(editing, { [github]: details('Old text.') });
+  await mountPage(editing);
   await openItem(github);
   await press(editButton());
   await typeAtEnd(' More.');
@@ -208,8 +221,8 @@ test('a failed save, such as an Azure conflict, keeps the editor open with the d
 });
 
 test('closing with unsaved changes asks "Discard changes?": Keep editing stays, Discard closes', async () => {
-  serve(sample, { [github]: details('Old text.') });
-  await mountPage();
+  serve(editing, { [github]: details('Old text.') });
+  await mountPage(editing);
   await openItem(github);
   await press(editButton());
   await typeAtEnd(' More.');
@@ -225,8 +238,8 @@ test('closing with unsaved changes asks "Discard changes?": Keep editing stays, 
 });
 
 test('Escape in the Link URL field closes the field, not the dialog', async () => {
-  serve(sample, { [github]: details('Old text.') });
-  await mountPage();
+  serve(editing, { [github]: details('Old text.') });
+  await mountPage(editing);
   await openItem(github);
   await press(editButton());
   await selectAll(editorArea()!);
@@ -240,8 +253,8 @@ test('Escape in the Link URL field closes the field, not the dialog', async () =
 });
 
 test('closing with the editor open but nothing changed closes at once', async () => {
-  serve(sample, { [github]: details('- one\n- two') });
-  await mountPage();
+  serve(editing, { [github]: details('- one\n- two') });
+  await mountPage(editing);
   await openItem(github);
   await press(editButton());
   await escape(editorArea()!);
@@ -250,8 +263,8 @@ test('closing with the editor open but nothing changed closes at once', async ()
 });
 
 test('the expand button and Ctrl+Shift+E grow the item dialog and back, the editor filling its height', async () => {
-  serve(sample, { [github]: details('Old text.') });
-  await mountPage();
+  serve(editing, { [github]: details('Old text.') });
+  await mountPage(editing);
   await openItem(github);
   const expand = () => inDialog<HTMLButtonElement>('button[data-expand]')!;
   await press(expand());

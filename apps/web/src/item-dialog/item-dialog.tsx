@@ -11,7 +11,7 @@
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, itemName, shortAgo } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, itemName, sameRepo, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -94,6 +94,8 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
   // Work with no ticket has no ticket text to show beside its record's.
   const ticket = !record || item.number > 0;
   const hint = carriesTwoStatuses(item) ? keepOneText(item.statuses) : HINTS[item.status];
+  // Saving a description writes the ticket, which waits on this Mac's consent to edit the repository's tickets.
+  const editable = data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.consent.includes('edit-ticket') ?? false;
   // The open editor in an expanded dialog takes the height the rest leaves.
   const fill = expanded && edit.editing;
   const rows = fill ? 'min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]' : aside ? '@min-[45rem]:grid-rows-[auto_1fr]' : '';
@@ -129,7 +131,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
           <ItemMeta item={item} read={read} now={now} />
           <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}>
             {record && <RecordText item={item} record={record} className="@min-[45rem]:col-start-1" />}
-            {ticket && <ItemDescription read={read} edit={edit} fill={fill} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}
+            {ticket && <ItemDescription read={read} edit={edit} editable={editable} fill={fill} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}
             {aside && (
               <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 @min-[45rem]:col-start-2 @min-[45rem]:row-span-2 @min-[45rem]:row-start-1 @min-[45rem]:border-l @min-[45rem]:border-(--border) @min-[45rem]:pl-6">
                 {waitsOn(item).length > 0 && <Section heading="Waits on"><ul className="m-0 grid list-none gap-1.5 p-0 text-sm" data-waits-on>

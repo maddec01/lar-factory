@@ -1,7 +1,7 @@
 // Edit in Settings › Repositories: the dialog shows each of the repository's settings with where it comes from, saves
 // a local override or removes it so the shared default applies again, says why a Repository config can't be used while
 // the last usable setup stays, and rechecks access. A changed item source or domain-doc location names the work it
-// pauses on the repository's row, with Accept.
+// pauses on the repository's row, with Accept. Offer sets the operations the factory offers, within the access found.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
@@ -12,7 +12,7 @@ const REPO = 'maddec01/lar-server';
 const SETUP: RepositorySetup = {
   repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, show: 'all', labels: ['area: server'],
   domainDocs: { kind: 'private' }, skills: [],
-  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused' },
+  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused' },
   consent: ['push-branch'], paused: [],
   sources: { role: 'shared', itemSource: 'default', show: 'default', labels: 'local', domainDocs: 'default', skills: 'default' },
   shared: { role: 'Backend API server', labels: ['area: web'] },
@@ -110,10 +110,24 @@ test('Recheck access forgets what the credentials allowed, after they changed', 
   const sent = serve(boardWith());
   await openEdit(boardWith());
   const access = $('[data-edit-dialog] [data-access]')!;
-  expect(text(access.querySelector('[data-operation="tag-ticket"]'))).toContain('Refused');
+  expect(text(access.querySelector('[data-operation="edit-ticket"]'))).toContain('Refused');
   expect(text(access.querySelector('[data-operation="push-branch"]'))).toContain('Allowed');
   await settle(() => buttonIn(access, 'Recheck access')!.click());
   expect(sent).toEqual([{ repo: REPO, change: 'recheck' }]);
+});
+
+test('Offer changes which operations the factory offers, and a refused one cannot be offered', async () => {
+  const sent = serve(boardWith());
+  await openEdit(boardWith());
+  const offer = (op: string) => $<HTMLInputElement>(`[data-edit-dialog] [data-operation="${op}"] input[type="checkbox"]`)!;
+  expect([offer('push-branch').checked, offer('open-pr').checked]).toEqual([true, false]);
+  expect(offer('edit-ticket').disabled, 'the credentials refuse it').toBe(true);
+  expect(['publish-ticket', 'tag-ticket'].map((op) => $(`[data-edit-dialog] [data-operation="${op}"]`)), 'publishing writes wait for a later build').toEqual([null, null]);
+  expect(text($('[data-edit-dialog] [data-access]'))).toContain('the first time you publish refined work');
+  await settle(() => offer('open-pr').click());
+  expect(sent).toEqual([{ repo: REPO, change: 'consent', value: ['push-branch', 'open-pr'] }]);
+  await settle(() => offer('push-branch').click());
+  expect(sent.at(-1)).toEqual({ repo: REPO, change: 'consent', value: [] });
 });
 
 test("a changed shared item source names the work it pauses on the repository's row, and Accept lets that work go on", async () => {

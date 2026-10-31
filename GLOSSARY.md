@@ -31,6 +31,21 @@ A brief that has passed the shaping gate and can be handed to a build thread.
 The check before a brief becomes Ready, combining a fresh-context doubt review
 with the user's answers to remaining assumptions or findings.
 
+**Publication**:
+Writing fully refined work to the team's tracker as tickets in the team's own
+terms, after the user approves the exact content. A concept publishes only
+once every decision is settled and every brief has passed the gate.
+_Avoid_: sync, export for publication
+
+**Handover**:
+The markdown the factory prepares for the user to post when their access cannot
+publish it, carrying the same content a published ticket would.
+
+**Vocabulary mapping**:
+A repository's local setting that pairs each factory term, concept, build and
+each kind, with the team's ticket types, labels or tags, or with nothing.
+_Avoid_: label mapping, type mapping
+
 **Concept**:
 Work too broad or unclear for a single brief, refined in its work record
 through decisions and builds. Once fully refined it can publish as a parent
@@ -103,6 +118,7 @@ _Avoid_: conflict
 
 **Kind**:
 The type of an item: bug, feature, improvement or concept, kept in its work record.
+Published tickets carry the team term the Vocabulary mapping pairs with it, if any.
 _Avoid_: type, work item type
 
 **Custom label**:

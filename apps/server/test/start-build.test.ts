@@ -202,7 +202,7 @@ for (const fail of ['killed', 'garbage']) {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { t3: { fail } });
     assert.equal((await (await startBuild(board, 'I_12')).json()).uncertain, true);
     assert.equal((await (await startBuild(board, 'I_12')).json()).uncertain, true);
-    assert.equal((await board.t3Calls()).length, 1);
+    assert.equal((await board.t3Calls()).filter(args => args[0] === 'thread' && args[1] === 'start').length, 1);
   });
 }
 

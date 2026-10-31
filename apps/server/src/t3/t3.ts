@@ -19,17 +19,20 @@ export interface NewWorktree {
  * `worktree`, `--worktree <base> --branch <branch>` runs the thread in a new worktree
  * instead of the project's folder.
  */
-export async function startThread(project: string, message: string, choice?: ModelChoice, worktree?: NewWorktree): Promise<StartResult> {
+export async function startThread(project: string, message: string, choice?: ModelChoice, worktree?: NewWorktree, run: T3Run = runT3): Promise<StartResult> {
   const model = choice ? ['--provider', choice.instanceId, '--model', choice.model] : [];
   const where = worktree ? ['--worktree', worktree.base, '--branch', worktree.branch] : [];
-  const command = toolCommand('t3');
   const missing = `${missingTool('t3')}. Install the T3 Code CLI or set T3_PATH.`;
-  if (!command) return { thread: null, error: missing };
-  const { code, stdout, detail } = await runTool(command.file, ['thread', 'start', project, message, ...model, ...where, '--json'], { env: command.env, timeout: 60_000 });
+  let result: RunResult;
+  try {
+    result = await run(['thread', 'start', project, message, ...model, ...where, '--json'], 60_000);
+  } catch {
+    return recoverStart(project, message, run);
+  }
+  const { code, stdout } = result;
   if (code === 'ENOENT') return { thread: null, error: missing };
-  // An exit code means t3 itself reported the failure; a signal (such as our timeout) leaves it unknown.
-  if (typeof code !== 'number') return UNCERTAIN;
-  if (code !== 0) return { thread: null, error: `t3 could not start the thread: ${detail}` };
+  // A failed command can have created a thread before losing its answer.
+  if (code !== 0) return recoverStart(project, message, run);
   try {
     const launched = JSON.parse(stdout) as { threadId?: unknown; title?: unknown };
     if (typeof launched.threadId !== 'string' || !launched.threadId) throw new Error('No thread id.');
@@ -37,8 +40,31 @@ export async function startThread(project: string, message: string, choice?: Mod
     const title = typeof launched.title === 'string' ? launched.title : message.split('\n')[0] ?? message;
     return { thread: { threadId: launched.threadId, title }, error: null };
   } catch {
-    return UNCERTAIN;
+    return recoverStart(project, message, run);
   }
+}
+
+/** List/show can recover a late launch; absence or ambiguity never permits a retry. */
+async function recoverStart(project: string, message: string, run: T3Run): Promise<StartResult> {
+  try {
+    const listed = await run(['thread', 'list', '--project', project, '--json'], 10_000);
+    if (listed.code !== 0) return UNCERTAIN;
+    const threads: unknown = JSON.parse(listed.stdout);
+    if (!Array.isArray(threads)) return UNCERTAIN;
+    const matches = [];
+    for (const thread of threads) {
+      if (!isRecord(thread) || typeof thread.threadId !== 'string') return UNCERTAIN;
+      if (thread.title !== message.split('\n')[0]) continue;
+      const shown = await run(['thread', 'show', thread.threadId, '--json', '--messages', '2147483647'], 10_000);
+      if (shown.code !== 0) return UNCERTAIN;
+      const answer: unknown = JSON.parse(shown.stdout);
+      if (!isRecord(answer) || !isRecord(answer.thread) || answer.thread.threadId !== thread.threadId || !Array.isArray(answer.messages)) return UNCERTAIN;
+      const first = answer.messages.find(entry => isRecord(entry) && entry.role === 'user');
+      if (isRecord(first) && first.text === message) matches.push({ threadId: thread.threadId, title: String(thread.title) });
+    }
+    if (matches.length === 1) return { thread: matches[0]!, error: null };
+  } catch { /* Keep duplicate protection when evidence cannot be read. */ }
+  return UNCERTAIN;
 }
 
 /** Runs `t3` with these arguments and timeout; tests pass a stub. */

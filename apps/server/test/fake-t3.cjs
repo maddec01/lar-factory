@@ -30,6 +30,17 @@ const main = async () => {
     process.exitCode = options.waitExit ?? 0;
     return;
   }
+  if (args[1] === 'list' && options.recover) {
+    process.stdout.write(JSON.stringify([{ threadId: 'thread-1', title: '#12 Issue 12' }]));
+    return;
+  }
+  if (args[1] === 'show' && options.recover) {
+    if (options.recover === 'deleted') {
+      process.stderr.write('Thread thread-1 is no longer available.');
+      process.exitCode = 1;
+    } else process.stdout.write(JSON.stringify({ thread: { threadId: 'thread-1' }, messages: [{ role: 'user', text: '#12 Issue 12\n$lar-shape maddec01/lar-factory#12' }] }));
+    return;
+  }
   if (options.fail === 'down') {
     process.stderr.write('Could not reach the T3 Code server. Is T3 Code running?');
     process.exitCode = 1;

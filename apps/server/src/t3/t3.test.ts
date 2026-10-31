@@ -71,3 +71,26 @@ test('only the exact unavailable answer releases a thread', async () => {
       : result.code === 1 && result.stdout === '' ? 'deleted' : 'unknown');
   }
 });
+
+ test('unconfirmed launch outcomes stay protected, including command failures', async () => {
+  const { startThread } = await import('./t3.ts');
+  for (const result of [{ code: null }, { code: 1 }, { code: 0, stdout: '{}' },
+    { code: 0, stdout: 'invalid JSON' }]) {
+    assert.equal((await startThread('p', 'm', undefined, undefined, t3With(result).run)).uncertain, true);
+  }
+  const launched = await startThread('p', 'm', undefined, { base: 'main', branch: 'build' },
+    t3With({ stdout: '{"threadId":"late","title":"Build"}' }).run);
+  assert.deepEqual(launched, { thread: { threadId: 'late', title: 'Build' }, error: null });
+});
+
+test('recovers one late success and holds ambiguous or absent CLI evidence', async () => {
+  const { startThread } = await import('./t3.ts');
+  for (const count of [0, 1, 2]) {
+    const run: T3Run = async args => ({ code: args[1] === 'start' ? null : 0, stderr: '', detail: '',
+      stdout: args[1] === 'list' ? JSON.stringify(Array.from({ length: count }, (_, i) => ({ threadId: `late-${i}`, title: 'Build' })))
+        : JSON.stringify({ thread: { threadId: args[2] }, messages: [{ role: 'user', text: 'Build\nissue' }] }) });
+    const answer = await startThread('project', 'Build\nissue', undefined, undefined, run);
+    assert.equal(answer.thread?.threadId, count === 1 ? 'late-0' : undefined);
+    assert.equal(answer.uncertain, count === 1 ? undefined : true);
+  }
+});

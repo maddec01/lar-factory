@@ -10,7 +10,7 @@ import type { Status } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
 import {
   openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
-  type NewReviewRound, type ReviewAxis, type WorkKind, type WorkRecords,
+  type NewObservation, type NewReviewRound, type Observed, type ReviewAxis, type WorkKind, type WorkRecords,
 } from './work-records.ts';
 
 const HELP = `Usage: lar-work <command> [options]
@@ -90,6 +90,21 @@ Content
                                     Change what became of the axis's Kth finding.
   review-rounds <work-id>           Print the build's review rounds.
 
+Provider observations
+  An observation is the last read of the record's ticket or current PR from its
+  provider, kept with the time it was read. A newer read replaces it. A failed
+  read keeps it and records when and why the read failed. An observation never
+  changes the record's title, context or refinement. A merged PR finishes the
+  work; replacing the PR drops its observation.
+  observe <work-id> --revision N --of ticket --state open|closed|not-found
+          [--assignee A]
+  observe <work-id> --revision N --of pr --state open|merged|closed
+                                    Record a successful read. A closed PR is
+                                    closed unmerged.
+  observe-failure <work-id> --revision N --of ticket|pr --failure F
+                                    Record that a read failed with reason F.
+  observations <work-id>            Print the ticket's observation, then the PR's.
+
 Threads and launch intents
   A thread ID is T3's. A launch intent is recorded before the board asks T3 to
   start a thread, and resolved once T3 answers, so a restart finds the start
@@ -142,7 +157,7 @@ class UsageError extends Error {}
 
 const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
   'children', 'blockers', 'dependents', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition', 'review-rounds',
-  'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
+  'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
 const COMMANDS = ['create', 'import', 'list', 'intents', 'retention', 'hidden', 'delete-expired', ...TAKES_WORK_ID];
 
 const OPTIONS = {
@@ -163,6 +178,9 @@ const OPTIONS = {
   finding: { type: 'string' },
   disposition: { type: 'string' },
   reason: { type: 'string' },
+  of: { type: 'string' },
+  state: { type: 'string' },
+  assignee: { type: 'string' },
   thread: { type: 'string' },
   purpose: { type: 'string' },
   intent: { type: 'string' },
@@ -284,6 +302,12 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
         need(values, 'disposition') as FindingDisposition, values.reason);
     case 'review-rounds':
       return records.reviewRounds(workId!);
+    case 'observe':
+      return records.observe(workId!, revision(), { of: need(values, 'of'), state: need(values, 'state'), assignee: values.assignee } as NewObservation);
+    case 'observe-failure':
+      return records.recordReadFailure(workId!, revision(), need(values, 'of') as Observed, need(values, 'failure'));
+    case 'observations':
+      return records.observations(workId!);
     case 'add-thread':
       return records.addThread(workId!, revision(), need(values, 'thread'), need(values, 'purpose'));
     case 'threads':

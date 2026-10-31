@@ -107,5 +107,18 @@ export const MIGRATIONS: readonly Migration[] = [
       replaced_at TEXT NOT NULL
     ) STRICT;
     CREATE INDEX replaced_pull_requests_by_work_id ON replaced_pull_requests (work_id);
+    -- The last read of a record's ticket or current PR from its provider, one row of each. A newer read replaces it;
+    -- a failed read keeps it and records when and why the read failed. state is null until a read succeeds.
+    CREATE TABLE observations (
+      work_id TEXT NOT NULL REFERENCES work_records (work_id),
+      observed TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      state TEXT,
+      assignee TEXT,
+      observed_at TEXT,
+      failed_at TEXT,
+      failure TEXT,
+      PRIMARY KEY (work_id, observed)
+    ) STRICT;
   `),
 ];

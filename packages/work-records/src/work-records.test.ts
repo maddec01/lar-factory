@@ -526,6 +526,70 @@ describe('work-record threads and launch intents', () => {
   });
 });
 
+describe('work-record provider observations', () => {
+  const lar = (records: WorkRecords, kind: WorkKind, ticket?: string) => records.create({ title: 'Work', repository: 'maddec01/lar', kind, ticket });
+
+  it("replaces the last observation of a ticket's state and assignee, and keeps it across reopen", async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const bug = lar(first, 'bug', 'maddec01/lar#7');
+    first.observe(bug.workId, 1, { of: 'ticket', state: 'open', assignee: 'pedro' });
+    expect(first.observe(bug.workId, 2, { of: 'ticket', state: 'closed' })).toMatchObject({ revision: 3, finishedAt: null });
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.observations(bug.workId)).toEqual([
+      { of: 'ticket', subject: 'maddec01/lar#7', state: 'closed', assignee: null, observedAt: expect.any(String), failedAt: null, failure: null },
+    ]);
+    reopened.observe(bug.workId, 3, { of: 'ticket', state: 'not-found' });
+    expect(reopened.observations(bug.workId)).toMatchObject([{ state: 'not-found' }]);
+    expect(() => reopened.observe(bug.workId, 3, { of: 'ticket', state: 'open' })).toThrow(expect.objectContaining({ code: 'stale-revision' }));
+  });
+
+  it('keeps the last observation after a failed read and records when it failed, until a read succeeds', async () => {
+    const records = await open();
+    const bug = lar(records, 'bug', 'maddec01/lar#7');
+    records.observe(bug.workId, 1, { of: 'ticket', state: 'open', assignee: 'pedro' });
+    const [observed] = records.observations(bug.workId);
+    records.recordReadFailure(bug.workId, 2, 'ticket', 'GitHub answered 502.');
+    expect(records.observations(bug.workId)).toEqual([{ ...observed, failedAt: expect.any(String), failure: 'GitHub answered 502.' }]);
+
+    records.observe(bug.workId, 3, { of: 'ticket', state: 'open', assignee: 'ana' });
+    expect(records.observations(bug.workId)).toMatchObject([{ assignee: 'ana', failedAt: null, failure: null }]);
+
+    const unread = lar(records, 'feature', 'maddec01/lar#8');
+    records.recordReadFailure(unread.workId, 1, 'ticket', 'Offline.');
+    expect(records.observations(unread.workId)).toMatchObject([{ subject: 'maddec01/lar#8', state: null, observedAt: null, failure: 'Offline.' }]);
+  });
+
+  it("observes the recorded PR, finishing the work when it merged, and drops the observation when the PR is replaced", async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    records.setPullRequest(build.workId, 1, 'maddec01/lar#90');
+    records.observe(build.workId, 2, { of: 'pr', state: 'closed' });
+    expect(records.observations(build.workId)).toMatchObject([{ of: 'pr', subject: 'maddec01/lar#90', state: 'closed' }]);
+
+    records.setPullRequest(build.workId, 3, 'maddec01/lar#91');
+    expect(records.observations(build.workId)).toEqual([]);
+    expect(records.observe(build.workId, 4, { of: 'pr', state: 'merged' })).toMatchObject({ finishedAt: expect.any(String), revision: 5 });
+    expect(records.observations(build.workId)).toMatchObject([{ subject: 'maddec01/lar#91', state: 'merged' }]);
+  });
+
+  it('refuses an observation of something the record lacks, an unknown state or a PR assignee, and changes nothing', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    expect(() => records.observe(build.workId, 1, { of: 'ticket', state: 'open' })).toThrow(/has no ticket/);
+    expect(() => records.observe(build.workId, 1, { of: 'pr', state: 'open' })).toThrow(/has no PR/);
+    expect(() => records.recordReadFailure(build.workId, 1, 'pr', 'Offline.')).toThrow(/has no PR/);
+    records.setPullRequest(build.workId, 1, 'maddec01/lar#90');
+    expect(() => records.observe(build.workId, 2, { of: 'pr', state: 'draft' as 'open' })).toThrow(/state "draft"/);
+    expect(() => records.observe(build.workId, 2, { of: 'pr', state: 'open', assignee: 'pedro' } as never)).toThrow(/assignee/);
+    expect(() => records.recordReadFailure(build.workId, 2, 'pr', ' ')).toThrow(/failure/);
+    expect(records.observations(build.workId)).toEqual([]);
+    expect(records.read(build.workId).revision).toBe(2);
+  });
+});
+
 describe('work-record retention', () => {
   const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind });
   /** `n` days after now. */
@@ -562,7 +626,7 @@ describe('work-record retention', () => {
     records.recordLaunchIntent(build.workId, 4, 'build');
     records.setPullRequest(build.workId, 5, 'maddec01/lar#1');
     records.setPullRequest(build.workId, 6, 'maddec01/lar#2');
-    records.recordFinished(build.workId, 7);
+    records.observe(build.workId, 7, { of: 'pr', state: 'merged' });
     const setting = { hideAfterDays: 7, deleteAfterDays: 30 };
 
     expect(records.deleteExpired(setting, later(29))).toEqual({ deleted: [], kept: [] });

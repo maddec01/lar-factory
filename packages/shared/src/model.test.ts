@@ -120,15 +120,21 @@ test('Done counts for 7 days after closing', () => {
   assert.equal(isRecentlyDone(item('Review', [], { closedAt: '2026-10-21T09:00:00Z' }), now), false);
 });
 
-test('the work message titles the thread, then runs lar-shape on the issue', () => {
-  assert.equal(workMessage(item('Queued')), '#7 t\n$lar-shape maddec01/lar-server#7');
-  assert.equal(workTitle(item('Queued')), '#7 t');
+test('the work message titles the thread, then runs lar-shape on the work ID', () => {
+  const work = item('Queued', [], { id: '0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a' });
+  assert.equal(workMessage(work), '#7 t\n$lar-shape 0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a');
+  assert.equal(workTitle(work), '#7 t');
+});
+
+test('the work message for ticketless work titles the thread with its title alone', () => {
+  const work = item('Queued', [], { id: 'w1', number: 0, url: null, title: 'Tidy the docs' });
+  assert.equal(workMessage(work), 'Tidy the docs\n$lar-shape w1');
 });
 
 test('a $word in the title is kept and $lar-shape still opens line 2', () => {
   const message = workMessage(item('Queued', [], { title: 'Fix $foo parsing' }))!;
-  assert.equal(message, '#7 Fix $foo parsing\n$lar-shape maddec01/lar-server#7');
-  assert.equal(message.split('\n')[1], '$lar-shape maddec01/lar-server#7');
+  assert.equal(message, '#7 Fix $foo parsing\n$lar-shape x');
+  assert.equal(message.split('\n')[1], '$lar-shape x');
 });
 
 test('a build branch is <kind>/<n>-<slug>: fix for a bug, feat for a feature or improvement, else chore', () => {
@@ -151,9 +157,14 @@ test('a build branch slug takes up to five words of the title, lowercase, with w
   assert.equal(branch('日本語 🚀'), 'fix/7');
 });
 
-test('the build message names the build and the builder agent of the installed lar-build', () => {
-  assert.equal(buildMessage(item('Ready'), '/Users/me/.agents/skills/lar-build'),
-    'Build maddec01/lar-server#7. Read /Users/me/.agents/skills/lar-build/agents/builder.md and follow it.');
+test('a ticketless build branch starts its slug with the first 8 characters of the work ID', () => {
+  const work = item('Ready', ['bug'], { id: '0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a', number: 0, url: null, title: 'Fix login' });
+  assert.equal(buildBranch(work), 'fix/0b6e2c1a-fix-login');
+});
+
+test('the build message names the build by its work ID and the builder agent of the installed lar-build', () => {
+  assert.equal(buildMessage(item('Ready', [], { id: 'w1' }), '/Users/me/.agents/skills/lar-build'),
+    'Build w1. Read /Users/me/.agents/skills/lar-build/agents/builder.md and follow it.');
 });
 
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {

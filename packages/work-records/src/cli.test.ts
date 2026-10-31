@@ -103,11 +103,13 @@ describe('lar-work', { timeout: 30_000 }, () => {
     expect(await larWork(data, 'body', workId, '--body', 'map')).toMatchObject({ code: 1, stderr: `lar-work: The work record ${workId} has no map.\n` });
 
     expect((await larWork(data, 'set-phase', workId, '--revision', '2', '--phase', 'review')).record).toMatchObject({ buildPhase: 'review' });
-    expect((await larWork(data, 'set-pr', workId, '--revision', '3', '--pr', 'maddec01/lar#9')).record).toMatchObject({ pullRequest: 'maddec01/lar#9' });
+    expect((await larWork(data, 'set-pr', workId, '--revision', '3', '--pr', 'maddec01/lar#8')).record).toMatchObject({ pullRequest: 'maddec01/lar#8' });
+    expect((await larWork(data, 'set-pr', workId, '--revision', '4', '--pr', 'maddec01/lar#9')).record).toMatchObject({ pullRequest: 'maddec01/lar#9' });
+    expect((await larWork(data, 'pr-history', workId)).record).toMatchObject([{ pullRequest: 'maddec01/lar#8' }]);
     const round = join(tempDir(), 'round.json');
     writeFileSync(round, JSON.stringify({ base: 'c8890a1a', reviewers: [{ axis: 'code', verdict: 'changes', findings: [{ severity: 'should', summary: 'Spec: a.ts:1: x.', disposition: 'open' }] }] }));
-    expect((await larWork(data, 'record-review-round', workId, '--revision', '4', '--file', round)).record).toMatchObject({ revision: 5 });
-    await larWork(data, 'set-disposition', workId, '--revision', '5', '--round', '1', '--axis', 'code', '--finding', '1', '--disposition', 'rejected', '--reason', 'Out of scope.');
+    expect((await larWork(data, 'record-review-round', workId, '--revision', '5', '--file', round)).record).toMatchObject({ revision: 6 });
+    await larWork(data, 'set-disposition', workId, '--revision', '6', '--round', '1', '--axis', 'code', '--finding', '1', '--disposition', 'rejected', '--reason', 'Out of scope.');
     expect((await larWork(data, 'review-rounds', workId)).record).toMatchObject([{ round: 1, reviewers: [{ axis: 'code', findings: [{ disposition: 'rejected', reason: 'Out of scope.' }] }] }]);
   });
 

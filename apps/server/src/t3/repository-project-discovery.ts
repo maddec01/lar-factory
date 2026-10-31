@@ -23,12 +23,13 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
     if (current) { current.key = ''; current.read = { ...current.read, availability: 'unavailable' }; }
     return current?.read ?? { availability: 'unavailable' };
   }
-  const key = JSON.stringify([path, runtime.origin, runtime.serverVersion]);
+  const key = JSON.stringify([path, runtime.origin, runtime.serverVersion, runtime.pid]);
   if (current?.key === key) return current.read;
   current?.stop();
   try {
     const protocol = boardProjects(runtime.origin, runtime.serverVersion);
-    const state = { key, read: await protocol.readProjects(), stop: () => {} };
+    const read = await protocol.readProjects();
+    const state = { key, read: { ...read, observation: read.observation ?? current?.read.observation }, stop: () => {} };
     current = state;
     state.stop = subscribeProjects(new URL(runtime.origin), runtime.serverVersion, protocol, read => {
       state.read = { ...read, observation: read.observation ?? state.read.observation };

@@ -15,4 +15,7 @@ test('successful empty discovery stays distinct from disconnect and retains its 
   const disconnected = await repositoryProjects();
   expect(disconnected.availability).toBe('unavailable');
   expect(disconnected.observation?.observedAt).toBe('2026-10-31T00:00:00Z');
+  fixture.notify({ availability: 'unsupported-version' });
+  expect((await repositoryProjects()).availability).toBe('unsupported-version');
+  expect((await repositoryProjects()).observation).toEqual(first.observation);
 });

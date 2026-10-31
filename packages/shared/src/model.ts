@@ -768,6 +768,56 @@ export type Provider = (typeof PROVIDERS)[number];
  */
 export type RepositoryItemSource = { kind: 'issues' } | { kind: 'azure-board'; team: string };
 
+/** Where a repository's glossary and ADRs go: its own files at these paths, or private drafts on this Mac. */
+export type DomainDocLocation = { kind: 'private' } | { kind: 'repository'; glossary: string; adrs: string };
+
+/**
+ * The settings .lar-factory.json may share as defaults, each one a local override replaces. Credentials and write
+ * consent are never among them.
+ */
+export interface SharedRepositorySettings {
+  /** Repository role: what this repository is to the others. */
+  role?: string;
+  itemSource?: RepositoryItemSource;
+  show?: ShowSetting;
+  labels?: string[];
+  domainDocs?: DomainDocLocation;
+  /** The project skills the user selected as coding guidance for builds. */
+  skills?: string[];
+}
+
+/** The repository writes the factory may need, each with its own credential access and local write consent. */
+export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket'] as const;
+
+export type RepositoryOperation = (typeof REPOSITORY_OPERATIONS)[number];
+
+/** What the user's credentials allow for an operation, as last found; one not needed since the last check stays unverified. */
+export type OperationAccess = 'unverified' | 'allowed' | 'refused';
+
+/**
+ * One repository's setup as the factory uses it: each shared setting from its local override, else from Repository
+ * config, else the default, with access and consent kept on this Mac.
+ */
+export interface RepositorySetup {
+  repo: string;
+  /** The T3 project its threads start in, once onboarding picked one. */
+  projectId?: string;
+  role: string;
+  /** Null for an Azure DevOps repository whose team no setting names yet. */
+  itemSource: RepositoryItemSource | null;
+  show: ShowSetting;
+  labels: string[];
+  domainDocs: DomainDocLocation;
+  skills: string[];
+  access: Record<RepositoryOperation, OperationAccess>;
+  /** The operations the user allows the factory to offer, less those the credentials refuse. */
+  consent: RepositoryOperation[];
+  /** The settings that changed since the user last accepted the setup; work that depends on them waits. */
+  paused: ('itemSource' | 'domainDocs')[];
+  /** Why the latest Repository config couldn't be used; the setup keeps its last usable shared defaults meanwhile. */
+  sharedProblem?: string;
+}
+
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
 export interface RepositoryConfigAnswers {
   itemSource: RepositoryItemSource;

@@ -1,6 +1,9 @@
+import { execFile } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 import { openWorkRecords, type WorkKind, type WorkRecords } from './work-records.ts';
 
@@ -83,6 +86,42 @@ describe('work records', () => {
       expect.objectContaining({ code: 'stale-revision', message: expect.stringContaining('revision 2') }),
     );
     expect(thread.read(made.workId)).toEqual(shaped);
+  });
+
+  it('keeps every commit from two processes writing at once, refusing only stale or locked writes', { timeout: 30_000 }, async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const made = (await open(path)).create({ repository: 'maddec01/lar', kind: 'build' });
+    // Each writer appends a line named after itself to the brief it just read, naming the revision it read. Neither
+    // starts writing until both have marked themselves ready.
+    const writer = `import { existsSync, writeFileSync } from 'node:fs';
+      import { openWorkRecords } from ${JSON.stringify(pathToFileURL(join(import.meta.dirname, 'work-records.ts')).href)};
+      const [path, workId, name, other] = process.argv.slice(1);
+      const records = await openWorkRecords(path);
+      writeFileSync(path + '.' + name + '-ready', '');
+      while (!existsSync(path + '.' + other + '-ready'));
+      const outcomes = [];
+      for (let i = 0; i < 100; i++) {
+        const { revision } = records.read(workId);
+        const brief = records.body(workId, 'brief') ?? '';
+        try {
+          records.setBody(workId, revision, 'brief', brief + name + '-' + i + '\\n');
+          outcomes.push(name + '-' + i);
+        } catch (error) {
+          outcomes.push(error.code ?? String(error));
+        }
+      }
+      records.close();
+      process.stdout.write(JSON.stringify(outcomes));`;
+    const run = (name: string, other: string) =>
+      promisify(execFile)(process.execPath, ['--disable-warning=ExperimentalWarning', '--input-type=module', '-e', writer, path, made.workId, name, other]);
+    const outcomes = (await Promise.all([run('board', 'thread'), run('thread', 'board')])).flatMap(({ stdout }) => JSON.parse(stdout) as string[]);
+
+    const committed = outcomes.filter((outcome) => /^(board|thread)-\d+$/.test(outcome));
+    for (const name of ['board', 'thread']) expect(committed.some((outcome) => outcome.startsWith(`${name}-`))).toBe(true);
+    for (const refused of outcomes.filter((outcome) => !committed.includes(outcome))) expect(['stale-revision', 'busy']).toContain(refused);
+    const reader = await open(path);
+    expect(reader.body(made.workId, 'brief')!.split('\n').filter(Boolean).toSorted()).toEqual(committed.toSorted());
+    expect(reader.read(made.workId).revision).toBe(1 + committed.length);
   });
 
   it('keeps Queued records in the order they joined the Queue', async () => {
@@ -240,3 +279,69 @@ describe('work-record structure', () => {
   });
 });
 
+
+describe('work-record content', () => {
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ repository: 'maddec01/lar', kind });
+
+  it('keeps a build brief, a decision text and a concept map across close and reopen', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const [build, decision, concept] = [lar(first, 'build'), lar(first, 'decision'), lar(first, 'concept')];
+    expect(first.setBody(build.workId, 1, 'brief', '## What\n\nAdd it.\n')).toMatchObject({ revision: 2 });
+    first.setBody(build.workId, 2, 'brief', '## What\n\nAdd it now.\n');
+    first.setBody(decision.workId, 1, 'decision', 'Use SQLite.');
+    first.setBody(concept.workId, 1, 'map', '# Map');
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.body(build.workId, 'brief')).toBe('## What\n\nAdd it now.\n');
+    expect(reopened.body(decision.workId, 'decision')).toBe('Use SQLite.');
+    expect(reopened.body(concept.workId, 'map')).toBe('# Map');
+    expect(reopened.body(concept.workId, 'brief')).toBeNull();
+  });
+
+  it('refuses a body its kind does not hold, and a body that is not text', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    expect(() => records.setBody(build.workId, 1, 'map', '# Map')).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('Only a concept holds a map') }));
+    expect(() => records.setBody(build.workId, 1, 'notes' as 'brief', 'x')).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(() => records.setBody(build.workId, 1, 'brief', 42 as unknown as string)).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(records.read(build.workId)).toEqual(build);
+  });
+
+  it('refuses a kind change that would leave a body, build phase or PR the new kind cannot hold', async () => {
+    const records = await open();
+    const [briefed, phased, released, mapped] = [lar(records, 'feature'), lar(records, 'build'), lar(records, 'build'), lar(records, 'concept')];
+    records.setBody(briefed.workId, 1, 'brief', '# Brief');
+    records.setBuildPhase(phased.workId, 1, 'plan');
+    records.setPullRequest(released.workId, 1, 'maddec01/lar#88');
+    records.setBody(mapped.workId, 1, 'map', '# Map');
+    const refuse = (workId: string, kind: WorkKind, message: string) => {
+      const before = records.read(workId);
+      expect(() => records.update(workId, 2, { kind, status: 'Ready' })).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining(message) }));
+      expect(records.read(workId)).toEqual(before);
+    };
+    refuse(briefed.workId, 'decision', 'A decision holds no brief');
+    refuse(phased.workId, 'slice', 'A slice is never built');
+    refuse(released.workId, 'concept', 'A concept is never built');
+    refuse(mapped.workId, 'decision', 'Only a concept holds a map');
+    expect(records.update(briefed.workId, 2, { kind: 'bug' })).toMatchObject({ kind: 'bug', revision: 3 });
+  });
+
+  it('records a build phase and its PR, refusing unknown phases and records that are never built', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    expect(build).toMatchObject({ buildPhase: null, pullRequest: null });
+    expect(first.setBuildPhase(build.workId, 1, 'implement')).toMatchObject({ buildPhase: 'implement', revision: 2 });
+    first.setPullRequest(build.workId, 2, 'maddec01/lar#88');
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.read(build.workId)).toMatchObject({ buildPhase: 'implement', pullRequest: 'maddec01/lar#88', revision: 3 });
+    expect(() => reopened.setBuildPhase(build.workId, 3, 'deploy' as 'plan')).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('phase "deploy"') }));
+    expect(() => reopened.setPullRequest(build.workId, 3, 'pr-88')).toThrow(expect.objectContaining({ code: 'invalid' }));
+    const concept = lar(reopened, 'concept');
+    expect(() => reopened.setBuildPhase(concept.workId, 1, 'plan')).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('A concept is never built') }));
+  });
+});

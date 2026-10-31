@@ -40,17 +40,23 @@ export function partKind(item: Item): PartKind {
   return DECISION_KINDS.find((k) => k === decision) ?? 'build';
 }
 
-/** Dependency waves shared by the checklist and Map. External blockers do not add a wave; cycles stop at a seen part. */
+/** The parts each part waits on: a recorded blocker by its work ID, a ticket's blocker by its ticket, since ticketless parts share number 0. */
+export function upstreamOf(parts: readonly Part[]): (part: Part) => Part[] {
+  const byId = new Map(parts.map((p) => [p.item.id, p]));
+  const byTicket = new Map(parts.filter((p) => p.item.number).map((p) => [refKey(p.item.repo, p.item.number), p]));
+  return (part) => part.waitsOn.flatMap((b) => (b.workId ? byId.get(b.workId) : b.number ? byTicket.get(refKey(b.repo, b.number)) : undefined) ?? []);
+}
+
+/** Dependency waves shared by the checklist and Map, by work ID. External blockers do not add a wave; cycles stop at a seen part. */
 export function partWaves(parts: Part[]): Map<string, number> {
-  const key = (p: Part) => refKey(p.item.repo, p.item.number);
-  const byKey = new Map(parts.map((p) => [key(p), p]));
+  const ups = upstreamOf(parts);
   const depth = new Map<string, number>();
   const at = (p: Part, path: string[]): number => {
-    const known = depth.get(key(p));
+    const known = depth.get(p.item.id);
     if (known !== undefined) return known;
-    const before = p.waitsOn.flatMap((b) => byKey.get(refKey(b.repo, b.number)) ?? []).filter((u) => !path.includes(key(u)));
-    const d = before.length ? Math.max(...before.map((u) => at(u, [...path, key(p)]))) + 1 : 0;
-    depth.set(key(p), d);
+    const before = ups(p).filter((u) => !path.includes(u.item.id));
+    const d = before.length ? Math.max(...before.map((u) => at(u, [...path, p.item.id]))) + 1 : 0;
+    depth.set(p.item.id, d);
     return d;
   };
   parts.forEach((p) => at(p, []));
@@ -63,7 +69,7 @@ export function partsOf(parent: Item, all: readonly Item[]): Part[] {
     .map((item) => ({ item, kind: partKind(item), waitsOn: item.blockers, thread: threadsOf(item)[0] }))
     .sort((a, b) => PART_KINDS.indexOf(a.kind) - PART_KINDS.indexOf(b.kind));
   const waves = partWaves(parts);
-  return parts.sort((a, b) => waves.get(refKey(a.item.repo, a.item.number))! - waves.get(refKey(b.item.repo, b.item.number))!);
+  return parts.sort((a, b) => waves.get(a.item.id)! - waves.get(b.item.id)!);
 }
 
 /** What still holds a part back: the issues it's blocked by that are open, while no thread has taken it on. */

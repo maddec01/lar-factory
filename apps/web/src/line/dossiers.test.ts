@@ -472,7 +472,7 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   expect([...map.querySelectorAll('.h-7\\.5')].map(text)).toEqual(['Wave 1· 2 in parallel', 'Wave 2· 2 in parallel', 'Check']);
   expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part'))).toEqual(['I_sample18', 'I_sample12', 'I_sample10', 'I_sample13']);
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
-    'maddec01/lar-server#203 maddec01/lar-server#201', 'maddec01/lar-server#202 maddec01/lar-server#140', 'maddec01/lar-server#140 e2e',
+    'I_sample18 I_sample10', 'I_sample12 I_sample13', 'I_sample13 e2e',
   ]);
   expect(text(map.querySelector('[data-map-check]'))).toBe('end-to-end checkSign in on the website, then stream from a phone off Wi-Fiwaiting · 3 stepsagents run it once #140 land');
   const node = (id: string) => map.querySelector(`[data-map-part="${id}"]`)!;

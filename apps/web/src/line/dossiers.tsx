@@ -23,7 +23,7 @@ import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, threadsOf 
 import type { Part } from './dossier-parts.ts';
 import { PartStart, startable } from './part-start.tsx';
 import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
-import { OnYourDesk, Track, stageOf, YOURS, picked } from './stage-track.tsx';
+import { OnYourDesk, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
 import { WorkMap } from './work-map.tsx';
 
 const open = (item: Item) => useItemDialogStore.getState().open(item.id);
@@ -55,7 +55,7 @@ function ThreadLine({ thread, waits }: { thread: ItemThread | undefined; waits: 
     <span className="flex min-w-0 items-center gap-1.5" title={thread.title}>
       <StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />
       <span className="truncate">T3 · {thread.title}</span>
-      <span className="shrink-0">· {thread.state}</span>
+      <span className="shrink-0">· {thread.state}{lastSeen(thread)}</span>
     </span>
   );
 }

@@ -1,7 +1,8 @@
 // The line's stages: the six-stage track a dossier's parts show, and what the line says of an item's thread and of an
 // item that waits on you.
 
-import type { Item, ItemStats, Status, ThreadState } from '@lar-factory/shared';
+import { clock } from '@lar-factory/shared';
+import type { Item, ItemStats, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
 
 const STAGES: { name: string; statuses: Status[] }[] = [
@@ -27,8 +28,11 @@ const THREAD_TEXT: Record<ThreadState, string> = {
 export function threadText(item: Item): string {
   if (item.threads === 'unavailable') return 'Thread unavailable';
   const latest = item.threads?.[0];
-  return latest ? THREAD_TEXT[latest.state] : 'Not started';
+  return latest ? `${THREAD_TEXT[latest.state]}${lastSeen(latest)}` : 'Not started';
 }
+
+/** While T3 can't be read, when the board last saw the thread's state: `, last seen 14:05`; empty otherwise. */
+export const lastSeen = (thread: ItemThread): string => (thread.observedAt ? `, last seen ${clock(thread.observedAt, undefined)}` : '');
 
 /** Where to act on an item that waits on you. */
 export function OnYourDesk({ status }: { status: Status }) {

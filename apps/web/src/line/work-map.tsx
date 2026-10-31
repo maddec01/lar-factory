@@ -4,20 +4,21 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BookOpen, FlaskConical, Hammer, ListChecks, Lightbulb, MessagesSquare, Shapes, Target } from 'lucide-react';
-import { ref, refKey, repoKey, repoName, shortAgo } from '@lar-factory/shared';
+import { ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partWaves, waitText } from './dossier-parts.ts';
+import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partWaves, upstreamOf, waitText } from './dossier-parts.ts';
 import type { Part, PartKind } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
 
 const DECISIONS = 'Decisions';
 const KIND_ICON: Record<PartKind, typeof Hammer> = { grill: MessagesSquare, prototype: Shapes, research: BookOpen, task: ListChecks, build: Hammer };
 const CHECK = 'e2e';
-const keyOf = (p: Part) => refKey(p.item.repo, p.item.number);
+/** A part's work ID, which ticketless parts have too. */
+const keyOf = (p: Part) => p.item.id;
 const pickedRing = (on: boolean) => (on ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--card)' : '');
 
 const LABEL_W = 116;
@@ -30,8 +31,7 @@ const MIN_COL = 200;
 interface Placed { key: string; part: Part | null; col: number; x: number; y: number }
 
 function layout(parts: Part[], data: BoardData, width: number) {
-  const keys = new Map(parts.map((p) => [keyOf(p), p]));
-  const ups = (p: Part) => p.waitsOn.flatMap((b) => keys.get(refKey(b.repo, b.number)) ?? []);
+  const ups = upstreamOf(parts);
   const depth = partWaves(parts);
   const laneOf = (p: Part) => (DECISION_KINDS.includes(p.kind) ? DECISIONS : repoKey(p.item));
   const named = [DECISIONS, ...data.repos.map((r) => r.repo), ...parts.map(laneOf)];

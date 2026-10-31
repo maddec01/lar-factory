@@ -4,7 +4,7 @@
 import { expect, test } from 'vite-plus/test';
 import type { Item } from '@lar-factory/shared';
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
-import { DECISION_KINDS, dossiersOf, inDossiers, openWaits, partKind, partsOf } from './dossier-parts.ts';
+import { DECISION_KINDS, dossiersOf, inDossiers, openWaits, partKind, partWaves, partsOf } from './dossier-parts.ts';
 
 const items = (sampleJson as unknown as { items: Item[] }).items;
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
@@ -57,11 +57,21 @@ test('the dossiers take their parents and parts off the rest of the line', () =>
 
 test('parts follow dependency waves across repositories, with stable ties and external blockers ignored', () => {
   const parent = byNumber(200);
-  const first = child(1, parent, { repo: 'owner/a', blockers: [] });
-  const after = child(1, parent, { repo: 'owner/b', blockers: [{ repo: 'owner/a', number: 1, state: 'open' }] });
+  const first = child(1, parent, { id: 'I_a1', repo: 'owner/a', blockers: [] });
+  const after = child(1, parent, { id: 'I_b1', repo: 'owner/b', blockers: [{ repo: 'owner/a', number: 1, state: 'open' }] });
   const parallel = child(3, parent, { blockers: [{ repo: 'external/repo', number: 1, state: 'open' }] });
   const last = child(4, parent, { blockers: [{ repo: 'owner/b', number: 1, state: 'closed' }] });
   expect(partsOf(parent, [last, after, parallel, first]).map((p) => [p.item.repo, p.item.number])).toEqual([
     [parallel.repo, 3], ['owner/a', 1], ['owner/b', 1], [last.repo, 4],
   ]);
+});
+
+test('ticketless parts are told apart by their work IDs, and wait on each other through them', () => {
+  const parent = byNumber(200);
+  const ticketless = (id: string, blockers: Item['blockers'] = []) => child(0, parent, { id, repo: 'owner/a', blockers });
+  const first = ticketless('W_first');
+  const second = ticketless('W_second', [{ repo: 'owner/a', number: 0, state: 'open', workId: 'W_first' }]);
+  const third = ticketless('W_third', [{ repo: 'owner/a', number: 0, state: 'open', workId: 'W_second' }]);
+  expect(partsOf(parent, [third, second, first]).map((p) => p.item.id)).toEqual(['W_first', 'W_second', 'W_third']);
+  expect(Object.fromEntries(partWaves(partsOf(parent, [third, second, first])))).toEqual({ W_first: 0, W_second: 1, W_third: 2 });
 });

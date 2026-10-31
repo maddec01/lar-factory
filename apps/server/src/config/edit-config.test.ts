@@ -67,7 +67,7 @@ function gh({ file = FILE as string | null, labels = ['bug', 'app: music'], fail
 function listDir(entries: object[]): string {
   const dir = mkdtempSync(join(tmpdir(), 'lar edit config test '));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
-  writeFileSync(join(dir, 'repositories.json'), JSON.stringify({ repositories: entries }));
+  writeFileSync(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: entries }));
   return dir;
 }
 

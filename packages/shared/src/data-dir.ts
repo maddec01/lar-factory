@@ -18,3 +18,9 @@ export function boardDataDir(home?: string, env: Readonly<Record<string, string 
   if (home === undefined && named && isAbsolute(named)) return named;
   return join(home ?? (env.HOME || homedir()), 'Library/Application Support/Lar Factory');
 }
+
+/**
+ * The board's repository list with each repository's local settings, in boardDataDir(). It replaced repositories.json,
+ * which the board leaves untouched: the upgraded board starts with an empty list and nothing migrates.
+ */
+export const REPOSITORY_LIST_FILE = 'repository-settings.json';

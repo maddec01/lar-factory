@@ -175,10 +175,10 @@ test('Start refuses an unreadable list of onboarded repositories, naming the fil
   const dir = home(t, ORIGINS);
   const board = await startBoard(t, { items: [boardIssue(12, 'Queued')] }, false, false, { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) });
   await until(board, (d) => d.items.length === 1);
-  writeFileSync(join(dir, 'Library/Application Support/Lar Factory/repositories.json'), '{ broken');
+  writeFileSync(join(dir, 'Library/Application Support/Lar Factory/repository-settings.json'), '{ broken');
   const response = await start(board, 'I_12');
   assert.equal(response.status, 409);
-  assert.match((await response.json()).error, /repositories\.json isn't valid JSON/);
+  assert.match((await response.json()).error, /repository-settings\.json isn't valid JSON/);
   assert.deepEqual(await board.t3Calls(), []);
 });
 

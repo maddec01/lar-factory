@@ -45,10 +45,10 @@ test("a list that isn't valid JSON stops the read with the board's read error, n
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
   const dir = join(home, 'Library/Application Support/Lar Factory');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'repositories.json'), '{ broken');
+  writeFileSync(join(dir, 'repository-settings.json'), '{ broken');
   const board = await startBoard(t, { items: [boardIssue(1, 'Queued', FACTORY)] }, false, false, { HOME: home });
   const data = await until(board, (d) => d.error !== null);
-  assert.equal(data.error, `${join(dir, 'repositories.json')} isn't valid JSON.`);
+  assert.equal(data.error, `${join(dir, 'repository-settings.json')} isn't valid JSON.`);
   assert.deepEqual(data.items, []);
 });
 
@@ -73,7 +73,7 @@ test("a list that stops being valid JSON clears the repositories and notices of 
     items: [boardIssue(1, 'Queued', FACTORY)] };
   const board = await startBoard(t, options, false, true, { HOME: home });
   await until(board, (d) => d.repos.length === 1 && !!d.repositoryConfigProblems?.length);
-  writeFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), '{ broken');
+  writeFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), '{ broken');
   const data = await until(board, (d) => d.error !== null);
   assert.deepEqual([data.repos, data.repositoryConfigProblems], [[], []]);
 });

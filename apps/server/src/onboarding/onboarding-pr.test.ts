@@ -17,7 +17,7 @@ const PR = 'https://github.com/maddec01/lar-web/pull/14';
 async function dataDir(t: TestContext, entries: object[] = []): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar onboarding pr test '));
   t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
-  await writeFile(join(dir, 'repositories.json'), JSON.stringify({ repositories: entries }));
+  await writeFile(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: entries }));
   return dir;
 }
 
@@ -196,7 +196,7 @@ test("a failing gh call answers with gh's message and keeps no PR; Retry goes on
     calls.length = 0;
     assert.equal((await open({ repo: 'maddec01/lar-web', progress, config, picks }) as { prUrl: string }).prUrl, PR);
     assert.deepEqual(calls.map((args) => args[1]), after);
-    await writeFile(join(dir, 'repositories.json'), JSON.stringify({ repositories: [{ repo: 'maddec01/lar-web', onboarding: progress }] }));
+    await writeFile(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: [{ repo: 'maddec01/lar-web', onboarding: progress }] }));
   }
 });
 
@@ -536,11 +536,11 @@ test("Reset of an onboarded repository whose entry can't be marked resetting nam
   const { run } = gh({}, {}, { '.lar-factory.json': LAR_CONFIG });
   const marking = async (args: string[]) => {
     const out = await run(args);
-    if (args[0] === 'pr' && args[1] === 'create') await writeFile(join(dir, 'repositories.json'), '{');
+    if (args[0] === 'pr' && args[1] === 'create') await writeFile(join(dir, 'repository-settings.json'), '{');
     return out;
   };
   assert.deepEqual(await resetRepository({ repo: 'maddec01/lar-web' }, dir, marking),
-    { status: 409, error: `Opened maddec01/lar-web's reset PR, ${PR}, but can't mark it resetting: ${join(dir, 'repositories.json')} isn't valid JSON.` });
+    { status: 409, error: `Opened maddec01/lar-web's reset PR, ${PR}, but can't mark it resetting: ${join(dir, 'repository-settings.json')} isn't valid JSON.` });
 });
 
 test("Reset of an onboarded repository whose PR can't be opened answers with gh's message and keeps the entry onboarded", async (t) => {
@@ -696,7 +696,7 @@ test("on Azure Repos, a failed push answers with az's message, and Retry goes on
     assert.equal((await open({ repo: AZURE, progress, config, picks }) as { prUrl: string }).prUrl, AZURE_PR);
     assert.deepEqual(az.calls.map((args) => (args[0] === 'devops' ? `invoke ${args[args.indexOf('--area') + 1]}/${args[args.indexOf('--resource') + 1]}` : args.slice(0, 3).join(' '))), retried);
     assert.equal(az.pushes.length, 1);
-    await writeFile(join(dir, 'repositories.json'), JSON.stringify({ repositories: [{ repo: AZURE, onboarding: progress }] }));
+    await writeFile(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: [{ repo: AZURE, onboarding: progress }] }));
   }
 });
 

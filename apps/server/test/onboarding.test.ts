@@ -14,7 +14,7 @@ import { rawIssue } from '@lar-factory/shared/test/raw-items';
 function writeList(home: string, repositories: object[]): void {
   const dir = join(home, 'Library/Application Support/Lar Factory');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'repositories.json'), JSON.stringify({ repositories }));
+  writeFileSync(join(dir, 'repository-settings.json'), JSON.stringify({ repositories }));
 }
 
 test("the onboarding T3 project step reads T3's projects with each repository's .lar-factory.json and place on the board", async (t) => {
@@ -119,7 +119,7 @@ test('closing onboarding keeps its repository on the list as onboarding, which t
   const response = await board.post({ repo: 'maddec01/lar-web', progress }, board.url, '/api/onboarding/repositories');
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json() as { board: BoardData }).board.onboarding, [{ repo: 'maddec01/lar-web', progress }]);
-  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')),
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')),
     { repositories: [{ repo: 'maddec01/lar-web', onboarding: progress }] });
   await board.stop();
   const restarted = await startBoard(t, {}, false, false, { HOME: home });
@@ -250,7 +250,7 @@ test('opening the onboarding PR keeps its URL on the Pull request step, and its 
   await board.update({ repoConfigs: { 'maddec01/lar-web': { role: 'Web client', itemSource: { kind: 'issues' } } }, prs: { [PR]: 'MERGED' } });
   const data = await until(board, (d) => d.repos.length === 2);
   assert.deepEqual([data.repos.map((r) => r.repo), data.onboarding], [['maddec01/lar-factory', 'maddec01/lar-web'], []]);
-  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')),
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')),
     { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web' }] });
 });
 
@@ -298,7 +298,7 @@ test("Reset closes an onboarding's open PR and drops it from the board and the l
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json() as { board: BoardData }).board.onboarding, []);
   assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'close').map((args) => args.slice(0, 3)), [['pr', 'close', PR]]);
-  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')),
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')),
     { repositories: [{ repo: 'maddec01/lar-factory' }] });
 });
 
@@ -307,7 +307,7 @@ test("a Reset whose PR gh can't close answers with gh's message and keeps the on
   await until(board, (d) => d.onboarding?.length === 1);
   const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
   assert.deepEqual([response.status, await response.json()], [502, { error: "Can't close maddec01/lar-web's onboarding PR: gh pr close failed: HTTP 403: Resource not accessible by integration" }]);
-  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories,
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')).repositories,
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } }]);
 });
 
@@ -325,7 +325,7 @@ test('Reset of an onboarded repository opens its reset PR and takes it off the b
   assert.deepEqual(data.resetting, [{ repo: 'maddec01/lar-web', prUrl: PR }]);
   assert.deepEqual([data.repos.map((r) => r.repo), data.items.map((i) => i.number)], [['maddec01/lar-factory'], [1]]);
   assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'create').map((args) => args[args.indexOf('--head') + 1]), ['lar-factory/reset']);
-  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories,
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')).repositories,
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', resetting: { prUrl: PR } }]);
   await board.stop();
   const restarted = await startBoard(t, options, false, false, { HOME: home });
@@ -344,7 +344,7 @@ test("a Reset whose reset PR can't be opened answers with gh's message and keeps
   const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
   assert.equal(response.status, 502);
   assert.match((await response.json() as { error: string }).error, /^Can't open maddec01\/lar-web's reset PR: gh pr create failed: /);
-  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories, [{ repo: 'maddec01/lar-web' }]);
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')).repositories, [{ repo: 'maddec01/lar-web' }]);
 });
 
 test('a .lar-factory.json that lands another way finishes onboarding and closes the PR with a comment', async (t) => {
@@ -353,7 +353,7 @@ test('a .lar-factory.json that lands another way finishes onboarding and closes 
   assert.deepEqual(data.onboarding, []);
   const close = (await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'close');
   assert.deepEqual(close.map((args) => args.slice(0, 4)), [['pr', 'close', PR, '--comment']]);
-  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')),
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')),
     { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web' }] });
 });
 

@@ -96,6 +96,9 @@ const OPERATIONS: Record<RepositoryOperation, { title: [string, string]; cost?: 
   'publish-ticket': { title: ['Open issues', 'Create work items'] },
   'edit-ticket': { title: ['Edit issues', 'Edit work items'], cost: "You can edit a ticket's description in its item dialog. Off: the dialog only shows it." },
   'tag-ticket': { title: ['Add labels', 'Add tags'] },
+  'comment-ticket': { title: ['Post comments', 'Post comments'] },
+  'type-ticket': { title: ['Set issue types', 'Set work item types'] },
+  'relate-ticket': { title: ['Link issues', 'Link work items'] },
 };
 
 /** The operation's title on the detected provider. */

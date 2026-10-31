@@ -5,8 +5,11 @@
 // board sent back shows each change.
 
 import { create } from 'zustand';
-import { REPOSITORY_OPERATIONS, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings, type SharedSetting } from '@lar-factory/shared';
+import { REPOSITORY_OPERATIONS, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings, type SharedSetting, type VocabularyKey, type VocabularyTerm } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
+
+/** Settings whose editor uses text drafts. Vocabulary saves one complete term at a time. */
+export type DraftSetting = Exclude<SharedSetting, 'vocabulary'>;
 
 /** The text of each field the dialog edits, by field. */
 export interface Drafts {
@@ -21,7 +24,7 @@ export interface Drafts {
 }
 
 /** The fields that make each setting's value. */
-const FIELDS: Record<SharedSetting, (keyof Drafts)[]> = {
+const FIELDS: Record<DraftSetting, (keyof Drafts)[]> = {
   role: ['role'], itemSource: ['team'], labels: ['labels'], skills: ['skills'], domainDocs: ['domainDocs', 'glossary', 'adrs'],
 };
 
@@ -38,7 +41,7 @@ const list = (text: string) => text.split(',').map((part) => part.trim()).filter
 export const shownDrafts = (setup: RepositorySetup, typed: Partial<Drafts>): Drafts => ({ ...draftsOf(setup), ...typed });
 
 /** The value `key`'s fields make, or null while one is empty that the value needs. */
-export function valueOf(key: SharedSetting, drafts: Drafts): SharedRepositorySettings[SharedSetting] | null {
+export function valueOf(key: DraftSetting, drafts: Drafts): SharedRepositorySettings[SharedSetting] | null {
   switch (key) {
     case 'role': return drafts.role.trim();
     case 'itemSource': return drafts.team.trim() ? { kind: 'azure-board', team: drafts.team.trim() } : null;
@@ -51,7 +54,7 @@ export function valueOf(key: SharedSetting, drafts: Drafts): SharedRepositorySet
 }
 
 /** Whether `key`'s fields make a value other than the setup's, so Save has something to set. */
-export function canSave(key: SharedSetting, setup: RepositorySetup, typed: Partial<Drafts>): boolean {
+export function canSave(key: DraftSetting, setup: RepositorySetup, typed: Partial<Drafts>): boolean {
   const value = valueOf(key, shownDrafts(setup, typed));
   return value !== null && JSON.stringify(value) !== JSON.stringify(setup[key]);
 }
@@ -69,17 +72,18 @@ interface EditState {
   open: (repo: string) => void;
   close: () => void;
   type: (field: keyof Drafts, text: string) => void;
-  save: (repo: string, key: SharedSetting, setup: RepositorySetup) => Promise<void>;
-  useShared: (repo: string, key: SharedSetting) => Promise<void>;
+  save: (repo: string, key: DraftSetting, setup: RepositorySetup) => Promise<void>;
+  useShared: (repo: string, key: DraftSetting) => Promise<void>;
   recheck: (repo: string) => Promise<void>;
   /** Offers `op` or stops offering it, keeping the other operations the setup offers. */
   offer: (repo: string, op: RepositoryOperation, on: boolean, setup: RepositorySetup) => Promise<void>;
+  vocabulary: (repo: string, key: VocabularyKey, value: VocabularyTerm | undefined) => Promise<boolean>;
   accept: (repo: string) => Promise<void>;
 }
 
 export const useEditStore = create<EditState>()((set, get) => {
   /** Posts the change for `repo`; once it lands, `key`'s typed text gives way to the setup the board sent back. */
-  async function call(repo: string, running: Running, change: object, key?: SharedSetting): Promise<void> {
+  async function call(repo: string, running: Running, change: object, key?: DraftSetting): Promise<void> {
     if (get().running) return;
     const { [repo]: _, ...errors } = get().errors;
     set({ running, errors });
@@ -103,6 +107,10 @@ export const useEditStore = create<EditState>()((set, get) => {
     recheck: (repo) => call(repo, 'recheck', { change: 'recheck' }),
     offer: (repo, op, on, setup) => call(repo, 'consent', { change: 'consent',
       value: REPOSITORY_OPERATIONS.filter((o) => (o === op ? on : setup.consent.includes(o))) }),
+    vocabulary: async (repo, key, value) => {
+      await call(repo, 'vocabulary', { change: 'vocabulary', key, ...value !== undefined && { value } });
+      return !get().errors[repo];
+    },
     accept: (repo) => call(repo, 'accept', { change: 'accept' }),
   };
 });

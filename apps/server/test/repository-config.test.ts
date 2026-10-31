@@ -29,8 +29,8 @@ test('each onboarded repository reads its items from the item source its .lar-fa
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(data.error, null);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]), [[FACTORY, 1, 'Queued'], [APPLE, 7, 'Queued'], [FACTORY, 2, 'List']], 'Queued work comes first, in Queue order');
-  assert.deepEqual(data.repos.map(({ setup: _, ...row }) => row), [{ repo: FACTORY, role: 'The factory', items: 'issues', labels: [], version: 1 },
-    { repo: APPLE, role: 'Apple client', items: 'issues', labels: ['app: music'], version: 1 }]);
+  assert.deepEqual(data.repos.map(({ setup: _, ...row }) => row), [{ repo: FACTORY, role: 'The factory', items: 'issues', labels: [], version: 1, configUpdate: 2 },
+    { repo: APPLE, role: 'Apple client', items: 'issues', labels: ['app: music'], version: 2 }]);
 });
 
 test('without a list of onboarded repositories the board is empty', async (t) => {
@@ -86,7 +86,7 @@ test('a change to a .lar-factory.json shows on the next refresh, and the board s
   await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple app', itemSource: { kind: 'issues' } } } });
   const data: BoardData = await until(board, (d) => d.repos[0]?.role === 'Apple app');
   assert.deepEqual(data.items, [], 'an issue with no work record stays off the board');
-  assert.deepEqual(data.repos.map(({ setup: _, ...row }) => row), [{ repo: APPLE, role: 'Apple app', items: 'issues', labels: [], version: 1 }]);
+  assert.deepEqual(data.repos.map(({ setup: _, ...row }) => row), [{ repo: APPLE, role: 'Apple app', items: 'issues', labels: [], version: 2 }]);
 });
 
 test('a repository without a .lar-factory.json is on the board from its local settings', async (t) => {

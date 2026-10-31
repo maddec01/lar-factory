@@ -222,6 +222,11 @@ export async function readBranchFile(repo: string, path: string, branch?: string
   }
 }
 
+/** An authenticated GET of all pages of provider metadata. */
+export async function githubJson(path: string, run: (args: string[]) => Promise<string> = gh): Promise<unknown> {
+  return JSON.parse(await run(['api', '--method', 'GET', path, '--paginate', '--slurp']));
+}
+
 /** What gh's login may do in the repository, as its `permissions` say, and whether it has issues turned on. */
 export async function repositoryAccess(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<{ push: boolean; triage: boolean; issues: boolean }> {
   const { push, triage, issues } = JSON.parse(await run(['api', `repos/${repo}`, '--jq', '{push: .permissions.push, triage: .permissions.triage, issues: .has_issues}'])) as Record<string, unknown>;

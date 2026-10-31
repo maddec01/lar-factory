@@ -6,6 +6,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { pageWithData, sameRepo, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
+import type { PublicationSettings } from '@lar-factory/shared/publication-settings';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
@@ -66,6 +67,7 @@ export interface HttpDeps {
   /** Records the repository's config update notice dismissed at the app's version, on this Mac, or says why it can't for a repository that isn't onboarded. */
   dismissConfigUpdate(repo: string): Refused | null;
   /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
+  publicationVocabulary(repo: unknown): Promise<PublicationSettings | Refused>;
   changeRepositorySettings(input: Record<string, unknown>): { setup: RepositorySetup } | Refused;
 }
 
@@ -142,7 +144,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings, publicationVocabulary }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -537,6 +539,11 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     if (path === '/api/onboarding/projects') return projectsRequest(res);
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
+    if (path === '/api/publication/vocabulary') {
+      if (sample) return json(res, 403, { error: 'Sample mode discovers no provider Vocabulary.' });
+      const result = await publicationVocabulary(url.searchParams.get('repo'));
+      return 'error' in result ? json(res, result.status, { error: result.error }) : json(res, 200, result);
+    }
     if (path === '/api/tickets') return ticketsRequest(url, res);
     if (path === '/api/archive') return json(res, 200, { items: archive() });
     if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));

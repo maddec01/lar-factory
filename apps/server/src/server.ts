@@ -1,3 +1,4 @@
+import { publicationVocabulary } from './publication/vocabulary.ts';
 import { repositoryProjects, reauthorizeRepositoryProjects } from './t3/repository-project-discovery.ts';
 // The board server: reads each item source through `gh` or `az` at its own pace, every 15 s while it holds active work
 // and every 5 min while idle, refreshes T3's threads and stats every 2 s without either, keeps the last good copy in
@@ -708,6 +709,7 @@ const { server, endStreams } = createBoardServer({
   },
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input),
   openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),
+  publicationVocabulary,
   changeRepositorySettings: (input) => changeRepositorySettings(input),
 });
 

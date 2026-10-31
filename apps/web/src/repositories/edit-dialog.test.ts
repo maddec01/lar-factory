@@ -5,16 +5,16 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
-import type { BoardData, RepositorySetup } from '@lar-factory/shared';
+import { effectiveVocabulary, type BoardData, type RepositorySetup } from '@lar-factory/shared';
 
 const REPO = 'maddec01/lar-server';
 
 const SETUP: RepositorySetup = {
   repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, labels: ['area: server'],
-  domainDocs: { kind: 'private' }, skills: [],
-  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused' },
+  domainDocs: { kind: 'private' }, skills: [], ...effectiveVocabulary(),
+  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
   consent: ['push-branch'], paused: [],
-  sources: { role: 'shared', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default' },
+  sources: { role: 'shared', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default', vocabulary: 'default' },
   shared: { role: 'Backend API server', labels: ['area: web'] },
 };
 
@@ -65,7 +65,7 @@ test('Edit shows each setting with where it comes from, has no Show setting, and
   expect(buttonIn(row(), 'Reset')).toBeUndefined();
   await settle(() => buttonIn(row(), 'Edit')!.click());
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Edit ${REPO}`);
-  expect([...dialog()!.querySelectorAll('[data-setting]')].map((s) => s.getAttribute('data-setting'))).toEqual(['role', 'itemSource', 'labels', 'domainDocs', 'skills']);
+  expect([...dialog()!.querySelectorAll('[data-setting]')].map((s) => s.getAttribute('data-setting'))).toEqual(['role', 'itemSource', 'labels', 'domainDocs', 'skills', 'vocabulary']);
   expect(dialog()!.querySelector('[aria-label="Show"]')).toBeNull();
   expect(text(setting('role').querySelector('[data-source]'))).toBe('Shared default');
   expect(text(setting('labels').querySelector('[data-source]'))).toBe('Set on this Mac');
@@ -124,8 +124,10 @@ test('Offer changes which operations the factory offers, and a refused one canno
   const offer = (op: string) => $<HTMLInputElement>(`[data-edit-dialog] [data-operation="${op}"] input[type="checkbox"]`)!;
   expect([offer('push-branch').checked, offer('open-pr').checked]).toEqual([true, false]);
   expect(offer('edit-ticket').disabled, 'the credentials refuse it').toBe(true);
-  expect(['publish-ticket', 'tag-ticket'].map((op) => $(`[data-edit-dialog] [data-operation="${op}"]`)), 'publishing writes wait for a later build').toEqual([null, null]);
-  expect(text($('[data-edit-dialog] [data-access]'))).toContain('the first time you publish refined work');
+  expect(offer('publish-ticket').checked).toBe(false);
+  expect(offer('comment-ticket').checked).toBe(false);
+  expect(offer('tag-ticket').disabled).toBe(true);
+  expect(text($('[data-edit-dialog] [data-access]'))).toContain('approve the exact content');
   await settle(() => offer('open-pr').click());
   expect(sent).toEqual([{ repo: REPO, change: 'consent', value: ['push-branch', 'open-pr'] }]);
   await settle(() => offer('push-branch').click());
@@ -143,4 +145,32 @@ test("a changed shared item source names the work it pauses on the repository's 
   await settle(() => buttonIn(notice, 'Accept')!.click());
   expect(sent).toEqual([{ repo: REPO, change: 'accept' }]);
   expect(row().querySelector('[data-setup-paused]')).toBeNull();
+});
+
+test('Vocabulary detects on demand, saves one mapping and removes its override from Settings', async () => {
+  let board = boardWith();
+  const sent: Record<string, unknown>[] = [];
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url.startsWith('/api/publication/vocabulary?')) return new Response(JSON.stringify({
+      setup: board.repos[0]!.setup, snapshot: 'fixture', discovery: { provider: 'github', types: { state: 'available', choices: ['Task'] }, labels: { state: 'available', choices: [] } },
+    }));
+    if (url === '/api/repositories/settings') {
+      const body = JSON.parse(String(init?.body));
+      sent.push(body);
+      board = boardWith({ ...effectiveVocabulary(body.value === undefined ? {} : { concept: body.value }) });
+      return new Response(JSON.stringify({ board, error: null }));
+    }
+    return new Response(JSON.stringify(board));
+  });
+  await openEdit(board);
+  expect(fetchMock.mock.calls.some(([url]) => url.startsWith('/api/publication/vocabulary'))).toBe(false);
+  await settle(() => buttonIn(setting('vocabulary'), 'Edit Vocabulary')!.click());
+  expect(text(setting('vocabulary'))).toContain('What we found');
+  await settle(() => buttonIn(setting('vocabulary'), 'Next')!.click());
+  await settle(() => $<HTMLButtonElement>('[data-choice="Task"] [role="radio"]')!.click());
+  await settle(() => buttonIn(setting('vocabulary'), 'Save and next')!.click());
+  expect(sent).toEqual([{ repo: REPO, change: 'vocabulary', key: 'concept', value: { type: 'Task', labels: [] } }]);
+  await settle(() => buttonIn(setting('vocabulary'), 'Back')!.click());
+  await settle(() => buttonIn(setting('vocabulary'), 'Use factory default')!.click());
+  expect(sent.at(-1)).toEqual({ repo: REPO, change: 'vocabulary', key: 'concept' });
 });

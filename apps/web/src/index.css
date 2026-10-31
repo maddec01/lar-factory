@@ -26,6 +26,7 @@
 @source "./line";
 @source "./list";
 @source "./onboarding";
+@source "./publication";
 @source "./repositories";
 @source "./notices/warning.tsx";
 @source "./notices/warnings.tsx";

@@ -1,6 +1,8 @@
 // The board's data model and the rules that place an item in the flow.
 // Shared by the server and the browser, so it imports nothing but types.
 
+import type { EffectiveVocabulary, VocabularyMapping, VocabularySources } from './vocabulary.ts';
+
 import type { SkillStatus } from './install-skills.ts';
 
 export const STATUSES = [
@@ -793,10 +795,11 @@ export interface SharedRepositorySettings {
   domainDocs?: DomainDocLocation;
   /** The project skills the user selected as coding guidance for builds. */
   skills?: string[];
+  vocabulary?: VocabularyMapping;
 }
 
 /** The settings Repository config may share, in the order Settings lists them. */
-export const SHARED_SETTINGS = ['role', 'itemSource', 'labels', 'domainDocs', 'skills'] as const satisfies readonly (keyof SharedRepositorySettings)[];
+export const SHARED_SETTINGS = ['role', 'itemSource', 'labels', 'domainDocs', 'skills', 'vocabulary'] as const satisfies readonly (keyof SharedRepositorySettings)[];
 
 export type SharedSetting = (typeof SHARED_SETTINGS)[number];
 
@@ -804,14 +807,14 @@ export type SharedSetting = (typeof SHARED_SETTINGS)[number];
 export type SettingSource = 'local' | 'shared' | 'default';
 
 /** The repository writes the factory may need, each with its own credential access and local write consent. */
-export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket'] as const;
+export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket'] as const;
 
 export type RepositoryOperation = (typeof REPOSITORY_OPERATIONS)[number];
 
-/** The writes only publishing uses. Publishing arrives in a later build, so until then nothing offers them. */
-export const PUBLISHING_OPERATIONS: readonly RepositoryOperation[] = ['publish-ticket', 'tag-ticket'];
+/** The writes first publication offers separately from onboarding. */
+export const PUBLISHING_OPERATIONS: readonly RepositoryOperation[] = ['publish-ticket', 'tag-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket'];
 
-/** The writes a current feature uses, which onboarding and Settings offer. */
+/** The writes onboarding offers. Publication asks for its own operations when first used. */
 export const OFFERED_OPERATIONS = REPOSITORY_OPERATIONS.filter((op) => !PUBLISHING_OPERATIONS.includes(op));
 
 /** What the user's credentials allow for an operation, as last found; one not needed since the last check stays unverified. */
@@ -831,6 +834,8 @@ export interface RepositorySetup {
   labels: string[];
   domainDocs: DomainDocLocation;
   skills: string[];
+  vocabulary: EffectiveVocabulary;
+  vocabularySources: VocabularySources;
   access: Record<RepositoryOperation, OperationAccess>;
   /** The operations the user allows the factory to offer, less those the credentials refuse. */
   consent: RepositoryOperation[];
@@ -845,7 +850,7 @@ export interface RepositorySetup {
 }
 
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
-export interface RepositoryConfigAnswers {
+export interface RepositoryConfigAnswers extends SharedRepositorySettings {
   itemSource: RepositoryItemSource;
   role: string;
   /** Its custom labels: the file's `labels`, or those the Labels step picked. */
@@ -856,11 +861,11 @@ export interface RepositoryConfigAnswers {
  * The Repository config `version` the app writes. Raise it only when .lar-factory.json's shape changes: a file at a
  * lower version then gets a notice offering a PR that rewrites it in the new shape.
  */
-export const CONFIG_VERSION = 1;
+export const CONFIG_VERSION = 2;
 
 /** The .lar-factory.json that onboarding's PR adds and Edit's PR writes, at CONFIG_VERSION unless a test names another. */
-export const onboardingConfigFile = ({ role, itemSource, labels }: RepositoryConfigAnswers, version = CONFIG_VERSION): string =>
-  `${JSON.stringify({ version, role, itemSource, labels }, null, 2)}\n`;
+export const onboardingConfigFile = ({ role, itemSource, labels, vocabulary, domainDocs, skills }: RepositoryConfigAnswers, version = CONFIG_VERSION): string =>
+  `${JSON.stringify({ version, role, itemSource, labels, vocabulary, domainDocs, skills }, null, 2)}\n`;
 
 /**
  * What the setup step has answered so far, as typed. Only Azure DevOps asks for a team.

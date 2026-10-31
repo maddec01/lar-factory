@@ -17,9 +17,9 @@ async function dataDir(t: TestContext, files: Record<string, string> = { 'reposi
   return dir;
 }
 
-test('the app writes Repository config version 1, so a file at version 1 gets no notice', () => {
-  assert.equal(CONFIG_VERSION, 1);
-  assert.equal(configUpdateOf({ repo: 'maddec01/lar-web', version: 1 }, new Map()), undefined);
+test('the app writes Repository config version 2, so a file at version 2 gets no notice', () => {
+  assert.equal(CONFIG_VERSION, 2);
+  assert.equal(configUpdateOf({ repo: 'maddec01/lar-web', version: 2 }, new Map()), undefined);
 });
 
 test('a file below the app version gets the notice at the app version, one at or above it none', () => {

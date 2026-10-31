@@ -163,13 +163,13 @@ const fact = (label: string) => text(body().querySelector(`[data-fact="${label}"
 
 test('What we found lists each detected fact, with what the login allows, refuses and leaves unverified', async () => {
   await openAt('What we found', routes(detection({
-    access: { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'unverified', 'tag-ticket': 'refused' },
+    access: { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
     domainDocs: { found: { kind: 'repository', glossary: 'CONTEXT.md', adrs: 'docs/adr' } }, projectSkills: { found: ['tdd', 'web-style'] },
   })));
   expect(fact('Provider')).toBe('GitHub');
   expect(fact('Repository folder')).toBe('/Users/me/Developer/lar-web');
   expect(fact('Item source')).toBe("maddec01/lar-web's issues");
-  expect(fact('Credential access')).toBe('Allowed: open issues. Refused: push branches, add labels. Unverified until needed: open pull requests, edit issues.');
+  expect(fact('Credential access')).toBe('Allowed: open issues. Refused: push branches, add labels. Unverified until needed: open pull requests, edit issues, post comments, set issue types, link issues.');
   expect(fact('Domain docs')).toBe('CONTEXT.md and docs/adr/');
   expect(fact('Factory files')).toBe('None found');
   expect(fact('Repository config')).toBe('None. Every setting is yours.');
@@ -213,7 +213,7 @@ test('the role step holds Next until it has a role, saying why', async () => {
 });
 
 test('Write consent preselects every allowed write, shows a cost line on each, Refused ones locked off, and names publishing writes for later', async () => {
-  await openAt('Write consent', routes(detection({ access: { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed' } })));
+  await openAt('Write consent', routes(detection({ access: { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' } })));
   expect(origin()).toBe('Detected');
   expect(text(body().querySelector('[data-origin]'))).toContain('The default is preselected.');
   expect(['publish-ticket', 'tag-ticket'].map((id) => body().querySelector(`[data-option="${id}"]`)), 'no control for a later feature').toEqual([null, null]);

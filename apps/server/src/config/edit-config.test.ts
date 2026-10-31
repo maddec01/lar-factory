@@ -175,3 +175,15 @@ test("on Azure, a refused push or PR shows az's message", async () => {
   assert.deepEqual(await openUpdate({ repo: AZURE }, refused('pr create', 'TF401179: An active pull request already exists.'), 4, AZURE_LISTED),
     { status: 502, error: `Can't open ${AZURE}'s Edit PR: TF401179: An active pull request already exists.` });
 });
+
+test('a config update preserves shared Vocabulary and validates it before proposing a write', async () => {
+  const vocabulary = { build: { type: null, labels: [] }, bug: { type: 'Bug', labels: ['defect'] } };
+  const { calls, run } = gh({ file: JSON.stringify({ role: 'API', vocabulary }) });
+  assert.deepEqual(await openConfigUpdatePr({ repo: REPO }, run, 2), { prUrl: PR });
+  const tree = writes(calls)[0]!;
+  assert.deepEqual(JSON.parse(field(tree, 'tree[][content]')[0]!).vocabulary, vocabulary);
+  const malformed = gh({ file: JSON.stringify({ role: 'API', vocabulary: { build: null } }) });
+  const result = await openConfigUpdatePr({ repo: REPO }, malformed.run, 2);
+  assert.ok('error' in result && result.error.includes('vocabulary'));
+  assert.deepEqual(writes(malformed.calls), []);
+});

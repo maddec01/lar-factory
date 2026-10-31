@@ -1,11 +1,15 @@
 #!/usr/bin/env -S node --disable-warning=ExperimentalWarning
 // lar-work: reads and changes work records by opening the work-record database directly, so shaping and build threads
-// use it from any folder while the board app is closed. It prints each record as JSON on stdout and each error as one
-// line on stderr.
+// use it from any folder while the board app is closed. It prints each result as JSON on stdout, a body as its markdown,
+// and each error as one line on stderr.
 
+import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import type { Status } from '@lar-factory/shared';
-import { openWorkRecords, WorkRecordError, workRecordsPath, type WorkKind, type WorkRecords } from './work-records.ts';
+import {
+  openWorkRecords, WorkRecordError, workRecordsPath, type Body, type BuildPhase, type FindingDisposition, type NewReviewRound, type ReviewAxis,
+  type WorkKind, type WorkRecords,
+} from './work-records.ts';
 
 const HELP = `Usage: lar-work <command> [options]
 
@@ -50,6 +54,49 @@ Structure
   blockers <work-id>                Print the records it waits on.
   dependents <work-id>              Print the records that wait on it.
 
+Content
+  A record keeps its markdown here only; nothing is written to a ticket. A
+  concept holds a map, a decision its text, and any other record a brief. A
+  --file of - reads standard input.
+  set-body <work-id> --revision N --body brief|decision|map --file F
+                                    Replace the body with the markdown in F.
+  body <work-id> --body B           Print the body as markdown.
+  set-phase <work-id> --revision N --phase P
+                                    P is one of plan, implement, domain-docs,
+                                    full-checks, review, approve, checks, retro.
+  set-pr <work-id> --revision N --pr owner/name#12
+                                    Record the PR the build delivers through.
+  record-review-round <work-id> --revision N --file F
+                                    Record the build's next review round from the
+                                    JSON in F: {"base": sha, "reviewers": [{"axis",
+                                    "verdict", "notChecked"?, "findings": [{"severity",
+                                    "summary", "disposition", "reason"?}]}]}. Axes are
+                                    code, security, ui and performance; verdicts
+                                    approve, changes and skipped; severities blocker,
+                                    should and nit; dispositions open, fixed and
+                                    rejected. A skipped axis or a rejection needs a
+                                    reason. A round with any bad part records nothing.
+  set-disposition <work-id> --revision N --round R --axis A --finding K
+                  --disposition D [--reason X]
+                                    Change what became of the axis's Kth finding.
+  review-rounds <work-id>           Print the build's review rounds.
+
+Threads and launch intents
+  A thread ID is T3's. A launch intent is recorded before the board asks T3 to
+  start a thread, and resolved once T3 answers, so a restart finds the start
+  instead of making a second one. lar-work never starts or checks a thread.
+  A purpose is a lowercase word naming what the thread does, such as build.
+  add-thread <work-id> --revision N --thread T --purpose P
+  threads <work-id>                 Print the record's threads.
+  record-intent <work-id> --revision N --purpose P
+                                    Print the record and the new intent.
+  intents [--repository R] [--unresolved]
+                                    Print launch intents, oldest first.
+  resolve-intent <work-id> --revision N --intent I (--thread T | --failure F)
+                                    Resolve the intent to T3's thread T, which joins
+                                    the record's threads, or to failure F. An intent
+                                    resolves once.
+
 Options
   --data-dir D   Use the work-record database in folder D instead of the
                  factory's data folder (${workRecordsPath()}).
@@ -64,8 +111,9 @@ Errors
 class UsageError extends Error {}
 
 const TAKES_WORK_ID = ['read', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
-  'children', 'blockers', 'dependents'];
-const COMMANDS = ['create', 'import', 'list', ...TAKES_WORK_ID];
+  'children', 'blockers', 'dependents', 'set-body', 'body', 'set-phase', 'set-pr', 'record-review-round', 'set-disposition', 'review-rounds',
+  'add-thread', 'threads', 'record-intent', 'resolve-intent'];
+const COMMANDS = ['create', 'import', 'list', 'intents', ...TAKES_WORK_ID];
 
 const OPTIONS = {
   repository: { type: 'string' },
@@ -75,19 +123,55 @@ const OPTIONS = {
   revision: { type: 'string' },
   parent: { type: 'string' },
   blocker: { type: 'string' },
+  body: { type: 'string' },
+  file: { type: 'string' },
+  phase: { type: 'string' },
+  pr: { type: 'string' },
+  round: { type: 'string' },
+  axis: { type: 'string' },
+  finding: { type: 'string' },
+  disposition: { type: 'string' },
+  reason: { type: 'string' },
+  thread: { type: 'string' },
+  purpose: { type: 'string' },
+  intent: { type: 'string' },
+  failure: { type: 'string' },
+  unresolved: { type: 'boolean' },
   'data-dir': { type: 'string' },
   help: { type: 'boolean' },
 } as const;
 
 type Values = ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>['values'];
 
-function need(values: Values, name: 'repository' | 'kind' | 'ticket' | 'revision' | 'parent' | 'blocker'): string {
+type StringOption = { [K in keyof Values]-?: Values[K] extends string | undefined ? K : never }[keyof Values];
+
+function need(values: Values, name: StringOption): string {
   const value = values[name];
   if (value === undefined) throw new UsageError(`--${name} is required.`);
   return value;
 }
 
-/** Runs `command`; `workId` is set for the commands that take one. */
+/** The text in the file `--file` names, or standard input for `-`. */
+function readInput(values: Values): string {
+  const file = need(values, 'file');
+  try {
+    return readFileSync(file === '-' ? 0 : file, 'utf8');
+  } catch (error) {
+    throw new WorkRecordError('invalid', `Can't read ${file === '-' ? 'standard input' : file}: ${(error as Error).message}.`);
+  }
+}
+
+/** The review round in the JSON `--file` holds. */
+function readRound(values: Values): NewReviewRound {
+  try {
+    return JSON.parse(readInput(values)) as NewReviewRound;
+  } catch (error) {
+    if (error instanceof WorkRecordError) throw error;
+    throw new WorkRecordError('invalid', `The review round in ${values.file} isn't JSON: ${(error as Error).message}.`);
+  }
+}
+
+/** Runs `command`; `workId` is set for the commands that take one. A string result prints as it is, anything else as JSON. */
 function run(records: WorkRecords, command: string, workId: string | undefined, values: Values): unknown {
   const revision = () => Number(need(values, 'revision'));
   const status = values.status as Status | undefined;
@@ -123,6 +207,39 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
       return records.blockers(workId!);
     case 'dependents':
       return records.dependents(workId!);
+    case 'set-body':
+      return records.setBody(workId!, revision(), need(values, 'body') as Body, readInput(values));
+    case 'body': {
+      const body = need(values, 'body') as Body;
+      const markdown = records.body(workId!, body);
+      if (markdown === null) throw new WorkRecordError('not-found', `The work record ${workId} has no ${body}.`);
+      return markdown;
+    }
+    case 'set-phase':
+      return records.setBuildPhase(workId!, revision(), need(values, 'phase') as BuildPhase);
+    case 'set-pr':
+      return records.setPullRequest(workId!, revision(), need(values, 'pr'));
+    case 'record-review-round':
+      return records.recordReviewRound(workId!, revision(), readRound(values));
+    case 'set-disposition':
+      return records.setFindingDisposition(workId!, revision(),
+        { round: Number(need(values, 'round')), axis: need(values, 'axis') as ReviewAxis, finding: Number(need(values, 'finding')) },
+        need(values, 'disposition') as FindingDisposition, values.reason);
+    case 'review-rounds':
+      return records.reviewRounds(workId!);
+    case 'add-thread':
+      return records.addThread(workId!, revision(), need(values, 'thread'), need(values, 'purpose'));
+    case 'threads':
+      return records.threads(workId!);
+    case 'record-intent':
+      return records.recordLaunchIntent(workId!, revision(), need(values, 'purpose'));
+    case 'intents':
+      return records.launchIntents({ repository: values.repository, unresolved: values.unresolved });
+    case 'resolve-intent': {
+      if ((values.thread === undefined) === (values.failure === undefined)) throw new UsageError('resolve-intent needs --thread or --failure, not both.');
+      const outcome = values.thread !== undefined ? { threadId: values.thread } : { failure: values.failure! };
+      return records.resolveLaunchIntent(workId!, revision(), need(values, 'intent'), outcome);
+    }
     default:
       throw new UsageError(`Unknown command "${command}".`);
   }
@@ -149,7 +266,8 @@ async function main(args: string[]): Promise<number> {
       throw new UsageError(workId === undefined ? `${command} needs a work ID.` : `${command} takes no work ID.`);
     }
     records = await openWorkRecords(workRecordsPath(values['data-dir']));
-    process.stdout.write(`${JSON.stringify(run(records, command, workId, values), null, 2)}\n`);
+    const result = run(records, command, workId, values);
+    process.stdout.write(typeof result === 'string' ? result : `${JSON.stringify(result, null, 2)}\n`);
     return 0;
   } catch (error) {
     if (error instanceof UsageError) {

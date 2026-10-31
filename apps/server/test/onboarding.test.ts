@@ -61,7 +61,7 @@ test("T3's projects that can't be read answer with the problem", async (t) => {
   const board = await startBoard(t);
   const response = await fetch(`${board.url}/api/onboarding/projects`);
   assert.equal(response.status, 502);
-  assert.match((await response.json() as { error: string }).error, /^Can't read T3 Code's projects at .*no-t3\.sqlite$/);
+  assert.match((await response.json() as { error: string }).error, /^Can't read T3 Code's projects; reconnect T3 Code before onboarding$/);
 });
 
 test('the sample board lists no T3 projects to onboard', async (t) => {

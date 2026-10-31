@@ -16,3 +16,5 @@ the same files, the builder implements it in the build branch itself, with no
 planner, slice sub-issues or slice worktrees
 ([#626](https://github.com/maddec01/lar-factory/issues/626)). Every other build
 still goes through slices as above.
+
+Partially superseded by [ADR 0037](0037-work-has-a-local-identity-and-t3-owns-execution.md): a slice is a private record its build's work record owns, never a sub-issue. Slices still merge into the build branch, and a Small build still has none.

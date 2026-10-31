@@ -1,0 +1,7 @@
+# Work has a local identity, and T3 owns execution
+
+Settled in [#686](https://github.com/maddec01/lar-factory/issues/686), built in [#694](https://github.com/maddec01/lar-factory/issues/694) on [#636](https://github.com/maddec01/lar-factory/issues/636) and [#693](https://github.com/maddec01/lar-factory/issues/693).
+
+Each work record has a work ID that names it for its whole life, with or without a ticket, so ticketless work and picked tickets work the same way. Its decisions, builds and slices are records it owns, and its threads are the T3 thread IDs recorded on it, not the threads whose first message names a ticket. T3 owns execution facts, such as runs, child tasks and worktrees. A build is Done when its recorded PR merges. A provider observation carries a timestamp and never overwrites refinement in the record, so a later ticket edit changes nothing the factory decided.
+
+This supersedes the slice sub-issues in [ADR 0004](0004-slices-merge-into-the-build-branch.md). Slices still fast-forward into the build branch and get no PR of their own. It completes the switch that [ADR 0035](0035-the-board-reads-t3-through-its-first-party-protocol.md) and [ADR 0005](0005-read-item-stats-from-t3s-database.md) left open: first-message matching survives only in onboarding's one-time import ([ADR 0041](0041-existing-repositories-re-onboard-instead-of-migrating.md)) and in recovering an uncertain launch.

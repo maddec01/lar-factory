@@ -3,6 +3,7 @@
 // the revision it read; a stale revision changes nothing, so the board and threads never overwrite each other's work.
 
 import { randomUUID } from 'node:crypto';
+import type { StatementSync } from 'node:sqlite';
 import { STATUSES, type Status } from '@lar-factory/shared';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 
@@ -11,6 +12,9 @@ export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './da
 /** The board's kinds, plus a build's slice. */
 export const WORK_KINDS = ['bug', 'feature', 'improvement', 'concept', 'decision', 'build', 'slice', 'issue'] as const;
 export type WorkKind = (typeof WORK_KINDS)[number];
+
+/** The kinds each kind may own as a structural parent. */
+const CHILD_KINDS: Partial<Record<WorkKind, readonly WorkKind[]>> = { concept: ['decision', 'build'], build: ['slice'] };
 
 export interface WorkRecord {
   /** The record's local identity, fixed for its life whether or not it has a ticket. */
@@ -23,6 +27,8 @@ export interface WorkRecord {
   queueOrder: number | null;
   /** Its published ticket, `owner/name#number`, or null while it has none. */
   ticket: string | null;
+  /** The work ID of the record that owns it, or null while it has no parent. */
+  parentId: string | null;
   /** Whether it is set aside, which leaves its Status as it was. */
   setAside: boolean;
   /** Counts the record's changes; every change names the revision it read. */
@@ -57,6 +63,18 @@ export interface WorkRecords {
   importTicket(record: NewWorkRecord & { ticket: string }): { record: WorkRecord; created: boolean };
   setAside(workId: string, revision: number): WorkRecord;
   restore(workId: string, revision: number): WorkRecord;
+  /** Puts the record under `parentId`, whose kind must own the record's kind. Clear a parent before setting another. */
+  setParent(workId: string, revision: number, parentId: string): WorkRecord;
+  clearParent(workId: string, revision: number): WorkRecord;
+  /** Records that the work waits on `blockerId`. Refuses a self-blocker and an edge that would close a cycle. */
+  addBlocker(workId: string, revision: number, blockerId: string): WorkRecord;
+  removeBlocker(workId: string, revision: number, blockerId: string): WorkRecord;
+  /** The records it owns, in the order they were made. */
+  children(workId: string): WorkRecord[];
+  /** The records it waits on. */
+  blockers(workId: string): WorkRecord[];
+  /** The records that wait on it. */
+  dependents(workId: string): WorkRecord[];
   close(): void;
 }
 
@@ -67,6 +85,7 @@ interface Row {
   status: Status;
   queue_order: number | null;
   ticket: string | null;
+  parent_id: string | null;
   set_aside_at: string | null;
   revision: number;
   created_at: string;
@@ -80,6 +99,7 @@ const fromRow = (row: Row): WorkRecord => ({
   status: row.status,
   queueOrder: row.queue_order,
   ticket: row.ticket,
+  parentId: row.parent_id,
   setAside: row.set_aside_at !== null,
   revision: row.revision,
   createdAt: row.created_at,
@@ -108,6 +128,14 @@ function checkTicket(ticket: unknown): string {
   return ticket;
 }
 
+/** Throws unless a `parent` may own a `child`. */
+function checkOwns(parent: Row, child: { work_id: string; kind: WorkKind }): void {
+  const owns = CHILD_KINDS[parent.kind] ?? [];
+  if (!owns.includes(child.kind)) {
+    throw invalid(`A ${parent.kind} owns ${owns.length ? `only ${owns.join(' and ')} records` : 'no records'}, so ${parent.work_id} can't own the ${child.kind} ${child.work_id}.`);
+  }
+}
+
 function checkRevision(revision: unknown): number {
   if (!Number.isSafeInteger(revision) || (revision as number) < 1) throw invalid(`The revision "${String(revision)}" isn't a whole number from 1.`);
   return revision as number;
@@ -122,6 +150,16 @@ function workRecords(database: Database): WorkRecords {
   const { db } = database;
   const select = db.prepare('SELECT * FROM work_records WHERE work_id = ?');
   const byTicket = db.prepare('SELECT * FROM work_records WHERE ticket = ?');
+  const childRows = db.prepare('SELECT * FROM work_records WHERE parent_id = ? ORDER BY rowid');
+  const blockerRows = db.prepare('SELECT r.* FROM blockers b JOIN work_records r ON r.work_id = b.blocker_id WHERE b.work_id = ? ORDER BY b.rowid');
+  const dependentRows = db.prepare('SELECT r.* FROM blockers b JOIN work_records r ON r.work_id = b.work_id WHERE b.blocker_id = ? ORDER BY b.rowid');
+  const hasBlocker = db.prepare('SELECT 1 FROM blockers WHERE work_id = ? AND blocker_id = ?');
+  const insertBlocker = db.prepare('INSERT INTO blockers (work_id, blocker_id) VALUES (?, ?)');
+  const deleteBlocker = db.prepare('DELETE FROM blockers WHERE work_id = ? AND blocker_id = ?');
+  // Whether `blocker` already waits on `work`, directly or through other records.
+  const waitsOn = db.prepare(`WITH RECURSIVE waiting (id) AS (SELECT ? UNION SELECT b.blocker_id FROM blockers b JOIN waiting ON b.work_id = waiting.id)
+    SELECT 1 FROM waiting WHERE id = ?`);
+  const bump = db.prepare('UPDATE work_records SET revision = revision + 1, updated_at = ? WHERE work_id = ?');
   const nextQueueOrder = db.prepare('SELECT coalesce(max(queue_order), 0) + 1 AS next FROM work_records WHERE repository = ?');
 
   const find = (workId: string): Row => {
@@ -157,20 +195,28 @@ function workRecords(database: Database): WorkRecords {
     return fromRow(find(workId));
   };
 
-  /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. */
-  const change = (workId: string, revision: number, apply: (row: Row) => Partial<Row>): WorkRecord =>
+  /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. Records `apply`
+   * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. */
+  const change = (workId: string, revision: number, apply: (row: Row, touched: string[]) => Partial<Row>): WorkRecord =>
     database.write(() => {
       const expected = checkRevision(revision);
       const row = find(workId);
       if (row.revision !== expected) {
         throw new WorkRecordError('stale-revision', `The work record ${workId} is at revision ${row.revision}, not ${expected}; read it again and retry.`);
       }
-      const next = { ...row, ...apply(row), revision: row.revision + 1, updated_at: new Date().toISOString() };
-      db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, set_aside_at = ?, revision = ?, updated_at = ?
+      const touched: string[] = [];
+      const next = { ...row, ...apply(row, touched), revision: row.revision + 1, updated_at: new Date().toISOString() };
+      db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, set_aside_at = ?, revision = ?, updated_at = ?
         WHERE work_id = ? AND revision = ?`)
-        .run(next.kind, next.status, next.queue_order, next.ticket, next.set_aside_at, next.revision, next.updated_at, workId, expected);
+        .run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.set_aside_at, next.revision, next.updated_at, workId, expected);
+      for (const id of touched) bump.run(next.updated_at, id);
       return fromRow(find(workId));
     });
+
+  const related = (query: StatementSync, workId: string): WorkRecord[] => database.read(() => {
+    find(workId);
+    return (query.all(workId) as unknown as Row[]).map(fromRow);
+  });
 
   return {
     create: (record) => database.write(() => insert(record)),
@@ -184,6 +230,11 @@ function workRecords(database: Database): WorkRecords {
       const nextStatus = status === undefined ? undefined : checkStatus(status);
       const nextKind = kind === undefined ? undefined : checkKind(kind);
       return change(workId, revision, (row) => {
+        if (nextKind && nextKind !== row.kind) {
+          const child = { work_id: row.work_id, kind: nextKind };
+          if (row.parent_id) checkOwns(find(row.parent_id), child);
+          for (const owned of childRows.all(workId) as unknown as Row[]) checkOwns({ ...row, kind: nextKind }, owned);
+        }
         const moved = nextStatus ?? row.status;
         return {
           status: moved,
@@ -219,6 +270,37 @@ function workRecords(database: Database): WorkRecords {
       if (!row.set_aside_at) throw invalid(`The work record ${workId} isn't set aside.`);
       return { set_aside_at: null };
     }),
+    setParent: (workId, revision, parentId) => change(workId, revision, (row, touched) => {
+      const parent = find(parentId);
+      if (row.parent_id) throw invalid(`The work record ${workId} already has the parent ${row.parent_id}; clear it first.`);
+      checkOwns(parent, row);
+      touched.push(parentId);
+      return { parent_id: parentId };
+    }),
+    clearParent: (workId, revision) => change(workId, revision, (row, touched) => {
+      if (!row.parent_id) throw invalid(`The work record ${workId} has no parent.`);
+      touched.push(row.parent_id);
+      return { parent_id: null };
+    }),
+    addBlocker: (workId, revision, blockerId) => change(workId, revision, (row, touched) => {
+      find(blockerId);
+      if (blockerId === workId) throw invalid(`The work record ${workId} can't block itself.`);
+      if (hasBlocker.get(workId, blockerId)) throw invalid(`The work record ${workId} is already blocked by ${blockerId}.`);
+      if (waitsOn.get(blockerId, workId)) throw invalid(`The work record ${blockerId} already waits on ${workId}, so blocking ${workId} by it would make a cycle.`);
+      insertBlocker.run(workId, blockerId);
+      touched.push(blockerId);
+      return {};
+    }),
+    removeBlocker: (workId, revision, blockerId) => change(workId, revision, (row, touched) => {
+      if (!deleteBlocker.run(workId, blockerId).changes) {
+        throw invalid(`The work record ${workId} isn't blocked by ${blockerId}.`);
+      }
+      touched.push(blockerId);
+      return {};
+    }),
+    children: (workId) => related(childRows, workId),
+    blockers: (workId) => related(blockerRows, workId),
+    dependents: (workId) => related(dependentRows, workId),
     close: () => database.close(),
   };
 }

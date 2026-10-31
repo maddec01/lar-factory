@@ -83,11 +83,32 @@ export function subscribeExecutionShell(origin: URL, version: string, protocol: 
   let sequence = -1;
   return subscribeProjects(origin, version, protocol,
     read => onChange({ availability: read.availability, observation }), {
-      tag: 'orchestration.subscribeShell', payload: { requestCompletionMarker: true },
+      tag: 'orchestration.subscribeShell', payload: { requestCompletionMarker: true, omitIdleSubagents: false, omitOlderSettled: false },
       accept(value) {
         if (!isRecord(value)) throw Error('Invalid shell event');
         if (value.kind === 'synchronized') return;
-        if (value.kind !== 'snapshot' || !isRecord(value.snapshot)) throw Error('Shell refresh required');
+        if (value.kind !== 'snapshot') {
+          if (!observation || !Number.isSafeInteger(value.sequence)) throw Error('Shell refresh required');
+          if ((value.sequence as number) <= sequence) return;
+          const snapshot = { ...observation.snapshot };
+          const threadEvent = value.kind === 'thread.updated' || value.kind === 'thread.removed';
+          const projectEvent = value.kind === 'project.updated' || value.kind === 'project.removed';
+          if (!threadEvent && !projectEvent) throw Error('Unknown shell event');
+          if (threadEvent && !['active', 'archive'].includes(String(value.location))) throw Error('Invalid thread location');
+          const key = projectEvent ? 'projects' : value.location === 'archive' ? 'archivedThreads' : 'threads';
+          const record = projectEvent ? value.project : value.thread;
+          const removed = value.kind === 'thread.removed' || value.kind === 'project.removed';
+          const id = removed ? projectEvent ? value.projectId : value.threadId : isRecord(record) ? record.id : undefined;
+          if (typeof id !== 'string') throw Error('Invalid shell ID');
+          snapshot[key] = (snapshot[key] as Record<string, unknown>[]).filter(entry => entry.id !== id);
+          if (!removed) (snapshot[key] as Record<string, unknown>[]).push(record as Record<string, unknown>);
+          sequence = value.sequence as number;
+          snapshot.snapshotSequence = sequence;
+          observation = { snapshot, observedAt: new Date().toISOString() };
+          onChange({ availability: 'available', observation });
+          return;
+        }
+        if (!isRecord(value.snapshot)) throw Error('Invalid shell snapshot');
         const snapshot = value.snapshot;
         if (!Number.isSafeInteger(snapshot.snapshotSequence) || (snapshot.snapshotSequence as number) < 0 || !['projects', 'threads', 'archivedThreads'].every(key => Array.isArray(snapshot[key]) && snapshot[key].every(isRecord))) throw Error('Invalid shell snapshot');
         if ((snapshot.snapshotSequence as number) < sequence) return;

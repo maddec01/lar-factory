@@ -42,6 +42,7 @@ import { createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectHints } from './t3/repository-project.ts';
+import { protocolItemThreads } from './t3/item-execution.ts';
 import { loadT3Reads, warmT3Stats } from './t3/t3-reads.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
 import { TOOL_NAMES, checkTools, lookUpTools, missingTool, probeGh, tools } from './tools/tools.ts';
@@ -239,7 +240,8 @@ let transcriptsRead = false;
 function withT3Reads(items: Item[], withStats = true): Item[] {
   const now = Date.now();
   const fresh = withStats && transcriptsRead;
-  const { stats, threads, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, fresh);
+  const threads = (item: Pick<Item, 'repo' | 'number'>) => protocolItemThreads(item.repo, item.number);
+  const { stats, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, fresh);
   if (fresh) {
     statsReadAt = now;
     statsUnavailable(unreadable);

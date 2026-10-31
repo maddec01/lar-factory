@@ -11,6 +11,7 @@
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item";
+@source "./archive";
 @source "./app.tsx";
 @source "./copy/copy-button.tsx";
 @source "./description-editor";

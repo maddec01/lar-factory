@@ -15,15 +15,22 @@ function Fact({ label, children, ...rest }: { label: string; children: ReactNode
   return <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm" {...rest}><span className="shrink-0 text-xs text-(--muted-foreground)">{label}</span>{children}</div>;
 }
 
-type Exported = { state: 'idle' | 'exporting' } | { state: 'done'; paths: string[] } | { state: 'failed'; error: string };
+export type Exported = { state: 'idle' | 'exporting' } | { state: 'done'; paths: string[] } | { state: 'failed'; error: string };
 
-function ExportMarkdown({ itemId, exported, setExported }: { itemId: string; exported: Exported; setExported: (e: Exported) => void }) {
+export function ExportMarkdown({ itemId, exported, setExported }: { itemId: string; exported: Exported; setExported: (e: Exported) => void }) {
   const run = async () => {
     setExported({ state: 'exporting' });
     const result = await postAction<{ paths: string[] }>('/api/item-export', { itemId });
     setExported(result.error || !result.paths ? { state: 'failed', error: result.error ?? 'The board did not say what it wrote.' } : { state: 'done', paths: result.paths });
   };
   return <Button {...kind('other')} loading={exported.state === 'exporting'} onClick={() => void run()}>Export markdown</Button>;
+}
+
+/** The files an export wrote, or why it couldn't; nothing before one runs. */
+export function ExportedLine({ exported }: { exported: Exported }) {
+  if (exported.state === 'done') return <p className="m-0 text-xs wrap-anywhere text-(--muted-foreground)" role="status">Exported to {exported.paths.join(', ')}</p>;
+  if (exported.state === 'failed') return <p className="m-0 text-xs text-(--error-foreground)" role="alert">{exported.error}</p>;
+  return null;
 }
 
 export function RecordText({ item, record, className }: { item: Item; record: RecordDetails; className: string }) {
@@ -35,8 +42,7 @@ export function RecordText({ item, record, className }: { item: Item; record: Re
         <h2 className="m-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)">{title}</h2>
         <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
       </div>
-      {exported.state === 'done' && <p className="m-0 text-xs wrap-anywhere text-(--muted-foreground)" role="status">Exported to {exported.paths.join(', ')}</p>}
-      {exported.state === 'failed' && <p className="m-0 text-xs text-(--error-foreground)" role="alert">{exported.error}</p>}
+      <ExportedLine exported={exported} />
       <div data-record-body>
         {record.body ? <RichText text={record.body} format="markdown" /> : <p className="m-0 text-sm text-(--muted-foreground)">No {title.toLowerCase()} written yet.</p>}
       </div>

@@ -103,7 +103,7 @@ let unread: string[] = [];
 const ticketOf = (item: Item): Item | undefined => (item.number ? ticketsByRef.get(refKey(item.repo, item.number).toLowerCase()) : undefined);
 /**
  * The board items: the onboarded repositories' work records, as they are now, with `read`'s tickets, kept for later,
- * less the work in Archive, which goes to the board data with the retention setting.
+ * less the work in Archive, which `archive` reads when Settings › Archive asks.
  */
 function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tickets, waiting: unread }): Item[] {
   if (read.items !== tickets) ticketsByRef = ticketsByReference(read.items);
@@ -112,9 +112,12 @@ function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tic
   if (!records) return [];
   const repos = items.repos().map((r) => r.repo);
   const hidden = retention.hidden();
-  board.update({ archive: archivedItems(records, tickets, repos, hidden), retention: retention.state() });
+  board.update({ retention: retention.state() });
   return recordItems(records, tickets, repos, unread, hidden);
 }
+
+/** Archive's work as the records are now, with the last tickets read: set aside, or finished and hidden by retention. */
+const archive = (): Item[] => records ? archivedItems(records, tickets, items.repos().map((r) => r.repo), retention.hidden()) : [];
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
 const modelManifest = modelManifestPath();
@@ -709,12 +712,12 @@ const reread = () => {
   showRecords();
   board.push();
 };
-const commands = createItemCommands({ board, items, records, reread, offerModelChoices, checkSkills: parentSkillCheck() });
+const commands = createItemCommands({ board, items, records, reread, archive, offerModelChoices, checkSkills: parentSkillCheck() });
 const adding = createCapture({ board, items, records, reread, repos: items.repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
-  board, commands, capture: adding, startAfter, retention, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  board, commands, capture: adding, startAfter, retention, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   reauthorizeT3: async () => {
     const read = await reauthorizeRepositoryProjects();
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });

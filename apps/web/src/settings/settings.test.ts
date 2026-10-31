@@ -171,7 +171,7 @@ test('unfinished settings show availability inline without controls or fictional
   await open('General');
   expect(text(row('refresh'))).toContain('45 seconds');
   expect(text(row('in-flight'))).toContain('Concurrent builds');
-  for (const id of ['login', 'done-window', 'in-flight', 'auto-start']) {
+  for (const id of ['login', 'open-in', 'in-flight', 'auto-start']) {
     expect(text(row(id))).toContain('Not available yet');
     expect(row(id).querySelector('button, input, select')).toBeNull();
   }
@@ -846,14 +846,6 @@ describe('updates', () => {
     expect($('.update-button')).toBeNull();
     expect(checked()).toBe('nightly');
   });
-});
-
-test('Archive explains its availability without fictional items or a Restore promise', async () => {
-  await open('Archive');
-  expect(text(modal())).toContain('The board does not list abandoned items yet.');
-  expect(text(modal())).toContain('Reopen issues on GitHub or reactivate work items in Azure DevOps.');
-  expect(text(modal())).not.toMatch(/#88|#41|Restore|last 30 days/);
-  expect($$('.settings-body button')).toHaveLength(0);
 });
 
 test('Diagnostics names the address serving this board', async () => {

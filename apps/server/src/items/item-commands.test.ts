@@ -41,8 +41,9 @@ async function openRecords(): Promise<WorkRecords> {
 function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = []) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
   const reread = () => {
-    if (records) board.update({ items: recordItems(records, tickets, [WEB]), archive: archivedItems(records, tickets, [WEB], new Set()) });
+    if (records) board.update({ items: recordItems(records, tickets, [WEB]) });
   };
+  const archive = () => (records ? archivedItems(records, tickets, [WEB], new Set()) : []);
   reread();
   const log: string[] = [];
   const branches: (string | undefined)[] = [];
@@ -65,14 +66,14 @@ function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<
       return null;
     },
   } as unknown as ItemSource;
-  const commands = createItemCommands({ board, items: source, records: records ?? null, reread, offerModelChoices: () => [],
+  const commands = createItemCommands({ board, items: source, records: records ?? null, reread, archive, offerModelChoices: () => [],
     showThread, reopenPr: async (repo, number) => { log.push(`reopen ${repo}#${number}`); }, projectOf: async (repo) => ({ projectId: repo }),
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
       log.push(`start ${project} ${message.split('\n')[1]}`);
       return { thread: { threadId: `thread-${branches.length}`, title: 't' }, error: null };
     } });
-  return { board, commands, log, branches };
+  return { board, commands, log, branches, archive };
 }
 
 test('Start on an untagged item tags it for the repository picked, then starts shaping in that repository', async () => {
@@ -134,11 +135,11 @@ test("Archive offers a set-aside ticket's close after the board restarts, and Re
   const records = await openRecords();
   const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
   records.setAside(work.workId, work.revision);
-  const { board, commands, log } = commandsOn([], undefined, undefined, records, [queued(7)]);
+  const { board, commands, log, archive } = commandsOn([], undefined, undefined, records, [queued(7)]);
   assert.equal((await commands.closeTicket(work.workId)).status, 200);
   assert.deepEqual(log, ['abandon 7']);
   assert.equal(commands.restore(work.workId).status, 200);
-  assert.deepEqual([board.find(work.workId)?.status, board.snapshot().archive], ['Queued', []]);
+  assert.deepEqual([board.find(work.workId)?.status, archive()], ['Queued', []]);
   const again = commands.restore(work.workId);
   assert.deepEqual([again.status, (again.body as { error: string }).error], [409, "That work isn't set aside in Archive, so there is nothing to restore."]);
 });
@@ -329,7 +330,7 @@ function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids
   }) });
   reread();
   const started: string[] = [];
-  const commands = createItemCommands({ board, items: {} as ItemSource, records, reread, offerModelChoices: () => [],
+  const commands = createItemCommands({ board, items: {} as ItemSource, records, reread, archive: () => [], offerModelChoices: () => [],
     showThread: lookup, projectOf: async (repo) => ({ projectId: repo }), recoverThread: recover, skillsOf: () => skills,
     startThread: async (_project, message) => {
       during();

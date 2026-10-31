@@ -495,8 +495,6 @@ export interface BoardData {
   repositoryProjects?: Record<string, string | null>;
   /** The bundle's skills and checklists, read once at startup; empty when the server can't read them. */
   bundledSkills?: BundledSkill[];
-  /** The onboarded repositories' set-aside work and the finished work retention hides, in the order it was made. Absent in sample mode. */
-  archive?: Item[];
   /** This Mac's retention setting and what its last timed delete did. Absent in sample mode. */
   retention?: RetentionState;
 }

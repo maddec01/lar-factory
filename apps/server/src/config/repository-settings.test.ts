@@ -7,7 +7,7 @@ import { fakeAzRepos } from '../azure/fake-az.ts';
 import { agentSetupWrites } from '../onboarding/agent-setup.ts';
 import { readRepositoryList, saveOnboarded, saveOnboarding } from './repository-config.ts';
 import {
-  acceptSetup, applySharedDefaults, readOnboardedConfigs, readRepositorySetups, recheckAccess, recordAccess, setConsent, setOverride, sharedDefaultsOf,
+  acceptSetup, applySharedDefaults, changeRepositorySettings, readOnboardedConfigs, readRepositorySetups, recheckAccess, recordAccess, setConsent, setOverride, sharedDefaultsOf,
 } from './repository-settings.ts';
 
 const REPO = 'maddec01/lar-apple';
@@ -274,4 +274,32 @@ test('reading an unchanged Repository config again leaves the list file alone', 
   await writeFile(file, `${await readFile(file, 'utf8')} `);
   applySharedDefaults(REPO, { defaults: { role: 'Apple app' } }, dir);
   assert.match(await readFile(file, 'utf8'), / $/);
+});
+
+test("Settings' changes set and remove an override, accept a changed setup and recheck access, answering the setup they make", async (t) => {
+  const dir = await dataDir(t, [AZURE]);
+  const team = (name: string) => ({ kind: 'azure-board' as const, team: name });
+  applySharedDefaults(AZURE, { defaults: { role: 'API', itemSource: team('API Team') } }, dir);
+  recordAccess(AZURE, 'open-pr', 'refused', dir);
+  const set = changeRepositorySettings({ repo: AZURE, change: 'override', key: 'itemSource', value: team('Platform Team') }, dir);
+  assert.ok('setup' in set);
+  assert.deepEqual([set.setup.itemSource, set.setup.sources.itemSource, set.setup.paused], [team('Platform Team'), 'local', ['itemSource']]);
+  const accepted = changeRepositorySettings({ repo: AZURE, change: 'accept' }, dir);
+  assert.deepEqual('setup' in accepted && accepted.setup.paused, []);
+  const removed = changeRepositorySettings({ repo: AZURE, change: 'override', key: 'itemSource' }, dir);
+  assert.deepEqual('setup' in removed && [removed.setup.itemSource, removed.setup.sources.itemSource], [team('API Team'), 'shared']);
+  const rechecked = changeRepositorySettings({ repo: AZURE, change: 'recheck' }, dir);
+  assert.equal('setup' in rechecked && rechecked.setup.access['open-pr'], 'unverified');
+});
+
+test("Settings' changes refuse a setting Repository config can't share, a value that doesn't fit and a repository not onboarded", async (t) => {
+  const progress = { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } };
+  const dir = await dataDir(t, [REPO, { repo: 'maddec01/lar-web', onboarding: progress }]);
+  assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'override', key: 'consent', value: ['open-pr'] }, dir),
+    { status: 400, error: 'Send a setting Repository config can share.' });
+  assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'override', key: 'show', value: 'some' }, dir),
+    { status: 400, error: `${REPO}: field show must be "all" or "opted-in".` });
+  assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'fly' }, dir), { status: 400, error: 'Send the repository and the change to its settings.' });
+  assert.deepEqual(changeRepositorySettings({ repo: 'maddec01/lar-web', change: 'recheck' }, dir), { status: 409, error: 'maddec01/lar-web is still onboarding.' });
+  assert.equal(setupOf(dir).sources.show, 'default');
 });

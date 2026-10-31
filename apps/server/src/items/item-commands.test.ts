@@ -392,6 +392,17 @@ test('after a restart, an unresolved start T3 shows no thread for sets Needs you
   } finally { vi.useRealTimers(); }
 });
 
+test("Start on work its repository's changed setup pauses is refused with why, and starts nothing", async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  const { board, commands, started } = recordedCommands(records);
+  const why = "Its repository's domain-doc location changed. Accept the change in Settings › Repositories to go on.";
+  board.update({ items: board.snapshot().items.map((item) => ({ ...item, paused: why })) });
+  const refused = await commands.start(work.workId, undefined);
+  assert.deepEqual([refused.status, (refused.body as { error: string }).error], [409, `Paused: ${why}`]);
+  assert.deepEqual([started, records.launchIntents({ workId: work.workId })], [[], []]);
+});
+
 test('a recorded thread T3 confirms deleted releases Start, and one T3 cannot be read for keeps it', async () => {
   const records = await openRecords();
   const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });

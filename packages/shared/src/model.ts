@@ -278,6 +278,11 @@ export interface Item {
    * and the board never saw one of them.
    */
   threads?: ItemThread[] | 'unavailable';
+  /**
+   * Why it waits for its repository's changed item source or domain-doc location to be accepted in Settings, which
+   * holds its starts; absent when no change affects it.
+   */
+  paused?: string;
   /** Why its work record waits on the user, with what the board offers to do about it; absent when it doesn't wait. */
   needsYou?: { reason: string; offers: NeedsYouOffer[] };
   /** Set on work off the board in Archive: set aside, which Restore brings back, or finished and hidden by retention. */
@@ -376,6 +381,8 @@ export interface RepoConfig {
    * up to date hasn't been dismissed at that version; absent otherwise.
    */
   configUpdate?: number;
+  /** Its setup from this Mac's local settings over its Repository config's defaults, which Settings edits; absent in sample mode. */
+  setup?: RepositorySetup;
 }
 
 export const ITEM_SOURCE_KINDS = ['issues', 'azure-board'] as const;

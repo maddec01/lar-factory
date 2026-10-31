@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import {
   CONFIG_VERSION, REPOSITORY_OPERATIONS, SHARED_SETTINGS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
   type LocalSetupAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings,
-  type ShowSetting,
+  type SharedSetting, type ShowSetting,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
 import { problemOf } from '../azure/azure-items.ts';
@@ -14,8 +14,9 @@ import { readBranchFile as readAzureFile } from '../azure/azure-repos.ts';
 import { readBranchFile } from '../github/github.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { AGENT_DOC_PATHS, withoutAgentSkills } from '../onboarding/agent-setup.ts';
+import { notEditable, type Refused } from './edit-config.ts';
 import {
-  isItemSource, onTheBoard, readListFile, writeListFile, type OnboardedRepository, type RepositoryConfig,
+  isItemSource, isRepo, onTheBoard, readListFile, writeListFile, type OnboardedRepository, type RepositoryConfig,
 } from './repository-config.ts';
 
 /** The settings that pause the work depending on them when they change. */
@@ -190,6 +191,29 @@ export function readDismissedUpdates(dir = boardDataDir()): Map<string, number> 
   }));
 }
 
+/**
+ * Changes the body's onboarded `repo`'s local settings as Settings asks: `override` sets `key`'s override to `value`, or
+ * removes it when the body has no value; `accept` accepts the setup as it is now; `recheck` forgets what the credentials
+ * allowed. Answers the setup the change makes, or why it can't.
+ */
+export function changeRepositorySettings(input: Record<string, unknown>, dir = boardDataDir()): { setup: RepositorySetup } | Refused {
+  const { repo, change, key, value } = input;
+  if (!isRepo(repo) || !['override', 'accept', 'recheck'].includes(change as string)) {
+    return { status: 400, error: 'Send the repository and the change to its settings.' };
+  }
+  if (change === 'override' && !SHARED_SETTINGS.includes(key as SharedSetting)) return { status: 400, error: 'Send a setting Repository config can share.' };
+  const refused = notEditable(repo, dir);
+  if (refused) return refused;
+  try {
+    if (change === 'accept') acceptSetup(repo, dir);
+    else if (change === 'recheck') recheckAccess(repo, dir);
+    else setOverride(repo, key as SharedSetting, value as SharedRepositorySettings[SharedSetting], dir);
+  } catch (err) {
+    return { status: 400, error: (err as Error).message };
+  }
+  return { setup: readRepositorySetups(dir).find((s) => sameRepo(s.repo, repo))! };
+}
+
 /** The access an onboarding's detection found, each operation it left unverified out. */
 type FoundAccess = NonNullable<LocalSettings['access']>;
 
@@ -259,9 +283,11 @@ export function sharedConfigOf(text: string, azure: boolean): { read: Exclude<Sh
   return { read, version: 'defaults' in read && typeof raw.version === 'number' ? raw.version : CONFIG_VERSION };
 }
 
-/** The onboarded repositories' configs, why each repository needs attention, and the repositories resetting. */
+/** The onboarded repositories' configs and setups, why each repository needs attention, and the repositories resetting. */
 export interface OnboardedConfigs {
   configs: RepositoryConfig[];
+  /** The setup of each repository in `configs`, in its order. */
+  setups: RepositorySetup[];
   problems: RepositoryConfigProblem[];
   resetting: string[];
 }
@@ -279,6 +305,7 @@ export async function readOnboardedConfigs(list: readonly OnboardedRepository[],
   for (const [index, { repo }] of onboarded.entries()) applySharedDefaults(repo, reads[index]!.read, dir);
   const setups = readRepositorySetups(dir);
   const configs: RepositoryConfig[] = [];
+  const onBoard: RepositorySetup[] = [];
   const problems: RepositoryConfigProblem[] = [];
   for (const [index, { repo }] of onboarded.entries()) {
     const setup = setups.find((s) => sameRepo(s.repo, repo))!;
@@ -289,6 +316,7 @@ export async function readOnboardedConfigs(list: readonly OnboardedRepository[],
     }
     if (sharedProblem) problems.push({ repo, kind: 'shared-config', problem: sharedProblem });
     configs.push({ repo, version: reads[index]!.version, role, itemSource, show, labels });
+    onBoard.push(setup);
   }
   const guidance: RepositoryConfigProblem[] = [];
   // A repository already reporting its .lar-factory.json has one notice, so its guidance waits until that reads.
@@ -316,5 +344,5 @@ export async function readOnboardedConfigs(list: readonly OnboardedRepository[],
     if (stale.length) guidance.push({ repo: config.repo, kind: 'agent-guidance',
       problem: `${stale.join(', ')} names retired factory skills. Update the Agent skills block to use lar-shape for shaping and lar-build for builds, and replace docs/agents guidance with the current setup from lar-factory's apps/server/src/onboarding/agent-setup.ts. Merge the change into the default branch, then refresh.` });
   }));
-  return { configs, problems: [...problems, ...guidance], resetting: list.flatMap((e) => e.resetting ? [e.repo] : []) };
+  return { configs, setups: onBoard, problems: [...problems, ...guidance], resetting: list.flatMap((e) => e.resetting ? [e.repo] : []) };
 }

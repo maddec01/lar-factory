@@ -15,7 +15,7 @@ import { configUpdateOf, dismissConfigUpdate } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
 import { onTheBoard, readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { prHost, prUrl } from './config/pr-host.ts';
-import { readDismissedUpdates, readOnboardedConfigs } from './config/repository-settings.ts';
+import { changeRepositorySettings, readDismissedUpdates, readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
@@ -100,7 +100,8 @@ let unread: string[] = [];
 const ticketOf = (item: Item): Item | undefined => (item.number ? ticketsByRef.get(refKey(item.repo, item.number).toLowerCase()) : undefined);
 /**
  * The board items: the onboarded repositories' work records, as they are now, with `read`'s tickets, kept for later,
- * less the work in Archive, which `archive` reads when Settings › Archive asks.
+ * less the work in Archive, which `archive` reads when Settings › Archive asks. Work a repository's changed setup
+ * affects waits, as the rows' setups say.
  */
 function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tickets, waiting: unread }): Item[] {
   if (read.items !== tickets) ticketsByRef = ticketsByReference(read.items);
@@ -110,7 +111,8 @@ function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tic
   const repos = items.repos().map((r) => r.repo);
   const hidden = retention.hidden();
   board.update({ retention: retention.state() });
-  return recordItems(records, tickets, repos, unread, hidden);
+  const setups = board.snapshot().repos.flatMap((r) => r.setup ? [r.setup] : []);
+  return recordItems(records, tickets, repos, unread, hidden, setups);
 }
 
 /** Archive's work as the records are now, with the last tickets read: set aside, or finished and hidden by retention. */
@@ -137,10 +139,10 @@ const items = onboardedSources(async () => {
     readEditPrs(onboarded.map((e) => e.repo), undefined, (repo, problem) => log(`can't read ${repo}'s Edit PR: ${problem}`))]);
   const dismissed = readDismissedUpdates();
   board.update({
-    repos: read.configs.map((config) => {
+    repos: read.configs.map((config, index) => {
       const configUpdate = configUpdateOf(config, dismissed);
       return { ...repoView(config), version: config.version, ...editPrs.has(config.repo) && { editPr: editPrs.get(config.repo) },
-        ...configUpdate !== undefined && { configUpdate } };
+        ...configUpdate !== undefined && { configUpdate }, setup: read.setups[index]! };
     }),
     repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list),
   });
@@ -708,6 +710,7 @@ const { server, endStreams } = createBoardServer({
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input),
   readEditConfig: (input) => readEditConfig(input), openEditPr: (input) => openEditPr(input),
   openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),
+  changeRepositorySettings: (input) => changeRepositorySettings(input),
 });
 
 /** Logs why the board can't start and exits. */

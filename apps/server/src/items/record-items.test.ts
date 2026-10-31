@@ -133,3 +133,21 @@ test('work that needs you shows the reason, with what its PR and ticket observat
   assert.deepEqual(shown.get(reopened.workId), { reason: 'Its ticket reopened.', offers: ['reopen-work'] });
   assert.equal(shown.get(calm.workId), undefined);
 });
+
+test("an item-source change pauses only the repository's ticketed work, a domain-doc change its open work, each saying why", async () => {
+  const records = await open();
+  const ticketed = records.importTicket({ title: 'Ticketed', repository: REPO, kind: 'bug', status: 'Queued', ticket: `${REPO}#12` }).record;
+  const local = records.create({ title: 'Local', repository: REPO, kind: 'build', status: 'Shaping' });
+  const done = records.create({ title: 'Finished', repository: REPO, kind: 'build', status: 'Done' });
+  const pausedBy = (paused: ('itemSource' | 'domainDocs')[]) =>
+    new Map(recordItems(records, [], [REPO], [], new Set(), [{ repo: REPO, paused }]).map((item) => [item.id, item.paused]));
+  const source = pausedBy(['itemSource']);
+  assert.equal(source.get(ticketed.workId), "Its repository's item source changed. Accept the change in Settings › Repositories to go on.");
+  assert.equal(source.get(local.workId), undefined);
+  const docs = pausedBy(['domainDocs']);
+  assert.equal(docs.get(local.workId), "Its repository's domain-doc location changed. Accept the change in Settings › Repositories to go on.");
+  assert.equal(docs.get(done.workId), undefined, 'finished work has nothing left to write');
+  assert.equal(pausedBy(['itemSource', 'domainDocs']).get(ticketed.workId),
+    "Its repository's item source and domain-doc location changed. Accept the change in Settings › Repositories to go on.");
+  assert.deepEqual([...pausedBy([]).values()], [undefined, undefined, undefined]);
+});

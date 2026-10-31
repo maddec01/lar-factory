@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { PublicationContent, PublicationOutcome, PublicationProposal, Status } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
+import { publicationEngine, type PreparePublication, type ReconciliationSelection } from './publication-engine.ts';
 import {
   openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
   type NewObservation, type NewReviewRound, type Observed, type ReviewAxis, type WorkKind, type WorkRecords,
@@ -118,6 +119,31 @@ Content
   review-rounds <work-id>           Print the build's review rounds.
 
 Publication
+  prepare-publication <work-id> --file F
+                                    Prepare an immutable new-ticket preview. F is
+                                    PreparePublication JSON: documents, optional
+                                    typeSelections and replaces. Each document names
+                                    workId, title, outcome, change, checks, assumptions,
+                                    decisions [{decision, reason}], builderNotes,
+                                    domainNotes and relatedTickets (HTTP URLs).
+                                    Lists may be empty when nothing applies. Use team
+                                    language; private bodies are never copied blindly.
+  inspect-publication <work-id> --plan P
+                                    Recheck sources and current effective settings.
+  execute-publication <work-id> --plan P --identity I
+  resume-publication <work-id> --plan P --identity I
+                                    Dispatch approved outstanding writes through the
+                                    same engine as the board; stop on failure or
+                                    uncertainty. Skips completed writes. No retries.
+  reconcile-publication <work-id> --plan P --identity I [--file F]
+                                    Search and inspect uncertain provider outcomes.
+                                    Optional F is [{operationId, ticket|commentId}], explicitly
+                                    selecting a creation candidate after inspection.
+                                    Empty or ambiguous searches never permit retry.
+  fallback-publication <work-id> --plan P
+                                    Preview a replacement using exact Part of or
+                                    Depends on comments after refused native links.
+                                    Approve its new digest before executing it.
   gate <work-id>                    Print the current brief digest and gate history.
   record-gate <work-id> --revision N --digest H --identity I --evidence E
                                     Attest that this exact brief passed its gate.
@@ -246,6 +272,7 @@ Errors
 class UsageError extends Error {}
 
 const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
+  'prepare-publication', 'inspect-publication', 'execute-publication', 'resume-publication', 'reconcile-publication', 'fallback-publication',
   'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
   'review-rounds', 'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
@@ -352,7 +379,7 @@ function retention(values: Values): unknown {
 }
 
 /** Runs `command`; `workId` is set for the commands that take one. A string result prints as it is, anything else as JSON. */
-function run(records: WorkRecords, command: string, workId: string | undefined, values: Values): unknown {
+async function run(records: WorkRecords, command: string, workId: string | undefined, values: Values): Promise<unknown> {
   const revision = () => Number(need(values, 'revision'));
   const status = values.status as Status | undefined;
   const kind = values.kind as WorkKind | undefined;
@@ -361,6 +388,17 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
     context: values.file === undefined ? undefined : readInput(values),
   });
   switch (command) {
+    case 'prepare-publication':
+      return publicationEngine(records, { dir: values['data-dir'] }).prepare(workId!, readJson(values) as PreparePublication);
+    case 'inspect-publication':
+      return publicationEngine(records, { dir: values['data-dir'] }).inspect(workId!, need(values, 'plan'));
+    case 'execute-publication':
+    case 'resume-publication':
+      return publicationEngine(records, { dir: values['data-dir'] }).execute(workId!, need(values, 'plan'), need(values, 'identity'));
+    case 'reconcile-publication':
+      return publicationEngine(records, { dir: values['data-dir'] }).reconcile(workId!, need(values, 'plan'), need(values, 'identity'), values.file === undefined ? [] : readJson(values) as ReconciliationSelection[]);
+    case 'fallback-publication':
+      return publicationEngine(records, { dir: values['data-dir'] }).fallback(workId!, need(values, 'plan'));
     case 'gate':
       return records.gate(workId!);
     case 'record-gate':
@@ -522,7 +560,7 @@ async function main(args: string[]): Promise<number> {
       return 0;
     }
     records = await openWorkRecords(workRecordsPath(values['data-dir']));
-    const result = run(records, command, workId, values);
+    const result = await run(records, command, workId, values);
     process.stdout.write(typeof result === 'string' ? result : `${JSON.stringify(result, null, 2)}\n`);
     return 0;
   } catch (error) {

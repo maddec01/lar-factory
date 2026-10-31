@@ -6,8 +6,10 @@ import { randomUUID } from 'node:crypto';
 import type { StatementSync } from 'node:sqlite';
 import { STATUSES, type Status } from '@lar-factory/shared';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
+import type { Retention } from './retention.ts';
 
 export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './database.ts';
+export { DEFAULT_RETENTION, readRetention, retentionPath, writeRetention, type Retention } from './retention.ts';
 
 /** The board's kinds, plus a build's slice. */
 export const WORK_KINDS = ['bug', 'feature', 'improvement', 'concept', 'decision', 'build', 'slice', 'issue'] as const;
@@ -131,6 +133,8 @@ export interface WorkRecord {
   pullRequest: string | null;
   /** Whether it is set aside, which leaves its Status as it was. */
   setAside: boolean;
+  /** When its work was finished, as its delivery PR showed, or null while unfinished. A Status never implies it. */
+  finishedAt: string | null;
   /** Counts the record's changes; every change names the revision it read. */
   revision: number;
   createdAt: string;
@@ -142,6 +146,12 @@ export interface NewWorkRecord {
   kind: WorkKind;
   status?: Status;
   ticket?: string;
+}
+
+/** What deleting expired records did: the records it deleted, and each due record it kept with the reason. */
+export interface Expired {
+  deleted: string[];
+  kept: { workId: string; reason: string }[];
 }
 
 export interface WorkRecordFilter {
@@ -192,6 +202,15 @@ export interface WorkRecords {
   launchIntents(filter: LaunchIntentFilter): LaunchIntent[];
   /** Resolves an unresolved intent once: to T3's thread ID, which it records as the record's thread, or to a failure. */
   resolveLaunchIntent(workId: string, revision: number, intentId: string, outcome: { threadId: string } | { failure: string }): { record: WorkRecord; intent: LaunchIntent };
+  /** Records that the work is finished. Only the build's delivery PR observation calls it; a ticket closing or a thread
+   * ending never does. A finish is final. */
+  recordFinished(workId: string, revision: number): WorkRecord;
+  /** The finished and set-aside records `retention` hides at `now`, in the order they were made. */
+  hidden(retention: Retention, now?: Date): WorkRecord[];
+  /** Deletes the finished and set-aside records `retention` deletes at `now`, with their bodies, review rounds, threads,
+   * launch intents and blocker edges, in one transaction. A due record stays while it owns a kept record or a kept
+   * record waits on it; the kept parent and blockers of a deleted record are bumped. */
+  deleteExpired(retention: Retention, now?: Date): Expired;
   /** The records it owns, in the order they were made. */
   children(workId: string): WorkRecord[];
   /** The records it waits on. */
@@ -212,6 +231,7 @@ interface Row {
   build_phase: BuildPhase | null;
   pull_request: string | null;
   set_aside_at: string | null;
+  finished_at: string | null;
   revision: number;
   created_at: string;
   updated_at: string;
@@ -228,6 +248,7 @@ const fromRow = (row: Row): WorkRecord => ({
   buildPhase: row.build_phase,
   pullRequest: row.pull_request,
   setAside: row.set_aside_at !== null,
+  finishedAt: row.finished_at,
   revision: row.revision,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -253,6 +274,16 @@ const fromIntentRow = (row: IntentRow): LaunchIntent => ({
   failure: row.failure,
   resolvedAt: row.resolved_at,
 });
+
+/** When a finished or set-aside record left active work, or null while it is active. */
+const retiredAt = (row: Row): string | null =>
+  row.finished_at && row.set_aside_at ? (row.finished_at < row.set_aside_at ? row.finished_at : row.set_aside_at) : row.finished_at ?? row.set_aside_at;
+
+/** The finished and set-aside rows that left active work at least `days` days before `now`. */
+function dueRows(rows: readonly Row[], days: number, now: Date): Row[] {
+  const cutoff = new Date(now.getTime() - days * 86_400_000).toISOString();
+  return rows.filter((row) => { const at = retiredAt(row); return at !== null && at <= cutoff; });
+}
 
 const invalid = (message: string) => new WorkRecordError('invalid', message);
 
@@ -399,9 +430,12 @@ function workRecords(database: Database): WorkRecords {
     return fromRow(find(workId));
   };
 
+  const updateRow = db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
+    pull_request = ?, set_aside_at = ?, finished_at = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
   /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. Records `apply`
-   * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. */
-  const change = (workId: string, revision: number, apply: (row: Row, touched: string[]) => Partial<Row>): WorkRecord =>
+   * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. When
+   * `apply` returns null the record already holds the change, so nothing is written or bumped. */
+  const change = (workId: string, revision: number, apply: (row: Row, touched: string[]) => Partial<Row> | null): WorkRecord =>
     database.write(() => {
       const expected = checkRevision(revision);
       const row = find(workId);
@@ -409,11 +443,11 @@ function workRecords(database: Database): WorkRecords {
         throw new WorkRecordError('stale-revision', `The work record ${workId} is at revision ${row.revision}, not ${expected}; read it again and retry.`);
       }
       const touched: string[] = [];
-      const next = { ...row, ...apply(row, touched), revision: row.revision + 1, updated_at: new Date().toISOString() };
-      db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?, pull_request = ?,
-        set_aside_at = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`)
-        .run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.build_phase, next.pull_request, next.set_aside_at,
-          next.revision, next.updated_at, workId, expected);
+      const patch = apply(row, touched);
+      if (patch === null) return fromRow(row);
+      const next = { ...row, ...patch, revision: row.revision + 1, updated_at: new Date().toISOString() };
+      updateRow.run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.build_phase, next.pull_request, next.set_aside_at,
+        next.finished_at, next.revision, next.updated_at, workId, expected);
       for (const id of touched) bump.run(next.updated_at, id);
       return fromRow(find(workId));
     });
@@ -429,6 +463,12 @@ function workRecords(database: Database): WorkRecords {
     const holder = threadHolder.get(threadId);
     if (holder) throw invalid(`The thread ${threadId} is already recorded on the work record ${String(holder.work_id)}.`);
     addThreadRow.run(threadId, workId, purpose, new Date().toISOString());
+  };
+
+  const retiredRows = db.prepare('SELECT * FROM work_records WHERE finished_at IS NOT NULL OR set_aside_at IS NOT NULL ORDER BY rowid');
+  const checkDays = (days: unknown, what: string): number => {
+    if (!Number.isSafeInteger(days) || (days as number) < 0) throw invalid(`The ${what} "${String(days)}" isn't a whole number of days from 0.`);
+    return days as number;
   };
 
   const related = (query: StatementSync, workId: string): WorkRecord[] => database.read(() => {
@@ -467,7 +507,7 @@ function workRecords(database: Database): WorkRecords {
     attachTicket: (workId, revision, ticket) => {
       const reference = checkTicket(ticket);
       return change(workId, revision, (row) => {
-        if (row.ticket === reference) return {};
+        if (row.ticket === reference) return null;
         if (row.ticket) throw invalid(`The work record ${workId} already has the ticket ${row.ticket}; it can't take ${reference}.`);
         const holder = byTicket.get(reference) as Row | undefined;
         if (holder) throw new WorkRecordError('ticket-taken', `The work record ${holder.work_id} already holds the ticket ${reference}.`);
@@ -631,6 +671,56 @@ function workRecords(database: Database): WorkRecords {
         return {};
       });
       return { record, intent: intent(intentId) };
+    },
+    recordFinished: (workId, revision) => change(workId, revision, (row) => {
+      if (row.finished_at) throw invalid(`The work record ${workId} is already finished.`);
+      return { finished_at: new Date().toISOString() };
+    }),
+    hidden: (retention, now = new Date()) => {
+      const days = checkDays(retention?.hideAfterDays, 'days before hiding');
+      return database.read(() => dueRows(retiredRows.all() as unknown as Row[], days, now).map(fromRow));
+    },
+    deleteExpired: (retention, now = new Date()) => {
+      if (retention?.deleteAfterDays === null) return { deleted: [], kept: [] };
+      const days = checkDays(retention?.deleteAfterDays, 'days before deleting');
+      return database.write(() => {
+        const due = new Map(dueRows(retiredRows.all() as unknown as Row[], days, now).map((row) => [row.work_id, row]));
+        const kept: Expired['kept'] = [];
+        // A due record that a kept record needs is kept too, which can keep its own parent or blockers in turn.
+        for (let changed = true; changed;) {
+          changed = false;
+          for (const [workId] of due) {
+            const child = (childRows.all(workId) as unknown as Row[]).find((row) => !due.has(row.work_id));
+            const waiting = child ? undefined : (dependentRows.all(workId) as unknown as Row[]).find((row) => !due.has(row.work_id));
+            if (!child && !waiting) continue;
+            due.delete(workId);
+            kept.push({ workId, reason: child ? `It owns the ${child.kind} ${child.work_id}, which is kept.` : `The ${waiting!.kind} ${waiting!.work_id}, which is kept, waits on it.` });
+            changed = true;
+          }
+        }
+        const deleted = [...due.keys()];
+        const touched = new Set<string>();
+        for (const workId of deleted) {
+          const { parent_id: parent } = due.get(workId)!;
+          if (parent && !due.has(parent)) touched.add(parent);
+          for (const blocker of blockerRows.all(workId) as unknown as Row[]) if (!due.has(blocker.work_id)) touched.add(blocker.work_id);
+        }
+        // Children go before their parents, so clear the parents among the deleted records first.
+        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents']
+          .map((table) => db.prepare(`DELETE FROM ${table} WHERE work_id = ?`));
+        const clearParent = db.prepare('UPDATE work_records SET parent_id = NULL WHERE work_id = ?');
+        const deleteBlockers = db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?');
+        const deleteRecord = db.prepare('DELETE FROM work_records WHERE work_id = ?');
+        for (const workId of deleted) clearParent.run(workId);
+        for (const workId of deleted) {
+          for (const statement of deleteOwned) statement.run(workId);
+          deleteBlockers.run(workId, workId);
+          deleteRecord.run(workId);
+        }
+        const at = new Date().toISOString();
+        for (const workId of touched) bump.run(at, workId);
+        return { deleted, kept };
+      });
     },
     children: (workId) => related(childRows, workId),
     blockers: (workId) => related(blockerRows, workId),

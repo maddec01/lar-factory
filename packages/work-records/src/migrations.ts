@@ -92,4 +92,8 @@ export const MIGRATIONS: readonly Migration[] = [
     ) STRICT;
     CREATE INDEX launch_intents_by_work_id ON launch_intents (work_id);
   `),
+  (db) => db.exec(`
+    -- When the work was finished, recorded from its delivery PR. Retention counts from it; Status never sets it.
+    ALTER TABLE work_records ADD COLUMN finished_at TEXT;
+  `),
 ];

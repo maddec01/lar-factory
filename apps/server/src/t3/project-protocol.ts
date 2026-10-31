@@ -54,6 +54,11 @@ export class ProjectProtocol {
     return this.pending;
   }
 
+  async subscriptionSession(): Promise<BoardSession> {
+    const stored = await this.vault.read();
+    return stored && Date.parse(stored.expiresAt) > this.now() + 60_000 ? stored : this.renew();
+  }
+
   async readProjects(): Promise<ProjectRead> {
     const result = (availability: ProjectAvailability): ProjectRead => ({ availability, ...(this.observation ? { observation: this.observation } : {}) });
     if (this.version !== supportedProjectVersion) return result('unsupported-version');

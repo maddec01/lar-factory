@@ -4,11 +4,10 @@
 // Dependency or its handover.
 
 import { randomUUID } from 'node:crypto';
+import { DEPENDENCY_OBSERVATION_KINDS, type DependencyObservationKind } from '@lar-factory/shared';
 import { WorkRecordError, type Database } from './database.ts';
 
-/** What the latest read of a Dependency's ticket or PR showed. A read that failed or lost access is a kind of its own. */
-export const DEPENDENCY_OBSERVATION_KINDS = ['open', 'closed', 'merged', 'reopened', 'deleted', 'access-lost', 'read-failed'] as const;
-export type DependencyObservationKind = (typeof DEPENDENCY_OBSERVATION_KINDS)[number];
+export { DEPENDENCY_OBSERVATION_KINDS, type DependencyObservationKind };
 
 interface DependencyObservation {
   /** The ticket or PR read, `owner/name#12`. */

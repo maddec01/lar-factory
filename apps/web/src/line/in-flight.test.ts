@@ -423,6 +423,8 @@ test.each(['Shaping', 'In progress', 'Review'] as const)('line activity follows 
   }
   await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: 'unavailable' })));
   expect(activity()).toBe('Thread unavailable');
+  await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: [{ ...thread('t1', 'running'), observedAt: '2026-10-21T09:05:00.000Z' }] })));
+  expect(activity()).toMatch(/^Thread running, last seen \d\d:05$/);
 });
 
 test('a stopped build replaces its remembered Started tag with recovery, also in the item dialog', async () => {

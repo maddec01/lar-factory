@@ -249,3 +249,69 @@ to exact preview; it never approves automatically. Browser documents are tempora
 editing drafts. Every reopen reconstructs plans and outcomes from the server.
 Controlled HTTP tests cover GitHub and Azure destinations with injected provider
 responses. They do not verify real credentials or provider availability.
+
+### Board recovery and handover
+
+The dialog separates the original raw description, the exact refined addition and
+its replacement range. A later preview shows the exact recorded before text and
+the proposed after text. Teammate conflicts show the stored, current and proposed
+versions. Select offsets in the current raw text, replace the recorded comment,
+keep the current text and append, or choose a new comment or handover. The engine
+rereads the resolution before recording a fresh unapproved plan.
+
+Delivery choices in the content editor include body, new comment and handover.
+Fallback buttons also return to an unapproved preview. Failed operations can use
+`retry`, which copies their exact operations into a replacement while retaining
+successful receipts. Approval still binds the replacement's ID, revision and
+digest. Changed sources or settings require a fresh content preview instead.
+The dialog keeps earlier outcomes visible and drops stale item-details caches
+after confirmed publication.
+
+`reconcile-url` accepts an ordinary URL in the approved GitHub repository or Azure
+project. It passes the resolved reference to shared-engine reconciliation. The
+engine searches first and inspects the supplied ticket even if search is refused.
+The title, full body and mapped terms must match the approved creation. An empty
+search never authorizes retry. `resolve-outcome` requires the user's explicit
+confirmation and inspection evidence, rereads provider evidence and records failure
+before a separately approved retry can be prepared. A lost HTTP response blocks
+another submission until the board reads the journal.
+
+The complete handover can be copied or downloaded without write permission. It
+includes team content and local relationships between its tickets. After manual
+posting, `resolve-url` reads the destination for inspection. `attach-url` requires
+the inspected work revision and uses `attachPublicationUrl`, preserving the same
+work ID and publication provenance. These actions never fetch an arbitrary host
+from user input. They use the existing provider adapter and approved destination.
+All added routes retain the board secret, origin, session and sample-mode guards.
+
+### User verification
+
+Use controlled provider fixtures or disposable tickets for these checks. Automated
+board route and dialog tests use controlled responses. They do not establish live
+permissions, provider availability or the rendered layout on a real display.
+
+1. Open Publish on a Ready build. Enter team-language content, review its exact
+   destination, title, text, type and terms, then cancel. Refinement and Start build
+   must remain available. On a new preview, approval must name the stored plan and
+   dispatch each remaining operation only once.
+2. On a picked Azure HTML ticket with coloured text and merged cells, inspect the
+   original description separately from the escaped addition. Choose new comment
+   or handover before writing. A body preview must retain HTML and the recorded
+   Azure field. It must show the revision and default-tenant limits.
+3. Publish an update, then edit its refined text as a teammate. Reopen Publish and
+   compare the stored, current and proposed text. Select only the replacement
+   range, prepare again and approve the new preview. Unrelated text must survive.
+4. Refuse a native relationship or body edit. Inspect the short cost line and the
+   exact fallback comment or textual relationship. Its preview must require its
+   own approval. Refused comments must still permit a complete markdown handover.
+5. Use read-only access to copy or download the handover. After posting, enter its
+   ordinary ticket URL, inspect the resolved destination and attach it. The work's
+   brief, Status and ID must remain the same.
+6. Lose a creation response and restart. Completed, failed and uncertain outcomes
+   must remain separate. Inspect provider candidates or supply the existing URL.
+   Select the matching ticket explicitly. If inspection establishes no completed
+   write, record that conclusion and prepare a retry. Completed operations must
+   stay visible and must not run again.
+7. Use the keyboard to reach choices, inspect links and cancel with Escape. Focus
+   must return to Publish. While a request runs, approval and cancellation must
+   remain disabled. Sample mode must offer no publication writes.

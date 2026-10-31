@@ -177,7 +177,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
 
   /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
   const WRITES: Record<string, Write> = {
-    ...Object.fromEntries(['open', 'prepare', 'approve', 'inspect', 'resume', 'reconcile', 'fallback'].map((action) => [`/api/publication/${action}`, {
+    ...Object.fromEntries(['open', 'prepare', 'approve', 'inspect', 'resume', 'reconcile', 'fallback', 'resolve-url', 'attach-url', 'reconcile-url', 'resolve-outcome', 'retry'].map((action) => [`/api/publication/${action}`, {
       what: 'the publication request', disabled: 'Publishing is disabled in sample mode. Your private work remains available.',
       restarted: () => ({ error: 'The board restarted. Reopen publication to inspect its stored plan.' }),
       run: (input: Record<string, unknown>) => publication.request(action, input),

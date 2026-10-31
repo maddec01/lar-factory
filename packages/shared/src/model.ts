@@ -743,19 +743,19 @@ export function canAbandon(item: Item): boolean {
   return item.status === 'List' || item.status === 'Queued';
 }
 
-/** Line 1 of the work message, which T3 titles the thread from. */
+/** Line 1 of the work message, which T3 titles the thread from: the item's name in a sentence. */
 export function workTitle(item: Item): string {
-  return `#${item.number} ${item.title}`;
+  return itemName(item);
 }
 
-/** The work message: `#<n> <title>`, then `$lar-shape <owner/repo>#<n>`. */
+/** The work message: the item's name, then `$lar-shape <work ID>`. */
 export function workMessage(item: Item): string {
-  const title = workTitle(item);
-  return `${title}\n$lar-shape ${item.repo}#${item.number}`;
+  return `${workTitle(item)}\n$lar-shape ${item.id}`;
 }
 
 /**
- * The branch Start build's worktree takes: `<kind>/<n>-<slug>`, the kind `fix` for a bug,
+ * The branch Start build's worktree takes: `<kind>/<n>-<slug>`, or `<kind>/<first 8 characters of the work ID>-<slug>`
+ * for ticketless work, the kind `fix` for a bug,
  * `feat` for a feature or improvement, else `chore`. The slug is up to five words of the
  * title, lowercase and hyphen-joined, accents dropped and anything but a-z and 0-9 left out.
  */
@@ -764,12 +764,12 @@ export function buildBranch(item: Item): string {
   const prefix = kind === 'bug' ? 'fix' : kind === 'feature' || kind === 'improvement' ? 'feat' : 'chore';
   const words = item.title.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/['’]/g, '')
     .split(/[^a-z0-9]+/).filter(Boolean).slice(0, 5);
-  return `${prefix}/${[item.number, ...words].join('-')}`;
+  return `${prefix}/${[item.number || item.id.slice(0, 8), ...words].join('-')}`;
 }
 
-/** Start build's message, naming the builder agent of the lar-build installed at `larBuild`. */
+/** Start build's message, naming the build's work ID and the builder agent of the lar-build installed at `larBuild`. */
 export function buildMessage(item: Item, larBuild: string): string {
-  return `Build ${item.repo}#${item.number}. Read ${larBuild}/agents/builder.md and follow it.`;
+  return `Build ${item.id}. Read ${larBuild}/agents/builder.md and follow it.`;
 }
 
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */

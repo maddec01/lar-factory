@@ -10,6 +10,7 @@ import type { TestContext } from 'vite-plus/test';
 import { changeRecords, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
+import { WorkRecordError } from '@lar-factory/work-records';
 
 /** The project item reads the board has started, one per read of GitHub. */
 async function reads(board: Board): Promise<number> {
@@ -59,7 +60,15 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
   const board = await startBoard(t, { repositories: ['maddec01/lar-server'], items: [concept, feature, coupled, part] });
   await firstRead(board);
   const [conceptId, featureId] = [board.id(1, 'maddec01/lar-server'), board.id(2, 'maddec01/lar-server')];
-  const shown = await changeRecords(board, (records) => records.addBlocker(featureId, records.read(featureId).revision, conceptId),
+  const shown = await changeRecords(board, (records) => {
+    // The running board can record an observation between this read and write.
+    for (let attempt = 0; ; attempt++) {
+      try { records.addBlocker(featureId, records.read(featureId).revision, conceptId); return; }
+      catch (error) {
+        if (!(error instanceof WorkRecordError) || error.code !== 'stale-revision' || attempt >= 4) throw error;
+      }
+    }
+  },
     featureId, (item) => item.blockers.length > 0);
   const [map, plain, parent, child] = shown.items;
   const read = { destination: 'There.', decisions: [], fog: [], check: { title: 'Try it', steps: ['Step'] } };

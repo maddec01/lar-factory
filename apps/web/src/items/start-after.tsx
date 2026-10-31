@@ -5,7 +5,7 @@
 
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { carriesTwoStatuses, openBlockerRefs, openBlockers, itemName, ref, startHold, startRequest } from '@lar-factory/shared';
+import { openBlockerRefs, openBlockers, itemName, ref, startHold, startRequest } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ICON, kind as buttonKind } from '../buttons/button-kinds.tsx';
@@ -89,11 +89,9 @@ export const showsStartAfter = (item: Item, data: BoardData): boolean =>
  * repository, where a refining thread and a build both start, while it is still onboarding or T3 has no project for
  * it. While a blocker holds it, Start after takes its place. While only the repository holds it, Start shows
  * disabled, its title giving the hold's reason; an armed start would fail then, so none is offered, but one armed
- * before the hold still shows while a blocker is open, so it can be disarmed. An item carrying more than one status
- * gets no Start until the user keeps one.
+ * before the hold still shows while a blocker is open, so it can be disarmed.
  */
 export function StartOrAfter({ item, data, label = 'Start', kind = 'refine' }: { item: Item; data: BoardData; label?: string; kind?: StartKind }) {
-  if (carriesTwoStatuses(item)) return null;
   if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} />;
   const hold = startHold(data, item.repo);
   if (!hold) return <StartControl item={item} data={data} label={label} kind={kind} />;

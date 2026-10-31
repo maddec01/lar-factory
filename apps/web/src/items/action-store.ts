@@ -1,14 +1,10 @@
-// What this page is doing for an item: a Queue, Back to List, Keep, Abandon or Needs you choice in flight, or the error
+// What this page is doing for an item: a Queue, Back to List, Abandon or Needs you choice in flight, or the error
 // it left. Keyed by item id.
 
 import { create } from 'zustand';
-import type { Status } from '@lar-factory/shared';
-
 export interface ItemAction {
   phase: 'pending' | 'error';
-  kind: 'queue' | 'back-to-list' | 'pick-status' | 'abandon' | 'needs-you';
-  /** The status a Keep picked. */
-  status?: Status;
+  kind: 'queue' | 'back-to-list' | 'abandon' | 'needs-you';
   message?: string;
 }
 

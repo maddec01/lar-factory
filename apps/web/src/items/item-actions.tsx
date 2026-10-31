@@ -1,14 +1,13 @@
-// The item dialog's buttons that move an item: Queue on a List item, Back to List on a Queued one, Abandon on
-// both, and Keep for each status of an issue that carries more than one, each with its pending label, plus a failed
-// Queue's or Keep's error.
+// The item dialog's buttons that move an item: Queue on a List item, Back to List on a Queued one and Abandon on
+// both, each with its pending label.
 
 import { useId, useRef } from 'react';
 import { canAbandon, itemName, ref } from '@lar-factory/shared';
-import type { BoardData, Item, Status } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { useActionStore, useItemAction } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
-import { askAbandon, backToList, pickStatus, queueItem } from './card-actions.ts';
+import { askAbandon, backToList, queueItem } from './card-actions.ts';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
@@ -32,16 +31,6 @@ export function BackToListButton({ item, data }: { item: Item; data: BoardData }
   const moving = action?.phase === 'pending' && action.kind === 'back-to-list';
   return <Button {...kind('other')} className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Back to List'} ${itemName(item)}`}
     {...writeState(data, action)} onClick={() => void backToList(item.id)}>{moving ? 'Moving to List…' : 'Back to List'}</Button>;
-}
-
-/** Keep, one per status an item carrying more than one has: the only moves it offers until one is picked. */
-export function PickStatusButtons({ item, data }: { item: Item; data: BoardData }) {
-  const action = useItemAction(item.id);
-  const keeping = (status: Status) => action?.phase === 'pending' && action.kind === 'pick-status' && action.status === status;
-  return item.statuses.map((status) => (
-    <Button {...kind('other')} key={status} data-pick-status={status} aria-label={`${keeping(status) ? 'Keeping' : 'Keep'} ${status} on ${itemName(item)}`}
-      {...writeState(data, action)} onClick={() => void pickStatus(item.id, status)}>{keeping(status) ? 'Keeping…' : `Keep ${status}`}</Button>
-  ));
 }
 
 /** Abandon, a link in the footer; greyed out, with a line saying why, on an item whose provider can't abandon it. */

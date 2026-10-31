@@ -2,7 +2,6 @@
 // today's Start on a Queued decision, Open thread while it has a live thread. While an issue it's blocked by is open,
 // Start after takes Start's place.
 
-import { carriesTwoStatuses } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
@@ -14,7 +13,7 @@ import type { Part } from './dossier-parts.ts';
  *  and carries one status. The dossier's "Ready to start" row and its header's "what's next" both read it. */
 export const startable = (part: Part): boolean =>
   (part.item.status === 'Ready' || part.item.status === 'Queued') && !openWaits(part).length
-  && !hasLiveThread(part.item) && !carriesTwoStatuses(part.item);
+  && !hasLiveThread(part.item);
 
 /** `label` names the Start, Start build on a Ready build and Start on a Queued one by default; other statuses get none. */
 export function PartStart({ part, data, label }: { part: Part; data: BoardData; label?: string }) {

@@ -260,26 +260,6 @@ test('a failed Queue stays in the dialog with a close button, which hands focus 
   expect(document.activeElement).toBe(button('queue', 'I_sample02'));
 });
 
-/** The sample with I_sample07, a Shaping issue, also carrying Review. */
-const twice: BoardData = { ...sample, items: sample.items.map((i) => (i.id === 'I_sample07' ? { ...i, statuses: ['Shaping', 'Review'] } : i)) };
-
-test('an issue with two statuses shows in the first with a warning mark, and its footer offers only to keep one of them', async () => {
-  await mountPage(twice);
-  expect($('[data-item="I_sample07"] [data-two-statuses]')!.getAttribute('aria-label')).toBe('Carries Shaping and Review; keep one');
-  expect($('[data-item="I_sample06"] [data-two-statuses]'), 'one status, no mark').toBeNull();
-  await openItem('I_sample07');
-  expect(text(inDialog('[data-item-summary]'))).toMatch(/^[\w-]+ Shaping· /);
-  expect(inDialog('[data-item-summary] [data-two-statuses]')).not.toBeNull();
-  expect(text(inDialog('[data-item-body] > div:nth-child(2)'))).toBe('This issue carries Shaping and Review. Keep one to move it again.');
-  expect(footerControls()).toEqual(['GitHub', 'Keep Shaping', 'Keep Review']);
-});
-
-test('a Queued issue with two statuses keeps Abandon, which deletes it, but not Back to List', async () => {
-  await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, statuses: ['Queued', 'Review'] as Item['statuses'] } : i)) });
-  await openItem('I_sample05');
-  expect(footerControls()).toEqual(['Abandon', 'GitHub', 'Keep Queued', 'Keep Review']);
-});
-
 test("Abandon is greyed out with the reason on an item whose type can't be abandoned", async () => {
   const refusal = "Issue has no Removed state in Fabrikam Fiber, so the board can't abandon it. Close or delete it in Azure DevOps.";
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample01' ? { ...i, abandonRefusal: refusal } : i)) });
@@ -290,30 +270,6 @@ test("Abandon is greyed out with the reason on an item whose type can't be aband
   const reason = footer().querySelector<HTMLElement>('[data-abandon-refusal]')!;
   expect(text(reason), 'a visible line says why').toBe(refusal);
   expect(abandon.getAttribute('aria-describedby')).toBe(reason.id);
-});
-
-test('Keep posts the status picked, shows it in flight, then shows the item with that status alone and says so', async () => {
-  holdPosts(twice);
-  await mountPage(twice);
-  await openItem('I_sample07');
-  await press(button('pick-status', 'Review'));
-  expect([text(button('pick-status', 'Review')), button('pick-status', 'Shaping').getAttribute('aria-disabled')]).toEqual(['Keeping…', 'true']);
-  expect(posted()).toEqual([['/api/pick-status', { itemId: 'I_sample07', status: 'Review' }]]);
-
-  await answer({ error: null, board: { ...twice, items: twice.items.map((i) => (i.id === 'I_sample07' ? { ...i, status: 'Review', statuses: ['Review'] } : i)) } });
-  expect(text(inDialog('[data-item-summary]'))).toMatch(/ Review· /);
-  expect(inDialog('[data-two-statuses], [data-pick-status]')).toBeNull();
-  expect(text(toast())).toMatch(/^Kept Review on #\d+ .*\./);
-});
-
-test('a failed Keep leaves both statuses and shows the error', async () => {
-  holdPosts(twice);
-  await mountPage(twice);
-  await openItem('I_sample07');
-  await press(button('pick-status', 'Review'));
-  await answer({ error: 'Could not set Review.' }, 502);
-  expect(text(inDialog('.action-error [role="alert"]'))).toBe('Could not set Review.');
-  expect(footerControls()).toEqual(['GitHub', 'Keep Shaping', 'Keep Review']);
 });
 
 test('Start refining opens the model menu, and picking a model starts the item and tags it Started', async () => {

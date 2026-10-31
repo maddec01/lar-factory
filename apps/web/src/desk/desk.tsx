@@ -4,7 +4,7 @@
 // step track; and the actions, the card's action on the left and Open thread as an icon in the right corner. Only a
 // Ready card's start message or Start after error, under its actions, makes one card taller than the rest.
 
-import { HINTS, carriesTwoStatuses, itemPr, openBlockerRefs, itemName, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
+import { HINTS, itemPr, openBlockerRefs, itemName, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -15,10 +15,10 @@ import { PrLink } from '../items/pr-link.tsx';
 import { StartAfterError, showsStartAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
-import { ItemStatusGlyph } from '../items/status-glyph.tsx';
+import { StatusGlyph } from '../items/status-glyph.tsx';
 
 /** Whether the card's action is Start build, or Start after in its place: a Ready item no thread works on yet, carrying no other status. */
-const startsBuild = (item: Item) => item.status === 'Ready' && !hasLiveThread(item) && !carriesTwoStatuses(item);
+const startsBuild = (item: Item) => item.status === 'Ready' && !hasLiveThread(item);
 
 /** What a Ready card waits on: the open blockers Start after names, what holds its repository, or nothing. */
 function readyStep(item: Item, data: BoardData): string {
@@ -75,7 +75,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
       className={`desk-card grid w-70 shrink-0 cursor-pointer content-start gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
       <button type="button" className="grid min-w-0 gap-2 text-left">
         <span className="desk-meta flex h-4 min-w-0 items-center gap-2 text-xs">
-          <ItemStatusGlyph item={item} /><span className="shrink-0 font-semibold text-(--warning-foreground)">{item.status}</span>
+          <StatusGlyph status={item.status} /><span className="shrink-0 font-semibold text-(--warning-foreground)">{item.status}</span>
           <span className="truncate text-(--muted-foreground)">· {repoName(repoKey(item), data.repos)} · {shortAgo(item.updatedAt, now)}</span>
         </span>
         {/* Two lines tall whatever the title's length, so the rows under it start at the same height on every card. */}

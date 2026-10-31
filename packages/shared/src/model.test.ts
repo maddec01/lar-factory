@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, keepOneText, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -307,15 +307,6 @@ test("a status's label is status- and its name in lowercase with hyphens for spa
 test("an issue's labels hold the statuses whose labels it carries, in flow order, and never Done", () => {
   assert.deepEqual(labelStatuses(['bug', 'status-verify', 'status-shaping', 'status-done']), ['Shaping', 'Verify']);
   assert.deepEqual(labelStatuses(['bug']), []);
-});
-
-test('an item carrying more than one status moves only once one is kept, and says which it carries', () => {
-  assert.equal(carriesTwoStatuses({ statuses: ['Ready', 'Verify'], state: 'open' }), true);
-  assert.equal(carriesTwoStatuses({ statuses: ['Ready'], state: 'open' }), false);
-  assert.equal(carriesTwoStatuses({ statuses: [], state: 'open' }), false);
-  assert.equal(carriesTwoStatuses({ statuses: ['Ready', 'Verify'], state: 'closed' }), false, 'a closed item is Done, whatever labels it kept');
-  assert.equal(keepOneText(['Ready', 'Verify']), 'This issue carries Ready and Verify. Keep one to move it again.');
-  assert.equal(keepOneText(['Shaping', 'Ready', 'Review']), 'This issue carries Shaping, Ready and Review. Keep one to move it again.');
 });
 
 test('a repository goes by its name, or by owner/name when another board repository shares the name', () => {

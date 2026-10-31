@@ -124,14 +124,6 @@ test("a Queued item whose repository is still onboarding has its Start refining 
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
-test('a Queued issue that also carries Review has no Start refining or Start after, and Start next passes over it', async () => {
-  const twice = { ...withChoices, items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, statuses: ['Queued', 'Review'] as Item['statuses'] } : i)) };
-  await mountPage(twice);
-  expect(row('I_sample05').querySelector('[data-start], [data-start-after]')).toBeNull();
-  expect(row('I_sample05').querySelector('.queue-title [data-two-statuses]')!.getAttribute('aria-label')).toBe('Carries Queued and Review; keep one');
-  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
-});
-
 test('when no queued item can start, Start next shows disabled and says why', async () => {
   const held = { ...withChoices, items: sample.items.map((i) => (['I_sample05', 'I_sample06', 'I_sample21'].includes(i.id)
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };

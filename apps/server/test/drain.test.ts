@@ -7,7 +7,7 @@ import { boardIssue } from '@lar-factory/shared/test/raw-items';
 
 const SECRET = 'app-secret-for-tests';
 const DRAINING = 'The board is installing an update. Try again once Lar Factory restarts.';
-const GUARDED = ['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/pick-status', '/api/recheck'];
+const GUARDED = ['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/recheck'];
 
 const post = (board: Board, path: string, body: unknown = {}, headers: Record<string, string> = { 'X-Board-Secret': SECRET }) =>
   fetch(`${board.url}${path}`, {

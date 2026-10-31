@@ -18,7 +18,7 @@ import { AzureFields, ItemTitle, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
-import { ItemStatusGlyph, STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
 import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { PartStart, startable } from './part-start.tsx';
@@ -98,7 +98,7 @@ function PartLink({ part }: { part: Part }) {
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); open(part.item); }} title={`${itemName(part.item)}`}
       className="flex min-w-0 items-start gap-1.5 rounded text-left text-[13px] hover:underline">
-      <span className="mt-0.5 inline-flex"><ItemStatusGlyph item={part.item} className="size-3.5" /></span>
+      <span className="mt-0.5 inline-flex"><StatusGlyph status={part.item.status} className="size-3.5" /></span>
       <span className="line-clamp-2"><ItemTitle item={part.item} /></span>
     </button>
   );

@@ -3,3 +3,5 @@
 [Issue #60](https://github.com/maddec01/lar-factory/issues/60) settled that the board computes item stats itself by reading T3 Code's internal SQLite database read-only, matching an item's threads by their first user message. It adds Claude subagent tokens from Claude Code transcripts and rewrites a marked stats block in the open PR. No T3 MCP tool exposes token usage, and having agents report their own usage would miss turns and spend tokens. The cost is coupling to an internal schema that may change between T3 releases, so the read lives in one module and fails soft.
 
 Amended by [ADR 0007](0007-count-item-tokens-like-t3s-usage-page.md): item tokens now come from provider transcripts, counted as T3's usage page counts them.
+
+Partially superseded by [ADR 0035](0035-the-board-reads-t3-through-its-first-party-protocol.md): protocol observations replace covered project, thread, timing and transcript-session reads. Only the documented historical Codex pricing selection query remains a production SQLite read.

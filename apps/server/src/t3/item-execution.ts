@@ -120,7 +120,7 @@ export function protocolThreadByTitle(projectId: string, title: string): { threa
 }
 
 /** Thread-ID lookup for the future switch/import; retained facts never imply availability. */
-function protocolThreadById(threadId: string): ExecutionRead {
+export function protocolThreadById(threadId: string): ExecutionRead {
   protocolItemThreads('', 0);
   const read = current?.reads?.get(threadId);
   return { availability: current?.available && read ? read.availability : 'unavailable',
@@ -131,8 +131,9 @@ function protocolThreadById(threadId: string): ExecutionRead {
 export function protocolStatsInputs() {
   protocolItemThreads('', 0);
   if (!current?.available || !current.reads) throw Error('T3 execution unavailable');
-  return executionStats([...current.reads.values()].map(read => {
-    if (read.availability !== 'available' || !read.observation) throw Error('T3 execution unavailable');
+  return executionStats((current.shells ?? []).filter(shell => !shell.deletedAt).map(shell => {
+    const read = current!.reads!.get(String(shell.id));
+    if (read?.availability !== 'available' || !read.observation) throw Error('T3 execution unavailable');
     return read.observation.projection;
   }));
 }

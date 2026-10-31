@@ -1,5 +1,10 @@
 # 5. Start the build
 
+Ready means the current brief passed its gate. Optional
+[publication](shared/issue-tracker/publication.md) shares finished refinement
+with the team and never starts implementation. A build may start with or
+without a ticket. Editing the brief requires a fresh gate; a ticket's edits
+never replace its private handover.
 
 The board's **Start build** on a Ready build is the user's Go. A build blocked by
 other work starts only once that work is complete

@@ -1,10 +1,9 @@
 Ported from mattpocock/skills, `skills/engineering/to-tickets/SKILL.md`. See [UPSTREAM.md](../../UPSTREAM.md) for the Ports record.
 
-# To Tickets
+# Plan slices
 
-Break a plan, spec, or conversation into a set of **tickets**: tracer-bullet vertical slices, each declaring the tickets that **block** it.
-
-Each ticket here is a slice: a private record the build owns, never published.
+Break a passing brief into private slices, each declaring the slices that
+block it. Record them only in work records. Slices are never provider tickets.
 
 ## Process
 
@@ -14,13 +13,13 @@ Work from whatever is already in the conversation context. Read the build's brie
 
 ### 2. Explore the codebase (optional)
 
-If you have not already explored the codebase, do so to understand the current state of the code. Ticket titles and descriptions should use the project's domain glossary vocabulary, and respect ADRs in the area you're touching.
+If you have not already explored the codebase, do so to understand the current state of the code. Slice titles and descriptions should use the project's domain glossary vocabulary, and respect ADRs in the area you're touching.
 
 Look for opportunities to prefactor the code to make the implementation easier. "Make the change easy, then make the easy change."
 
 ### 3. Draft vertical slices
 
-Break the work into **tracer bullet** tickets.
+Break the work into **tracer bullet** slices.
 
 <vertical-slice-rules>
 
@@ -31,9 +30,15 @@ Break the work into **tracer bullet** tickets.
 
 </vertical-slice-rules>
 
-Give each ticket its **blocking edges**: the other tickets that must complete before it can start. A ticket with no blockers can start immediately.
+Give each slice its blockers, the other slices that must complete before it
+can start. A slice with no blockers can start immediately.
 
-**Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical change (rename a column, retype a shared symbol) whose **blast radius** fans across the whole codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land green. Don't force it into a tracer bullet; sequence it as **expand–contract**. First expand: add the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping CI green batch to batch because the old form still exists. Finally contract: delete the old form once no caller remains, in a ticket blocked by every migrate batch. When even the batches can't stay green alone, keep the sequence but let them share an integration branch that all block a final integrate-and-verify ticket; green is promised only there.
+A wide refactor changes the same structure across many callers, such as a
+column rename. First add the new form beside the old one. Then migrate callers
+in batches, each a private slice blocked by the first change. Finally remove
+the old form in a slice blocked by every migration batch. Keep each batch
+passing its checks. When batches cannot pass alone, share an integration
+branch and require a final slice to integrate and verify them.
 
 ### 4. Record slices
 

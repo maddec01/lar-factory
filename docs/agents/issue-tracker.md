@@ -29,8 +29,18 @@ makes it Done.
 
 ## When a skill says "publish to the issue tracker"
 
-Publishing work as issues arrives in a later Lar Factory release. Keep the work
-in its record and tell the user publishing isn't available yet.
+Offer optional publication once refinement finishes, and later on request,
+through the lar skill's `shared/issue-tracker/publication.md`. Use `lar-work`
+and its journal with the board open or closed. Show exact text, destination,
+mapped team terms and operations for approval. Recheck before writes, resume
+recorded outcomes and reconcile uncertainty before an approved retry or fallback.
+Decisions and slices stay private. Publication, Ready and Start build are
+separate choices. Provider edits never rewrite private refinement.
+
+A build's PR uses its own published ticket's GitHub closing reference even
+when the repository sets no link style, per `shared/issue-tracker/publication-pr.md`.
+Keep the project's other PR rules and a complete outcome, decisions and reasons
+for ticketless PRs. Local Done follows the recorded PR merging.
 
 ## When a skill says "fetch the relevant ticket"
 

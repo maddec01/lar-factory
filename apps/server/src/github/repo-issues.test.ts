@@ -150,6 +150,22 @@ test("a ticket read gives an open issue's text and kind, and nothing for a close
   assert.equal(await issues.readTicket(REPO, 9), null);
 });
 
+test('a ticket observation reads its state and assignees, and a confirmed not-found, but throws on any other failure', async () => {
+  const answers: Record<string, () => string> = {
+    7: () => JSON.stringify({ state: 'OPEN', assignees: [{ login: 'pedro' }, { login: 'ana' }] }),
+    8: () => JSON.stringify({ state: 'CLOSED', assignees: [] }),
+    9: () => { throw new Error('gh issue view failed: GraphQL: Could not resolve to an issue or pull request with the number of 9.'); },
+    10: () => { throw new Error('gh issue view failed: HTTP 502'); },
+  };
+  const gh = fakeGh((args) => answers[args[2]!]!());
+  const issues = repoIssues(REPO, gh.run);
+  assert.deepEqual(await issues.observeTicket(REPO, 7), { state: 'open', assignee: 'ana, pedro' });
+  assert.deepEqual(gh.calls[0], ['issue', 'view', '7', '-R', REPO, '--json', 'state,assignees']);
+  assert.deepEqual(await issues.observeTicket(REPO, 8), { state: 'closed' });
+  assert.deepEqual(await issues.observeTicket(REPO, 9), { state: 'not-found' });
+  await assert.rejects(issues.observeTicket(REPO, 10), /HTTP 502/);
+});
+
 test("a change check lists the issues and PRs updated since, and can't tell once every one it lists changed", async () => {
   const updated = (number: number, at: string, pr = false) => ({ html_url: `https://github.com/${REPO}/${pr ? 'pull' : 'issues'}/${number}`, updated_at: at, closed_at: null });
   let page = [updated(9, '2026-10-21T08:10:00Z', true), updated(7, '2026-10-21T08:09:45Z'), updated(5, '2026-10-21T08:00:00Z')];

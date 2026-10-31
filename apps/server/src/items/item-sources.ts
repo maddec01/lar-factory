@@ -18,6 +18,7 @@ const unlisted: ItemSource = {
   addLabel: async () => NOT_ONBOARDED,
   searchTickets: async () => { throw new Error(NOT_ONBOARDED); },
   readTicket: async () => { throw new Error(NOT_ONBOARDED); },
+  observeTicket: async () => { throw new Error(NOT_ONBOARDED); },
   setParentStatus: async () => NOT_ONBOARDED,
   abandon: async () => NOT_ONBOARDED,
 };
@@ -318,6 +319,7 @@ export function mergeSources(byRepo: ReadonlyMap<string, ItemSource>, optedIn: r
     addLabel: (item, label) => sourceOf(item).addLabel(item, label),
     searchTickets: (repo, query) => forRepo(repo).searchTickets(repo, query),
     readTicket: (repo, number) => forRepo(repo).readTicket(repo, number),
+    observeTicket: (repo, number) => forRepo(repo).observeTicket(repo, number),
     setParentStatus: (parent, status) => forRepo(parent.repo).setParentStatus(parent, status),
     abandon: (item) => sourceOf(item).abandon(item),
   };
@@ -378,6 +380,7 @@ export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = 
     addLabel: (item, label) => current.addLabel(item, label),
     searchTickets: (repo, query) => current.searchTickets(repo, query),
     readTicket: (repo, number) => current.readTicket(repo, number),
+    observeTicket: (repo, number) => current.observeTicket(repo, number),
     setParentStatus: (parent, status) => current.setParentStatus(parent, status),
     abandon: (item) => current.abandon(item),
   };

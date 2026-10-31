@@ -2,6 +2,7 @@
 // Each adapter lives with its provider's code, such as GitHub issues in github/repo-issues.ts.
 
 import type { IssueRef, Item, ItemSourceKind, ItemSourceProblem, PickedTicket, Status, TicketMatch } from '@lar-factory/shared';
+import type { NewObservation } from '@lar-factory/work-records';
 
 /** One read of an item source: its title, for the board's header, and its items. */
 export interface ItemsRead {
@@ -63,6 +64,9 @@ export const TICKET_MATCHES = 20;
 /** A ticket search's number: `12` or `#12`; null for words. */
 export const ticketNumberOf = (query: string): number | null => (/^#?\d+$/.test(query.trim()) ? Number(query.trim().replace('#', '')) : null);
 
+/** A ticket as its provider shows it now: open or closed with its assignees, or a confirmed not-found. */
+export type TicketObservation = Omit<Extract<NewObservation, { of: 'ticket' }>, 'of'>;
+
 /** Every write returns the error to show, or null when the provider accepted it. */
 export interface ItemSource {
   /** What a read reports for this source; absent for a source its repositories name, as the merged source then does. */
@@ -97,6 +101,8 @@ export interface ItemSource {
   searchTickets(repo: string, query: string): Promise<TicketMatch[]>;
   /** One of `repo`'s open tickets as a pick reads it; null when it has none open with that number. Throws when the provider can't answer. */
   readTicket(repo: string, number: number): Promise<PickedTicket | null>;
+  /** One of `repo`'s tickets, open or not, as a work record observes it. Throws when the provider can't answer. */
+  observeTicket(repo: string, number: number): Promise<TicketObservation>;
   /** Sets the status of a child's parent that isn't on the board, adding it to the item source first. */
   setParentStatus(parent: IssueRef, status: Status): Promise<string | null>;
   abandon(item: Item): Promise<string | null>;

@@ -4,7 +4,7 @@
 import { carriesTwoStatuses, keepOneText, labelStatuses } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { DONE_REFUSED, TICKET_MATCHES, ticketNumberOf, type ItemSource } from '../items/item-source.ts';
-import { addIssueLabel, changedSince, createStatusLabel, abandonIssue, fetchIssues, fetchRepoIssues, getIfChanged, issueLabels, message, findIssues, readIssue, setStatusLabel } from './github.ts';
+import { addIssueLabel, changedSince, createStatusLabel, abandonIssue, fetchIssues, fetchRepoIssues, getIfChanged, issueLabels, message, findIssues, observeIssue, readIssue, setStatusLabel } from './github.ts';
 
 /** How many of the latest updated issues and PRs a change check lists; when all of them changed, the whole source reads. */
 const CHANGES_PAGE = 30;
@@ -61,6 +61,7 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
       return issue ? [{ number: issue.number, title: issue.title, url: issue.url }] : [];
     },
     readTicket: (_repo, number) => readIssue(repo, number, run),
+    observeTicket: (_repo, number) => observeIssue(repo, number, run),
     async setParentStatus(parent, status) {
       if (status === 'Done') return DONE_REFUSED;
       try {

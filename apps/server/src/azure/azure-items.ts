@@ -411,5 +411,14 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const [raw] = await openFor(repo, await workItems([number]));
       return raw ? { number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), text: field(raw, 'System.Description'), kind: labelKind(labelsOf(raw)) } : null;
     },
+    async observeTicket(_repo, number) {
+      // workitemsbatch omits an id it can't find, so a missing work item is a confirmed not-found.
+      const [raw] = await workItems([number]);
+      if (!raw) return { state: 'not-found' };
+      const type = field(raw, 'System.WorkItemType');
+      const category = (await categories([type])).get(type)?.get(field(raw, 'System.State'));
+      const { assignee } = azureWorkItem(raw);
+      return { state: category === 'Completed' || category === 'Removed' ? 'closed' : 'open', ...assignee && { assignee } };
+    },
   };
 }

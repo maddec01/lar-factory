@@ -86,6 +86,17 @@ test("a ticket read gives an open work item's description and kind, and nothing 
   assert.equal(await source.readTicket(API, 99), null);
 });
 
+test('a ticket observation reads a work item open or not, with its assignee, and a confirmed not-found', async () => {
+  const items: WorkItem[] = [
+    { id: 1, type: 'User Story', state: 'Active', title: 'Export', assignedTo: 'Ana Silva' },
+    { id: 2, type: 'User Story', state: 'Closed', title: 'Old', tags: 'repo-web' },
+  ];
+  const source = azureBoard([WEB, API], TEAM, fakeAz({ items }).run);
+  assert.deepEqual(await source.observeTicket(API, 1), { state: 'open', assignee: 'Ana Silva' });
+  assert.deepEqual(await source.observeTicket(API, 2), { state: 'closed' });
+  assert.deepEqual(await source.observeTicket(API, 99), { state: 'not-found' });
+});
+
 test('a repository tag goes on an untagged item, and an item tagged for another repository refuses a second', async () => {
   const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 2, type: 'User Story', state: 'New', tags: 'repo-web' }] });
   const source = azureBoard([WEB, API], TEAM, az.run);

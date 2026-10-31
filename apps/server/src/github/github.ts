@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
 import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, Status, TicketMatch } from '@lar-factory/shared';
+import type { TicketObservation } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -706,4 +707,17 @@ export async function readIssue(repo: string, number: number, run: (args: string
   }
   if (issue.state !== 'OPEN') return null;
   return { number: issue.number, title: issue.title, url: issue.url, text: issue.body, kind: labelKind(issue.labels.map((l) => l.name)) };
+}
+
+/** An issue's state and assignees as a work record observes them; not-found when `repo` has no issue `number`. */
+export async function observeIssue(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<TicketObservation> {
+  let issue: { state: string; assignees: { login: string }[] };
+  try {
+    issue = JSON.parse(await run(['issue', 'view', String(number), '-R', repo, '--json', 'state,assignees']));
+  } catch (err) {
+    if (/Could not resolve to an issue/.test(message(err))) return { state: 'not-found' };
+    throw err;
+  }
+  const assignee = issue.assignees.map((a) => a.login).sort().join(', ');
+  return { state: issue.state === 'OPEN' ? 'open' : 'closed', ...assignee && { assignee } };
 }

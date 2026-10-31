@@ -7,13 +7,14 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, providerTool, refKey, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
 import { onTheBoard, readBoardSettings, readRepositoryList, stillOnboarding, stillResetting, type OnboardedRepository } from './config/repository-config.ts';
+import { prHost, prUrl } from './config/pr-host.ts';
 import { readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
@@ -21,8 +22,9 @@ import { createBoardServer } from './http/http.ts';
 import { createCapture } from './items/capture.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
+import { finishCompleted, observeRecords } from './items/observe-records.ts';
 import { recordItems, ticketsByReference } from './items/record-items.ts';
-import type { ItemsRead, ReadPace, ReadProgress } from './items/item-source.ts';
+import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
 import { createClashRuns } from './onboarding/clash-runs.ts';
@@ -608,6 +610,47 @@ async function refresh(): Promise<void> {
   // PR edits take a gh call or two each, and a start runs t3; the board doesn't wait for them.
   if (read) void syncPrStats(board.snapshot().items);
   if (read) void startAfter.startUnblocked();
+  if (read) void observeProviders();
+}
+
+/**
+ * The ticket as the item sources' last read showed it, when that read shows it open with its assignees; undefined when
+ * it doesn't, as for a closed ticket, which takes a read of its own.
+ */
+function knownTicket(repo: string, number: number): TicketObservation | undefined {
+  const ticket = ticketsByRef.get(refKey(repo, number).toLowerCase());
+  const assignee = ticket?.azure ? ticket.azure.assignee : ticket?.assignee;
+  if (ticket?.state !== 'open' || assignee === undefined) return undefined;
+  return { state: 'open', ...assignee && { assignee } };
+}
+
+/** When the records' tickets and PRs were last observed, which runs at the idle pace as each record takes a call or two. */
+let observedAt = -Infinity;
+let observing = false;
+
+/**
+ * Records what each onboarded repository's tickets and PRs show now, then finishes the decisions and concepts now
+ * complete; the next local refresh shows what changed.
+ */
+async function observeProviders(): Promise<void> {
+  if (!records || observing || Date.now() - observedAt < idleMs()) return;
+  observing = true;
+  observedAt = Date.now();
+  const toState = { OPEN: 'open', MERGED: 'merged', CLOSED: 'closed' } as const;
+  const repos = items.repos().map((r) => r.repo);
+  try {
+    // While gh's quota runs low, GitHub repositories' reads wait and their records keep their last observation; az reads go on.
+    await observeRecords(records, quotaLow ? repos.filter(onAzure) : repos, {
+      ticket: (repo, number) => items.observeTicket(repo, number),
+      pr: async (repo, number) => toState[await prHost(repo).prState(prUrl(repo, number))],
+      known: (repo, number) => knownTicket(repo, number),
+    });
+    // After the PR reads, so a concept whose last build merged finishes in the same pass.
+    finishCompleted(records, repos);
+  } finally {
+    observing = false;
+  }
+  refreshLocal();
 }
 
 let offeredAt = -Infinity;

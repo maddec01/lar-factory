@@ -149,8 +149,9 @@ Threads and launch intents
                                     resolves once.
 
 Retention and export
-  A record is finished once its delivery PR shows it; a Status or a closed
-  ticket never finishes it. By default this machine keeps finished and set-aside
+  A record is finished once its delivery PR shows it, and the board finishes a
+  decision or concept once it is complete; a Status or a closed ticket never
+  finishes it. By default this machine keeps finished and set-aside
   records indefinitely and hides them 7 days after they were finished or set
   aside. Deleting them after a number of days is a separate choice.
   retention [--hide-after N] [--delete-after N|never]

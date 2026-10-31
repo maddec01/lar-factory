@@ -248,6 +248,11 @@ export interface Item {
   /** Azure backlog priority position, retained through partial reads and UI sorting. */
   sourceOrder?: number;
   state: 'open' | 'closed';
+  /**
+   * Its ticket's assignees, sorted and comma-joined as a work record observes them, or null when it has none; absent
+   * when the read didn't carry them. An Azure work item's is its `azure.assignee`.
+   */
+  assignee?: string | null;
   /** How a closed item closed: `done` when completed or merged, `not-planned` otherwise; null while open. */
   closedAs: 'done' | 'not-planned' | null;
   parent: IssueRef | null;

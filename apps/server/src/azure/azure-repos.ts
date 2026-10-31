@@ -156,7 +156,8 @@ async function branchExists(repo: string, branch: string, run: Az = az): Promise
 }
 
 /** The PR's URL, as Azure Repos shows it. */
-const prUrl = (repo: string, id: number) => {
+/** A PR's URL, from its repository and id. */
+export const prUrl = (repo: string, id: number) => {
   const [organization, project, repository] = repo.split('/');
   return `https://dev.azure.com/${organization}/${project}/_git/${repository}/pullrequest/${id}`;
 };

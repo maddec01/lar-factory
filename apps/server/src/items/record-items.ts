@@ -62,6 +62,7 @@ export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> 
 /** Maps records to board items with the ticket items an item source read, each paused as `paused` says. */
 function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paused = []) {
   const byTicket = ticketsByReference(tickets);
+  const publication = records.publicationSummaries();
   const ticketOf = (record: WorkRecord) => (record.ticket ? byTicket.get(record.ticket.toLowerCase()) : undefined);
   const ref = (record: WorkRecord): IssueRef => ({ number: ticketNumber(record.ticket), title: record.title, url: ticketOf(record)?.url ?? '',
     repo: record.repository, state: state(record) });
@@ -102,8 +103,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paus
       slices,
     };
     if (!['decision', 'slice'].includes(record.kind)) {
-      const { eligible, reasons } = records.publicationReadiness(record.workId);
-      item.publication = { eligible, reasons };
+      item.publication = publication.get(record.workId);
     }
     if (map) item.map = map;
     const pause = pausedOf(record, paused);

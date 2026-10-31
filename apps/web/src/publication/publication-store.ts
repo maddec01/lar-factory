@@ -29,9 +29,7 @@ export const usePublicationStore = create<PublicationState>()((set, get) => ({
     set({ workId, state: null, documents: [], typeSelections: {}, error: null, conflict: null });
     if (!await get().request('open')) return;
     const state = get().state!;
-    set({ mode: state.pending ? 'preview' : state.firstUse ? 'setup' : 'edit', documents: state.sources.map((source) => ({
-      workId: source.workId, title: source.title, outcome: '', change: '', checks: [], assumptions: [], decisions: [], builderNotes: [], domainNotes: [], relatedTickets: [],
-    })) });
+    set({ mode: state.pending ? 'preview' : state.firstUse ? 'setup' : 'edit' });
   },
   close() { if (!get().busy) set({ workId: null, state: null, documents: [], typeSelections: {}, error: null, conflict: null }); },
   editDocument(workId, change) { set({ documents: get().documents.map((doc) => doc.workId === workId ? { ...doc, ...change } : doc) }); },
@@ -58,7 +56,13 @@ export const usePublicationStore = create<PublicationState>()((set, get) => ({
       ...action !== 'open' && action !== 'prepare' && plan && { planId: plan.planId },
       ...['approve', 'resume'].includes(action) && plan && { revision: plan.revision, digest: plan.digest }, ...extra,
     });
-    if (result.readiness) set({ state: result as PublicationBoardState, ...result.pending && { mode: 'preview' } });
+    if (result.readiness) {
+      const documents = (result.sources ?? []).map((source) => get().documents.find((doc) => doc.workId === source.workId) ?? {
+        workId: source.workId, title: source.title, outcome: '', change: '', checks: [], assumptions: [], decisions: [], builderNotes: [], domainNotes: [], relatedTickets: [],
+      });
+      const changedVocabulary = JSON.stringify(state?.settings.map((config) => config.setup.vocabulary)) !== JSON.stringify(result.settings?.map((config) => config.setup.vocabulary));
+      set({ state: result as PublicationBoardState, documents, ...changedVocabulary && { typeSelections: {} }, ...result.pending && { mode: 'preview' } });
+    }
     set({ busy: false, error: result.error, conflict: result.conflict ?? null });
     return !result.error;
   },

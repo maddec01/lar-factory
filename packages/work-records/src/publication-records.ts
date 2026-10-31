@@ -10,6 +10,8 @@ export interface PublicationRecords {
   gate(workId: string): GateResult;
   recordGate(workId: string, revision: number, evidence: Pick<GateEvidence, 'briefDigest' | 'approvedBy' | 'evidence'>): GateEvidence;
   publicationReadiness(workId: string): PublicationReadiness;
+  /** Batched board projection. Does not load source text, fingerprints or plan payloads. */
+  publicationSummaries(): Map<string, Pick<PublicationReadiness, 'eligible' | 'reasons'> & { recoverable?: true }>;
   publicationReceipt(workId: string): { ticket: string; url: string } | null;
   recordCreationVerification(workId: string, planId: string, revision: number, operationId: string, verified: boolean, evidence: string): PublicationPlan;
   proposePublication(workId: string, revision: number, proposal: PublicationProposal): PublicationPlan;
@@ -113,29 +115,36 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       gate: evidence.findLast((item) => item.briefDigest === briefDigest) ?? null,
     };
   };
-  const readiness = (workId: string): PublicationReadiness => {
-    const root = find(workId);
+  type Refinement = Pick<WorkRecord, 'workId' | 'kind' | 'setAside' | 'fogGone'>;
+  type BodyReadiness = { written: number; hasContent: boolean; hasPassingGate: boolean };
+  const eligibility = (root: Refinement, records: Refinement[], metadata: (workId: string, body: string) => BodyReadiness | undefined) => {
     const reasons: string[] = [];
     if (root.kind === 'decision' || root.kind === 'slice') reasons.push('Decisions and slices cannot publish.');
     if (root.setAside) reasons.push('The work is set aside.');
-    const records = root.kind === 'concept' ? [root, ...children(workId)] : [root];
     if (root.kind === 'concept') {
       if (!root.fogGone) reasons.push('The concept still has Fog.');
-      const mapWritten = Number(db.prepare("SELECT written FROM bodies WHERE work_id = ? AND body = 'map'").get(workId)?.written ?? 0);
-      if (!mapWritten || !body(workId, 'map')?.trim()) reasons.push('The concept has no map.');
+      const map = metadata(root.workId, 'map');
+      if (!map?.written || !map.hasContent) reasons.push('The concept has no map.');
       for (const decision of records.filter((item) => item.kind === 'decision')) {
-        const answer = db.prepare("SELECT written FROM bodies WHERE work_id = ? AND body = 'answer'").get(decision.workId);
-        const drafts = db.prepare("SELECT written FROM bodies WHERE work_id = ? AND body = 'domain-drafts'").get(decision.workId);
-        if (!answer || !drafts || !body(decision.workId, 'answer')?.trim() || mapWritten <= Math.max(Number(answer?.written ?? 0), Number(drafts?.written ?? 0))) {
+        const answer = metadata(decision.workId, 'answer'); const drafts = metadata(decision.workId, 'domain-drafts');
+        if (!answer || !drafts || !answer.hasContent || (map?.written ?? 0) <= Math.max(answer.written, drafts.written)) {
           reasons.push(`Decision ${decision.workId} is not settled in the map.`);
         }
       }
     }
-    const sources = records.map((item) => source(item.workId));
     for (const item of records.filter((record) => !['concept', 'decision', 'slice'].includes(record.kind))) {
-      if (!sources.find((candidate) => candidate.workId === item.workId)?.gate) reasons.push(`The brief for ${item.workId} has no current passing gate.`);
+      if (!metadata(item.workId, 'brief')?.hasPassingGate) reasons.push(`The brief for ${item.workId} has no current passing gate.`);
     }
-    return { eligible: !reasons.length, reasons, sources };
+    return { eligible: !reasons.length, reasons };
+  };
+  const bodyReadiness = (row: Record<string, unknown>): BodyReadiness => ({ written: Number(row.written), hasContent: Boolean(row.has_content), hasPassingGate: Boolean(row.has_passing_gate) });
+  const readiness = (workId: string): PublicationReadiness => {
+    const root = find(workId);
+    const records = root.kind === 'concept' ? [root, ...children(workId)] : [root];
+    return { ...eligibility(root, records, (id, name) => {
+      const row = db.prepare('SELECT written, has_content, has_passing_gate FROM bodies WHERE work_id = ? AND body = ?').get(id, name);
+      return row ? bodyReadiness(row) : undefined;
+    }), sources: records.map((item) => source(item.workId)) };
   };
   const load = (workId: string, planId: string): PublicationPlan => {
     find(workId);
@@ -395,6 +404,7 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
         approvedBy: filled(value.approvedBy, 'gate approval identity'), evidence: filled(value.evidence, 'gate evidence'), recordedAt: now() };
       db.prepare('INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(item.gateId, workId, revision, item.briefDigest, item.approvedBy, item.evidence, item.recordedAt);
+      db.prepare("UPDATE bodies SET has_passing_gate = 1 WHERE work_id = ? AND body = 'brief'").run(workId);
       return item;
     }),
     publicationReceipt: (workId) => database.read(() => { find(workId); return knownTicket(workId); }),
@@ -412,6 +422,23 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
         .run(planId, operationId, ticket.workId, attempt.ticket, attempt.url, ticket.body, JSON.stringify(boundary), now());
       bump(planId);
       return load(workId, planId);
+    }),
+    publicationSummaries: () => database.read(() => {
+      const rows = db.prepare('SELECT work_id, kind, parent_id, set_aside_at, fog_gone_at FROM work_records ORDER BY rowid').all();
+      const bodies = new Map(db.prepare('SELECT work_id, body, written, has_content, has_passing_gate FROM bodies').all()
+        .map((row) => [`${row.work_id}:${row.body}`, bodyReadiness(row)]));
+      const published = new Set(db.prepare('SELECT DISTINCT work_id FROM publication_plans').all().map((row) => String(row.work_id)));
+      const refinements = rows.map((row) => ({ workId: String(row.work_id), kind: row.kind as WorkRecord['kind'], setAside: row.set_aside_at !== null, fogGone: row.fog_gone_at !== null }));
+      const children = new Map<string, Refinement[]>();
+      rows.forEach((row, index) => {
+        if (row.parent_id && row.set_aside_at === null && row.kind !== 'slice') {
+          const id = String(row.parent_id);
+          if (!children.has(id)) children.set(id, []);
+          children.get(id)!.push(refinements[index]!);
+        }
+      });
+      return new Map(refinements.map((root) => [root.workId, { ...eligibility(root, root.kind === 'concept' ? [root, ...children.get(root.workId) ?? []] : [root],
+        (id, name) => bodies.get(`${id}:${name}`)), ...(published.has(root.workId) ? { recoverable: true as const } : {}) }]));
     }),
     publicationReadiness: (workId) => database.read(() => readiness(workId)),
     proposePublication: (workId, revision, proposal) => database.write(() => {

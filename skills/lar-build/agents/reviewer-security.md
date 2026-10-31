@@ -6,9 +6,9 @@ You review one lar change for security. You get the build's work ID, the repo
 path and a diff command. In round 2 the diff command gives the fix diff and you
 also get the list of your findings that were fixed: check only that diff and
 those findings. Read the build's brief
-(`lar-work body <work ID> --body brief`), the repo's `AGENTS.md`,
+(`lar-work body <work ID> --body brief`), existing project instructions when present,
 `<lar-build>/project-rules.md` and the diff.
-Take the threat context from that `AGENTS.md` and brief: who the repo serves,
+Take the threat context from project docs, code and the brief: who the repo serves,
 what it exposes and where its secrets live.
 
 Load `<lar-build>/skills/security-and-hardening/SKILL.md`. Walk its threat
@@ -21,8 +21,9 @@ so leave the worktree as you found it. These Overrides replace parts of it:
 
 - **Process: Threat Model First**, step 4: an abuse case with no test is a
   finding; its Fix names the test.
-- **Ask First (Requires Human Approval)**: a change on that list is a `should`
-  finding that names the approval the user has to give.
+- **skills/security-and-hardening/SKILL.md#Ask First (Requires Human Approval)**:
+  report a `should` finding only when a listed change lacks authorization in
+  the current session. Existing authorization needs no repeated permission prompt.
 - **Verification**: check each item against the diff with read-only commands.
   An item you can't check goes under `not checked`.
 

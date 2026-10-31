@@ -1,7 +1,7 @@
 # Question UI
 
 Ask the user ordinary questions with the question UI (`AskUserQuestion`), so T3
-shows the thread as waiting: Size up, grilling rounds, the prototype pick,
+shows the thread as waiting for an unresolved decision: grilling rounds, the prototype pick,
 Gate assumptions, Doubt findings, Concepts,
 grill decisions, and the builder's stops. Retro picks and their
 clarifications use [chat](#retro-picks).
@@ -9,6 +9,10 @@ If the tool is deferred, load it with `ToolSearch`; if it isn't available, ask
 in chat with each numbered question, its title and body, followed by the
 recommended answer. Separate questions with a horizontal rule. Word each so
 "yes" accepts the recommendation.
+
+Reuse answers and authorization already given. State routine shaping routes and
+implementation choices, then continue. Ask only for a missing decision, genuine
+conflict or expansion of scope. The saved sync choice needs no per-update prompt.
 
 Every ordinary question batch runs these once, however many calls it takes:
 
@@ -27,9 +31,8 @@ Use this format for the call:
   reasoning in its description. The others are the real alternatives; "Other"
   stays for free text. Without an honest recommendation (a prototype pick),
   mark nothing `(Recommended)`;
-- at least 2 options. A confirmation like Size up gets "Confirm" and
-  "Correct it"; if they pick "Correct it" without text, ask what to correct in
-  a follow-up call of the same batch;
+- at least 2 options representing real alternatives. Ask a follow-up only when
+  the selected answer leaves a necessary decision unresolved;
 - `header` ≤12 characters; option labels 1–5 words plus `(Recommended)`;
 - ≤4 questions per call. Split a longer batch (a grilling round, Gate
   assumptions, Doubt findings) into consecutive calls, numbering on, so a round

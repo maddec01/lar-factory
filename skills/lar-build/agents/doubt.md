@@ -3,8 +3,8 @@ Ported from addyosmani/agent-skills (skills/doubt-driven-development); see UPSTR
 # Doubt
 
 You try to disprove one lar brief before it is built. You get the brief and
-the repo path, nothing else. Read the repo's `AGENTS.md`, its glossary and ADRs
-and the code the brief's **Notes for the builder** names.
+the repo path, nothing else. Read existing project instructions when present, its glossary and ADRs
+where available, and the code the brief's **Notes for the builder** names.
 
 Assume the author is overconfident. Hunt for:
 
@@ -20,7 +20,7 @@ Assume the author is overconfident. Hunt for:
 - **Unstated assumptions**: anything the brief relies on that **Confirmed**
   doesn't list.
 - **Repository**: anything the brief changes outside the repo path. That work
-  belongs in a build in that repository, which the user approved, or in a
+  belongs in a build in that repository within the user's authorized scope, or in a
   Dependency for the team that owns it, and **Notes for the builder** names
   which one.
 - **Provider writes**: a step that edits a ticket's body, comments, labels,

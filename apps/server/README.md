@@ -5,187 +5,76 @@
   </picture>
 </p>
 
-# Board
+# Board server
 
-A local board for the lar project. It reads the onboarded repositories through your
-`gh` login (see [Adding a repository](#adding-a-repository)), each item source at
-its own pace:
-whole every `refreshSeconds` (5 minutes, at least 1), and its changed items
-alone. Every 5 seconds each GitHub source asks GitHub whether anything changed,
-sending the last answer's ETag; an unchanged answer is a 304, which costs no
-quota, so an edit on github.com shows within seconds and reads only the changed
-item. An item also reads alone at once when `status.sh` or `slice.sh` names it,
-every 15 seconds while its PR's checks run, and, in an Azure
-DevOps team, every 15 seconds while it holds active work. A rate-limited `gh` or `az` makes no calls until its limit resets. T3's threads
-refresh every 2 seconds and its stats every 30, with no `gh` or `az` call. It
-serves the board on the first free port from 4317 to 4416, which it logs;
-`BOARD_PORT` pins the port; `BOARD_PORT=0` lets the OS assign a free port. The board app's board usually gets 4317.
-`BOARD_APP_SECRET`, which the board app sets on each launch, makes every write
-except `/api/read` answer 403 unless the request carries it in `X-Board-Secret`.
-Before it installs an update, the app posts that secret to `/api/drain`: the board
-refuses new writes with 503 and answers once the running ones finish. Without
-`BOARD_APP_SECRET` the board refuses every drain. Open it in a browser or in T3's browser preview.
+The local server serves the Lar Factory board for any onboarded repository.
+Repository issue sources populate List. Queue, Status and ordinary progress live
+in local work records. The default tracker-sync option saves concept and
+multi-repository structure only. See [the main README](../../README.md) for
+onboarding, the exact sync boundary and fresh-install restoration.
+
+## Run locally
+
+Use Node 24.15+ and install the workspace from its root. From `apps/server`:
 
 ```sh
-pnpm install                        # once, at the repo root
-cd apps/server && pnpm start        # pnpm run dev restarts on changes
+pnpm start
 ```
 
-`pnpm start`, `dev`, `sample` and `test` first build the page in `apps/web` with Vite+
-into `apps/web/dist/`, which git ignores; the server reads it at startup.
-`dev` then rebuilds the page when a file changes and restarts the server on each
-new build or `src/` change.
+`pnpm run dev` rebuilds the page and restarts the server on changes.
+`pnpm run sample` uses fixtures without provider calls. Choose a free port for a
+second instance with `BOARD_PORT`. The app normally uses the first free port
+between 4317 and 4416; `BOARD_PORT=0` asks the OS for one.
 
-- **Board** shows what needs you first (Needs you, Verify, Ready to merge), then
-  what's in flight, concepts with their sub-issues, Queued items, List counts per
-  repository, and the last 7 days of Done. Every card has a step bar showing where
-  it is in the flow.
-- **Queue** on a List row sets the item's Status to Queued. The board shows it
-  in Queued at once and keeps it there until GitHub reports the change.
-- **Start** on a Queued issue opens a T3 Code thread in the issue's repository
-  project, the T3 project whose folder is a main checkout with the repository
-  as its git `origin`, whose first message is the issue's work message: `#n title`, then `$lar-work owner/repo#n`. T3 titles the
-  thread from line 1 and runs lar-work, which shapes or builds the issue and
-  sets its Status. Start ▾ opens a menu of model choices: "T3 default" (the
-  project's default model), then each enabled T3 provider instance with its
-  models; picking one starts the thread on it, and Escape or a click outside
-  closes the menu without starting anything. A toast shows the thread's id, and its title when T3 chose
-  one other than line 1; every board page marks the card Started. While the
-  board runs, a double press, a retry or another tab starts no second thread.
-  Before starting, Start checks that the
-  repository is in `repository-settings.json`, then reads T3 Code's live projects from its
-  database (read-only) and keeps those whose folder exists, has a `.git`
-  directory (so a worktree doesn't count) and has the repository as its git
-  `origin`. The folder can have any name and live anywhere. With no such
-  project, Start refuses with a hint to add the checkout in T3 Code; with two
-  or more, it refuses and names their folders. The board never adds or changes
-  T3 projects, and it refuses when it can't read T3's database.
-- **Back to List**, in the footer row of a Queued issue card, is the
-  reverse of Queue: it sets the item's Status back to List, and the board moves
-  the card there at once. **Abandon**, on the right of the same row, works as
-  it does on List rows: it asks first, then closes a GitHub issue as "not planned"
-  or moves an Azure DevOps work item to Removed. Reopen it in its provider to
-  bring it back. Once a card's Start is running, may have started or has started, the row disappears and
-  the board refuses both actions for it; while either is running, it refuses
-  Start. The board remembers Started only until it restarts.
-- **Notices**: a success (Added, Moved, Abandoned, Started, a finished update)
-  is a toast that clears after about 5 s. A failure stays until you close it
-  or the next attempt succeeds. Warnings such as stale data or an available
-  update stay while their cause lasts. Closing is per page: a reload shows
-  again whatever still holds.
-- **Add item** records work in an onboarded repository and adds it to List. It
-  creates no ticket: the title and description go into a work record on this
-  machine, and the board shows the work without a ticket number. **Pick a ticket**
-  searches the repository's open tickets by title words or `#12`, and records the
-  one you pick with its text as the record's initial context. Picking a ticket
-  that is already on the board opens its item. The item dialog of work without a
-  ticket offers **Attach a ticket**, which keeps the work's ID. The form keeps
-  your draft while the board refreshes.
+The server commands build `apps/web` before serving its page. A process keeps
+the page it started with, so rebuilding another checkout does not replace it.
+The packaged Electron app starts and stops its own server.
 
-The ticket search and a pick read tickets through the same local `gh` or `az`
-login as reads, and write nothing to them. Start runs the local `t3` CLI and
-needs T3 Code running. If a response is lost, retry the current submission. A
-board restart asks you to check List before adding the work again.
+## Repository settings
 
-At startup the board looks up `t3`, `gh` and `az` the way T3 Code does, so it
-finds them when opened with a bare PATH. For each tool it tries the override
-(`T3_PATH`, `GH_PATH`, `AZ_PATH`), then your login shell's PATH, then
-`/opt/homebrew/bin` and `/usr/local/bin`. An override with a `/` is used as
-given, and if it isn't runnable the tool counts as missing. A bare name is
-looked up on the PATH. Sample mode looks up no tools.
+Onboarding has three steps, repository, source/docs/sync, then access/add. It
+saves directly on this machine. It offers no setup PR, configuration file or
+guidance changes. The source supplies List without a per-ticket import step.
+Existing project conventions apply even when the repository has no agent docs.
 
-With no `t3` found, a "T3 Code not found" notice replaces the board. A missing
-`gh` gets a notice with `brew install gh`, and a logged-out one a notice with
-`gh auth login`. Each notice has a Recheck button that looks the tools up again
-without a restart, and the board also looks again every 10 seconds while one
-shows. A broken override is named in its notice. A missing `az` shows nothing.
+`~/Library/Application Support/Lar Factory/repository-settings.json` stores the
+repository list and settings. An absolute `LAR_FACTORY_DATA_DIR` selects another
+folder. A repository entry uses `owner/name` for GitHub or
+`organization/project/repository` for Azure DevOps. Its local `settings.overrides`
+holds role, issue source, labels, domain docs, selected project skills and
+vocabulary mappings. This retained field name has only built-in defaults beneath
+it. Cached shared values are ignored, and the server reads no repository config.
 
-If `gh` can't reach GitHub for another reason, the board keeps the last data it
-read and shows a stale warning. `pnpm run sample` serves `packages/shared/test/sample.json` instead of GitHub;
-adding, queuing and starting are disabled in sample mode.
+`domainDocs.kind` is `private` for OFF or `repository` for ON. OFF keeps domain
+drafts local without later publish prompts. ON names the glossary and ADR paths
+that builds include in their PR. The tracker option is ON by default, currently
+`settings.structureSync` in the app. The local-settings helper also accepts
+`progressSync` as a compatibility spelling. Its scope is kind, map, parts, Connections, Dependencies and issue
+grouping. It never syncs queue, board Status or ordinary progress.
 
-## Adding a repository
+`bash skills/shared/scripts/repo-config.sh <repository>` from the workspace root
+prints effective local settings without a provider call. Its `--list` and
+`--connections <repository>` forms read the same file. A missing file means no
+onboarded repositories.
 
-Open Settings, then Repositories, then Add repository. Pick a repository from
-your T3 Code projects. GitHub reads its repository issues; Azure DevOps reads the
-team's backlog and current sprint together. Check access and create any missing
-workflow labels. Review the cleanup choices and open the onboarding PR. Merge
-that PR to finish. The board remembers your progress so you can resume from Settings.
+## Access and runtime
 
-### Manual configuration reference
+Provider access uses the local `gh` or `az` login. The server looks up `t3`, `gh`
+and `az` through tool overrides, the login shell PATH and common install folders.
+`T3_PATH`, `GH_PATH` and `AZ_PATH` can select a tool explicitly. Sample mode
+looks up no tools. T3 Code supplies the repository projects and starts threads.
 
-The board reads `repository-settings.json` in the board app's data folder,
-`~/Library/Application Support/Lar Factory/`. Its `repositories` lists the onboarded
-repositories, each GitHub one as `owner/name` and each Azure DevOps one as
-`organization/project/repository`, as its origin URL names them, each with its local
-settings under `settings`. Without the file, the board shows no repository. Its
-`refreshSeconds` sets how often the board reads item sources with no active work and
-the Repository configs, 300 when the field is missing. The file replaced
-`repositories.json` and `settings.json`, which the board leaves untouched. Nothing
-migrates, so each repository onboards again.
+The Electron app supplies `BOARD_APP_SECRET`. Writes require its
+`X-Board-Secret` header. Before updating, the app requests `/api/drain` with the
+secret so running writes finish before the server stops.
 
-A repository may keep its Repository config in `.lar-factory.json` at its root.
-Its fields are shared defaults: a local setting overrides any of them, and removing
-the override inherits the default again. Credentials and write consent are never
-shared. The board reads it with `gh` from the repository's default branch every
-`refreshSeconds` and on a read request naming no item, never from a checkout, so a change shows once it merges to the default
-branch. Its fields:
+Source refresh and PR observations read providers; local progress does not write
+back to issues. Structural sync uses the saved local option and outbox. A fresh
+installation restores a saved concept or multi-repository structure from List,
+with fresh queue and Status. It does not restore briefs or build progress.
 
-- `version`: the file's shape, `1`. A missing `version` counts as `1`.
-- `role`: what the repository is for, which lar-work reads.
-- `itemSource`: `{ "kind": "issues" }` for GitHub repository issues (the default), or
-  `{ "kind": "azure-board", "team": "<team>" }` on Azure DevOps. The Azure board
-  combines the team's open backlog and current sprint, with each item once. It keeps
-  completed sprint work and reads the backlog alone when no sprint is current.
-- `labels`: an array of strings, empty by default.
-- `domainDocs`: `{ "kind": "private" }`, the default, for private drafts on this Mac,
-  or `{ "kind": "repository", "glossary": "<path>", "adrs": "<path>" }`.
-- `skills`: the project skills builds use as coding guidance, none by default.
+## Tests
 
-Edit in Settings › Repositories shows each setting with its source, sets or removes
-its local override, and rechecks access after a credential change. A change to the
-item source pauses the repository's work with a ticket, and a change to the domain-doc
-location pauses its open work. The repository's row names the paused work until you
-accept the change there.
-
-To add lar-factory, write `repository-settings.json`:
-
-```json
-{ "repositories": [{ "repo": "maddec01/lar-factory" }] }
-```
-
-and, to share its defaults, merge this `.lar-factory.json` to lar-factory's default
-branch:
-
-```json
-{
-  "version": 1,
-  "role": "The factory: board, lar-work skill and process docs",
-  "itemSource": { "kind": "issues" }
-}
-```
-
-On its next refresh the board shows lar-factory. If `repository-settings.json` isn't
-valid or has the wrong shape, the board shows the read error with the file's path. If
-a repository's `.lar-factory.json` is wrong or can't be read, the board keeps its last
-usable setup and names the problem in a notice. An Azure DevOps repository stays off
-the board until a setting names its team.
-`bash skills/lar-work/scripts/repo-config.sh maddec01/lar-factory` prints the
-config the board reads, with defaults filled in.
-
-To use the board every day, install the board app from
-[GitHub Releases](https://github.com/maddec01/lar-factory/releases) (see the
-[factory install instructions](../README.md#install)). `pnpm start`, `pnpm run dev`
-and `pnpm run sample` are for developing the board. A running process keeps the built
-page it started with, so a new browser load still works after checkout changes or a
-rebuild.
-
-`src/server.ts` starts the board: it reads GitHub, checks the tools and wires the rest.
-`src/board/` holds the board data and the changes laid over it, `src/items/` the item
-commands and their locks, and `src/http/` the routes.
-
-`pnpm test` runs the server tests with Vitest: unit tests sit next to the
-files they test in `src/`, and the tests that start the whole board, with their fixtures,
-in `test/`. The page tests sit next to their files in `apps/web/src/`; `pnpm test` in
-`apps/web` runs them with Vitest in a DOM. The board and its tests need Node 24.15+ (jsdom's
-minimum on the 24 line); the root `.node-version` pins 24.
+`pnpm test` in this folder runs server tests. Unit tests sit beside their source
+files; tests in `test/` start the server with fixtures. Web tests live in
+`apps/web`. See the root `AGENTS.md` for checks required by a change.

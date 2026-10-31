@@ -1,12 +1,12 @@
 # Lar Factory
 
-Skills, build agents and a local board for working on lar. See the README for
+Skills, build agents and a local board for working on any repository. See the README for
 the flow and `docs/plan.md` for how it was set up.
 
 - `skills/` holds copies of upstream skills, unchanged, plus lar's own skills
   (`lar-shape`, `lar-build`); checkout-only `skill-sync` lives in `.agents/skills/`. Never edit a copy by hand: upstream changes come in
-  through `skill-sync`, which updates `UPSTREAM.md`. lar rules go in the skill that loads the Copy or
-  in each lar repo's `AGENTS.md`. To set aside part of a Copy, write an Override:
+  through `skill-sync`, which updates `UPSTREAM.md`. Factory rules go in the skill
+  that loads the Copy. Existing project instructions supply project conventions. To set aside part of a Copy, write an Override:
   a rule beside the step that loads the Copy, citing its file and section heading, listed
   in the Copy's "Overridden in" column of `UPSTREAM.md`.
 - The board is a root pnpm workspace laid out like T3 Code's monorepo:
@@ -19,8 +19,9 @@ the flow and `docs/plan.md` for how it was set up.
   tests sit next to the file they test.
 - `packages/ui` holds Copies of lar-server's design system, listed in its `UPSTREAM.md`.
   Never edit one: take a fresh copy from upstream and update its row.
-- Nothing secret goes in this public repo or in any repository's Repository config
-  (`.lar-factory.json`); the board reads GitHub through the local `gh` login.
+- Repository settings live only in the local app data folder. The factory never
+  reads, writes, detects or offers repository configuration or guidance files.
+  Nothing secret goes in this public repo. Provider access uses local logins.
 - Every commit and PR title uses conventional commits (`type(scope): description`;
   scopes: `board`, `lar-shape`, `lar-build`, `skill-sync`, `skills`, `ci`). A required check and the
   `commit-msg` hook enforce it. Update branches by rebase; fold review fixes in with

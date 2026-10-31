@@ -20,7 +20,7 @@ The two branches produce very different artifacts, so getting this wrong wastes 
 3. **No persistence by default.** State lives in memory. Persistence is the thing the prototype is _checking_, not something it should depend on. If the question explicitly involves a database, hit a scratch DB or a local file with a clear "PROTOTYPE, wipe me" name.
 4. **Skip the polish.** No tests, no error handling beyond what makes the prototype _runnable_, no abstractions. The point is to learn something fast.
 5. **Surface the state.** After every action (logic) or on every variant switch (UI), print or render the full relevant state so the user can see what changed.
-6. **Capture it when done.** Fold any validated decision into the real code, then capture the prototype itself as a **primary source**: commit it to a `prototype/<slug>` branch, out of main, and leave a context pointer to that branch in the work record's brief or decision answer. Capture the answer too (the verdict and the question it settled) in the work record or a commit. The main branch keeps only the validated decision.
+6. **Capture it when done.** Record the validated decision without implementing the product change. Capture the prototype itself as a **primary source**: commit it to a `prototype/<slug>` branch, out of main, and leave a context pointer to that branch in the work record's brief or decision answer. Capture the answer too (the verdict and the question it settled) in the work record or a commit. Shaping leaves the main branch unchanged.
 
 ## Show the variants inside T3
 
@@ -33,7 +33,8 @@ The Prototype child returns each variant's start command or HTML path, worktree 
   `file://`). Serve a static HTML file's folder with
   `python3 -m http.server --bind 127.0.0.1 --directory <dir> <port>`.
 - Native iOS or Android: run the build and install scripts named in the
-  target repo's `t3.json` and `AGENTS.md`, one variant at a time, then
+  target project's existing instructions or inferred from its scripts and
+  manifests, one variant at a time, then
   `device_open` (`device_list` finds the device id).
 - Say in chat which variant is showing. For another round, send the request
   to a Prototype child task.

@@ -32,20 +32,25 @@ az devops invoke --area wit --resource comments --organization "$org" \
   --query 'comments[].{by: createdBy.displayName, date: createdDate, text: text}'
 ```
 
-Status and shaping or build progress live in the record. Finished refinement
-may publish as work items with approved team types, tags and native
-relationships through [publication](publication.md). Decisions and slices
-stay private. An old `repo-<repository>` tag only places existing work when
-onboarding imports it; publication adds no repository tag.
+Queue, Status and shaping or build progress live only in local work records.
+[Tracker structure sync](publication.md) saves concept and multi-repository kind,
+map diagram, parts, Connections, Dependencies and issue grouping when the local
+option is ON. Only shaping results needed for that structure reach work items.
+Ordinary briefs, decisions, domain drafts and slices stay local. The source
+supplies List without a per-ticket import step. Do not write workflow labels,
+progress comments or Azure State.
 
-The common engine preserves raw HTML and Repro Steps when updating an existing
-item. It keeps body and comment consent separate and uses a revision guard for
-body and relationship PATCH. A refusal needs a separately approved fallback;
-uncertainty needs reconciliation before retry. Read-only handover is available
-without write consent.
+Preserve teammates' raw HTML and Repro Steps. Respect the sync command's recorded
+outcomes, and reconcile uncertainty before retrying. The saved onboarding option
+covers structural sync without repeated per-update approval prompts.
 
 Build PRs use the native work-item relationship through
-[PR delivery](publication-pr.md), regardless of the repository's link style.
-The user's PR completion settings decide whether Azure transitions the linked
-work item. Keep those settings as they are. The factory never calls a State
-transition to close publication work.
+[PR delivery](publication-pr.md). Preserve the team's PR completion settings.
+Only the user marks a local Dependency met; a work-item State proves no contract
+or deployment.
+
+## Read-only environments
+
+Never write to `dev.azure.com/VanEckEurope/VanEckDirect IApp`, including its
+URL-encoded equivalent. Respect `LAR_FACTORY_AZURE_READ_ONLY=1` for live reads;
+it grants no write permission. Development and script tests use fake providers.

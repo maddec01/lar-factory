@@ -1,6 +1,6 @@
 # shellcheck shell=bash disable=SC2034 # the variables each parser sets are for the scripts that source this
 # Sourced by work.sh, which parses an Azure work item URL, and by repo-config.sh,
-# which reads a file from Azure DevOps through az.
+# which parses repository identity for local settings.
 # Each parser sets az_org (https://dev.azure.com/<org>), az_project (as in the
 # URL, which may be percent-encoded) and returns false when its argument isn't
 # of its form.

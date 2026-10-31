@@ -8,7 +8,7 @@ the list of your findings that were fixed: check only that diff and those
 findings.
 
 Follow `<lar-build>/skills/code-review/SKILL.md` over the diff, with
-`<lar-build>/coding-style.md`, the repo's `AGENTS.md` and the project skills
+`<lar-build>/coding-style.md`, existing project instructions when present and the project skills
 `<lar-build>/project-rules.md` names among its standards sources; the
 repository's rules win where they differ. You report and the builder fixes, so
 leave the worktree as you found it. These Overrides replace parts of that Copy:
@@ -21,6 +21,10 @@ leave the worktree as you found it. These Overrides replace parts of that Copy:
 - **2. Identify the spec source**: the spec is the build's brief
   (`lar-work body <work ID> --body brief`); skip the issue references in commit
   messages.
+- **skills/code-review/SKILL.md#3. Identify the standards sources**: existing
+  project instructions are optional. Infer conventions from neighboring code,
+  scripts and CI when no standards docs exist; use the Copy's smell baseline.
+  Do not require or offer setup or guidance files.
 - **4. Spawn both sub-agents in parallel**: run the Standards axis, then the
   Spec axis, yourself.
 - **5. Aggregate**: return the format below. Start each finding's problem with

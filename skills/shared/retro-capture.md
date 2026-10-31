@@ -1,8 +1,9 @@
 # Retro capture
 
 Use after the builder's retro selection. Capture selected work as List records
-on this machine; shaping and implementation come later. Capture writes no
-ticket. Keep the source build's final Status throughout, including
+on this machine; shaping and implementation come later. Ordinary captures write
+no ticket. A concept follows the saved structural-sync option. Keep the source
+build's final Status throughout, including
 clarification questions and failures.
 
 ## Select and route
@@ -14,12 +15,11 @@ clarification questions and failures.
    uncertainty or silence never means “none”. An explicit “none”, or no
    suggestions, ends capture with nothing made. With no suggestions, ask no
    selection question.
-2. Route each selected suggestion to the repository that owns the change: its
-   product code, `AGENTS.md`, CI or local tooling → that repository; the
-   factory workflow or board, shared skills and instructions, and machine-wide
-   setup without a clear owner → the factory repository,
-   `maddec01/lar-factory`. One suggestion needing changes across repositories →
-   one factory concept per [Capture-only concepts](issue-tracker/capture-only-concepts.md).
+2. Route each selected suggestion to the repository owning its product code,
+   instructions, CI or local tooling. Factory workflow or board changes belong
+   to the factory repository when it is onboarded. Keep an unowned machine-wide suggestion in chat until the user
+   chooses its repository. One suggestion needing changes across repositories
+   becomes one concept in the source work's repository per [Capture-only concepts](issue-tracker/capture-only-concepts.md).
    A destination must be on the board: `repo-config.sh --list` lists the
    onboarded repositories. Report a pick whose repository isn't, and suggest
    onboarding it.

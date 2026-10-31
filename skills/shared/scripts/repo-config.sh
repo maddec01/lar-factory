@@ -1,28 +1,11 @@
 #!/bin/bash
 # Usage: repo-config.sh <owner/repo> | <Azure repository> | --list | --connections <repository>
-# <owner/repo> prints the GitHub repository's settings: its local overrides on this
-# Mac over its optional .lar-factory.json, the shared defaults read from its default
-# branch with gh, never from a checkout, over the built-in defaults (version 1,
-# itemSource {"kind": "issues"}, labels [], domainDocs {"kind": "private"},
-# skills []). role has no default, and it drops the old show setting. The local
-# overrides are settings.overrides in the repository's entry of the list --list
-# reads, as the board writes it; each replaces its shared default, and an absent one
-# inherits it. A repository with local
-# overrides needs no .lar-factory.json. When its .lar-factory.json can't be read or
-# used, it falls back to the last usable copy the board kept, settings.shared, and
-# says why on stderr; a logged-out gh has no fallback.
-# An Azure repository is its origin URL or <org>/<project>/<repo>; its file is read
-# with az the same way. Its itemSource names the team’s backlog and current sprint
-# together: {"kind": "azure-board", "team": ...}.
-# --list prints the onboarded repositories with their local settings, the
-# repositories array of repository-settings.json in the board's data folder
-# (LAR_FACTORY_DATA_DIR when it names an absolute folder, else
-# ~/Library/Application Support/Lar Factory). A missing file means none: [].
-# --connections <repository> prints the onboarded repositories connected to that
-# onboarded one, as a JSON array named as the list names them. A Connection is a
-# pair in the file's connections array, matched case-insensitively from either end;
-# a pair naming a repository off the list is left out, as the board leaves it out.
-# Each error exits nonzero with its reason on stderr.
+# Reads only this machine's repository-settings.json. No provider CLI or checkout
+# files are consulted. Settings live in each repository entry's settings.overrides;
+# the name is retained for compatibility, with built-in defaults as the only fallback.
+# The absolute LAR_FACTORY_DATA_DIR overrides ~/Library/Application Support/Lar Factory.
+# --list prints the repositories array, or [] when no settings file exists.
+# --connections prints listed repositories paired with the named repository.
 set -euo pipefail
 
 usage="usage: repo-config.sh <owner/repo> | <Azure repository> | --list | --connections <repository>"
@@ -90,24 +73,9 @@ if [[ $arg == --connections ]]; then
     exit 0
 fi
 
-err=$(mktemp)
-trap 'rm -f "$err"' EXIT
-read_status=0
-# Why the shared file can't be used, when it can't; the last usable copy stands in for it.
-shared_problem=
+# Parse repository identity locally. azure.sh's parsers make no provider calls.
 if jq -en --arg repo "$arg" --arg repo_form "$repo_form" '$repo | test($repo_form)' >/dev/null; then
     provider=github repo=$arg
-    # Without ref, the contents API reads the default branch.
-    raw=$(gh api -H "Accept: application/vnd.github.raw" "repos/$repo/contents/.lar-factory.json" 2>"$err") || read_status=$?
-    if ((read_status != 0)); then
-        if [[ $read_status == 4 || $(cat "$err") == *"gh auth login"* ]]; then
-            echo "gh is logged out. Run gh auth login, then rerun." >&2
-            exit 1
-        elif [[ $(cat "$err") != *"HTTP 404"* ]]; then
-            shared_problem="could not read .lar-factory.json. $(cat "$err")"
-        fi
-        raw=null
-    fi
 else
     # shellcheck source-path=SCRIPTDIR source=azure.sh
     source "$(dirname "$0")/azure.sh"
@@ -116,80 +84,39 @@ else
         exit 1
     fi
     provider=azure repo="${az_org##*/}/$az_project/$az_repo"
-    # Without versionDescriptor, the items API reads the default branch.
-    raw=$(az devops invoke --area git --resource items --organization "$az_org" \
-        --route-parameters "project=$(percent_decode "$az_project")" "repositoryId=$(percent_decode "$az_repo")" \
-        --query-parameters path=/.lar-factory.json includeContent=true \
-        --api-version 7.1 --output json 2>"$err") || read_status=$?
-    if ((read_status != 0)); then
-        # TF401174 is Azure's "item could not be found".
-        if [[ $(cat "$err") != *TF401174* ]]; then
-            shared_problem=$(az_failure "could not read .lar-factory.json" "$(cat "$err")")
-        fi
-        raw=null
-    elif ! raw=$(jq -er '.content | strings' <<<"$raw" 2>/dev/null); then
-        shared_problem="could not read .lar-factory.json. az returned no file content"
-        raw=null
-    fi
-fi
-
-if [[ -z $shared_problem ]] && ! jq empty <<<"$raw" 2>/dev/null; then
-    shared_problem=".lar-factory.json isn't valid JSON"
-    raw=null
 fi
 repositories=$(list)
 entry=$(jq --arg repo "$repo" 'first(.[] | select(.repo | ascii_downcase == ($repo | ascii_downcase))) // null' <<<"$repositories")
-local_settings=$(jq 'if . == null then null else .settings.overrides // {} end' <<<"$entry")
-# problem: why one source's fields can't be settings, or nothing when they can.
-fields='def problem:
-    if type != "object" then "isn'"'"'t a JSON object"
-    elif has("version") and (.version | type) != "number" then "field version must be a number"
-    elif has("role") and ((.role | type) != "string" or .role == "") then "field role must be a non-empty string"
-    elif has("itemSource") and (.itemSource | type) != "object" then "field itemSource must be an object"
-    elif has("labels") and ((.labels | type) != "array" or any(.labels[]; type != "string")) then
-        "field labels must be an array of strings"
-    elif has("domainDocs") and (.domainDocs | type != "object" or (.kind != "private"
-        and (.kind != "repository" or (.glossary | type) != "string" or (.adrs | type) != "string"))) then
-        "field domainDocs must be {\"kind\": \"private\"} or name the repository'"'"'s glossary and adrs paths"
-    elif has("skills") and ((.skills | type) != "array" or any(.skills[]; type != "string")) then
-        "field skills must be an array of strings"
-    else empty end;'
-if [[ -z $shared_problem ]]; then
-    shared_problem=$(jq -rn --argjson shared "$raw" "$fields"'
-        if $shared != null and ($shared | problem) then ".lar-factory.json \($shared | problem)" else empty end')
-fi
-if [[ -n $shared_problem ]]; then
-    raw=$(jq '.settings.shared // null' <<<"$entry")
-    if [[ $raw == null ]]; then
-        echo "$repo: ${shared_problem%.}." >&2
-        exit 1
-    fi
-    echo "$repo: ${shared_problem%.}. Using the last usable copy on this Mac." >&2
-fi
-if [[ $raw == null && $local_settings == null ]]; then
-    echo "$repo isn't onboarded on this Mac and has no .lar-factory.json on its default branch." >&2
+if [[ $entry == null ]]; then
+    echo "$repo isn't onboarded on this machine. Add it in Settings > Repositories." >&2
     exit 1
 fi
-problem=$(jq -rn --argjson shared "$raw" --argjson local "$local_settings" --arg list_file "$list_file" "$fields"'
-    if $shared != null and ($shared | problem) then "its last usable .lar-factory.json in \($list_file): \($shared | problem)"
-    elif $local != null and ($local | problem) then "its local overrides in \($list_file): \($local | problem)"
-    else empty end')
-if [[ -n $problem ]]; then
-    echo "$repo: $problem." >&2
-    exit 1
-fi
-settings=$(jq -n --argjson shared "$raw" --argjson local "$local_settings" '
-    {version: 1, role: null, itemSource: {kind: "issues"}, labels: [], domainDocs: {kind: "private"}, skills: []}
-    + ($shared // {} | del(.show)) + ($local // {} | with_entries(select(.key | IN("role", "itemSource", "labels", "domainDocs", "skills"))))')
+local_settings=$(jq '.settings // {}' <<<"$entry")
 problem=$(jq -r --arg provider "$provider" '
-    if (.role | type) != "string" then "no role in its local overrides or .lar-factory.json"
-    elif ($provider == "github" and .itemSource.kind != "issues") or ($provider == "azure" and .itemSource.kind != "azure-board") then
-        "an unsupported item source. Run onboarding again"
-    elif $provider == "azure" and ((.itemSource.team | type) != "string" or .itemSource.team == "") then
-        "no itemSource.team to name the team for an azure-board"
-    else empty end' <<<"$settings")
+    if type != "object" then "settings must be an object"
+    elif has("overrides") and (.overrides | type) != "object" then "settings.overrides must be an object"
+    elif has("structureSync") and (.structureSync | type) != "boolean" then "structureSync must be a boolean"
+    elif has("progressSync") and (.progressSync | type) != "boolean" then "progressSync must be a boolean"
+    else (.overrides // {}) |
+        if has("role") and (.role | type) != "string" then "role must be a string"
+        elif has("itemSource") and (.itemSource | type) != "object" then "itemSource must be an object"
+        elif has("itemSource") and (($provider == "github" and .itemSource.kind != "issues")
+            or ($provider == "azure" and (.itemSource.kind != "azure-board" or (.itemSource.team | type) != "string" or .itemSource.team == ""))) then "itemSource must name this provider and its Azure team when applicable"
+        elif has("labels") and ((.labels | type) != "array" or any(.labels[]; type != "string")) then "labels must be an array of strings"
+        elif has("skills") and ((.skills | type) != "array" or any(.skills[]; type != "string")) then "skills must be an array of strings"
+        elif has("domainDocs") and (.domainDocs | type != "object" or (.kind != "private" and (.kind != "repository" or (.glossary | type) != "string" or (.adrs | type) != "string"))) then "domainDocs must be private or name repository glossary and adrs paths"
+        else empty end
+    end' <<<"$local_settings")
 if [[ -n $problem ]]; then
-    echo "$repo has $problem." >&2
+    echo "$list_file: $repo: $problem." >&2
     exit 1
 fi
-echo "$settings"
+# structureSync is the app setting; progressSync is the structural outbox setting.
+# Accept either spelling for the same option. An explicit false disables both.
+jq --arg provider "$provider" '
+    . as $local | (.overrides // {}) as $settings |
+    ($local.progressSync != false and $local.structureSync != false) as $sync |
+    {version: 1, role: "", itemSource: (if $provider == "azure" then null else {kind: "issues"} end),
+        labels: [], domainDocs: {kind: "private"}, skills: []}
+    + ($settings | with_entries(select(.key | IN("role", "itemSource", "labels", "domainDocs", "skills", "vocabulary"))))
+    + {structureSync: $sync, progressSync: $sync}' <<<"$local_settings"

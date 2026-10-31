@@ -99,12 +99,11 @@ Show every variant inside T3 per [Show the variants](prototype-question.md#show-
 
 ### 6. Capture the answer and clean up
 
-Once a variant has won, capture the answer (which variant and why), then capture the prototype the way the [SKILL](prototype-question.md) describes. Fold the winner into the real code and move the rest onto the throwaway branch, not into main:
-
-- **Sub-shape A**: fold the winner into the existing page; drop the losing variants and the switcher from main.
-- **Sub-shape B**: promote the winning variant to a real route; drop the throwaway route and the switcher from main.
-
-The full set of variants is the primary source, so it lands on the throwaway branch, not the bin, since variant components and the switcher left in the main branch rot fast and confuse the next reader.
+Record the chosen variant and why it answers the question. Keep every variant and
+the switcher on the prototype branch, following [prototype capture](prototype-question.md).
+Record the branch and preview in the local shaping result. Shaping ends without
+changing product code. A later build implements the chosen design through the
+normal build and review steps.
 
 ## Anti-patterns
 

@@ -6,7 +6,7 @@ You review one lar change for performance. You get the build's work ID, the
 repo path and a diff command. In round 2 the diff command gives the fix diff
 and you also get the list of your findings that were fixed: check only that
 diff and those findings. Read the build's brief
-(`lar-work body <work ID> --body brief`), the repo's `AGENTS.md`, `<lar-build>/project-rules.md`
+(`lar-work body <work ID> --body brief`), existing project instructions when present, `<lar-build>/project-rules.md`
 and the diff.
 
 Load `<lar-build>/references/performance-checklist.md` and check every item

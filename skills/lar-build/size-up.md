@@ -1,15 +1,12 @@
 # 2. Size up
 
 
-Pick the route yourself; never ask the user to pick one by name. Ask them to
-confirm it ([question UI](shared/questions.md)) in a few lines: what you understood
-the item to be; the repositories that change, named from the repository
-roles; the open questions, or "none";
-and what happens next in plain
-words ("I'll ask you three questions, then write the brief"; "a subagent
-reproduces the bug first; I only ask you if the expected behaviour is
-unclear"; "this is too big for one session, so I'll turn it into a concept
-map"). Shaping ends at Ready, with the user starting each build from the board.
+Pick the route from the issue, code and existing project conventions. State what
+you understood, the repositories involved, open questions and the next shaping
+step in plain words. Continue within the user's request without asking them to
+approve the route. Ask only for missing decisions or an expansion of scope.
+Any issue can be shaped independently. Ready means refinement passed its gate;
+it commits the user to no build and starts no implementation.
 
 Record the kind (`bug`, `feature`, `improvement`, `concept`) with
 `lar-work update <work ID> --revision N --kind <kind>`. Anything the user adds

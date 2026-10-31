@@ -1,12 +1,22 @@
 Ported from mattpocock/skills (skills/engineering/domain-modeling/SKILL.md); see UPSTREAM.md.
 
-# Domain Modeling
+# Domain modeling
 
 Actively build and sharpen the project's domain model as you design. This is the *active* discipline: challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. (Merely *reading* `GLOSSARY.md` for vocabulary is not this skill: that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.)
 
 ## Where domain docs live
 
-`repo-config.sh <repository>` prints the repository's `domainDocs`. `{"kind": "repository", "glossary": ..., "adrs": ...}` names its glossary file and ADR folder; read and write those paths in place of `GLOSSARY.md` and `docs/adr/` below. `{"kind": "private"}` means its drafts stay in work records on this machine: read the repository's glossary and ADRs where they exist, and the build PR writes no domain docs.
+`repo-config.sh <repository>` reads this machine's local `domainDocs` setting.
+This one setting controls all domain-doc writes. `private` is OFF and
+`repository` is ON. No repository instructions or setup files are required.
+
+`{"kind": "repository", "glossary": "GLOSSARY.md", "adrs": "docs/adr"}`
+names the glossary file and ADR folder. Use the configured paths in place of the
+examples below. Builds include the relevant entries and ADRs in their build PR.
+
+`{"kind": "private"}` keeps drafts in local work records. Read existing domain
+docs for context, but write no glossary or ADR files and offer no later
+publication. Shaping alone writes no repository files in either mode.
 
 ## File structure
 
@@ -38,7 +48,7 @@ If a `GLOSSARY-MAP.md` exists at the root, the repo has multiple contexts. The m
 │       └── docs/adr/
 ```
 
-Create files lazily: only when you have something to write. If no `GLOSSARY.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
+In repository mode, create files lazily during the build: only when you have something to write. If no `GLOSSARY.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
 
 ## During the session
 
@@ -64,9 +74,9 @@ Shaping, concept and decision threads draft each resolved entry in the work reco
 
 `GLOSSARY.md` should be totally devoid of implementation details. Do not treat `GLOSSARY.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
 
-### Offer ADRs sparingly
+### Draft ADRs sparingly
 
-Only offer to create an ADR when all three are true:
+Draft an ADR only when all three are true:
 
 1. **Hard to reverse**: the cost of changing your mind later is meaningful
 2. **Surprising without context**: a future reader will wonder "why did they do it this way?"

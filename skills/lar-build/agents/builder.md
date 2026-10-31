@@ -33,7 +33,7 @@ thread resuming after a handoff, and pass them in every subagent's brief.
 - **Project rules**: every prompt carries `<lar-build>/project-rules.md`.
 - **Fixer**: commits on the build branch here as `git commit --fixup <sha>`
   (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
-  never `--no-verify`, and reruns only the checks `AGENTS.md` names for the
+  never `--no-verify`, and reruns only the project checks for the
   files its fix touched, never the full suite. Its prompt carries
   `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
 
@@ -42,8 +42,10 @@ thread resuming after a handoff, and pass them in every subagent's brief.
 1. Set **In progress**, unless a handoff resumes past **Build**. Read the
    record (`lar-work read`), its brief (`lar-work body <work ID> --body brief`),
    its initial context (`lar-work context`), the prototype or research branches
-   the brief names, the repo's `AGENTS.md` and `<lar-build>/project-rules.md`;
-   run the repo's worktree setup if it asks.
+   the brief names, existing project instructions when present and `<lar-build>/project-rules.md`;
+   follow existing worktree instructions if present. When no instructions exist,
+   infer setup and checks from package scripts, manifests, CI and nearby code.
+   Missing factory setup or agent instruction files never block a build.
 
    Then archive the build's idle shaping threads, on every start and every
    resume:
@@ -72,7 +74,7 @@ thread resuming after a handoff, and pass them in every subagent's brief.
    worktree, test first per `<lar-build>/test-first.md`, with no planner,
    slices or slice worktrees, using `<lar-build>/coding-style.md`,
    plus `<lar-build>/design-modules.md` when a module's shape changes. Commit
-   per the repo's commit rules, run the checks `AGENTS.md` names for the
+   per the repo's commit rules, run the project checks for the
    changed files, then go to step 5. Any other build starts a **planner**
    subagent with `planner.md`, the build's work ID and the repo path; it
    returns the slice list.
@@ -116,9 +118,10 @@ thread resuming after a handoff, and pass them in every subagent's brief.
    nothing. A new term or ADR-worthy decision (all three conditions) settled
    during the build is added the same way (by the fixer during review) without
    stopping. Keep a list of each, headed **Domain docs added by the build**,
-   current through review fixes, for the reviewers and approver; with private
-   domain docs the list holds the drafts themselves.
-6. A subagent runs the full check suite `AGENTS.md` names, once, on the build
+   current through review fixes, for the reviewers and approver. With private
+   domain docs, keep drafts in the local record and leave this PR list empty.
+   Never copy private domain drafts into a PR or offer publication later.
+6. A subagent runs the full project check suite, once, on the build
    branch HEAD, and returns that commit's tree (`git rev-parse HEAD^{tree}`):
    the step 6 tree. Failures go to the fixer. All must pass. A fix for a
    failing step 6 check reruns only the fixer's checks, and the step 6 tree
@@ -153,7 +156,7 @@ Work in another repository (a planner or implementer `needs <owner/repo>`, a
 failed check or a failed Verify) is routed per **Other repositories** in
 `<lar-build>/shared/issue-tracker/work-records.md`. Tell the user in chat what
 that repository needs and offer the choices that section gives for it: a build
-there, which waits for their OK before you plan it, or onboarding or a
+there within the user's authorized scope, or onboarding or a
 Dependency for a repository that is not onboarded. List the build or
 Dependency they choose in the PR body's out-of-scope notes. This build carries
 on when it can work without it; otherwise follow the stop rule below. A slice holding that work is
@@ -171,7 +174,7 @@ they answer, and continue. A Clash stops the build the same way
 
 Set **Review**. Review runs in review rounds, at most two.
 
-Round 1: read what `git diff origin/main...HEAD` touches and pick the
+Round 1: read what `git diff origin/$base_branch...HEAD` touches and pick the
 reviewers from it. In parallel, start one **reviewer subagent** for each:
 
 - **Code** (`reviewer-code.md`): always.
@@ -188,7 +191,7 @@ reviewers from it. In parallel, start one **reviewer subagent** for each:
 
 Give each only the prose rules, `<lar-build>/project-rules.md`, its file's
 path, the build's work ID, the repo path and the diff command
-`git diff origin/main...HEAD`. Note each reviewer you skip with a reason, and
+`git diff origin/$base_branch...HEAD`. Note each reviewer you skip with a reason, and
 say so in chat.
 
 Each returns a verdict (`approve` or `changes`), findings and what it couldn't
@@ -230,7 +233,7 @@ the PR and returns a recommended status; the item stays in Review. Record the
 PR on the build (`lar-work set-pr <work ID> --revision N --pr <owner/repo#n>`)
 and link it to this thread (`link_pull_request`).
 When the approver reports a rebase conflict or a failing check instead, hand
-it to the fixer; for a conflict, the fixer rebases onto `origin/main` and
+it to the fixer; for a conflict, the fixer rebases onto `origin/$base_branch` and
 resolves it. Add the fix to the unreviewed fixes, then start the approver
 again. When it reports that the PR can't be delivered (no push access to the
 branch or fork, or a PR rule only the user can meet), set **Needs you**, tell

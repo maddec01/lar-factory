@@ -5,7 +5,7 @@ Use this template for writing the PR body:
 Within the repository's own template, lead with the outcome, each confirmed
 decision and its reason so the PR stands alone without a ticket. When opening
 the PR, follow [PR delivery](shared/issue-tracker/publication-pr.md) for this
-build's current published ticket. Include its GitHub closing reference even
+build's own ticket when present. Include its GitHub closing reference even
 when the repository defines no link style. Azure uses the native PR work-item
 relationship and the team's completion setting. A concept's parent ticket is
 separate from the build's closing target. Keep the project's other PR rules.

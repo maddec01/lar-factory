@@ -1,0 +1,1 @@
+Factory smoke test.

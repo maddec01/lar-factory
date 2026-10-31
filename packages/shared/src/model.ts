@@ -840,6 +840,14 @@ export interface SharedRepositorySettings {
   skills?: string[];
 }
 
+/** The settings Repository config may share, in the order Settings lists them. */
+export const SHARED_SETTINGS = ['role', 'itemSource', 'show', 'labels', 'domainDocs', 'skills'] as const satisfies readonly (keyof SharedRepositorySettings)[];
+
+export type SharedSetting = (typeof SHARED_SETTINGS)[number];
+
+/** Where a setting's value comes from: this Mac's override, Repository config's default, or the factory's default. */
+export type SettingSource = 'local' | 'shared' | 'default';
+
 /** The repository writes the factory may need, each with its own credential access and local write consent. */
 export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket'] as const;
 
@@ -876,6 +884,10 @@ export interface RepositorySetup {
   paused: ('itemSource' | 'domainDocs')[];
   /** Why the latest Repository config couldn't be used; the setup keeps its last usable shared defaults meanwhile. */
   sharedProblem?: string;
+  /** Where each shared setting's value comes from. */
+  sources: Record<SharedSetting, SettingSource>;
+  /** Repository config's defaults as last read while usable, which removing an override brings back. */
+  shared: SharedRepositorySettings;
 }
 
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */

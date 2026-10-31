@@ -1,6 +1,6 @@
-// The board's configuration: the onboarded repositories, in REPOSITORY_LIST_FILE, and the board-wide settings, in
-// settings.json, both in boardDataDir(), and each repository's Repository config, its .lar-factory.json read from its
-// default branch. The board only reads settings.json, and leaves the old repositories.json untouched.
+// The board's configuration: the onboarded repositories and the board-wide settings, both in REPOSITORY_LIST_FILE in
+// boardDataDir(), and each repository's Repository config, its .lar-factory.json read from its default branch. The
+// board leaves the old repositories.json and settings.json untouched.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,7 +24,7 @@ export interface RepositoryConfig {
 
 export interface BoardSettings {
   refreshSeconds: number;
-  /** Why settings.json couldn't be used, naming its path, when it couldn't; the defaults stand in for it. */
+  /** Why the list file couldn't be used, naming its path, when it couldn't; the defaults stand in for it. */
   problem?: string;
 }
 
@@ -201,10 +201,13 @@ export function stillOnboarding(list: readonly OnboardedRepository[]): Onboardin
   return list.flatMap(({ repo, onboarding }) => onboarding ? [{ repo, progress: onboarding }] : []);
 }
 
-/** settings.json, with each missing field, or the whole file, taking its default; a file it can't use takes them all, with the problem. */
+/**
+ * The board-wide settings beside the list's `repositories`, such as `"refreshSeconds": 300`, with each missing field, or
+ * the whole file, taking its default; a file it can't use takes them all, with the problem.
+ */
 export function readBoardSettings(dir = boardDataDir()): BoardSettings {
   const defaults = { refreshSeconds: 300 };
-  const file = join(dir, 'settings.json');
+  const file = join(dir, REPOSITORY_LIST_FILE);
   if (!existsSync(file)) return defaults;
   let raw: unknown;
   try { raw = readJson(file); }

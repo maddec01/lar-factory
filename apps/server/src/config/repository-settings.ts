@@ -4,7 +4,7 @@
 
 import { join } from 'node:path';
 import {
-  CONFIG_VERSION, REPOSITORY_OPERATIONS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
+  CONFIG_VERSION, REPOSITORY_OPERATIONS, SHARED_SETTINGS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
   type LocalSetupAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings,
   type ShowSetting,
 } from '@lar-factory/shared';
@@ -36,6 +36,8 @@ interface LocalSettings {
   sharedProblem?: string;
   /** The pausing settings as the user last accepted them. */
   accepted?: { itemSource: RepositoryItemSource | null; domainDocs: DomainDocLocation };
+  /** The app's Repository config version at which the user dismissed the notice offering the update PR. */
+  dismissedUpdate?: number;
 }
 
 const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
@@ -84,6 +86,7 @@ function isLocalSettings(value: unknown, azure: boolean): value is LocalSettings
   return (value.projectId === undefined || typeof value.projectId === 'string') && shared(value.overrides) && shared(value.shared)
     && (value.access === undefined || isAccess(value.access)) && (value.consent === undefined || Array.isArray(value.consent) && value.consent.every(isOperation))
     && (value.sharedProblem === undefined || typeof value.sharedProblem === 'string')
+    && (value.dismissedUpdate === undefined || typeof value.dismissedUpdate === 'number')
     && (accepted === undefined || isRecord(accepted) && (accepted.itemSource === null || isItemSource(accepted.itemSource)) && isDomainDocs(accepted.domainDocs));
 }
 
@@ -113,6 +116,9 @@ function setupOf(repo: string, local: LocalSettings): RepositorySetup {
     consent: (local.consent ?? []).filter((op) => accessOf(op) !== 'refused'),
     paused: (['itemSource', 'domainDocs'] as const).filter((key) => changed(key, key === 'itemSource' ? itemSource : domainDocs)),
     ...local.sharedProblem !== undefined && { sharedProblem: local.sharedProblem },
+    sources: Object.fromEntries(SHARED_SETTINGS.map((key) => [key,
+      local.overrides?.[key] !== undefined ? 'local' : local.shared?.[key] !== undefined ? 'shared' : 'default'])) as RepositorySetup['sources'],
+    shared: local.shared ?? {},
   };
 }
 
@@ -168,6 +174,20 @@ export function setOverride<K extends keyof SharedRepositorySettings>(repo: stri
 /** Accepts the repository's item source and domain-doc location as they are now, so the work depending on them goes on. */
 export function acceptSetup(repo: string, dir = boardDataDir()): void {
   updateSettings(repo, dir, (local, { itemSource, domainDocs }) => ({ ...local, accepted: { itemSource, domainDocs } }));
+}
+
+/** Records the repository's config update notice dismissed at the app's Repository config `version`. */
+export function recordDismissedUpdate(repo: string, version: number, dir = boardDataDir()): void {
+  updateSettings(repo, dir, (local) => ({ ...local, dismissedUpdate: version }));
+}
+
+/** Each repository whose config update notice was dismissed, with the app version it was dismissed at. */
+export function readDismissedUpdates(dir = boardDataDir()): Map<string, number> {
+  const { list, settings } = readSettings(dir);
+  return new Map(list.flatMap(({ repo }, index) => {
+    const at = settings[index]!.dismissedUpdate;
+    return at === undefined ? [] : [[repo, at] as const];
+  }));
 }
 
 /** The access an onboarding's detection found, each operation it left unverified out. */

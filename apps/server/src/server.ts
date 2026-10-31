@@ -11,11 +11,11 @@ import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource,
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from './board/board-state.ts';
-import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
+import { configUpdateOf, dismissConfigUpdate } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
 import { onTheBoard, readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { prHost, prUrl } from './config/pr-host.ts';
-import { readOnboardedConfigs } from './config/repository-settings.ts';
+import { readDismissedUpdates, readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
@@ -321,7 +321,7 @@ const checksRunning = (item: Item, now: number) => item.linkedPrs.map((pr) => [p
     return now - (pr.checks.since ? Date.parse(pr.checks.since) : checksSeenAt.get(key)!) < SLOW_CHECKS_MS;
   });
 
-/** The idle pace: settings.json's refreshSeconds, at least a minute, so a setting saved from before ADR 0028 spends no more. */
+/** The idle pace: the list file's refreshSeconds, at least a minute, so a setting saved from before ADR 0028 spends no more. */
 const idleMs = () => TEST_READ_MS || Math.max(60, settings.refreshSeconds) * 1000;
 
 /** The pace reads run at now: slow while gh's quota runs low. */

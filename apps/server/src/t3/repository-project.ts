@@ -7,8 +7,7 @@
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { runTool } from '../tools/run-tool.ts';
-import { liveProjects } from './t3-db.ts';
-import { statsDbPath } from './t3-settings.ts';
+import { repositoryProjects } from './repository-project-discovery.ts';
 import type { RepoConfig } from '@lar-factory/shared';
 
 export type RepositoryProject = { projectId: string; error?: undefined } | { error: string };
@@ -53,7 +52,9 @@ export interface Checkout { id: string; title: string; folder: string; origin: s
 
 /** T3's live projects with each one's `origin` URL, null for a worktree or a checkout without one; throws when T3's projects can't be read. */
 export async function checkouts(env: NodeJS.ProcessEnv): Promise<Checkout[]> {
-  const projects = liveProjects(statsDbPath(env), env.HOME ?? '');
+  const read = await repositoryProjects(env);
+  if (read.availability !== 'available' || !read.observation) throw new Error('T3 project discovery unavailable');
+  const projects = read.observation.projects.map(p => ({ id: p.id, title: p.title, folder: p.workspaceRoot }));
   const origins = await Promise.all(projects.map((p) => mainCheckout(p.folder) ? originUrl(p.folder) : null));
   return projects.map((p, i) => ({ ...p, origin: origins[i] ?? null }));
 }
@@ -63,7 +64,7 @@ async function projectFinder(env: NodeJS.ProcessEnv): Promise<(repo: string) => 
   const home = env.HOME ?? '';
   let projects: Checkout[];
   try { projects = await checkouts(env); }
-  catch { return () => ({ error: `Can't read T3 Code's projects at ${statsDbPath(env)}` }); }
+  catch { return () => ({ error: "Can't read T3 Code's projects; reconnect T3 Code before starting" }); }
   return (repo) => {
     const matches = projects.filter((p) => p.origin !== null && originRepo(p.origin)?.toLowerCase() === repo.toLowerCase());
     if (matches.length === 1) return { projectId: matches[0]!.id };

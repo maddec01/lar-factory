@@ -7,7 +7,6 @@ import type { OnboardingOffer, ProjectChoice, Provider } from '@lar-factory/shar
 import type { OnboardedRepository } from '../config/repository-config.ts';
 import type { ConfigAnswer } from './config-checks.ts';
 import { azureRepo, checkouts, githubRepo, onAzureDevOps, originHost } from '../t3/repository-project.ts';
-import { statsDbPath } from '../t3/t3-settings.ts';
 
 /** The provider an origin URL is on, or null for any other host. */
 function providerOf(origin: string): Provider | null {
@@ -23,7 +22,7 @@ export async function projectChoices(list: readonly OnboardedRepository[], confi
   env: NodeJS.ProcessEnv = process.env): Promise<ProjectChoice[]> {
   let found;
   try { found = await checkouts(env); }
-  catch { throw new Error(`Can't read T3 Code's projects at ${statsDbPath(env)}`); }
+  catch { throw new Error("Can't read T3 Code's projects; reconnect T3 Code before onboarding"); }
   const listed = new Map(list.map((entry) => [entry.repo.toLowerCase(), entry]));
   return Promise.all(found.map(async ({ id, title, folder, origin }) => {
     const provider = origin ? providerOf(origin) : null;

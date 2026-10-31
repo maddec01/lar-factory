@@ -11,6 +11,7 @@ import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { SidebarNavigationItem } from '@lar-factory/ui/design-system/SidebarNavigationItem';
 import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-system/SidebarPane';
 import { SettingsIcon } from '@lar-factory/ui/design-system/NavigationIcons';
+import { useArchiveStore } from '../archive/archive-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
@@ -74,7 +75,13 @@ function SettingsModal() {
   // The title bar's Update pill follows the updater too, but it isn't there above the missing-t3 notice.
   const follow = useUpdateStore((state) => state.follow);
   useEffect(follow, [follow]);
-  const all = pages({ data, app: !!boardApp(), targets, version });
+  const archived = useArchiveStore((state) => state.items);
+  const archiveProblem = useArchiveStore((state) => state.problem);
+  // Archive stays off the board data, so it's read each time its section opens.
+  useEffect(() => {
+    if (section === 'archive') void useArchiveStore.getState().load();
+  }, [section]);
+  const all = pages({ data, app: !!boardApp(), targets, version, archive: { items: archived, problem: archiveProblem } });
   const byId = new Map(all.map((p) => [p.id, p]));
   const [query, setQuery] = useState('');
   const search = useRef<HTMLInputElement>(null);

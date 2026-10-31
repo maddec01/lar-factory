@@ -78,6 +78,8 @@ export interface ItemCommandsDeps {
   records: WorkRecords | null;
   /** Shows the work records as they are now, after a write or a refused one. */
   reread(): void;
+  /** Archive's work as the records are now: set aside, or finished and hidden by retention. */
+  archive(): Item[];
   /** Reads the model choices T3 offers now into the board data. */
   offerModelChoices(): ModelGroup[];
   /**
@@ -170,7 +172,7 @@ type StartRecord = keyof typeof PURPOSES;
 const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Check the repository's project in T3 Code; the board settles it once T3 shows it.";
 const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code, then clear Needs you to start again.";
 
-export function createItemCommands({ board, items, records, reread, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
+export function createItemCommands({ board, items, records, reread, archive, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
   showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, skillsOf = selectedSkills,
   reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)) }: ItemCommandsDeps): ItemCommands {
   const retryBuilds = new Set<string>();
@@ -571,7 +573,7 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
         const error = await kept;
         return withBoard(error ? 502 : 200, { error });
       }
-      const item = board.snapshot().archive?.find((shown) => shown.id === itemId);
+      const item = archive().find((shown) => shown.id === itemId);
       if (!item?.archived?.setAside) return withBoard(409, { error: "That work isn't set aside, so the board closes no ticket. Abandon it first." });
       if (!item.number) return withBoard(409, { error: 'That work has no ticket to close.' });
       if (item.abandonRefusal) return withBoard(409, { error: item.abandonRefusal });
@@ -582,7 +584,7 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
 
     restore(itemId) {
       if (!records) return withBoard(409, { error: 'The board has no work records to change.' });
-      if (!board.snapshot().archive?.some((shown) => shown.id === itemId && shown.archived?.setAside)) {
+      if (!archive().some((shown) => shown.id === itemId && shown.archived?.setAside)) {
         return withBoard(409, { error: "That work isn't set aside in Archive, so there is nothing to restore." });
       }
       try { write(itemId, (revision) => records.restore(itemId, revision)); }

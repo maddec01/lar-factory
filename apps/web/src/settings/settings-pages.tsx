@@ -3,9 +3,10 @@
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
+import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type Item, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { ArchiveActions, archivedAs, RetentionSetting } from '../archive/archive.tsx';
 import { RepoTag } from '../items/item-parts.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
@@ -44,6 +45,8 @@ export interface PagesInput {
   targets: TargetSnapshot[] | null;
   /** The running version, once the updater has said. */
   version: string | null;
+  /** Archive's work as /api/archive answered last, null before Archive first reads it, and why that read failed. */
+  archive: { items: Item[] | null; problem: string | null };
 }
 
 const ONLY_APP_TARGETS = 'Only the board app installs skills into agent folders.';
@@ -237,13 +240,30 @@ function updateRows({ app, version }: PagesInput): Row[] {
   ];
 }
 
+/** This Mac's retention setting, then each piece of work in Archive with what it offers; none in sample mode. */
+function archiveGroups(data: BoardData, archive: PagesInput['archive']): Group[] {
+  if (!data.retention) return [{ title: 'Archive', description: 'Sample mode keeps no work records.', rows: [] }];
+  const retention = data.retention;
+  const work: Row[] = (archive.items ?? []).map((item) => ({
+    id: `archived-${item.id}`, title: item.title || item.id,
+    description: [shownRepo(item.repo), item.number ? `#${item.number}` : 'No ticket', archivedAs(item)].join(' · '),
+    control: custom(() => <ArchiveActions item={item} />),
+  }));
+  return [
+    { title: 'Retention', description: 'Finished and set-aside work leaves the board after this many days. Nothing is deleted unless you turn on a timed delete.', rows: [
+      { id: 'retention', title: 'Keep work', control: custom(() => null), below: <RetentionSetting retention={retention} /> },
+    ] },
+    { title: 'Set aside and hidden', rows: work,
+      description: archive.problem ?? (archive.items === null ? 'Reading Archive…' : work.length ? undefined : 'No work is set aside or hidden.') },
+  ];
+}
+
 export function pages(input: PagesInput): Page[] {
   const { data } = input;
   return [
     { id: 'general', label: 'General', icon: <Settings2 />, description: 'How the board refreshes, what Start may do on its own, and how the app sits on your Mac.', groups: [
       { title: 'Board', rows: [
         { id: 'refresh', title: 'Refresh every', description: "How often the board reads every item, and each repository's .lar-factory.json, through gh on GitHub and az on Azure DevOps. Between these reads it checks GitHub for changes every 5 seconds, for free, and reads only what changed.", control: refreshEvery(data.refreshSeconds) },
-        { id: 'done-window', title: 'Done shows', control: { type: 'unavailable' } },
         { id: 'open-in', title: 'Open an item in', control: { type: 'unavailable' } },
         { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon sets work aside on this Mac, then asks again before it closes the ticket.', control: custom(() => <span className="text-xs text-(--muted-foreground)">Always ask</span>) },
       ] },
@@ -327,10 +347,7 @@ export function pages(input: PagesInput): Page[] {
     { id: 'updates', label: 'Updates', icon: <RefreshCw />, description: 'Which Releases Lar Factory offers, and when it installs them.', groups: [
       { title: 'Updates', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) },
     ] },
-    { id: 'archive', label: 'Archive', icon: <Archive />, description: 'Abandoned work is set aside on this Mac.', groups: [
-      { title: 'Abandoned items', description: 'The board does not list abandoned items yet.', rows: [],
-        note: <p className="m-0 text-xs text-(--muted-foreground)">Reopen issues on GitHub or reactivate work items in Azure DevOps.</p> },
-    ] },
+    { id: 'archive', label: 'Archive', icon: <Archive />, description: 'Work off the board: set aside, or finished and hidden. This Mac keeps it until a timed delete runs.', groups: archiveGroups(data, input.archive) },
     { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, description: 'The commands the board runs, and its server.', groups: [
       { title: 'Tools', rows: [
         ...DIAGNOSED.filter(([name]) => name !== 'gh' || !ghSkipped(data)).map(([name, does]): Row => ({

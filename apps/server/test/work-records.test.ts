@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import type { BoardData, ItemDetails } from '@lar-factory/shared';
+import type { BoardData, Item, ItemDetails } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { startBoard, until } from './server-support.ts';
 
@@ -77,21 +77,24 @@ test('Archive lists set-aside work with export and Restore, and a timed delete r
   writeFileSync(brief, '# Put away\n');
   const written = await larWork(board.dataDir, 'set-body', created.workId, '--revision', String(created.revision), '--body', 'brief', '--file', brief);
   await larWork(board.dataDir, 'set-aside', created.workId, '--revision', String(written.revision));
-  const archived = await until(board, (d) => d.archive?.length === 1);
-  assert.deepEqual([archived.items, archived.archive![0]!.archived, archived.retention], [[], { setAside: true, hidden: false, ticketOpen: false },
-    { hideAfterDays: 7, deleteAfterDays: null }]);
+  const archive = async () => (await (await fetch(`${board.url}/api/archive`)).json() as { items: Item[] }).items;
+  const archived = await archive();
+  const data = await board.board();
+  assert.deepEqual([archived.map((i) => [i.id, i.archived]), data.retention, 'archive' in data], [[[created.workId, { setAside: true, hidden: false, ticketOpen: false }]],
+    { hideAfterDays: 7, deleteAfterDays: null }, false], 'Archive has its own route, off the streamed board data');
   assert.equal((await board.postSession({ itemId: created.workId }, '/api/item-export')).status, 200);
 
   const asked = await (await board.postSession({ hideAfterDays: 7, deleteAfterDays: 0 }, '/api/retention')).json() as { saved: boolean; due: { workId: string }[] };
   assert.deepEqual([asked.saved, asked.due.map((d) => d.workId)], [false, [created.workId]]);
-  assert.equal((await board.board()).archive?.length, 1, 'nothing is deleted before the confirm');
+  assert.equal((await archive()).length, 1, 'nothing is deleted before the confirm');
   assert.equal((await board.postSession({ itemId: created.workId }, '/api/restore')).status, 200);
-  await until(board, (d) => d.items.some((i) => i.id === created.workId) && d.archive?.length === 0);
+  await until(board, (d) => d.items.some((i) => i.id === created.workId));
+  assert.deepEqual(await archive(), []);
 
   const again = await larWork(board.dataDir, 'read', created.workId);
   await larWork(board.dataDir, 'set-aside', created.workId, '--revision', String(again.revision));
-  await until(board, (d) => d.archive?.length === 1);
+  assert.equal((await archive()).length, 1);
   const confirmed = await board.postSession({ hideAfterDays: 7, deleteAfterDays: 0, confirmed: true }, '/api/retention');
   const { board: after } = await confirmed.json() as { board: BoardData };
-  assert.deepEqual([after.archive, after.retention?.deleteAfterDays, after.retention?.lastDelete?.deleted], [[], 0, [created.workId]]);
+  assert.deepEqual([await archive(), after.retention?.deleteAfterDays, after.retention?.lastDelete?.deleted], [[], 0, [created.workId]]);
 });

@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type ClashRun, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type ClashRun, type Item, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
@@ -24,6 +24,8 @@ export interface HttpDeps {
   capture: Capture;
   startAfter: Pick<StartAfter, 'arm' | 'disarm'>;
   retention: Pick<BoardRetention, 'save'>;
+  /** Archive's work as the records are now, which Settings › Archive reads from /api/archive when it opens. */
+  archive(): Item[];
   page: BuiltPage;
   /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
   appSecret: string | null;
@@ -156,7 +158,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
   runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
   resetRepository, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
@@ -296,8 +298,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     '/api/item-export': {
       what: 'the item to export', disabled: 'Exporting is disabled in sample mode.',
       run: forItem('Name the item to export.', async (itemId) => {
-        const { items, archive = [] } = board.snapshot();
-        const item = items.find((i) => i.id === itemId) ?? archive.find((i) => i.id === itemId);
+        const item = board.snapshot().items.find((i) => i.id === itemId) ?? archive().find((i) => i.id === itemId);
         if (!item) return { status: 404, body: { error: 'That item is not on the board or in Archive.' } };
         const exported = await itemDetails.exportMarkdown(item);
         return 'error' in exported ? { status: exported.status, body: { error: exported.error } } : { status: 200, body: { ...exported, error: null } };
@@ -616,6 +617,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
     if (path === '/api/tickets') return ticketsRequest(url, res);
+    if (path === '/api/archive') return json(res, 200, { items: archive() });
     if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));
     if (path === '/healthz') return json(res, 200, {});
     const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;

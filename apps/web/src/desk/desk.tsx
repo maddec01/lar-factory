@@ -1,3 +1,4 @@
+import { PublishButton } from '../publication/publication-dialog.tsx';
 // Your desk: the items only you can move, Ready, Needs you, Verify and Ready to merge, as cards in one row that scrolls
 // sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the same five
 // rows at the same heights, so they line up across cards: status, repository and age; the title; the next step; the
@@ -85,6 +86,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
         <span className="pt-1"><StepTrack status={item.status} /></span>
       </button>
       <Actions item={item} data={data} />
+      {item.publication?.eligible && <KeepClicks className="cursor-auto"><PublishButton item={item} data={data} /></KeepClicks>}
       {item.status === 'Ready' && <KeepClicks className="desk-start cursor-auto empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
     </div>
   );

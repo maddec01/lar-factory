@@ -19,7 +19,7 @@ every 15 seconds while its PR's checks run, and, in an Azure
 DevOps team, every 15 seconds while it holds active work. A rate-limited `gh` or `az` makes no calls until its limit resets. T3's threads
 refresh every 2 seconds and its stats every 30, with no `gh` or `az` call. It
 serves the board on the first free port from 4317 to 4416, which it logs;
-`BOARD_PORT` pins the port. The board app's board usually gets 4317.
+`BOARD_PORT` pins the port; `BOARD_PORT=0` lets the OS assign a free port. The board app's board usually gets 4317.
 `BOARD_APP_SECRET`, which the board app sets on each launch, makes every write
 except `/api/read` answer 403 unless the request carries it in `X-Board-Secret`.
 Before it installs an update, the app posts that secret to `/api/drain`: the board

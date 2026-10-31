@@ -5,10 +5,14 @@ import type { Server } from 'node:net';
 /** The ports a board without BOARD_PORT tries, in order. The board app's board usually gets the first, 4317. */
 export const BOARD_PORTS: readonly number[] = Array.from({ length: 100 }, (_, i) => 4317 + i);
 
-/** Listens on the first of `ports` that isn't in use and returns it; null when every one is. */
+/** Listens on the first available port and returns the bound port; zero asks the OS to assign one. */
 export async function listenOnFreePort(server: Server, host: string, ports: readonly number[]): Promise<number | null> {
   for (const port of ports) {
-    if (await listen(server, host, port)) return port;
+    if (await listen(server, host, port)) {
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Expected a listening TCP port');
+      return address.port;
+    }
   }
   return null;
 }

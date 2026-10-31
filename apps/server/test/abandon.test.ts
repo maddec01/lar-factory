@@ -7,6 +7,7 @@ import type { BoardData } from '@lar-factory/shared';
 
 
 const abandon = (board: Board, itemId: string, origin = board.url) => board.postSession({ itemId }, '/api/abandon', origin);
+const closeTicket = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/close-ticket');
 
 const has = (data: BoardData, id: string) => data.items.some((i) => i.id === id);
 const writes = async (board: Board) => (await board.calls()).filter((args) => args[1] === 'close' || args[1] === 'item-delete');
@@ -17,7 +18,7 @@ async function reads(board: Board, n: number): Promise<void> {
   while (await count() < target) await new Promise((r) => setTimeout(r, 20));
 }
 
-test('Abandon closes the issue as not planned on GitHub and the board drops it at once', async (t) => {
+test('Abandon sets the item aside and the board drops it at once, and only Close ticket closes the issue as not planned', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List'), boardIssue(13, 'List')] });
   await until(board, (d) => d.items.length === 2);
   const response = await abandon(board, board.id(12));
@@ -26,18 +27,20 @@ test('Abandon closes the issue as not planned on GitHub and the board drops it a
   assert.equal(result.error, null);
   assert.ok(!has(result.board, board.id(12)));
   assert.ok(has(result.board, board.id(13)));
+  assert.deepEqual(await writes(board), []);
+  assert.equal((await closeTicket(board, board.id(12))).status, 200);
   assert.deepEqual(await writes(board), [['issue', 'close', '12', '-R', 'maddec01/lar-factory', '--reason', 'not planned']]);
 });
 
-test('a failed close keeps the item and reports the error', async (t) => {
+test('a failed ticket close reports the error, and the work stays set aside', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')], fail: 'abandon' });
   await until(board, (d) => d.items.length === 1);
-  const response = await abandon(board, board.id(12));
+  assert.equal((await abandon(board, board.id(12))).status, 200);
+  const response = await closeTicket(board, board.id(12));
   assert.equal(response.status, 502);
   const result = await response.json();
   assert.match(result.error, /Could not abandon #12\. .*write access/);
-  assert.ok(has(result.board, board.id(12)));
-  assert.ok(has(await board.board(), board.id(12)));
+  assert.ok(!has(await board.board(), board.id(12)));
 });
 
 test('an abandoned item does not come back while GitHub still reports it', async (t) => {

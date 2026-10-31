@@ -1,4 +1,5 @@
-// The commands the board's buttons send: queue, back to List, pick a status, start, start build and abandon.
+// The commands the board's buttons send: queue, back to List, pick a status, start, start build, abandon, close an
+// abandoned item's ticket and act on Needs you.
 // Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
 // commands in flight are private here, so every rule about which command blocks which lives in this file.
 
@@ -8,6 +9,7 @@ import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbando
 import type { BoardData, DriftChoice, Item, ModelChoice, ModelGroup, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
 import type { BoardState } from '../board/board-state.ts';
+import { prHost, prUrl } from '../config/pr-host.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
 import { readRepositorySetups } from '../config/repository-settings.ts';
 import { installHome } from '../skills/bundled-skills.ts';
@@ -48,7 +50,19 @@ export interface ItemCommands {
    * Drift refuses it with the skills that changed until `drift` carries the User's DriftChoice.
    */
   startBuild(itemId: string, model: unknown, drift?: unknown): Promise<Reply>;
-  abandon(itemId: string): Promise<Reply>;
+  /**
+   * Sets List or Queued work aside on this Mac, or work whose Needs you offers it, and leaves its ticket as it is.
+   * closeTicket closes that ticket after its own confirmation.
+   */
+  abandon(itemId: string): Reply;
+  /** Closes the ticket of work Abandon set aside during this board run: as not planned on GitHub, to Removed on Azure DevOps. */
+  closeTicket(itemId: string): Promise<Reply>;
+  /**
+   * Acts on work that needs you as `choice` says, then clears its reason: `clear` alone, or one of its offers. Reopening
+   * the PR reopens it in its provider, a replacement build moves the work to Ready for Start build, and reopening the
+   * work moves it to List. Setting it aside is Abandon.
+   */
+  resolveNeedsYou(itemId: string, choice: unknown): Promise<Reply>;
 }
 
 export interface ItemCommandsDeps {
@@ -76,6 +90,8 @@ export interface ItemCommandsDeps {
   recoverThread?: (projectId: string, message: string, known: readonly string[]) => Promise<StartedThread | 'absent' | 'unknown'>;
   /** The project skills selected for the repository as builds start now; tests stand in for the local settings. */
   skillsOf?: (repo: string) => readonly string[];
+  /** Reopens the repository's PR `number`; tests stand in for gh and az. */
+  reopenPr?: (repo: string, number: number) => Promise<void>;
 }
 
 type Action = 'queue' | 'back to List' | 'pick' | 'start' | 'abandon';
@@ -150,7 +166,8 @@ const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Ch
 const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code, then clear Needs you to start again.";
 
 export function createItemCommands({ board, items, records, reread, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
-  showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, skillsOf = selectedSkills }: ItemCommandsDeps): ItemCommands {
+  showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, skillsOf = selectedSkills,
+  reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)) }: ItemCommandsDeps): ItemCommands {
   const retryBuilds = new Set<string>();
   /** Thread lookups by thread ID: one in flight, or when the next may run. */
   const checks = new Map<string, { pending: boolean; retryAt: number }>();
@@ -167,8 +184,10 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
   // Only settled starts can be retried; requests arriving during a retry share its pending result.
   const finishedStarts = new WeakMap<Promise<Start>, string>();
   const settled = new WeakSet<Promise<Start>>();
-  /** Deletes in flight by item id, so a second press waits for the first. */
-  const abandoning = new Map<string, Promise<string | null>>();
+  /** The items Abandon set aside this board run, as the board showed them, whose tickets closeTicket may close. */
+  const abandoned = new Map<string, Item>();
+  /** Ticket closes by item id: one in flight, so a second press waits for it, or one that succeeded, kept. */
+  const closing = new Map<string, Promise<string | null>>();
 
   const reply = (status: number, body: object): Reply => ({ status, body });
   const withBoard = (status: number, body: object): Reply => reply(status, { ...body, board: board.snapshot() });
@@ -178,7 +197,6 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
     const started = starts.has(itemId) || !!board.snapshot().started?.[itemId] || recordedStart(itemId);
     if (started && action === 'back to List') return 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
     if (started && action === 'abandon') return 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
-    if (abandoning.has(itemId) && action !== 'abandon') return `This item is being abandoned, so it can't ${action === 'start' ? 'start' : 'move'}.`;
     return null;
   }
 
@@ -299,6 +317,12 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
     return recordedThreads(workId).length > 0 || !!records?.launchIntents({ workId, unresolved: true }).length;
   }
 
+  /** Whether the work's recorded PR is observed closed unmerged, so its build starts again as a replacement. */
+  function prClosed(workId: string): boolean {
+    try { return records?.observations(workId).some((o) => o.of === 'pr' && o.state === 'closed') ?? false; }
+    catch { return false; }
+  }
+
   /** Writes a change to the item's work record at its current revision, then shows the records again. */
   function write<T>(workId: string, change: (revision: number) => T): T {
     try { return change(records!.read(workId).revision); }
@@ -355,7 +379,8 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
     if (unresolved) return settle(item, unresolved, projectId, message);
     const needsYou = records.read(item.id).needsYou;
     if (needsYou) return { thread: null, error: `Needs you: ${needsYou}`, refused: true };
-    const held = heldThread(board.find(item.id) ?? item, purpose);
+    // A build whose PR closed unmerged starts a replacement, so the thread that opened that PR holds no start.
+    const held = record === 'startedBuilds' && prClosed(item.id) ? null : heldThread(board.find(item.id) ?? item, purpose);
     const shown = board.snapshot()[record]?.[item.id];
     if (held) return { thread: shown?.threadId === held.threadId ? shown : held, error: null };
     prepare();
@@ -496,7 +521,7 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
       const message = buildMessage(item, larBuild());
       const previous = board.snapshot().startedBuilds?.[itemId];
       const retry = retryBuilds.has(itemId) || previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped')
-        || recordedThreads(itemId).some((t) => t.purpose === PURPOSES.startedBuilds);
+        || recordedThreads(itemId).some((t) => t.purpose === PURPOSES.startedBuilds) || prClosed(itemId);
       const branch = `${buildBranch(item)}${retry ? `-retry-${randomUUID().slice(0, 8)}` : ''}`;
       const { repo } = item;
       return async () => {
@@ -515,30 +540,58 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
       };
     }),
 
-    async abandon(itemId) {
-      let pending = abandoning.get(itemId);
-      if (!pending) {
-        const item = board.find(itemId);
-        // A second press after Abandon finished has nothing left to do.
-        if (!item && board.removed(itemId)) return withBoard(200, { error: null });
-        if (!item) return withBoard(404, { error: GONE });
-        if (!canAbandon(item)) return reply(409, { error: `Only List and Queued items can be abandoned; this one is in ${item.status}.` });
-        if (item.abandonRefusal) return reply(409, { error: item.abandonRefusal });
-        const busy = busyReason(itemId, 'abandon');
-        if (busy) return withBoard(409, { error: busy });
-        // Work with no ticket has nothing to close; the record is set aside once its ticket closes.
-        const work = (!item.number ? Promise.resolve(null) : items.abandon(item)).then((error) => {
-          if (error) return error;
-          board.remove(itemId);
-          try { records?.setAside(item.id, item.revision); }
-          catch (err) { return (err as Error).message; }
-          finally { reread(); }
-          return null;
-        });
-        pending = track(abandoning, itemId, work);
+    abandon(itemId) {
+      const item = board.find(itemId);
+      // A second press after Abandon finished has nothing left to do.
+      if (!item && board.removed(itemId)) return withBoard(200, { error: null });
+      if (!item) return withBoard(404, { error: GONE });
+      // Needs you offers setting work aside whatever its Status and threads, as after its PR closed unmerged.
+      const offered = item.needsYou?.offers.includes('set-aside');
+      if (!canAbandon(item) && !offered) return reply(409, { error: `Only List and Queued items can be abandoned; this one is in ${item.status}.` });
+      const busy = offered ? null : busyReason(itemId, 'abandon');
+      if (busy) return withBoard(409, { error: busy });
+      if (records) {
+        try { records.setAside(item.id, item.revision); }
+        catch (err) {
+          reread();
+          return withBoard(409, { error: (err as Error).message });
+        }
       }
-      const error = await pending;
+      abandoned.set(itemId, item);
+      board.remove(itemId);
+      reread();
+      return withBoard(200, { error: null });
+    },
+
+    async closeTicket(itemId) {
+      const item = abandoned.get(itemId);
+      if (!item) return withBoard(409, { error: "The board didn't set that work aside since it started, so it closes no ticket. Close it in its provider." });
+      if (!item.number) return withBoard(409, { error: 'That work has no ticket to close.' });
+      if (item.abandonRefusal) return withBoard(409, { error: item.abandonRefusal });
+      const error = await (closing.get(itemId) ?? track(closing, itemId, items.abandon(item), (failed) => failed === null));
       return withBoard(error ? 502 : 200, { error });
+    },
+
+    async resolveNeedsYou(itemId, choice) {
+      const item = board.find(itemId);
+      if (!item) return reply(404, { error: GONE });
+      if (!records) return withBoard(409, { error: 'The board has no work records to change.' });
+      if (!item.needsYou) return withBoard(409, { error: "That work doesn't need you." });
+      const offered = choice === 'clear' || (choice !== 'set-aside' && item.needsYou.offers.some((offer) => offer === choice));
+      if (!offered) return withBoard(409, { error: 'Pick one of the choices the board offers for this work.' });
+      try {
+        if (choice === 'reopen-pr') {
+          const pullRequest = records.read(itemId).pullRequest!;
+          await reopenPr(item.repo, Number(pullRequest.slice(pullRequest.lastIndexOf('#') + 1)));
+        }
+        write(itemId, (revision) => records.clearNeedsYou(itemId, revision));
+        if (choice === 'replace-pr') write(itemId, (revision) => records.update(itemId, revision, { status: 'Ready' }));
+        if (choice === 'reopen-work') write(itemId, (revision) => records.update(itemId, revision, { status: 'List' }));
+      } catch (err) {
+        reread();
+        return withBoard(err instanceof WorkRecordError ? 409 : 502, { error: (err as Error).message });
+      }
+      return withBoard(200, { error: null });
     },
   };
 }

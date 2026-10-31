@@ -158,18 +158,19 @@ test("in a repository with no factory labels or config, Add item records work lo
   assert.deepEqual(writes, []);
 });
 
-test("Abandon on an item from a repository's issues closes it as not planned; without write access it shows gh's error and keeps the item", async (t) => {
+test("closing an abandoned item's ticket from a repository's issues closes it as not planned; without write access it shows gh's error", async (t) => {
   const deleted = await issuesBoard(t, { repoIssues: { [APPLE]: [appleIssue(8), appleIssue(9)] } });
   const response = await deleted.postSession({ itemId: deleted.id(8, APPLE) }, '/api/abandon');
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json() as { board: BoardData }).board.items.map((i) => i.number), [9]);
+  assert.equal((await deleted.postSession({ itemId: deleted.id(8, APPLE) }, '/api/close-ticket')).status, 200);
   assert.deepEqual((await deleted.calls()).filter((args) => args[1] === 'close'), [['issue', 'close', '8', '-R', APPLE, '--reason', 'not planned']]);
   assert.deepEqual(await projectCommands(deleted), []);
 
   const kept = await issuesBoard(t, { fail: 'abandon' });
-  const refused = await kept.postSession({ itemId: kept.id(8, APPLE) }, '/api/abandon');
+  assert.equal((await kept.postSession({ itemId: kept.id(8, APPLE) }, '/api/abandon')).status, 200);
+  const refused = await kept.postSession({ itemId: kept.id(8, APPLE) }, '/api/close-ticket');
   assert.equal(refused.status, 502);
   assert.match((await refused.json() as { error: string }).error, /^Could not abandon #8\. .*write access/);
-  assert.equal((await kept.board() as BoardData).items.length, 1);
 });
 

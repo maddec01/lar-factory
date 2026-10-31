@@ -260,6 +260,15 @@ export function createBoardServer({ board, commands, capture, startAfter, page, 
       restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),
       run: forItem('Name the item to abandon.', (itemId) => commands.abandon(itemId)),
     },
+    '/api/close-ticket': {
+      what: 'the abandoned item whose ticket to close', disabled: 'Closing tickets is disabled in sample mode.',
+      restarted: () => withBoard({ error: 'The board restarted, so it closes no ticket. Close it in its provider.' }),
+      run: forItem('Name the item whose ticket to close.', (itemId) => commands.closeTicket(itemId)),
+    },
+    '/api/needs-you': {
+      what: 'the item that needs you and the choice', disabled: 'Acting on Needs you is disabled in sample mode.',
+      run: forItem('Name the item that needs you.', (itemId, input) => commands.resolveNeedsYou(itemId, input.choice)),
+    },
     '/api/item-description': {
       what: 'the description and its item', disabled: 'Saving descriptions is disabled in sample mode.',
       async run({ itemId, body, bodyField, revision }) {

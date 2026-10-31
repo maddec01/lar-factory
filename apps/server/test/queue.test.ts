@@ -126,15 +126,3 @@ test('Back to List is refused while a Start is in flight, uncertain or done for 
   assert.equal(await recordedStatus(board, id), 'Queued');
 });
 
-test('Back to List is refused while Abandon is pending for the item', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(12, 'Queued')], writeDelay: 300 });
-  await until(board, (d) => d.items.length === 1);
-  const id = board.id(12);
-  const abandoning = board.postSession({ itemId: id }, '/api/abandon');
-  await new Promise((r) => setTimeout(r, 100));
-  const refused = await backToList(board, id);
-  assert.equal(refused.status, 409);
-  assert.equal((await refused.json()).error, 'This item is being abandoned, so it can\'t move.');
-  assert.equal((await abandoning).status, 200);
-  assert.deepEqual(await issueEdits(board), []);
-});

@@ -1,6 +1,6 @@
 // The loading screen: the Lar Factory lockup over one line naming the first read's step. It covers the board from the
-// page's first paint until the first read has settled, or a repository's items have landed, and the mark has drawn,
-// then fades out. It comes back whenever the server's first read is unsettled again with nothing read, after a restart.
+// page's first paint until the whole first read has settled and the mark has drawn, then fades out once. Background
+// reads and server restarts keep the loaded board visible.
 
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -20,7 +20,7 @@ const drawnByDesktop = () => new URLSearchParams(location.search).get('loading')
 
 type Phase = 'showing' | 'leaving' | 'gone';
 
-/** The screen's phase and whether the mark is drawn. The screen leaves once the read is settled and the mark drawn; an unsettled read brings it back. */
+/** The screen's phase and whether the mark is drawn. Readiness stays true after the page's initial read. */
 function useScreen(settled: boolean): { phase: Phase; drawn: boolean } {
   const [drawn, setDrawn] = useState(() => drawnByDesktop() || reducedMotion());
   const [phase, setPhase] = useState<Phase>('showing');
@@ -90,9 +90,8 @@ function useInertBoard(covered: boolean) {
 
 export function LoadingScreen() {
   const read = useBoardStore((state) => state.data.firstRead);
-  // The board fills in as each repository's read lands, so the first to land ends the screen.
-  const landed = useBoardStore((state) => state.data.firstRead.waiting !== undefined);
-  const { phase, drawn } = useScreen(read.settled || landed);
+  const loaded = useBoardStore((state) => state.loaded);
+  const { phase, drawn } = useScreen(loaded);
   const { current, leaving, rolled } = useLines(stepText(read));
   useInertBoard(phase !== 'gone');
   const installs = useInstallStore((state) => state.snapshot?.installs);

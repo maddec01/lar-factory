@@ -3,10 +3,10 @@
 // of an empty desk and line. While no t3 is found, the notice replaces the content and the title bar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
 // it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
-// settled or a repository's items have landed. Every screen shares the notification stack.
+// settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
 
 import { LoaderCircle } from 'lucide-react';
-import { boardSections, failedCheck, inRepo, noneOnboarded, repoName, stillReading } from '@lar-factory/shared';
+import { boardSections, failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
 import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
 import { useScopeStore } from './board/scope-store.ts';
@@ -27,15 +27,15 @@ import { SettingsDialog } from './settings/settings.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
 
 function Content() {
-  const { data, now } = useBoardStore();
+  const { data, now, loaded } = useBoardStore();
   const scope = useScopeStore((state) => state.scope);
   const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="grid gap-7 px-6 py-5">
         <OnboardingCards />
-        {scope && stillReading(data, scope)
-          ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Reading {repoName(scope, data.repos)}…</p>
+        {scope && !loaded && stillReading(data, scope)
+          ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Loading projects…</p>
           : <>
             <Desk items={boardSections({ ...data, items }, now).needsYou} />
             <Line items={items} />

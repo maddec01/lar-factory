@@ -311,12 +311,13 @@ test('Pick a ticket searches the repository picked and lists its open tickets, s
   expect($('[data-pane="pick"]')!.getAttribute('aria-pressed')).toBe('true');
   expect(dialog()!.style.height, 'the short pane sizes the dialog to its content').toBe('auto');
   expect([...$('#pick-ticket')!.classList], 'a long result list scrolls above the footer').toEqual(expect.arrayContaining(['min-h-0', 'overflow-y-auto']));
-  expect(dialog()!.textContent).toContain('Pick an open ticket in lar-server and add it to List.');
+  expect(dialog()!.textContent).toContain('Find an open ticket in lar-server.');
+  expect(text($('#pick-ticket'))).toContain('Find tickets outside your list, or open one you’ve already added.');
   await enter(field<HTMLSelectElement>('pick-repo'), 'maddec01/lar-apple');
   respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }, { number: 9, title: 'Seek is slow', url: 'u9', workId: 'work-9' }], error: null });
   await searchFor('seek');
   expect(calls('/api/tickets')).toEqual([['/api/tickets?repo=maddec01%2Flar-apple&q=seek', null]]);
-  expect($$('[data-ticket]').map(text)).toEqual(['#8Seek stalls', '#9Seek is slowOn the board']);
+  expect($$('[data-ticket]').map(text)).toEqual(['#8Seek stalls', '#9Seek is slowAlready added']);
   respond({ tickets: [], error: null });
   await searchFor('nothing');
   expect(text(field('pick-result'))).toBe('No open ticket matches.');

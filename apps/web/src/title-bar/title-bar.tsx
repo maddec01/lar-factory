@@ -25,7 +25,6 @@ import { useBoardStore } from '../board/board-store.ts';
 import { useScopeStore } from '../board/scope-store.ts';
 import { repoTone } from '../items/item-parts.tsx';
 import { ListButton } from '../list/list-modal.tsx';
-import { listed } from '../loading/step-text.ts';
 import { SettingsButton } from '../settings/settings.tsx';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { Counters } from './counters.tsx';
@@ -122,7 +121,7 @@ function Refreshed({ data }: { data: BoardData }) {
   }, [fetchedAt]);
   const landed = useLandedReads(fetchedAt);
   // A repository whose items haven't landed would show as empty, so the board says it still reads instead.
-  const reading = data.firstRead.waiting?.map((repo) => repoName(repo, data.repos)) ?? [];
+  const reading = data.firstRead.waiting ?? [];
   const health: Health = reading.length ? 'waiting' : isStale(data, now) ? 'stale' : fetchedAt ? 'live' : 'waiting';
   const ago = fetchedAt ? shortAgo(fetchedAt, now) : null;
   return (
@@ -137,7 +136,7 @@ function Refreshed({ data }: { data: BoardData }) {
             <span data-dot className={`size-1.5 rounded-full ${DOT[health]}`} />
           </span>
           <span className="@max-[48rem]:sr-only">
-            {reading.length ? `Reading ${listed(reading)}` : !fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
+            {reading.length ? 'Loading projects' : !fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
           </span>
         </span>
       </TooltipTrigger>

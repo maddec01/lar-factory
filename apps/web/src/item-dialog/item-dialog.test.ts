@@ -34,21 +34,21 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
   const parent = inDialog<HTMLAnchorElement>('[data-item-parent] a')!;
   expect([text(parent), parent.href]).toEqual(['#200 lar cloud: website sign-in and relay', 'https://github.com/maddec01/lar-server/issues/200']);
-  expect(steps()).toHaveLength(10);
+  expect(steps()).toHaveLength(8);
   expect(text(inDialog('[data-meta]'))).toContain('Usage totals are still loading.');
   expect(text(inDialog('[data-labels]'))).toBe('build');
 });
 
-/** The progress bar's ten step segments. */
+/** The progress bar's active step segments. */
 const steps = () => $$('[data-item-dialog] [data-progress] [data-steps] > li');
 
 test('the progress bar names the current step on its segment and every step in a title and an accessible label', async () => {
   await mountPage();
   await openItem('I_sample13');
-  const current = steps()[4]!;
-  expect([current.getAttribute('aria-label'), current.getAttribute('aria-current'), text(current)]).toEqual(['Step 5 of 10: Ready', 'step', 'Ready5/10']);
-  expect(steps().map((s) => s.title)).toEqual(['List', 'Queued', 'Shaping', 'Needs you', 'Ready', 'In progress', 'Review', 'Verify', 'Ready to merge', 'Done']);
-  expect(steps().filter((s) => s !== current).map((s) => text(s))).toEqual(Array(9).fill(''));
+  const current = steps()[3]!;
+  expect([current.getAttribute('aria-label'), current.getAttribute('aria-current'), text(current)]).toEqual(['Step 4 of 8: Ready', 'step', 'Ready4/8']);
+  expect(steps().map((s) => s.title)).toEqual(['Queued', 'Shaping', 'Needs you', 'Ready', 'In progress', 'Review', 'Verify', 'Ready to merge']);
+  expect(steps().filter((s) => s !== current).map((s) => text(s))).toEqual(Array(7).fill(''));
   expect(steps().filter((s) => s.hasAttribute('aria-current'))).toEqual([current]);
 });
 
@@ -59,7 +59,7 @@ test('slices show as an overview under the progress bar, not in the sidebar, wit
   expect(text(slices.querySelector('p'))).toBe('Slices · 1/3 done');
   expect([...slices.querySelectorAll('ul > li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
   expect(slices.querySelectorAll('ol > li'), 'a small bar of the slices').toHaveLength(3);
-  expect(steps()[4]!.querySelector('ol'), 'the Ready segment is not subdivided').toBeNull();
+  expect(steps()[3]!.querySelector('ol'), 'the Ready segment is not subdivided').toBeNull();
   expect($$('[data-item-dialog] aside h2').map(text)).toEqual(['Sub-tickets']);
 });
 
@@ -67,7 +67,7 @@ test('an In progress item with slices subdivides its current segment, a mini seg
   const slices = sample.items.find((i) => i.id === 'I_sample13')!.slices;
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample14' ? { ...i, slices } : i)) });
   await openItem('I_sample14');
-  expect([...steps()[5]!.querySelectorAll<HTMLElement>('ol > li')].map((s) => s.title)).toEqual(['#144 Owner table and sign-up', '#145 Sign-in sessions', '#146 Owner settings page']);
+  expect([...steps()[4]!.querySelectorAll<HTMLElement>('ol > li')].map((s) => s.title)).toEqual(['#144 Owner table and sign-up', '#145 Sign-in sessions', '#146 Owner settings page']);
   expect(text(inDialog('[data-slices] p'))).toBe('Slices · 1/3 done');
   expect(inDialog('[data-slices] ol'), 'the bar is in the track, not repeated').toBeNull();
   expect(inDialog('[data-slices] ul')!.children).toHaveLength(3);

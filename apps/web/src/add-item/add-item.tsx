@@ -1,6 +1,7 @@
 // The title bar's Add item button and its dialog, in two panes. New work is a form that records work in an onboarded
 // repository and adds it to List, creating no ticket: a large title and the description editor on the left, the
-// repository and kind in the side panel. Pick a ticket searches a repository's open tickets and records the one picked.
+// repository and kind in the side panel. Find a ticket looks up open tickets, including direct-number matches outside
+// the configured List, and reuses an existing work record instead of duplicating it.
 // ⌘N opens it too. The store keeps the form's values as they're edited, so a half-written draft survives a close.
 
 import { useEffect, useRef, useState } from 'react';
@@ -121,7 +122,7 @@ function AddItemForm() {
   );
 }
 
-/** Pick a ticket: the repository, then the ticket picker for it. Picking closes the dialog. */
+/** Find a ticket: the repository, then the ticket picker for it. Picking closes the dialog. */
 function PickTicketPane() {
   const data = useBoardStore((state) => state.data);
   const { pick, setOpen } = useAddItemStore();
@@ -131,6 +132,7 @@ function PickTicketPane() {
   const disabled = data.capture?.enabled === false || !selected;
   return (<>
     <div className="grid min-h-0 content-start gap-4 overflow-y-auto border-t border-base-300 px-5 pb-5 pt-4 sm:px-6" id="pick-ticket">
+      <p className={HINT}>Find tickets outside your list, or open one you’ve already added.</p>
       <PanelSection heading="Repository" htmlFor="pick-repo">
         <RepoSelect id="pick-repo" repo={repo} onRepo={setRepo} />
       </PanelSection>
@@ -143,7 +145,7 @@ function PickTicketPane() {
   </>);
 }
 
-/** New work or Pick a ticket, as two buttons, the shown pane's pressed. */
+/** New work or Find a ticket, as two buttons, the shown pane's pressed. */
 function PaneSwitch() {
   const { pane, setPane } = useAddItemStore();
   const choice = (to: AddItemPane, label: string) => (
@@ -152,7 +154,7 @@ function PaneSwitch() {
   );
   return (
     <div role="group" aria-label="Add" className="flex gap-0.5 rounded-lg bg-base-200 p-0.5">
-      {choice('new', 'New work')}{choice('pick', 'Pick a ticket')}
+      {choice('new', 'New work')}{choice('pick', 'Find a ticket')}
     </div>
   );
 }
@@ -163,10 +165,10 @@ function useDescription(): string {
   const { pane, values } = useAddItemStore();
   const selected = repos.find((r) => r.repo === values?.repo) ?? repos[0];
   const where = selected ? ` in ${repoName(selected.repo, repos)}` : '';
-  return pane === 'pick' ? `Pick an open ticket${where} and add it to List.` : `Record work${where} and add it to List.`;
+  return pane === 'pick' ? `Find an open ticket${where}.` : `Record work${where} and add it to List.`;
 }
 
-/** Pick a ticket's pane is short, so the dialog keeps its width but takes the pane's height; a long result list scrolls inside it. */
+/** Find a ticket's pane is short, so the dialog keeps its width but takes the pane's height; a long result list scrolls inside it. */
 const FITS_CONTENT = { height: 'auto' };
 
 /** The open dialog; each opening starts at the normal size. */

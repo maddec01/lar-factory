@@ -55,7 +55,7 @@ export function receive(result: ActionResult): void {
   if (!result.board) return;
   const board = useBoardStore.getState();
   board.beginWrite();
-  board.receive(result.board);
+  board.receive(result.board, 'action');
 }
 
 const by = (attr: string, value: string) => `[${attr}="${CSS.escape(value)}"]`;

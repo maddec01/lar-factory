@@ -39,7 +39,7 @@ test('a desk card shows its status, repository and age, numbered title, next ste
   await mountPage();
   const rows = [...card('I_sample16').querySelector('button')!.children];
   expect(rows.slice(0, 3).map(text)).toEqual(['Verify· lar-apple · 1h ago', '#31 New artwork grid layout', 'can merge · 1 passed']);
-  expect(rows[3]!.querySelectorAll('ol > li')).toHaveLength(10);
+  expect(rows[3]!.querySelectorAll('ol > li')).toHaveLength(8);
 });
 
 test("a desk card's title is always two lines tall, cut short, with the whole title in its tooltip", async () => {

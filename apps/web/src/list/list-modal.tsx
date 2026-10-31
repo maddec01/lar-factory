@@ -58,15 +58,22 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
   const repos = useBoardStore((state) => state.data.repos);
   return (
     <button type="button" onClick={onOpen} data-item={item.id} title={item.title}
-      className="flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-base-200/70 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
-      <StatusGlyph status={item.status} />
+      className="flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-base-200/70 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
+      <span className="mt-0.5 shrink-0" aria-hidden="true">
+        <StatusGlyph status={item.status} />
+      </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium leading-[18px] text-base-content">{item.title}</span>
-        <span className="my-1 flex flex-wrap gap-1"><ItemKind item={item} /><StructureSync item={item} /></span>
-        <AzureFields azure={item.azure} />
-        <span className="block truncate text-xs leading-4 tabular-nums text-base-700">
-          {showRepo && `${repoName(repoKey(item), repos)} · `}{item.number ? `${ref(item)} · ` : ''}{shortAgo(item.updatedAt, now)}
+        <span className="block truncate text-[13px] font-medium leading-5 text-base-content">
+          {item.number ? <span className="font-normal text-base-700">{ref(item)} </span> : null}{item.title}
         </span>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 [&_[data-item-kind]>span]:h-4 [&_[data-item-kind]>span]:text-[10px]">
+          <span className="min-w-0 truncate text-[11px] leading-4 tabular-nums text-base-700">
+            {showRepo && `${repoName(repoKey(item), repos)} · `}{shortAgo(item.updatedAt, now)}
+          </span>
+          <ItemKind item={item} />
+          <StructureSync item={item} />
+        </span>
+        <AzureFields azure={item.azure} />
       </span>
     </button>
   );
@@ -161,7 +168,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
         </div>
         <Modal.Body>
           {items.map((item) => <ItemRow key={item.id} item={item} now={now} showRepo={!picked} onOpen={() => useItemDialogStore.getState().open(item.id)} />)}
-          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q ? 'Nothing here matches.' : reading ? `Reading ${picked!.name}…` : 'Nothing in List.'}</p>}
+          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q ? 'Nothing here matches.' : reading ? 'Loading projects…' : 'Nothing in List.'}</p>}
         </Modal.Body>
       </Modal.Content>
     </Modal>

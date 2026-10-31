@@ -1,4 +1,4 @@
-// The line's stages: the six-stage track a dossier's parts show, and what the line says of an item's thread and of an
+// The line's stages: the five-stage track a dossier's parts show, and what the line says of an item's thread and of an
 // item that waits on you.
 
 import { clock } from '@lar-factory/shared';
@@ -11,10 +11,9 @@ const STAGES: { name: string; statuses: Status[] }[] = [
   { name: 'Building', statuses: ['In progress'] },
   { name: 'Review', statuses: ['Review'] },
   { name: 'Verify', statuses: ['Verify', 'Ready to merge'] },
-  { name: 'Done', statuses: ['Done'] },
 ];
-/** The status's stage on the track, or -1 for List and Queued, which sit before it. */
-export const stageOf = (s: Status) => STAGES.findIndex((st) => st.statuses.includes(s));
+/** Done follows the active stages; List and Queued sit before them. */
+export const stageOf = (s: Status) => s === 'Done' ? STAGES.length : STAGES.findIndex((st) => st.statuses.includes(s));
 export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
 const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
@@ -41,11 +40,13 @@ export function OnYourDesk({ status }: { status: Status }) {
 
 export const statsOf = (item: Item): ItemStats | null => (item.stats && item.stats !== 'unavailable' ? item.stats : null);
 
-/** Six stage cells: the stages behind filled, the current one coloured up to its glyph, the rest faint. */
+/** Active stages only; completed parts keep a check instead of a further workflow step. */
 export function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
   const at = stageOf(status);
+  if (status === 'Done') return <span className="flex h-5 items-center" title="Complete"><StatusGlyph status="Done" /></span>;
+  if (at < 0) return null;
   return (
-    <ol className="m-0 grid list-none grid-cols-6 gap-px p-0" title={`${status}${waiting ? ', waiting' : ''}`}>
+    <ol className="m-0 grid list-none grid-cols-5 gap-px p-0" title={`${status}${waiting ? ', waiting' : ''}`}>
       {STAGES.map((st, n) => (
         <li key={st.name} className="relative flex h-5 items-center justify-center">
           <span className={`absolute inset-x-0 h-1.5 ${n === 0 ? 'rounded-l-full' : ''} ${n === STAGES.length - 1 ? 'rounded-r-full' : ''}`}

@@ -91,7 +91,7 @@ test('a repository whose items have not landed yet says it is reading, not that 
   await mountPage(reading);
   await open();
   await settle(() => group('lar-apple').click());
-  expect(text($('[data-list-modal] .empty'))).toBe('Reading lar-apple…');
+  expect(text($('[data-list-modal] .empty'))).toBe('Loading projects…');
   expect(counts().find(([name]) => name === 'lar-apple'), 'no count in the left pane').toEqual(['lar-apple', '']);
   const header = () => text($('[data-list-modal] button.scope-board')!.parentElement);
   expect(header(), 'no count in the header').toBe('lar-appleScope boardRecently updated');

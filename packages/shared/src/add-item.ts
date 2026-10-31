@@ -24,6 +24,7 @@ export interface TicketMatch {
 export interface PickedTicket extends TicketMatch {
   text: string;
   kind: Kind;
+  tracker?: import('./tracker-structure.ts').TrackerStructure;
 }
 
 /** What capture and pick answer: the item the record shows as, or the error. */

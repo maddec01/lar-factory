@@ -1,4 +1,4 @@
-// The Settings page: whether it's open and on which section, the Install targets the app's bridge lists, the tick
+// The Settings page: whether it's open and on which section, the Skill folders the app's bridge lists, the tick
 // being changed, the update channel being switched to, and what the last call did. Opening in the board app reads
 // the install state and follows each change until Settings closes.
 
@@ -7,7 +7,7 @@ import { boardApp, type InstallOperationResult, type InstallSnapshot, type Targe
 import { useInstallStore } from './install-store.ts';
 import { useUpdateStore } from '../updates/update-store.ts';
 
-/** What the last call did, and the group it came from: the Install targets or the updates. */
+/** What the last call did, and the group it came from: the Skill folders or the updates. */
 export interface SettingsResult { text: string; tone?: 'success' | 'warning' | 'error'; paths?: string[]; from?: 'targets' | 'updates' }
 
 interface SettingsState {
@@ -78,7 +78,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
         if (!latest()) return;
         set(fromSnapshot(snapshot));
       },
-      (error) => latest() && set({ targets: [], result: { text: `Couldn't read the Install targets: ${failure(error)}`, tone: 'error', from: 'targets' } }),
+      (error) => latest() && set({ targets: [], result: { text: `Couldn't read the Skill folders: ${failure(error)}`, tone: 'error', from: 'targets' } }),
     );
   },
   setSection: (section) => set({ section }),

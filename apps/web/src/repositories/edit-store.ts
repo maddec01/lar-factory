@@ -1,11 +1,6 @@
-// Edit in Settings › Repositories: the onboarded repository whose settings it edits, and the text the user typed for
-// each setting. The setup itself comes from the board, so the dialog shows the latest read. Save posts one setting as a
-// local override, Use shared default removes it, Recheck access forgets what the credentials allowed, Offer sets the
-// operations offered, and Accept, on the repository's row, accepts a changed item source or domain-doc location. The
-// board sent back shows each change.
-
+// Local repository settings, edited from Settings.
 import { create } from 'zustand';
-import { REPOSITORY_OPERATIONS, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings, type SharedSetting, type VocabularyKey, type VocabularyTerm } from '@lar-factory/shared';
+import { type RepositorySetup, type SharedRepositorySettings, type SharedSetting } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
 
 /** Settings whose editor uses text drafts. Vocabulary saves one complete term at a time. */
@@ -60,7 +55,7 @@ export function canSave(key: DraftSetting, setup: RepositorySetup, typed: Partia
 }
 
 /** A call to the board: one setting's Save or removal, Recheck access, Offer, or Accept. */
-type Running = SharedSetting | 'recheck' | 'consent' | 'accept';
+type Running = SharedSetting | 'recheck' | 'structure-sync';
 
 interface EditState {
   /** The repository whose dialog is open. */
@@ -73,12 +68,9 @@ interface EditState {
   close: () => void;
   type: (field: keyof Drafts, text: string) => void;
   save: (repo: string, key: DraftSetting, setup: RepositorySetup) => Promise<void>;
-  useShared: (repo: string, key: DraftSetting) => Promise<void>;
+  reset: (repo: string, key: DraftSetting) => Promise<void>;
   recheck: (repo: string) => Promise<void>;
-  /** Offers `op` or stops offering it, keeping the other operations the setup offers. */
-  offer: (repo: string, op: RepositoryOperation, on: boolean, setup: RepositorySetup) => Promise<void>;
-  vocabulary: (repo: string, key: VocabularyKey, value: VocabularyTerm | undefined) => Promise<boolean>;
-  accept: (repo: string) => Promise<void>;
+  structureSync: (repo: string, on: boolean) => Promise<void>;
 }
 
 export const useEditStore = create<EditState>()((set, get) => {
@@ -103,14 +95,8 @@ export const useEditStore = create<EditState>()((set, get) => {
       const value = valueOf(key, shownDrafts(setup, get().typed));
       return value === null ? Promise.resolve() : call(repo, key, { change: 'override', key, value }, key);
     },
-    useShared: (repo, key) => call(repo, key, { change: 'override', key }, key),
+    reset: (repo, key) => call(repo, key, { change: 'override', key }, key),
     recheck: (repo) => call(repo, 'recheck', { change: 'recheck' }),
-    offer: (repo, op, on, setup) => call(repo, 'consent', { change: 'consent',
-      value: REPOSITORY_OPERATIONS.filter((o) => (o === op ? on : setup.consent.includes(o))) }),
-    vocabulary: async (repo, key, value) => {
-      await call(repo, 'vocabulary', { change: 'vocabulary', key, ...value !== undefined && { value } });
-      return !get().errors[repo];
-    },
-    accept: (repo) => call(repo, 'accept', { change: 'accept' }),
+    structureSync: (repo, on) => call(repo, 'structure-sync', { change: 'structure-sync', value: on }),
   };
 });

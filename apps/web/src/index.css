@@ -16,6 +16,7 @@
 @source "./copy/copy-button.tsx";
 @source "./description-editor";
 @source "./desk";
+@source "./diagrams";
 @source "./expand-dialog";
 @source "./item-dialog";
 @source "./items/item-parts.tsx";
@@ -26,7 +27,6 @@
 @source "./line";
 @source "./list";
 @source "./onboarding";
-@source "./publication";
 @source "./repositories";
 @source "./notices/warning.tsx";
 @source "./notices/warnings.tsx";

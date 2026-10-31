@@ -94,7 +94,7 @@ test('the stream pushes the first read as it moves from unsettled to settled, na
 test("each repository's items show once its own read lands, while another repository's read still runs", async (t) => {
   const apple = 'maddec01/lar-apple';
   const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 1_500,
-    repoConfigs: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } }, repoIssues: { [apple]: [boardIssue(7, 'List', apple).content] } });
+    localSetups: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } }, repoIssues: { [apple]: [boardIssue(7, 'List', apple).content] } });
   const early = await until(board, (d) => d.items.length > 0);
   assert.deepEqual(early.items.map((i) => [i.repo, i.number]), [[apple, 7]], "the repository's read still sleeps");
   assert.equal(early.firstRead.settled, false);

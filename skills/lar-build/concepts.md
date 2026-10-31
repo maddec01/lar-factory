@@ -10,7 +10,7 @@ file and save it with `lar-work set-body <work ID> --revision N --body map --fil
 <what is true when this is done>
 
 ## Decisions so far
-- <gist> (<decision title>)
+- <shaping result needed to explain a part or relationship> (<decision title>)
 
 ## Fog
 - <what we don't know yet, and can't phrase as a question yet>
@@ -23,7 +23,8 @@ file and save it with `lar-work set-body <work ID> --revision N --body map --fil
 
 ## Map
 <Mermaid flowchart of the concept's decisions, builds and Dependencies by
-title, with edges for structural dependencies. Keep progress styling local.
+title, with edges for structural dependencies. Omit Status, progress labels and
+completion styling from this map. The board displays local progress separately.
 Redraw it whenever the structure changes. Below it, list Dependencies and the
 parts they affect. The board reads their local completion separately.>
 - <need>, from <owner>, blocks <build title>
@@ -68,9 +69,11 @@ in this order, so completion reads it as complete:
    (`slice.sh <concept work ID> "<title>" <brief file> --kind build`) with a
    brief ([3. Brief](brief.md)) whose Domain docs copies the map entries that
    build needs, run the [gate](gate.md) and set it Ready.
-3. Save the concept's map with the decision's gist in Decisions so far, its
-   drafts in Domain docs, the cleared fog removed and the Map redrawn. Once no
-   Fog is left, record it with `lar-work set-fog <concept work ID> --revision N --fog gone`.
+3. Save the concept's map. Put only results needed to explain parts or
+   relationships in Decisions so far; keep the full answer in the decision
+   record. Copy its drafts into Domain docs, remove cleared fog and redraw the
+   Map. Once no Fog is left, record it with
+   `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
 Start each new research decision at once, as in step 3; every other new
 decision waits in Queued as in step 4, and each build in Ready for the board's

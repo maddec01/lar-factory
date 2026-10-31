@@ -30,13 +30,13 @@ export function isVocabularyMapping(raw: unknown): raw is VocabularyMapping {
     && new Set(term.labels).size === term.labels.length);
 }
 
-/** Each local term replaces the shared term in full, including an explicit choice of nothing. */
-export function effectiveVocabulary(local: VocabularyMapping = {}, shared: VocabularyMapping = {}): {
+/** Each local mapping is complete, including an explicit choice of no type or labels. */
+export function effectiveVocabulary(local: VocabularyMapping = {}): {
   vocabulary: EffectiveVocabulary; vocabularySources: VocabularySources;
 } {
   return {
-    vocabulary: Object.fromEntries(VOCABULARY_KEYS.map((key) => [key, local[key] ?? shared[key] ?? emptyVocabularyTerm()])) as EffectiveVocabulary,
-    vocabularySources: Object.fromEntries(VOCABULARY_KEYS.map((key) => [key, local[key] !== undefined ? 'local' : shared[key] !== undefined ? 'shared' : 'default'])) as VocabularySources,
+    vocabulary: Object.fromEntries(VOCABULARY_KEYS.map((key) => [key, local[key] ?? emptyVocabularyTerm()])) as EffectiveVocabulary,
+    vocabularySources: Object.fromEntries(VOCABULARY_KEYS.map((key) => [key, local[key] !== undefined ? 'local' : 'default'])) as VocabularySources,
   };
 }
 

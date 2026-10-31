@@ -1,6 +1,4 @@
-// The pointer to the server README's "Adding a repository", which says how to onboard a repository by hand and how to
-// fix its .lar-factory.json.
-
+// Link to repository onboarding instructions.
 const README = 'https://github.com/maddec01/lar-factory/blob/main/apps/server/README.md#adding-a-repository';
 
 /** A short link to the repository setup instructions. */

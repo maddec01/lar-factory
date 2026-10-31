@@ -1,5 +1,5 @@
 // The board's configuration: the onboarded repositories, their Connections and the board-wide settings, all in
-// REPOSITORY_LIST_FILE in boardDataDir(), and each repository's Repository config, its .lar-factory.json read from its default branch. The
+// REPOSITORY_LIST_FILE in boardDataDir(). The
 // board leaves the old repositories.json and settings.json untouched.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -10,10 +10,9 @@ import {
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
 
-/** One repository's Repository config, with each field its file leaves out filled in. */
+/** One repository's settings used by its item source. */
 export interface RepositoryConfig extends RepositoryConfigAnswers {
   repo: string;
-  version: number;
   role: string;
   itemSource: RepositoryItemSource;
   labels: string[];
@@ -45,7 +44,7 @@ export const isRepo = (value: unknown): value is string => typeof value === 'str
 const isTeam = (value: unknown): value is string => typeof value === 'string' && value !== '';
 
 /**
- * Whether a value is an item source as .lar-factory.json holds it: GitHub issues or an Azure DevOps team's combined board.
+ * Whether a value is an item source in local settings: GitHub issues or an Azure DevOps team's combined board.
  */
 export function isItemSource(value: unknown): value is RepositoryItemSource {
   if (!isRecord(value)) return false;
@@ -116,12 +115,10 @@ export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] 
 /**
  * Stores where an onboarding stopped in its repository's entry, adding the entry when there is none, and drops the
  * onboarding entry of `replaces`, the repository it was saved under before it picked another T3 project. Keeps every
- * other entry as the file has it, and returns the list. `replaceUnusableConfig` allows restarting only the named repository, after the caller has checked its saved
- * settings. Otherwise throws for a repository that is onboarded already.
+ * other entry as the file has it, and returns the list. Throws for a repository that is onboarded already.
  */
-export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir(),
-  { replaceUnusableConfig = false } = {}): OnboardedRepository[] {
-  return saveEntry({ repo, onboarding: progress }, replaces, dir, replaceUnusableConfig);
+export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
+  return saveEntry({ repo, onboarding: progress }, replaces, dir);
 }
 
 /**
@@ -133,13 +130,12 @@ export function saveOnboarded(repo: string, replaces: string | null, dir = board
 }
 
 /** Writes `entry` over its repository's entry and drops the one of `replaces`, as saveOnboarding and saveOnboarded say. */
-function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: string, replaceUnusableConfig = false): OnboardedRepository[] {
+function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: string): OnboardedRepository[] {
   const { repo } = entry;
   if (!REPO.test(repo)) throw new Error(`${repo} isn't a repository of the form owner/name.`);
   const file = join(dir, REPOSITORY_LIST_FILE);
   const { raw, list } = readListFile(file);
-  const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces))
-    && !(replaceUnusableConfig && sameRepo(e.repo, repo)));
+  const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces)));
   if (onboarded) throw new Error(`${onboarded.repo} is onboarded already.`);
   const at = list.findIndex((e) => sameRepo(e.repo, repo));
   const dropped = (e: OnboardedRepository) => sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces);

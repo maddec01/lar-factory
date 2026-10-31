@@ -5,11 +5,9 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
-import type { PublicationSettings } from '@lar-factory/shared/publication-settings';
+import { pageWithData, sameRepo, type Item, type ItemCommentsPage, type ItemDetails, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type SetupDetection } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
-import type { Refused } from '../config/edit-config.ts';
-import { isRepo } from '../config/repository-config.ts';
+import type { Refused } from '../config/editable-repository.ts';
 import type { Capture } from '../items/capture.ts';
 import type { BoardRetention } from '../items/retention.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
@@ -19,10 +17,8 @@ import type { StartAfter } from '../start-after/start-after.ts';
 import { log } from '../log.ts';
 import { readAzureReadiness } from '../azure/azure-readiness.ts';
 
-import type { createPublication } from '../publication/publication.ts';
 
 export interface HttpDeps {
-  publication: ReturnType<typeof createPublication>;
   board: BoardState;
   commands: ItemCommands;
   capture: Capture;
@@ -57,21 +53,8 @@ export interface HttpDeps {
   detectSetup(input: Record<string, unknown>): Promise<{ detection: SetupDetection } | Refused>;
   /** Saves onboarding's answers as the body's repository's local settings, returning the repositories still onboarding, or why it can't. */
   saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
-  /** The body's repository's open tickets carrying a status label or tag, which onboarding offers to import, or why it can't list them. */
-  importableTickets(input: Record<string, unknown>): Promise<{ tickets: ImportableTicket[] } | Refused>;
-  /** Imports the body's chosen tickets as work records, reporting each one, or why it can't import. */
-  importTickets(input: Record<string, unknown>): Promise<TicketsImported | Refused>;
-  /** Opens the PR with the repository edits onboarding's user approved, returning its URL, or gh's or az's problem. */
-  openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
-  /** What an onboarding's PR would change against its default branch with the body's edits and picks, or why it can't say. */
-  previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | Refused>;
-  /** The config update notice's PR: rewrites the body's repository's .lar-factory.json at the app's version through Edit's PR, returning its URL, or gh's problem. */
-  openConfigUpdatePr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
-  /** Records the repository's config update notice dismissed at the app's version, on this Mac, or says why it can't for a repository that isn't onboarded. */
-  dismissConfigUpdate(repo: string): Refused | null;
   /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
-  publicationVocabulary(repo: unknown): Promise<PublicationSettings | Refused>;
-  changeRepositorySettings(input: Record<string, unknown>): { setup: RepositorySetup } | Refused;
+  changeRepositorySettings(input: Record<string, unknown>): Promise<{ setup: RepositorySetup } | Refused>;
 }
 
 export interface BoardServer {
@@ -147,7 +130,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings, publicationVocabulary, publication }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, changeRepositorySettings }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -164,24 +147,8 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     board.push();
   }
 
-  /**
-   * Records the repository's config update notice dismissed and takes it off its row at once, with `changes` to the row;
-   * or answers why it can't.
-   */
-  function dismissNotice(repo: string, changes: object = {}): Refused | null {
-    const refused = dismissConfigUpdate(repo);
-    if (refused) return refused;
-    changeRow(repo, ({ configUpdate: _, ...r }) => ({ ...r, ...changes }));
-    return null;
-  }
-
   /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
   const WRITES: Record<string, Write> = {
-    ...Object.fromEntries(['open', 'prepare', 'approve', 'inspect', 'resume', 'reconcile', 'fallback', 'resolve-url', 'attach-url', 'reconcile-url', 'resolve-outcome', 'retry'].map((action) => [`/api/publication/${action}`, {
-      what: 'the publication request', disabled: 'Publishing is disabled in sample mode. Your private work remains available.',
-      restarted: () => ({ error: 'The board restarted. Reopen publication to inspect its stored plan.' }),
-      run: (input: Record<string, unknown>) => publication.request(action, input),
-    }])),
     '/api/pr-readiness': {
       what: 'the linked PR to read', disabled: 'Azure readiness is unavailable in sample mode.',
       async run({ itemId, number }) {
@@ -319,22 +286,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         return 'error' in detected ? { status: detected.status, body: { error: detected.error } } : { status: 200, body: { ...detected, error: null } };
       },
     },
-    '/api/onboarding/import/tickets': {
-      what: 'the repository whose tickets to list', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const listed = await importableTickets(input);
-        return 'error' in listed ? { status: listed.status, body: { error: listed.error } } : { status: 200, body: { ...listed, error: null } };
-      },
-    },
-    // The board shows the imported records at once when the repository is already on it.
-    '/api/onboarding/import': {
-      what: 'the tickets to import', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const imported = await importTickets(input);
-        if ('error' in imported) return { status: imported.status, body: { error: imported.error } };
-        return { status: 200, body: withBoard({ ...imported, error: null }) };
-      },
-    },
     // The repository goes on the board with its local settings, and the next read loads its items.
     '/api/onboarding/setup': {
       what: 'the answers to save', disabled: 'Sample mode onboards no repository.',
@@ -347,44 +298,11 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         return { status: 200, body: withBoard({ error: null }) };
       },
     },
-    '/api/onboarding/pr': {
-      what: 'the repository edits to open a PR with', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const opened = await openOnboardingPr(input);
-        return 'error' in opened ? { status: opened.status, body: { error: opened.error } } : { status: 200, body: { ...opened, error: null } };
-      },
-    },
-    '/api/onboarding/pr/changes': {
-      what: 'the repository edits to preview', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const previewed = await previewOnboardingPr(input);
-        return 'error' in previewed ? { status: previewed.status, body: { error: previewed.error } } : { status: 200, body: { ...previewed, error: null } };
-      },
-    },
-    // A config update PR the notice opened takes the notice's place, as the row's open Edit PR.
-    '/api/repositories/config-update/pr': {
-      what: 'the repository to update', disabled: 'Sample mode edits no repository.',
-      async run(input) {
-        const opened = await openConfigUpdatePr(input);
-        if ('error' in opened) return { status: opened.status, body: { error: opened.error } };
-        dismissNotice(input.repo as string, { editPr: opened.prUrl });
-        return { status: 200, body: withBoard({ ...opened, error: null }) };
-      },
-    },
-    '/api/repositories/config-update/dismiss': {
-      what: 'the repository whose notice to dismiss', disabled: 'Sample mode edits no repository.',
-      async run({ repo }) {
-        if (!isRepo(repo)) return { status: 400, body: { error: 'Send the repository whose notice to dismiss.' } };
-        const refused = dismissNotice(repo);
-        if (refused) return { status: refused.status, body: { error: refused.error } };
-        return { status: 200, body: withBoard({ error: null }) };
-      },
-    },
     // The row shows the new setup at once; the read after it shows what the setup changes, such as paused work.
     '/api/repositories/settings': {
       what: 'the repository and the change to its settings', disabled: 'Sample mode changes no repository settings.',
       async run(input) {
-        const changed = changeRepositorySettings(input);
+        const changed = await changeRepositorySettings(input);
         if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
         changeRow(input.repo as string, (r) => ({ ...r, setup: changed.setup }));
         readSoon();
@@ -461,7 +379,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     json(res, 202, {});
   }
 
-  /** Lists T3's projects for onboarding's T3 project step, which reads gh for each repository's Repository config. */
+  /** Lists T3's projects and repository origins for onboarding. */
   async function projectsRequest(res: ServerResponse): Promise<void> {
     if (sample) return json(res, 403, { error: 'Sample mode onboards no repository.' });
     try { json(res, 200, { projects: await projectChoices() }); }
@@ -556,11 +474,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     if (path === '/api/onboarding/projects') return projectsRequest(res);
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
-    if (path === '/api/publication/vocabulary') {
-      if (sample) return json(res, 403, { error: 'Sample mode discovers no provider Vocabulary.' });
-      const result = await publicationVocabulary(url.searchParams.get('repo'));
-      return 'error' in result ? json(res, result.status, { error: result.error }) : json(res, 200, result);
-    }
     if (path === '/api/tickets') return ticketsRequest(url, res);
     if (path === '/api/archive') return json(res, 200, { items: archive() });
     if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));

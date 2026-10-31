@@ -96,7 +96,6 @@ problem=$(jq -r --arg provider "$provider" '
     if type != "object" then "settings must be an object"
     elif has("overrides") and (.overrides | type) != "object" then "settings.overrides must be an object"
     elif has("structureSync") and (.structureSync | type) != "boolean" then "structureSync must be a boolean"
-    elif has("progressSync") and (.progressSync | type) != "boolean" then "progressSync must be a boolean"
     else (.overrides // {}) |
         if has("role") and (.role | type) != "string" then "role must be a string"
         elif has("itemSource") and (.itemSource | type) != "object" then "itemSource must be an object"
@@ -111,12 +110,11 @@ if [[ -n $problem ]]; then
     echo "$list_file: $repo: $problem." >&2
     exit 1
 fi
-# structureSync is the app setting; progressSync is the structural outbox setting.
-# Accept either spelling for the same option. An explicit false disables both.
+# structureSync defaults to ON unless this machine explicitly disables it.
 jq --arg provider "$provider" '
     . as $local | (.overrides // {}) as $settings |
-    ($local.progressSync != false and $local.structureSync != false) as $sync |
+    ($local.structureSync != false) as $sync |
     {version: 1, role: "", itemSource: (if $provider == "azure" then null else {kind: "issues"} end),
         labels: [], domainDocs: {kind: "private"}, skills: []}
     + ($settings | with_entries(select(.key | IN("role", "itemSource", "labels", "domainDocs", "skills", "vocabulary"))))
-    + {structureSync: $sync, progressSync: $sync}' <<<"$local_settings"
+    + {structureSync: $sync}' <<<"$local_settings"

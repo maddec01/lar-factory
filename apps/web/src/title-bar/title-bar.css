@@ -16,3 +16,14 @@
 /* Inside the status strip the counters are 24 px tall, as the Refreshed time is, under the button kinds' 28, and
    padded as lar-server's summary buttons. Unlayered, so this wins over the copied Button's utilities. */
 .status-strip [data-kind] { height: --spacing(6); padding-inline: --spacing(1.5); }
+
+/* Narrow toolbars give actions their own row. Counters stay on the board, so the controls never overlap them.
+   Browser traffic lights are decorative; native windows keep the space reserved for their real controls. */
+@media (max-width: 48rem) {
+  .title-bar:not([data-native-window]) { padding-left: 0; }
+  .title-bar .browser-window-controls { display: none; }
+  .title-bar header { height: auto; min-height: --spacing(13); flex-wrap: wrap; padding-block: --spacing(2); }
+  .title-bar .status-strip { display: none; }
+  .title-bar .scope { max-width: 100%; flex-shrink: 1; }
+  .title-bar header > div:last-child { flex-basis: 100%; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+}

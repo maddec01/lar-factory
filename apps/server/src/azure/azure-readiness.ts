@@ -37,8 +37,9 @@ export async function readAzureReadiness(organization: string, project: string, 
       if (page.length < 100) break;
     }
     const statuses = list(await call('git', 'pullRequestStatuses')).map((s) => {
-      if (!object(s) || typeof s.id !== 'number' || typeof s.state !== 'string' || !object(s.context) || typeof s.context.name !== 'string' || (s.iterationId !== undefined && typeof s.iterationId !== 'number')) return malformed();
-      return s as unknown as PrStatus;
+      if (!object(s) || typeof s.id !== 'number' || (s.state !== undefined && typeof s.state !== 'string') || !object(s.context) || typeof s.context.name !== 'string' || (s.iterationId !== undefined && typeof s.iterationId !== 'number')) return malformed();
+      // Azure omits state for unset statuses. Keep them as blockers instead of discarding all evidence.
+      return { ...s, state: s.state ?? 'notSet' } as unknown as PrStatus;
     });
     const reviewers = list(await call('git', 'pullRequestReviewers')).map((r) => {
       if (!object(r) || typeof r.id !== 'string' || typeof r.vote !== 'number' || (r.isRequired !== undefined && typeof r.isRequired !== 'boolean')) return malformed();

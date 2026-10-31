@@ -1,31 +1,24 @@
-// Onboarding's detection, its first step: what the repository and the login allow before onboarding asks anything,
-// read without a checkout and with no test write. One read of the default branch's tree finds the domain docs, the
-// factory files of an earlier setup, the shared .lar-factory.json and the project skills; the login's permissions,
-// gh's or on Azure DevOps az's, give each operation's access and the item sources. A fact the login can't read is
-// Refused with why, and an operation its permissions can't settle stays unverified until the factory needs it.
-
 import {
-  REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, type Detected, type DomainDocLocation, type FactoryFile, type OperationAccess,
+  REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, type Detected, type DomainDocLocation, type OperationAccess,
   type RepositoryItemSource, type RepositoryOperation, type SetupDetection,
 } from '@lar-factory/shared';
 import { az, type Az } from '../azure/azure-items.ts';
 import { canPush as azureCanPush } from '../azure/azure-repos.ts';
+import { azureAccess as readAzureAccess } from './azure-access.ts';
 import { prHost } from '../config/pr-host.ts';
-import { sharedConfigOf } from '../config/repository-settings.ts';
 import { isRepo } from '../config/repository-config.ts';
-import { type CommitTree, message, repositoryAccess } from '../github/github.ts';
+import { type CommitTree, type RepositoryAccess, message, repositoryAccess } from '../github/github.ts';
 import { type Checkout, azureRepo, checkouts, githubRepo, onAzureDevOps } from '../t3/repository-project.ts';
-import { AGENT_DOC_PATHS, withoutAgentSkills } from './agent-setup.ts';
 import { projectSkills } from './project-skills.ts';
-import { linkTarget } from './pr-changes.ts';
 import { readProjectTeams } from './project-teams.ts';
 
 /** What detection reads: T3's projects, the default branch's tree, and the login's permissions and teams. */
 export interface DetectReads {
   checkouts(): Promise<Checkout[]>;
-  tree(repo: string): Promise<{ tree: CommitTree; read: (sha: string) => Promise<string> }>;
-  github(repo: string): Promise<{ push: boolean; triage: boolean; issues: boolean }>;
+  tree(repo: string): Promise<{ tree: CommitTree }>;
+  github(repo: string): Promise<RepositoryAccess>;
   azurePush(repo: string): Promise<boolean>;
+  azureAccess?(repo: string): Promise<Access>;
   teams(repo: string): Promise<string[]>;
 }
 
@@ -34,13 +27,14 @@ export function detectReads(run: Az = az): DetectReads {
   return {
     checkouts: () => checkouts(process.env),
     tree: async (repo) => {
-      const { commitTree, defaultBranchHead, readBlob } = prHost(repo);
+      const { commitTree, defaultBranchHead } = prHost(repo);
       const tool = onAzure(repo) ? run : undefined;
       const head = await defaultBranchHead(repo, tool);
-      return { tree: await commitTree(repo, head.sha, tool), read: (sha) => readBlob(repo, sha, tool) };
+      return { tree: await commitTree(repo, head.sha, tool) };
     },
     github: (repo) => repositoryAccess(repo),
     azurePush: (repo) => azureCanPush(repo, run),
+    azureAccess: (repo) => readAzureAccess(repo, run),
     teams: async (repo) => {
       const read = await readProjectTeams({ repo }, run);
       if ('error' in read) throw new Error(read.error.replace(/^Can't load teams\. /, ''));
@@ -75,35 +69,34 @@ async function detectCheckout(key: string, projectId: string, reads: DetectReads
 
 type Access = Partial<Record<RepositoryOperation, Exclude<OperationAccess, 'unverified'>>>;
 
-/**
- * The item sources and access gh's permissions give. Without push, a fork PR or editing one's own issues may still
- * work, so those stay unverified; tagging needs triage.
- */
+/** Positive access needs both token scopes and the repository role. */
 async function githubAccess(repo: string, reads: DetectReads): Promise<{ itemSources: Detected<RepositoryItemSource[]>; access: Access }> {
   let found;
   try { found = await reads.github(repo); }
   catch (err) { return { itemSources: { refused: `Can't read ${repo} with gh: ${message(err)}` }, access: {} }; }
-  const { push, triage, issues } = found;
-  return {
-    itemSources: issues ? { found: [{ kind: 'issues' }] } : { refused: `${repo} has issues turned off.` },
-    access: {
-      'push-branch': push ? 'allowed' : 'refused', ...push && { 'open-pr': 'allowed', 'edit-ticket': 'allowed' },
-      'publish-ticket': issues ? 'allowed' : 'refused', 'tag-ticket': triage ? 'allowed' : 'refused',
-    },
-  };
+  const { push, triage, issues, tokenWrites } = found;
+  const access: Access = {};
+  if (!push) access['push-branch'] = 'refused';
+  if (!triage) access['tag-ticket'] = 'refused';
+  if (tokenWrites === false) for (const operation of REPOSITORY_OPERATIONS) access[operation] = 'refused';
+  if (tokenWrites === true) {
+    if (push) for (const operation of ['push-branch', 'open-pr', 'edit-ticket', 'type-ticket', 'relate-ticket'] as const) access[operation] = 'allowed';
+    if (triage) access['tag-ticket'] = 'allowed';
+    if (issues) for (const operation of ['publish-ticket', 'comment-ticket'] as const) access[operation] = 'allowed';
+  }
+  if (!issues) for (const operation of ['publish-ticket', 'edit-ticket', 'comment-ticket', 'tag-ticket', 'type-ticket', 'relate-ticket'] as const) access[operation] = 'refused';
+  return { itemSources: issues ? { found: [{ kind: 'issues' }] } : { refused: `${repo} has issues turned off.` }, access };
 }
 
 /** The teams' boards and the push access az finds; a push check that fails leaves both PR operations unverified. */
 async function azureAccess(repo: string, reads: DetectReads): Promise<{ itemSources: Detected<RepositoryItemSource[]>; access: Access }> {
   const shown = shownRepo(repo);
-  const [teams, push] = await Promise.all([
+  const [teams, access] = await Promise.all([
     reads.teams(repo).then((names): Detected<RepositoryItemSource[]> => ({ found: names.map((team) => ({ kind: 'azure-board', team })) }),
       (err) => ({ refused: `Can't read ${shown}'s teams with az: ${message(err)}` })),
-    reads.azurePush(repo).catch(() => null),
+    reads.azureAccess ? reads.azureAccess(repo).catch(() => ({})) : reads.azurePush(repo).then((push): Access => ({ 'push-branch': push ? 'allowed' : 'refused' }), () => ({})),
   ]);
-  if (push === null) return { itemSources: teams, access: {} };
-  const pushes = push ? 'allowed' : 'refused';
-  return { itemSources: teams, access: { 'push-branch': pushes, 'open-pr': pushes } };
+  return { itemSources: teams, access };
 }
 
 /** What the login's permissions show it may do in the repository, each operation they can't settle left out. */
@@ -111,7 +104,7 @@ export async function detectAccess(repo: string, reads: DetectReads = detectRead
   return (await (onAzure(repo) ? azureAccess : githubAccess)(repo, reads)).access;
 }
 
-type TreeFacts = Pick<SetupDetection, 'domainDocs' | 'factoryFiles' | 'sharedConfig' | 'projectSkills'>;
+type TreeFacts = Pick<SetupDetection, 'domainDocs' | 'projectSkills'>;
 
 /** The repository's glossary and ADRs when it has either, at the paths it has them, else private drafts. */
 function domainDocsOf(files: readonly string[]): DomainDocLocation {
@@ -120,39 +113,17 @@ function domainDocsOf(files: readonly string[]): DomainDocLocation {
   return glossary || adrs ? { kind: 'repository', glossary: glossary ?? 'GLOSSARY.md', adrs: 'docs/adr' } : { kind: 'private' };
 }
 
-/** The files CLAUDE.md and AGENTS.md lead to that hold an `## Agent skills` section, each once. */
-async function agentSkillsFiles(tree: CommitTree, read: (sha: string) => Promise<string>): Promise<string[]> {
-  const paths: string[] = [];
-  for (const name of ['AGENTS.md', 'CLAUDE.md']) {
-    const path = await linkTarget(tree, read, name);
-    const file = path === null ? undefined : tree.files.get(path);
-    if (!path || !file || paths.includes(path)) continue;
-    if (withoutAgentSkills(await read(file.sha)) !== null) paths.push(path);
-  }
-  return paths;
-}
-
 /** The facts the default branch's tree holds, each Refused with the same problem when gh or az can't read it. */
 async function treeFacts(repo: string, reads: DetectReads): Promise<TreeFacts> {
-  let tree, read;
-  try { ({ tree, read } = await reads.tree(repo)); }
+  let tree;
+  try { ({ tree } = await reads.tree(repo)); }
   catch (err) {
     const refused = { refused: `Can't read ${shownRepo(repo)} with ${onAzure(repo) ? 'az' : 'gh'}: ${message(err)}` };
-    return { domainDocs: refused, factoryFiles: refused, sharedConfig: refused, projectSkills: refused };
+    return { domainDocs: refused, projectSkills: refused };
   }
   const files = [...tree.files.keys()];
-  const config = tree.files.get('.lar-factory.json');
-  const skills = await agentSkillsFiles(tree, read);
-  const docs = AGENT_DOC_PATHS.filter((path) => tree.files.has(path));
-  const factoryFiles: FactoryFile[] = [
-    ...config ? [{ kind: 'config' as const, paths: ['.lar-factory.json'] }] : [],
-    ...skills.length ? [{ kind: 'agent-skills' as const, paths: skills }] : [],
-    ...docs.length ? [{ kind: 'agent-docs' as const, paths: docs }] : [],
-  ];
   return {
     domainDocs: { found: domainDocsOf(files) },
-    factoryFiles: { found: factoryFiles },
-    sharedConfig: { found: config ? sharedConfigOf(await read(config.sha), onAzure(repo)).read : null },
     projectSkills: { found: [...new Set(projectSkills(files).map((skill) => skill.name))].sort() },
   };
 }

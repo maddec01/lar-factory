@@ -1,101 +1,60 @@
-// The onboarding dialog: the copied Modal over the board, a scrolling body, the progress bar, Back and Next, and Finish.
-
 import { expect, test, vi } from 'vite-plus/test';
-import { $, mountPage, settle, text } from '../../test/support.ts';
-import { detection, dialog, empty, openOnboarding, project, serve } from './onboarding-support.ts';
+import { $, settle, text } from '../../test/support.ts';
+import { detection, dialog, openOnboarding, posted, project } from './onboarding-support.ts';
 
-const DETECTED = { '/api/onboarding/detect': { detection: detection(), error: null } };
+const button = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).trim() === label)!;
+const heading = () => text(dialog()!.querySelector('[data-slot="modal-header"] h2'));
+async function pick() {
+  await settle(() => dialog()!.querySelector<HTMLElement>('[data-choice="lar-web"] [role="radio"]')!.click());
+  await settle(() => button('Next').click());
+}
 
-const inDialog = <T extends HTMLElement = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
-const button = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).trim() === label);
-const radio = (name: string) => [...dialog()!.querySelectorAll<HTMLElement>('[role="radio"]')].find((r) => text(r.closest('[data-choice]')).startsWith(name))!;
-
-test('the dialog is a modal with a scrolling body, the step, its place and the progress bar', async () => {
-  await openOnboarding([project('lar-web')]);
+test('three accessible screens lead straight to the board with no ticket picker or repository PR', async () => {
+  await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: detection() }, '/api/onboarding/setup': { error: null } });
   expect(dialog()!.getAttribute('aria-modal')).toBe('true');
-  expect(dialog()!.getAttribute('aria-describedby'), 'its place describes it').toBe('onboarding-place');
-  expect(inDialog('[data-slot="modal-body"]')).not.toBeNull();
-  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Repository');
-  expect(text(inDialog('#onboarding-place'))).toBe('Set up a repository. Step 1 of 8.');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('0');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label'), 'the bar is named by its caption').toBe('0 of 8 done');
-});
-
-test('Next is disabled until a project is picked, then shows What we found, and Back returns', async () => {
-  await openOnboarding([project('lar-web')], DETECTED);
-  expect(button('Back'), 'the first step has no Back').toBeUndefined();
-  expect(button('Next')!.disabled).toBe(true);
-  await settle(() => radio('lar-web').click());
-  expect(button('Next')!.disabled).toBe(false);
-  inDialog('[data-slot="modal-body"]')!.scrollTop = 300;
-  await settle(() => button('Next')!.click());
-  expect(inDialog('[data-slot="modal-body"]')!.scrollTop).toBe(0);
-  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('What we found');
-  expect(text(inDialog('#onboarding-place'))).toBe('Set up lar-web. Step 2 of 8.');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('1');
-  await settle(() => button('Back')!.click());
-  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Repository');
-  expect(radio('lar-web').getAttribute('aria-checked'), 'the pick stays').toBe('true');
-});
-
-test('a repository with files from an earlier setup counts Factory files too, and Repository edits once one is dropped', async () => {
-  const files = detection({ factoryFiles: { found: [{ kind: 'agent-docs', paths: ['docs/agents/domain.md'] }] } });
-  await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: files, error: null } });
-  await settle(() => radio('lar-web').click());
-  await settle(() => button('Next')!.click());
-  expect(text(inDialog('#onboarding-place'))).toBe('Set up lar-web. Step 2 of 9.');
-  const { useWizardStore } = await import('./wizard-store.ts');
-  await settle(() => useWizardStore.getState().choose({ drop: ['agent-docs'] }));
-  expect(text(inDialog('#onboarding-place'))).toBe('Set up lar-web. Step 2 of 10.');
-});
-
-test('Add a repository after a close starts a new run', async () => {
-  await openOnboarding([project('lar-web')]);
-  await settle(() => radio('lar-web').click());
-  await settle(() => inDialog<HTMLButtonElement>('[aria-label="Close"]')!.click());
-  const { useWizardStore } = await import('./wizard-store.ts');
-  expect(useWizardStore.getState().run).toBeNull();
-  await settle(() => $<HTMLButtonElement>('[data-onboard]')!.click());
-  expect(radio('lar-web').getAttribute('aria-checked')).toBe('false');
-});
-
-test('Next and Back move focus to the step heading, and closing returns it to the button that opened the dialog', async () => {
-  serve(empty, [project('lar-web')], { error: null }, 200, DETECTED);
-  await mountPage(empty);
-  const onboard = $<HTMLButtonElement>('[data-onboard]')!;
-  onboard.focus();
-  await settle(() => onboard.click());
-  await settle(() => vi.advanceTimersByTime(50));
-  await settle(() => radio('lar-web').click());
-  await settle(() => button('Next')!.click());
-  expect(document.activeElement, 'Next').toBe(inDialog('[data-slot="modal-header"] h2'));
-  await settle(() => button('Back')!.click());
-  expect(document.activeElement, 'Back').toBe(inDialog('[data-slot="modal-header"] h2'));
-  // Unpicked, so closing keeps nothing and the empty board's button stays.
-  const { useWizardStore } = await import('./wizard-store.ts');
-  await settle(() => useWizardStore.getState().chooseNew());
-  await settle(() => inDialog<HTMLButtonElement>('[aria-label="Close"]')!.click());
-  await settle(() => vi.advanceTimersByTime(500));
-  expect(document.activeElement).toBe($('[data-onboard]'));
-});
-
-test('Finish shows the repository on the board, and Go to the board closes with focus on the button that opened the dialog', async () => {
-  serve(empty, [project('lar-web')], { error: null }, 200, { ...DETECTED, '/api/onboarding/import/tickets': { tickets: [], error: null }, '/api/onboarding/setup': { error: null } });
-  await mountPage(empty);
-  const onboard = $<HTMLButtonElement>('[data-onboard]')!;
-  onboard.focus();
-  await settle(() => onboard.click());
-  await settle(() => radio('lar-web').click());
-  const { useWizardStore } = await import('./wizard-store.ts');
-  for (let i = 0; i < 8 && !button('Finish'); i++) {
-    if (useWizardStore.getState().run!.step === 'role') await settle(() => useWizardStore.getState().choose({ role: 'Web client' }));
-    await settle(() => button('Next')!.click());
-  }
-  await settle(() => button('Finish')!.click());
-  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Onboarded');
-  expect(text(inDialog('#onboarding-place'))).toBe('Set up lar-web.');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label')).toBe('Ready');
-  await settle(() => button('Go to the board')!.click());
+  expect(heading()).toBe('Repository');
+  expect((dialog()!.textContent?.match(/Step 1 of 3/g) ?? [])).toHaveLength(1);
+  expect(button('Next').disabled).toBe(true);
+  await pick();
+  expect(heading()).toBe('Work and docs');
+  expect(dialog()!.textContent).toContain('Save concepts and cross-repository links to issues');
+  expect(dialog()!.querySelector('[data-import-step]')).toBeNull();
+  expect(document.activeElement).toBe(dialog()!.querySelector('[data-slot="modal-header"] h2'));
+  await settle(() => button('Next').click());
+  expect(heading()).toBe('Access and add');
+  expect(dialog()!.textContent).toContain('Save concept maps and links');
+  await settle(() => button('Add repository').click());
+  expect(heading()).toBe('Repository added');
+  expect(posted('/api/onboarding/setup')).toHaveLength(1);
+  await settle(() => button('Go to the board').click());
   await settle(() => vi.advanceTimersByTime(500));
   expect(dialog()).toBeNull();
+  expect($('[data-onboard]')).not.toBeNull();
+});
+
+test('the access screen names the missing permission once and blocks enabled sync', async () => {
+  const found = detection(); found.access['comment-ticket'] = 'refused';
+  await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
+  await pick();
+  await settle(() => button('Next').click());
+  expect(button('Add repository').disabled).toBe(true);
+  expect(dialog()!.textContent).toContain('Issues: Read and write');
+  await settle(() => button('Back').click());
+  const toggle = [...dialog()!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')][0]!;
+  await settle(() => toggle.click());
+  await settle(() => button('Next').click());
+  expect(button('Add repository').disabled).toBe(false);
+});
+
+test('unverified token writes never show Ready for concept sync or builds', async () => {
+  const found = detection();
+  for (const op of Object.keys(found.access) as (keyof typeof found.access)[]) found.access[op] = 'unverified';
+  await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
+  await pick();
+  await settle(() => button('Next').click());
+  expect(button('Add repository').disabled).toBe(true);
+  const rows = [...dialog()!.querySelectorAll('[data-access-step] li')];
+  expect(rows.slice(1).every((row) => row.textContent?.includes('Not verified'))).toBe(true);
+  expect(dialog()!.textContent).toContain('Contents and Pull requests: Read and write');
+  expect(dialog()!.textContent).toContain('cannot verify fine-grained token permissions');
 });

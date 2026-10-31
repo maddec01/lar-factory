@@ -3,7 +3,7 @@ import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { NOT_LANDED, SAMPLE_MODELS, changeRecords, recordBlockers, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { shapePrompt, NOT_LANDED, SAMPLE_MODELS, changeRecords, recordBlockers, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import { rawIssue } from '@lar-factory/shared/test/raw-items';
@@ -12,6 +12,7 @@ import type { BoardData, RawItem } from '@lar-factory/shared';
 const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 
 const build = rawIssue('I_12', 12, 'Ready', ['build']);
+const CLOSED_DEPENDENCY = { ticketObservations: { 'maddec01/lar-server#40': { state: 'CLOSED', assignees: [] } } };
 
 /** A board that can start lar-factory threads, offering the sample model choices, and its environment. */
 async function armableBoard(t: TestContext, items: RawItem[], options: object = {}, env: Record<string, string> = { ...startableEnv(t), ...SAMPLE_MODELS }) {
@@ -95,7 +96,7 @@ const markMet = async (board: Board, dependencyId: string, met: boolean) => {
 };
 
 test('a Dependency whose ticket closed still holds Start and Start after until the user marks it met, which fires the armed start', async (t) => {
-  const { board } = await armableBoard(t, [build]);
+  const { board } = await armableBoard(t, [build], CLOSED_DEPENDENCY);
   const dependencyId = await recordClosedDependency(board);
   const refused = await board.postSession({ itemId: board.id(12) }, '/api/start-build');
   assert.equal(refused.status, 409);
@@ -109,7 +110,7 @@ test('a Dependency whose ticket closed still holds Start and Start after until t
 });
 
 test('clearing the met mark holds the build again', async (t) => {
-  const { board } = await armableBoard(t, [build]);
+  const { board } = await armableBoard(t, [build], CLOSED_DEPENDENCY);
   const dependencyId = await recordClosedDependency(board);
   assert.equal((await markMet(board, dependencyId, true)).status, 200);
   const cleared = await markMet(board, dependencyId, false);
@@ -125,7 +126,7 @@ test("a Queued decision starts with today's Start once its blockers complete", a
   assert.equal((await arm(board, board.id(20))).status, 200);
   await settleDecisions(board, board.id(20), blockers);
   await until(board, (d) => !!d.started?.[board.id(20)]);
-  assert.deepEqual(await board.t3Calls(), [['thread', 'start', 'project-factory', `#20 Issue 20\n$lar-shape ${board.id(20)}`, '--json']]);
+  assert.deepEqual(await board.t3Calls(), [['thread', 'start', 'project-factory', shapePrompt(board,'#20 Issue 20',board.id(20)), '--json']]);
 });
 
 test('a failed start disarms the part and shows its error on it, until it is armed again', async (t) => {

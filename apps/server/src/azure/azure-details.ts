@@ -1,10 +1,12 @@
+import { isStructureComment, stripTrackerStructure } from '@lar-factory/shared';
 // A work item's description and comments, which the item dialog reads when it opens. The board-wide read in
 // azure-items.ts leaves them out and stays on API_VERSION. az devops invoke can't pass a preview's resource version,
 // as in 7.1-preview.4: it reads the version as a number. Given 7.1-preview, az adds the server's latest one.
 
 import { decodePart, onAzure } from '@lar-factory/shared';
 import type { AzureBodyField, IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails, TextFormat } from '@lar-factory/shared';
-import type { Refused } from '../config/edit-config.ts';
+import type { Refused } from '../config/editable-repository.ts';
+import { skipEmptyCommentPages } from '../item-details/comment-pages.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { API_VERSION, az, azureWorkItem, field, linked, orgFlags, problemOf, withFile, workItemUrl, type Az, type RawWorkItem } from './azure-items.ts';
 
@@ -72,8 +74,16 @@ async function inArea<T>(item: Item, run: Az, use: (call: Call, repo: string) =>
 }
 
 /** The comments call for a work item: COMMENT_LIMIT newest first from `token`, or from the newest when none. */
-const readComments = (call: Call, item: Item, token?: string) =>
-  call<RawComments>('comments', [`workItemId=${item.number}`], COMMENTS_API_VERSION, ['--query-parameters', `$top=${COMMENT_LIMIT}`, 'order=desc', ...token ? [`continuationToken=${token}`] : []]);
+const readComments = (call: Call, item: Item, token?: string, limit = COMMENT_LIMIT) =>
+  call<RawComments>('comments', [`workItemId=${item.number}`], COMMENTS_API_VERSION, ['--query-parameters', `$top=${limit}`, 'order=desc', ...token ? [`continuationToken=${token}`] : []]);
+
+const commentPage = (read: RawComments): ItemCommentsPage => ({
+  comments: read.comments.filter((c) => !c.isDeleted && !isStructureComment(c.text ?? '')).map(comment),
+  olderCursor: read.continuationToken || null,
+});
+
+/** Cross empty factory comment batches in larger reads, with a bounded number of CLI calls. */
+const discussionPage = (call: Call, item: Item, first: RawComments) => skipEmptyCommentPages(commentPage(first), async (before) => commentPage(await readComments(call, item, before, 100)));
 
 /** Named children, Related work and predecessors in shared batches of at most 200. Removed children stay hidden. */
 async function relationsOf(call: Call, repo: string, workItem: RawWorkItem): Promise<Pick<ItemDetails, 'subTickets' | 'related' | 'blockers'>> {
@@ -132,7 +142,8 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
     const body = text(name) ?? '';
     return name !== bodyField && hasContent(body) ? [{ title, body, format: formatOf(workItem.multilineFieldsFormat?.[name], body) }] : [];
   });
-  const olderCursor = read.continuationToken || null;
+  const discussion = await discussionPage(call, item, read);
+  if ('error' in discussion) return discussion;
   let relationsError: string | undefined;
   const relations = await relationsOf(call, repo, workItem).catch((err: unknown) => {
     relationsError = err instanceof Error ? err.message : String(err);
@@ -146,7 +157,7 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
   });
   const assignee = nameOf(workItem.fields['System.AssignedTo']);
   return {
-    body,
+    body:stripTrackerStructure(body),
     format: formatOf(workItem.multilineFieldsFormat?.[bodyField], body),
     bodyField,
     ...workItem.rev !== undefined && { revision: workItem.rev },
@@ -159,14 +170,13 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
     ...relations,
     ...attachments.length > 0 && { attachments },
     ...relationsError !== undefined && { relationsError },
-    comments: read.comments.filter((c) => !c.isDeleted).map(comment),
-    hasOlderComments: olderCursor !== null,
-    olderCursor,
+    ...discussion,
+    hasOlderComments: discussion.olderCursor !== null,
   };
 });
 
 /** Reads the COMMENT_LIMIT comments after the continuation token `before`, newest first, or says why it can't. */
 export const readAzureOlderComments = (item: Item, before: string, run: Az = az): Promise<ItemCommentsPage | Refused> => inArea(item, run, async (call) => {
   const read = await readComments(call, item, before);
-  return { comments: read.comments.filter((c) => !c.isDeleted).map(comment), olderCursor: read.continuationToken || null };
+  return discussionPage(call, item, read);
 });

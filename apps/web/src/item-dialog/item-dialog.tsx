@@ -1,4 +1,3 @@
-import { PublishButton } from '../publication/publication-dialog.tsx';
 // The item dialog: every item, wherever it's listed, opens here over the page, as the design system's workspace-sized
 // Modal, whose body fades at its scrolled edges. Under its title it shows the item's repository, status and parent, with
 // the agent work figures beside the title. Its body has a progress bar with the slices as an overview, its hint, a meta area of
@@ -12,7 +11,7 @@ import { PublishButton } from '../publication/publication-dialog.tsx';
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { HINTS, blockedText, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
+import { HINTS, blockedText, canResumeShaping, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -25,7 +24,7 @@ import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { NeedsYou } from '../items/needs-you.tsx';
 import { Dependencies, dependenciesOf } from '../items/dependencies.tsx';
 import { PrLink } from '../items/pr-link.tsx';
-import { AgentWork, PrList, RepoTag } from '../items/item-parts.tsx';
+import { AgentWork, ItemKind, PrList, RepoTag, StructureSync } from '../items/item-parts.tsx';
 import { LinkButton } from '../items/link-button.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
@@ -38,6 +37,7 @@ import type { DescriptionEdit } from './use-description-edit.ts';
 import { ItemProgress } from './item-progress.tsx';
 import { useItemDetails } from './use-item-details.ts';
 import { AttachTicket } from './attach-ticket.tsx';
+import { Diagram } from '../diagrams/markdown-diagrams.tsx';
 import { RecordText } from './record-text.tsx';
 
 /** The one thing the item's status asks of you. */
@@ -46,9 +46,10 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
     case 'List': return <QueueButton item={item} data={data} />;
     case 'Queued':
       if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-      return <StartOrAfter item={item} data={data} label="Start refining" />;
+      return <StartOrAfter item={item} data={data} label="Shape issue" />;
     case 'Ready': return <StartBuild item={item} data={data} />;
-    case 'Shaping': case 'In progress': case 'Review': return <OpenThread item={item} data={data} />;
+    case 'Shaping': return canResumeShaping(item) ? <StartOrAfter item={item} data={data} label="Resume shaping" /> : <OpenThread item={item} data={data} />;
+    case 'In progress': case 'Review': return <OpenThread item={item} data={data} />;
     case 'Needs you': return <OpenThread item={item} data={data} label="Answer in T3" />;
     case 'Verify': return <PrLink item={item} label="Verify build" />;
     case 'Ready to merge': return <PrLink item={item} label="Merge PR" />;
@@ -91,7 +92,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
   const record = read.state === 'loaded' ? read.details.record : undefined;
   // Work with no ticket has no ticket text to show beside its record's.
   const ticket = !record || item.number > 0;
-  const hint = HINTS[item.status];
+  const hint = item.status === 'Needs you' ? 'Answer in T3' : HINTS[item.status];
   // Saving a description writes the ticket, which waits on this Mac's consent to edit the repository's tickets.
   const editable = data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.consent.includes('edit-ticket') ?? false;
   // The open editor in an expanded dialog takes the height the rest leaves.
@@ -112,12 +113,14 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
         </div>
         {item.parent && <p className="m-0 min-w-0 wrap-anywhere" data-item-parent>Part of {item.parent.url
           ? <a href={item.parent.url} target="_blank" rel="noopener" className="underline">{itemName(item.parent)}</a> : itemName(item.parent)}</p>}
+        <div className="flex flex-wrap items-center gap-2"><ItemKind item={item} /><StructureSync item={item} /></div>
         <AttachTicket item={item} />
       </div>
       <Modal.Body layout={fill ? 'fill' : 'scroll'}>
         {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
         <div className={`@container gap-3 pt-2 ${fill ? 'flex min-h-0 flex-1 flex-col' : 'grid grid-cols-[minmax(0,1fr)]'}`} data-item-body>
           <ItemProgress item={item} />
+          {item.map?.diagram && (!record || record.bodyKind !== 'map') && <Diagram source={item.map.diagram} />}
           {hint && (
             <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
               <StatusGlyph status={item.status} className="size-4" />
@@ -150,7 +153,6 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
       <Modal.Footer leading={<span className="inline-flex items-center gap-3 text-xs"><MoveActions item={item} data={data} /></span>}>
         <span className="inline-flex items-center gap-1.5">
           {item.url && <LinkButton kind="other" href={item.url} target="_blank" rel="noopener">{item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}</LinkButton>}
-          <PublishButton item={item} data={data} />
           <StatusAction item={item} data={data} />
         </span>
       </Modal.Footer>

@@ -16,6 +16,18 @@ describe('recorded thread lookup', () => {
     const child = { ...shell, id: 'child', lineage: { relationshipToParent: 'subagent' } };
     expect(executionItemThreads([child])(['child'])).toHaveLength(1);
   });
+  it('keeps an interrupted root held while one of its nested child threads runs or waits', () => {
+    const parent = { ...shell, status: 'interrupted' };
+    const child = { ...shell, id: 'child', status: 'idle', lineage: { parentThreadId: 'root', rootThreadId: 'root' } };
+    const grandchild = { ...shell, id: 'grandchild', status: 'running', lineage: { parentThreadId: 'child', rootThreadId: 'root' } };
+    expect(executionItemThreads([parent, child, grandchild])(['root', 'child'])).toMatchObject([
+      { id: 'root', state: 'stopped', hasLiveChildren: true }, { id: 'child', hasLiveChildren: true },
+    ]);
+    expect(executionItemThreads([parent, { ...grandchild, pendingRuntimeRequest: { id: 'question' } }])(['root'])).toMatchObject([{ hasLiveChildren: true }]);
+    expect(executionItemThreads([parent, { ...grandchild, status: 'cancelled' }])(['root'])).toEqual([
+      { id: 'root', title: 'Build', state: 'stopped', updated: shell.updatedAt },
+    ]);
+  });
 });
 
 it('exposes discovery-owned thread lookup without transport configuration', () => {

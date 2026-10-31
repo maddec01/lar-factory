@@ -1,42 +1,19 @@
-// A lasting warning in the shared notification stack. Updates keep its place and its content mounted.
-
-import { useEffect, useRef } from 'react';
+// Operational warnings are inline details. They never open a toast or dialog.
 import type { ReactNode } from 'react';
-import { toast } from '@lar-factory/ui/toasts';
 import { useDismissed, useDismissStore } from './dismiss-store.ts';
 import { DismissButton, closeKeepingFocus } from './toasts.tsx';
 
 export function Warning({ dismissKey, title, what = title, action, children }: {
-  dismissKey: string;
-  what?: string;
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
+  dismissKey: string; what?: string; title: string; action?: ReactNode; children: ReactNode;
 }) {
   const dismissed = useDismissed(dismissKey);
-  const id = useRef<string | null>(null);
-  useEffect(() => {
-    if (dismissed) return;
-    const current = toast.create({ color: 'warning', duration: 0, closable: false });
-    id.current = current;
-    return () => {
-      toast.dismiss(current);
-      id.current = null;
-    };
-  }, [dismissKey, dismissed]);
-  useEffect(() => {
-    if (!id.current) return;
-    toast.update(id.current, { description: (
-      <div data-warning={dismissKey}>
-        <DismissButton what={`: ${what}`} onClick={(event) => closeKeepingFocus(
-          event.currentTarget.closest('[data-slot="toast"]'),
-          () => useDismissStore.getState().dismiss(dismissKey),
-        )} />
-        <div data-slot="title" className="font-semibold">{title}</div>
-        <div data-slot="description">{children}</div>
-        {action && <div className="mt-2">{action}</div>}
-      </div>
-    ) });
-  }, [dismissKey, dismissed, what, title, action, children]);
-  return null;
+  if (dismissed) return null;
+  return <div data-slot="notice" className="relative border-t py-3 pr-8 text-xs">
+    <div data-warning={dismissKey}>
+      <DismissButton what={`: ${what}`} onClick={(event) => closeKeepingFocus(event.currentTarget.closest('[data-slot="notice"]'), () => useDismissStore.getState().dismiss(dismissKey))} />
+      <div data-slot="title" className="font-medium">{title}</div>
+      <div data-slot="description" className="mt-1 text-base-700">{children}</div>
+      {action && <div className="mt-2">{action}</div>}
+    </div>
+  </div>;
 }

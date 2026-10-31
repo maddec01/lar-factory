@@ -41,7 +41,7 @@ export const useWindowControlsInset = () => (useLightsHidden() ? '' : 'pl-[74px]
 export function TrafficLights() {
   if (inMacApp()) return null;
   return (
-    <div className="pointer-events-none fixed left-0 top-0 z-50 flex h-13 items-center">
+    <div className="browser-window-controls pointer-events-none fixed left-0 top-0 z-50 flex h-13 items-center">
       <span className="traffic-lights absolute left-4 flex gap-2" aria-hidden="true">
         {['close', 'minimize', 'zoom'].map((light) => <span key={light} className="size-3 rounded-full bg-(--traffic-stand-in)" />)}
       </span>

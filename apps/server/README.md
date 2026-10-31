@@ -47,10 +47,11 @@ it. Cached shared values are ignored, and the server reads no repository config.
 
 `domainDocs.kind` is `private` for OFF or `repository` for ON. OFF keeps domain
 drafts local without later publish prompts. ON names the glossary and ADR paths
-that builds include in their PR. The tracker option is ON by default, currently
-`settings.structureSync` in the app. The local-settings helper also accepts
-`progressSync` as a compatibility spelling. Its scope is kind, map, parts, Connections, Dependencies and issue
-grouping. It never syncs queue, board Status or ordinary progress.
+that builds include in their PR. The tracker option is ON by default and uses
+only `structureSync`, stored as `settings.structureSync`. Its scope is kind, map
+diagram, parts, Connections, Dependencies and issue grouping. It includes only
+shaping results needed to explain that structure. Queue, board Status, ordinary
+briefs, decisions, slices and per-item progress stay local.
 
 `bash skills/shared/scripts/repo-config.sh <repository>` from the workspace root
 prints effective local settings without a provider call. Its `--list` and
@@ -64,14 +65,35 @@ and `az` through tool overrides, the login shell PATH and common install folders
 `T3_PATH`, `GH_PATH` and `AZ_PATH` can select a tool explicitly. Sample mode
 looks up no tools. T3 Code supplies the repository projects and starts threads.
 
+Before enabling structural sync, onboarding checks creation, comments and label
+capability on GitHub using the classic token's actual scopes and repository
+role. Unverified fine-grained tokens block the option with guidance to grant
+repository Issues read and write permission. Azure checks work-item creation,
+description editing and comments. These checks make no probe writes.
+
 The Electron app supplies `BOARD_APP_SECRET`. Writes require its
 `X-Board-Secret` header. Before updating, the app requests `/api/drain` with the
 secret so running writes finish before the server stops.
 
 Source refresh and PR observations read providers; local progress does not write
-back to issues. Structural sync uses the saved local option and outbox. A fresh
-installation restores a saved concept or multi-repository structure from List,
-with fresh queue and Status. It does not restore briefs or build progress.
+back to issues. Structural sync uses the saved local option and outbox. GitHub
+stores immutable managed projection, manifest and gzip chunk comments, with
+`linked-work` for discovery. It creates a missing label only when structure is
+first used, preserves existing labels and never patches authored issue bodies.
+Azure uses batch reads, revision-tested numeric REST description patches and
+managed Markdown chunk comments. See [the structural protocol](../../skills/shared/issue-tracker/publication.md#storage-and-conflicts)
+for ETags, backwards comment pagination, canonical roots, detach cleanup and
+conflicts. Conflicts retain both versions and stop sync; there is no resolution
+UI yet.
+
+A fresh installation reconstructs a saved concept or multi-repository structure
+by adding it from List. Restored items start in List. Work records remain the
+local progress source; tracker sync cannot restore an entire board.
+
+The board receives T3 shell status immediately. Active unfinished local PRs are
+observed every 15 seconds with conditional ETag reads, including ticketless
+builds. Usage totals cover only board thread families. Skill maintenance lives
+in Settings > Skills.
 
 ## Tests
 

@@ -14,7 +14,7 @@ const daysAgo = (days: number) => new Date(Date.now() - days * DAY).toISOString(
 const appleIssue = (number: number, extra: object = {}) => ({ ...boardIssue(number, 'List', APPLE).content!, ...extra });
 
 /** lar-apple's .lar-factory.json naming its issues, for the fake gh. */
-const repoConfigs = { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } };
+const localSetups = { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } };
 
 /** A lar-apple issue closed as completed `days` ago. */
 const closedIssue = (number: number, days: number, extra: object = {}) =>
@@ -40,7 +40,7 @@ test("closed issues are paged light and only the kept ones read in full: a close
     closedIssue(23, 1, { parent: appleRef(60, 'CLOSED') }),
     closedIssue(24, 1, { stateReason: 'NOT_PLANNED' }),
   ] };
-  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => [i.number, i.status]), [[8, 'List'], [20, 'List'], [21, 'Done'], [22, 'Done'], [23, 'Done']]);
   assert.deepEqual((await readInFull(board)).sort(), ['I_21', 'I_22', 'I_23'], 'a slice whose build was not read stays; one closed as not planned is never read');
@@ -50,7 +50,7 @@ test("closed issues are paged light and only the kept ones read in full: a close
 
 test("closed issues are searched in close-date ranges at once, and one the search doesn't list yet shows from the issues updated last", async (t) => {
   const repoIssues = { [APPLE]: [closedIssue(22, 1), closedIssue(25, 3.5), closedIssue(26, 6.9), closedIssue(27, 0.001), closedIssue(28, 8)] };
-  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs, unindexed: ['I_27'] });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups, unindexed: ['I_27'] });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => [i.number, i.status]).sort(), [[22, 'Done'], [25, 'Done'], [26, 'Done'], [27, 'Done']]);
   const ranges = (await board.calls()).flatMap((args) => args.filter((a) => a.startsWith('q=') && a.includes('is:closed')).map((a) => /closed:(\S+)/.exec(a)![1]));
@@ -76,19 +76,19 @@ async function untilClosed(board: Board, kind: 'ranges' | 'pages', count: number
 }
 
 test('after the first read, a whole read searches the close-date ranges only when the page of closed issues updated last is full', async (t) => {
-  const few = await startBoard(t, { repositories: [APPLE], repoIssues: { [APPLE]: [closedIssue(22, 1), closedIssue(25, 3)] }, repoConfigs }, false, true);
+  const few = await startBoard(t, { repositories: [APPLE], repoIssues: { [APPLE]: [closedIssue(22, 1), closedIssue(25, 3)] }, localSetups }, false, true);
   const read = await untilClosed(few, 'pages', 3);
   assert.ok(read.pages >= 3, 'the board read whole again');
   assert.equal(read.ranges, 10, 'only the first read searched the ranges');
   assert.deepEqual((await few.board() as BoardData).items.map((i) => i.number).sort(), [22, 25]);
 
-  const full = await startBoard(t, { repositories: [APPLE], repoIssues: { [APPLE]: Array.from({ length: 100 }, (_, i) => closedIssue(100 + i, 1)) }, repoConfigs }, false, true);
+  const full = await startBoard(t, { repositories: [APPLE], repoIssues: { [APPLE]: Array.from({ length: 100 }, (_, i) => closedIssue(100 + i, 1)) }, localSetups }, false, true);
   assert.ok((await untilClosed(full, 'ranges', 20)).ranges >= 20, 'a full page might miss some, so a later read searches the ranges again');
 });
 
 test('the kept closed issues are read in full in calls of at most 25 issues', async (t) => {
   const repoIssues = { [APPLE]: Array.from({ length: 30 }, (_, i) => closedIssue(100 + i, 1)) };
-  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
   await until(board, (d) => d.fetchedAt !== null);
   const calls = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues(')));
   assert.deepEqual(calls.map((args) => args.filter((a) => a.startsWith('ids[]=')).length).sort((a, b) => b - a), [25, 5]);
@@ -100,7 +100,7 @@ test('a repository read runs each build search once, one repository a search, an
     appleIssue(8, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(11, 'OPEN'), serverRef] } }),
     closedIssue(50, 1, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(51, 'OPEN')] } }),
   ] };
-  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
   await until(board, (d) => d.fetchedAt !== null);
   const searches = (await board.calls()).flatMap((args) => args.filter((a) => a.startsWith('q=') && !a.includes('is:closed')));
   assert.deepEqual([...searches].sort(), [...new Set(searches)].sort(), 'no search runs twice');
@@ -116,7 +116,7 @@ test("open and kept closed issues normalize together: a closed dossier keeps its
     closedIssue(50, 1, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(51, 'OPEN')] } }),
     appleIssue(51, { parent: appleRef(50, 'CLOSED') }),
   ] };
-  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => i.number).sort(), [40, 41, 50]);
   assert.equal(data.items.find((i) => i.number === 40)!.map?.destination, 'There.');
@@ -127,7 +127,7 @@ test("open and kept closed issues normalize together: a closed dossier keeps its
 async function issuesBoard(t: TestContext, options: { items?: object[]; repoIssues?: object; fail?: string } = {}, env: Record<string, string> = {}) {
   const items = options.items ?? [];
   const repoIssues = options.repoIssues ?? { [APPLE]: [appleIssue(8)] };
-  const board = await startBoard(t, { ...options, items, repoIssues, repoConfigs }, false, false, env);
+  const board = await startBoard(t, { ...options, items, repoIssues, localSetups }, false, false, env);
   await until(board, (d) => d.fetchedAt !== null);
   return board;
 }

@@ -3,7 +3,9 @@
 // while an issue it's blocked by is open. It's disabled, its title saying why, while its repository is still
 // onboarding or T3 has no project for its repository.
 
-import type { BoardData, Item } from '@lar-factory/shared';
+import { buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { OpenThread, hasLiveThread } from './open-thread.tsx';
 import { StartOrAfter } from './start-after.tsx';
 
@@ -11,5 +13,8 @@ import { StartOrAfter } from './start-after.tsx';
 export function StartBuild({ item, data, label = 'Start build' }: { item: Item; data: BoardData; label?: string }) {
   // A thread already at work on the item would get a second one.
   if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
+  const setup = data.repos.find(repo => sameRepo(repo.repo, item.repo))?.setup;
+  const problem = setup && buildAccessProblem(setup.access);
+  if (problem) return <Button {...kind('start')} leftIcon={ICON.play} disabled title={problem} data-build-unavailable={item.id}>{label}</Button>;
   return <StartOrAfter item={item} data={data} label={label} kind="build" />;
 }

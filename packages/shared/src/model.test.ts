@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, dependencyNotice, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, dependencyNotice, buildBranch, buildMessage, canAbandon, canResumeShaping, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, providerTool, repositoryProjectHint, sameRepo, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
 import type { BoardData, Blocker, Checks, DependencyHold, DependencyObservationKind, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -33,6 +33,18 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
     ...extra,
   };
 }
+
+test('only the latest stopped shaping session can resume, with fresh evidence that its whole family is inactive', () => {
+  const stopped = { id: 'old', title: 'Shape', state: 'stopped' as const, updated: '2026-10-31T00:00:00Z', purpose: 'shape' };
+  assert.equal(canResumeShaping(item('Shaping', [], { threads: [stopped] })), true);
+  for (const state of ['running', 'needs you', 'done'] as const) {
+    assert.equal(canResumeShaping(item('Shaping', [], { threads: [{ ...stopped, id: 'new', state }, stopped] })), false);
+  }
+  assert.equal(canResumeShaping(item('Ready', [], { threads: [stopped] })), false);
+  assert.equal(canResumeShaping(item('Shaping', [], { threads: [{ ...stopped, observedAt: stopped.updated }] })), false);
+  assert.equal(canResumeShaping(item('Shaping', [], { threads: [{ ...stopped, hasLiveChildren: true }] })), false);
+  assert.equal(canResumeShaping(item('Shaping', [], { threads: 'unavailable' })), false);
+});
 
 test('a slice ticket is done once closed as completed, else waiting; not planned is hidden', () => {
   assert.equal(sliceProgress('CLOSED', 'COMPLETED'), 'done');
@@ -424,22 +436,15 @@ test('Add item refuses an unlisted repository, an unknown kind and a blank title
   }
 });
 
-test('.lar-factory.json as onboarding writes it has the answers, version 2 and the custom labels the Labels step picked', () => {
-  assert.equal(onboardingConfigFile({ itemSource: { kind: 'issues' }, role: 'Web client', labels: ['app: music', 'web'] }),
-    '{\n  "version": 2,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "labels": [\n    "app: music",\n    "web"\n  ]\n}\n');
-});
-
-test('.lar-factory.json as Edit writes it keeps the version the file had', () => {
-  const file = onboardingConfigFile({ itemSource: { kind: 'issues' }, role: 'API server', labels: [] }, 2);
-  assert.deepEqual(JSON.parse(file), { version: 2, role: 'API server', itemSource: { kind: 'issues' }, labels: [] });
-});
-
-test('a skill Clash renames only to a valid name no bundled skill, no other project skill and no rename beside it has', () => {
-  const bundled = ['code-review', 'tdd'];
-  assert.equal(skillRenameProblem('web-review', bundled, ['code-review', 'ours'], ['web-tdd']), null);
-  assert.match(skillRenameProblem('Web_Review', bundled, [], [])!, /lowercase letters, numbers and single hyphens/);
-  assert.match(skillRenameProblem('..', bundled, [], [])!, /lowercase letters/);
-  assert.equal(skillRenameProblem('tdd', bundled, [], []), 'tdd is already a bundled skill.');
-  assert.equal(skillRenameProblem('ours', bundled, ['Ours'], []), 'A local skill already uses ours.');
-  assert.equal(skillRenameProblem('web-skill', bundled, [], ['web-skill']), 'Another skill will use web-skill in this folder.');
+test('thread handoffs carry an explicit isolated factory environment and absolute skills to every subagent', () => {
+  const context={dataDir:"/tmp/O'Brien $(literal)/data",bin:'/tmp/factory home/.local/bin',shapeSkill:'/tmp/factory home/.agents/skills/lar-shape/SKILL.md',azureReadOnly:true};
+  const work=item('Queued',[],{id:'w-safe'});
+  const message=workMessage(work,context);
+  assert.ok(message.includes("Read '/tmp/factory home/.agents/skills/lar-shape/SKILL.md'"));
+  assert.ok(message.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
+  assert.ok(message.includes('export PATH=')); assert.ok(message.includes("export LAR_FACTORY_AZURE_READ_ONLY='1'"));
+  assert.ok(message.includes('every delegated task'));assert.ok(message.includes('Do not build'));
+  assert.equal(workMessage(work,context),message,'recovery uses a stable first message');
+  const build=buildMessage(work,'/tmp/factory home/.agents/skills/lar-build',context);
+  assert.ok(build.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
 });

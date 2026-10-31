@@ -45,8 +45,51 @@ it('finds the one started thread whose first message is the start message, leavi
   expect(() => protocolStartedThread('p', message, [])).toThrow('unavailable');
   const shell = (id: string) => ({ id, projectId: 'p', title: message, updatedAt: observedAt });
   fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [shell('old'), shell('new')], archivedThreads: [] } } });
-  await vi.waitFor(() => expect(protocolItemThreads(['new'])).toHaveLength(1));
+  await vi.waitFor(() => expect(protocolStartedThread('p', message, ['old'])).toEqual({ threadId: 'new', title: message }));
   expect(protocolStartedThread('p', message, ['old'])).toEqual({ threadId: 'new', title: message });
   expect(protocolStartedThread('p', message, []), 'two matches establish nothing').toBeNull();
   expect(protocolStartedThread('other', message, [])).toBeNull();
+});
+
+it('shows shell status changes immediately while history reads wait, without treating stale details as current', async () => {
+  const { protocolItemThreads, protocolStartedThread, protocolThreadById, protocolStatsInputs } = await import('./item-execution.ts');
+  const observedAt = '2026-10-31T12:00:00Z';
+  let release!: (read: ExecutionRead) => void;
+  const delayed = new Promise<ExecutionRead>(resolve => { release = resolve; });
+  fixture.read.mockReturnValue(delayed);
+  protocolItemThreads(['one']);
+  const publish = (thread: Record<string, unknown>) => fixture.changed!({ availability: 'available', observation: {
+    observedAt, snapshot: { threads: [thread], archivedThreads: [] },
+  } });
+  const shell = { id: 'one', projectId: 'p', title: 'Shape issue', updatedAt: observedAt, status: 'running' };
+  publish(shell);
+  expect(protocolItemThreads(['one'])).toMatchObject([{ state: 'running' }]);
+  expect(protocolThreadById('one').availability).toBe('unavailable');
+  expect(() => protocolStatsInputs()).toThrow('unavailable');
+  expect(() => protocolStartedThread('p', 'Shape issue', [])).toThrow('unavailable');
+
+  publish({ ...shell, pendingRuntimeRequest: { id: 'request' } });
+  expect(protocolItemThreads(['one'])).toMatchObject([{ state: 'needs you' }]);
+  release({ availability: 'available', observation: { observedAt, projection: { thread: { id: 'one' }, messages: [] } } });
+  await vi.waitFor(() => expect(protocolThreadById('one').availability).toBe('available'));
+  expect(protocolItemThreads(['one'])).toMatchObject([{ state: 'needs you' }]);
+  expect(fixture.read).toHaveBeenCalledTimes(2);
+});
+
+it('reads stats only for the requested thread family even when unrelated history is still loading', async () => {
+  const { protocolItemThreads, protocolThreadById, protocolStatsInputs } = await import('./item-execution.ts');
+  const observedAt = '2026-10-31T12:00:00Z';
+  fixture.read.mockImplementation(async id => id === 'unrelated' ? new Promise<ExecutionRead>(() => {}) : {
+    availability: 'available', observation: { observedAt, projection: { thread: { id }, messages: [], providerSessions: [],
+      providerThreads: [], providerTurns: [], runtimeRequests: [], subagents: [] } },
+  });
+  protocolItemThreads(['own']);
+  fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: {
+    threads: [{ id: 'own', updatedAt: observedAt }, { id: 'child', updatedAt: observedAt, lineage: { rootThreadId: 'own' } },
+      { id: 'unrelated', updatedAt: observedAt }], archivedThreads: [],
+  } } });
+  await vi.waitFor(() => expect(protocolThreadById('child').availability).toBe('available'));
+  expect(protocolStatsInputs(['own']).rows.threads.map(thread => thread.id)).toEqual(['own', 'child']);
+  expect(() => protocolStatsInputs()).toThrow('unavailable');
+  expect(protocolStatsInputs([]).rows.threads).toEqual([]);
 });

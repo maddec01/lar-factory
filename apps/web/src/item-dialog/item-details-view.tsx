@@ -12,6 +12,7 @@ import type { IssueRef, Item, ItemComment, ItemDetails, TextFormat } from '@lar-
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { RichText } from '@lar-factory/ui/rich-text';
+import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';
 import { AzureFields, AgentWork, AgentWorkNote } from '../items/item-parts.tsx';
 import type { DescriptionEdit } from './use-description-edit.ts';
@@ -55,7 +56,7 @@ function Comment({ comment, now }: { comment: ItemComment; now: number }) {
   );
 }
 
-/** The comments, newest first: the latest the details hold, then each page "Load 10 more" fetched. Remounts with each open of the dialog. */
+/** The comments, newest first: the latest the details hold, then each older page fetched. Remounts with each open of the dialog. */
 function Comments({ itemId, entry, now, ticketContext, className }: { itemId: string; entry: DetailsEntry; now: number; ticketContext: boolean; className: string }) {
   const older = useOlderComments(itemId, entry);
   const comments = [...entry.details.comments, ...older.comments];
@@ -64,10 +65,10 @@ function Comments({ itemId, entry, now, ticketContext, className }: { itemId: st
       <Heading>{ticketContext ? 'Ticket comments' : 'Comments'}{comments.length > 0 && ` · ${comments.length}`}</Heading>
       {comments.length > 0
         ? <ol className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-3 p-0">{comments.map((c) => <Comment key={c.id} comment={c} now={now} />)}</ol>
-        : <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>}
+        : !older.hasMore && <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>}
       {older.hasMore && (
         <div className="flex flex-wrap items-center gap-3">
-          <Button {...kind('other')} loading={older.loading} onClick={older.loadMore}>Load 10 more</Button>
+          <Button {...kind('other')} loading={older.loading} onClick={older.loadMore}>Load older comments</Button>
           {older.error && <p className="m-0 text-xs text-(--error-foreground)" role="alert">Could not load older comments: {older.error}</p>}
         </div>
       )}
@@ -117,7 +118,7 @@ export function ItemDescription({ read, edit, editable, fill, ticketContext = fa
       </div>
       {edit.editing
         ? <EditDescription body={body} format={format} edit={edit} fill={fill} />
-        : body ? <RichText text={body} format={format} /> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
+        : body ? <>{format === 'markdown' ? <MarkdownDiagrams text={body} /> : <RichText text={body} format={format} />}</> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
       {sections?.map((section) => <section key={section.title} className="grid min-w-0 gap-2"><Heading>{section.title}</Heading><RichText text={section.body} format={section.format} /></section>)}
     </div>
   );

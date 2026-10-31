@@ -1,4 +1,4 @@
-// The line's Queue: Queued items as numbered rows that open the item dialog, the build slots, Start refining and
+// The line's Queue: Queued items as numbered rows that open the item dialog, the build slots, Shape issue and
 // Start next with their model menu, and what a start shows on the row. Ported from the Queued cases of the old Board
 // view's tests.
 
@@ -102,17 +102,17 @@ test('a Queued item blocked by an open issue shows only Start after, a Start, an
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
-test("a Queued item whose repository has no T3 project has its Start refining disabled with the project's hint, and Start next passes over it", async () => {
+test("a Queued item whose repository has no T3 project has its Shape issue disabled with the project's hint, and Start next passes over it", async () => {
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   await mountPage({ ...withChoices, repositoryProjects: { 'maddec01/lar-server': hint } });
-  expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, hint]);
+  expect([text(start()), start().disabled, start().title]).toEqual(['Shape issue', true, hint]);
   expect(row('I_sample05').querySelector('[data-start-after]'), 'nothing blocks it, so no Start after').toBeNull();
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
-test("a Queued item whose repository is still onboarding has its Start refining disabled until onboarding's PR merges, and Start next passes over it", async () => {
+test("a Queued item whose repository is still onboarding has its Shape issue disabled until onboarding's PR merges, and Start next passes over it", async () => {
   await mountPage({ ...withChoices, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
-  expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, "Waits for onboarding to finish"]);
+  expect([text(start()), start().disabled, start().title]).toEqual(['Shape issue', true, "Waits for onboarding to finish"]);
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
@@ -148,17 +148,17 @@ test('the drag handles and Auto-start are disabled and say they are not built ye
     .toEqual(['Auto-start', true, 'false', "Auto-start isn't built yet: it will start the next item whenever a build slot frees"]);
 });
 
-test('Start refining sits on Queued issues, one Start on every row, and Start next is filled', async () => {
+test('Shape issue sits on Queued issues, one Start on every row, and Start next is filled', async () => {
   await mountPage();
   expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['I_sample05', 'I_sample06', 'I_sample21']);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-label')])
-    .toEqual(['Start refining ▾', 'menu', `Start refining #129 ${sample05.title}`]);
+    .toEqual(['Shape issue ▾', 'menu', `Shape issue #129 ${sample05.title}`]);
   expect([start(), start('I_sample06')].map((b) => [b.dataset.kind, Boolean(b.querySelector('[data-slot="icon"] svg'))]), 'every row the same Start, with its icon')
     .toEqual([['start', true], ['start', true]]);
   expect(startNext().dataset.kind, "Start next is the Queue's Main action").toBe('main');
 });
 
-test("Start refining opens its menu without opening the dialog, and starts its row's item with the picked model", async () => {
+test("Shape issue opens its menu without opening the dialog, and starts its row's item with the picked model", async () => {
   holdPosts(withChoices);
   await mountPage(withChoices);
   await pressMenu(start('I_sample06'));
@@ -186,7 +186,7 @@ test('Start next starts the first row that can start, with its model menu', asyn
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
 });
 
-test('while an item has a running or needs-you thread, its row has Open thread in place of Start refining', async () => {
+test('while an item has a running or needs-you thread, its row has Open thread in place of Shape issue', async () => {
   const threads = (state: string) => [{ id: 't1', title: 'x', state }];
   const items = sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, threads: threads('running') } : i.id === 'I_sample06' ? { ...i, threads: threads('needs you') } : i)) as Item[];
   await mountPage({ ...sample, items, t3EnvironmentId: 'env-1' });
@@ -207,10 +207,10 @@ test("a failed Start shows on its row with Retry start; closing the error doesn'
   await press(row('I_sample05').querySelector<HTMLButtonElement>('p.start button.dismiss')!);
   expect(row('I_sample05').querySelector('p.start')).toBeNull();
   expect(dialog()).toBeNull();
-  expect(text(start())).toBe('Start refining ▾');
+  expect(text(start())).toBe('Shape issue ▾');
 });
 
-test('a Start that may have run hides Start refining; closing its message leaves a tag', async () => {
+test('a Start that may have run hides Shape issue; closing its message leaves a tag', async () => {
   holdPosts(withChoices);
   await mountPage(withChoices);
   await pressMenu(start());
@@ -223,13 +223,13 @@ test('a Start that may have run hides Start refining; closing its message leaves
   expect(text(row('I_sample05').querySelector('.started-tag.unsure'))).toBe('May have started');
 });
 
-test('a thread another page started shows on its row in place of Start refining', async () => {
+test('a thread another page started shows on its row in place of Shape issue', async () => {
   await mountPage({ ...sample, started: { I_sample06: { threadId: 'thread-9', title: 'x' } } });
   expect(row('I_sample06').querySelector('.started-tag')?.getAttribute('title')).toBe('T3 thread thread-9');
   expect(row('I_sample06').querySelector('[data-start]')).toBeNull();
 });
 
-test('in sample mode Start refining still opens its menu, which starts nothing', async () => {
+test('in sample mode Shape issue still opens its menu, which starts nothing', async () => {
   await mountPage({ ...withChoices, capture: { session: 's', enabled: false } });
   expect(start().hasAttribute('disabled')).toBe(false);
   await pressMenu(start());

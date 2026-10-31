@@ -206,6 +206,8 @@ export interface FakePr {
   isDraft?: boolean;
   mergeStatus?: string;
   sourceRefName: string;
+  targetRefName?: string;
+  title?: string;
   description?: string;
   closedDate?: string;
 }
@@ -322,7 +324,11 @@ export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {},
       return JSON.stringify(prs.filter((p) => p.sourceRefName === source && p.status === 'active').map((p) => JSON.parse(show(p)) as unknown));
     }
     if (command === 'repos pr create') {
-      const pr: FakePr = { pullRequestId: 100 + prs.length, status: 'active', sourceRefName: `refs/heads/${flag(args, '--source-branch')}` };
+      const source = flag(args, '--source-branch');
+      const target = flag(args, '--target-branch');
+      if (!heads.has(source) || !heads.has(target)) throw new Error('The source or target branch does not exist.');
+      const pr: FakePr = { pullRequestId: 100 + prs.length, status: 'active', sourceRefName: `refs/heads/${source}`,
+        targetRefName: `refs/heads/${target}`, title: flag(args, '--title'), description: flag(args, '--description') };
       prs.push(pr);
       return show(pr);
     }

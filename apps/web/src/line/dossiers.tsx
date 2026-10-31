@@ -14,7 +14,7 @@ import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemTitle, SliceBar } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, SliceBar, StructureSync } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
@@ -24,6 +24,7 @@ import type { Part } from './dossier-parts.ts';
 import { PartStart, startable } from './part-start.tsx';
 import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
 import { OnYourDesk, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
+import { Diagram } from '../diagrams/markdown-diagrams.tsx';
 import { WorkMap } from './work-map.tsx';
 
 const open = (item: Item) => useItemDialogStore.getState().open(item.id);
@@ -173,6 +174,7 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
  *  works on it. A part that waits on another and has no Start says what it waits on instead. */
 function Action({ part, data }: { part: Part; data: BoardData }) {
   const { status } = part.item;
+  if (isDone(part.item)) return null;
   if (YOURS.includes(status)) return <OnYourDesk status={status} />;
   if (status === 'Ready' || status === 'Queued') return <span onClick={stop}><PartStart part={part} data={data} label="Start" /></span>;
   if (openWaits(part).length) return <span>{waitsOn(part)}</span>;
@@ -195,15 +197,15 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
         <Action part={part} data={data} />
       </span>
       <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
-        <span className="w-28 shrink-0"><Track status={item.status} waiting={waits.length > 0} /></span>
-        <span>{item.status}</span>
+        <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} waiting={waits.length > 0} /></span>
+        <span>{isDone(item) ? 'Complete' : item.status}</span>
         {s && <Figures s={s} />}
         <AzureFields azure={item.azure} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
         <span className="min-w-0 empty:hidden"><ThreadLine part={part} /></span>
       </span>
       {item.slices.length > 0 && <span className="col-span-2 pl-3.5"><SliceBar item={item} /></span>}
-      {(item.status === 'Ready' || item.status === 'Queued') && (
+      {!isDone(item) && (item.status === 'Ready' || item.status === 'Queued') && (
         <span className="col-span-2 pl-5 empty:hidden" onClick={stop}><StartMessage item={item} kind={item.status === 'Ready' ? 'build' : 'refine'} /><StartAfterError item={item} data={data} /></span>
       )}
     </li>
@@ -383,6 +385,8 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
           {missing > 0 && <p className="m-0 text-xs text-(--muted-foreground)" data-unread-parts>
             {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
           </p>}
+          <StructureSync item={parent} />
+          {parent.map?.diagram && <Diagram source={parent.map.diagram} />}
           <Attention parent={parent} parts={parts} data={data} find={find} />
           <div className="grid gap-3">
             <ViewToggle view={view} onView={setView} />

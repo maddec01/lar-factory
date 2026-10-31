@@ -79,6 +79,81 @@ test('older comments of an item GitHub no longer has or of a failed call answer 
   assert.deepEqual(await readGithubOlderComments(item('I_7'), 'CUR_1', failing), { status: 502, error: 'gh api graphql failed: HTTP 403' });
 });
 
+/** A paginated issue history, oldest first, using the requested GraphQL page size and cursor. */
+function historyGh(history: ReturnType<typeof comment>[]) {
+  const calls: string[][] = [];
+  const run = async (args: string[]) => {
+    calls.push(args);
+    const query = args.find((arg) => arg.startsWith('query='))!;
+    const limit = Number(query.match(/comments\(last: (\d+)/)![1]);
+    const end = Number(args.find((arg) => arg.startsWith('before='))?.slice(7) ?? history.length);
+    const start = Math.max(0, end - limit);
+    return JSON.stringify({ data: { node: { body: 'Human description.\n\n<!-- lar-factory:structure\n{}\n-->',
+      comments: { pageInfo: { hasPreviousPage: start > 0, startCursor: String(start) }, nodes: history.slice(start, end) } } } });
+  };
+  return { calls, run };
+}
+
+const managed = (n: number) => ({ ...comment(n), body: n % 2 ? '<!-- lar-factory:chunk version=1 -->\nc2VjcmV0LWJhc2U2NA==' : '<!-- lar-factory:structure\n{}\n-->' });
+
+test('details and older pages skip managed-only history to its end without exposing transport comments', async () => {
+  const history = Array.from({ length: 125 }, (_, i) => managed(i));
+  for (const older of [false, true]) {
+    const gh = historyGh(history);
+    const page = older ? await readGithubOlderComments(item('I_managed'), '125', gh.run) : await readGithubItemDetails(item('I_managed'), gh.run);
+    assert.ok(!('error' in page));
+    assert.deepEqual([page.comments, page.olderCursor], [[], null]);
+    if ('hasOlderComments' in page && 'body' in page) assert.deepEqual([page.hasOlderComments, page.body], [false, 'Human description.']);
+    assert.equal(gh.calls.length, 3);
+    assert.doesNotMatch(JSON.stringify(page), /lar-factory:|c2VjcmV0/);
+  }
+});
+
+test('managed-only leading pages reveal all ordinary discussion from the larger lookahead page', async () => {
+  const human = Array.from({ length: 30 }, (_, i) => comment(i + 1));
+  const history = [...human, ...Array.from({ length: 15 }, (_, i) => managed(i + 31))];
+  for (const older of [false, true]) {
+    const gh = historyGh(history);
+    const page = older ? await readGithubOlderComments(item('I_mixed'), '45', gh.run) : await readGithubItemDetails(item('I_mixed'), gh.run);
+    assert.ok(!('error' in page));
+    assert.deepEqual(page.comments.map((c) => c.id), human.map((c) => c.id).reverse());
+    assert.equal(page.olderCursor, null);
+    assert.equal(gh.calls.length, 2);
+  }
+});
+
+test('large managed histories stop after three calls and preserve a cursor for continued discussion reads', async () => {
+  const gh = historyGh([comment(1), ...Array.from({ length: 999 }, (_, i) => managed(i + 2))]);
+  const details = await readGithubItemDetails(item('I_large'), gh.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual([details.comments, details.hasOlderComments, details.olderCursor, gh.calls.length], [[], true, '790', 3]);
+  let cursor = details.olderCursor;
+  while (cursor !== null) {
+    const before = gh.calls.length;
+    const page = await readGithubOlderComments(item('I_large'), cursor, gh.run);
+    assert.ok(!('error' in page));
+    assert.ok(gh.calls.length - before <= 3);
+    cursor = page.olderCursor;
+    if (cursor === null) assert.deepEqual(page.comments.map((c) => c.id), ['IC_1']);
+  }
+});
+
+test('ordinary history keeps ten-comment pages in order without gaps or duplicate comments', async () => {
+  const gh = historyGh(Array.from({ length: 23 }, (_, i) => comment(i + 1)));
+  const details = await readGithubItemDetails(item('I_ordinary'), gh.run);
+  assert.ok(!('error' in details));
+  const ids = details.comments.map((c) => c.id);
+  let cursor = details.olderCursor;
+  while (cursor !== null) {
+    const page = await readGithubOlderComments(item('I_ordinary'), cursor, gh.run);
+    assert.ok(!('error' in page));
+    ids.push(...page.comments.map((c) => c.id));
+    cursor = page.olderCursor;
+  }
+  assert.deepEqual(ids, Array.from({ length: 23 }, (_, i) => `IC_${23 - i}`));
+  assert.equal(gh.calls.length, 3);
+});
+
 const issue = (number: number): Item => ({ id: `I_${number}`, repo: 'maddec01/lar-server', number } as Item);
 
 test('a saved description is the issue body, through gh issue edit --body-file', async () => {

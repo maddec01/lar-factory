@@ -39,7 +39,7 @@ refuses() {
         failures=$((failures + 1))
     fi
 }
-defaults='{"version":1,"role":"","itemSource":{"kind":"issues"},"labels":[],"domainDocs":{"kind":"private"},"skills":[],"structureSync":true,"progressSync":true}'
+defaults='{"version":1,"role":"","itemSource":{"kind":"issues"},"labels":[],"domainDocs":{"kind":"private"},"skills":[],"structureSync":true}'
 run --list
 check 'missing local file has an empty list' '[]'
 run team/app
@@ -65,17 +65,18 @@ run 'https://org.visualstudio.com/project/_git/repo'
 check 'legacy Azure origin resolves locally' "$(jq '.itemSource=null' <<<"$defaults")"
 printf '%s' '{"repositories":[{"repo":"team/app","settings":{"shared":{"role":"Ignored","domainDocs":{"kind":"repository","glossary":"OLD.md","adrs":"old"}},"overrides":{"role":"App","domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"},"labels":["feature"],"skills":["style"],"vocabulary":{"build":{"type":null,"labels":[]}}},"structureSync":false}}]}' >"$list_file"
 run team/app
-check 'only local overrides apply; explicit sync false survives' "$(jq '.role="App" | .domainDocs={kind:"repository",glossary:"GLOSSARY.md",adrs:"docs/adr"} | .labels=["feature"] | .skills=["style"] | .vocabulary={build:{type:null,labels:[]}} | .structureSync=false | .progressSync=false' <<<"$defaults")"
-printf '%s' '{"repositories":[{"repo":"team/app","settings":{"shared":{"role":"Ignored"},"progressSync":false}}]}' >"$list_file"
+check 'only local overrides apply; explicit sync false survives' "$(jq '.role="App" | .domainDocs={kind:"repository",glossary:"GLOSSARY.md",adrs:"docs/adr"} | .labels=["feature"] | .skills=["style"] | .vocabulary={build:{type:null,labels:[]}} | .structureSync=false' <<<"$defaults")"
+printf '%s' '{"repositories":[{"repo":"team/app","settings":{"shared":{"role":"Ignored","structureSync":false}}}]}' >"$list_file"
 run team/app
-check 'cached shared defaults are ignored and progressSync false survives' "$(jq '.structureSync=false | .progressSync=false' <<<"$defaults")"
-printf '%s' '{"repositories":[{"repo":"team/app","settings":{"progressSync":true,"structureSync":false}}]}' >"$list_file"
+check 'cached shared defaults cannot change local settings or sync' "$defaults"
+printf '%s' '{"repositories":[{"repo":"team/app","settings":{"structureSync":true}}]}' >"$list_file"
 run team/app
-check 'an explicit OFF wins when both sync spellings exist' "$(jq '.structureSync=false | .progressSync=false' <<<"$defaults")"
+check 'explicit structure sync ON survives' "$defaults"
+printf '%s' '{"repositories":[{"repo":"team/app","settings":{"structureSync":false}}]}' >"$list_file"
 LAR_FACTORY_DATA_DIR="$fixture/elsewhere" run --list
 check 'absolute data directory override is honored' '[]'
 LAR_FACTORY_DATA_DIR=relative run team/app
-check 'relative data directory override is ignored' "$(jq '.structureSync=false | .progressSync=false' <<<"$defaults")"
+check 'relative data directory override is ignored' "$(jq '.structureSync=false' <<<"$defaults")"
 for entry in '"bad"' '{"repo":"team/.."}' '{"repo":"team/app\n"}' '{"repo":"../project/repo"}'; do
     printf '{"repositories":[%s]}' "$entry" >"$list_file"
     run --list
@@ -87,7 +88,7 @@ refuses 'invalid JSON names local file' "$list_file isn't valid JSON"
 printf '%s' '[]' >"$list_file"
 run --list
 refuses 'invalid root shape fails' 'expected an object'
-for settings in '[]' '{"overrides":[]}' '{"structureSync":"yes"}' '{"progressSync":null}' '{"overrides":{"role":1}}' '{"overrides":{"skills":[1]}}' '{"overrides":{"labels":"x"}}' '{"overrides":{"itemSource":{"kind":"azure-board"}}}' '{"overrides":{"domainDocs":{"kind":"repository"}}}'; do
+for settings in '[]' '{"overrides":[]}' '{"structureSync":"yes"}' '{"structureSync":null}' '{"overrides":{"role":1}}' '{"overrides":{"skills":[1]}}' '{"overrides":{"labels":"x"}}' '{"overrides":{"itemSource":{"kind":"azure-board"}}}' '{"overrides":{"domainDocs":{"kind":"repository"}}}'; do
     printf '{"repositories":[{"repo":"team/app","settings":%s}]}' "$settings" >"$list_file"
     run team/app
     refuses 'invalid local settings fail before output' "$list_file: team/app:"

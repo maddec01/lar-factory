@@ -2,16 +2,13 @@
 
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
-import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
+import { Archive, ExternalLink, FolderGit2, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
 import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type Item, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ArchiveActions, archivedAs, RetentionSetting } from '../archive/archive.tsx';
-import { RepoTag } from '../items/item-parts.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
-import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
-import { SetupNotice } from '../repositories/setup-notice.tsx';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { TargetProgress } from './target-progress.tsx';
 import { TargetReaders } from './target-readers.tsx';
@@ -41,7 +38,7 @@ export interface PagesInput {
   data: BoardData;
   /** Whether the board app's bridge is there. */
   app: boolean;
-  /** The bridge's Install targets, null while they load. */
+  /** The bridge's Skill folders, null while they load. */
   targets: TargetSnapshot[] | null;
   /** The running version, once the updater has said. */
   version: string | null;
@@ -121,16 +118,14 @@ function onboardingDescription(progress: OnboardingProgress): string {
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}
-      {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
-    below: <><SetupNotice repo={r} /><ConfigUpdateNotice repo={r} /></>,
+    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}</>,
     control: custom(() => r.setup ? <Button {...kind('other')} onClick={() => useEditStore.getState().open(r.repo)}>Edit</Button> : null),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
     id: `repo-${repo}`, title: shownRepo(repo), description: onboardingDescription(progress),
     control: custom(() => <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>),
   }));
-  return { title: 'Repositories', description: "Each repository works from this Mac's settings, over the shared defaults in its .lar-factory.json when it has one.",
+  return { title: 'Repositories', description: 'Settings stay on this machine. Repositories need no factory files.',
     rows: [...onboarded, ...onboarding],
     footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add repository</Button> };
 }
@@ -154,9 +149,9 @@ function targetNote(target: TargetSnapshot): string | undefined {
 
 function targetGroup({ app, targets }: PagesInput): Group {
   const description = 'The app installs its skills into each ticked folder: copies, or links in a Claude home.';
-  if (!app) return { title: 'Install targets', description: ONLY_APP_TARGETS, rows: [] };
+  if (!app) return { title: 'Skill folders', description: ONLY_APP_TARGETS, rows: [] };
   return {
-    title: 'Install targets', description, note: <TargetsNote />,
+    title: 'Skill folders', description, note: <TargetsNote />,
     rows: (targets ?? []).map((target) => ({
       id: `target-${target.path}`, title: target.path, description: targetNote(target), control: custom(() => <TargetSwitch path={target.path} reason={targetNote(target)} />),
       below: <><TargetReaders target={target} /><TargetProgress target={target} /></>,
@@ -244,45 +239,12 @@ function archiveGroups(data: BoardData, archive: PagesInput['archive']): Group[]
 export function pages(input: PagesInput): Page[] {
   const { data } = input;
   return [
-    { id: 'general', label: 'General', icon: <Settings2 />, description: 'How the board refreshes, what Start may do on its own, and how the app sits on your Mac.', groups: [
-      { title: 'Board', rows: [
-        { id: 'refresh', title: 'Refresh every', description: "How often the board reads every item, and each repository's .lar-factory.json, through gh on GitHub and az on Azure DevOps. Between these reads it checks GitHub for changes every 5 seconds, for free, and reads only what changed.", control: refreshEvery(data.refreshSeconds) },
-        { id: 'open-in', title: 'Open an item in', control: { type: 'unavailable' } },
-        { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon sets work aside on this Mac, then asks again before it closes the ticket.', control: custom(() => <span className="text-xs text-(--muted-foreground)">Always ask</span>) },
-      ] },
-      { title: 'Flow limits', rows: [
-        { id: 'in-flight', title: 'Concurrent builds', control: { type: 'unavailable' } },
-        { id: 'needs-you-pause', title: 'Pause Start when Needs you is above', control: { type: 'unavailable' } },
-        { id: 'auto-start', title: 'Start the next Queued item when a slot frees', control: { type: 'unavailable' } },
-      ] },
-      { title: 'App', rows: [
-        { id: 'login', title: 'Open at login', control: { type: 'unavailable' } },
-        { id: 'menu-bar', title: 'Show in the menu bar', control: { type: 'unavailable' } },
-        { id: 'dock-badge', title: 'Dock badge', control: { type: 'unavailable' } },
-        { id: 'float', title: 'Keep above T3 Code', control: { type: 'unavailable' } },
-        { id: 'dock-side', title: 'Dock beside T3 Code', control: { type: 'unavailable' } },
-      ] },
-    ] },
-    { id: 'appearance', label: 'Appearance', icon: <Palette />, description: "The board's theme, density and what each item shows.", groups: [
+    { id: 'general', label: 'General', icon: <Settings2 />, description: 'Board preferences.', groups: [
       { title: 'Dialogs', rows: [
-        { id: 'match-list-size', title: 'Match List size when opening Item or Add item', control: custom(() => <DialogPreference preference="matchList" label="Match List size when opening Item or Add item" />) },
-        { id: 'open-list-expanded', title: 'Open List expanded', control: custom(() => <DialogPreference preference="openList" label="Open List expanded" />) },
+        { id: 'match-list-size', title: 'Match list size when opening an item', control: custom(() => <DialogPreference preference="matchList" label="Match list size when opening an item" />) },
+        { id: 'open-list-expanded', title: 'Open list expanded', control: custom(() => <DialogPreference preference="openList" label="Open list expanded" />) },
       ] },
-      { title: 'Theme', rows: [
-        { id: 'scheme', title: 'Color scheme', control: { type: 'unavailable' } },
-        { id: 'follow-t3', title: "Follow T3 Code's theme", control: { type: 'unavailable' } },
-        { id: 'density', title: 'Density', control: { type: 'unavailable' } },
-        { id: 'font-size', title: 'Interface font size', control: { type: 'unavailable' } },
-      ] },
-      { title: 'Items show', rows: [
-        { id: 'show-status-bar', title: 'Status bar', control: { type: 'unavailable' } },
-        { id: 'show-slices', title: 'Slice bar', control: { type: 'unavailable' } },
-        { id: 'show-stats', title: 'Agent time, tokens and cost', control: { type: 'unavailable' } },
-        { id: 'show-labels', title: 'Labels', control: { type: 'unavailable' } },
-      ] },
-      { title: 'Repository colours', rows: data.repos.map((r) => ({ id: `color-${r.repo}`, title: repoName(r.repo, data.repos),
-        // A title that already is owner/name needs no line repeating it.
-        description: repoName(r.repo, data.repos) === r.repo ? undefined : r.repo, control: custom(() => <RepoTag repo={r.repo} repos={data.repos} />) })) },
+      { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },
     ] },
     { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, description: 'The repositories the board reads, and the command line logins it reads them through.', groups: [
       { title: 'Command line tools', description: 'The board reads each provider through your own login and never stores a token.', rows: [
@@ -293,39 +255,9 @@ export function pages(input: PagesInput): Page[] {
       ] },
       repositoryGroup(data),
     ] },
-    { id: 't3', label: 'T3 Code', icon: <Plug />, description: 'How the board reads T3 Code, and what Start opens there.', groups: [
-      { title: 'Connection', rows: [
-        { id: 't3-app', title: 'T3 Code', control: { type: 'unavailable' } },
-        { id: 't3-stats', title: 'Read thread stats', control: { type: 'unavailable' } },
-      ] },
-      { title: 'Start', description: 'What Start does when it opens a lar-shape thread.', rows: [
-        { id: 'model', title: 'Default model', control: { type: 'unavailable' } },
-        { id: 'workspace', title: 'Workspace', control: { type: 'unavailable' } },
-        { id: 'base', title: 'Base branch', control: { type: 'unavailable' } },
-        { id: 'title', title: 'Thread title', control: { type: 'unavailable' } },
-        { id: 'switch-after', title: 'Switch to T3 Code after Start', control: { type: 'unavailable' } },
-      ] },
-    ] },
     { id: 'skills', label: 'Skills', icon: <Sparkles />, description: 'The skills and checklists Lar Factory installs, and the folders that get them.', groups: [
       targetGroup(input),
       bundledGroup(input),
-    ] },
-    { id: 'notifications', label: 'Notifications', icon: <Bell />, description: 'Which changes on the board tell you, and when.', groups: [
-      { title: 'Tell me when', rows: [
-        { id: 'n-needs-you', title: 'An item needs me', control: { type: 'unavailable' } },
-        { id: 'n-verify', title: 'A build is ready to verify', control: { type: 'unavailable' } },
-        { id: 'n-merge', title: 'A PR is ready to merge', control: { type: 'unavailable' } },
-        { id: 'n-checks', title: 'Checks fail or run over 30 minutes', control: { type: 'unavailable' } },
-        { id: 'n-blocked', title: 'A slice gets blocked', control: { type: 'unavailable' } },
-        { id: 'n-stale', title: "The board can't refresh", control: { type: 'unavailable' } },
-      ] },
-      { title: 'Delivery', rows: [
-        { id: 'quiet', title: 'Quiet hours', control: { type: 'unavailable' } },
-        { id: 'sound', title: 'Sound', control: { type: 'unavailable' } },
-      ] },
-    ] },
-    { id: 'keybindings', label: 'Keyboard shortcuts', icon: <Keyboard />, description: "The board's keyboard shortcuts.", groups: [
-      { title: 'Keyboard shortcuts', description: 'Keyboard shortcut settings are not available yet.', rows: [] },
     ] },
     { id: 'updates', label: 'Updates', icon: <RefreshCw />, description: 'Which Releases Lar Factory offers, and when it installs them.', groups: [
       { title: 'Updates', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) },

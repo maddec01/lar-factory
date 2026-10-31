@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react';
 import type { Item, RecordDetails } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { RichText } from '@lar-factory/ui/rich-text';
+import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 import { postAction } from '../items/card-actions.ts';
 
@@ -44,7 +45,7 @@ export function RecordText({ item, record, className }: { item: Item; record: Re
       </div>
       <ExportedLine exported={exported} />
       <div data-record-body>
-        {record.body ? <RichText text={record.body} format="markdown" /> : <p className="m-0 text-sm text-(--muted-foreground)">No {title.toLowerCase()} written yet.</p>}
+        {record.body ? <MarkdownDiagrams text={record.body} /> : <p className="m-0 text-sm text-(--muted-foreground)">No {title.toLowerCase()} written yet.</p>}
       </div>
       {record.buildPhase && <Fact label="Build phase" data-build-phase>{record.buildPhase}</Fact>}
       {record.reviewRounds.length > 0 && (

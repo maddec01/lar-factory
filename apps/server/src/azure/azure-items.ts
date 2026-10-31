@@ -7,7 +7,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { STATUSES, decodePart, labelKind, labelStatuses, repoTag, sameRepo, statusLabel } from '@lar-factory/shared';
+import { STATUSES, decodePart, readTrackerStructure, trackerKind, parseConceptMap, labelStatuses, repoTag, sameRepo, statusLabel } from '@lar-factory/shared';
 import type { AzureWorkItem, Blocker, Item, LinkedPr } from '@lar-factory/shared';
 import { AccessLost, NotFound, ReadProblem, TICKET_MATCHES, ticketNumberOf, type ItemSource, type ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
@@ -273,12 +273,21 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     return new Map(read.flatMap((pr) => (pr ? [[pr.pullRequestId, linkedPr(pr)] as const] : [])));
   }
 
+  const placementOf = (raw: RawWorkItem) => {
+    try {
+      const repository=readTrackerStructure(field(raw,'System.Description'))?.repository;
+      const matched=repository && repos.find(repo=>sameRepo(repo,repository));
+      if(matched) return {repo:matched};
+    } catch { /* Normalization reports a malformed structure block inline. */ }
+    return placement(tagsOf(raw),repos);
+  };
+
   /** The work items still open, neither Completed nor Removed, that show for `repo`: tagged for it, or untagged. */
   async function openFor(repo: string, raws: readonly RawWorkItem[]): Promise<RawWorkItem[]> {
     const byType = await categories([...new Set(raws.map((raw) => field(raw, 'System.WorkItemType')))]);
     const open = (raw: RawWorkItem) => !['Completed', 'Removed'].includes(byType.get(field(raw, 'System.WorkItemType'))?.get(field(raw, 'System.State')) ?? '');
     const shows = (raw: RawWorkItem) => {
-      const where = placement(tagsOf(raw), repos);
+      const where = placementOf(raw);
       return !!where && (where.untaggedFor ?? [where.repo]).some((r) => sameRepo(r, repo));
     };
     return raws.filter((raw) => open(raw) && shows(raw));
@@ -333,7 +342,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     const childrenOf = new Map<number, RawWorkItem[]>();
     for (const raw of parents) {
       if (!shown(raw) || (!(typeof completed === 'boolean' ? completed : completed.has(raw.id)) && done(raw))) continue;
-      const where = placement(tagsOf(raw), repos);
+      const where = placementOf(raw);
       if (!where) continue;
       placed.set(raw.id, where);
       childrenOf.set(raw.id, withTasks.filter((child) => (factoryTask(raw) || factoryTask(child) || childIds === undefined || childIds.includes(child.id)) && tasks.has(type(child)) && shown(child) && Number(child.fields['System.Parent']) === raw.id)
@@ -345,7 +354,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     }
     const top = parents.filter((raw) => childrenOf.has(raw.id));
     // An item outside the listing, such as a predecessor, goes by its own tags.
-    const repoOf = (raw: RawWorkItem | undefined) => (raw && (placed.get(raw.id) ?? placement(tagsOf(raw), repos))?.repo) || repos[0]!;
+    const repoOf = (raw: RawWorkItem | undefined) => (raw && (placed.get(raw.id) ?? placementOf(raw))?.repo) || repos[0]!;
     const blocker = (id: number): Blocker => {
       const raw = byId.get(id);
       // A Removed predecessor no longer holds anything up; one the board can't read is taken as open.
@@ -358,13 +367,18 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const closed = done(raw);
       const parent = factoryTask(raw) ? byId.get(Number(raw.fields['System.Parent'])) : undefined;
       const childNumbers = linked(raw, 'System.LinkTypes.Hierarchy-Forward');
+      let tracker;
+      let sync: Item['sync'];
+      try { tracker = readTrackerStructure(field(raw, 'System.Description')); } catch (error) { sync = {state:'error',message:(error as Error).message}; }
       return {
         id: itemId(raw.id),
         ...currentSprint && childNumbers.length > 0 && { currentSprint: { name: currentSprint.name, childNumbers: childNumbers.filter((id) => currentSprint.childIds.includes(id)) } },
         revision: 0,
         status: closed ? 'Done' : statuses[0] ?? 'List',
         statuses,
-        kind: labelKind(labelsOf(raw)),
+        kind: tracker?.kind ?? trackerKind(labelsOf(raw), field(raw, 'System.WorkItemType')),
+        ...(tracker && { tracker, ...(tracker.map && {map:parseConceptMap(tracker.map)}) }),
+        ...(sync && {sync}),
         content: 'ticket',
         number: raw.id,
         title: field(raw, 'System.Title'),
@@ -422,7 +436,9 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     },
     async readTicket(repo, number) {
       const [raw] = await openFor(repo, await workItems([number]));
-      return raw ? { number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), text: field(raw, 'System.Description'), kind: labelKind(labelsOf(raw)) } : null;
+      if (!raw) return null;
+      const tracker = readTrackerStructure(field(raw, 'System.Description'));
+      return { number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), text: field(raw, 'System.Description'), kind: tracker?.kind ?? trackerKind(labelsOf(raw), field(raw, 'System.WorkItemType')), ...(tracker && {tracker}) };
     },
     async observeTicket(_repo, number) {
       try {

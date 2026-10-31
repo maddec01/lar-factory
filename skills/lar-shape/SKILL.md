@@ -21,7 +21,8 @@ Facts are yours to find; decisions are the user's. Delegated work follows
 without files, logs or screenshots. Ask ordinary questions per the
 [question guide](shared/questions.md). Retro picks stay in chat.
 Past about 150k tokens, follow [handoff](shared/handoff.md).
-Never merge or push to main. Follow the repository's commit rules and
+Leave product changes for Build and keep prototypes on their prototype branch.
+Never merge or push to the repository's default branch. Follow its commit rules and
 [cross-repository citations](shared/cross-repo-citations.md).
 
 ## Steps

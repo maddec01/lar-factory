@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import type { BoardData, Item } from '@lar-factory/shared';
+import type { BoardData, Item, OperationAccess } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
 import { createItemCommands } from './item-commands.ts';
@@ -21,10 +21,19 @@ const queued = (id: number, extra: Partial<Item> = {}): Item => ({
 
 const opened: { records: WorkRecords; dir: string }[] = [];
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const { records, dir } of opened.splice(0)) {
     records.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('read-only Azure sessions refuse shaping and builds before any T3 or provider call', async () => {
+  vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '1');
+  const { commands, log } = commandsOn([queued(1), queued(2, { status: 'Ready', statuses: ['Ready'], kind: 'build' })]);
+  assert.equal((await commands.start(queued(1).id, undefined)).status, 403);
+  assert.equal((await commands.startBuild(queued(2).id, undefined)).status, 403);
+  assert.deepEqual(log, []);
 });
 async function openRecords(): Promise<WorkRecords> {
   const dir = mkdtempSync(join(tmpdir(), 'item-commands-'));
@@ -33,11 +42,30 @@ async function openRecords(): Promise<WorkRecords> {
   return records;
 }
 
+for (const operation of ['push-branch', 'open-pr'] as const) for (const state of ['refused', 'unverified'] as const) {
+  test(`${state} ${operation} prevents a build intent while read-only shaping still works`, async () => {
+    const records = await openRecords();
+    const build = records.importTicket({ title: 'Read-only build', repository: WEB, kind: 'build', status: 'Ready', ticket: `${WEB}#7` }).record;
+    const access = { 'push-branch': 'allowed', 'open-pr': 'allowed', [operation]: state } as const;
+    const { commands, log, reread } = commandsOn([], undefined, records, [], access);
+    const reply = await commands.startBuild(build.workId, undefined);
+    assert.equal(reply.status, 403);
+    assert.match(JSON.stringify(reply.body), operation === 'push-branch' ? /push branches/ : /open pull requests/);
+    assert.equal(records.read(build.workId).revision, build.revision);
+    assert.deepEqual(records.launchIntents({ workId: build.workId }), []);
+    assert.deepEqual(log, []);
+    const shape = records.importTicket({ title: 'Read-only shaping', repository: WEB, kind: 'issue', status: 'Queued', ticket: `${WEB}#8` }).record;
+    reread();
+    assert.equal((await commands.start(shape.workId, undefined)).status, 200);
+    assert.equal(log.length, 1);
+  });
+}
+
 /**
  * Commands on a board holding `items`, whose source records each abandon it gets. Given `records`, the board shows their items and Archive with `tickets` as the source read them, and reads them
  * again after each write.
  */
-function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = []) {
+function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = [], access: Partial<Record<'push-branch' | 'open-pr', OperationAccess>> = { 'push-branch': 'allowed', 'open-pr': 'allowed' }) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
   const reread = () => {
     if (records) board.update({ items: recordItems(records, tickets, [WEB]) });
@@ -46,20 +74,22 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
   reread();
   const log: string[] = [];
   const branches: (string | undefined)[] = [];
+  const bases: (string | undefined)[] = [];
   const source = {
     abandon: async (item: Item) => {
       log.push(`abandon ${item.number}`);
       return null;
     },
   } as unknown as ItemSource;
-  const commands = createItemCommands({ board, items: source, records: records ?? null, reread, archive, offerModelChoices: () => [],
-    showThread, reopenPr: async (repo, number) => { log.push(`reopen ${repo}#${number}`); }, projectOf: async (repo) => ({ projectId: repo }),
+  const commands = createItemCommands({ factoryContext:null, board, items: source, records: records ?? null, reread, archive, offerModelChoices: () => [],
+    showThread, reopenPr: async (repo, number) => { log.push(`reopen ${repo}#${number}`); }, projectOf: async (repo) => ({ projectId: repo }), baseOf: async () => 'release', buildAccessOf: () => access,
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
+      bases.push(worktree?.base);
       log.push(`start ${project} ${message.split('\n')[1]}`);
       return { thread: { threadId: `thread-${branches.length}`, title: 't' }, error: null };
     } });
-  return { board, commands, log, branches, archive, reread };
+  return { board, commands, log, branches, bases, archive, reread };
 }
 
 for (const failed of [false, true]) test(`Abandon uses the current record after a provider ${failed ? 'failure' : 'observation'} while another ticket still reads`, async () => {
@@ -183,10 +213,11 @@ test('reopening Done work from Needs you moves it back to List', async () => {
 
 test('Start build reuses a live start, but a confirmed stopped build can start again once', async () => {
   const item = queued(7, { status: 'Ready', statuses: ['Ready'], labels: ['build'] });
-  const { board, commands, log, branches } = commandsOn([item]);
+  const { board, commands, log, branches, bases } = commandsOn([item]);
   await commands.startBuild(item.id, undefined);
   await commands.startBuild(item.id, undefined);
   assert.equal(log.length, 1, 'a repeated request reuses the original start');
+  assert.deepEqual(bases, ['release'], 'builds use the resolved target even when it is not main');
   board.update({ items: [{ ...item, threads: [{ id: 'thread-1', title: 'Build', state: 'stopped', updated: '2026-10-29T00:00:00Z' }] }] });
   await Promise.all([commands.startBuild(item.id, undefined), commands.startBuild(item.id, undefined)]);
   assert.equal(log.length, 2, 'concurrent retries start exactly one replacement');
@@ -303,8 +334,8 @@ function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids
   }) });
   reread();
   const started: string[] = [];
-  const commands = createItemCommands({ board, items: {} as ItemSource, records, reread, archive: () => [], offerModelChoices: () => [],
-    showThread: lookup, projectOf: async (repo) => ({ projectId: repo }), recoverThread: recover, skillsOf: () => skills,
+  const commands = createItemCommands({ factoryContext:null, board, items: {} as ItemSource, records, reread, archive: () => [], offerModelChoices: () => [],
+    showThread: lookup, projectOf: async (repo) => ({ projectId: repo }), baseOf: async () => 'release', buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }), recoverThread: recover, skillsOf: () => skills,
     startThread: async (_project, message) => {
       during();
       started.push(message);
@@ -365,17 +396,6 @@ test('after a restart, an unresolved start T3 shows no thread for sets Needs you
   } finally { vi.useRealTimers(); }
 });
 
-test("Start on work its repository's changed setup pauses is refused with why, and starts nothing", async () => {
-  const records = await openRecords();
-  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
-  const { board, commands, started } = recordedCommands(records);
-  const why = "Its repository's domain-doc location changed. Accept the change in Settings › Repositories to go on.";
-  board.update({ items: board.snapshot().items.map((item) => ({ ...item, paused: why })) });
-  const refused = await commands.start(work.workId, undefined);
-  assert.deepEqual([refused.status, (refused.body as { error: string }).error], [409, `Paused: ${why}`]);
-  assert.deepEqual([started, records.launchIntents({ workId: work.workId })], [[], []]);
-});
-
 test('a recorded thread T3 confirms deleted releases Start, and one T3 cannot be read for keeps it', async () => {
   const records = await openRecords();
   const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
@@ -399,6 +419,41 @@ test('a finished T3 turn moves no Status', async () => {
   await commands.reconcileStarts(board.snapshot().items);
   assert.equal(records.read(work.workId).status, 'Queued');
   assert.equal(board.find(work.workId)?.status, 'Queued');
+});
+
+test('stopped shaping resumes in one new thread without changing its gate or starting a build', async () => {
+  const records = await openRecords();
+  let work = records.create({ title: 'Prototype', repository: WEB, kind: 'feature', status: 'Shaping' });
+  work = records.addThread(work.workId, work.revision, 'old', 'shape');
+  const { commands, started } = recordedCommands(records, { shown: ids => ids.map(id => ({ id, title: 'Shape',
+    state: id === 'old' ? 'stopped' : 'running', updated: '2026-10-31T00:00:00Z' })) });
+  const replies = await Promise.all([commands.start(work.workId, undefined), commands.start(work.workId, undefined)]);
+  assert.deepEqual(replies.map(reply => reply.status), [200, 200]);
+  assert.equal(started.length, 1);
+  assert.equal(records.read(work.workId).status, 'Shaping');
+  assert.deepEqual(records.threads(work.workId).map(thread => thread.purpose), ['shape', 'shape']);
+  assert.equal((await commands.start(work.workId, undefined)).status, 409, 'a running resumed thread is not a second resume');
+});
+
+for (const state of ['running', 'needs you', 'done', 'unavailable', 'live child', 'stale'] as const) test(`shaping cannot resume from ${state} thread evidence`, async () => {
+  const records = await openRecords();
+  let work = records.create({ title: 'Prototype', repository: WEB, kind: 'feature', status: 'Shaping' });
+  work = records.addThread(work.workId, work.revision, 'old', 'shape');
+  const { commands, started } = recordedCommands(records, { shown: ids => state === 'unavailable' ? 'unavailable' : ids.map(id => ({ id,
+    title: 'Shape', state: state === 'live child' || state === 'stale' ? 'stopped' : state,
+    ...state === 'live child' && { hasLiveChildren: true }, ...state === 'stale' && { observedAt: '2026-10-31T00:00:00Z' },
+    updated: '2026-10-31T00:00:00Z' })) });
+  assert.equal((await commands.start(work.workId, undefined)).status, 409);
+  assert.deepEqual(started, []);
+});
+
+test('a completed Ready shaping gate never resumes shaping even if its old thread stopped', async () => {
+  const records = await openRecords();
+  let work = records.create({ title: 'Prototype', repository: WEB, kind: 'feature', status: 'Ready' });
+  work = records.addThread(work.workId, work.revision, 'old', 'shape');
+  const { commands, started } = recordedCommands(records, { shown: ids => ids.map(id => ({ id, title: 'Shape', state: 'stopped', updated: '2026-10-31T00:00:00Z' })) });
+  assert.equal((await commands.start(work.workId, undefined)).status, 409);
+  assert.deepEqual(started, []);
 });
 
 test("Start build snapshots the repository's selected project skills on the record and names the work ID", async () => {

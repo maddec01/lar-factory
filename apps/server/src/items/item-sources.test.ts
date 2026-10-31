@@ -52,7 +52,7 @@ test('with no source a read lists nothing and an abandon is refused', async () =
 });
 
 const config = (repo: string): RepositoryConfig =>
-  ({ repo, version: 1, role: 'role', itemSource: { kind: 'issues' }, labels: [] });
+  ({ repo, role: 'role', itemSource: { kind: 'issues' }, labels: [] });
 
 test('each read loads the configs first and builds the sources again only when they changed', async () => {
   let configs = [config('maddec01/lar-apple')];
@@ -94,7 +94,7 @@ test("a read leaves out the items of a repository whose config couldn't be read,
 });
 
 const azure = (repo: string, team = 'Fabrikam Team'): RepositoryConfig =>
-  ({ repo, version: 1, role: 'role', itemSource: { kind: 'azure-board', team }, labels: [] });
+  ({ repo, role: 'role', itemSource: { kind: 'azure-board', team }, labels: [] });
 
 test("repositories reading one team's sprint share one read, and an untagged item from it is for each of them", async () => {
   const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 2, type: 'User Story', state: 'New', tags: 'repo-api' }] });

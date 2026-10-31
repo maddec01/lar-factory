@@ -166,5 +166,6 @@ test("a read request naming an item reads that item alone, without loading the c
   assert.equal(await reads(board), readsBefore, 'the repository is not read whole');
   assert.equal(await configReads(), configsBefore);
   assert.equal((await askRead(board)).status, 202);
-  await waitFor(async () => await configReads() > configsBefore);
+  await waitFor(async () => await reads(board) > readsBefore);
+  assert.equal(await configReads(), 0, 'refreshes use local settings');
 });

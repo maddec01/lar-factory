@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import { promisify } from 'node:util';
 import type { TestContext } from 'vite-plus/test';
-import { DONE_WINDOW_MS, isSkillCheckRequest, normalizeItems, readBuilds, refKey } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, REPOSITORY_OPERATIONS, isSkillCheckRequest, normalizeItems, readBuilds, refKey, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, Item, RawItem, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
@@ -47,10 +47,10 @@ export async function freePort(): Promise<number> {
 const TEST_REPOSITORIES = ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec01/lar-factory'];
 
 /** Writes the board app's list of onboarded repositories under `home`. */
-export function writeRepositoryList(home: string, repos: readonly string[]): void {
+export function writeRepositoryList(home: string, repos: readonly string[], setups: Record<string, unknown> = {}): void {
   const dir = join(home, 'Library/Application Support/Lar Factory');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: repos.map((repo) => ({ repo })) }));
+  writeFileSync(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: repos.map((repo) => ({ repo, settings: { structureSync: false, access: Object.fromEntries(REPOSITORY_OPERATIONS.map(operation => [operation, 'allowed'])), overrides: typeof setups[repo] === 'object' && setups[repo] !== null ? setups[repo] : {} } })) }));
 }
 
 /**
@@ -143,7 +143,7 @@ export async function settleDecisions(board: Board, workId: string, decisions: s
  * Lists TEST_REPOSITORIES under `home` with `repo` still onboarding, its PR open. Its default branch has no
  * .lar-factory.json yet, as NOT_LANDED tells the fake gh, or the board finishes the onboarding with the file.
  */
-export const NOT_LANDED = { repoConfigs: { 'maddec01/lar-factory': null } };
+export const NOT_LANDED = { localSetups: { 'maddec01/lar-factory': null } };
 
 export function writeOnboarding(home: string, repo: string): void {
   const progress = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'project-factory' } };
@@ -174,7 +174,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   // Each test gets a spare port; BOARD_PORT '' leaves the board to pick one from its range.
   const home = env.HOME ?? dir;
   const { repositories = TEST_REPOSITORIES } = options as { repositories?: readonly string[] | null };
-  if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'))) writeRepositoryList(home, repositories);
+  if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'))) writeRepositoryList(home, repositories, (options as { localSetups?: Record<string, unknown> }).localSetups);
   // Only recorded work is on the board, so each fake issue starts recorded, unless `recorded: false` says none is.
   type Ref = { number: number; repository: { nameWithOwner: string } };
   const { items: issues = [], repoIssues = {}, builds = [], active = [], blocked = [], recorded = true, threads = {} } = options as {
@@ -348,3 +348,6 @@ export function startableEnv(t: TestContext): Record<string, string> {
   checkouts(home, { 'lar-factory': 'git@github.com:maddec01/lar-factory.git' });
   return { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/lar/lar-factory` }]) };
 }
+
+export const testFactoryContext = (home: string) => ({dataDir:boardDataDir(home,{}),bin:join(home,'.local/bin'),shapeSkill:join(home,'.agents/skills/lar-shape/SKILL.md'),azureReadOnly:process.env.LAR_FACTORY_AZURE_READ_ONLY==='1'});
+export const shapePrompt = (board: Board, title: string, id: string) => workMessage({id,title,number:0} as Item,testFactoryContext(dirname(dirname(dirname(board.dataDir)))));

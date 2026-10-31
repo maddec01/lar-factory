@@ -14,6 +14,10 @@ Reuse answers and authorization already given. State routine shaping routes and
 implementation choices, then continue. Ask only for a missing decision, genuine
 conflict or expansion of scope. The saved sync choice needs no per-update prompt.
 
+Keep questions short. Use the issue title or ticket number only when context is
+needed. Local work IDs belong in commands and tool identifiers, never in the
+question text shown to the user.
+
 Every ordinary question batch runs these once, however many calls it takes:
 
 1. Set **Needs you**, then make the calls; each blocks.

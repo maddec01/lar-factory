@@ -268,9 +268,13 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 }
 
 export interface Item {
+  /** Local completion facts, independent of the board Status and absent on provider-only items. Never published. */
+  completion?: { complete: boolean; reasons: string[] };
   sync?: { state: 'saved' | 'pending' | 'error' | 'conflict'; message?: string };
   /** Public tracker structure, also present before this machine queues the issue. */
   tracker?: import('./tracker-structure.ts').TrackerStructure;
+  /** False for an issue from the list that has no local work record yet. */
+  recorded?: boolean;
   /** Eligibility from the durable journal, independent of Status. Absent for decisions and slices. */
   publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'> & { recoverable?: boolean };
   /**
@@ -363,6 +367,18 @@ export interface ItemThread {
   updated: string;
   /** Set while T3 can't be read: when the board last saw this state. */
   observedAt?: string;
+  /** A running or waiting descendant still belongs to this thread's work. */
+  hasLiveChildren?: true;
+  /** The work record's thread role, when recorded by the factory. */
+  purpose?: string;
+}
+
+/** Resume only an interrupted shaping session whose current thread family is known to have stopped. */
+export function canResumeShaping(item: Item): boolean {
+  if (item.status !== 'Shaping' || item.needsYou || !Array.isArray(item.threads) || !item.threads.length) return false;
+  if (item.threads.some(thread => thread.observedAt || thread.hasLiveChildren || thread.state === 'running' || thread.state === 'needs you')) return false;
+  const shaping = item.threads.filter(thread => thread.purpose === 'shape');
+  return (shaping.length ? shaping : item.threads)[0]?.state === 'stopped';
 }
 
 /** The deep link that opens a T3 thread in T3 Code, as T3's promptLinks.ts parses it (pingdotgg/t3code d53873b6). */
@@ -424,18 +440,9 @@ export interface RepoConfig {
   items?: ItemSourceKind;
   /** The Azure DevOps team whose backlog and current sprint its item source is; absent for the other item sources. */
   team?: string;
-  /** Its custom labels, the `labels` in its .lar-factory.json, which Add item offers and the queue shows. */
+  /** Its custom labels, saved in local settings, which Add item offers and the queue shows. */
   labels: string[];
-  /** The URL of its open Edit PR, the open PR from lar-factory/edit-config, as the latest read found it; absent when it has none. */
-  editPr?: string;
-  /** Its .lar-factory.json's `version`, 1 when the file has none; absent in sample mode. */
-  version?: number;
-  /**
-   * CONFIG_VERSION, while its .lar-factory.json's version is lower and the notice offering the PR that brings the file
-   * up to date hasn't been dismissed at that version; absent otherwise.
-   */
-  configUpdate?: number;
-  /** Its setup from this Mac's local settings over its Repository config's defaults, which Settings edits; absent in sample mode. */
+  /** Settings saved on this machine. */
   setup?: RepositorySetup;
 }
 
@@ -460,11 +467,9 @@ export interface BundledSkill {
 }
 
 /**
- * Why a repository needs attention: with no kind, it is off the board; `shared-config` keeps its last usable setup
- * while its .lar-factory.json can't be used; `agent-guidance` names stale agent guidance.
+ * Why a repository's local settings need attention.
  */
 export interface RepositoryConfigProblem {
-  kind?: 'agent-guidance' | 'shared-config';
   repo: string;
   problem: string;
 }
@@ -477,7 +482,7 @@ export interface ItemSourceProblem {
 }
 
 /**
- * What the first read is doing: `repositories` loads each repository's config and onboarding PR, `items` reads their
+ * What the first read is doing: `repositories` reads local repository settings, `items` reads their
  * items, and `finishing` reads what the board shows besides them. The page maps each id to its line of text.
  */
 export type FirstReadStep = 'repositories' | 'items' | 'finishing';
@@ -501,19 +506,19 @@ export interface FirstRead {
 export const SETTLED_FIRST_READ: FirstRead = { step: 'finishing', running: [], settled: true };
 
 export interface BoardData {
+  /** A local process problem; cached items remain available while it needs attention. */
+  localProblem?: string;
   /** Sanitized authenticated source state. Credentials stay in the server. */
   t3Availability?: { availability: 'available' | 'unavailable' | 'renewal-required' | 'unsupported-version' | 'malformed'; observedAt?: string };
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
   repos: RepoConfig[];
-  /** Each onboarded repository the latest read left off the board because its .lar-factory.json couldn't be read, and why. */
+  /** Repositories whose local settings need attention. */
   repositoryConfigProblems?: RepositoryConfigProblem[];
   /** Each onboarded repository whose items the latest read left off, such as one reading through a logged-out az, and why. */
   itemSourceProblems?: ItemSourceProblem[];
   /** The repositories on this Mac's list that are still onboarding, in the list's order. Absent in sample mode. */
   onboarding?: OnboardingRepository[];
-  /** A T3 project the board offers to onboard, as its repository has .lar-factory.json and isn't on the list. Absent in sample mode. */
-  onboardingOffers?: OnboardingOffer[];
   refreshSeconds: number;
   /** Time of the last successful read, or null if there has never been one. */
   fetchedAt: string | null;
@@ -817,8 +822,27 @@ export function workTitle(item: Item): string {
 }
 
 /** The work message: the item's name, then `$lar-shape <work ID>`. */
-export function workMessage(item: Item): string {
-  return `${workTitle(item)}\n$lar-shape ${item.id}`;
+export interface FactoryThreadContext {
+  dataDir: string;
+  bin: string;
+  shapeSkill: string;
+  azureReadOnly?: boolean;
+}
+const shellPath = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+function factoryEnvironment(context: FactoryThreadContext): string {
+  return [
+    'Use the factory installation and data folder below for this thread and every subagent.',
+    'Before running any factory command, set this environment in that command shell:',
+    `export LAR_FACTORY_DATA_DIR=${shellPath(context.dataDir)}`,
+    `export PATH=${shellPath(context.bin)}:"$PATH"`,
+    ...(context.azureReadOnly ? ["export LAR_FACTORY_AZURE_READ_ONLY='1'", 'All Azure DevOps organizations are read-only. Never launch Azure implementation or write through another tool.'] : []),
+    `Use ${shellPath(`${context.bin}/lar-work`)} for work records. Never use another data folder or command installation.`,
+    'Pass these exact paths and environment to every delegated task. The target repository needs no factory files or factory instructions in AGENTS.md or CLAUDE.md.',
+  ].join('\n');
+}
+export function workMessage(item: Item, context?: FactoryThreadContext | null): string {
+  if (!context) return `${workTitle(item)}\n$lar-shape ${item.id}`;
+  return `${workTitle(item)}\nShape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\nShaping is independent of implementation. Do not build unless the user later chooses Start build.\n\n${factoryEnvironment(context)}`;
 }
 
 /**
@@ -836,8 +860,9 @@ export function buildBranch(item: Item): string {
 }
 
 /** Start build's message, naming the build's work ID and the builder agent of the lar-build installed at `larBuild`. */
-export function buildMessage(item: Item, larBuild: string): string {
-  return `Build ${item.id}. Read ${larBuild}/agents/builder.md and follow it.`;
+export function buildMessage(item: Item, larBuild: string, context?: FactoryThreadContext | null): string {
+  const message = `Build ${item.id}. Read ${larBuild}/agents/builder.md and follow it.`;
+  return context ? `${message}\n\n${factoryEnvironment(context)}` : message;
 }
 
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */
@@ -862,8 +887,7 @@ export type RepositoryItemSource = { kind: 'issues' } | { kind: 'azure-board'; t
 export type DomainDocLocation = { kind: 'private' } | { kind: 'repository'; glossary: string; adrs: string };
 
 /**
- * The settings .lar-factory.json may share as defaults, each one a local override replaces. Credentials and write
- * consent are never among them.
+ * Settings saved on this machine. Credentials stay with the provider's CLI.
  */
 export interface SharedRepositorySettings {
   /** Repository role: what this repository is to the others. */
@@ -876,13 +900,13 @@ export interface SharedRepositorySettings {
   vocabulary?: VocabularyMapping;
 }
 
-/** The settings Repository config may share, in the order Settings lists them. */
+/** Settings editable on this machine. */
 export const SHARED_SETTINGS = ['role', 'itemSource', 'labels', 'domainDocs', 'skills', 'vocabulary'] as const satisfies readonly (keyof SharedRepositorySettings)[];
 
 export type SharedSetting = (typeof SHARED_SETTINGS)[number];
 
-/** Where a setting's value comes from: this Mac's override, Repository config's default, or the factory's default. */
-export type SettingSource = 'local' | 'shared' | 'default';
+/** Whether a value was set on this machine or uses the factory default. */
+export type SettingSource = 'local' | 'default';
 
 /** The repository writes the factory may need, each with its own credential access and local write consent. */
 export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket'] as const;
@@ -894,23 +918,23 @@ export function structureSyncOperations(repo: string): readonly RepositoryOperat
   return onAzure(repo) ? ['publish-ticket', 'edit-ticket', 'comment-ticket'] : ['publish-ticket', 'comment-ticket', 'tag-ticket'];
 }
 
-/** The writes first publication offers separately from onboarding. */
-export const PUBLISHING_OPERATIONS: readonly RepositoryOperation[] = ['publish-ticket', 'tag-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket'];
-
-/** The writes onboarding offers. Publication asks for its own operations when first used. */
-export const OFFERED_OPERATIONS = REPOSITORY_OPERATIONS.filter((op) => !PUBLISHING_OPERATIONS.includes(op));
-
 /** What the user's credentials allow for an operation, as last found; one not needed since the last check stays unverified. */
 export type OperationAccess = 'unverified' | 'allowed' | 'refused';
 
+/** Delivery needs both permissions; reading and shaping remain independent. */
+export function buildAccessProblem(access: Partial<Record<'push-branch' | 'open-pr', OperationAccess>> = {}): string | null {
+  const missing = ([['push-branch', 'push branches'], ['open-pr', 'open pull requests']] as const)
+    .filter(([operation]) => access[operation] !== 'allowed').map(([, name]) => name);
+  return missing.length ? `Builds need verified access to ${missing.join(' and ')}. Recheck repository access in Settings.` : null;
+}
+
 /**
- * One repository's setup as the factory uses it: each shared setting from its local override, else from Repository
- * config, else the default, with access and consent kept on this Mac.
+ * One repository's local settings, with factory defaults for values the user has not set.
  */
 export interface RepositorySetup {
   repo: string;
-  /** Save concepts and relationships on the tracker; optional for existing setups. */
-  structureSync?: boolean;
+  /** Save concepts and relationships on the tracker for recovery on another machine. */
+  structureSync: boolean;
   /** The T3 project its threads start in, once onboarding picked one. */
   projectId?: string;
   role: string;
@@ -924,35 +948,19 @@ export interface RepositorySetup {
   access: Record<RepositoryOperation, OperationAccess>;
   /** The operations the user allows the factory to offer, less those the credentials refuse. */
   consent: RepositoryOperation[];
-  /** The settings that changed since the user last accepted the setup; work that depends on them waits. */
-  paused: ('itemSource' | 'domainDocs')[];
-  /** Why the latest Repository config couldn't be used; the setup keeps its last usable shared defaults meanwhile. */
-  sharedProblem?: string;
-  /** Where each shared setting's value comes from. */
+  /** Where each setting's value comes from. */
   sources: Record<SharedSetting, SettingSource>;
-  /** Repository config's defaults as last read while usable, which removing an override brings back. */
-  shared: SharedRepositorySettings;
   /** The other repositories the user connected it to, on this Mac only; the board's reads always fill it. */
   connections?: string[];
 }
 
-/** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
+/** Repository values used by item sources. */
 export interface RepositoryConfigAnswers extends SharedRepositorySettings {
   itemSource: RepositoryItemSource;
   role: string;
   /** Its custom labels: the file's `labels`, or those the Labels step picked. */
   labels: string[];
 }
-
-/**
- * The Repository config `version` the app writes. Raise it only when .lar-factory.json's shape changes: a file at a
- * lower version then gets a notice offering a PR that rewrites it in the new shape.
- */
-export const CONFIG_VERSION = 2;
-
-/** The .lar-factory.json that onboarding's PR adds and Edit's PR writes, at CONFIG_VERSION unless a test names another. */
-export const onboardingConfigFile = ({ role, itemSource, labels, vocabulary, domainDocs, skills }: RepositoryConfigAnswers, version = CONFIG_VERSION): string =>
-  `${JSON.stringify({ version, role, itemSource, labels, vocabulary, domainDocs, skills }, null, 2)}\n`;
 
 /**
  * What the setup step has answered so far, as typed. Only Azure DevOps asks for a team.
@@ -978,38 +986,14 @@ export interface OnboardingAnswers {
 
 /** The onboarding wizard's answers, each one absent while its detected default stands. */
 export interface OnboardingChoices {
+  structureSync?: boolean;
   itemSource?: RepositoryItemSource;
   role?: string;
   consent?: RepositoryOperation[];
   domainDocs?: DomainDocLocation;
   skills?: string[];
-  /** The factory files of an earlier setup to drop through a PR. */
-  drop?: FactoryFileKind[];
   /** The other onboarded repositories ticked in the Connections step. */
   connections?: string[];
-}
-
-/** What the user picked for a skill Clash: delete the skill's folder in the PR, or rename the skill. */
-export type SkillPick = { kind: 'delete' } | { kind: 'rename'; name: string };
-
-/** A skill name as SKILL.md's `name:` takes it: lowercase letters, digits and single hyphens, at most 64 characters. */
-const SKILL_NAME = /^(?=.{1,64}$)[a-z0-9]+(-[a-z0-9]+)*$/;
-
-/** Whether `name` is a skill name SKILL.md's `name:` takes. */
-export const isSkillName = (name: string) => SKILL_NAME.test(name);
-
-/**
- * Why a skill Clash can't be renamed to `name`, or null when it can: the name must be valid and match no `bundled`
- * skill, no other skill in `projectSkills`, the repository's project skills by name, and none of `renamedBeside`, the
- * new names of the other skill Clashes renamed in the same skills folder, which would move into one folder.
- */
-export function skillRenameProblem(name: string, bundled: readonly string[], projectSkills: readonly string[],
-  renamedBeside: readonly string[]): string | null {
-  if (!isSkillName(name)) return 'Use lowercase letters, numbers and single hyphens, such as web-code-review.';
-  if (bundled.some((other) => other.toLowerCase() === name)) return `${name} is already a bundled skill.`;
-  if (projectSkills.some((other) => other.toLowerCase() === name)) return `A local skill already uses ${name}.`;
-  if (renamedBeside.includes(name)) return `Another skill will use ${name} in this folder.`;
-  return null;
 }
 
 /** Where an onboarding stopped when its dialog closed, so Resume reopens it there. */
@@ -1027,17 +1011,6 @@ export interface OnboardingRepository {
   progress: OnboardingProgress;
 }
 
-/** A T3 project the board offers to onboard with the Repository config its repository has. */
-export interface OnboardingOffer {
-  projectId: string;
-  /** The T3 project's title. */
-  name: string;
-  repo: string;
-  provider: Provider;
-  /** Why setup must replace the saved settings instead of reusing them. */
-  configProblem?: string;
-}
-
 /** A T3 project onboarding can offer, with what the T3 project step shows about its repository. */
 export interface ProjectChoice {
   id: string;
@@ -1047,12 +1020,6 @@ export interface ProjectChoice {
   /** `owner/name` from the folder's origin; null when the folder isn't a main checkout with an origin on a provider. */
   repo: string | null;
   provider: Provider | null;
-  /** Whether the repository has `.lar-factory.json` on its default branch; null when that couldn't be read. */
-  hasConfig: boolean | null;
-  /** The values of the `.lar-factory.json` it has, which onboarding reuses. */
-  config?: RepositoryConfigAnswers;
-  /** Why the `.lar-factory.json` it has can't be reused, in place of `config`. */
-  configProblem?: string;
   /** Whether the repository is already on the board or is onboarding. Unusable settings can start fresh. */
   onBoard: boolean;
 }
@@ -1070,16 +1037,6 @@ export type SetupCheckResult = { passed: true; detail: string } | { passed: fals
 /** A fact onboarding's detection found, or why the login's access kept it from finding it. */
 export type Detected<T> = { found: T } | { refused: string };
 
-/** The kinds of factory file a repository may have from an earlier setup, each one a keep-or-drop choice. */
-export const FACTORY_FILES = ['config', 'agent-skills', 'agent-docs'] as const;
-export type FactoryFileKind = (typeof FACTORY_FILES)[number];
-
-/** A factory file on the default branch: `.lar-factory.json`, the files with an `## Agent skills` section, or the docs/agents/ files. */
-export interface FactoryFile {
-  kind: FactoryFileKind;
-  paths: string[];
-}
-
 /**
  * What onboarding detects about a repository before it asks anything, reading only: each fact found, or Refused with
  * why. `access` is what the login's permissions show for each operation; one they can't settle stays unverified.
@@ -1094,15 +1051,13 @@ export interface SetupDetection {
   access: Record<RepositoryOperation, OperationAccess>;
   /** The repository's own glossary and ADRs when it has either, else private drafts. */
   domainDocs: Detected<DomainDocLocation>;
-  factoryFiles: Detected<FactoryFile[]>;
-  /** The defaults of `.lar-factory.json`, why they can't be used, or null when the repository has none. */
-  sharedConfig: Detected<{ defaults: SharedRepositorySettings } | { problem: string } | null>;
   /** The names of the repository's project skills, which the user may select as coding guidance. */
   projectSkills: Detected<string[]>;
 }
 
 /** Onboarding's answers, which become the repository's local settings. */
 export interface LocalSetupAnswers {
+  structureSync?: boolean;
   projectId: string;
   role: string;
   itemSource: RepositoryItemSource;
@@ -1110,91 +1065,4 @@ export interface LocalSetupAnswers {
   skills: string[];
   consent: RepositoryOperation[];
 }
-
-/**
- * An open ticket onboarding's first step offers to import, as it carries a status label or tag. One carrying more than
- * one Status, or an Azure DevOps work item with no repo- tag, imports once the user resolves it.
- */
-export interface ImportableTicket {
-  number: number;
-  title: string;
-  url: string;
-  /** The Statuses its labels or tags carry. */
-  statuses: Status[];
-  /** Whether it is an Azure DevOps work item with no repo- tag, which may be another repository's work. */
-  untagged: boolean;
-  /** The work record already holding it, which an import skips; null while none does. */
-  workId: string | null;
-}
-
-/** The user's choice for one ticket to import: the Status, when it carries several, and whether an untagged one is this repository's. */
-export interface TicketImport {
-  number: number;
-  status?: Status;
-  placeHere?: boolean;
-}
-
-/** What importing tickets did: each ticket's record and the threads it recorded, and why each other ticket wasn't imported. */
-export interface TicketsImported {
-  imported: { number: number; workId: string; created: boolean; threads: number }[];
-  refused: { number: number; reason: string }[];
-}
-
-/**
- * The repository edits the user chose in onboarding, which a PR carries once the user approves them: the factory files
- * to drop, and the optional additions, `.lar-factory.json` with these shared defaults and the factory's agent guidance.
- */
-export interface RepositoryEdits {
-  drop: FactoryFileKind[];
-  config?: SharedRepositorySettings;
-  guidance?: boolean;
-}
-
-/** What a Clash's fix does to its file: swaps lines for others, deletes the file or folder, or renames it. */
-export type ClashEdit = { kind: 'lines'; remove: string[]; add: string[] } | { kind: 'delete' } | { kind: 'rename'; to: string };
-
-/** Something in a repository that makes agents work against the factory, with the fix onboarding's PR offers for it. */
-export interface Clash {
-  id: string;
-  /** The path on the default branch; a folder's ends in `/`. */
-  file: string;
-  /** The line the reason points at, from 1. */
-  line?: number;
-  reason: string;
-  edit: ClashEdit;
-  /** Whether the fix starts ticked, so the PR holds it. */
-  ticked: boolean;
-  /**
-   * Why the agent's edit can't go in the PR, set by the board when its removed lines aren't at its line on the default
-   * branch or another edit touches them; such a Clash is unticked and can't be ticked.
-   */
-  wontApply?: string;
-}
-
-/** A project skill whose folder is named like a bundled skill; onboarding waits until the user picks delete or rename. */
-export interface SkillClash {
-  name: string;
-  /** The skill's folder on the default branch, such as `.claude/skills/code-review/`. */
-  path: string;
-}
-
-/** The fixes onboarding's PR holds, as the Cleanup step leaves them: the ticked Clashes and each skill Clash's pick, by its folder's path. */
-export interface OnboardingPicks {
-  clashes: Clash[];
-  skills: Record<string, SkillPick>;
-}
-
-/**
- * One change onboarding's PR makes against the default branch: the `## Agent skills` block written or removed in its file, a file written
- * whole, a Clash's lines swapped at its line, or a file or folder (its path ending in `/`) deleted or renamed.
- */
-export type OnboardingPrChange = (
-  | { kind: 'agent-skills'; path: string; removed?: true }
-  | { kind: 'write'; path: string; created: boolean }
-  | { kind: 'edit'; path: string; line: number; reason: string }
-  | { kind: 'delete'; path: string }
-  | { kind: 'rename'; path: string; to: string }) & {
-    /** Current and proposed file contents. Null means the file does not exist yet. */
-    preview?: { before: string | null; after: string };
-  };
 

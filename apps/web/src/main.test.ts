@@ -39,12 +39,12 @@ test('an entered title round-trips through the inline board data without closing
 
 test('fresh data shows no warning', async () => {
   await mountPage(fresh);
-  expect($('[data-toast-color="warning"]')).toBeNull();
+  expect($('[data-warning="client-error"]')).toBeNull();
 });
 
 test('stale data and a failed read show no warning, the title bar carries them', async () => {
   await mountPage(sample);
-  expect($('[data-toast-color="warning"]')).toBeNull();
+  expect($('[data-warning="client-error"]')).toBeNull();
 });
 
 test('the page is the control room, with no tabs: the title bar, desk and line', async () => {
@@ -90,32 +90,32 @@ test("a failed fetch says the server can't be reached and keeps the last data", 
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect(warningText($('[data-toast-color="warning"][role="status"]')!)).toEqual(["Can't reach the board server.", 'HTTP 502 Showing the last data this page received.']);
+  expect(warningText($('[data-warning="client-error"]')!)).toEqual(["Can't reach the board server.", 'HTTP 502 Showing the last data this page received.']);
   expect($$('.desk-card')).toHaveLength(8);
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect($('[data-toast-color="warning"]')).toBeNull();
+  expect($('[data-warning="client-error"]')).toBeNull();
 });
 
 test("the lost server's warning closes, and the next failure after the server answers shows it again", async () => {
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  const close = $<HTMLButtonElement>('[data-toast-color="warning"] .dismiss')!;
+  const close = $<HTMLButtonElement>('[data-warning="client-error"] .dismiss')!;
   expect(close.getAttribute('aria-label')).toBe("Dismiss: can't reach the board server");
   close.focus();
   await settle(() => close.click());
-  expect($('[data-toast-color="warning"]')).toBeNull();
+  expect($('[data-warning="client-error"]')).toBeNull();
   expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect($('[data-toast-color="warning"]'), 'it stays closed while the server stays away').toBeNull();
+  expect($('[data-warning="client-error"]'), 'it stays closed while the server stays away').toBeNull();
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
   await settle(() => vi.advanceTimersByTime(15_000));
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect(warningText($('[data-toast-color="warning"][role="status"]')!)[0]).toBe("Can't reach the board server.");
+  expect(warningText($('[data-warning="client-error"]')!)[0]).toBe("Can't reach the board server.");
 });
 
 test('new data keeps focus', async () => {

@@ -54,28 +54,15 @@ const main = async () => {
     process.exitCode = 1;
     return;
   }
-  // A repository's .lar-factory.json from its default branch: options.repoConfigs holds each one's, by owner/name,
-  // null for none (a 404), false for a read that fails; any other repository reads its issues.
-  const configPath = args[0] === 'api' && !args.includes('PUT') && /^repos\/([\w.-]+\/[\w.-]+)\/contents\/\.lar-factory\.json$/.exec(args[1]);
-  if (configPath) {
-    const repo = configPath[1];
-    const config = options.repoConfigs && repo in options.repoConfigs ? options.repoConfigs[repo]
-      : { version: 1, role: `${repo}'s role`, itemSource: { kind: 'issues' } };
-    if (config === false) {
-      process.stderr.write('HTTP 502: Bad Gateway\n');
-      process.exitCode = 1;
-      return;
-    }
-    if (config === null) {
-      process.stderr.write('gh: Not Found (HTTP 404)\n');
-      process.exitCode = 1;
-      return;
-    }
-    return void process.stdout.write(typeof config === 'string' ? config : JSON.stringify(config));
+  // Repository configuration reads are forbidden. Keep this sentinel to catch regressions.
+  if (args[0] === 'api' && args.some((arg) => arg.includes('/contents/.lar-factory.json'))) {
+    throw new Error('Factory configuration must come from local settings');
   }
   // What the login may do in a repository: push and triage unless options.canPush says false, with issues turned on.
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.some((a) => a.includes('.permissions.push'))) {
-    return void output({ push: options.canPush !== false, triage: options.canPush !== false, issues: true });
+    const scope = options.oauthScopes === null ? '' : `X-OAuth-Scopes: ${options.oauthScopes ?? 'repo'}\r\n`;
+    if (args.includes('--include')) process.stdout.write(`HTTP/2.0 200 OK\r\n${scope}\r\n`);
+    return void output({ push: options.canPush !== false, triage: options.canPush !== false, issues: true, private: options.privateRepo === true });
   }
   // Onboarding's PR: the default branch is main at commit abc123, and options.fail names the call that fails. An
   // opened PR goes in options.prs, by URL, with its state, which a test changes to MERGED to merge it; gh pr close and
@@ -204,8 +191,19 @@ const main = async () => {
     }
     throw new Error('Unexpected fake GraphQL query');
   }
-  // A work record's observation of its ticket: open with no one assigned.
-  if (args[0] === 'issue' && args[1] === 'view' && args.includes('state,assignees')) return output({ state: 'OPEN', assignees: [] });
+  // REST issue reads include the native type and original body used by picking and structural recovery.
+  const restIssue = args[0] === 'api' && /^repos\/(.+\/.+)\/issues\/(\d+)$/.exec(args[1]);
+  if (restIssue && !args.includes('PATCH')) {
+    const issue = (options.repoIssues?.[restIssue[1]] ?? []).find(issue => issue.number === Number(restIssue[2]));
+    if (!issue) { process.stderr.write('HTTP 404: Not Found'); process.exitCode=1; return; }
+    return output({number:issue.number,title:issue.title,html_url:issue.url,body:issue.body ?? '',labels:issue.labels?.nodes ?? [],state:issue.state.toLowerCase(),type:issue.issueType ?? null,updated_at:issue.updatedAt});
+  }
+  // A ticket observation, defaulting to open with no one assigned. Keep explicit fixture observations separate from
+  // listed issues so an external Dependency need not become local board work just to give its real state.
+  if (args[0] === 'issue' && args[1] === 'view' && args.includes('state,assignees')) {
+    const ticket = `${args[args.indexOf('-R') + 1]}#${args[2]}`;
+    return output(options.ticketObservations?.[ticket] ?? { state: 'OPEN', assignees: [] });
+  }
   // The ticket picker's search and a pick's read, of options.repoIssues: open issues whose title has every word, and one issue by number.
   if (args[0] === 'issue' && (args[1] === 'list' || args[1] === 'view')) {
     const issues = options.repoIssues?.[args[args.indexOf('-R') + 1]] ?? [];

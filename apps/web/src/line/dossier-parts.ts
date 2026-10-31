@@ -1,13 +1,13 @@
 // What the line's dossiers hold: every open concept, and every open item with sub-issues on the board, with its parts
-// in the order they run. Each part's kind comes from its labels, what it waits on from its blocked-by issues, and its
+// in the order they run. Each part's kind comes from its local record, what it waits on from its blockers, and its
 // thread is its newest item thread.
 
 import { blockerRef, decisionType, openBlockers, refKey } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
-const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'build'] as const;
+const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'decision', 'build'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
-export const DECISION_KINDS: readonly PartKind[] = ['research', 'grill', 'prototype', 'task'];
+export const DECISION_KINDS: readonly PartKind[] = ['research', 'grill', 'prototype', 'task', 'decision'];
 
 export interface Part {
   item: Item;
@@ -30,14 +30,16 @@ export const THREAD_GLYPH: Record<ThreadState, Status> = { running: 'In progress
 const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 'Done'];
 
 const started = (item: Item) => STARTED.includes(item.status);
-export const isDone = (item: Item) => item.status === 'Done' || item.state === 'closed';
+export const isDone = (item: Item) => item.completion?.complete ?? (item.status === 'Done' || item.state === 'closed');
 const childOf = (child: Item, parent: Item) => child.parentId === parent.id;
 export const threadsOf = (item: Item): ItemThread[] => (Array.isArray(item.threads) ? item.threads : []);
 
-/** `decision-grill`, `decision-prototype`, `decision-research` and `decision-task` are decisions; everything else builds. */
+/** Local kind is authoritative. Legacy source labels can still name a decision method. */
 export function partKind(item: Item): PartKind {
   const decision = decisionType(item);
-  return DECISION_KINDS.find((k) => k === decision) ?? 'build';
+  if (item.kind === 'decision') return DECISION_KINDS.find(kind => kind === decision) ?? 'decision';
+  if (item.recorded === true) return 'build';
+  return DECISION_KINDS.find(kind => kind === decision) ?? 'build';
 }
 
 /** The parts each part waits on: a recorded blocker by its work ID, a ticket's blocker by its ticket, since ticketless parts share number 0. */

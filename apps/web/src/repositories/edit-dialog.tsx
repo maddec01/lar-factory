@@ -1,14 +1,8 @@
-// Edit's dialog over Settings › Repositories: each of the repository's settings with where its value comes from, an
-// editor and Save, which sets it on this Mac over the shared default, and Use shared default once it is set here. Below
-// them, what the credentials were found to allow, Offer for each operation they don't refuse, and Recheck access. While a Repository config
-// can't be used, the dialog says why and shows the last usable setup. Shared defaults change only through a PR.
-
+// The repository editor keeps all settings on this machine.
 import type { ReactNode } from 'react';
-import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, type OperationAccess, type RepositoryOperation, type RepositorySetup,
-  type SettingSource, type SharedRepositorySettings } from '@lar-factory/shared';
+import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, type OperationAccess, type RepositoryOperation, type RepositorySetup } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
@@ -16,10 +10,8 @@ import { Text } from '@lar-factory/ui/design-system/Typography';
 import { NativeSelect } from '@lar-factory/ui/native-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { canSave, shownDrafts, useEditStore, type Drafts, type DraftSetting } from './edit-store.ts';
-import { VocabularySettings } from '../publication/vocabulary-settings.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
-const SOURCES: Record<SettingSource, string> = { local: 'Set on this Mac', shared: 'Shared default', default: 'Factory default' };
 const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: 'Refused', unverified: 'Not checked yet' };
 
 const OPERATIONS = (azure: boolean): Record<RepositoryOperation, string> => ({
@@ -28,35 +20,23 @@ const OPERATIONS = (azure: boolean): Record<RepositoryOperation, string> => ({
   'comment-ticket': 'Post comments', 'type-ticket': azure ? 'Set work item types' : 'Set issue types', 'relate-ticket': 'Set relationships',
 });
 
-/** A setting's value as the dialog names it. */
-function shown<K extends DraftSetting>(value: SharedRepositorySettings[K]): string {
-  const v = value as SharedRepositorySettings[DraftSetting];
-  if (Array.isArray(v)) return v.length ? v.join(', ') : 'none';
-  if (typeof v === 'string') return v || 'none';
-  if (v?.kind === 'azure-board') return `${v.team}'s backlog and current sprint`;
-  if (v?.kind === 'repository') return `${v.glossary} and ${v.adrs}`;
-  return v?.kind === 'private' ? 'Private drafts on this Mac' : "This repository's GitHub issues";
-}
-
 /** One setting: its name, source and editor, Save, and Use shared default while it is set on this Mac. */
 function Setting({ repo, setup, name, hint, settingKey, children }: {
   repo: string; setup: RepositorySetup; name: string; hint?: string; settingKey: DraftSetting; children: ReactNode;
 }) {
-  const { typed, running, save, useShared } = useEditStore();
+  const { typed, running, save, reset } = useEditStore();
   const source = setup.sources[settingKey];
-  const shared = setup.shared[settingKey];
   const editable = !(settingKey === 'itemSource' && !onAzure(repo));
   return (
     <div data-setting={settingKey} className="grid gap-1.5">
-      <span className="flex flex-wrap items-center gap-2 text-sm font-medium">{name}<Badge data-source tone={source === 'local' ? 'accent' : 'neutral'}>{SOURCES[source]}</Badge></span>
+      <span className="flex flex-wrap items-center gap-2 text-sm font-medium">{name}</span>
       {hint && <p className="m-0 text-xs text-base-700">{hint}</p>}
       {children}
-      {source === 'local' && shared !== undefined && <p data-shared className="m-0 text-xs text-base-700">Shared default: {shown(shared)}</p>}
       {editable && <span className="flex flex-wrap gap-2">
         <Button {...kind('other')} disabled={running !== null || !canSave(settingKey, setup, typed)} loading={running === settingKey}
           onClick={() => void save(repo, settingKey, setup)}>Save</Button>
-        {source === 'local' && <Button {...kind('other')} disabled={running !== null} onClick={() => void useShared(repo, settingKey)}>
-          {shared === undefined ? 'Use factory default' : 'Use shared default'}</Button>}
+        {source === 'local' && <Button {...kind('other')} disabled={running !== null} onClick={() => void reset(repo, settingKey)}>
+          Reset</Button>}
       </span>}
     </div>
   );
@@ -80,10 +60,10 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
       <Setting repo={repo} setup={setup} settingKey="labels" name={azure ? 'Custom tags' : 'Custom labels'} hint="Separate them with commas.">
         {text('labels', azure ? 'Custom tags' : 'Custom labels', 'area: server, area: web')}
       </Setting>
-      <Setting repo={repo} setup={setup} settingKey="domainDocs" name="Domain docs" hint="Where builds write the glossary and ADRs.">
+      <Setting repo={repo} setup={setup} settingKey="domainDocs" name="Glossary and decisions" hint="Choose whether builds include domain docs in their PRs.">
         <NativeSelect aria-label="Domain docs" value={drafts.domainDocs} disabled={running !== null} onChange={(e) => type('domainDocs', e.target.value)}>
-          <option value="private">Private drafts on this Mac</option>
-          <option value="repository">The repository's own files</option>
+          <option value="private">Off</option>
+          <option value="repository">Write in build PRs</option>
         </NativeSelect>
         {drafts.domainDocs === 'repository' && <span className="grid gap-2 sm:grid-cols-2">{text('glossary', 'Glossary path')}{text('adrs', 'ADR folder')}</span>}
       </Setting>
@@ -94,29 +74,16 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
   );
 }
 
-/**
- * What the credentials were found to allow for each operation a current feature uses, Offer, which lets the factory offer it unless the
- * credentials refuse it, and Recheck access.
- */
 function Access({ repo, setup }: { repo: string; setup: RepositorySetup }) {
-  const { running, recheck, offer } = useEditStore();
+  const { running, recheck } = useEditStore();
   const names = OPERATIONS(onAzure(repo));
-  return (
-    <div data-access className="grid gap-2">
-      <span className="text-sm font-medium">Access</span>
-      <p className="m-0 text-xs text-base-700">What your credentials allowed when the factory last tried, and what you let it offer. After you change credentials, recheck so each one is tried again when needed.</p>
-      <ul className="m-0 grid list-none gap-1 p-0 text-sm">
-        {REPOSITORY_OPERATIONS.map((op) => <li key={op} data-operation={op} className="flex flex-wrap justify-between gap-2">
-          <span>{names[op]}</span>
-          <span className="flex items-center gap-3 text-xs text-base-700">{ACCESS[setup.access[op]]}
-            <Checkbox label="Offer" checked={setup.consent.includes(op)} disabled={running !== null || setup.access[op] === 'refused'}
-              onChange={() => void offer(repo, op, !setup.consent.includes(op), setup)} /></span>
-        </li>)}
-      </ul>
-      <p className="m-0 text-xs text-base-700">Each operation needs its own permission. Publication also asks you to approve the exact content before any write.</p>
-      <span><Button {...kind('other')} disabled={running !== null} loading={running === 'recheck'} onClick={() => void recheck(repo)}>Recheck access</Button></span>
-    </div>
-  );
+  return <details className="rounded-lg border p-3" data-access>
+    <summary className="cursor-pointer text-sm font-medium">Access</summary>
+    <ul className="m-0 mt-3 grid list-none gap-2 p-0 text-sm">
+      {REPOSITORY_OPERATIONS.map((op) => <li key={op} data-operation={op} className="flex justify-between gap-2"><span>{names[op]}</span><span className="text-xs text-base-700">{ACCESS[setup.access[op]]}</span></li>)}
+    </ul>
+    <Button {...kind('other')} className="mt-3" disabled={running !== null} loading={running === 'recheck'} onClick={() => void recheck(repo)}>Recheck access</Button>
+  </details>;
 }
 
 export function EditDialog() {
@@ -128,15 +95,13 @@ export function EditDialog() {
       {/* ninna-ui's Modal drops the description from aria-describedby, so the description names itself. */}
       <Modal.Content data-edit-dialog title={`Edit ${shownRepo(repo)}`} description="Change how the factory works with this repository on this Mac." aria-describedby="edit-description">
         <Text id="edit-description" tone="muted" className="shrink-0 px-5 pb-4 text-xs sm:px-6">
-          A setting saved here applies on this Mac, over the shared default in .lar-factory.json. Shared defaults change only through a PR on that file.
+          Settings stay on this machine. The repository needs no factory setup files.
         </Text>
         <Modal.Body>
           <div className="grid gap-5">
-            {setup.sharedProblem && <Alert data-shared-problem tone="warning" role="note" title="Can't use .lar-factory.json">
-              {setup.sharedProblem} The board keeps the last usable setup until the file reads again.
-            </Alert>}
+            <Checkbox label="Save concepts and cross-repository links to issues" checked={setup.structureSync} disabled={running !== null}
+              onChange={() => void useEditStore.getState().structureSync(repo, !setup.structureSync)} />
             <Settings repo={repo} setup={setup} />
-            <VocabularySettings key={repo} setup={setup} />
             <Access repo={repo} setup={setup} />
             {errors[repo] && <Alert tone="danger" title="Can't change this setting">{errors[repo]}</Alert>}
           </div>

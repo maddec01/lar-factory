@@ -24,12 +24,12 @@ async function open(): Promise<WorkRecords> {
 }
 const tickets = (...issues: Parameters<typeof boardIssue>[]) => normalizeItems(issues.map((args) => boardIssue(...args)));
 
-test('only recorded work in an onboarded repository is a board item, named by its work ID', async () => {
+test('recorded work keeps its progress and unpicked tracker issues appear fresh in List', async () => {
   const records = await open();
   const recorded = records.importTicket({ title: 'Recorded', repository: REPO, kind: 'feature', status: 'Queued', ticket: `${REPO}#12` }).record;
   records.create({ title: 'Elsewhere', repository: 'maddec01/other', kind: 'bug' });
   const items = recordItems(records, tickets([12, 'List'], [13, 'Shaping']), [REPO]);
-  assert.deepEqual(items.map((i) => [i.id, i.number, i.status, i.kind, i.revision]), [[recorded.workId, 12, 'Queued', 'feature', recorded.revision]]);
+  assert.deepEqual(items.map((i) => [i.id, i.number, i.status, i.kind, i.revision]), [[recorded.workId, 12, 'Queued', 'feature', recorded.revision], [items[1]!.id,13,'List','issue',0]]);
   assert.equal(items[0]!.url, `https://github.com/${REPO}/issues/12`);
 });
 
@@ -172,48 +172,28 @@ test('work that needs you shows the reason, with what its PR and ticket observat
   assert.equal(shown.get(calm.workId), undefined);
 });
 
-test("an item-source change pauses only the repository's ticketed work, a domain-doc change its open work, each saying why", async () => {
-  const records = await open();
-  const ticketed = records.importTicket({ title: 'Ticketed', repository: REPO, kind: 'bug', status: 'Queued', ticket: `${REPO}#12` }).record;
-  const local = records.create({ title: 'Local', repository: REPO, kind: 'build', status: 'Shaping' });
-  const done = records.create({ title: 'Finished', repository: REPO, kind: 'build', status: 'Done' });
-  const pausedBy = (paused: ('itemSource' | 'domainDocs')[]) =>
-    new Map(recordItems(records, [], [REPO], [], new Set(), [{ repo: REPO, paused }]).map((item) => [item.id, item.paused]));
-  const source = pausedBy(['itemSource']);
-  assert.equal(source.get(ticketed.workId), "Its repository's item source changed. Accept the change in Settings › Repositories to go on.");
-  assert.equal(source.get(local.workId), undefined);
-  const docs = pausedBy(['domainDocs']);
-  assert.equal(docs.get(local.workId), "Its repository's domain-doc location changed. Accept the change in Settings › Repositories to go on.");
-  assert.equal(docs.get(done.workId), undefined, 'finished work has nothing left to write');
-  assert.equal(pausedBy(['itemSource', 'domainDocs']).get(ticketed.workId),
-    "Its repository's item source and domain-doc location changed. Accept the change in Settings › Repositories to go on.");
-  assert.deepEqual([...pausedBy([]).values()], [undefined, undefined, undefined]);
-});
-
-test('publication eligibility follows finished refinement through Status changes and explains ineligible concepts and briefs', async () => {
-  const records = await open();
-  let build = records.create({ title: 'Ready to publish', repository: REPO, kind: 'build', status: 'Ready' });
-  build = records.setBody(build.workId, build.revision, 'brief', 'Complete brief.');
-  records.recordGate(build.workId, build.revision, { briefDigest: records.gate(build.workId).briefDigest!, approvedBy: 'reviewer', evidence: 'Passed.' });
-  const decision = records.create({ title: 'Private decision', repository: REPO, kind: 'decision' });
-  const concept = records.create({ title: 'Unfinished concept', repository: REPO, kind: 'concept' });
-  const unfinished = records.create({ title: 'No gate', repository: REPO, kind: 'feature' });
-  records.update(build.workId, records.read(build.workId).revision, { status: 'In progress' });
-  const items = new Map(recordItems(records, [], [REPO]).map((item) => [item.id, item]));
-  assert.deepEqual(items.get(build.workId)!.publication, { eligible: true, reasons: [] });
-  assert.equal(items.get(decision.workId)!.publication, undefined);
-  assert.ok(items.get(concept.workId)!.publication!.reasons.includes('The concept still has Fog.'));
-  assert.ok(items.get(unfinished.workId)!.publication!.reasons.some((reason) => reason.includes('no current passing gate')));
-});
-
-test('publication history remains recoverable when a changed brief no longer has a passing gate', async () => {
-  const records = await open();
-  let build = records.create({ title: 'Search', repository: REPO, kind: 'build', status: 'Ready' });
-  build = records.setBody(build.workId, build.revision, 'brief', 'Passed brief.');
-  records.recordGate(build.workId, build.revision, { briefDigest: records.gate(build.workId).briefDigest!, approvedBy: 'reviewer', evidence: 'Passed.' });
-  records.proposePublication(build.workId, build.revision, { tickets: [{ workId: build.workId, destination: { provider: 'github', repository: REPO }, vocabulary: {}, typeResolution: { candidates: [], selected: null }, title: 'Find searches', body: 'Find saved searches.' }],
-    operations: [{ operationId: 'create', ticketWorkId: build.workId, kind: 'create', dependsOn: [] }], sources: records.publicationReadiness(build.workId).sources.map(({ workId, revision }) => ({ workId, revision })) });
-  records.setBody(build.workId, build.revision, 'brief', 'Changed brief.');
-  assert.equal(recordItems(records, [], [REPO])[0]!.publication!.eligible, false);
-  assert.equal(recordItems(records, [], [REPO])[0]!.publication!.recoverable, true);
+test('concept counts completed decision facts while its Status remains Shaping, and recovered structure starts with no local completion', async () => {
+  const records=await open();const concept=records.create({repository:REPO,kind:'concept',title:'Naming concept',status:'Shaping'});
+  let first=records.create({repository:REPO,kind:'decision',title:'Choose the name',status:'Shaping'});
+  first=records.setParent(first.workId,first.revision,concept.workId);
+  let second=records.create({repository:REPO,kind:'decision',title:'Choose the visibility',status:'Shaping'});
+  second=records.setParent(second.workId,second.revision,concept.workId);
+  first=records.setBody(first.workId,first.revision,'answer','Use the native issue title.');
+  first=records.setBody(first.workId,first.revision,'domain-drafts','none');
+  records.setBody(concept.workId,records.read(concept.workId).revision,'map','## Destination\nClear names.\n\n## Decisions so far\n- Use the native issue title.\n\n## Fog\n- Visibility remains open.\n');
+  let ready=records.create({repository:REPO,kind:'build',title:'Ready work',status:'Ready'});
+  ready=records.setBody(ready.workId,ready.revision,'brief','A private passing brief.');
+  records.recordGate(ready.workId,ready.revision,{briefDigest:records.gate(ready.workId).briefDigest!,approvedBy:'reviewer',evidence:'Checks passed.'});
+  assert.deepEqual(records.completion(first.workId),{complete:true,reasons:[]});
+  const items=recordItems(records,[],[REPO]);const shown=(id:string)=>items.find(item=>item.id===id)!;
+  assert.deepEqual(shown(concept.workId).subIssues,{total:2,completed:1});
+  assert.deepEqual([shown(first.workId).kind,shown(first.workId).status,shown(first.workId).labels,shown(first.workId).completion],['decision','Shaping',[],{complete:true,reasons:[]}]);
+  assert.equal(shown(second.workId).completion?.complete,false);
+  assert.deepEqual([shown(ready.workId).status,shown(ready.workId).completion?.complete,records.gate(ready.workId).current],['Ready',false,true]);
+  const snapshot=records.trackerSnapshot(concept.workId);const encoded=JSON.stringify(snapshot);
+  for(const localOnly of ['"completion":','"status":','"answer":','"domain-drafts":','A private passing brief.'])assert.ok(!encoded.includes(localOnly));
+  const fresh=await open();const restored=fresh.trackerRestore(snapshot,'a'.repeat(64));const recovered=recordItems(fresh,[],[REPO]);
+  assert.deepEqual(recovered.find(item=>item.id===restored)!.subIssues,{total:2,completed:0});
+  assert.ok(recovered.every(item=>item.status==='List'&&item.completion?.complete===false));
+  assert.deepEqual(recovered.find(item=>item.id===restored)!.map?.decisions,['Use the native issue title.']);
 });

@@ -7,6 +7,7 @@ import { WorkRecordError, type WorkRecord, type WorkRecords } from '@lar-factory
 import type { BoardState } from '../board/board-state.ts';
 import type { Reply } from './item-commands.ts';
 import type { ItemSource } from './item-source.ts';
+import { importPickedTicket } from './import-ticket.ts';
 
 export interface Capture {
   /** Records the work a submission describes, once per request ID. */
@@ -109,7 +110,7 @@ export function createCapture({ board, items, records, reread, repos }: CaptureD
       catch (err) { return withBoard(502, { error: `Could not read ${ticket}. ${(err as Error).message}` }); }
       if (!read) return withBoard(404, { error: `${repo.repo} has no open ticket #${input.number}.` });
       try {
-        const { record, created } = records.importTicket({ title: read.title, context: read.text, repository: repo.repo, kind: read.kind, ticket });
+        const { record, created } = await importPickedTicket(records, repo.repo, read);
         return shown(record.workId, { created });
       } catch (err) { return failed(err); }
     },

@@ -3,7 +3,7 @@
 // PRs and provider fields, so a ticket edit never moves, retitles, restructures or blocks work.
 
 import { onAzure, parseConceptMap, refKey, sameRepo } from '@lar-factory/shared';
-import type { Blocker, DependencyHold, IssueRef, Item, NeedsYouOffer, RepositorySetup, Slice, SliceProgress } from '@lar-factory/shared';
+import type { Blocker, DependencyHold, IssueRef, Item, NeedsYouOffer, Slice, SliceProgress } from '@lar-factory/shared';
 import type { Dependency, WorkRecord, WorkRecords } from '@lar-factory/work-records';
 import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
@@ -56,22 +56,6 @@ function needsYouOf(records: WorkRecords, record: WorkRecord): Item['needsYou'] 
   return { reason: record.needsYou, offers: [...offers] };
 }
 
-/** Each repository's settings that changed since the user last accepted its setup. */
-type Paused = readonly Pick<RepositorySetup, 'repo' | 'paused'>[];
-
-/**
- * Why the record waits for its repository's changed setup to be accepted: an item-source change holds work with a
- * ticket, and a domain-doc-location change holds all work not Done. Undefined when no change affects it.
- */
-function pausedOf(record: WorkRecord, paused: Paused): string | undefined {
-  const changed = paused.find((p) => sameRepo(p.repo, record.repository))?.paused ?? [];
-  const what = [
-    ...changed.includes('itemSource') && record.ticket !== null && !isDone(record) ? ['item source'] : [],
-    ...changed.includes('domainDocs') && !isDone(record) ? ['domain-doc location'] : [],
-  ];
-  return what.length ? `Its repository's ${what.join(' and ')} changed. Accept the change in Settings › Repositories to go on.` : undefined;
-}
-
 /** The ticket items an item source read, by their lowercase reference, `owner/name#12`, in each repository that lists them. */
 export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> {
   const byTicket = new Map<string, Item>();
@@ -81,10 +65,15 @@ export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> 
   return byTicket;
 }
 
-/** Maps records to board items with the ticket items an item source read, each paused as `paused` says. */
-function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paused = []) {
+/** Maps records and their local completion facts to board items, alongside their latest ticket context. */
+function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly {repo:string;structureSync?:boolean}[] = []) {
   const byTicket = ticketsByReference(tickets);
-  const publication = records.publicationSummaries();
+  const completions = new Map<string, ReturnType<WorkRecords['completion']>>();
+  const completionOf = (record: WorkRecord) => {
+    let completion = completions.get(record.workId);
+    if (!completion) { completion = records.completion(record.workId); completions.set(record.workId, completion); }
+    return completion;
+  };
   const ticketOf = (record: WorkRecord) => (record.ticket ? byTicket.get(record.ticket.toLowerCase()) : undefined);
   const ref = (record: WorkRecord): IssueRef => ({ number: ticketNumber(record.ticket), title: record.title, url: ticketOf(record)?.url ?? '',
     repo: record.repository, state: state(record) });
@@ -95,18 +84,23 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paus
     const children = records.children(record.workId).filter((c) => !c.setAside);
     // A blocker holds the work until its local facts complete it; its Status, its ticket closing and its thread ending never do.
     const blockers = records.blockers(record.workId).map((b): Blocker => ({ number: ticketNumber(b.ticket), repo: b.repository,
-      state: records.completion(b.workId).complete ? 'closed' : 'open', workId: b.workId, title: b.title }))
+      state: completionOf(b).complete ? 'closed' : 'open', workId: b.workId, title: b.title }))
       .concat(record.kind === 'build' ? records.blockingDependencies(record.workId).map(dependencyBlocker) : []);
     const slices = children.filter((c) => c.kind === 'slice').map((c): Slice => ({ ...ref(c), progress: sliceProgress(c), workId: c.workId }));
     const work = children.filter((c) => c.kind !== 'slice');
     const mapBody = record.kind === 'concept' ? records.body(record.workId, 'map') : null;
     const map = mapBody !== null ? parseConceptMap(mapBody) : record.kind === 'concept' ? ticket?.map ?? parseConceptMap('') : ticket?.map;
     const done = isDone(record);
+    const sync = setups.find(setup=>sameRepo(setup.repo,record.repository))?.structureSync === false ? undefined : records.trackerState(record.workId);
     const item: Item = {
       content: 'ticket', labels: [], linkedPrs: [], ...ticket && { labels: ticket.labels, linkedPrs: ticket.linkedPrs },
       ...ticket?.azure && { azure: ticket.azure }, ...ticket?.sourceOrder !== undefined && { sourceOrder: ticket.sourceOrder },
       ...ticket?.abandonRefusal && { abandonRefusal: ticket.abandonRefusal }, ...ticket?.currentSprint && { currentSprint: ticket.currentSprint },
       id: record.workId,
+      recorded: true,
+      completion: completionOf(record),
+      ...(ticket?.tracker && {tracker: ticket.tracker}),
+      ...(sync && {sync}),
       revision: record.revision,
       status: record.status,
       statuses: done ? [] : [record.status],
@@ -117,20 +111,15 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paus
       repo: record.repository,
       state: state(record),
       closedAs: done ? 'done' : null,
-      parent: parent && ref(parent),
+      parent: parent ? ref(parent) : ticket?.parent ?? null,
       parentId: record.parentId,
-      subIssues: { total: work.length, completed: work.filter(isDone).length },
+      subIssues: { total: work.length, completed: work.filter(child => completionOf(child).complete).length },
       blockers,
       updatedAt: record.updatedAt,
       closedAt: done ? record.finishedAt ?? record.updatedAt : null,
       slices,
     };
-    if (!['decision', 'slice'].includes(record.kind)) {
-      item.publication = publication.get(record.workId);
-    }
     if (map) item.map = map;
-    const pause = pausedOf(record, paused);
-    if (pause) item.paused = pause;
     const needsYou = needsYouOf(records, record);
     if (needsYou) item.needsYou = needsYou;
     return item;
@@ -144,14 +133,17 @@ const listed = (record: WorkRecord, repos: readonly string[]) => record.kind !==
 /**
  * Every board item from the records of `repos`, in the records' order, with the ticket items an item source read,
  * less set-aside work and the work IDs in `hidden`, which retention hides. In a repository of `unread`, whose source
- * hasn't read yet, a record with a ticket waits until its ticket is read. Work a repository's changed setup in `paused`
- * affects says why it waits.
+ * hasn't read yet, a record with a ticket waits until its ticket is read.
  */
 export function recordItems(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[] = [],
-  hidden: ReadonlySet<string> = new Set(), paused: Paused = []): Item[] {
-  const { ticketOf, toItem } = itemMapper(records, tickets, paused);
+  hidden: ReadonlySet<string> = new Set(), setups: readonly {repo:string;structureSync?:boolean}[] = []): Item[] {
+  const { ticketOf, toItem } = itemMapper(records, tickets, setups);
   const waits = (record: WorkRecord) => record.ticket !== null && !ticketOf(record) && unread.some((repo) => sameRepo(repo, record.repository));
-  return records.list({}).filter((r) => !r.setAside && !hidden.has(r.workId) && listed(r, repos) && !waits(r)).map(toItem);
+  const all = records.list({});
+  const held = new Set(all.flatMap(record => record.ticket ? [record.ticket.toLowerCase()] : []));
+  const unpicked = tickets.filter(ticket => repos.some(repo=>sameRepo(repo,ticket.repo)) && ticket.state === 'open' && !held.has(refKey(ticket.repo, ticket.number).toLowerCase()))
+    .map((ticket): Item => ({...ticket, recorded: false, status: 'List', statuses: [], slices: []}));
+  return [...all.filter((r) => !r.setAside && !hidden.has(r.workId) && listed(r, repos) && !waits(r)).map(toItem), ...unpicked];
 }
 
 /** Archive's items: the set-aside work of `repos` and the work in `hidden`, in the records' order, each with its `archived` facts. */

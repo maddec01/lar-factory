@@ -15,7 +15,7 @@ import type { Part, PartKind } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
 
 const DECISIONS = 'Decisions';
-const KIND_ICON: Record<PartKind, typeof Hammer> = { grill: MessagesSquare, prototype: Shapes, research: BookOpen, task: ListChecks, build: Hammer };
+const KIND_ICON: Record<PartKind, typeof Hammer> = { grill: MessagesSquare, prototype: Shapes, research: BookOpen, task: ListChecks, decision: MessagesSquare, build: Hammer };
 const CHECK = 'e2e';
 /** A part's work ID, which ticketless parts have too. */
 const keyOf = (p: Part) => p.item.id;
@@ -81,10 +81,13 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
   const isPicked = useItemDialogStore((state) => state.itemId === item.id);
   const Icon = KIND_ICON[part.kind];
   const open = openWaits(part);
-  const tone = item.status === 'Needs you' ? 'border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] shadow-[inset_3px_0_0_var(--warning)]'
-    : isDone(item) ? 'border-(--border) bg-(--muted)' : open.length ? 'border-dashed border-(--input)' : 'border-(--border)';
+  const complete = isDone(item);
+  const tone = complete ? 'border-(--border) bg-(--muted)'
+    : item.status === 'Needs you' ? 'border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] shadow-[inset_3px_0_0_var(--warning)]'
+    : open.length ? 'border-dashed border-(--input)' : 'border-(--border)';
   let action: ReactNode = null;
-  if (item.status === 'Needs you') action = <OpenThread item={item} data={data} label="Answer in T3" />;
+  if (complete) action = null;
+  else if (item.status === 'Needs you') action = <OpenThread item={item} data={data} label="Answer in T3" />;
   else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} label="Start" />;
   else if (open.length) action = <span className="text-[11px] text-(--muted-foreground)">starts by itself after {waitText(item, open)}</span>;
   else if (thread?.state === 'running') action = <span className="text-[11px] text-(--muted-foreground)">thread working · {shortAgo(thread.updated, now)}</span>;
@@ -102,7 +105,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
       <AzureFields azure={item.azure} />
       {item.slices.length > 0 && <span className="pointer-events-none relative"><SliceBar item={item} /></span>}
       <span className="pointer-events-none relative mt-auto flex items-center gap-1.5 text-xs">
-        <StatusGlyph status={item.status} className="size-3" />{item.status}
+        <StatusGlyph status={complete ? 'Done' : item.status} className="size-3" />{complete ? 'Complete' : item.status}
         {thread && <span className="truncate text-(--muted-foreground)">· {thread.state}</span>}
       </span>
       {action && <span className="relative flex min-h-6 min-w-0 items-center">{action}</span>}

@@ -40,10 +40,10 @@ const stop = (e: MouseEvent) => e.stopPropagation();
 const canStart = (data: BoardData) => (item: Item) => !openBlockers(item).length
   && !startHold(data, item.repo) && !hasLiveThread(item);
 
-/** A row's action: Start refining, Open thread while the item has a live thread, once it starts. */
+/** A row's action: Shape issue, Open thread while the item has a live thread, once it starts. */
 function RowAction({ item, data }: { item: Item; data: BoardData }) {
   if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-  return <StartOrAfter item={item} data={data} label="Start refining" />;
+  return <StartOrAfter item={item} data={data} label="Shape issue" />;
 }
 
 /** `waits` marks the row Start next starts while every build slot is taken. */
@@ -92,7 +92,7 @@ function Header({ items, building, next, data }: { items: Item[]; building: numb
     <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-(--border) px-3 py-2.5">
       <StatusGlyph status="Queued" />
       <span id="queue-h" className="text-[13px] font-medium">Queue <span className="font-normal text-(--muted-foreground) tabular-nums">{items.length}</span></span>
-      <span className="text-[11px] text-(--muted-foreground)">Starting one opens a refining thread; once refined it moves to Ready.</span>
+      <span className="text-[11px] text-(--muted-foreground)">Shape an issue to explore it and write a brief. Start a build separately when you are ready.</span>
       <span className="ml-auto flex items-center gap-2 text-[11px] text-(--muted-foreground)">
         <BuildSlots building={building} />
         <button type="button" role="switch" aria-checked={false} disabled title="Auto-start isn't built yet: it will start the next item whenever a build slot frees"

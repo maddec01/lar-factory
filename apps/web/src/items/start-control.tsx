@@ -6,7 +6,7 @@
 import { useId, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { itemName, ref, highlightedChoice, storedChoice } from '@lar-factory/shared';
+import { canResumeShaping, itemName, ref, highlightedChoice, storedChoice } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -87,8 +87,10 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
   const thread = startedThread(item, data, start, kind);
   const threads = Array.isArray(item.threads) ? item.threads : [];
   // An unrecorded shaping thread can explain refining, but never a build that hasn't started.
-  const observed = thread ? threads.find((t) => t.id === thread.threadId)
-    : kind === 'refine' ? threads.find((t) => t.id !== data.startedBuilds?.[item.id]?.threadId) : undefined;
+  const recorded = thread ? threads.find((t) => t.id === thread.threadId) : undefined;
+  const resume = kind === 'refine' && canResumeShaping(item) && (!thread || recorded);
+  const observed = resume ? threads.find((t) => t.purpose === 'shape') ?? threads[0]
+    : thread ? recorded : kind === 'refine' ? threads.find((t) => t.id !== data.startedBuilds?.[item.id]?.threadId) : undefined;
   const stopped = observed?.state === 'stopped';
   if (thread && observed?.state === 'done') {
     return <span className="start-group"><span className="basis-full">Run finished.</span><OpenThread item={item} data={data} threadId={observed.id} /></span>;
@@ -99,7 +101,7 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
     // Once its message is closed, a tag still says why Start is gone.
     return <span className="start-group">{!start.message && <Badge tone="warning" className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</Badge>}</span>;
   }
-  const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : stopped ? 'Start again' : label;
+  const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : stopped && !resume ? 'Start again' : label;
   // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
   const state = data.capture?.enabled === false ? {} : start?.phase === 'pending' ? { 'aria-disabled': true as const } : writeState(data, action);
   const held = Boolean(state['aria-disabled']);

@@ -5,7 +5,7 @@ import { $, $$, mountPage, sample, settle, text, toast } from '../../test/suppor
 import type { BoardData } from '@lar-factory/shared';
 import { detection, dialog, empty, project, serve } from './onboarding-support.ts';
 
-const waiting = (data: BoardData, step = 'role'): BoardData => ({ ...data,
+const waiting = (data: BoardData, step = 'work'): BoardData => ({ ...data,
   onboarding: [{ repo: 'maddec01/lar-web', progress: { step, done: ['project'], answers: { projectId: 'lar-web' } } }] });
 
 const card = () => $('[data-onboarding-card="maddec01/lar-web"]');
@@ -20,7 +20,7 @@ test('a repository still onboarding shows its card with its step instead of the 
   expect($('[data-empty-state]')).toBeNull();
   expect(text(card()!.querySelector('h2'))).toBe('maddec01/lar-web');
   expect(text(card())).toContain('Setting up');
-  expect(text(card())).toContain('Stopped at Repository role');
+  expect(text(card())).toContain('Stopped at Work and docs');
   expect(text(card()!.querySelector('[data-resume]'))).toBe('Resume');
 });
 
@@ -34,12 +34,12 @@ test("a card for an older board's onboarding says it stopped at the first step",
 
 test("an Azure DevOps repository's card shows its name decoded, and its step", async () => {
   const repo = 'contoso/Fabrikam%20Fiber/lar-api';
-  const data: BoardData = { ...empty, onboarding: [{ repo, progress: { step: 'source', done: ['project', 'detect'], answers: { projectId: 'lar-api', provider: 'Azure DevOps' } } }] };
+  const data: BoardData = { ...empty, onboarding: [{ repo, progress: { step: 'work', done: ['project', 'work'], answers: { projectId: 'lar-api', provider: 'Azure DevOps' } } }] };
   serve(data, []);
   await mountPage(data);
   const azure = $(`[data-onboarding-card="${repo}"]`)!;
   expect(text(azure.querySelector('h2'))).toBe('contoso/Fabrikam Fiber/lar-api');
-  expect(text(azure)).toContain('Stopped at Item source');
+  expect(text(azure)).toContain('Stopped at Work and docs');
 });
 
 test('the card sits above the board of the repositories onboarded already', async () => {
@@ -51,11 +51,11 @@ test('the card sits above the board of the repositories onboarded already', asyn
 });
 
 test('Resume reopens the dialog on the stored step with the stored project', async () => {
-  serve(waiting(empty, 'detect'), [project('lar-web', { onBoard: true })], { error: null }, 200, { '/api/onboarding/detect': { detection: detection(), error: null } });
-  await mountPage(waiting(empty, 'detect'));
+  serve(waiting(empty, 'work'), [project('lar-web', { onBoard: true })], { error: null }, 200, { '/api/onboarding/detect': { detection: detection(), error: null } });
+  await mountPage(waiting(empty, 'work'));
   await resume();
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('What we found');
-  expect(text(dialog()!.querySelector('#onboarding-place'))).toBe('Set up lar-web. Step 2 of 8.');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Work and docs');
+  expect(text(dialog()!.querySelector('#onboarding-place'))).toBe('Set up lar-web.');
   await settle(() => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).includes('Back'))!.click());
   const radio = dialog()!.querySelector('[data-choice="lar-web"] [role="radio"]')!;
   expect(radio.getAttribute('aria-checked')).toBe('true');

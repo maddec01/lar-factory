@@ -1,5 +1,5 @@
 // Settings: the modal with its section list in groups, each section's title and description over its rows, the
-// Install targets with their switches and what a change did, the bundled skills with their last updates and install
+// Skill folders with their switches and what a change did, the bundled skills with their last updates and install
 // states, the update channel, version, the update pill's state and step, and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the targets and updates explain that they need the board app.
 
@@ -69,40 +69,35 @@ test('Settings opens from the title bar, in a browser too, as a modal over the b
   await settle(() => settingsButton()!.click());
   expect(modal()!.getAttribute('role')).toBe('dialog');
   expect($$('.settings-nav [role="group"]').map((g) => [g.getAttribute('aria-label'), [...g.querySelectorAll('button')].map(text)])).toEqual([
-    ['Board', ['General', 'Appearance', 'Notifications', 'Keyboard shortcuts']],
-    ['Connections', ['Repositories', 'T3 Code', 'Skills']],
+    ['Board', ['General']],
+    ['Connections', ['Repositories', 'Skills']],
     ['App', ['Updates', 'Archive', 'Diagnostics']],
   ]);
   expect(section('General').getAttribute('aria-current')).toBe('page');
   expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
-  expect(text(modal())).toContain('How the board refreshes, what Start may do on its own, and how the app sits on your Mac.');
-  expect($$('.settings-group h3').map(text)).toEqual(['Board', 'Flow limits', 'App']);
+  expect(text(modal())).toContain('Board preferences.');
+  expect($$('.settings-group h3').map(text)).toEqual(['Dialogs', 'Refresh']);
   expect($('.title-bar')!.closest('[hidden]'), 'the board stays under it').toBeNull();
   expect($('.desk')).not.toBeNull();
 });
 
-test('choosing a section shows its title, description and controls on the right', async () => {
-  await open('Notifications');
-  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Notifications');
-  expect(modal()!.getAttribute('aria-label') ?? text($(`#${modal()!.getAttribute('aria-labelledby')}`))).toBe('Settings: Notifications');
-  expect(text(modal())).toContain('Which changes on the board tell you, and when.');
-  expect(section('Notifications').getAttribute('aria-current')).toBe('page');
+test('choosing a section shows useful controls', async () => {
+  await open('Repositories');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repositories');
+  expect(section('Repositories').getAttribute('aria-current')).toBe('page');
   expect(section('General').getAttribute('aria-current')).toBeNull();
-  expect($$('.settings-group h3').map(text)).toEqual(['Tell me when', 'Delivery']);
-  expect(switches()).toHaveLength(0);
-  expect(text(row('quiet'))).toContain('Not available yet');
-  expect(text(body())).not.toContain('Follow Focus');
+  expect(text(body())).toContain('Add repository');
 });
 
 test('search keeps the sections whose name or a row matches, and / focuses it', async () => {
   await open('General');
-  await type(search(), 'dock');
+  await type(search(), 'full refresh');
   expect(sections().map(text)).toEqual(['General']);
-  await type(search(), 'targets');
+  await type(search(), 'skill folders');
   expect(sections().map(text)).toEqual(['Skills']);
   expect($$('.settings-nav [role="group"]').map((g) => g.getAttribute('aria-label')), 'a group with no match goes').toEqual(['Connections']);
   await type(search(), '');
-  expect(sections()).toHaveLength(10);
+  expect(sections()).toHaveLength(6);
   search().blur();
   await settle(() => modal()!.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true })));
   expect(document.activeElement).toBe(search());
@@ -110,7 +105,7 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
 
 test('a search that leaves out the open section shows the first one it keeps, and clearing it goes back', async () => {
   await open('General');
-  await type(search(), 'targets');
+  await type(search(), 'skill folders');
   expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Skills');
   expect(section('Skills').getAttribute('aria-current')).toBe('page');
   await type(search(), '');
@@ -119,11 +114,11 @@ test('a search that leaves out the open section shows the first one it keeps, an
 });
 
 test('a search that matches nothing says so in the section list and keeps the open section on the right', async () => {
-  await open('Notifications');
+  await open('General');
   await type(search(), 'zzz');
   expect(sections()).toHaveLength(0);
   expect(text($('.settings-nav [role="status"]')), 'screen readers announce it').toBe('No settings match.');
-  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Notifications');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
   await type(search(), '');
   expect($('.settings-nav .no-match')).toBeNull();
 });
@@ -155,35 +150,10 @@ test.each([[15, '15 seconds'], [60, '1 minute'], [300, '5 minutes'], [120, '2 mi
   expect(text(row('refresh'))).toContain(label);
 });
 
-test('a repository colour named owner/name shows it once; one named by its name shows owner/name under it', async () => {
-  await open('Appearance', { ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork', labels: [] }] });
-  expect(text(row('color-maddec01/lar-server')).split('maddec01/lar-server').length - 1, 'the title and the tag, no description').toBe(2);
-  expect(text(row('color-maddec01/lar-apple'))).toContain('maddec01/lar-apple');
-});
-
-test('Refresh every says the board reads each repository\'s items and .lar-factory.json', async () => {
+test('settings only show working controls', async () => {
   await open('General');
-  expect(text(row('refresh'))).toContain("How often the board reads every item, and each repository's .lar-factory.json, through gh on GitHub and az on Azure DevOps. Between these reads it checks GitHub for changes every 5 seconds, for free, and reads only what changed.");
-  expect(text(row('confirm-abandon'))).toContain('Abandon sets work aside on this Mac, then asks again before it closes the ticket.');
-});
-
-test('unfinished settings show availability inline without controls or fictional values', async () => {
-  await open('General');
-  expect(text(row('refresh'))).toContain('45 seconds');
-  expect(text(row('in-flight'))).toContain('Concurrent builds');
-  for (const id of ['login', 'open-in', 'in-flight', 'auto-start']) {
-    expect(text(row(id))).toContain('Not available yet');
-    expect(row(id).querySelector('button, input, select')).toBeNull();
-  }
-  expect(text(body())).not.toContain('Start holds back when the factory is full');
-  await settle(() => section('Appearance').click());
-  expect(text(row('scheme'))).toContain('Not available yet');
-  expect(text(row('font-size'))).not.toContain('13');
-  expect($$('.settings-body [role="radio"], .settings-body input')).toHaveLength(0);
-  expect(switches()).toHaveLength(2);
-  await settle(() => section('T3 Code').click());
-  expect(text(body())).not.toContain('Connected');
-  expect(text(row('base'))).toContain('Not available yet');
+  expect(text(body())).not.toContain('Not available yet');
+  expect(text(body())).not.toContain('.lar-factory.json');
 });
 
 /** Each Settings group's title with its rows' ids. */
@@ -210,16 +180,6 @@ test('Repositories shows the command line tools\' logins and each repository wit
   ]);
 });
 
-test('a repository with an open Edit PR shows it on its row, with its link, until a read finds it gone', async () => {
-  const editPr = 'https://github.com/maddec01/lar-server/pull/21';
-  await open('Repositories', { ...sample, repos: [{ ...sample.repos[0]!, editPr }, sample.repos[1]!] });
-  const link = row(`repo-${sample.repos[0]!.repo}`).querySelector('a[data-edit-pr]')!;
-  expect([text(link), link.getAttribute('href')]).toEqual(['Edit PR open', editPr]);
-  expect(row(`repo-${sample.repos[1]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
-  await push(sample);
-  expect(row(`repo-${sample.repos[0]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
-});
-
 test('an onboarded repository whose setup the board read has Edit, one without none, and Add repository opens the onboarding dialog over Settings', async () => {
   const board = { ...sample, repos: [{ ...sample.repos[0]!, setup: {} as RepositorySetup }, sample.repos[1]!] };
   serve(board, [project('lar-web')]);
@@ -241,17 +201,17 @@ test('an onboarded repository whose setup the board read has Edit, one without n
 
 test('a repository still onboarding is listed with its provider and its step, and Resume reopens the dialog there', async () => {
   const data: BoardData = { ...sample, onboarding: [
-    { repo: 'maddec01/lar-web', progress: { step: 'role', done: ['project', 'detect', 'import'], answers: { projectId: 'lar-web', provider: 'GitHub' } } },
+    { repo: 'maddec01/lar-web', progress: { step: 'work', done: ['project', 'detect', 'import'], answers: { projectId: 'lar-web', provider: 'GitHub' } } },
     { repo: 'contoso/Fabrikam%20Fiber/lar-api', progress: { step: 'checks', done: ['project'], answers: { projectId: 'lar-api', provider: 'Azure DevOps' } } },
   ] };
   serve(data, [project('lar-web', { onBoard: true })]);
   await open('Repositories', data);
   expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
-  expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Repository roleResume');
+  expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Work and docsResume');
   expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResume');
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repository role');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Work and docs');
 });
 
 const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];
@@ -447,7 +407,7 @@ test('a Date or restore from another year shows its year', async () => {
 
 test('Skills has no Skill sync group', async () => {
   await open('Skills', { ...sample, bundledSkills: [larWork] });
-  expect(groups().map(([title]) => title)).toEqual(['Install targets', 'Bundled skills']);
+  expect(groups().map(([title]) => title)).toEqual(['Skill folders', 'Bundled skills']);
 });
 
 test("Skills says so in one row when it couldn't read the bundled skills", async () => {
@@ -608,7 +568,7 @@ test('a bridge that throws shows the error', async () => {
   bridge.getInstallState.mockRejectedValueOnce(new Error('home is gone'));
   await open();
   expect($('.settings-row[data-row="target-~/.claude/skills"]')).toBeNull();
-  expect(result().textContent).toBe('Couldn\'t read the Install targets: home is gone');
+  expect(result().textContent).toBe('Couldn\'t read the Skill folders: home is gone');
 });
 
 test("a state that couldn't read the targets shows its error", async () => {
@@ -838,14 +798,14 @@ test('dialog preferences default off and persist when Settings reopens', async (
   localStorage.removeItem('lar-board:match-list-size');
   localStorage.removeItem('lar-board:open-list-expanded');
   try {
-    await open('Appearance');
+    await open('General');
     expect(switches().map(ticked)).toEqual([false, false]);
     for (const control of switches()) await settle(() => control.click());
     expect(localStorage.getItem('lar-board:match-list-size')).toBe('1');
     expect(localStorage.getItem('lar-board:open-list-expanded')).toBe('1');
     await settle(() => close().click());
     await settle(() => settingsButton()!.click());
-    await settle(() => section('Appearance').click());
+    await settle(() => section('General').click());
     expect(switches().map(ticked)).toEqual([true, true]);
   } finally {
     localStorage.removeItem('lar-board:match-list-size');
@@ -866,7 +826,7 @@ test('Skills shows live work and recovery without counting blocked skills as ins
   await bridge.push({ ...listed, targets: [{ ...work, running: false, error: 'Permission denied. Fix access and Retry.',
     skills: [{ name: 'lar-build', state: 'installed' }, { name: 'lar-shape', state: 'failed' }], replaced: ['lar-build'] }] });
   expect(text(row('target-~/.agents/skills'))).toContain('Permission denied');
-  expect(text(row('target-~/.agents/skills'))).toContain('Replaced Drift: lar-build');
+  expect(text(row('target-~/.agents/skills'))).toContain('Restored skills: lar-build');
   expect(row('target-~/.agents/skills').querySelector('progress')!.value).toBe(1);
   expect(row('target-~/.agents/skills').querySelector('button[data-retry-install]')).not.toBeNull();
   await bridge.push({ ...listed, targets: [{ ...work, operation: 'check', running: true }] });
@@ -976,12 +936,12 @@ test('dismissed Drift stays in Settings with failed Replace and later recovery',
   });
   await open();
   const warning = () => $('[data-warning="drift"]')?.closest('[data-slot="toast"]');
-  await settle(() => warning()!.querySelector<HTMLButtonElement>('.dismiss')!.click());
+  expect(warning()).toBeUndefined();
   await settle(() => pushInstall({ ...drifted }));
   await settle(() => section('General').click());
   await settle(() => section('Skills').click());
   expect(warning()).toBeUndefined();
-  expect(text(row('target-~/.agents/skills'))).toContain('lar-build: Drift');
+  expect(text(row('target-~/.agents/skills'))).toContain('lar-build: Changed');
   const replace = () => row('target-~/.agents/skills').querySelector<HTMLButtonElement>('[data-replace-drift]')!;
   await settle(() => replace().click());
   expect(text(row('target-~/.agents/skills'))).toContain('EACCES');
@@ -990,7 +950,7 @@ test('dismissed Drift stays in Settings with failed Replace and later recovery',
   const recovered = { ...drifted, drift: [], targets: [{ ...target, finished: true, replaced: ['lar-build'], skills: [{ name: 'lar-build', state: 'installed' as const }] }] };
   bridge.replaceDrift.mockResolvedValueOnce({ snapshot: recovered });
   await settle(() => replace().click());
-  expect(text(row('target-~/.agents/skills'))).toContain('Replaced Drift: lar-build');
+  expect(text(row('target-~/.agents/skills'))).toContain('Restored skills: lar-build');
   expect(text(body())).not.toContain('EACCES');
   expect(replace()).toBeNull();
   expect(bridge.replaceDrift).toHaveBeenCalledTimes(2);
@@ -1003,12 +963,12 @@ test('Settings retains Clash paths and Retry after the overview closes', async (
   const bridge = stubApp({ getInstallState: vi.fn(async () => clashed), retryInstall: vi.fn(async () => ({ snapshot: listed })) });
   await open();
   const target = row('target-~/.claude/skills');
-  expect(text(target)).toContain('lar-build: Clash');
-  expect(text(target)).toContain('Clash at ~/.claude/skills/lar-build');
+  expect(text(target)).toContain('lar-build: Existing skill');
+  expect(text(target)).toContain('Existing skill at ~/.claude/skills/lar-build');
   expect(text(target)).toContain('does not own this path. Rename or remove it, then Retry.');
   await settle(() => target.querySelector<HTMLButtonElement>('[data-retry-install]')!.click());
   expect(bridge.retryInstall).toHaveBeenCalledOnce();
-  expect(text(body())).not.toContain('Clash at');
+  expect(text(body())).not.toContain('Existing skill at');
   expect($('[data-install-overview]')).toBeNull();
 });
 
@@ -1020,9 +980,9 @@ test('a dependent Claude target directs Clash recovery to the source path only',
   })) });
   await open();
   const target = row('target-~/.claude/skills');
-  expect(text(target)).toContain('lar-build: Blocked by source Clash');
-  expect(text(target)).toContain('Clash at ~/.agents/skills/lar-build');
-  expect(text(target)).not.toContain('Clash at ~/.claude/skills/lar-build');
+  expect(text(target)).toContain('lar-build: Blocked by an existing skill');
+  expect(text(target)).toContain('Existing skill at ~/.agents/skills/lar-build');
+  expect(text(target)).not.toContain('Existing skill at ~/.claude/skills/lar-build');
   expect(text(target)).toContain('Rename or remove it, then Retry.');
 });
 

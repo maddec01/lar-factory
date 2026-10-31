@@ -12,11 +12,11 @@ import { LAR_WORK, larWork, startBoard, until } from './server-support.ts';
 test('the board lists the records lar-work writes while it runs, and their next change', { timeout: 30_000 }, async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')], recorded: false });
   await until(board, (d) => d.fetchedAt !== null);
-  assert.deepEqual((await board.board()).items, [], 'an issue with no work record is not on the board');
+  assert.deepEqual((await board.board()).items.map((item:Item)=>[item.number,item.status,item.recorded]), [[12,'List',false]], 'unpicked issues appear fresh in List');
   const local = await larWork(board.dataDir, 'create', '--title', 'From a thread', '--repository', 'maddec01/lar-factory', '--kind', 'feature');
   const imported = await larWork(board.dataDir, 'import', '--title', 'Picked ticket', '--repository', 'maddec01/lar-factory', '--kind', 'bug',
     '--ticket', 'maddec01/lar-factory#12', '--status', 'Queued');
-  const shown = await until(board, (d) => d.items.length === 2);
+  const shown = await until(board, (d) => d.items.some(item=>item.id===imported.workId) && d.items.some(item=>item.id===local.workId));
   assert.deepEqual(shown.items.map((i) => [i.id, i.title, i.status, i.url]), [
     [imported.workId, 'Picked ticket', 'Queued', 'https://github.com/maddec01/lar-factory/issues/12'],
     [local.workId, 'From a thread', 'List', null],

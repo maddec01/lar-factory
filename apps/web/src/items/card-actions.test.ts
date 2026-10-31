@@ -18,7 +18,7 @@ async function openItem(itemId: string): Promise<void> {
   await settle(() => useItemDialogStore.getState().open(itemId));
 }
 
-test('Queue shows the action in flight and holds Abandon without relabelling it, then says so', async () => {
+test('Queue shows pending state, then leaves Shape reachable without an overlay', async () => {
   holdPosts();
   await mountPage();
   await openItem('I_sample01');
@@ -30,8 +30,8 @@ test('Queue shows the action in flight and holds Abandon without relabelling it,
 
   await answer({ error: null, board: moved('I_sample01', 'Queued') });
   expect(text($('.title-bar .list-button')), 'it leaves the List').toBe('List3');
-  expect([toast()!.getAttribute('role'), text(toast())]).toEqual(['status', `Moved #61 ${sample.items[0]!.title} to Queued. View item`]);
-  expect(toast()!.querySelector('button.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Moved #61');
+  expect(toast()).toBeNull();
+  expect(text(button('start', 'I_sample01'))).toContain('Shape issue');
 });
 
 test("a server that can't be reached is a Queue error too", async () => {
@@ -51,7 +51,7 @@ test('Back to List shows only its own pending state', async () => {
   await press(back);
   expect([text(back), back.getAttribute('aria-label')!.split(' ').slice(0, 2).join(' '), back.getAttribute('aria-disabled')]).toEqual(['Moving to List…', 'Moving #129', 'true']);
   expect(text(button('abandon', 'I_sample05')), 'Abandon is not relabelled').toBe('Abandon');
-  expect(text(button('start', 'I_sample05')), 'Start is not relabelled').toBe('Start refining ▾');
+  expect(text(button('start', 'I_sample05')), 'Start is not relabelled').toBe('Shape issue ▾');
 });
 
 test('a failed Back to List shows as a toast naming the item, which stays until closed and hands focus back', async () => {
@@ -145,4 +145,18 @@ test('in sample mode Back to List is disabled too', async () => {
   for (const b of [button('back-to-list', 'I_sample05'), button('abandon', 'I_sample05')]) {
     expect([b.disabled, b.title]).toEqual([true, 'Disabled in sample mode']);
   }
+});
+
+test('queuing a source issue switches the open dialog to its new local work ID', async () => {
+  holdPosts();
+  await mountPage();
+  await openItem('I_sample01');
+  await press(button('queue', 'I_sample01'));
+  const board = moved('I_sample01', 'Queued');
+  board.items = board.items.map((item) => item.id === 'I_sample01' ? { ...item, id: 'I_imported', recorded: true } : item);
+  await answer({ error: null, board, itemId: 'I_imported' });
+  const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+  expect(useItemDialogStore.getState().itemId).toBe('I_imported');
+  expect(button('start', 'I_imported')).not.toBeNull();
+  expect($('[data-item-dialog] .action-error')).toBeNull();
 });

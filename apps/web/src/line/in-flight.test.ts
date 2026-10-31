@@ -10,12 +10,12 @@ import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
 const table = () => $('[data-in-flight]')!;
 const rows = () => $$('[data-in-flight] [data-item]');
-const row = (id: string) => $(`[data-in-flight] [data-item="${id}"]`)!;
+const row = (id: string) => $(`[data-in-flight] [data-item="${id}"]`) ?? $(`.desk-card[data-item="${id}"]`)!;
 const numberOf = (id: string) => sample.items.find((i) => i.id === id)!.number;
 const meta = (id: string) => row(id).querySelector<HTMLElement>('[data-meta]')!;
 const col = (id: string, name: string) => row(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
-const side = (id: string) => col(id, 'side');
-const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-in-flight] [data-start="${id}"]`)!;
+const side = (id: string) => col(id, 'side') ?? row(id).querySelector<HTMLElement>('.desk-actions')!;
+const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-start="${id}"]`)!;
 /** Clicks `el`; a menu it closes hands focus back on the next tick. */
 const press = (el: Element) => settle(() => {
   (el as HTMLElement).click();
@@ -33,10 +33,10 @@ const boardOf = (raws: RawItem[], { active = [], blocked = [] }: { active?: numb
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData =>
   ({ ...data, items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)) });
 /** The sample with #140 out of its concept's dossier, so it has a row in the table. */
-const loose = withItem('I_sample13', { parent: null, parentId: null });
+const loose = withItem('I_sample13', { parent: null, parentId: null, status: 'Review' });
 /** #140 with its blocker closed, so its Start build runs, on a board whose writes are on. */
 const unblocked = (data: BoardData = loose): BoardData => withItem('I_sample13', {
-  blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }],
+  status: 'Ready', blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }],
 }, { ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 
@@ -44,11 +44,11 @@ beforeEach(() => localStorage.clear());
 
 test('the card lists everything past the Queue and short of Done that no dossier shows, furthest along first, under its title', async () => {
   await mountPage();
-  expect(text(table().firstElementChild)).toBe('Everything else in flight · 11');
+  expect(text(table().firstElementChild)).toBe('Everything else in flight · 5');
   expect(rows().map((r) => numberOf(r.dataset.item!)), 'Verify first, Refining last, in board order within a stage; #200 and #180 and their parts sit in dossiers')
-    .toEqual([31, 900026, 34, 147, 142, 141, 150, 30, 130, 22, 23]);
+    .toEqual([141, 150, 30, 130, 22]);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(loose));
-  expect(rows().map((r) => numberOf(r.dataset.item!)), 'a part out of its dossier is back').toEqual([31, 900026, 34, 147, 142, 141, 150, 30, 140, 130, 22, 23]);
+  expect(rows().map((r) => numberOf(r.dataset.item!)), 'a part out of its dossier is back').toEqual([140, 141, 150, 30, 130, 22]);
 });
 
 test('with nothing in flight, the table says so', async () => {
@@ -60,7 +60,7 @@ test('the table takes the main area\'s scope', async () => {
   await mountPage();
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
-  expect(rows().map((r) => numberOf(r.dataset.item!))).toEqual([31, 34, 30, 22, 23]);
+  expect(rows().map((r) => numberOf(r.dataset.item!))).toEqual([30, 22]);
 });
 
 test("scoped to a repository whose items haven't landed yet, the main area says it's reading instead of an empty desk and line", async () => {
@@ -79,7 +79,7 @@ test('line 1 shows the status glyph, the numbered title and muted meta: status, 
   const title = row('I_sample13').querySelector('[data-title]')!;
   expect([text(title), title.getAttribute('title')]).toEqual(['#140 Owner accounts', 'Owner accounts']);
   expect(row('I_sample13').querySelector('[data-glyph] svg'), 'the status glyph sits in the chevron\'s place').not.toBeNull();
-  expect([...meta('I_sample13').children].map(text)).toEqual(['Ready · Run finished · lar-server', 'blocked by 1. Blocked by #202 until it completes']);
+  expect([...meta('I_sample13').children].map(text)).toEqual(['Review · Run finished · lar-server', 'blocked by 1. Blocked by #202 until it completes']);
   expect(text(meta('I_sample13').querySelector('.sr-only')), 'what blocks it is read out, not only a hover title').toBe('. Blocked by #202 until it completes');
   expect(meta('I_sample13').lastElementChild!.outerHTML).toContain('danger');
   expect([...meta('I_sample14').children].map(text), 'a linked PR follows the repository').toEqual(['In progress · Thread running · lar-apple', 'PR #33 (draft)']);
@@ -105,7 +105,7 @@ test('the badge counts the blocked-by issues still open', async () => {
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
     .receive(withItem('I_sample13', { blockers: [] }, loose)));
   expect(meta('I_sample13').textContent, 'with no open issue listed, nothing blocks').not.toContain('blocked by');
-  expect(text(startBuild())).toBe('Start build ▾');
+  expect(text(side('I_sample13'))).toBe('Open thread');
 });
 
 test('a Dependency holds the badge until it is marked met, whatever its ticket shows, and the badge names it', async () => {
@@ -142,7 +142,7 @@ test('the figures column shows agent time, tokens and cost on one line, or nothi
   const stats = { agentMs: (3 * 60 + 20) * 60_000, wallMs: 70 * 60_000, tokens: 12_436_000, costUsd: 41.197 };
   let data = withItem('I_sample14', { stats }, loose);
   data = withItem('I_sample15', { stats: { agentMs: 45 * 60_000, tokens: 980 } }, data);
-  data = withItem('I_sample16', { stats: { ...stats, costUsd: 41, frozen: true } }, data);
+  data = withItem('I_sample16', { status: 'Review', stats: { ...stats, costUsd: 41, frozen: true } }, data);
   data = withItem('I_sample07', { stats: 'unavailable' }, data);
   await mountPage(data);
   const figures = (id: string) => col(id, 'figures').firstElementChild as HTMLElement;
@@ -163,18 +163,19 @@ test('a row opens the item dialog and stays marked while it shows', async () => 
 test('the side says where the item waits on you, or shows its next action', async () => {
   await mountPage(loose);
   const say = (id: string) => [text(side(id)), [...side(id).querySelectorAll('button, a')].map((b) => text(b))];
-  expect(say('I_sample16')).toEqual(['on your desk', []]);
-  expect(say('I_sample17')).toEqual(['on your desk', []]);
-  expect(say('I_sample11')).toEqual(['on your desk', []]);
+  for (const id of ['I_sample16', 'I_sample17', 'I_sample11']) {
+    expect($(`[data-in-flight] [data-item="${id}"]`)).toBeNull();
+    expect($(`.desk-card[data-item="${id}"]`)).not.toBeNull();
+  }
   expect(say('I_sample07')).toEqual(['Open thread', ['Open thread']]);
   expect(say('I_sample14')).toEqual(['Open thread', ['Open thread']]);
   expect(say('I_sample15')).toEqual(['Open thread', ['Open thread']]);
-  expect(say('I_sample13')).toEqual(['Start after #202 ▾', ['Start after #202 ▾']]);
+  expect(say('I_sample13')).toEqual(['Open thread', ['Open thread']]);
   expect(meta('I_sample14').firstElementChild!.textContent, 'the thread moves to the meta').toContain('Thread running');
 });
 
 test('Start after on a blocked Ready row arms its start on the picked model, then reads Starts after until pressed again', async () => {
-  const blocked = { ...loose, capture: { session: 's1', enabled: true }, modelChoices: unblocked().modelChoices };
+  const blocked = { ...withItem('I_sample13', { status: 'Ready' }, loose), capture: { session: 's1', enabled: true }, modelChoices: unblocked().modelChoices };
   holdPosts(blocked);
   await mountPage(blocked);
   const after = () => side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
@@ -191,7 +192,7 @@ test('Start after on a blocked Ready row arms its start on the picked model, the
 });
 
 test("Start after names the last open blocker, another repository's without its owner, and its title and label name it in full", async () => {
-  await mountPage(withItem('I_sample13', { blockers: [
+  await mountPage(withItem('I_sample13', { status: 'Ready', blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 12, repo: 'maddec01/lar-apple', state: 'open' },
   ] }, loose));
   const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
@@ -201,20 +202,20 @@ test("Start after names the last open blocker, another repository's without its 
 
 test("a blocked build whose repository has no T3 project offers no Start after: Start build shows the project's hint", async () => {
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
-  await mountPage({ ...loose, repositoryProjects: { 'maddec01/lar-server': hint } });
+  await mountPage({ ...withItem('I_sample13', { status: 'Ready' }, loose), repositoryProjects: { 'maddec01/lar-server': hint } });
   expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
   expect(side('I_sample13').querySelector('[data-start-after]')).toBeNull();
 });
 
 test("a blocked build whose repository is still onboarding offers no Start after: Start build waits for onboarding's PR", async () => {
-  await mountPage({ ...loose, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
+  await mountPage({ ...withItem('I_sample13', { status: 'Ready' }, loose), onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
   expect([startBuild().disabled, startBuild().title]).toEqual([true, "Waits for onboarding to finish"]);
   expect(side('I_sample13').querySelector('[data-start-after]')).toBeNull();
 });
 
 test('a start armed before its repository lost its T3 project still shows Starts after, so it can be disarmed', async () => {
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
-  const armed = { ...loose, capture: { session: 's1', enabled: true }, repositoryProjects: { 'maddec01/lar-server': hint },
+  const armed = { ...withItem('I_sample13', { status: 'Ready' }, loose), capture: { session: 's1', enabled: true }, repositoryProjects: { 'maddec01/lar-server': hint },
     armed: { I_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } };
   holdPosts(armed);
   await mountPage(armed);
@@ -231,7 +232,7 @@ test("a start the board ran by itself and that failed shows its error under the 
   const failed = { ...unblocked(), armedErrors: { I_sample13: 'T3 is down.' } };
   holdPosts(failed);
   await mountPage(failed);
-  const error = table().querySelector('[data-start-after-error="I_sample13"]')!;
+  const error = row('I_sample13').querySelector('[data-start-after-error="I_sample13"]')!;
   expect(text(error.querySelector('[role="alert"]'))).toBe('Start after failed: T3 is down.');
   await press(error.querySelector('button')!);
   expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'I_sample13' }]]);
@@ -248,8 +249,8 @@ test('Open thread on a row opens the latest thread, as an Open with the thread i
   expect([none.disabled, none.title, none.dataset.kind]).toEqual([true, 'No T3 thread has worked on this yet', 'open']);
 });
 
-test('a blocked Ready row shows only Start after, a Start with its icon, never a disabled Start build beside it', async () => {
-  await mountPage(loose);
+test('a blocked Ready card shows only Start after, a Start with its icon, never a disabled Start build beside it', async () => {
+  await mountPage(withItem('I_sample13', { status: 'Ready' }, loose));
   expect(startBuild()).toBeNull();
   const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual(['start', true]);
@@ -284,7 +285,7 @@ test('Start build sends the build with the chosen model, then shows the thread i
   expect(entries().map(text)).toEqual(['T3 default', 'GPT-5.5']);
   await press(entries()[1]!);
   expect(dialog(), 'picking an entry does not open the dialog').toBeNull();
-  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+  expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   expect([text(startBuild()), startBuild().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
   const started = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
   await answer({ thread: started, error: null });
@@ -300,13 +301,13 @@ test('a failed Start build shows its error under the row and offers Retry start;
   await mountPage(unblocked());
   await pressMenu(startBuild());
   await press(entries()[0]!);
-  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13' }]]);
+  expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13' }]]);
   await answer({ thread: null, error: 'T3 is down.' }, 502);
   expect(text(startBuild())).toBe('Retry start ▾');
-  const message = row('I_sample13').parentElement!.querySelector('p.start')!;
+  const message = row('I_sample13').closest('[data-flight], .desk-card')!.querySelector('p.start')!;
   expect(text(message.querySelector('[role="alert"]'))).toBe('T3 is down.');
   await press(message.querySelector('button.dismiss')!);
-  expect(row('I_sample13').parentElement!.querySelector('p.start')).toBeNull();
+  expect(row('I_sample13').closest('[data-flight], .desk-card')!.querySelector('p.start')).toBeNull();
   expect(text(startBuild())).toBe('Start build ▾');
   expect(dialog(), 'closing the error does not open the dialog').toBeNull();
 });
@@ -318,7 +319,7 @@ test('a Start build that may have run hides Start build; closing its message lea
   await press(entries()[0]!);
   await answer({ thread: null, uncertain: true, error: 'Check T3.' });
   expect(startBuild()).toBeNull();
-  const message = row('I_sample13').parentElement!.querySelector<HTMLElement>('p.start[data-start-result]')!;
+  const message = row('I_sample13').closest('[data-flight], .desk-card')!.querySelector<HTMLElement>('p.start[data-start-result]')!;
   expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
   await press(message.querySelector('button.dismiss')!);
   expect(text(row('I_sample13').querySelector('.started-tag.unsure'))).toBe('May have started');

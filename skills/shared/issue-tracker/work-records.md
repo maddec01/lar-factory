@@ -7,7 +7,8 @@ read and write records only through `lar-work` and the shared scripts.
 the `--revision` from your last read; when the record moved on, the change
 writes nothing, so read it again and redo the change.
 
-Factory progress stays on this machine. Tracker writes carry only the structure
+Factory progress stays on this machine. Work records are its source of truth,
+not a fully recoverable tracker cache. Tracker writes carry only the structure
 described below, never queue, Status or build progress.
 
 ## Picking
@@ -108,12 +109,20 @@ provider's closing relationship independently of local completion.
 ## Tracker structure sync
 
 Follow [Tracker structure sync](publication.md) for concepts and multi-repository
-work. The ON-by-default onboarding option saves kind, map, parts, Connections,
-Dependencies and issue grouping, with only the shaping results needed to explain
-them. Local changes enter the structural outbox automatically;
+work. The ON-by-default local `structureSync` option saves kind, map diagram,
+parts, Connections, Dependencies and issue grouping, with only the shaping
+results needed to explain them. Local changes enter the structural outbox
+automatically.
 `lar-work sync-structure <work ID>` requests a drain explicitly. Queue, Status,
 ordinary briefs, decisions, slices and per-item progress stay in local records.
 Shaping and starting a build remain independent choices.
+
+On a new machine, add the repository, then add its saved work from List to
+reconstruct the structure and cross-repository links. Restored items start in
+List. Ordinary briefs, decisions, slices and progress need the original local
+records; tracker sync cannot recover them. Conflicting structural versions stop
+sync with both copies retained. Follow the protocol's recovery rules rather
+than assuming a merge or conflict resolution UI exists.
 
 Opening a build's PR follows [PR delivery](publication-pr.md), including
 work without a ticket.

@@ -1,7 +1,9 @@
 // Node-only transport shared by publication settings and writes. Uses the local CLI login; never retries.
 import { execFile } from 'node:child_process';
+import { assertAzureCommandAllowed } from './azure-safety.ts';
 
-export function providerCommand(command: 'gh' | 'az', args: string[], input?: string): Promise<string> {
+export async function providerCommand(command: 'gh' | 'az', args: string[], input?: string): Promise<string> {
+  if (command === 'az') assertAzureCommandAllowed(args);
   return new Promise((resolve, reject) => {
     const child = execFile(process.env[command === 'gh' ? 'GH_PATH' : 'AZ_PATH'] || command, args,
       { timeout: 60_000, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {

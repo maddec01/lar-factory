@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, Item, ModelChoice, ModelGroup, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
+import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
 import type { BoardState } from '../board/board-state.ts';
 import { prHost, prUrl } from '../config/pr-host.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
@@ -262,6 +263,10 @@ export function createItemCommands({ board, items, records, reread, archive, off
     }
     let pending = runs.get(itemId);
     const item = board.find(itemId);
+    if (item) {
+      try { assertAzureThreadAllowed(item.repo); }
+      catch (error) { return withBoard(403, { error: (error as Error).message }); }
+    }
     const previous = pending && finishedStarts.get(pending);
     if (previous && Array.isArray(item?.threads) && item.threads.some((t) => t.id === previous && t.state === 'stopped')
       && !item.threads.some((t) => t.state === 'running' || t.state === 'needs you')) {

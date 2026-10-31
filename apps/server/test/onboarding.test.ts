@@ -7,8 +7,7 @@ import { join } from 'node:path';
 import { checkouts } from './repo-support.ts';
 import { readsRepositoryConfig, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
-import type { BoardData } from '@lar-factory/shared';
-import { rawIssue } from '@lar-factory/shared/test/raw-items';
+import type { BoardData, SetupDetection } from '@lar-factory/shared';
 
 /** Writes this Mac's list of repositories under `home` with the entries as given. */
 function writeList(home: string, repositories: object[]): void {
@@ -147,13 +146,39 @@ test('the sample board keeps no onboarding', async (t) => {
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }]);
 });
 
-test('an onboarding setup check answers with its result', async (t) => {
-  const board = await startBoard(t, { canPush: false });
-  const check = (body: object) => board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web', itemSource: { kind: 'issues' }, ...body }, board.url, '/api/onboarding/checks');
-  const push = await check({ check: 'push' });
-  assert.deepEqual([push.status, (await push.json() as { result: { passed: boolean } }).result.passed], [200, false]);
-  const unknown = await check({ check: 'labels' });
-  assert.deepEqual([unknown.status, await unknown.json()], [400, { error: 'Choose a repository and complete its settings before running checks.' }]);
+/** Whether a gh call writes to a repository: a POST, PATCH, PUT or DELETE through the API, or a label, issue or PR change. */
+const writesRepository = (args: string[]) => args.some((a) => /^(POST|PATCH|PUT|DELETE)$/.test(a))
+  || ['label', 'issue', 'pr'].includes(args[0]!) && !['list', 'view'].includes(args[1]!);
+
+const ANSWERS = { projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [], consent: ['push-branch', 'open-pr'] };
+
+test('a repository with no factory files is detected and onboards with no write to it, its answers saved as local settings', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  writeList(home, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+  const board = await startBoard(t, { canPush: false, files: ['README.md'], repoConfigs: { 'maddec01/lar-web': null } }, false, true, { HOME: home });
+  const detected = await board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web' }, board.url, '/api/onboarding/detect');
+  assert.equal(detected.status, 200);
+  const { detection } = await detected.json() as { detection: SetupDetection };
+  assert.deepEqual([detection.factoryFiles, detection.domainDocs, detection.sharedConfig, detection.access['push-branch']],
+    [{ found: [] }, { found: { kind: 'private' } }, { found: null }, 'refused']);
+  const saved = await board.post({ repo: 'maddec01/lar-web', ...ANSWERS }, board.url, '/api/onboarding/setup');
+  assert.equal(saved.status, 200);
+  assert.deepEqual((await saved.json() as { board: BoardData }).board.onboarding, []);
+  const data = await until(board, (d) => d.repos.some((r) => r.repo === 'maddec01/lar-web'));
+  assert.deepEqual(data.repos.find((r) => r.repo === 'maddec01/lar-web')?.role, 'Web client');
+  const settings = JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')).repositories[0].settings;
+  assert.deepEqual([settings.projectId, settings.consent, settings.access['push-branch']], ['lar-web', ['push-branch', 'open-pr'], 'refused']);
+  assert.deepEqual((await board.calls()).filter(writesRepository), []);
+});
+
+test('detection and saving refuse a body they cannot use', async (t) => {
+  const board = await startBoard(t);
+  const detected = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/detect');
+  assert.deepEqual([detected.status, await detected.json()], [400, { error: 'Choose a repository and its T3 project before detecting its setup.' }]);
+  const saved = await board.post({ repo: 'maddec01/lar-web', ...ANSWERS, consent: ['merge'] }, board.url, '/api/onboarding/setup');
+  assert.deepEqual([saved.status, await saved.json()],
+    [400, { error: 'Send the repository, its T3 project, role, item source, domain-doc location, skills and write consent.' }]);
 });
 
 test("onboarding's fixed checks answer with the default branch's Clashes, or gh's problem", async (t) => {
@@ -198,39 +223,9 @@ test("onboarding's Clash agent runs on a fresh fetch of origin's default branch,
   assert.equal(bad.status, 400);
 });
 
-test('an onboarding whose repository lacks a workflow label opens no PR, with a new or a reused .lar-factory.json', async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  writeList(home, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
-  const board = await startBoard(t, { repoLabels: { 'maddec01/lar-web': ['bug', 'decision: grill'] } } as object, false, false, { HOME: home });
-  const refused = { error: 'maddec01/lar-web is missing a required label. Go back to Labels to create or rename it.' };
-  for (const sent of [config, null]) {
-    const response = await board.post({ repo: 'maddec01/lar-web', progress, config: sent, picks: { clashes: [], skills: {} } }, board.url, '/api/onboarding/pr');
-    assert.deepEqual([response.status, await response.json()], [409, refused], JSON.stringify(sent));
-  }
-  assert.ok(!(await board.calls()).some((args) => args[0] === 'pr' && args[1] === 'create'));
-  assert.deepEqual((await board.board() as BoardData).onboarding, [{ repo: 'maddec01/lar-web', progress }]);
-});
-
-test("the Labels step reads a repository's labels, creates the missing workflow labels and renames an old one", async (t) => {
-  const board = await startBoard(t, { repoLabels: { 'maddec01/lar-web': ['bug', 'decision: grill', 'needs-triage'] } } as object);
-  const labels = async (path: string, body: object = {}) => {
-    const response = await board.post({ repo: 'maddec01/lar-web', ...body }, board.url, path);
-    return [response.status, (await response.json() as { labels: string[] }).labels] as const;
-  };
-  assert.deepEqual(await labels('/api/onboarding/labels'), [200, ['bug', 'decision: grill', 'needs-triage']]);
-  const [status, created] = await labels('/api/onboarding/labels/create', { itemSource: { kind: 'issues' }, renaming: ['decision: grill'] });
-  assert.equal(status, 200);
-  assert.ok(created!.includes('blocked') && created!.includes('status-list') && !created!.includes('decision-grill'));
-  const [, renamed] = await labels('/api/onboarding/labels/rename', { names: ['decision: grill'] });
-  assert.ok(renamed!.includes('decision-grill') && !renamed!.includes('decision: grill') && renamed!.includes('needs-triage'));
-  const [, custom] = await labels('/api/onboarding/labels/custom', { name: 'app: music' });
-  assert.ok(custom!.includes('app: music'));
-});
-
-test('the sample board runs no onboarding check, finds no Clash, runs no Clash agent and touches no label', async (t) => {
+test('the sample board detects nothing, saves no setup, finds no Clash and runs no Clash agent', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/teams', '/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs', '/api/onboarding/labels', '/api/onboarding/labels/create', '/api/onboarding/labels/rename', '/api/onboarding/labels/custom']) {
+  for (const path of ['/api/onboarding/teams', '/api/onboarding/detect', '/api/onboarding/setup', '/api/onboarding/clashes', '/api/onboarding/clash-runs']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }
@@ -238,150 +233,40 @@ test('the sample board runs no onboarding check, finds no Clash, runs no Clash a
   assert.deepEqual([runs.status, await runs.json()], [403, { error: 'Sample mode onboards no repository.' }]);
 });
 
-const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: [] };
 const PR = 'https://github.com/maddec01/lar-web/pull/77';
 
-test('opening the onboarding PR keeps its URL on the Pull request step, and its merge finishes onboarding on the next check', async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  writeList(home, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: progress }]);
-  const board = await startBoard(t, { repoConfigs: { 'maddec01/lar-web': null } }, false, true, { HOME: home });
-  await until(board, (d) => d.fetchedAt !== null);
-  const response = await board.post({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [], skills: {} } }, board.url, '/api/onboarding/pr');
-  assert.equal(response.status, 200);
-  const opened = { step: 'pr', done: ['project', 'setup'], answers: { projectId: 'lar-web' }, prUrl: PR };
-  const body = await response.json() as { prUrl: string; board: BoardData };
-  assert.deepEqual([body.prUrl, body.board.onboarding], [PR, [{ repo: 'maddec01/lar-web', progress: opened }]]);
-  assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'create').length, 1);
-  await board.update({ repoConfigs: { 'maddec01/lar-web': { role: 'Web client', itemSource: { kind: 'issues' } } }, prs: { [PR]: 'MERGED' } });
-  const data = await until(board, (d) => d.repos.length === 2);
-  assert.deepEqual([data.repos.map((r) => r.repo), data.onboarding], [['maddec01/lar-factory', 'maddec01/lar-web'], []]);
-  assert.deepEqual(listFile(home),
-    { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web' }] });
+test('dropping existing factory files opens a PR only with the approved edits, after the preview writes nothing', async (t) => {
+  const board = await startBoard(t, { files: ['.lar-factory.json', 'AGENTS.md', 'docs/agents/domain.md'] });
+  const detected = await board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web' }, board.url, '/api/onboarding/detect');
+  const { detection } = await detected.json() as { detection: SetupDetection };
+  assert.deepEqual(detection.factoryFiles, { found: [{ kind: 'config', paths: ['.lar-factory.json'] }, { kind: 'agent-docs', paths: ['docs/agents/domain.md'] }] });
+  const edits = { drop: ['config', 'agent-docs'] };
+  const preview = await board.post({ repo: 'maddec01/lar-web', edits }, board.url, '/api/onboarding/pr/changes');
+  assert.deepEqual((await preview.json() as { changes: object[] }).changes,
+    [{ kind: 'delete', path: '.lar-factory.json' }, { kind: 'delete', path: 'docs/agents/domain.md' }]);
+  assert.deepEqual((await board.calls()).filter(writesRepository), []);
+  const opened = await board.post({ repo: 'maddec01/lar-web', edits }, board.url, '/api/onboarding/pr');
+  assert.deepEqual([opened.status, await opened.json()], [200, { prUrl: PR, error: null }]);
+  assert.equal((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'create').length, 1);
 });
 
-test("a failing gh pr create answers with gh's message and keeps the onboarding where it was", async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  writeList(home, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
-  const board = await startBoard(t, { fail: 'pr-create' }, false, false, { HOME: home });
-  const response = await board.post({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [], skills: {} } }, board.url, '/api/onboarding/pr');
+test("a failing gh pr create answers with gh's message", async (t) => {
+  const board = await startBoard(t, { fail: 'pr-create', files: ['.lar-factory.json'] });
+  const response = await board.post({ repo: 'maddec01/lar-web', edits: { drop: ['config'] } }, board.url, '/api/onboarding/pr');
   assert.equal(response.status, 502);
   assert.match((await response.json() as { error: string }).error,
     /^Can't open maddec01\/lar-web's onboarding PR: gh pr create failed: .*No commits between main and lar-factory\/onboarding/);
-  assert.deepEqual((await board.board() as BoardData).onboarding, [{ repo: 'maddec01/lar-web', progress }]);
 });
 
-/** A board whose list has lar-web onboarding with its PR open, and lar-factory onboarded; `options` set the fake gh. */
-async function onPr(t: TestContext, options: object) {
-  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  writeList(home, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } }]);
-  return { home, board: await startBoard(t, options, false, true, { HOME: home }) };
-}
-
-test('a PR closed without merging shows on the board as closed, and Reopen PR reopens it', async (t) => {
-  const { board } = await onPr(t, { repoConfigs: { 'maddec01/lar-web': null }, prs: { [PR]: 'CLOSED' } });
-  const closed = await until(board, (d) => !!d.onboarding?.[0]?.progress.prClosed);
-  assert.deepEqual(closed.onboarding, [{ repo: 'maddec01/lar-web', progress: { ...progress, step: 'pr', prUrl: PR, prClosed: true } }]);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/pr/reopen');
-  assert.equal(response.status, 200);
-  assert.deepEqual((await response.json() as { board: BoardData }).board.onboarding, [{ repo: 'maddec01/lar-web', progress: { ...progress, step: 'pr', prUrl: PR } }]);
-  assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'reopen'), [['pr', 'reopen', PR]]);
-});
-
-test("a Reopen PR that gh refuses answers with gh's message and keeps the PR closed", async (t) => {
-  const { board } = await onPr(t, { repoConfigs: { 'maddec01/lar-web': null }, prs: { [PR]: 'CLOSED' }, fail: 'pr-reopen' });
-  await until(board, (d) => !!d.onboarding?.[0]?.progress.prClosed);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/pr/reopen');
-  assert.deepEqual([response.status, await response.json()], [502, { error: "Can't reopen maddec01/lar-web's onboarding PR: gh pr reopen failed: HTTP 403: Resource not accessible by integration" }]);
-});
-
-test("Reset closes an onboarding's open PR and drops it from the board and the list", async (t) => {
-  const { home, board } = await onPr(t, { repoConfigs: { 'maddec01/lar-web': null }, prs: { [PR]: 'OPEN' } });
-  await until(board, (d) => d.onboarding?.length === 1);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
-  assert.equal(response.status, 200);
-  assert.deepEqual((await response.json() as { board: BoardData }).board.onboarding, []);
-  assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'close').map((args) => args.slice(0, 3)), [['pr', 'close', PR]]);
-  assert.deepEqual(listFile(home),
-    { repositories: [{ repo: 'maddec01/lar-factory' }] });
-});
-
-test("a Reset whose PR gh can't close answers with gh's message and keeps the onboarding", async (t) => {
-  const { home, board } = await onPr(t, { repoConfigs: { 'maddec01/lar-web': null }, prs: { [PR]: 'OPEN' }, fail: 'pr-close' });
-  await until(board, (d) => d.onboarding?.length === 1);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
-  assert.deepEqual([response.status, await response.json()], [502, { error: "Can't close maddec01/lar-web's onboarding PR: gh pr close failed: HTTP 403: Resource not accessible by integration" }]);
-  assert.deepEqual(listFile(home).repositories,
-    [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } }]);
-});
-
-test('Reset of an onboarded repository opens its reset PR and takes it off the board, with its items, also after a restart', async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  writeList(home, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web' }]);
-  const options = { files: ['.lar-factory.json', 'AGENTS.md'], items: [rawIssue('I_1', 1, 'List', []), rawIssue('I_2', 2, 'List', [], { repository: { nameWithOwner: 'maddec01/lar-web' } })] };
-  const board = await startBoard(t, options, false, false, { HOME: home });
-  await until(board, (d) => d.items.length === 2);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
-  assert.equal(response.status, 200);
-  const { board: data, prUrl } = await response.json() as { board: BoardData; prUrl: string };
-  assert.equal(prUrl, PR);
-  assert.deepEqual(data.resetting, [{ repo: 'maddec01/lar-web', prUrl: PR }]);
-  assert.deepEqual([data.repos.map((r) => r.repo), data.items.map((i) => i.number)], [['maddec01/lar-factory'], [1]]);
-  assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'create').map((args) => args[args.indexOf('--head') + 1]), ['lar-factory/reset']);
-  assert.deepEqual(listFile(home).repositories,
-    [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', resetting: { prUrl: PR } }]);
-  await board.stop();
-  const restarted = await startBoard(t, options, false, false, { HOME: home });
-  const read = await until(restarted, (d) => d.fetchedAt !== null);
-  assert.deepEqual(read.resetting, [{ repo: 'maddec01/lar-web', prUrl: PR }]);
-  assert.deepEqual([read.repos.map((r) => r.repo), read.items.map((i) => i.number), read.onboarding, read.repositoryConfigProblems],
-    [['maddec01/lar-factory'], [1], [], []]);
-  assert.ok(!(await restarted.calls()).some((args) => readsRepositoryConfig(args) && args[1]!.includes('lar-web')));
-});
-
-test("a Reset whose reset PR can't be opened answers with gh's message and keeps the repository onboarded", async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  writeList(home, [{ repo: 'maddec01/lar-web' }]);
-  const board = await startBoard(t, { files: ['.lar-factory.json'], fail: 'pr-create' }, false, false, { HOME: home });
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
-  assert.equal(response.status, 502);
-  assert.match((await response.json() as { error: string }).error, /^Can't open maddec01\/lar-web's reset PR: gh pr create failed: /);
-  assert.deepEqual(listFile(home).repositories, [{ repo: 'maddec01/lar-web' }]);
-});
-
-test('a .lar-factory.json that lands another way finishes onboarding and closes the PR with a comment', async (t) => {
-  const { home, board } = await onPr(t, { repoConfigs: { 'maddec01/lar-web': { role: 'Web client', itemSource: { kind: 'issues' } } }, prs: { [PR]: 'OPEN' } });
-  const data = await until(board, (d) => d.repos.length === 2);
-  assert.deepEqual(data.onboarding, []);
-  const close = (await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'close');
-  assert.deepEqual(close.map((args) => args.slice(0, 4)), [['pr', 'close', PR, '--comment']]);
-  assert.deepEqual(listFile(home),
-    { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web' }] });
-});
-
-test('the sample board opens, reopens and resets no onboarding PR', async (t) => {
+test('the sample board previews and opens no onboarding PR, and has no Reset', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/pr', '/api/onboarding/pr/changes', '/api/onboarding/pr/reopen', '/api/repositories/reset']) {
-    const response = await board.post({ repo: 'maddec01/lar-web', progress, config }, board.url, path);
+  for (const path of ['/api/onboarding/pr', '/api/onboarding/pr/changes']) {
+    const response = await board.post({ repo: 'maddec01/lar-web', edits: { drop: [] } }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }
-});
-
-test('label creation streams successful updates through the guarded HTTP route', async (t) => {
-  const board = await startBoard(t);
-  const response = await fetch(`${board.url}/api/onboarding/labels/create`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', Origin: board.url },
-    body: JSON.stringify({ repo: 'maddec01/lar-web', itemSource: { kind: 'issues' }, renaming: [] }),
-  });
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get('content-type')!, /application\/x-ndjson/);
-  const events = (await response.text()).trim().split('\n').map((line) => JSON.parse(line));
-  assert.ok(events[0].progress.labels.length > 0);
-  assert.equal(events.at(-1).result.error, null);
+  for (const path of ['/api/repositories/reset', '/api/onboarding/pr/reopen', '/api/onboarding/labels/create']) {
+    assert.equal((await board.post({ repo: 'maddec01/lar-web' }, board.url, path)).status, 405, path);
+  }
 });
 
 test('a listed repository with an unsupported config remains offered for fresh onboarding', async (t) => {

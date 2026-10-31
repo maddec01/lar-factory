@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type ClashRun, type Item, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type ClashRun, type Item, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupDetection } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
@@ -50,28 +50,20 @@ export interface HttpDeps {
   keepOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
   /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
   createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | Refused>;
-  /** Runs one of onboarding's setup checks on the body's repository, T3 project and item source, or says why it can't. */
-  runSetupCheck(input: Record<string, unknown>): Promise<{ result: SetupCheckResult } | Refused>;
+  /** Onboarding's detection of the body's repository with its T3 project, reading only, or why it can't run. */
+  detectSetup(input: Record<string, unknown>): Promise<{ detection: SetupDetection } | Refused>;
+  /** Saves onboarding's answers as the body's repository's local settings, returning the repositories still onboarding, or why it can't. */
+  saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
   /** Runs onboarding's fixed checks for known Clashes on the body's repository's default branch, or says why it can't. */
   findFixedClashes(input: Record<string, unknown>): Promise<FixedClashes | Refused>;
   /** Starts onboarding's Clash agent on the body's repository, T3 project and model, or returns its running run; answers the repository's runs. */
   startClashRun(input: Record<string, unknown>): Promise<{ runs: ClashRun[] } | Refused>;
   /** The repository's Clash agent runs, oldest first. */
   clashRuns(repo: string): ClashRun[];
-  /** Reads, creates or renames the labels of onboarding's Labels step, or creates a custom label, answering with the repository's labels, or gh's problem. */
-  repositoryLabels: Record<'read' | 'create' | 'rename' | 'custom', (input: Record<string, unknown>, progress?: (labels: string[]) => void) => Promise<{ labels: string[] } | Refused>>;
-  /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
-  openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | Refused>;
-  /** What an onboarding's PR would change against its default branch with the body's answers and picks, or why it can't say. */
+  /** Opens the PR with the repository edits onboarding's user approved, returning its URL, or gh's or az's problem. */
+  openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
+  /** What an onboarding's PR would change against its default branch with the body's edits and picks, or why it can't say. */
   previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | Refused>;
-  /** Reopens an onboarding's PR that closed without merging, returning the repositories still onboarding, or gh's problem. */
-  reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
-  /**
-   * Reset: closes a repository's open onboarding PR and drops its entry while it is still onboarding, or opens its reset
-   * PR, returning its URL, and marks it resetting once onboarded; returns the repositories still onboarding, or gh's problem,
-   * with `editPrClosed` when it closed the Edit PR before it failed.
-   */
-  resetRepository(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[]; prUrl?: string } | (Refused & { editPrClosed?: true })>;
   /**
    * Edit's load: an onboarded repository's .lar-factory.json values and its labels, or why it can't. The values come
    * from its open Edit PR's branch, which `editPr` names, while there is one, else from its default branch.
@@ -99,8 +91,7 @@ interface Write {
   disabled?: string;
   /** The answer when the page's session is from an earlier board run; a write without one skips the check. */
   restarted?: () => object;
-  progress?: boolean;
-  run(input: Record<string, unknown>, progress?: (body: object) => void): Promise<Reply>;
+  run(input: Record<string, unknown>): Promise<Reply>;
 }
 
 const SECURITY_HEADERS = {
@@ -159,8 +150,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
-  runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
-  resetRepository, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -187,16 +177,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     changeRow(repo, ({ configUpdate: _, ...r }) => ({ ...r, ...changes }));
     return null;
   }
-
-  /** A write of onboarding's Labels step, which answers with the repository's labels. */
-  const labelsWrite = (action: keyof HttpDeps['repositoryLabels']): Write => ({
-    progress: action === 'create',
-    what: `the labels to ${action}`, disabled: 'Sample mode onboards no repository.',
-    async run(input, progress) {
-      const answer = await repositoryLabels[action](input, (labels) => progress?.({ labels }));
-      return 'error' in answer ? { status: answer.status, body: { error: answer.error } } : { status: 200, body: { ...answer, error: null } };
-    },
-  });
 
   /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
   const WRITES: Record<string, Write> = {
@@ -328,17 +308,25 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         return 'error' in answer ? { status: answer.status, body: { error: answer.error } } : { status: 200, body: answer };
       },
     },
-    '/api/onboarding/checks': {
-      what: 'the check to run', disabled: 'Sample mode onboards no repository.',
+    '/api/onboarding/detect': {
+      what: 'the repository whose setup to detect', disabled: 'Sample mode onboards no repository.',
       async run(input) {
-        const checked = await runSetupCheck(input);
-        return 'error' in checked ? { status: checked.status, body: { error: checked.error } } : { status: 200, body: { ...checked, error: null } };
+        const detected = await detectSetup(input);
+        return 'error' in detected ? { status: detected.status, body: { error: detected.error } } : { status: 200, body: { ...detected, error: null } };
       },
     },
-    '/api/onboarding/labels': labelsWrite('read'),
-    '/api/onboarding/labels/create': labelsWrite('create'),
-    '/api/onboarding/labels/rename': labelsWrite('rename'),
-    '/api/onboarding/labels/custom': labelsWrite('custom'),
+    // The repository goes on the board with its local settings, and the next read loads its items.
+    '/api/onboarding/setup': {
+      what: 'the answers to save', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const saved = await saveSetup(input);
+        if ('error' in saved) return { status: saved.status, body: { error: saved.error } };
+        board.update({ onboarding: saved.onboarding });
+        board.push();
+        readSoon();
+        return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
     '/api/onboarding/clashes': {
       what: 'the repository to check', disabled: 'Sample mode onboards no repository.',
       async run(input) {
@@ -354,50 +342,17 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       },
     },
     '/api/onboarding/pr': {
-      what: 'the onboarding whose PR to open', disabled: 'Sample mode onboards no repository.',
+      what: 'the repository edits to open a PR with', disabled: 'Sample mode onboards no repository.',
       async run(input) {
         const opened = await openOnboardingPr(input);
-        if ('error' in opened) return { status: opened.status, body: { error: opened.error } };
-        board.update({ onboarding: opened.onboarding });
-        board.push();
-        return { status: 200, body: withBoard({ prUrl: opened.prUrl, error: null }) };
+        return 'error' in opened ? { status: opened.status, body: { error: opened.error } } : { status: 200, body: { ...opened, error: null } };
       },
     },
     '/api/onboarding/pr/changes': {
-      what: 'the onboarding PR to preview', disabled: 'Sample mode onboards no repository.',
+      what: 'the repository edits to preview', disabled: 'Sample mode onboards no repository.',
       async run(input) {
         const previewed = await previewOnboardingPr(input);
         return 'error' in previewed ? { status: previewed.status, body: { error: previewed.error } } : { status: 200, body: { ...previewed, error: null } };
-      },
-    },
-    '/api/onboarding/pr/reopen': {
-      what: 'the onboarding whose PR to reopen', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const reopened = await reopenOnboardingPr(input);
-        if ('error' in reopened) return { status: reopened.status, body: { error: reopened.error } };
-        board.update({ onboarding: reopened.onboarding });
-        board.push();
-        return { status: 200, body: withBoard({ error: null }) };
-      },
-    },
-    '/api/repositories/reset': {
-      what: 'the repository to reset', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const reset = await resetRepository(input);
-        if ('error' in reset) {
-          if (!reset.editPrClosed) return { status: reset.status, body: { error: reset.error } };
-          // The Edit PR Reset closed leaves the row at once, though the reset PR didn't open.
-          changeRow(input.repo as string, ({ editPr: _, ...r }) => r);
-          return { status: reset.status, body: withBoard({ error: reset.error }) };
-        }
-        // Hide its items at once, keeping the reset PR in Settings until the read sees it merge or close.
-        const gone = (repo: string | null) => repo !== null && sameRepo(repo, input.repo as string);
-        const { repos, items, resetting = [] } = board.snapshot();
-        board.update({ onboarding: reset.onboarding, repos: repos.filter((r) => !gone(r.repo)), items: items.filter((i) => !gone(i.repo)),
-          resetting: [...resetting.filter((r) => !gone(r.repo)), ...reset.prUrl ? [{ repo: input.repo as string, prUrl: reset.prUrl }] : []] });
-        board.push();
-        readSoon();
-        return { status: 200, body: withBoard({ ...reset.prUrl && { prUrl: reset.prUrl }, error: null }) };
       },
     },
     '/api/repositories/config': {
@@ -436,7 +391,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         return { status: 200, body: withBoard({ error: null }) };
       },
     },
-    // Looks the tools up again for the notices' Recheck button and onboarding's Checks step.
+    // Looks the tools up again for the notices' Recheck button and onboarding's detection.
     '/api/t3/reauthorize': {
       what: 'the T3 reauthorization request',
       async run() {
@@ -479,14 +434,8 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     try {
       const input = await writeInput(req, res, write);
       if (!input) return;
-      const streaming = write.progress && req.headers.accept === 'application/x-ndjson';
-      const emit = (body: object) => {
-        if (!res.headersSent) res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
-        res.write(`${JSON.stringify(body)}\n`);
-      };
-      const { status, body } = await write.run(input, streaming ? (progress) => emit({ progress }) : undefined);
-      if (res.headersSent) { emit({ result: body }); res.end(); }
-      else json(res, status, body);
+      const { status, body } = await write.run(input);
+      json(res, status, body);
     } finally {
       if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
     }

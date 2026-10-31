@@ -1,4 +1,4 @@
-// The factory's optional agent setup, which an onboarding PR writes when the user keeps it: the `## Agent skills` block
+// The factory's optional agent setup, which an onboarding PR writes when the user adds it: the `## Agent skills` block
 // and the three docs/agents/ files it points at. They tell an agent how the repository's tickets relate to its work
 // records, and replace Matt Pocock's setup wherever it is. They live here as text, so the bundled server ships them.
 
@@ -153,7 +153,7 @@ function docs(provider: Provider): FileWrite[] {
   ];
 }
 
-/** The docs/agents/ files the setup writes, which Reset deletes. */
+/** The docs/agents/ files the setup writes, which onboarding offers to drop. */
 export const AGENT_DOC_PATHS = docs('GitHub').map(({ path }) => path);
 
 /**

@@ -518,7 +518,7 @@ export function repositoryProjectHint(data: Pick<BoardData, 'repositoryProjects'
 }
 
 /** Why Start build and Start refining are held for a repository still onboarding. */
-export const WAITS_FOR_ONBOARDING = "Waits for onboarding's PR to merge";
+export const WAITS_FOR_ONBOARDING = "Waits for onboarding to finish";
 
 /** Whether the repository is on this Mac's list still onboarding, whatever the case. */
 export function isOnboarding(data: Pick<BoardData, 'onboarding'>, repo: string | null): boolean {
@@ -1010,6 +1010,60 @@ export type SetupCheckId = (typeof SETUP_CHECKS)[number];
 /** A setup check's result: what it found, or the problem with its fix and the command that fixes it, when one does. */
 export type SetupCheckResult = { passed: true; detail: string; counts?: Record<ShowSetting, number> } | { passed: false; problem: string; fix: string; command?: string };
 
+/** A fact onboarding's detection found, or why the login's access kept it from finding it. */
+export type Detected<T> = { found: T } | { refused: string };
+
+/** The kinds of factory file a repository may have from an earlier setup, each one a keep-or-drop choice. */
+export const FACTORY_FILES = ['config', 'agent-skills', 'agent-docs'] as const;
+export type FactoryFileKind = (typeof FACTORY_FILES)[number];
+
+/** A factory file on the default branch: `.lar-factory.json`, the files with an `## Agent skills` section, or the docs/agents/ files. */
+export interface FactoryFile {
+  kind: FactoryFileKind;
+  paths: string[];
+}
+
+/**
+ * What onboarding detects about a repository before it asks anything, reading only: each fact found, or Refused with
+ * why. `access` is what the login's permissions show for each operation; one they can't settle stays unverified.
+ */
+export interface SetupDetection {
+  repo: string;
+  provider: Provider;
+  /** The T3 project's folder, once it is the repository's only main checkout. */
+  checkout: Detected<string>;
+  /** The item sources the board can read: the repository's issues, or one per Azure DevOps team. */
+  itemSources: Detected<RepositoryItemSource[]>;
+  access: Record<RepositoryOperation, OperationAccess>;
+  /** The repository's own glossary and ADRs when it has either, else private drafts. */
+  domainDocs: Detected<DomainDocLocation>;
+  factoryFiles: Detected<FactoryFile[]>;
+  /** The defaults of `.lar-factory.json`, why they can't be used, or null when the repository has none. */
+  sharedConfig: Detected<{ defaults: SharedRepositorySettings } | { problem: string } | null>;
+  /** The names of the repository's project skills, which the user may select as coding guidance. */
+  projectSkills: Detected<string[]>;
+}
+
+/** Onboarding's answers, which become the repository's local settings. */
+export interface LocalSetupAnswers {
+  projectId: string;
+  role: string;
+  itemSource: RepositoryItemSource;
+  domainDocs: DomainDocLocation;
+  skills: string[];
+  consent: RepositoryOperation[];
+}
+
+/**
+ * The repository edits the user chose in onboarding, which a PR carries once the user approves them: the factory files
+ * to drop, and the optional additions, `.lar-factory.json` with these shared defaults and the factory's agent guidance.
+ */
+export interface RepositoryEdits {
+  drop: FactoryFileKind[];
+  config?: SharedRepositorySettings;
+  guidance?: boolean;
+}
+
 /** What a Clash's fix does to its file: swaps lines for others, deletes the file or folder, or renames it. */
 export type ClashEdit = { kind: 'lines'; remove: string[]; add: string[] } | { kind: 'delete' } | { kind: 'rename'; to: string };
 
@@ -1052,11 +1106,11 @@ export interface OnboardingPicks {
 }
 
 /**
- * One change onboarding's PR makes against the default branch: the `## Agent skills` block in its file, a file written
+ * One change onboarding's PR makes against the default branch: the `## Agent skills` block written or removed in its file, a file written
  * whole, a Clash's lines swapped at its line, or a file or folder (its path ending in `/`) deleted or renamed.
  */
 export type OnboardingPrChange = (
-  | { kind: 'agent-skills'; path: string }
+  | { kind: 'agent-skills'; path: string; removed?: true }
   | { kind: 'write'; path: string; created: boolean }
   | { kind: 'edit'; path: string; line: number; reason: string }
   | { kind: 'delete'; path: string }

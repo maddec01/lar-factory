@@ -1,11 +1,12 @@
 // What onboarding's PR changes against the default branch's head, worked out before anything is written: the tree
-// entries of its one commit, and the list the Pull request step and the PR body show. Each ticked edit swaps its lines
-// at the line the Clash names on that head, so an edit whose lines moved fails rather than landing in the wrong place.
+// entries of its one commit, and the list the user approves and the PR body show. It holds only the edits the user
+// chose: factory files dropped, the optional additions, and Clash fixes. Each ticked edit swaps its lines at the line
+// the Clash names on that head, so an edit whose lines moved fails rather than landing in the wrong place.
 
 import { posix } from 'node:path';
-import { skillRenameProblem, type Provider, type OnboardingPicks, type OnboardingPrChange } from '@lar-factory/shared';
+import { skillRenameProblem, type FactoryFileKind, type Provider, type OnboardingPicks, type OnboardingPrChange } from '@lar-factory/shared';
 import type { CommitTree, TreeEntry } from '../github/github.ts';
-import { agentSetupWrites } from './agent-setup.ts';
+import { AGENT_DOC_PATHS, agentSetupWrites, withoutAgentSkills } from './agent-setup.ts';
 import { isInstructionFile, isLineEdit, opencodeInstructions, overlaps, removesWhatIsThere } from './clash-edits.ts';
 import { projectSkills } from './fixed-clashes.ts';
 
@@ -46,15 +47,24 @@ export async function linkTarget(tree: CommitTree, read: (sha: string) => Promis
   return null;
 }
 
+/** The repository edits a PR makes: factory files dropped, `config` as .lar-factory.json unless null, and the factory's agent guidance. */
+export interface PlannedEdits {
+  drop: readonly FactoryFileKind[];
+  config: string | null;
+  guidance: boolean;
+}
+
 /**
  * The PR's changes to the default branch's `tree`, whose blobs `read` gives: ticked line edits, the factory's agent
- * setup, `config` as .lar-factory.json unless it is null because the repository's own is reused, then each delete and
- * rename, with a renamed skill's SKILL.md naming it anew. Returns the problem when a pick no longer fits the branch, or
- * is one the Cleanup step can't make: an edit of a file the Clash agent doesn't read, or a skill pick for a folder that
- * is no project skill named like one of the `bundled` skills, or a rename to a name the Cleanup step refuses.
+ * guidance when `edits` adds it, else each dropped `## Agent skills` section removed, `config` as .lar-factory.json,
+ * then each delete and rename, with a renamed skill's SKILL.md naming it anew. Returns the problem when a pick no
+ * longer fits the branch, or is one the Cleanup step can't make: an edit of a file the Clash agent doesn't read, or a
+ * skill pick for a folder that is no project skill named like one of the `bundled` skills, or a rename to a name the
+ * Cleanup step refuses.
  */
-export async function planPrChanges(tree: CommitTree, read: (sha: string) => Promise<string>, config: string | null,
+export async function planPrChanges(tree: CommitTree, read: (sha: string) => Promise<string>, { drop, config, guidance }: PlannedEdits,
   picks: OnboardingPicks, bundled: readonly string[], provider: Provider): Promise<PrPlan | { problem: string }> {
+  if (guidance && (drop.includes('agent-skills') || drop.includes('agent-docs'))) return { problem: "Keep the factory's agent files or add its guidance, not both." };
   const texts = new Map<string, string>();
   /** Each renamed file's path, by its new path, whose blob it keeps unless `texts` has its new text. */
   const moved = new Map<string, string>();
@@ -102,7 +112,7 @@ export async function planPrChanges(tree: CommitTree, read: (sha: string) => Pro
     if (content !== undefined) instructions[path] = content;
   }
   const written = new Set<string>();
-  for (const write of agentSetupWrites(instructions, provider)) {
+  for (const write of guidance ? agentSetupWrites(instructions, provider) : []) {
     const path = real[write.path] ?? write.path;
     // CLAUDE.md linked to AGENTS.md gets the same block as AGENTS.md, so it is written once.
     if (written.has(path)) continue;
@@ -110,9 +120,24 @@ export async function planPrChanges(tree: CommitTree, read: (sha: string) => Pro
     texts.set(path, write.content);
     changes.push(path.startsWith('docs/agents/') ? { kind: 'write', path, created: !tree.files.has(path) } : { kind: 'agent-skills', path });
   }
+  for (const name of drop.includes('agent-skills') ? ['AGENTS.md', 'CLAUDE.md'] : []) {
+    const path = real[name]!;
+    const content = name in instructions && !written.has(path) ? withoutAgentSkills(instructions[name]!) : null;
+    if (content === null) continue;
+    written.add(path);
+    texts.set(path, content);
+    changes.push({ kind: 'agent-skills', path, removed: true });
+  }
   if (config !== null) {
     texts.set('.lar-factory.json', config);
     changes.push({ kind: 'write', path: '.lar-factory.json', created: !tree.files.has('.lar-factory.json') });
+  } else if (drop.includes('config') && tree.files.has('.lar-factory.json')) {
+    deleted.add('.lar-factory.json');
+    changes.push({ kind: 'delete', path: '.lar-factory.json' });
+  }
+  for (const path of drop.includes('agent-docs') ? AGENT_DOC_PATHS.filter((doc) => tree.files.has(doc)) : []) {
+    deleted.add(path);
+    changes.push({ kind: 'delete', path });
   }
   for (const clash of edits) changes.push({ kind: 'edit', path: clash.file, line: clash.line, reason: clash.reason });
 

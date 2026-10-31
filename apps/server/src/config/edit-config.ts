@@ -6,7 +6,7 @@
 // reading the default branch, so the values change there once the PR merges. The config update notice's PR goes the
 // same way, writing the file's own values in the app's shape and CONFIG_VERSION.
 // On Azure DevOps the labels are the project's tags, read through az, and Save creates none: the board writes a tag the
-// first time a work item needs it, as onboarding's Labels step does there.
+// first time a work item needs it.
 
 import { CONFIG_VERSION, missingCustomLabels, onAzure, onboardingConfigFile, sameRepo, type RepositoryConfigAnswers } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
@@ -50,7 +50,7 @@ export function notEditable(repo: string, dir = boardDataDir()): Refused | null 
 }
 
 /** The URL of the repository's open Edit PR, the open PR from lar-factory/edit-config, or null when it has none. */
-export const editPrOf = (repo: string, run?: Run) => prHost(repo).openPrFrom(repo, EDIT_BRANCH, run);
+const editPrOf = (repo: string, run?: Run) => prHost(repo).openPrFrom(repo, EDIT_BRANCH, run);
 
 /** The repository's labels, or its project's tags on Azure DevOps. */
 const labelsOf = (repo: string, run?: Run) => (onAzure(repo) ? listTags : listLabels)(repo, run);

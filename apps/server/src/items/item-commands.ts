@@ -257,7 +257,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
   }
 
   /**
-   * Refuses a start while the item's repository is still onboarding, until its PR merges, or while a blocker's work
+   * Refuses a start while the item's repository is still onboarding, until it saves its setup, or while a blocker's work
    * isn't complete; Start after starts it once they complete.
    */
   function blockedReply(item: Item): Reply | null {

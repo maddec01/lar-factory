@@ -145,31 +145,15 @@ export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] 
 /**
  * Stores where an onboarding stopped in its repository's entry, adding the entry when there is none, and drops the
  * onboarding entry of `replaces`, the repository it was saved under before it picked another T3 project. Keeps every
- * other entry as the file has it, and returns the list. Only the board marks a PR closed or keeping its
- * .lar-factory.json, so the progress's own marks are dropped and the saved ones kept while the PR is the same;
- * `reusesConfig` marks the PR the board opened. `replaceUnusableConfig` allows restarting only the named repository,
- * after the caller has checked its saved settings. Otherwise throws for a repository that is onboarded already.
+ * other entry as the file has it, and returns the list. The marks an earlier board kept on its onboarding PR are
+ * dropped. `replaceUnusableConfig` allows restarting only the named repository, after the caller has checked its saved
+ * settings. Otherwise throws for a repository that is onboarded already.
  */
 export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir(),
-  { reusesConfig = false, replaceUnusableConfig = false } = {}): OnboardedRepository[] {
+  { replaceUnusableConfig = false } = {}): OnboardedRepository[] {
   const { prClosed: _, reusesConfig: __, ...sent } = progress;
-  const saved = onboardingOf(repo, dir);
-  const samePr = saved?.prUrl !== undefined && saved.prUrl === sent.prUrl;
-  return saveEntry({ repo, onboarding: {
-    ...sent, ...samePr && saved.prClosed && { prClosed: true },
-    ...(reusesConfig || samePr && saved.reusesConfig) && { reusesConfig: true },
-  } }, replaces, dir, replaceUnusableConfig);
+  return saveEntry({ repo, onboarding: sent }, replaces, dir, replaceUnusableConfig);
 }
-
-/** Marks whether the repository's onboarding PR closed without merging, as the board found it on GitHub, and returns the list. */
-export function savePrClosed(repo: string, closed: boolean, dir = boardDataDir()): OnboardedRepository[] {
-  const onboarding = onboardingOf(repo, dir);
-  if (!onboarding) throw new Error(`${repo} is not onboarding.`);
-  const { prClosed: _, ...progress } = onboarding;
-  return saveEntry({ repo, onboarding: closed ? { ...progress, prClosed: true } : progress }, null, dir);
-}
-
-const onboardingOf = (repo: string, dir: string) => readRepositoryList(dir).find((e) => sameRepo(e.repo, repo))?.onboarding;
 
 /**
  * Finishes an onboarding: its repository's entry keeps only the repository and its local settings, in place of its onboarding entry and of
@@ -198,31 +182,8 @@ function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: str
   return writeListFile(dir, { ...raw, repositories });
 }
 
-/** Drops the repository's entry, keeping every other entry as the file has it, and returns the list. Throws for a repository the list doesn't name. */
-export function dropRepository(repo: string, dir = boardDataDir()): OnboardedRepository[] {
-  const file = join(dir, REPOSITORY_LIST_FILE);
-  const { raw, list } = readListFile(file);
-  if (!list.some((e) => sameRepo(e.repo, repo))) throw new Error(`${repo} is not on this Mac's list.`);
-  return writeListFile(dir, { ...raw, repositories: raw.repositories.filter((_, i) => !sameRepo(list[i]!.repo, repo)) });
-}
-
-/**
- * Marks an onboarded repository resetting, with its reset PR's URL, keeping every other entry as the file has it, and
- * returns the list. Throws for a repository that is not onboarded, or is onboarding or resetting.
- */
-export function saveResetting(repo: string, prUrl: string, dir = boardDataDir()): OnboardedRepository[] {
-  const { raw, list } = readListFile(join(dir, REPOSITORY_LIST_FILE));
-  const at = list.findIndex((e) => sameRepo(e.repo, repo));
-  if (at < 0 || list[at]!.onboarding || list[at]!.resetting) throw new Error(`${repo} is not onboarded.`);
-  return writeListFile(dir, { ...raw, repositories: raw.repositories.map((e, i) => i === at ? { ...e, resetting: { prUrl } } : e) });
-}
-
 /** The list's repositories on the board: neither still onboarding nor resetting. */
 export const onTheBoard = (list: readonly OnboardedRepository[]) => list.filter((e) => !e.onboarding && !e.resetting);
-
-/** The reset PRs still waiting to merge or close, including after a board restart. */
-export const stillResetting = (list: readonly OnboardedRepository[]) =>
-  list.flatMap(({ repo, resetting }) => resetting ? [{ repo, prUrl: resetting.prUrl }] : []);
 
 /** Writes the repository list with `content` and returns its list. */
 export function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {
@@ -235,13 +196,9 @@ export function writeListFile(dir: string, content: Record<string, unknown>): On
   return readListFile(file).list;
 }
 
-/** The list's repositories that are still onboarding, each with where it stopped and the problem in `followProblems`, by repository, following its PR met. */
-export function stillOnboarding(list: readonly OnboardedRepository[], followProblems: ReadonlyMap<string, string> = new Map()): OnboardingRepository[] {
-  return list.flatMap(({ repo, onboarding }) => {
-    if (!onboarding) return [];
-    const followProblem = [...followProblems].find(([r]) => sameRepo(r, repo))?.[1];
-    return [{ repo, progress: onboarding, ...followProblem !== undefined && { followProblem } }];
-  });
+/** The list's repositories that are still onboarding, each with where it stopped. */
+export function stillOnboarding(list: readonly OnboardedRepository[]): OnboardingRepository[] {
+  return list.flatMap(({ repo, onboarding }) => onboarding ? [{ repo, progress: onboarding }] : []);
 }
 
 /** settings.json, with each missing field, or the whole file, taking its default; a file it can't use takes them all, with the problem. */

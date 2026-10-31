@@ -1,4 +1,4 @@
-// The calls that open and follow the board's PRs on a repository, onboarding's, Edit's and Reset's: az's on Azure
+// The calls that open and follow the board's PRs on a repository, onboarding's and Edit's: az's on Azure
 // DevOps, gh's on GitHub, each named and shaped alike.
 
 import { onAzure } from '@lar-factory/shared';

@@ -107,7 +107,7 @@ test("a repository's project hint is found whatever the case, and is null once T
 test("a start in a repository still onboarding waits for its PR, whatever the case; else the project's hint holds it", () => {
   const onboarding = [{ repo: 'maddec01/lar-docs', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }];
   const repositoryProjects = { 'maddec01/lar-server': 'Add the checkout in T3 Code' };
-  assert.equal(startHold({ onboarding, repositoryProjects }, 'MADDEC01/Lar-Docs'), "Waits for onboarding's PR to merge");
+  assert.equal(startHold({ onboarding, repositoryProjects }, 'MADDEC01/Lar-Docs'), "Waits for onboarding to finish");
   assert.equal(startHold({ onboarding, repositoryProjects }, 'maddec01/lar-server'), 'Add the checkout in T3 Code');
   assert.equal(startHold({ onboarding, repositoryProjects }, 'maddec01/lar-factory'), null);
   assert.equal(startHold({}, null), null);

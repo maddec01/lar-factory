@@ -10,11 +10,11 @@ import type { BoardData, RepositorySetup } from '@lar-factory/shared';
 const REPO = 'maddec01/lar-server';
 
 const SETUP: RepositorySetup = {
-  repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, show: 'all', labels: ['area: server'],
+  repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, labels: ['area: server'],
   domainDocs: { kind: 'private' }, skills: [],
   access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused' },
   consent: ['push-branch'], paused: [],
-  sources: { role: 'shared', itemSource: 'default', show: 'default', labels: 'local', domainDocs: 'default', skills: 'default' },
+  sources: { role: 'shared', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default' },
   shared: { role: 'Backend API server', labels: ['area: web'] },
 };
 
@@ -58,13 +58,15 @@ async function openEdit(board: BoardData): Promise<void> {
   await settle(() => buttonIn(row(), 'Edit')!.click());
 }
 
-test('Edit shows each setting with where it comes from, and Settings offers no Reset', async () => {
+test('Edit shows each setting with where it comes from, has no Show setting, and Settings offers no Reset', async () => {
   const board = boardWith();
   serve(board);
   await openRepositories(board);
   expect(buttonIn(row(), 'Reset')).toBeUndefined();
   await settle(() => buttonIn(row(), 'Edit')!.click());
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Edit ${REPO}`);
+  expect([...dialog()!.querySelectorAll('[data-setting]')].map((s) => s.getAttribute('data-setting'))).toEqual(['role', 'itemSource', 'labels', 'domainDocs', 'skills']);
+  expect(dialog()!.querySelector('[aria-label="Show"]')).toBeNull();
   expect(text(setting('role').querySelector('[data-source]'))).toBe('Shared default');
   expect(text(setting('labels').querySelector('[data-source]'))).toBe('Set on this Mac');
   expect(text(setting('domainDocs').querySelector('[data-source]'))).toBe('Factory default');

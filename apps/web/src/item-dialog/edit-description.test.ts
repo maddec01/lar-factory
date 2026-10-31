@@ -64,7 +64,7 @@ const editing = allowEdits(sample);
 const azureBoard = (): [BoardData, string] => {
   const id = 'azure:contoso/310';
   const item: Item = { ...sample.items[0]!, id, number: 310, repo: 'contoso/Fabrikam/web', url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/310', labels: ['bug'] };
-  return [allowEdits({ ...sample, repos: [...sample.repos, { repo: item.repo!, role: 'Web client', items: 'azure-board', team: 'Web', show: 'all', labels: [] }], items: [item, ...sample.items.slice(1)] }), id];
+  return [allowEdits({ ...sample, repos: [...sample.repos, { repo: item.repo!, role: 'Web client', items: 'azure-board', team: 'Web', labels: [] }], items: [item, ...sample.items.slice(1)] }), id];
 };
 const github = sample.items[0]!.id;
 

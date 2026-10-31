@@ -3,10 +3,11 @@
 # <owner/repo> prints the GitHub repository's settings: its local overrides on this
 # Mac over its optional .lar-factory.json, the shared defaults read from its default
 # branch with gh, never from a checkout, over the built-in defaults (version 1,
-# itemSource {"kind": "issues"}, show "all", labels [], domainDocs {"kind":
-# "private"}, skills []). role has no default. The local overrides are settings.overrides
-# in the repository's entry of the list --list reads, as the board writes it; each
-# replaces its shared default, and an absent one inherits it. A repository with local
+# itemSource {"kind": "issues"}, labels [], domainDocs {"kind": "private"},
+# skills []). role has no default, and it drops the old show setting. The local
+# overrides are settings.overrides in the repository's entry of the list --list
+# reads, as the board writes it; each replaces its shared default, and an absent one
+# inherits it. A repository with local
 # overrides needs no .lar-factory.json. When its .lar-factory.json can't be read or
 # used, it falls back to the last usable copy the board kept, settings.shared, and
 # says why on stderr; a logged-out gh has no fallback.
@@ -119,7 +120,6 @@ fields='def problem:
     elif has("version") and (.version | type) != "number" then "field version must be a number"
     elif has("role") and ((.role | type) != "string" or .role == "") then "field role must be a non-empty string"
     elif has("itemSource") and (.itemSource | type) != "object" then "field itemSource must be an object"
-    elif has("show") and (.show | IN("all", "opted-in") | not) then "field show must be \"all\" or \"opted-in\""
     elif has("labels") and ((.labels | type) != "array" or any(.labels[]; type != "string")) then
         "field labels must be an array of strings"
     elif has("domainDocs") and (.domainDocs | type != "object" or (.kind != "private"
@@ -153,8 +153,8 @@ if [[ -n $problem ]]; then
     exit 1
 fi
 settings=$(jq -n --argjson shared "$raw" --argjson local "$local_settings" '
-    {version: 1, role: null, itemSource: {kind: "issues"}, show: "all", labels: [], domainDocs: {kind: "private"}, skills: []}
-    + ($shared // {}) + ($local // {} | with_entries(select(.key | IN("role", "itemSource", "show", "labels", "domainDocs", "skills"))))')
+    {version: 1, role: null, itemSource: {kind: "issues"}, labels: [], domainDocs: {kind: "private"}, skills: []}
+    + ($shared // {} | del(.show)) + ($local // {} | with_entries(select(.key | IN("role", "itemSource", "labels", "domainDocs", "skills"))))')
 problem=$(jq -r --arg provider "$provider" '
     if (.role | type) != "string" then "no role in its local overrides or .lar-factory.json"
     elif ($provider == "github" and .itemSource.kind != "issues") or ($provider == "azure" and .itemSource.kind != "azure-board") then

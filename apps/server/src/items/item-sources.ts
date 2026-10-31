@@ -19,15 +19,14 @@ const unlisted: ItemSource = {
   abandon: async () => NOT_ONBOARDED,
 };
 
-/** A repository's config as the page sees it: its role, item source, show setting and custom labels. */
-export function repoView({ repo, role, itemSource, show, labels }: RepositoryConfig): RepoConfig {
-  if (itemSource.kind === 'issues') return { repo, role, items: 'issues', show, labels };
-  return { repo, role, items: 'azure-board', team: itemSource.team, show, labels };
+/** A repository's config as the page sees it: its role, item source and custom labels. */
+export function repoView({ repo, role, itemSource, labels }: RepositoryConfig): RepoConfig {
+  if (itemSource.kind === 'issues') return { repo, role, items: 'issues', labels };
+  return { repo, role, items: 'azure-board', team: itemSource.team, labels };
 }
 
 /**
- * Each repository's item source as its config names it, merged, showing each repository's items as its show setting
- * says. Repositories reading the same Azure DevOps team's board share one adapter, which then sorts the team's work items among them by their repo- tags.
+ * Each repository's item source as its config names it, merged. Repositories reading the same Azure DevOps team's board share one adapter, which then sorts the team's work items among them by their repo- tags.
  * Each source waits while the pace says its kind waits. `run` stands in for az in tests.
  */
 export function configuredSources(configs: readonly RepositoryConfig[], run: Az = az): MergedSource {

@@ -32,7 +32,7 @@ export function createConfigChecks(run?: (args: string[]) => Promise<string>, lo
     failing.delete(key);
     if (!found) return { hasConfig: false };
     if ('problem' in found) return { hasConfig: true, configProblem: found.problem };
-    return { hasConfig: true, config: { itemSource: found.itemSource, show: found.show, role: found.role, labels: found.labels } };
+    return { hasConfig: true, config: { itemSource: found.itemSource, role: found.role, labels: found.labels } };
   };
   return {
     configOf: (repo) => {

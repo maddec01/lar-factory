@@ -51,24 +51,24 @@ test('with no source a read lists nothing and an abandon is refused', async () =
   assert.equal(await sources.abandon(item('I_1', 'maddec01/lar-server')), "That item's repository isn't onboarded.");
 });
 
-const config = (repo: string, show: RepositoryConfig['show'] = 'all'): RepositoryConfig =>
-  ({ repo, version: 1, role: 'role', itemSource: { kind: 'issues' }, show, labels: [] });
+const config = (repo: string): RepositoryConfig =>
+  ({ repo, version: 1, role: 'role', itemSource: { kind: 'issues' }, labels: [] });
 
 test('each read loads the configs first and builds the sources again only when they changed', async () => {
   let configs = [config('maddec01/lar-apple')];
   const built: string[][] = [];
   const sources = onboardedSources(async () => ({ configs, problems: [] }), (read) => {
-    built.push(read.map((c) => `${c.repo} ${c.show}`));
+    built.push(read.map((c) => `${c.repo} ${c.labels.join(',')}`));
     return merged(fakeSource(read.map((c) => c.repo).join(',') || 'none', [], []));
   });
   assert.deepEqual(sources.repos(), []);
   assert.equal((await sources.read()).title, 'maddec01/lar-apple');
   await sources.read();
-  configs = [{ ...config('maddec01/lar-apple', 'opted-in'), labels: ['app: music'] }, config('maddec01/lar-server')];
+  configs = [{ ...config('maddec01/lar-apple'), labels: ['app: music'] }, config('maddec01/lar-server')];
   assert.equal((await sources.read()).title, 'maddec01/lar-apple,maddec01/lar-server');
-  assert.deepEqual(built, [[], ['maddec01/lar-apple all'], ['maddec01/lar-apple opted-in', 'maddec01/lar-server all']]);
-  assert.deepEqual(sources.repos(), [{ repo: 'maddec01/lar-apple', role: 'role', items: 'issues', show: 'opted-in', labels: ['app: music'] },
-    { repo: 'maddec01/lar-server', role: 'role', items: 'issues', show: 'all', labels: [] }]);
+  assert.deepEqual(built, [[], ['maddec01/lar-apple '], ['maddec01/lar-apple app: music', 'maddec01/lar-server ']]);
+  assert.deepEqual(sources.repos(), [{ repo: 'maddec01/lar-apple', role: 'role', items: 'issues', labels: ['app: music'] },
+    { repo: 'maddec01/lar-server', role: 'role', items: 'issues', labels: [] }]);
 });
 
 test("a read whose configs can't be loaded fails, and abandons keep going to the last sources", async () => {
@@ -93,8 +93,8 @@ test("a read leaves out the items of a repository whose config couldn't be read,
   assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
 });
 
-const azure = (repo: string, team = 'Fabrikam Team', show: RepositoryConfig['show'] = 'all'): RepositoryConfig =>
-  ({ repo, version: 1, role: 'role', itemSource: { kind: 'azure-board', team }, show, labels: [] });
+const azure = (repo: string, team = 'Fabrikam Team'): RepositoryConfig =>
+  ({ repo, version: 1, role: 'role', itemSource: { kind: 'azure-board', team }, labels: [] });
 
 test("repositories reading one team's sprint share one read, and an untagged item from it is for each of them", async () => {
   const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 2, type: 'User Story', state: 'New', tags: 'repo-api' }] });

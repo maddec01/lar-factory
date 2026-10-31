@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -355,12 +355,9 @@ test("an untagged Azure work item shows in the List of every repository reading 
   assert.equal(inRepo(items[1]!, 'contoso/Fabrikam/api'), false);
 });
 
-test("an untagged item two repositories read shows both as its repositories, and any other item its own", () => {
+test("an item's repository name is its own repository's", () => {
   const repos = [{ repo: 'contoso/p/web', role: 'app', labels: [] }, { repo: 'contoso/p/api', role: 'api', labels: [] }];
-  const both = { repo: 'contoso/p/web', untaggedFor: ['contoso/p/web', 'contoso/p/api'] };
-  assert.deepEqual(itemRepos(both), ['contoso/p/web', 'contoso/p/api']);
-  assert.equal(itemRepoNames(both, repos), 'web or api');
-  assert.equal(itemRepoNames({ repo: 'contoso/p/web', untaggedFor: ['contoso/p/web'] }, repos), 'web');
+  assert.equal(itemRepoNames({ repo: 'contoso/p/web' }, repos), 'web');
   assert.equal(itemRepoNames({ repo: 'contoso/p/api' }, repos), 'api');
 });
 
@@ -396,13 +393,13 @@ test('Add item refuses an unlisted repository, an unknown kind and a blank title
 });
 
 test('.lar-factory.json as onboarding writes it has the answers, version 1 and the custom labels the Labels step picked', () => {
-  assert.equal(onboardingConfigFile({ itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: ['app: music', 'web'] }),
-    '{\n  "version": 1,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "show": "opted-in",\n  "labels": [\n    "app: music",\n    "web"\n  ]\n}\n');
+  assert.equal(onboardingConfigFile({ itemSource: { kind: 'issues' }, role: 'Web client', labels: ['app: music', 'web'] }),
+    '{\n  "version": 1,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "labels": [\n    "app: music",\n    "web"\n  ]\n}\n');
 });
 
 test('.lar-factory.json as Edit writes it keeps the version the file had', () => {
-  const file = onboardingConfigFile({ itemSource: { kind: 'issues' }, show: 'all', role: 'API server', labels: [] }, 2);
-  assert.deepEqual(JSON.parse(file), { version: 2, role: 'API server', itemSource: { kind: 'issues' }, show: 'all', labels: [] });
+  const file = onboardingConfigFile({ itemSource: { kind: 'issues' }, role: 'API server', labels: [] }, 2);
+  assert.deepEqual(JSON.parse(file), { version: 2, role: 'API server', itemSource: { kind: 'issues' }, labels: [] });
 });
 
 test('a skill Clash renames only to a valid name no bundled skill, no other project skill and no rename beside it has', () => {

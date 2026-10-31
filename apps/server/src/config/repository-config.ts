@@ -5,8 +5,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  PROVIDERS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type OnboardingProgress, type OnboardingRepository, type Provider,
-  type RepositoryConfigAnswers, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
+  PROVIDERS, isRecord, onAzure, sameRepo, type OnboardingProgress, type OnboardingRepository, type Provider,
+  type RepositoryConfigAnswers, type RepositoryItemSource, type SetupAnswers,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
 import { readBranchFile as readAzureFile } from '../azure/azure-repos.ts';
@@ -18,7 +18,6 @@ export interface RepositoryConfig {
   version: number;
   role: string;
   itemSource: RepositoryItemSource;
-  show: ShowSetting;
   labels: string[];
 }
 
@@ -65,11 +64,10 @@ const strings = (value: unknown): value is string[] => Array.isArray(value) && v
 
 const SETUP_SOURCES: readonly SetupAnswers['itemSource'][] = ['issues', 'azure-board'];
 
-/** Whether the Provider and item source step's answers have their shape. */
+/** Whether the Provider and item source step's answers have their shape. Progress saved before show was dropped still has it, unread. */
 function isSetup(value: unknown): value is SetupAnswers {
   return isRecord(value) && SETUP_SOURCES.includes(value.itemSource as SetupAnswers['itemSource'])
-    && (value.team === undefined || typeof value.team === 'string') && SHOW_SETTINGS.includes(value.show as ShowSetting)
-    && typeof value.showPicked === 'boolean' && typeof value.role === 'string';
+    && (value.team === undefined || typeof value.team === 'string') && typeof value.role === 'string';
 }
 
 /** Whether an entry's onboarding is progress the dialog can resume from. */
@@ -203,7 +201,6 @@ function problem(raw: Record<string, unknown>, azure: boolean): string | null {
   if ('itemSource' in raw && (typeof source !== 'object' || source === null || Array.isArray(source))) return 'field itemSource must be an object';
   if (source && source.kind !== (azure ? 'azure-board' : 'issues') || azure && !source) return 'has an unsupported item source. Run onboarding again';
   if (azure && !isTeam(source?.team)) return 'name the Azure DevOps team whose backlog and current sprint the board reads';
-  if ('show' in raw && !SHOW_SETTINGS.includes(raw.show as ShowSetting)) return 'field show must be "all" or "opted-in"';
   if ('labels' in raw && (!Array.isArray(raw.labels) || raw.labels.some((l) => typeof l !== 'string'))) return 'field labels must be an array of strings';
   return null;
 }
@@ -226,5 +223,5 @@ export async function findRepositoryConfig(repo: string, run?: (args: string[]) 
   const file = raw as Partial<RepositoryConfig> & { role: string };
   const source = file.itemSource;
   const itemSource: RepositoryItemSource = source?.kind === 'azure-board' ? { kind: 'azure-board', team: source.team } : { kind: 'issues' };
-  return { repo, version: file.version ?? 1, role: file.role, itemSource, show: file.show ?? 'all', labels: file.labels ?? [] };
+  return { repo, version: file.version ?? 1, role: file.role, itemSource, labels: file.labels ?? [] };
 }

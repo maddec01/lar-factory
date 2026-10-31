@@ -105,14 +105,6 @@ test('the dialog lays out by its own width and never hides an overflow', async (
   expect(inDialog('[data-item-body]')!.className).not.toMatch(/overflow/);
 });
 
-test('the dialog of an untagged item two repositories read tags it with both', async () => {
-  const [web, api] = ['contoso/Fabrikam/web', 'contoso/Fabrikam/api'];
-  await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'azure-board', team: 'Web', show: 'all', labels: [] }],
-    items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, repo: web, untaggedFor: [web, api] } : i)) });
-  await openItem('I_sample05');
-  expect([...inDialog('[data-item-summary]')!.querySelectorAll('.repo-tag')].map(text)).toEqual(['web', 'api']);
-});
-
 test('the dialog shows the hint, each pull request with its checks, and the agent work figures', async () => {
   await mountPage();
   await openItem('I_sample14');

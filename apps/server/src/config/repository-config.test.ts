@@ -28,7 +28,7 @@ function ghWith(files: Record<string, unknown>): (args: string[]) => Promise<str
 }
 
 const progress = (step = 'setup', projectId = 'lar-apple') => ({ step, done: ['project'], answers: { projectId } });
-const setup = { itemSource: 'issues', show: 'all', showPicked: false, role: 'Apple app' };
+const setup = { itemSource: 'issues', role: 'Apple app' };
 
 test('the list file names the onboarded repositories, each still onboarding with its progress; a missing one names none', async (t) => {
   const onboarding = { ...progress(), answers: { projectId: 'lar-apple', provider: 'GitHub', setup } };
@@ -36,6 +36,12 @@ test('the list file names the onboarded repositories, each still onboarding with
   assert.deepEqual(readRepositoryList(await dataDir(t, { 'repository-settings.json': JSON.stringify(list) })),
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding }]);
   assert.deepEqual(readRepositoryList(await dataDir(t)), []);
+});
+
+test('progress saved with the old show setting still resumes', async (t) => {
+  const onboarding = { ...progress(), answers: { projectId: 'lar-apple', setup: { ...setup, show: 'some', showPicked: 'yes' } } };
+  const list = { repositories: [{ repo: 'maddec01/lar-apple', onboarding }] };
+  assert.deepEqual(readRepositoryList(await dataDir(t, { 'repository-settings.json': JSON.stringify(list) })), [{ repo: 'maddec01/lar-apple', onboarding }]);
 });
 
 test("an onboarding's setup answers may name an Azure DevOps team's sprint or backlog", async (t) => {
@@ -49,7 +55,7 @@ test("an onboarding's setup answers may name an Azure DevOps team's sprint or ba
 test("an onboarding that isn't progress is refused, naming its entry", async (t) => {
   for (const onboarding of [true, { step: 'setup', done: ['project'] }, { step: 3, done: [], answers: { projectId: 'x' } },
     { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} },
-    ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { showPicked: 'yes' }, { team: 3 }].map((wrong) =>
+    ...[{ itemSource: 'sprint' }, { role: 3 }, { team: 3 }].map((wrong) =>
       ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } }]) {
     const dir = await dataDir(t, { 'repository-settings.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding }] }) });
     assert.throws(() => readRepositoryList(dir), { message: `${join(dir, 'repository-settings.json')}: repositories[0] has an onboarding without its step, done steps and T3 project, or with answers it can't use.` },
@@ -157,16 +163,16 @@ test("a repository's config comes from its default branch, with each missing fie
   const gh = ghWith({ 'maddec01/lar-factory': { version: 1, role: 'The factory', itemSource: project, show: 'opted-in', labels: ['area'] },
     'maddec01/lar-apple': { role: 'Apple client' } });
   assert.deepEqual(await findRepositoryConfig('maddec01/lar-factory', gh),
-    { repo: 'maddec01/lar-factory', version: 1, role: 'The factory', itemSource: project, show: 'opted-in', labels: ['area'] });
+    { repo: 'maddec01/lar-factory', version: 1, role: 'The factory', itemSource: project, labels: ['area'] }, 'the old show setting is left out');
   assert.deepEqual(await findRepositoryConfig('maddec01/lar-apple', gh),
-    { repo: 'maddec01/lar-apple', version: 1, role: 'Apple client', itemSource: { kind: 'issues' }, show: 'all', labels: [] });
+    { repo: 'maddec01/lar-apple', version: 1, role: 'Apple client', itemSource: { kind: 'issues' }, labels: [] });
 });
 
 test("an Azure DevOps repository's config is read from its default branch with one az call, and a missing file is no config", async () => {
   const file = { role: 'API', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'opted-in' };
   const az = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify(file) } });
   assert.deepEqual(await findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', az.run),
-    { repo: 'contoso/Fabrikam%20Fiber/lar-api', version: 1, role: 'API', itemSource: file.itemSource, show: 'opted-in', labels: [] });
+    { repo: 'contoso/Fabrikam%20Fiber/lar-api', version: 1, role: 'API', itemSource: file.itemSource, labels: [] });
   assert.deepEqual(az.calls, [['devops', 'invoke', '--area', 'git', '--resource', 'items', '--route-parameters', 'project=Fabrikam Fiber', 'repositoryId=lar-api',
     '--query-parameters', 'path=/.lar-factory.json', 'includeContent=true', '--api-version', '7.1', '--org', 'https://dev.azure.com/contoso', '--detect', 'false', '--output', 'json']]);
   assert.equal(await findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', fakeAzRepos().run), null);
@@ -196,10 +202,10 @@ test('removed and unknown sources ask for onboarding again, without migration', 
 });
 
 test('malformed configs still name their problem', async () => {
-  const gh = ghWith({ 'maddec01/broken': '{ broken', 'maddec01/no-role': {}, 'maddec01/some': { role: 'x', show: 'some' } });
+  const gh = ghWith({ 'maddec01/broken': '{ broken', 'maddec01/no-role': {}, 'maddec01/some': { role: 'x', labels: 'area' } });
   assert.equal(await findRepositoryConfig('maddec01/missing', gh), null);
   for (const [repo, problem] of Object.entries({ broken: ".lar-factory.json isn't valid JSON.",
-    'no-role': '.lar-factory.json field role is missing or not a string.', some: '.lar-factory.json field show must be "all" or "opted-in".' })) {
+    'no-role': '.lar-factory.json field role is missing or not a string.', some: '.lar-factory.json field labels must be an array of strings.' })) {
     assert.deepEqual(await findRepositoryConfig(`maddec01/${repo}`, gh), { problem });
   }
 });

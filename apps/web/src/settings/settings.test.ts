@@ -189,8 +189,8 @@ test('unfinished settings show availability inline without controls or fictional
 /** Each Settings group's title with its rows' ids. */
 const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
 
-test('Repositories shows the command line tools\' logins and each repository with its provider, item source and show setting', async () => {
-  const repos = [sample.repos[0]!, { ...sample.repos[1]!, items: 'issues' as const, show: 'opted-in' as const },
+test('Repositories shows the command line tools\' logins and each repository with its provider and item source', async () => {
+  const repos = [sample.repos[0]!, { ...sample.repos[1]!, items: 'issues' as const },
     { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'azure-board' as const, team: 'Fabrikam Team', labels: [] },
     { repo: 'contoso/Fabrikam/lar-web', role: 'Web', items: 'azure-board' as const, team: 'Web Team', labels: [] }];
   await open('Repositories', { ...sample, repos });
@@ -203,10 +203,10 @@ test('Repositories shows the command line tools\' logins and each repository wit
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
   expect(repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual([
-    `${repos[0]!.repo}GitHub · Issues · All items`,
-    `${repos[1]!.repo}GitHub · Issues · Items with a status`,
-    'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint · All items',
-    'contoso/Fabrikam/lar-webAzure DevOps · Web Team\'s backlog and current sprint · All items',
+    `${repos[0]!.repo}GitHub · Issues`,
+    `${repos[1]!.repo}GitHub · Issues`,
+    'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint',
+    'contoso/Fabrikam/lar-webAzure DevOps · Web Team\'s backlog and current sprint',
   ]);
 });
 

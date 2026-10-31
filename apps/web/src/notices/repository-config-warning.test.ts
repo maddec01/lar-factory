@@ -6,7 +6,7 @@ import { $, $$, warningText, mountPage, push, sample, settle, text } from '../..
 
 const problems = [
   { repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' },
-  { repo: 'maddec01/lar-server', problem: '.lar-factory.json field show must be "all" or "opted-in".' },
+  { repo: 'maddec01/lar-server', problem: '.lar-factory.json field labels must be an array of strings.' },
 ];
 
 test("each repository whose .lar-factory.json can't be read gets a warning naming it and why, which clears once it reads", async () => {
@@ -15,7 +15,7 @@ test("each repository whose .lar-factory.json can't be read gets a warning namin
   expect(warnings().map(warningText)).toEqual([
     ['maddec01/lar-apple is off the board.', 'No .lar-factory.json on its default branch. '
       + 'Read how to add a repository. The board reads it again on each refresh.'],
-    ['maddec01/lar-server is off the board.', '.lar-factory.json field show must be "all" or "opted-in". '
+    ['maddec01/lar-server is off the board.', '.lar-factory.json field labels must be an array of strings. '
       + 'Read how to add a repository. The board reads it again on each refresh.'],
   ]);
   expect(warnings()[0]!.querySelector('a')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-factory/blob/main/apps/server/README.md#adding-a-repository');

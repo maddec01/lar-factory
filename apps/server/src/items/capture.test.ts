@@ -11,7 +11,7 @@ import type { ItemSource } from './item-source.ts';
 import { recordItems } from './record-items.ts';
 
 const WEB = 'maddec01/lar-web';
-const REPOS: RepoConfig[] = [{ repo: WEB, role: 'app', items: 'issues', show: 'all', labels: [] }];
+const REPOS: RepoConfig[] = [{ repo: WEB, role: 'app', items: 'issues', labels: [] }];
 const REQUEST = '00000000-0000-4000-8000-000000000001';
 
 const ticket = (number: number, extra: Partial<PickedTicket> = {}): PickedTicket =>

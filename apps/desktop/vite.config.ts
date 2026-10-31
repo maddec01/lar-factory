@@ -1,12 +1,31 @@
 // Builds the main process and preload to CommonJS in dist-electron/, as T3 Code's
 // apps/desktop/vite.config.ts does, and bundles the board server into
-// dist-electron/server/server.mjs for the packaged app, which has no node_modules.
-// The dev window runs apps/server/src/server.ts as source.
+// dist-electron/server/server.mjs and the lar-work command into dist-electron/work-records/lar-work.mjs for the
+// packaged app, which has no node_modules. The dev window runs apps/server/src/server.ts as source.
 import { compiledCss } from "@lar-factory/ui/compiled-css";
-import { defineConfig } from "vite-plus";
+import { defineConfig, type UserConfig } from "vite-plus";
 import { sharedTest } from "../../vitest.shared.ts";
 
 const electronOnly = (id: string) => id === "electron" || id.startsWith("electron/");
+
+/**
+ * The lar-work command as one ES module with every dependency in it, which the launcher runs with the app's own Node.
+ * Its tests build it on its own.
+ */
+export const larWorkPack = {
+  format: "esm",
+  outDir: "dist-electron/work-records",
+  dts: false,
+  sourcemap: false,
+  outExtensions: () => ({ js: ".mjs" }),
+  outputOptions: { codeSplitting: false },
+  entry: { "lar-work": "../../packages/work-records/src/cli.ts" },
+  clean: false,
+  deps: {
+    alwaysBundle: (id) => !id.startsWith("node:"),
+    onlyBundle: false,
+  },
+} satisfies NonNullable<UserConfig["pack"]>;
 
 export default defineConfig({
   pack: [
@@ -73,6 +92,7 @@ export default defineConfig({
         onlyBundle: false,
       },
     },
+    larWorkPack,
   ],
   plugins: [compiledCss()],
   test: {

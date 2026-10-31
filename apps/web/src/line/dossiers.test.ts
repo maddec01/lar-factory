@@ -510,6 +510,17 @@ test('the parts list keeps a build before a research decision blocked by that bu
   expect([...dossier().querySelectorAll('[data-parts-list] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([build.id, research.id]);
 });
 
+test("a concept map's Dependencies show as a Dependencies row, after what waits and before the fog", async () => {
+  const dependencies = ['A resume endpoint, from team/relay, blocks #140'];
+  await mountPage(withItem(C200, { map: { ...c200.map!, dependencies } }));
+  const rows = [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')].map((r) => r.dataset.attentionRow);
+  expect(rows).toEqual(['you', 'decisions', 'waiting', 'dependencies', 'fog']);
+  const row = dossier().querySelector('[data-attention-row="dependencies"]')!;
+  expect([text(row.firstElementChild), [...row.querySelector('dd')!.children].map(text)]).toEqual(['Dependencies 1', dependencies]);
+  await press(button(row, '#140'));
+  expect(dialogTitle(), "a Dependency's #n opens its item").toBe(`#140 ${sample.items.find((i) => i.number === 140)!.title}`);
+});
+
 test('a concept with no map has no fog row', async () => {
   const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: 'A concept written as ordinary prose.' });
   await mountPage({ ...sample, items: normalizeItems([concept]) });

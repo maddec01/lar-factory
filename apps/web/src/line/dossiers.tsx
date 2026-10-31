@@ -120,7 +120,8 @@ function Entry({ main, side }: { main: ReactNode; side?: ReactNode }) {
 }
 
 /** What keeps the work moving, as labelled rows, each shown only with entries: parts in Needs you, parts in Verify or
- *  Ready to merge, open decisions, blocked slices, parts waiting on others, parts ready to start and the map's fog. */
+ *  Ready to merge, open decisions, blocked slices, parts waiting on others, parts ready to start, the map's
+ *  Dependencies and its fog. */
 function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[]; data: BoardData; find: FindRef }) {
   const ahead = parts.filter((p) => !isDone(p.item));
   const blocked = ahead.flatMap((part) => part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice })));
@@ -144,6 +145,10 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
     { key: 'ready', label: 'Ready to start', tone: 'text-(--st-now)',
       entries: ahead.filter(startable).map((p) => (
         <Entry key={p.item.id} main={<PartLink part={p} />} side={<span onClick={stop}><PartStart part={p} data={data} label="Start" /></span>} />
+      )) },
+    { key: 'dependencies', label: 'Dependencies', tone: 'text-(--st-review)',
+      entries: (parent.map?.dependencies ?? []).map((d) => (
+        <Entry key={d} main={<span className="flex items-start gap-1.5 text-[13px]"><Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" /><span><Refs text={d} find={find} /></span></span>} />
       )) },
     { key: 'fog', label: 'Fog', tone: 'text-(--st-amber)',
       entries: (parent.map?.fog ?? []).map((q) => (

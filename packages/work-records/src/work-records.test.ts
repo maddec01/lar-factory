@@ -526,6 +526,44 @@ describe('work-record threads and launch intents', () => {
   });
 });
 
+describe('work-record facts the board sets', () => {
+  const lar = (records: WorkRecords, kind: WorkKind) => records.create({ title: 'Work', repository: 'maddec01/lar', kind });
+
+  it('sets, replaces and clears a Needs you reason without moving the Status', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    expect(build.needsYou).toBeNull();
+    first.setNeedsYou(build.workId, 1, 'Its PR closed without merging.');
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.read(build.workId)).toMatchObject({ needsYou: 'Its PR closed without merging.', status: 'List', revision: 2 });
+    expect(reopened.setNeedsYou(build.workId, 2, "The start's outcome is unknown.")).toMatchObject({ needsYou: "The start's outcome is unknown.", revision: 3 });
+    expect(() => reopened.setNeedsYou(build.workId, 3, ' ')).toThrow(/reason/);
+    expect(reopened.clearNeedsYou(build.workId, 3)).toMatchObject({ needsYou: null, revision: 4 });
+    expect(reopened.clearNeedsYou(build.workId, 4)).toMatchObject({ revision: 4 });
+  });
+
+  it("snapshots a build's selected project skills once, so later selections leave it alone", async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    expect(build.skills).toBeNull();
+    first.snapshotSkills(build.workId, 1, ['react-patterns', 'acme:testing']);
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.read(build.workId)).toMatchObject({ skills: ['react-patterns', 'acme:testing'], revision: 2 });
+    expect(() => reopened.snapshotSkills(build.workId, 2, ['other'])).toThrow(/already snapshotted/);
+    expect(reopened.snapshotSkills(lar(reopened, 'feature').workId, 1, [])).toMatchObject({ skills: [] });
+    expect(() => reopened.snapshotSkills(lar(reopened, 'decision').workId, 1, [])).toThrow(/never built/);
+    expect(() => reopened.snapshotSkills(lar(reopened, 'bug').workId, 1, ['a', 'a'])).toThrow(/twice/);
+    expect(() => reopened.snapshotSkills(lar(reopened, 'bug').workId, 1, ['has space'])).toThrow(/skill/);
+    expect(() => reopened.update(build.workId, 2, { kind: 'concept' })).toThrow(/never built/);
+  });
+});
+
 describe('work-record provider observations', () => {
   const lar = (records: WorkRecords, kind: WorkKind, ticket?: string) => records.create({ title: 'Work', repository: 'maddec01/lar', kind, ticket });
 

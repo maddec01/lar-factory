@@ -127,6 +127,15 @@ describe('lar-work', { timeout: 30_000 }, () => {
     expect(await larWork(data, 'resolve-intent', workId, '--revision', '3', '--intent', intent.intentId)).toMatchObject({ code: 2, stderr: expect.stringContaining('--thread or --failure') });
   });
 
+  it('sets and clears a Needs you reason and snapshots skills with no board running', async () => {
+    const data = tempDir();
+    const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')).record;
+    expect((await larWork(data, 'set-needs-you', workId, '--revision', '1', '--reason', 'Its PR closed without merging.')).record).toMatchObject({ needsYou: 'Its PR closed without merging.' });
+    expect((await larWork(data, 'clear-needs-you', workId, '--revision', '2')).record).toMatchObject({ needsYou: null, revision: 3 });
+    expect((await larWork(data, 'snapshot-skills', workId, '--revision', '3', '--skill', 'react-patterns', '--skill', 'acme:testing')).record).toMatchObject({ skills: ['react-patterns', 'acme:testing'] });
+    expect(await larWork(data, 'snapshot-skills', workId, '--revision', '4')).toMatchObject({ code: 1, stderr: expect.stringContaining('already snapshotted') });
+  });
+
   it("records a ticket's observations and a failed read with no board running", async () => {
     const data = tempDir();
     const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug', '--ticket', 'maddec01/lar#4')).record;

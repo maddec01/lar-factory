@@ -45,6 +45,15 @@ Changes
   attach-ticket <work-id> --revision N --ticket T
   set-aside <work-id> --revision N  Set the record aside. Its Status stays.
   restore <work-id> --revision N    Bring a set-aside record back.
+  set-needs-you <work-id> --revision N --reason X
+                                    Record why the work waits on you, such as a
+                                    closed unmerged PR. Its Status stays.
+  clear-needs-you <work-id> --revision N
+  snapshot-skills <work-id> --revision N [--skill S]...
+                                    Record the project skills selected as the build
+                                    starts; give none for an empty selection. A
+                                    build snapshots once, so later selections
+                                    change only future builds.
 
 Structure
   A concept owns decisions and builds, and a build owns slices. A record has at
@@ -155,7 +164,7 @@ Errors
 
 class UsageError extends Error {}
 
-const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
+const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you', 'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
   'children', 'blockers', 'dependents', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition', 'review-rounds',
   'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export'];
 const COMMANDS = ['create', 'import', 'list', 'intents', 'retention', 'hidden', 'delete-expired', ...TAKES_WORK_ID];
@@ -178,6 +187,7 @@ const OPTIONS = {
   finding: { type: 'string' },
   disposition: { type: 'string' },
   reason: { type: 'string' },
+  skill: { type: 'string', multiple: true },
   of: { type: 'string' },
   state: { type: 'string' },
   assignee: { type: 'string' },
@@ -266,6 +276,12 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
       return records.setAside(workId!, revision());
     case 'restore':
       return records.restore(workId!, revision());
+    case 'set-needs-you':
+      return records.setNeedsYou(workId!, revision(), need(values, 'reason'));
+    case 'clear-needs-you':
+      return records.clearNeedsYou(workId!, revision());
+    case 'snapshot-skills':
+      return records.snapshotSkills(workId!, revision(), values.skill ?? []);
     case 'set-parent':
       return records.setParent(workId!, revision(), need(values, 'parent'));
     case 'clear-parent':

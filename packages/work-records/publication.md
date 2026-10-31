@@ -214,3 +214,35 @@ commands with their returned plans. No additional receipt store exists.
 Controlled tests cover both native completion settings, refusal, lost-response
 recovery, GitHub body generation and ticketless completeness. Local completion
 still comes from the recorded PR's merge observation.
+
+## Board interface
+
+The board routes all publication requests through guarded POST endpoints under
+`/api/publication/`. Every request includes `workId` and the current board `session`.
+`open` reconstructs `PublicationBoardState` from the journal, with eligibility,
+private source text for reference, fresh destination settings and the latest plan.
+It also attaches confirmed creation receipts that survived an interrupted board
+request. Neither opening nor cancelling dispatches a provider write.
+
+`prepare` accepts the engine's document, type-selection, delivery and resolution
+fields plus `sources`, every readiness source's work ID and displayed revision.
+It refuses stale source revisions before preparing. The shared browser-safe
+`PublicationDocument` type is also re-exported by the engine entry. The shared
+`publicationConsents` function names the independent permissions for an operation.
+
+`approve` and `resume` require the stored `planId`, `revision` and `digest`.
+`inspect`, `fallback` and `reconcile` require `planId`. Fallback accepts optional
+`delivery`; reconciliation accepts explicit `selections`. Every result returns a
+fresh board publication state. An approval conflict may return that state with
+an `error` and HTTP 409. Text conflicts during preparation return the engine's
+`conflict` with stored, current and proposed text. Requests for the same root work
+are rejected while another request runs. The journal also guards claims shared
+with commands and other publications.
+
+The board mounts one `PublicationDialog`. Later append, update and recovery
+screens can open it through `usePublicationStore.open(workId)` and submit engine
+request fields through `request(action, extra)`. `request('prepare', ...)` returns
+to exact preview; it never approves automatically. Browser documents are temporary
+editing drafts. Every reopen reconstructs plans and outcomes from the server.
+Controlled HTTP tests cover GitHub and Azure destinations with injected provider
+responses. They do not verify real credentials or provider availability.

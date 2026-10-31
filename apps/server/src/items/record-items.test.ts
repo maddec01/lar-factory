@@ -151,3 +151,19 @@ test("an item-source change pauses only the repository's ticketed work, a domain
     "Its repository's item source and domain-doc location changed. Accept the change in Settings › Repositories to go on.");
   assert.deepEqual([...pausedBy([]).values()], [undefined, undefined, undefined]);
 });
+
+test('publication eligibility follows finished refinement through Status changes and explains ineligible concepts and briefs', async () => {
+  const records = await open();
+  let build = records.create({ title: 'Ready to publish', repository: REPO, kind: 'build', status: 'Ready' });
+  build = records.setBody(build.workId, build.revision, 'brief', 'Complete brief.');
+  records.recordGate(build.workId, build.revision, { briefDigest: records.gate(build.workId).briefDigest!, approvedBy: 'reviewer', evidence: 'Passed.' });
+  const decision = records.create({ title: 'Private decision', repository: REPO, kind: 'decision' });
+  const concept = records.create({ title: 'Unfinished concept', repository: REPO, kind: 'concept' });
+  const unfinished = records.create({ title: 'No gate', repository: REPO, kind: 'feature' });
+  records.update(build.workId, records.read(build.workId).revision, { status: 'In progress' });
+  const items = new Map(recordItems(records, [], [REPO]).map((item) => [item.id, item]));
+  assert.deepEqual(items.get(build.workId)!.publication, { eligible: true, reasons: [] });
+  assert.equal(items.get(decision.workId)!.publication, undefined);
+  assert.ok(items.get(concept.workId)!.publication!.reasons.includes('The concept still has Fog.'));
+  assert.ok(items.get(unfinished.workId)!.publication!.reasons.some((reason) => reason.includes('no current passing gate')));
+});

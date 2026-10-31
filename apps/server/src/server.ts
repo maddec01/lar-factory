@@ -1,3 +1,4 @@
+import { createPublication } from './publication/publication.ts';
 import { publicationVocabulary } from './publication/vocabulary.ts';
 import { repositoryProjects, reauthorizeRepositoryProjects } from './t3/repository-project-discovery.ts';
 // The board server: reads each item source through `gh` or `az` at its own pace, every 15 s while it holds active work
@@ -8,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from './board/board-state.ts';
@@ -710,6 +711,13 @@ const { server, endStreams } = createBoardServer({
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input),
   openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),
   publicationVocabulary,
+  publication: createPublication(records, { allowed: (repo) => items.repos().some((row) => sameRepo(row.repo, repo)), changed: reread,
+    settings: async (repo) => {
+      const result = await publicationVocabulary(repo);
+      if ('error' in result) throw new Error(result.error);
+      return result;
+    },
+  }),
   changeRepositorySettings: (input) => changeRepositorySettings(input),
 });
 

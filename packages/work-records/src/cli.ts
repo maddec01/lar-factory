@@ -6,9 +6,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { isRecord } from '@lar-factory/shared';
 import type { PublicationContent, PublicationOutcome, PublicationProposal, Status } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
-import { publicationEngine, type PreparePublication, type ReconciliationSelection } from './publication-engine.ts';
+import { PublicationRefused } from './publication-providers.ts';
+import { PublicationConflict, publicationEngine, type PreparePublication, type ReconciliationSelection } from './publication-engine.ts';
 import {
   openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
   type NewObservation, type NewReviewRound, type Observed, type ReviewAxis, type WorkKind, type WorkRecords,
@@ -120,16 +122,20 @@ Content
 
 Publication
   prepare-publication <work-id> --file F
-                                    Prepare an immutable new-ticket preview. F is
+                                    Prepare an immutable publication preview. F is
                                     PreparePublication JSON: documents, optional
-                                    typeSelections and replaces. Each document names
+                                    typeSelections, replaces, delivery and resolutions.
+                                    delivery maps work IDs to body, comment or handover.
+                                    resolutions map work IDs to observedText, location
+                                    and expectedText from an explicit user resolution.
+                                    Each document names
                                     workId, title, outcome, change, checks, assumptions,
                                     decisions [{decision, reason}], builderNotes,
                                     domainNotes and relatedTickets (HTTP URLs).
                                     Lists may be empty when nothing applies. Use team
                                     language; private bodies are never copied blindly.
   inspect-publication <work-id> --plan P
-                                    Recheck sources and current effective settings.
+                                    Recheck sources, settings and pending provider text.
   execute-publication <work-id> --plan P --identity I
   resume-publication <work-id> --plan P --identity I
                                     Dispatch approved outstanding writes through the
@@ -138,11 +144,12 @@ Publication
   reconcile-publication <work-id> --plan P --identity I [--file F]
                                     Search and inspect uncertain provider outcomes.
                                     Optional F is [{operationId, ticket|commentId}], explicitly
-                                    selecting a creation candidate after inspection.
+                                    selecting a ticket or comment after inspection.
                                     Empty or ambiguous searches never permit retry.
-  fallback-publication <work-id> --plan P
-                                    Preview a replacement using exact Part of or
-                                    Depends on comments after refused native links.
+  fallback-publication <work-id> --plan P [--file F]
+                                    Preview comments after body or native link refusal,
+                                    or a handover after comment refusal. Optional F
+                                    is {delivery: comment|handover} for text operations.
                                     Approve its new digest before executing it.
   gate <work-id>                    Print the current brief digest and gate history.
   record-gate <work-id> --revision N --digest H --identity I --evidence E
@@ -397,8 +404,11 @@ async function run(records: WorkRecords, command: string, workId: string | undef
       return publicationEngine(records, { dir: values['data-dir'] }).execute(workId!, need(values, 'plan'), need(values, 'identity'));
     case 'reconcile-publication':
       return publicationEngine(records, { dir: values['data-dir'] }).reconcile(workId!, need(values, 'plan'), need(values, 'identity'), values.file === undefined ? [] : readJson(values) as ReconciliationSelection[]);
-    case 'fallback-publication':
-      return publicationEngine(records, { dir: values['data-dir'] }).fallback(workId!, need(values, 'plan'));
+    case 'fallback-publication': {
+      const input = values.file === undefined ? {} : readJson(values);
+      if (!isRecord(input) || (input.delivery !== undefined && input.delivery !== 'comment' && input.delivery !== 'handover')) throw new WorkRecordError('invalid', 'Choose comment or handover fallback in a JSON object.');
+      return publicationEngine(records, { dir: values['data-dir'] }).fallback(workId!, need(values, 'plan'), input.delivery as 'comment' | 'handover' | undefined);
+    }
     case 'gate':
       return records.gate(workId!);
     case 'record-gate':
@@ -567,6 +577,14 @@ async function main(args: string[]): Promise<number> {
     if (error instanceof UsageError) {
       process.stderr.write(`lar-work: ${error.message}\nRun lar-work --help for usage.\n`);
       return 2;
+    }
+    if (error instanceof PublicationConflict) {
+      process.stderr.write(`${JSON.stringify({ error: 'publication-conflict', message: error.message, conflict: error.conflict })}\n`);
+      return 1;
+    }
+    if (error instanceof PublicationRefused) {
+      process.stderr.write(`${JSON.stringify({ error: 'publication-refused', message: error.message, alternatives: error.alternatives ?? ['comment', 'handover'] })}\n`);
+      return 1;
     }
     if (error instanceof WorkRecordError) {
       process.stderr.write(`lar-work: ${error.message}\n`);

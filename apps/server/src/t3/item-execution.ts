@@ -1,47 +1,35 @@
 import { executionStats } from './execution-stats.ts';
 import { isRecord, type ItemThread } from '@lar-factory/shared';
-import { namedIssue, issueKey } from '../threads/item-threads.ts';
 import { readJsonRecord } from '../json-file.ts';
 import { boardProjects } from './board-projects.ts';
 import { readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead } from './execution-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 
-const firstMessageIssues = new WeakMap<object, string | null>();
-
-/** Association uses the first user message, never a shell's latest message. */
-export function executionItemThreads(shells: Record<string, unknown>[], reads: Map<string, ExecutionRead>) {
-  const byIssue = new Map<string, ItemThread[]>();
+/** Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out (docs/adr/0005). */
+export function executionItemThreads(shells: Record<string, unknown>[]) {
+  const byId = new Map<string, ItemThread>();
   for (const shell of shells) {
     if (typeof shell.id !== 'string' || shell.deletedAt) continue;
-    const lineage = shell.lineage;
-    if (isRecord(lineage) && lineage.relationshipToParent != null) continue;
-    const read = reads.get(shell.id);
-    if (read?.availability !== 'available' || !read.observation) throw Error('Execution unavailable');
-    const projection = read.observation.projection;
-    let issue = firstMessageIssues.get(projection);
-    if (issue === undefined) {
-      let first: Record<string, unknown> | undefined;
-      for (const message of projection.messages) {
-        if (message.role === 'user' && (!first || String(message.createdAt).localeCompare(String(first.createdAt)) < 0)) first = message;
-      }
-      issue = typeof first?.text === 'string' ? namedIssue(first.text) : null;
-      firstMessageIssues.set(projection, issue);
-    }
-    if (!issue) continue;
     if (typeof shell.updatedAt !== 'string' || !Number.isFinite(Date.parse(shell.updatedAt))) throw Error('Invalid execution timestamp');
     const state: ItemThread['state'] = shell.pendingRuntimeRequest ? 'needs you'
       : ['preparing', 'starting', 'running', 'waiting'].includes(String(shell.status)) ? 'running'
       : ['failed', 'interrupted', 'cancelled'].includes(String(shell.status)) ? 'stopped' : 'done';
-    const thread: ItemThread = { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, updated: shell.updatedAt };
-    byIssue.set(issue, [...(byIssue.get(issue) ?? []), thread]);
+    byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, updated: shell.updatedAt });
   }
-  for (const threads of byIssue.values()) threads.sort((a, b) => b.updated.localeCompare(a.updated));
-  return (repo: string, number: number) => byIssue.get(issueKey(repo, number));
+  /** The recorded threads T3 shows, newest first; undefined for work with no recorded thread. */
+  return (threadIds: readonly string[]): ItemThread[] | undefined => threadIds.length
+    ? threadIds.flatMap((id) => byId.get(id) ?? []).sort((a, b) => b.updated.localeCompare(a.updated)) : undefined;
 }
 
+/** The last lookup the board read while T3 could be read, kept through an outage, and when it read it. */
+let lastSeen: { lookup: ReturnType<typeof executionItemThreads>; observedAt: string } | undefined;
+
 let current: { key: string; stop(): void; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; reads?: Map<string, ExecutionRead>; observedAt?: string } | undefined;
-/** The server refresh reads only a completed observation. Failures never become empty success. */
-export function protocolItemThreads(repo: string, number: number): ItemThread[] | 'unavailable' | undefined {
+/**
+ * The recorded threads as T3 shows them now. While T3 can't be read, each thread's last observation with when the board
+ * saw it, or 'unavailable' once one was never seen. Failures never become empty success.
+ */
+export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] | 'unavailable' | undefined {
   const path = serverRuntimePath(process.env);
   const runtime = readJsonRecord(path);
   if (!t3Running(path) || typeof runtime?.origin !== 'string' || typeof runtime.serverVersion !== 'string') {
@@ -87,9 +75,10 @@ export function protocolItemThreads(repo: string, number: number): ItemThread[] 
             if (current !== state) return;
             state.reads = new Map(entries);
             if (pending || state.shell?.availability !== 'available') continue;
-            state.lookup = executionItemThreads(shells, entries);
+            state.lookup = executionItemThreads(shells);
             state.shells = shells;
             state.observedAt = read.observation.observedAt;
+            lastSeen = { lookup: state.lookup, observedAt: state.observedAt };
             state.available = true;
           }
         } catch { state.available = false; }
@@ -104,12 +93,17 @@ export function protocolItemThreads(repo: string, number: number): ItemThread[] 
       });
     } catch { state.available = false; }
   }
-  return current.available ? current.lookup?.(repo, number) : 'unavailable';
+  if (!threadIds.length) return undefined;
+  if (current.available) return current.lookup?.(threadIds);
+  const seen = lastSeen?.lookup(threadIds);
+  if (!lastSeen || seen?.length !== threadIds.length) return 'unavailable';
+  const { observedAt } = lastSeen;
+  return seen.map((thread) => ({ ...thread, observedAt }));
 }
 
 /** Unavailable observations throw so callers retain an uncertain run. */
 export function protocolThreadByTitle(projectId: string, title: string): { threadId: string; latest: string | null } | null {
-  protocolItemThreads('', 0);
+  protocolItemThreads([]);
   if (!current?.available) throw Error('T3 execution unavailable');
   const shell = current.shells?.filter(shell => shell.projectId === projectId && shell.title === title && !shell.deletedAt)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
@@ -121,7 +115,7 @@ export function protocolThreadByTitle(projectId: string, title: string): { threa
 
 /** Thread-ID lookup for the future switch/import; retained facts never imply availability. */
 export function protocolThreadById(threadId: string): ExecutionRead {
-  protocolItemThreads('', 0);
+  protocolItemThreads([]);
   const read = current?.reads?.get(threadId);
   return { availability: current?.available && read ? read.availability : 'unavailable',
     ...(read?.observation ? { observation: read.observation } : {}) };
@@ -129,7 +123,7 @@ export function protocolThreadById(threadId: string): ExecutionRead {
 
 /** Complete current observations only; no database fallback for timing facts. */
 export function protocolStatsInputs() {
-  protocolItemThreads('', 0);
+  protocolItemThreads([]);
   if (!current?.available || !current.reads) throw Error('T3 execution unavailable');
   return executionStats((current.shells ?? []).filter(shell => !shell.deletedAt).map(shell => {
     const read = current!.reads!.get(String(shell.id));

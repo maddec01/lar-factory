@@ -140,14 +140,15 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
   assert.equal(without?.stats, undefined);
 });
 
-test('each refresh attaches item threads and T3\'s environment id, and leaves them out without T3\'s files', async (t) => {
-  const db = statsDb(t, [{ id: 'build', title: 'Build: owner accounts', messages: ['Build maddec01/lar-factory#12'],
+test('each refresh attaches the threads each work record holds and T3\'s environment id, and leaves them out without T3\'s files', async (t) => {
+  // The thread's first message names #13, which no longer associates it.
+  const db = statsDb(t, [{ id: 'build', title: 'Build: owner accounts', messages: ['Build maddec01/lar-factory#13'],
     turns: [{ id: 't', startedAt: '2026-10-20T09:00:00Z' }] }]);
   const environment = join(mkdtempSync(join(tmpdir(), 'lar-t3-env-')), 'environment-id');
   t.onTestFinished(() => rmSync(join(environment, '..'), { recursive: true, force: true }));
   writeFileSync(environment, 'env-1\n');
-  const board = await startBoard(t, { items: [boardIssue(12, 'In progress'), boardIssue(13, 'Review')] }, false, false,
-    { T3_STATE_DB: db, T3_ENVIRONMENT_ID: environment });
+  const board = await startBoard(t, { items: [boardIssue(12, 'In progress'), boardIssue(13, 'Review')], threads: { 'maddec01/lar-factory#12': ['build'] } },
+    false, false, { T3_STATE_DB: db, T3_ENVIRONMENT_ID: environment });
   const data = await until(board, (d) => d.items.length > 0 && d.firstRead?.settled === true);
   assert.equal(data.t3EnvironmentId, 'env-1');
   assert.deepEqual(data.items.find((i) => i.number === 12)?.threads,

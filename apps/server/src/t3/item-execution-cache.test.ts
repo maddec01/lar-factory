@@ -11,24 +11,26 @@ vi.mock('./execution-protocol.ts', () => ({
   readExecution: (_origin: unknown, _version: unknown, _protocol: unknown, id: string) => fixture.read(id),
 }));
 afterEach(() => { vi.resetModules(); fixture.read.mockReset(); });
-it('loads history once, refreshes changed threads and retains timestamped facts on disconnect', async () => {
+it('loads history once, refreshes changed threads and keeps timestamped last observations through an outage', async () => {
   const { protocolItemThreads, protocolThreadById } = await import('./item-execution.ts');
   const observedAt = '2026-10-31T12:00:00Z';
   fixture.read.mockImplementation(async id => ({ availability: 'available', observation: { observedAt,
     projection: { thread: { id }, messages: [{ role: 'user', text: 'Build Owner/Repo#636', createdAt: observedAt }] } } }));
-  protocolItemThreads('owner/repo', 636);
+  protocolItemThreads(['one', 'archive']);
   const shells = [{ id: 'one', updatedAt: observedAt }, { id: 'archive', updatedAt: observedAt }];
   const publish = (threads: Record<string, unknown>[] = shells) => fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [threads[0]], archivedThreads: [threads[1]] } } });
   publish();
-  await vi.waitFor(() => expect(protocolItemThreads('owner/repo', 636)).toHaveLength(2));
+  await vi.waitFor(() => expect(protocolItemThreads(['one', 'archive'])).toHaveLength(2));
   publish();
-  await vi.waitFor(() => expect(protocolItemThreads('owner/repo', 636)).toHaveLength(2));
+  await vi.waitFor(() => expect(protocolItemThreads(['one', 'archive'])).toHaveLength(2));
   expect(fixture.read).toHaveBeenCalledTimes(2);
   publish([{ ...shells[0]!, title: 'changed' }, shells[1]!]);
-  await vi.waitFor(() => expect(protocolItemThreads('owner/repo', 636)).toHaveLength(2));
+  await vi.waitFor(() => expect(protocolItemThreads(['one'])).toMatchObject([{ title: 'changed' }]));
   expect(fixture.read).toHaveBeenCalledTimes(3);
   fixture.changed!({ availability: 'unavailable' });
   expect(protocolThreadById('one')).toMatchObject({ availability: 'unavailable', observation: { observedAt } });
+  expect(protocolItemThreads(['one'])).toMatchObject([{ id: 'one', title: 'changed', observedAt }]);
+  expect(protocolItemThreads(['one', 'never-seen'])).toBe('unavailable');
   publish();
-  await vi.waitFor(() => expect(protocolItemThreads('owner/repo', 636)).toHaveLength(2));
+  await vi.waitFor(() => expect(protocolItemThreads(['one', 'archive'])).toHaveLength(2));
 });

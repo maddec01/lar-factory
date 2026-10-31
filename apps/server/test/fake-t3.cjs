@@ -38,7 +38,12 @@ const main = async () => {
     if (options.recover === 'deleted') {
       process.stderr.write('Thread thread-1 is no longer available.');
       process.exitCode = 1;
-    } else process.stdout.write(JSON.stringify({ thread: { threadId: 'thread-1' }, messages: [{ role: 'user', text: '#12 Issue 12\n$lar-shape maddec01/lar-factory#12' }] }));
+    } else {
+      // The thread's first message is the one the board sent with its start.
+      const started = fs.readFileSync(process.env.FAKE_GH_STATE + '.t3calls', 'utf8').trim().split('\n').map((line) => JSON.parse(line))
+        .find((call) => call[1] === 'start');
+      process.stdout.write(JSON.stringify({ thread: { threadId: 'thread-1' }, messages: [{ role: 'user', text: started?.[3] ?? '' }] }));
+    }
     return;
   }
   if (options.fail === 'down') {

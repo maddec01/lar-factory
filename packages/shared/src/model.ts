@@ -268,7 +268,10 @@ export interface Item {
   map?: ConceptMap;
   /** Absent when no T3 thread worked on it or there's no T3 database; 'unavailable' when the database can't be read. */
   stats?: ItemStats | 'unavailable';
-  /** Its item threads, newest first; absent when none or there's no T3 database, 'unavailable' when the database can't be read. */
+  /**
+   * The T3 threads its work record holds, newest first; absent when it holds none, 'unavailable' while T3 can't be read
+   * and the board never saw one of them.
+   */
   threads?: ItemThread[] | 'unavailable';
 }
 
@@ -282,6 +285,8 @@ export interface ItemThread {
   state: ThreadState;
   /** The thread's latest message, turn or runtime request time. */
   updated: string;
+  /** Set while T3 can't be read: when the board last saw this state. */
+  observedAt?: string;
 }
 
 /** The deep link that opens a T3 thread in T3 Code, as T3's promptLinks.ts parses it (pingdotgg/t3code d53873b6). */

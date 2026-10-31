@@ -1,21 +1,19 @@
-// Protocol observations supply association and timing. SQLite supplies residual usage pricing.
+// Protocol observations supply timing. SQLite supplies residual usage pricing.
 
 import { existsSync } from 'node:fs';
-import type { Item, ItemStats, ItemThread } from '@lar-factory/shared';
+import type { Item, ItemStats } from '@lar-factory/shared';
 import { itemStats, transcriptsToRead } from '../stats/item-stats.ts';
 import { warmTranscripts } from '../stats/transcript-usage.ts';
 import type { ItemStatsReader, StatsSources } from '../stats/item-stats.ts';
-import { protocolItemThreads, protocolStatsInputs } from './item-execution.ts';
+import { protocolStatsInputs } from './item-execution.ts';
 import { readT3Db } from './t3-db.ts';
 
 type Issue = Pick<Item, 'repo' | 'number'>;
 
-/** Execution observations and usage, as the board shows them. */
+/** Item stats from execution observations and usage, as the board shows them. */
 export interface T3Reads {
   /** An item's stats; undefined when it has none, 'unavailable' when they can't be read. */
   stats: (item: Issue) => ItemStats | 'unavailable' | undefined;
-  /** An item's threads, newest first; undefined when it has none, 'unavailable' when they can't be read. */
-  threads: (item: Issue) => ItemThread[] | 'unavailable' | undefined;
   /** True when the database is there but its stats can't be read. */
   statsUnavailable: boolean;
   /** Whether a rate table priced the stats; null when no stats were read. */
@@ -29,22 +27,21 @@ const statsLookup = (reader: ItemStatsReader): T3Reads['stats'] => ({ repo, numb
 /** The same answer for every item. */
 const every = <T>(value: T) => (): T => value;
 
-/** Thread association remains available independently of residual usage pricing reads. */
+/** The stats and their residual usage pricing; item threads read apart, through protocolItemThreads. */
 export function loadT3Reads(sources: StatsSources, now: number, withStats = true): T3Reads {
-  const threads: T3Reads['threads'] = ({ repo, number }) => protocolItemThreads(repo, number);
-  if (!withStats) return { stats: every(undefined), threads, statsUnavailable: false, priced: null };
-  if (!existsSync(sources.db)) return { stats: every('unavailable'), threads, statsUnavailable: true, priced: null };
+  if (!withStats) return { stats: every(undefined), statsUnavailable: false, priced: null };
+  if (!existsSync(sources.db)) return { stats: every('unavailable'), statsUnavailable: true, priced: null };
   const unavailable = { stats: every('unavailable' as const), statsUnavailable: true, priced: null };
   try {
     return readT3Db(sources.db, (db) => {
       const { rows, sessions } = protocolStatsInputs();
       let stats: ItemStatsReader;
       try { stats = itemStats(db, rows, sources, now, sessions); }
-      catch { return { ...unavailable, threads }; }
-      return { stats: statsLookup(stats), threads, statsUnavailable: false, priced: stats.priced };
+      catch { return unavailable; }
+      return { stats: statsLookup(stats), statsUnavailable: false, priced: stats.priced };
     });
   } catch {
-    return { ...unavailable, threads };
+    return unavailable;
   }
 }
 

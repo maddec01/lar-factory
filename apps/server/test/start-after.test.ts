@@ -3,26 +3,29 @@ import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { NOT_LANDED, SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { NOT_LANDED, SAMPLE_MODELS, recordBlockers, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
+import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import { rawIssue } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, RawItem } from '@lar-factory/shared';
 
 const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 
-/** A lar-factory issue in `status`, blocked by issues 5 and 6 in the given states. */
-const blockedIssue = (number: number, status: string, labels: string[], states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED']): RawItem =>
-  rawIssue(`I_${number}`, number, status, labels, {
-    blockedBy: { nodes: states.map((state, n) => ({ number: 5 + n, state, repository: { nameWithOwner: 'maddec01/lar-factory' } })) },
-  });
-
-const blockedBuild = (states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED'] = ['CLOSED', 'OPEN']) => blockedIssue(12, 'Ready', ['build'], states);
+const build = rawIssue('I_12', 12, 'Ready', ['build']);
 
 /** A board that can start lar-factory threads, offering the sample model choices, and its environment. */
 async function armableBoard(t: TestContext, items: RawItem[], options: object = {}, env: Record<string, string> = { ...startableEnv(t), ...SAMPLE_MODELS }) {
   const board = await startBoard(t, { items, ...options }, false, false, env);
   await until(board, (d) => d.items.length === items.length);
   return { board, env };
+}
+
+/** A board whose build #12 waits on two decisions, the first settled; returns the open one's work ID too. */
+async function blockedBuildBoard(t: TestContext, options: object = {}) {
+  const armable = await armableBoard(t, [build], options);
+  const [settled, open] = await recordBlockers(armable.board, armable.board.id(12), ['Decision 5', 'Decision 6']);
+  await settleDecisions(armable.board, armable.board.id(12), [settled!]);
+  return { ...armable, open: open! };
 }
 
 const arm = (board: Board, itemId: string, model?: unknown) => board.postSession({ itemId, model }, '/api/arm');
@@ -38,7 +41,7 @@ async function read(board: Board): Promise<BoardData> {
 }
 
 test('arming and disarming write and remove the entry, which the board data carries', async (t) => {
-  const { board, env } = await armableBoard(t, [blockedBuild()]);
+  const { board, env } = await blockedBuildBoard(t);
   const armed = await arm(board, board.id(12), OPUS);
   assert.equal(armed.status, 200);
   assert.deepEqual((await armed.json()).board.armed, { [board.id(12)]: { model: OPUS } });
@@ -50,20 +53,20 @@ test('arming and disarming write and remove the entry, which the board data carr
 });
 
 test('armed starts survive a board restart', async (t) => {
-  const { board, env } = await armableBoard(t, [blockedBuild()]);
+  const { board, env } = await blockedBuildBoard(t);
   assert.equal((await arm(board, board.id(12))).status, 200);
   await board.stop();
-  const { board: again } = await armableBoard(t, [blockedBuild()], {}, env);
+  const { board: again } = await armableBoard(t, [build], {}, env);
   assert.deepEqual((await again.board() as BoardData).armed, { [board.id(12)]: {} });
 });
 
-test('a refresh with a blocker still open starts nothing; once the last closes, the next starts the build once, on its armed model', async (t) => {
-  const { board, env } = await armableBoard(t, [blockedBuild()]);
+test('a refresh with a blocker incomplete starts nothing; once the last completes, the board starts the build once, on its armed model', async (t) => {
+  const { board, env, open } = await blockedBuildBoard(t);
   assert.equal((await arm(board, board.id(12), OPUS)).status, 200);
   // A start disarms its part before the read's data is served, so a part still armed didn't start.
   assert.deepEqual((await read(board)).armed, { [board.id(12)]: { model: OPUS } });
-  await board.update({ items: [blockedBuild(['CLOSED', 'CLOSED'])] });
-  await read(board);
+  // No ticket read is asked for: the board sees the decision complete in the work records.
+  await settleDecisions(board, board.id(12), [open]);
   const started = await until(board, (d) => !!d.startedBuilds?.[board.id(12)]);
   assert.deepEqual(started.armed, {});
   assert.deepEqual(armedFile(env.HOME!), {});
@@ -74,28 +77,23 @@ test('a refresh with a blocker still open starts nothing; once the last closes, 
   assert.ok((await board.t3Calls())[0]!.includes('--worktree'), 'a build starts in its own worktree');
 });
 
-test("a Queued decision starts with today's Start once its blockers close", async (t) => {
-  const decision = (states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED']) => blockedIssue(20, 'Queued', ['decision-grill'], states);
-  const { board } = await armableBoard(t, [decision(['OPEN', 'OPEN'])]);
+test("a Queued decision starts with today's Start once its blockers complete", async (t) => {
+  const { board } = await armableBoard(t, [rawIssue('I_20', 20, 'Queued', ['decision-grill'])]);
+  const blockers = await recordBlockers(board, board.id(20), ['Decision 5', 'Decision 6']);
   assert.equal((await arm(board, board.id(20))).status, 200);
-  await board.update({ items: [decision(['CLOSED', 'CLOSED'])] });
-  await read(board);
+  await settleDecisions(board, board.id(20), blockers);
   await until(board, (d) => !!d.started?.[board.id(20)]);
   assert.deepEqual(await board.t3Calls(), [['thread', 'start', 'project-factory', `#20 Issue 20\n$lar-shape ${board.id(20)}`, '--json']]);
 });
 
 test('a failed start disarms the part and shows its error on it, until it is armed again', async (t) => {
-  const { board, env } = await armableBoard(t, [blockedBuild()], { t3: { fail: 'down' } });
+  const { board, env, open } = await blockedBuildBoard(t, { t3: { fail: 'down' } });
   assert.equal((await arm(board, board.id(12))).status, 200);
-  await board.update({ items: [blockedBuild(['CLOSED', 'CLOSED'])], t3: { fail: 'down' } });
-  await read(board);
+  await settleDecisions(board, board.id(12), [open]);
   const failed = await until(board, (d) => !!d.armedErrors?.[board.id(12)]);
   assert.deepEqual(failed.armed, {});
   assert.deepEqual(armedFile(env.HOME!), {});
-  await board.update({ items: [blockedBuild()], t3: { fail: 'down' } });
-  await read(board);
-  // An older read can advance fetchedAt before the requested read lands. Rearm only once its blocker is open.
-  await until(board, (d) => d.items.find((i) => i.id === board.id(12))?.blockers.some((b) => b.number === 6 && b.state === 'open') === true);
+  await recordBlockers(board, board.id(12), ['Decision 7']);
   const rearmed = await arm(board, board.id(12));
   assert.equal(rearmed.status, 200);
   assert.equal((await rearmed.json()).board.armedErrors[board.id(12)], undefined);
@@ -104,9 +102,9 @@ test('a failed start disarms the part and shows its error on it, until it is arm
 test("a part whose repository has no T3 project can't be armed, as its start would fail", async (t) => {
   const server = rawIssue('I_30', 30, 'Ready', ['build'], {
     url: 'https://github.com/maddec01/lar-server/issues/30', repository: { nameWithOwner: 'maddec01/lar-server' },
-    blockedBy: { nodes: [{ number: 5, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } }] },
   });
   const { board } = await armableBoard(t, [server]);
+  await recordBlockers(board, board.id(30, 'maddec01/lar-server'), ['Decision 5']);
   await until(board, (d) => !!d.repositoryProjects);
   const refused = await arm(board, board.id(30, 'maddec01/lar-server'));
   assert.equal(refused.status, 409);
@@ -117,23 +115,28 @@ test("a part whose repository has no T3 project can't be armed, as its start wou
 
 
 test('an armed start whose repository Reset takes off the board drops on the next read and never starts, also after a restart', async (t) => {
-  const { board, env } = await armableBoard(t, [blockedBuild()], { files: ['.lar-factory.json'] });
+  const { board, env, open } = await blockedBuildBoard(t, { files: ['.lar-factory.json'] });
   assert.equal((await arm(board, board.id(12), OPUS)).status, 200);
   assert.equal((await board.post({ repo: 'maddec01/lar-factory' }, board.url, '/api/repositories/reset')).status, 200);
-  await board.update({ items: [blockedBuild(['CLOSED', 'CLOSED'])] });
+  const records = await openWorkRecords(workRecordsPath(board.dataDir));
+  try {
+    records.setBody(open, records.read(open).revision, 'answer', 'Settled.');
+    records.setBody(open, records.read(open).revision, 'domain-drafts', 'None.');
+  } finally { records.close(); }
   await read(board);
   const data = await until(board, (d) => d.items.length === 0 && Object.keys(d.armed ?? {}).length === 0);
   assert.deepEqual([data.items, data.armed], [[], {}]);
   assert.deepEqual(armedFile(env.HOME!), {});
   await board.stop();
-  const again = await startBoard(t, { items: [blockedBuild(['CLOSED', 'CLOSED'])] }, false, false, env);
+  const again = await startBoard(t, { items: [build] }, false, false, env);
   assert.deepEqual((await read(again)).items, []);
   assert.deepEqual([await board.t3Calls(), await again.t3Calls()], [[], []]);
 });
 
 test('only a blocked Ready or Queued issue, on an offered model, from this page and session, can be armed', async (t) => {
-  const { board } = await armableBoard(t, [blockedBuild(), rawIssue('I_13', 13, 'Ready', []),
-    blockedIssue(14, 'In progress', [], ['OPEN', 'OPEN'])]);
+  const { board } = await armableBoard(t, [build, rawIssue('I_13', 13, 'Ready', []), rawIssue('I_14', 14, 'In progress', [])]);
+  await recordBlockers(board, board.id(12), ['Decision 5']);
+  await recordBlockers(board, board.id(14), ['Decision 6']);
   assert.match((await (await arm(board, board.id(13))).json()).error, /^Nothing blocks this item now/);
   assert.match((await (await arm(board, board.id(14))).json()).error, /^Only Ready and Queued items can start after their blockers; this one is in In progress\.$/);
   assert.equal((await arm(board, 'I_missing')).status, 404);

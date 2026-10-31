@@ -75,11 +75,11 @@ test("an item's open blockers are the blocked-by issues still open", () => {
   assert.deepEqual(openBlockers(item('Ready', [], { blockers })), [blockers[1]]);
 });
 
-test('the blocked text names the open blockers, with the repository when it is another', () => {
+test("the blocked text names the blockers whose work isn't complete, with the repository when it is another", () => {
   const blocker = (number: number, repo: string, state: 'open' | 'closed') => ({ number, repo, state });
-  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'open')] })), 'Blocked by #3 until it closes');
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'open')] })), 'Blocked by #3 until it completes');
   assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'open'), blocker(4, 'maddec01/lar-apple', 'open')] })),
-    'Blocked by #3, maddec01/lar-apple#4 until they close');
+    'Blocked by #3, maddec01/lar-apple#4 until they complete');
   assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'closed')] })), null);
 });
 

@@ -177,7 +177,7 @@ test("Start after names the last open blocker, another repository's without its 
     { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 12, repo: 'maddec01/lar-apple', state: 'open' },
   ] }, loose));
   const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
-  expect([text(after), after.title]).toEqual(['Start after lar-apple#12 ▾', 'Starts by itself once #202, maddec01/lar-apple#12 close']);
+  expect([text(after), after.title]).toEqual(['Start after lar-apple#12 ▾', 'Starts by itself once #202, maddec01/lar-apple#12 complete']);
   expect(after.getAttribute('aria-label')).toBe('Start #140 Owner accounts after maddec01/lar-apple#12');
 });
 

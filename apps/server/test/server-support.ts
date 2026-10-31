@@ -10,7 +10,7 @@ import type { TestContext } from 'vite-plus/test';
 import { DONE_WINDOW_MS, isSkillCheckRequest, normalizeItems, readBuilds, refKey } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, Item, RawItem, Searched, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
-import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
+import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
@@ -85,6 +85,42 @@ async function recordIssues(home: string, raws: readonly RawItem[], optedIn: rea
     }
   } finally { records.close(); }
   return ids;
+}
+
+/** A repository no test board onboards, so the decisions blocking its work stay off the board. */
+const OFF_BOARD = 'maddec01/lar-docs';
+
+/** Runs `change` on the board's work records, then waits until the board shows `item` as `shown` says. */
+export async function changeRecords(board: Board, change: (records: WorkRecords) => void, item: string, shown: (item: Item) => boolean): Promise<BoardData> {
+  const records = await openWorkRecords(workRecordsPath(board.dataDir));
+  try { change(records); } finally { records.close(); }
+  return until(board, (d) => { const found = d.items.find((i) => i.id === item); return !!found && shown(found); });
+}
+
+/**
+ * Records that the board's work `workId` waits on a new decision for each of `titles`, in a repository off the
+ * board, and waits until the board shows them; returns their work IDs, for settleDecisions.
+ */
+export async function recordBlockers(board: Board, workId: string, titles: string[]): Promise<string[]> {
+  const ids: string[] = [];
+  await changeRecords(board, (records) => {
+    for (const title of titles) {
+      const decision = records.create({ title, repository: OFF_BOARD, kind: 'decision', status: 'Shaping' });
+      records.addBlocker(workId, records.read(workId).revision, decision.workId);
+      ids.push(decision.workId);
+    }
+  }, workId, (item) => ids.every((id) => item.blockers.some((b) => b.workId === id)));
+  return ids;
+}
+
+/** Completes each decision from local facts, its confirmed answer and domain drafts, and waits until `workId` shows them complete. */
+export async function settleDecisions(board: Board, workId: string, decisions: string[]): Promise<BoardData> {
+  return changeRecords(board, (records) => {
+    for (const decision of decisions) {
+      records.setBody(decision, records.read(decision).revision, 'answer', 'Settled.');
+      records.setBody(decision, records.read(decision).revision, 'domain-drafts', 'None.');
+    }
+  }, workId, (item) => decisions.every((id) => item.blockers.some((b) => b.workId === id && b.state === 'closed')));
 }
 
 /**

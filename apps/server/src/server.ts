@@ -364,7 +364,8 @@ async function checkQuota(): Promise<void> {
 
 /**
  * Shows the work records as they are now, which threads may have changed, with T3's threads and every LOCAL_STATS_MS
- * its stats, pushing only when they changed. Before the first read lands, there are no records to show yet.
+ * its stats, pushing only when they changed, and starts the armed parts a record's change unblocked. Before the first
+ * read lands, there are no records to show yet.
  */
 function refreshLocal(): void {
   if (refreshing) return;
@@ -383,6 +384,8 @@ function refreshLocal(): void {
   if (JSON.stringify(after) === JSON.stringify(before)) return;
   board.push();
   void syncPrStats(after);
+  // A blocker completes from local facts, as a decision's answer the shaping session records, without any ticket read.
+  void startAfter.startUnblocked();
 }
 
 /** Shows the work records as they are now with the last tickets read, and their T3 threads; stats only when `withStats`. */

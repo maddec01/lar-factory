@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { once } from 'node:events';
-import { startBoard } from './server-support.ts';
+import { changeRecords, startBoard } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 
@@ -40,18 +40,22 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
   const coupled = boardIssue(3, 'In progress', 'maddec01/lar-server', ['feature']);
   const part = boardIssue(4, 'Ready', 'maddec01/lar-server', ['build']);
   Object.assign(concept.content!, { id: 'I_1', body });
-  Object.assign(feature.content!, { id: 'I_2', body, blockedBy: { nodes: [{ number: 1, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } }] } });
+  // A ticket's provider blocker never reaches the page; the record's blocker does.
+  Object.assign(feature.content!, { id: 'I_2', body, blockedBy: { nodes: [{ number: 3, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } }] } });
   Object.assign(coupled.content!, { id: 'I_3', body });
   Object.assign(part.content!, { id: 'I_4', body,
     parent: { number: 3, title: 'Issue 3', url: 'https://github.com/maddec01/lar-server/issues/3', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } } });
   const board = await startBoard(t, { repositories: ['maddec01/lar-server'], items: [concept, feature, coupled, part] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
-  const [map, plain, parent, child] = (await board.board()).items;
+  const [conceptId, featureId] = [board.id(1, 'maddec01/lar-server'), board.id(2, 'maddec01/lar-server')];
+  const shown = await changeRecords(board, (records) => records.addBlocker(featureId, records.read(featureId).revision, conceptId),
+    featureId, (item) => item.blockers.length > 0);
+  const [map, plain, parent, child] = shown.items;
   const read = { destination: 'There.', decisions: [], fog: [], check: { title: 'Try it', steps: ['Step'] } };
   assert.deepEqual(map?.map, read);
   assert.deepEqual(parent?.map, read, 'an item with a sub-issue on the board is a dossier, with its map');
   assert.deepEqual(map?.blockers, []);
-  assert.deepEqual(plain?.blockers, [{ number: 1, repo: 'maddec01/lar-server', state: 'open' }]);
+  assert.deepEqual(plain?.blockers, [{ number: 1, repo: 'maddec01/lar-server', state: 'open', workId: conceptId, title: 'Issue 1' }]);
   assert.ok(!('map' in plain!) && !('body' in plain!), 'a feature gets no map and no body');
   assert.ok(!('map' in child!) && !('body' in child!), 'nor does a part');
   const bodyReads = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('id body }')));

@@ -9,6 +9,7 @@ import { pageWithData, sameRepo, type ClashRun, type ItemCommentsPage, type Item
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
+import type { Capture } from '../items/capture.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { ItemDetailsReader } from '../item-details/item-details.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -19,6 +20,7 @@ import { readAzureReadiness } from '../azure/azure-readiness.ts';
 export interface HttpDeps {
   board: BoardState;
   commands: ItemCommands;
+  capture: Capture;
   startAfter: Pick<StartAfter, 'arm' | 'disarm'>;
   page: BuiltPage;
   /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
@@ -152,7 +154,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
   runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
   resetRepository, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
@@ -211,8 +213,16 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     },
     '/api/items': {
       what: 'item details', disabled: 'Adding items is disabled in sample mode.',
-      restarted: () => ({ uncertain: true, error: 'The board restarted. Check your items in GitHub or Azure DevOps before starting a new item.' }),
-      run: (input) => commands.capture(input),
+      restarted: () => ({ uncertain: true, error: 'The board restarted. Check List for this item before adding it again.' }),
+      run: (input) => capture.capture(input),
+    },
+    '/api/pick-ticket': {
+      what: 'the repository and the ticket to pick', disabled: 'Picking tickets is disabled in sample mode.',
+      run: (input) => capture.pick(input),
+    },
+    '/api/attach-ticket': {
+      what: 'the item and the ticket to attach', disabled: 'Attaching tickets is disabled in sample mode.',
+      run: forItem('Name the item to attach a ticket to.', (itemId, input) => capture.attachTicket(itemId, input.number)),
     },
     '/api/queue': {
       what: 'the item to queue', disabled: 'Queuing is disabled in sample mode.',
@@ -513,6 +523,13 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     } catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
   }
 
+  /** Answers the ticket picker's search of a repository's open tickets. */
+  async function ticketsRequest(url: URL, res: ServerResponse): Promise<void> {
+    if (sample) return json(res, 403, { error: 'Sample mode searches no tickets.' });
+    const { status, body } = await capture.searchTickets({ repo: url.searchParams.get('repo'), query: url.searchParams.get('q') ?? '' });
+    json(res, status, body);
+  }
+
   /** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
   function openStream(req: IncomingMessage, res: ServerResponse): void {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
@@ -567,6 +584,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     if (path === '/api/onboarding/clash-runs') return clashRunsRequest(url, res);
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
+    if (path === '/api/tickets') return ticketsRequest(url, res);
     if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));
     if (path === '/healthz') return json(res, 200, {});
     const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;

@@ -57,14 +57,33 @@ test('one repository reading the sprint still leaves an untagged item untagged, 
   assert.deepEqual(placed(read.items), [[1, WEB, [WEB]]]);
 });
 
-test('Add item tags the new work item for its repository only when Only for <repo> is ticked', async () => {
-  const draft = { repo: API, kind: 'feature' as const, title: 'Export', description: '', labels: [] };
-  const az = fakeAz({ items: [] });
-  const source = azureBoard([WEB, API], TEAM, az.run);
-  const shared = await source.create(draft, {});
-  const only = await source.create({ ...draft, onlyFor: true }, {});
-  assert.deepEqual(az.created.map((c) => c.ops.find((op) => op.path === '/fields/System.Tags')!.value), ['feature; status-list', 'feature; status-list; repo-Web Api']);
-  assert.deepEqual(placed([shared.item!, only.item!]), [[shared.item!.number, API, [WEB, API]], [only.item!.number, API, null]]);
+test("a ticket search lists the open backlog items for the repository whose title has every word, and a number reads that item alone", async () => {
+  const items: WorkItem[] = [
+    { id: 1, type: 'User Story', state: 'New', title: 'Export the report' },
+    { id: 2, type: 'User Story', state: 'Active', title: 'Report export for api', tags: 'repo-Web Api' },
+    { id: 3, type: 'User Story', state: 'Closed', title: 'Export old report' },
+    { id: 4, type: 'User Story', state: 'New', title: 'Export a report', tags: 'repo-web' },
+    { id: 5, type: 'User Story', state: 'New', title: 'Import a report' },
+  ];
+  const source = azureBoard([WEB, API], TEAM, fakeAz({ items }).run);
+  const url = (id: number) => `https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/${id}`;
+  assert.deepEqual(await source.searchTickets(API, 'EXPORT report'), [{ number: 1, title: 'Export the report', url: url(1) }, { number: 2, title: 'Report export for api', url: url(2) }]);
+  assert.deepEqual(await source.searchTickets(API, '#5'), [{ number: 5, title: 'Import a report', url: url(5) }]);
+  assert.deepEqual(await source.searchTickets(API, '4'), [], "another repository's item");
+});
+
+test("a ticket read gives an open work item's description and kind, and nothing for a closed one or another repository's", async () => {
+  const items: WorkItem[] = [
+    { id: 1, type: 'User Story', state: 'New', title: 'Export', tags: 'bug', description: '## Steps', descriptionFormat: 'Markdown' },
+    { id: 2, type: 'User Story', state: 'Closed', title: 'Old' },
+    { id: 3, type: 'User Story', state: 'New', title: 'Theirs', tags: 'repo-web' },
+  ];
+  const source = azureBoard([WEB, API], TEAM, fakeAz({ items }).run);
+  assert.deepEqual(await source.readTicket(API, 1),
+    { number: 1, title: 'Export', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/1', text: '## Steps', kind: 'bug' });
+  assert.equal(await source.readTicket(API, 2), null);
+  assert.equal(await source.readTicket(API, 3), null);
+  assert.equal(await source.readTicket(API, 99), null);
 });
 
 test('a repository tag goes on an untagged item, and an item tagged for another repository refuses a second', async () => {

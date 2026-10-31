@@ -23,11 +23,21 @@ function fakeSource(title: string, items: Item[], writes: string[]): ItemSource 
     setStatus: async (i, status) => write(`${i.id} ${status}`)(),
     statusRefusal: (i) => `${title} refuses ${'id' in i ? i.id : `${i.repo}#${i.number}`}`,
     addLabel: async (i, label) => write(`${i.id} ${label}`)(),
-    create: async (draft) => { writes.push(`${title} create ${draft.repo}`); return { item: null, issueUrl: null, error: null }; },
+    searchTickets: async (repo, query) => { writes.push(`${title} search ${repo} ${query}`); return []; },
+    readTicket: async (repo, number) => { writes.push(`${title} read ${repo}#${number}`); return null; },
     setParentStatus: async (parent, status) => write(`${parent.repo}#${parent.number} ${status}`)(),
     abandon: async (i) => write(`abandon ${i.id}`)(),
   };
 }
+
+test("a ticket search and a ticket read go to the repository's own source, and an unlisted repository's refuse", async () => {
+  const writes: string[] = [];
+  const source = mergeSources(new Map([['maddec01/lar-server', fakeSource('lar', [], writes)], ['maddec01/lar-apple', fakeSource('apple', [], writes)]]));
+  await source.searchTickets('maddec01/lar-apple', 'seek');
+  await source.readTicket('Maddec01/Lar-Server', 7);
+  assert.deepEqual(writes, ['apple search maddec01/lar-apple seek', 'lar read Maddec01/Lar-Server#7']);
+  await assert.rejects(source.searchTickets('maddec01/other', 'seek'), /isn't onboarded/);
+});
 
 test('a source with no opted-in repositories lists every item it read', async () => {
   const project = fakeSource('lar', [{ ...item('I_1', 'maddec01/lar-server'), statuses: [] }], []);

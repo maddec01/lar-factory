@@ -7,13 +7,12 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { STATUSES, decodePart, labelKind, labelStatuses, repoTag, statusLabel } from '@lar-factory/shared';
+import { STATUSES, decodePart, labelKind, labelStatuses, repoTag, sameRepo, statusLabel } from '@lar-factory/shared';
 import type { AzureWorkItem, Blocker, Item, LinkedPr } from '@lar-factory/shared';
-import { ReadProblem, type ItemSource, type ItemsRead } from '../items/item-source.ts';
+import { ReadProblem, TICKET_MATCHES, ticketNumberOf, type ItemSource, type ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
-import { azureCreate } from './azure-create.ts';
 import { linkedPr, prIds, type AzurePr } from './azure-prs.ts';
 import { azureWrites } from './azure-writes.ts';
 
@@ -261,6 +260,17 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     return new Map(read.flatMap((pr) => (pr ? [[pr.pullRequestId, linkedPr(pr)] as const] : [])));
   }
 
+  /** The work items still open, neither Completed nor Removed, that show for `repo`: tagged for it, or untagged. */
+  async function openFor(repo: string, raws: readonly RawWorkItem[]): Promise<RawWorkItem[]> {
+    const byType = await categories([...new Set(raws.map((raw) => field(raw, 'System.WorkItemType')))]);
+    const open = (raw: RawWorkItem) => !['Completed', 'Removed'].includes(byType.get(field(raw, 'System.WorkItemType'))?.get(field(raw, 'System.State')) ?? '');
+    const shows = (raw: RawWorkItem) => {
+      const where = placement(tagsOf(raw), repos);
+      return !!where && (where.untaggedFor ?? [where.repo]).some((r) => sameRepo(r, repo));
+    };
+    return raws.filter((raw) => open(raw) && shows(raw));
+  }
+
   /** Whether the last listing showed Completed requirement-level items, so an item read alone shows as that listing would. */
   let showsCompleted: Listing['completed'] = true;
   let childIds: readonly number[] | undefined;
@@ -387,11 +397,19 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       return (await itemsOf({ title: '', items: listed, completed: showsCompleted, ...currentSprint && { currentSprint }, ...childIds !== undefined && { childIds } }, levels)).items;
     },
     ...azureWrites(project, workItems, (id, file) => parsed(workItemPatch(organization, project, id, file)), statesOf),
-    // A new work item is in its type's first state, Proposed, so it shows open in List.
-    create: azureCreate(project, team, invoke, async () => (await backlogOf()).requirementBacklog.defaultWorkItemType.name, (raw, draft) => ({
-      id: itemId(raw.id), revision: 0, status: 'List', statuses: ['List'], kind: labelKind(labelsOf(raw)), content: 'ticket', number: raw.id, title: field(raw, 'System.Title'),
-      url: url(raw.id), repo: draft.repo, azure: azureWorkItem(raw), ...!draft.onlyFor && { untaggedFor: [...repos] }, labels: labelsOf(raw), state: 'open', closedAs: null, parent: null, parentId: null, subIssues: { total: 0, completed: 0 },
-      blockers: [], updatedAt: field(raw, 'System.ChangedDate'), closedAt: null, linkedPrs: [], slices: [],
-    })),
+    async searchTickets(repo, query) {
+      const number = ticketNumberOf(query);
+      const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+      const levels = await backlogOf();
+      const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
+      const listed = (await workItems(number === null ? await backlogIds() : [number])).filter((raw) => requirements.has(field(raw, 'System.WorkItemType')));
+      const found = await openFor(repo, listed);
+      return found.filter((raw) => number !== null || words.every((word) => field(raw, 'System.Title').toLowerCase().includes(word)))
+        .slice(0, TICKET_MATCHES).map((raw) => ({ number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id) }));
+    },
+    async readTicket(repo, number) {
+      const [raw] = await openFor(repo, await workItems([number]));
+      return raw ? { number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), text: field(raw, 'System.Description'), kind: labelKind(labelsOf(raw)) } : null;
+    },
   };
 }

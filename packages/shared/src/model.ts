@@ -726,8 +726,14 @@ export function repoName(key: string, repos: readonly RepoConfig[]): string {
   return shownRepo(repos.some((r) => !sameRepo(r.repo, key) && nameOf(r.repo) === name) ? key : name);
 }
 
-export function ref(item: Item): string {
-  return `#${item.number}`;
+/** The item's shortest name: its ticket's number, `#12`, or its title while it has no ticket. */
+export function ref(item: Pick<Item, 'number' | 'title'>): string {
+  return item.number ? `#${item.number}` : item.title;
+}
+
+/** The item's name in a sentence: `#12 Title`, or the title alone while it has no ticket. */
+export function itemName(item: Pick<Item, 'number' | 'title'>): string {
+  return item.number ? `#${item.number} ${item.title}` : item.title;
 }
 
 /** Abandon closes a List or Queued issue. */

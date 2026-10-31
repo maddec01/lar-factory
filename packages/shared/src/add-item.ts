@@ -1,29 +1,35 @@
-// Shared contract for capturing an issue; no browser or Node dependencies.
-import type { Item, RepoConfig } from './model.ts';
+// Shared contract for Add item, which captures work or picks a ticket; no browser or Node dependencies.
+import type { Item, Kind, RepoConfig } from './model.ts';
 
 export const ITEM_KINDS = ['bug', 'feature', 'improvement'] as const;
 
+/** Work to capture: a ticketless work record with this title, and the description as its initial context. */
 export interface ItemDraft {
   repo: string;
   kind: (typeof ITEM_KINDS)[number];
   title: string;
   description: string;
-  labels: string[];
-  /** Only for <repo>: the new Azure work item is tagged for its repository, so no other repository's List shows it. */
-  onlyFor?: true;
 }
 
-export interface CreationProgress {
-  creationUncertain?: boolean;
-  issue?: { number: number; node_id: string; html_url: string; updated_at: string };
-  item?: Item;
+/** One of a repository's open tickets, as the ticket picker lists it. */
+export interface TicketMatch {
+  number: number;
+  title: string;
+  url: string;
+  /** The work ID of the record already holding the ticket; absent while none does. */
+  workId?: string;
 }
 
+/** An open ticket as a pick or an attach reads it: its text becomes a picked record's initial context. */
+export interface PickedTicket extends TicketMatch {
+  text: string;
+  kind: Kind;
+}
+
+/** What capture and pick answer: the item the record shows as, or the error. */
 export interface CreationResult {
   item: Item | null;
-  issueUrl: string | null;
   error: string | null;
-  uncertain?: boolean;
 }
 
 export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft {
@@ -38,15 +44,5 @@ export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft {
   if (typeof value.description !== 'string' || value.description.length > 65_536) {
     throw new Error('Description must be text of at most 65,536 characters.');
   }
-  const allowed = repo.labels;
-  if (!Array.isArray(value.labels) || value.labels.length > allowed.length ||
-    value.labels.some((l: unknown) => typeof l !== 'string' || !allowed.includes(l))) {
-    throw new Error("Choose only the selected repository's custom labels.");
-  }
-  const azure = repo.items === 'azure-board';
-  if (value.onlyFor !== undefined && value.onlyFor !== false && (value.onlyFor !== true || !azure)) {
-    throw new Error('Only an item on Azure DevOps can be only for its repository.');
-  }
-  return { repo: repo.repo, kind: value.kind as ItemDraft['kind'], title: value.title.trim(),
-    description: value.description, labels: [...new Set(value.labels as string[])], ...value.onlyFor === true && { onlyFor: true as const } };
+  return { repo: repo.repo, kind: value.kind as ItemDraft['kind'], title: value.title.trim(), description: value.description };
 }

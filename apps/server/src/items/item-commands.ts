@@ -1,11 +1,11 @@
-// The commands the board's buttons send: add, queue, back to List, pick a status, start, start build and abandon.
+// The commands the board's buttons send: queue, back to List, pick a status, start, start build and abandon.
 // Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
 // commands in flight are private here, so every rule about which command blocks which lives in this file.
 
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isDriftChoice, isOnboarding, pickRepoText, repoTag, startRepo, validateDraft, workMessage } from '@lar-factory/shared';
-import type { BoardData, CreationProgress, CreationResult, DriftChoice, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, SkillCheckOutcome, StartResult, Status } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isDriftChoice, isOnboarding, pickRepoText, repoTag, startRepo, workMessage } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, Item, ModelChoice, ModelGroup, SkillCheckOutcome, StartResult, Status } from '@lar-factory/shared';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import type { BoardState } from '../board/board-state.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
@@ -25,8 +25,6 @@ export interface Reply {
 export interface ItemCommands {
   /** Checks settled Starts missing from an available thread read. */
   reconcileStarts(items: Item[]): Promise<void>;
-  /** Creates the issue a submission describes, once per request ID. */
-  capture(input: Record<string, unknown>): Promise<Reply>;
   queue(itemId: string): Reply;
   backToList(itemId: string): Reply;
   /** Keeps one of the statuses an item carrying more than one has, and drops the others: the one move such an item allows. */
@@ -51,10 +49,8 @@ export interface ItemCommandsDeps {
   items: ItemSource;
   /** Where the commands write Status moves; null in sample mode, which moves nothing. */
   records: WorkRecords | null;
-  /** Shows the work records as they are now, after a write or a refused one, with `tickets` a source has yet to read. */
-  reread(tickets?: Item[]): void;
-  /** The onboarded repositories as the last read found them, which Add item may create in. */
-  repos(): RepoConfig[];
+  /** Shows the work records as they are now, after a write or a refused one. */
+  reread(): void;
   /** Reads the model choices T3 offers now into the board data. */
   offerModelChoices(): ModelGroup[];
   /**
@@ -93,7 +89,6 @@ const BACK_TO_LIST: Move = {
 /** A refused Start ran no t3: one of the repository project's checks failed. */
 type Start = StartResult & { refused?: true };
 
-const REQUEST_ID = /^[a-f0-9-]{36}$/;
 const GONE = 'That item is no longer on the board.';
 
 /** Keeps `work` in `inFlight` under `key` until it settles, or for good when `keep` says so. */
@@ -117,13 +112,10 @@ async function currentRepositoryProject(repo: string): Promise<RepositoryProject
   return repositoryProject(repo, repos);
 }
 
-export function createItemCommands({ board, items, records, reread, repos, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
+export function createItemCommands({ board, items, records, reread, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
   showThread = lookupThread, startThread: startIn = startThread }: ItemCommandsDeps): ItemCommands {
   const retryBuilds = new Set<string>();
   const checks = new WeakMap<Promise<Start>, { pending: boolean; retryAt: number }>();
-  const submissions = new Map<string, {
-    draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
-  }>();
   /** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
   const starts = new Map<string, Promise<Start>>();
   /** Start builds by item id, kept like Starts, so an item started while Queued can still start its build. */
@@ -296,38 +288,6 @@ export function createItemCommands({ board, items, records, reread, repos, offer
           board.push();
         })));
     },
-    async capture(input) {
-      if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) {
-        return reply(400, { error: 'The submission needs a valid request ID.' });
-      }
-      let draft: ItemDraft;
-      try { draft = validateDraft(input.draft, repos()); }
-      catch (err) { return reply(422, { error: (err as Error).message }); }
-      let entry = submissions.get(input.requestId);
-      if (entry && JSON.stringify(entry.draft) !== JSON.stringify(draft)) {
-        return reply(409, { error: 'This submission already belongs to another item. Finish it before starting a new one.' });
-      }
-      if (!entry) {
-        if (submissions.size >= 1000) return reply(503, { error: 'The board has reached its submission limit. Finish pending items and restart the board.' });
-        entry = { draft, progress: {} };
-        submissions.set(input.requestId, entry);
-      }
-      entry.pending ??= items.create(draft, entry.progress);
-      const result = await entry.pending;
-      entry.pending = undefined;
-      if (result.item && !entry.published) {
-        entry.published = true;
-        // Only recorded work is on the board, so the new ticket gets its work record, which a retry finds again.
-        if (records) {
-          const { item } = result;
-          const work = records.importTicket({ title: item.title, repository: item.repo, kind: item.kind, ticket: `${item.repo}#${item.number}` });
-          reread([item]);
-          result.item = board.find(work.record.workId) ?? null;
-        } else board.showChanged(result.item);
-      }
-      return withBoard(result.error ? 502 : 200, result);
-    },
-
     queue: (itemId) => move(itemId, QUEUE),
     backToList: (itemId) => move(itemId, BACK_TO_LIST),
     pickStatus,

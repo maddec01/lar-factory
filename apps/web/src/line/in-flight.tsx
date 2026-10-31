@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight, GitPullRequest } from 'lucide-react';
-import { openBlockers, prLabel, repoKey, repoName } from '@lar-factory/shared';
+import { itemName, openBlockers, prLabel, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -78,7 +78,7 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
               {done}/{item.slices.length} slices{slices ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
             </button>
           ) : <span className="h-4" data-col="count" />}
-          <span data-col="next" className="min-w-0 truncate text-[12px] leading-4" title={note.map(({ s, word }) => `${word} #${s.number} ${s.title}`).join('\n')}>
+          <span data-col="next" className="min-w-0 truncate text-[12px] leading-4" title={note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n')}>
             {note[0] && <><span className={`font-medium ${note[0].tone}`}>{note[0].word}</span> {note[0].s.title}{note.length > 1 && <span className="text-(--muted-foreground)"> +{note.length - 1} more</span>}</>}
           </span>
           <span data-col="figures" className="grid min-w-0"><Figures s={figuresOf(item, data)} /></span>

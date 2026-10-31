@@ -3,7 +3,7 @@
 // one mini segment per slice; at any other status the slices get a small bar of their own. A chip for each slice
 // follows, so what the bar shows is also readable.
 
-import { STATUSES } from '@lar-factory/shared';
+import { STATUSES, itemName } from '@lar-factory/shared';
 import type { Item, Slice, Status } from '@lar-factory/shared';
 import { SliceBar, SliceMark } from '../items/item-parts.tsx';
 import { STATUS_COLOR } from '../items/status-glyph.tsx';
@@ -12,9 +12,9 @@ const SPLIT_STATUSES: readonly Status[] = ['In progress', 'Review'];
 
 function SliceChip({ slice }: { slice: Slice }) {
   return (
-    <li title={`#${slice.number} ${slice.title} (${slice.progress})`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-(--border) bg-(--card) py-0.5 ps-1 pe-2.5 text-xs">
+    <li title={`${itemName(slice)} (${slice.progress})`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-(--border) bg-(--card) py-0.5 ps-1 pe-2.5 text-xs">
       <SliceMark progress={slice.progress} />
-      <span className="shrink-0 text-(--muted-foreground) tabular-nums">#{slice.number}</span>
+      {slice.number > 0 && <span className="shrink-0 text-(--muted-foreground) tabular-nums">#{slice.number}</span>}
       <span className={`min-w-0 truncate ${slice.progress === 'done' ? 'text-(--muted-foreground)' : slice.progress === 'active' ? 'font-medium' : ''}`}>{slice.title}</span>
       <span className="shrink-0 text-[11px] text-(--muted-foreground)">{slice.progress}</span>
     </li>

@@ -113,7 +113,7 @@ const otherRepo: ItemSource = {
     repo: 'maddec01/lar-apple', labels: [], state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
     updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [] }] }),
   setStatus: async () => null, statusRefusal: () => null, addLabel: async () => null,
-  create: async () => ({ item: null, issueUrl: null, error: null }), setParentStatus: async () => null, abandon: async () => null,
+  searchTickets: async () => [], readTicket: async () => null, setParentStatus: async () => null, abandon: async () => null,
 };
 
 test("a logged-out az and a missing azure-devops extension each name their fix, and another repository's items still show", async () => {

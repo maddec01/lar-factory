@@ -135,18 +135,27 @@ const projectCommands = async (board: Board) => (await board.calls()).filter((ar
 
 const labelEdits = async (board: Board) => (await board.calls()).filter((args) => args[0] === 'label' || (args[0] === 'issue' && args[1] === 'edit'));
 
-test("Add item in a repository reading its issues creates the issue with status-list and nothing else, and shows it as List", async (t) => {
-  const board = await issuesBoard(t);
-  const draft = { repo: APPLE, kind: 'feature', title: 'Capture an item', description: '', labels: [] };
-  const response = await board.postSession({ requestId: randomUUID(), draft }, '/api/items');
-  assert.equal(response.status, 200);
-  const result = await response.json() as { item: { status: string; url: string }; error: string | null };
-  assert.equal(result.error, null);
-  assert.equal(result.item.status, 'List');
-  assert.equal(result.item.url, `https://github.com/${APPLE}/issues/900001`);
-  const creations = (await board.calls()).filter((args) => args[0] === 'api' && args[1] === '--method');
-  assert.deepEqual(creations.map((args) => args.filter((a) => a.startsWith('labels[]='))), [['labels[]=feature', 'labels[]=status-list']]);
-  assert.deepEqual(await projectCommands(board), []);
+test("in a repository with no factory labels or config, Add item records work locally and a picked ticket gets one record", async (t) => {
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues: { [APPLE]: [appleIssue(8, { title: 'Seek stalls', labels: { nodes: [] }, body: 'Steps.' })] }, recorded: false });
+  await until(board, (d) => d.fetchedAt !== null);
+  const draft = { repo: APPLE, kind: 'feature', title: 'Capture an item', description: '' };
+  const captured = await board.postSession({ requestId: randomUUID(), draft }, '/api/items');
+  assert.equal(captured.status, 200);
+  const { item } = await captured.json() as { item: { id: string; number: number; status: string } };
+  assert.deepEqual([item.number, item.status], [0, 'List']);
+
+  const search = await fetch(`${board.url}/api/tickets?repo=${APPLE}&q=seek`);
+  assert.deepEqual((await search.json() as { tickets: unknown[] }).tickets, [{ number: 8, title: 'Seek stalls', url: `https://github.com/${APPLE}/issues/8` }]);
+  const pick = () => board.postSession({ repo: APPLE, number: 8 }, '/api/pick-ticket');
+  const first = await (await pick()).json() as { item: { id: string; number: number; url: string }; board: BoardData };
+  assert.deepEqual([first.item.number, first.item.url], [8, `https://github.com/${APPLE}/issues/8`]);
+  const again = await (await pick()).json() as { item: { id: string }; board: BoardData };
+  assert.equal(again.item.id, first.item.id);
+  assert.deepEqual(again.board.items.map((i) => i.number).sort(), [0, 8]);
+  const searched = await (await fetch(`${board.url}/api/tickets?repo=${APPLE}&q=seek`)).json() as { tickets: { workId?: string }[] };
+  assert.equal(searched.tickets[0]!.workId, first.item.id);
+  const writes = (await board.calls()).filter((args) => args[0] === 'label' || (args[0] === 'issue' && !['list', 'view'].includes(args[1]!)) || args.includes('POST'));
+  assert.deepEqual(writes, []);
 });
 
 test("Abandon on an item from a repository's issues closes it as not planned; without write access it shows gh's error and keeps the item", async (t) => {

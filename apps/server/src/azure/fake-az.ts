@@ -59,7 +59,7 @@ export const STATES: Record<string, [string, string][]> = {
  * A fake az for one team whose current sprint holds `sprint`'s ids and whose requirement backlog lists `backlog`'s,
  * reading `items` (listed or not), with `requirement` its requirement backlog level's type and `areas` its area paths.
  * `pullRequests` are the PRs az repos pr show prints, and `tags` the project's tags, which a tag PATCH renames. It records
- * each call, each work item patch, each work item created and each tag renamed, and `fail` throws for a call it matches.
+ * each call, each work item patch and each tag renamed, and `fail` throws for a call it matches.
  * Like az, it refuses a devops invoke at a preview's resource version, and one on wit/workitems' {id} route, which az rest PATCHes.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
@@ -84,8 +84,6 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   const batches: number[][] = [];
   /** Each work item patch's id and operations, read from its --in-file while the file exists. */
   const patches: { id: number; ops: unknown[] }[] = [];
-  /** Each work item created, with its id, type and operations; it joins the items the fake reads. */
-  const created: { id: number; type: string; ops: { path: string; value: unknown }[] }[] = [];
   const byId = new Map(items.map((i) => [i.id, i]));
   const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
   const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
@@ -167,16 +165,6 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         const found = ids.flatMap((id) => byId.has(id) ? [raw(byId.get(id)!, version)] : []);
         return JSON.stringify({ count: found.length, value: found.sort((a, b) => a.id - b.id) });
       }
-      if (resource === 'wit/workitems' && route(args, 'type')) {
-        const type = route(args, 'type')!;
-        const ops = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { path: string; value: unknown }[];
-        const value = (path: string) => ops.find((op) => op.path === path)?.value as string | undefined;
-        const id = Math.max(100, ...byId.keys()) + 1;
-        created.push({ id, type, ops });
-        if (requirementTypes.includes(type)) backlog.push(id);
-        byId.set(id, { id, type, state: STATES[type]![0]![0], title: value('/fields/System.Title'), tags: value('/fields/System.Tags'), area: value('/fields/System.AreaPath') ?? 'Fabrikam Fiber', iteration: value('/fields/System.IterationPath') ?? 'Fabrikam Fiber' });
-        return JSON.stringify(raw(byId.get(id)!));
-      }
       if (resource === 'wit/comments') {
         // Newest first, $top at a time; the continuation token is how many it has already given.
         const id = Number(route(args, 'workItemId'));
@@ -208,7 +196,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
     }
     throw new Error(`fake az: unexpected ${args.join(' ')}`);
   };
-  return { calls, batches, patches, created, tags, tagRenames, run };
+  return { calls, batches, patches, tags, tagRenames, run };
 }
 
 /** A pull request on the fake repository, as az repos pr show prints it. */

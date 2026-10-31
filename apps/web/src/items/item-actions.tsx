@@ -3,7 +3,7 @@
 // Queue's or Keep's error.
 
 import { useId, useRef } from 'react';
-import { canAbandon, ref } from '@lar-factory/shared';
+import { canAbandon, itemName, ref } from '@lar-factory/shared';
 import type { BoardData, Item, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { useActionStore, useItemAction } from './action-store.ts';
@@ -22,7 +22,7 @@ export function writeState(data: BoardData, action?: ItemAction): { disabled?: t
 export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);
   const verb = action?.phase === 'pending' && action.kind === 'queue' ? 'Queuing…' : 'Queue';
-  return <Button {...kind('other')} data-queue={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
+  return <Button {...kind('other')} data-queue={item.id} aria-label={`${verb} ${itemName(item)}`}
     {...writeState(data, action)} onClick={() => void queueItem(item.id)}>{verb}</Button>;
 }
 
@@ -30,7 +30,7 @@ export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
 export function BackToListButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);
   const moving = action?.phase === 'pending' && action.kind === 'back-to-list';
-  return <Button {...kind('other')} className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Back to List'} ${ref(item)} ${item.title}`}
+  return <Button {...kind('other')} className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Back to List'} ${itemName(item)}`}
     {...writeState(data, action)} onClick={() => void backToList(item.id)}>{moving ? 'Moving to List…' : 'Back to List'}</Button>;
 }
 
@@ -39,7 +39,7 @@ export function PickStatusButtons({ item, data }: { item: Item; data: BoardData 
   const action = useItemAction(item.id);
   const keeping = (status: Status) => action?.phase === 'pending' && action.kind === 'pick-status' && action.status === status;
   return item.statuses.map((status) => (
-    <Button {...kind('other')} key={status} data-pick-status={status} aria-label={`${keeping(status) ? 'Keeping' : 'Keep'} ${status} on ${ref(item)} ${item.title}`}
+    <Button {...kind('other')} key={status} data-pick-status={status} aria-label={`${keeping(status) ? 'Keeping' : 'Keep'} ${status} on ${itemName(item)}`}
       {...writeState(data, action)} onClick={() => void pickStatus(item.id, status)}>{keeping(status) ? 'Keeping…' : `Keep ${status}`}</Button>
   ));
 }
@@ -53,7 +53,7 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
   const refusal = item.abandonRefusal;
   const state = refusal ? { disabled: true as const, title: refusal, 'aria-describedby': reason } : writeState(data, action);
   return <>
-    <Button {...kind('other')} className="link-action disabled:pointer-events-auto" data-abandon={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
+    <Button {...kind('other')} className="link-action disabled:pointer-events-auto" data-abandon={item.id} aria-label={`${verb} ${itemName(item)}`}
       {...state} onClick={() => askAbandon(item.id)}>{verb}</Button>
     {refusal && <span id={reason} className="text-base-700" data-abandon-refusal>{refusal}</span>}
   </>;

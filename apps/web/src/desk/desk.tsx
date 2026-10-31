@@ -4,7 +4,7 @@
 // step track; and the actions, the card's action on the left and Open thread as an icon in the right corner. Only a
 // Ready card's start message or Start after error, under its actions, makes one card taller than the rest.
 
-import { HINTS, carriesTwoStatuses, itemPr, openBlockerRefs, ref, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, itemPr, openBlockerRefs, itemName, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -79,7 +79,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
           <span className="truncate text-(--muted-foreground)">· {repoName(repoKey(item), data.repos)} · {shortAgo(item.updatedAt, now)}</span>
         </span>
         {/* Two lines tall whatever the title's length, so the rows under it start at the same height on every card. */}
-        <span className="desk-title line-clamp-2 h-10 text-sm/5 font-medium" title={`${ref(item)} ${item.title}`}><ItemTitle item={item} /></span>
+        <span className="desk-title line-clamp-2 h-10 text-sm/5 font-medium" title={`${itemName(item)}`}><ItemTitle item={item} /></span>
         <AzureFields azure={item.azure} />
         <span className="desk-next flex h-4 min-w-0 items-center gap-1.5 text-xs text-(--muted-foreground) tabular-nums"><NextStep item={item} data={data} /></span>
         <span className="pt-1"><StepTrack status={item.status} /></span>

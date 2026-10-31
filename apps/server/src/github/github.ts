@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
-import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, RawLinkedPr, Searched, Status } from '@lar-factory/shared';
+import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, Status, TicketMatch } from '@lar-factory/shared';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -687,51 +687,23 @@ export async function abandonIssue(item: Item, run: (args: string[]) => Promise<
   }
 }
 
-/**
- * Creates the issue a draft describes, resuming from `progress` after a failed try. `prepare` ensures its status
- * label exists before creation. The issue shows as List.
- */
-export async function createIssue(
-  draft: ItemDraft,
-  progress: CreationProgress,
-  run: (args: string[]) => Promise<string> = gh,
-  prepare: () => Promise<void> = async () => {},
-): Promise<CreationResult> {
-  let step = 'issue setup';
-  const uncertain = (): CreationResult => ({ item: null, issueUrl: null, uncertain: true,
-    error: 'Issue creation could not be confirmed. Check the repository issues before starting a new item; this submission will not create another issue.' });
-  if (progress.creationUncertain) return uncertain();
+/** The open issues of `repo` whose words match `query`, as gh's issue search finds them, or the latest open ones for no words. */
+export async function findIssues(repo: string, query: string, limit: number, run: (args: string[]) => Promise<string> = gh): Promise<TicketMatch[]> {
+  const words = query.trim();
+  const issues = JSON.parse(await run(['issue', 'list', '-R', repo, '--state', 'open', '--limit', String(limit), '--json', 'number,title,url',
+    ...words ? ['--search', words] : []])) as TicketMatch[];
+  return issues.map(({ number, title, url }) => ({ number, title, url }));
+}
+
+/** An open issue's title, body and kind; null when `repo` has no issue `number` or it is closed. */
+export async function readIssue(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<PickedTicket | null> {
+  let issue: { number: number; title: string; url: string; body: string; labels: { name: string }[]; state: string };
   try {
-    if (progress.item) return { item: progress.item, issueUrl: progress.item.url, error: null };
-    await prepare();
-    const labels = [draft.kind, ...draft.labels];
-    step = 'issue creation';
-    if (!progress.issue) {
-      // A CLI timeout can happen after GitHub accepted the issue. Never blindly recreate it.
-      progress.creationUncertain = true;
-      const issue = JSON.parse(await run(['api', '--method', 'POST', `repos/${draft.repo}/issues`,
-        '-f', `title=${draft.title}`, '-f', `body=${draft.description}`,
-        ...labels.flatMap((label) => ['-f', `labels[]=${label}`])])) as NonNullable<CreationProgress['issue']>;
-      if (!Number.isSafeInteger(issue.number) || !issue.node_id || issue.html_url !== `https://github.com/${draft.repo}/issues/${issue.number}`) {
-        throw new Error('GitHub did not return an issue identity.');
-      }
-      progress.issue = issue;
-      progress.creationUncertain = false;
-    }
-    const issue = progress.issue;
-    progress.item = {
-      id: issue.node_id, revision: 0, status: 'List', statuses: ['List'], kind: labelKind(labels), content: 'ticket', number: issue.number,
-      title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'open', closedAs: null,
-      parent: null, parentId: null, subIssues: { total: 0, completed: 0 }, blockers: [],
-      updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],
-    };
-    return { item: progress.item, issueUrl: issue.html_url, error: null };
+    issue = JSON.parse(await run(['issue', 'view', String(number), '-R', repo, '--json', 'number,title,url,body,labels,state']));
   } catch (err) {
-    const detail = message(err);
-    // A definite client rejection did not create an issue and can be corrected/retried.
-    if (step === 'issue creation' && /HTTP (?:400|401|403|404|410|422)\b/.test(detail)) progress.creationUncertain = false;
-    if (progress.creationUncertain) return uncertain();
-    return { item: null, issueUrl: progress.issue?.html_url ?? null,
-      error: `Could not finish ${step}. ${detail}` };
+    if (/Could not resolve to an issue/.test(message(err))) return null;
+    throw err;
   }
+  if (issue.state !== 'OPEN') return null;
+  return { number: issue.number, title: issue.title, url: issue.url, text: issue.body, kind: labelKind(issue.labels.map((l) => l.name)) };
 }

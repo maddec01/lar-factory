@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { itemTotal } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
-const draft = { repo: 'maddec01/lar-factory', kind: 'feature', title: 'Capture an item', description: '', labels: [] };
+const draft = { repo: 'maddec01/lar-factory', kind: 'feature', title: 'Capture an item', description: '' };
 
 test('writes reject foreign and missing origins before touching GitHub', async (t) => {
   const board = await startBoard(t);
@@ -29,7 +29,7 @@ test('writes reject foreign and missing origins before touching GitHub', async (
 });
 
 test('a completed submission is immediately visible and duplicate delivery reuses it', async (t) => {
-  const board = await startBoard(t, { createDelay: 80, readDelay: 700 });
+  const board = await startBoard(t, { readDelay: 700 });
   await onboarded(board);
   const initial = await board.board();
   const body = { session: initial.capture.session, requestId: randomUUID(), draft };
@@ -43,15 +43,16 @@ test('a completed submission is immediately visible and duplicate delivery reuse
   await new Promise((r) => setTimeout(r, 850));
   assert.equal((await board.board()).items[0].title, 'Capture an item', 'older refresh cannot erase the created item');
   assert.equal((await board.post(body)).status, 200, 'lost HTTP response can be delivered again');
+  assert.equal((await board.board()).items.filter((i: { title: string }) => i.title === 'Capture an item').length, 1, 'one work record');
   const calls = await board.calls();
-  assert.equal(calls.filter((args) => args[0] === 'api' && args[1] === '--method').length, 1);
+  assert.equal(calls.filter((args) => args[0] === 'api' && args[1] === '--method').length, 0, 'no ticket is created');
 });
 
 test('HTTP validation rejects malformed, oversized and mismatched drafts without a GitHub write', async (t) => {
   const board = await startBoard(t);
   const initial = await board.board();
   const body = { session: initial.capture.session, requestId: randomUUID(), draft };
-  for (const changed of [{ title: '  ' }, { labels: ['app: music'] }, { repo: 'other/repo' }, { kind: 'concept' }, { description: 42 }]) {
+  for (const changed of [{ title: '  ' }, { repo: 'other/repo' }, { kind: 'concept' }, { description: 42 }]) {
     const response = await board.post({ ...body, draft: { ...draft, ...changed } });
     assert.equal(response.status, 422);
     assert.equal(typeof (await response.json()).error, 'string');

@@ -1,7 +1,7 @@
-// The Add item dialog: the form, its repo-dependent fields, and each phase of a submission.
+// The Add item dialog: the New work form and each phase of a submission, and the Pick a ticket pane.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, checkedOf, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
+import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
 import { pastePlain, selectEnd, typeInto } from '../../test/editor.ts';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -13,14 +13,7 @@ const dialog = () => $('#add-item-dialog');
 const field = <T extends HTMLElement = HTMLInputElement>(id: string) => $<T>(`#${id}`)!;
 const submit = () => field<HTMLButtonElement>('item-submit');
 const result = () => field('item-result');
-const labels = () => $$<HTMLInputElement>('input[name="labels"]').map((input) => input.value);
-const box = (label: string) => $$('input[type="checkbox"]').find((each) => each.closest('label')!.textContent === label)!;
-/** A label's toggle chip, by the label's full name. */
-const chip = (label: string) => $<HTMLInputElement>(`input[name="labels"][value="${label}"]`)!;
 const editorArea = () => $('#add-item-dialog [contenteditable]')!;
-/** Each Label group's heading and its options' text. */
-const groups = () => $$('.custom-labels [role="group"]').map((group) => [group.getAttribute('aria-label'),
-  [...group.querySelectorAll('label')].map((option) => option.textContent)]);
 
 async function open(data: BoardData = withFactory): Promise<void> {
   await mountPage(data);
@@ -47,10 +40,9 @@ async function fillDraft(): Promise<void> {
 }
 
 const respond = (body: object, status = 200) => fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify(body), { status }));
-const created = { number: 501, html_url: 'https://github.com/maddec01/lar-server/issues/501' };
 const posted = () => JSON.parse(String((fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>;
 
-test('Add item opens a dialog with the configured repositories, kinds, and the selected repo\'s custom labels', async () => {
+test('Add item opens a dialog with the configured repositories and kinds, and no labels to pick', async () => {
   await open();
   const popup = dialog()!;
   expect(popup.getAttribute('role')).toBe('dialog');
@@ -64,12 +56,9 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
   expect(field('item-title').required).toBe(true);
   expect(editorArea().getAttribute('aria-label')).toBe('Description');
   expect([result().getAttribute('role'), result().dataset.slot, result().dataset.tone]).toEqual(['status', 'alert', 'warning']);
-  expect(popup.textContent).toContain('Create an issue in lar-server and add it to List.');
+  expect(popup.textContent).toContain('Record work in lar-server and add it to List.');
   expect(popup.textContent, 'one line describes it').not.toContain('Capture work for a repository.');
-
-  expect(labels()).toEqual(['area: server', 'area: web']);
-  expect($('.custom-labels legend')!.textContent).toBe('Labels');
-  expect(groups()).toEqual([['area', ['server', 'web']]]);
+  expect($$('#add-item-dialog input[type="checkbox"]'), 'a ticket\'s labels are no part of captured work').toEqual([]);
 });
 
 test('the side panel heads Repository and Kind in small uppercase labels, beside the title and the editor', async () => {
@@ -83,43 +72,12 @@ test('the side panel heads Repository and Kind in small uppercase labels, beside
   expect(panel.contains(field('item-title')) || panel.contains(editorArea()), 'the title and editor sit left of it').toBe(false);
 });
 
-test('labels show by Label group, unprefixed ones last under Other, and a ticked option creates the item with its full label', async () => {
-  await open({ ...withFactory, repos: [{ ...withFactory.repos[0]!, labels: ['app: music', 'UI', 'app: video', 'os: ios'] }] });
-  expect(groups()).toEqual([['app', ['music', 'video']], ['os', ['ios']], ['Other', ['UI']]]);
-  expect($$('.custom-labels [role="group"] > span').map((heading) => heading.textContent)).toEqual(['app', 'os', 'Other']);
-  await settle(() => chip('app: music').click());
-  expect(checkedOf(chip('app: music'))).toBe('true');
-  await fillDraft();
-  respond({ item: null, issueUrl: null, error: null }, 500);
-  await settle(() => submit().click());
-  expect((posted().draft as Record<string, unknown>).labels).toEqual(['app: music']);
-});
-
-test('labels with no prefix sit under Other even when no label has one', async () => {
-  await open({ ...withFactory, repos: [{ ...withFactory.repos[0]!, labels: ['UI', 'docs'] }] });
-  expect($$('.custom-labels [role="group"] > span').map((heading) => heading.textContent)).toEqual(['Other']);
-});
-
-test('Clear unticks every label and the draft keeps that', async () => {
-  await open();
-  const clear = () => $$<HTMLButtonElement>('.custom-labels button').find((b) => b.textContent === 'Clear');
-  expect(clear(), 'nothing to clear').toBeUndefined();
-  await settle(() => chip('area: web').click());
-  await settle(() => chip('area: server').click());
-  await settle(() => clear()!.click());
-  expect([chip('area: web'), chip('area: server')].map(checkedOf)).toEqual(['false', 'false']);
-  expect(clear()).toBeUndefined();
-  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
-  await settle(() => addButton().click());
-  expect(checkedOf(chip('area: web')), 'the kept draft has no labels').toBe('false');
-});
-
 test.each([['- a\nb', '- a\n- b'], ['1. a\nb', '1. a\n2. b'], ['# h', '# h']])('typing %j in the description creates the item with %j', async (typed, body) => {
   await open();
   await enter(field<HTMLSelectElement>('item-kind'), 'bug');
   await enter(field('item-title'), 'Playback stalls');
   await typeInto(editorArea(), typed);
-  respond({ item: null, issueUrl: null, error: null }, 500);
+  respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
   expect((posted().draft as Record<string, unknown>).description).toBe(body);
 });
@@ -134,7 +92,7 @@ test('a description typed in Add item survives closing and reopening it', async 
   expect([...editorArea().querySelectorAll('ul > li')].map((li) => li.textContent)).toEqual(['a', 'b']);
   await enter(field<HTMLSelectElement>('item-kind'), 'bug');
   await enter(field('item-title'), 'Playback stalls');
-  respond({ item: null, issueUrl: null, error: null }, 500);
+  respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
   expect((posted().draft as Record<string, unknown>).description).toBe('- a\n- b');
 });
@@ -155,7 +113,7 @@ test('a description added to over several openings creates the item with all of 
   await typeInto(editorArea(), 'z');
   await enter(field<HTMLSelectElement>('item-kind'), 'bug');
   await enter(field('item-title'), 'Playback stalls');
-  respond({ item: null, issueUrl: null, error: null }, 500);
+  respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
   expect((posted().draft as Record<string, unknown>).description).toBe('xyz');
 });
@@ -183,25 +141,6 @@ test('the expand button and Ctrl+Shift+E grow the dialog to the window and back,
   expect(dialog(), 'the shortcut leaves the dialog open').not.toBeNull();
 });
 
-test('changing the repo shows its custom labels, unchecked, and a repo with none or an empty list shows no toggles', async () => {
-  await open();
-  await settle(() => chip('area: web').click());
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-apple');
-  expect(field<HTMLSelectElement>('item-kind').value, 'the kind stays').toBe('bug');
-  expect(labels()).toEqual(['app: music', 'app: video', 'app: photos', 'app: books', 'os: ios', 'os: macos', 'os: tvos', 'os: watchos']);
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-factory');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-factory');
-  expect($('.custom-labels'), 'no .lar-factory.json labels').toBeNull();
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-empty');
-  expect($('.custom-labels'), 'an empty labels').toBeNull();
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-server');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-server');
-  expect(field<HTMLSelectElement>('item-kind').value, 'the kind stays').toBe('bug');
-  expect($$<HTMLInputElement>('input[name="labels"]').some((input) => input.checked), 'a repo shown again starts unchecked').toBe(false);
-});
-
 test('a draft without a kind is not sent and says why', async () => {
   await open();
   await enter(field('item-title'), 'Playback stalls');
@@ -212,15 +151,6 @@ test('a draft without a kind is not sent and says why', async () => {
   expect(result().textContent, 'editing clears the message').toBe('');
 });
 
-test('ticking a box counts as editing and clears the message', async () => {
-  await open();
-  await settle(() => submit().click());
-  expect(result().textContent).toBe('Choose bug, feature or improvement.');
-  await settle(() => chip('area: web').click());
-  expect(checkedOf(chip('area: web'))).toBe('true');
-  expect(result().textContent).toBe('');
-});
-
 test('a repo picked while a message shows is the one posted', async () => {
   await open();
   await settle(() => submit().click());
@@ -228,14 +158,13 @@ test('a repo picked while a message shows is the one posted', async () => {
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
   expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-apple');
   await fillDraft();
-  respond({ item: null, issueUrl: null, error: null }, 500);
+  respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
   expect((posted().draft as Record<string, unknown>).repo).toBe('maddec01/lar-apple');
 });
 
-test('submitting posts the draft, shows it sending, then closes and announces the new item', async () => {
+test('submitting posts the draft, shows it sending, then closes and announces the recorded work, which has no ticket number', async () => {
   await open();
-  await settle(() => chip('area: web').click());
   await fillDraft();
   let finish!: (response: Response) => void;
   fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (finish = resolve)));
@@ -243,65 +172,43 @@ test('submitting posts the draft, shows it sending, then closes and announces th
 
   expect(fetchMock.mock.calls.at(-1)![0]).toBe('/api/items');
   const body = posted();
-  expect(body.draft).toEqual({ repo: 'maddec01/lar-server', kind: 'bug', title: 'Playback stalls', description: 'After a seek.', labels: ['area: web'] });
+  expect(body.draft).toEqual({ repo: 'maddec01/lar-server', kind: 'bug', title: 'Playback stalls', description: 'After a seek.' });
   expect(typeof body.requestId).toBe('string');
   expect(submit().textContent).toBe('Adding…');
   expect(submit().disabled).toBe(true);
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
   expect(editorArea().getAttribute('contenteditable'), 'the description locks with them').toBe('false');
-  expect(chip('area: server').matches(':disabled'), 'the boxes lock with the fields').toBe(true);
-  await settle(() => chip('area: server').click());
-  expect(checkedOf(chip('area: server'))).toBe('false');
   expect($('#add-item-form')!.getAttribute('aria-busy')).toBe('true');
-  expect(result().textContent).toBe('Creating the issue and adding it to List…');
+  expect(result().textContent).toBe('Adding it to List…');
 
-  const item = { ...sample.items[0]!, id: 'I_created501', title: 'Playback stalls', number: 501 };
+  const item = { ...sample.items[0]!, id: 'work-501', title: 'Playback stalls', number: 0, url: null };
   const board = { ...sample, items: [...sample.items, item] };
-  await settle(() => finish(new Response(JSON.stringify({ item, issueUrl: created.html_url, error: null, board }))));
+  await settle(() => finish(new Response(JSON.stringify({ item, error: null, board }))));
   await settle(() => vi.advanceTimersByTime(50));
   expect(dialog(), 'the dialog closes').toBeNull();
   expect(document.activeElement, 'focus goes back to Add item').toBe(addButton());
   const toast = $('[data-slot="toast"][role="status"] [data-toast]')!;
-  expect(toast.textContent).toBe('Added #501 Playback stalls to List. View item');
-  expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added #501');
+  expect(toast.textContent).toBe('Added Playback stalls to List. View item');
+  expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added Playback stalls');
   expect(text($('.title-bar .list-button')), 'the board shows the new data').toBe('List5');
 });
 
-test('a created issue the server could not add offers a retry of the same request', async () => {
+test('a refused submission keeps the draft for editing', async () => {
   await open();
   await fillDraft();
-  respond({ item: null, issueUrl: created.html_url, error: 'Could not add it to List.' }, 502);
-  await settle(() => submit().click());
-  const first = posted();
-  expect(result().textContent).toBe('Issue created. Could not add it to List. Retry to finish this issue.View created issue');
-  expect(submit().textContent).toBe('Retry this submission');
-  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
-  expect(chip('area: server').matches(':disabled'), 'the boxes lock with the fields').toBe(true);
-  await settle(() => chip('area: server').click());
-  expect(checkedOf(chip('area: server'))).toBe('false');
-
-  respond({ item: null, issueUrl: null, error: 'Still failing.' }, 502);
-  await settle(() => submit().click());
-  expect(posted().requestId, 'the retry repeats the same request').toBe(first.requestId);
-});
-
-test('an error before any issue exists keeps the draft for editing', async () => {
-  await open();
-  await fillDraft();
-  respond({ item: null, issueUrl: null, error: null }, 500);
+  respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
   expect(result().textContent).toBe('Request failed (HTTP 500).');
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(false);
   expect(field('item-title').value).toBe('Playback stalls');
 });
 
-test('an uncertain creation points at the repo\'s issues and only New item goes on', async () => {
+test('a submission the restarted board can\'t confirm says to check List, and only New item goes on', async () => {
   await open();
   await fillDraft();
-  respond({ item: null, issueUrl: null, error: 'GitHub did not answer.', uncertain: true });
+  respond({ uncertain: true, error: 'The board restarted. Check List for this item before adding it again.' }, 409);
   await settle(() => submit().click());
-  expect(result().querySelector('a')!.href).toBe('https://github.com/maddec01/lar-server/issues');
-  expect(result().querySelector('a')!.textContent).toBe('Check repository issues');
+  expect(result().textContent).toBe('The board restarted. Check List for this item before adding it again.');
   expect(submit().disabled).toBe(true);
   expect(field<HTMLButtonElement>('item-new').hidden).toBe(false);
 });
@@ -311,7 +218,7 @@ test('a lost response offers a retry', async () => {
   await fillDraft();
   fetchMock.mockImplementationOnce(async () => { throw new TypeError('Failed to fetch'); });
   await settle(() => submit().click());
-  expect(result().textContent).toBe('The submission response was lost. Retry this submission to recover its result without creating another issue.');
+  expect(result().textContent).toBe('The submission response was lost. Retry this submission to recover its result without adding it twice.');
   expect(submit().textContent).toBe('Retry this submission');
 });
 
@@ -324,7 +231,7 @@ test('sample mode disables adding and says so', async () => {
 test('the description names the repository picked', async () => {
   await open();
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
-  expect(dialog()!.textContent).toContain('Create an issue in lar-apple and add it to List.');
+  expect(dialog()!.textContent).toContain('Record work in lar-apple and add it to List.');
 });
 
 test('with no repository onboarded, adding is disabled and says where to add one, but not before the first read, beside a read error or a repository left off the board', async () => {
@@ -332,7 +239,7 @@ test('with no repository onboarded, adding is disabled and says where to add one
   const hint = () => $('#item-repo-hint');
   await open(empty);
   expect(submit().disabled).toBe(true);
-  expect(dialog()!.textContent).toContain('Create an issue and add it to List.');
+  expect(dialog()!.textContent).toContain('Record work and add it to List.');
   expect(hint()!.textContent).toBe('No repository is onboarded. Read how to add a repository.');
   expect(field('item-repo').getAttribute('aria-describedby')).toBe('item-repo-hint');
   for (const data of [{ ...empty, error: 'gh: HTTP 502' }, { ...empty, fetchedAt: null },
@@ -348,8 +255,7 @@ test('opened before the repositories arrive, the dialog picks the first one once
   await open({ ...withFactory, repos: [], fetchedAt: null });
   await push(withFactory);
   expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-server');
-  expect(dialog()!.textContent).toContain('Create an issue in lar-server and add it to List.');
-  expect(labels()).toEqual(['area: server', 'area: web']);
+  expect(dialog()!.textContent).toContain('Record work in lar-server and add it to List.');
   expect(submit().disabled).toBe(false);
 });
 
@@ -378,7 +284,7 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
 
   await fillDraft();
   const item = { ...sample.items[0]!, title: 'Playback stalls', number: 501 };
-  respond({ item, issueUrl: created.html_url, error: null, board: withFactory });
+  respond({ item, error: null, board: withFactory });
   await settle(() => submit().click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(dialog()).toBeNull();
@@ -389,47 +295,81 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
   expect(submit().textContent).toBe('Add to List');
 });
 
-test('on an Azure repository, Only for <repo> starts unticked, and ticked, the draft is only for that repository', async () => {
-  const azure: BoardData = { ...withFactory, capture: { session: 's1', enabled: true },
-    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }] };
-  await open(azure);
-  expect($$('input[type="checkbox"]').some((each) => each.closest('label')!.textContent!.startsWith('Only for')), 'a GitHub repository has no such box').toBe(false);
-  await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam/web');
-  expect(checkedOf(box('Only for web'))).toBe('false');
-  expect($('#item-only-for-hint')!.textContent).toBe("Unticked, it appears for every repository that reads the Web team's backlog and current sprint.");
-  await fillDraft();
-  respond({ error: 'Could not create the work item.', item: null, issueUrl: null }, 502);
-  await settle(() => submit().click());
-  expect(posted().draft).toMatchObject({ repo: 'contoso/Fabrikam/web' });
-  expect(posted().draft, 'unticked, the draft is for every repository reading the source').not.toHaveProperty('onlyFor');
-  await settle(() => box('Only for web').click());
-  expect(checkedOf(box('Only for web'))).toBe('true');
-  respond({ error: 'Could not create the work item.', item: null, issueUrl: null }, 502);
-  await settle(() => submit().click());
-  expect(posted().draft).toMatchObject({ repo: 'contoso/Fabrikam/web', onlyFor: true });
+/** The fetch calls to `path`, each with its body, if it has one. */
+const calls = (path: string) => fetchMock.mock.calls.map((call) => call as unknown as [string, RequestInit | undefined])
+  .filter(([url]) => url.startsWith(path)).map(([url, init]) => [url, init?.body ? JSON.parse(String(init.body)) : null]);
+const ticketButton = (number: number) => $<HTMLButtonElement>(`[data-ticket="${number}"]`)!;
+
+async function searchFor(query: string): Promise<void> {
+  await enter(field('pick-query'), query);
+  await settle(() => field<HTMLButtonElement>('pick-search').click());
+}
+
+test('Pick a ticket searches the repository picked and lists its open tickets, saying which are on the board already', async () => {
+  await open();
+  await settle(() => $<HTMLButtonElement>('[data-pane="pick"]')!.click());
+  expect($('[data-pane="pick"]')!.getAttribute('aria-pressed')).toBe('true');
+  expect(dialog()!.style.height, 'the short pane sizes the dialog to its content').toBe('auto');
+  expect([...$('#pick-ticket')!.classList], 'a long result list scrolls above the footer').toEqual(expect.arrayContaining(['min-h-0', 'overflow-y-auto']));
+  expect(dialog()!.textContent).toContain('Pick an open ticket in lar-server and add it to List.');
+  await enter(field<HTMLSelectElement>('pick-repo'), 'maddec01/lar-apple');
+  respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }, { number: 9, title: 'Seek is slow', url: 'u9', workId: 'work-9' }], error: null });
+  await searchFor('seek');
+  expect(calls('/api/tickets')).toEqual([['/api/tickets?repo=maddec01%2Flar-apple&q=seek', null]]);
+  expect($$('[data-ticket]').map(text)).toEqual(['#8Seek stalls', '#9Seek is slowOn the board']);
+  respond({ tickets: [], error: null });
+  await searchFor('nothing');
+  expect(text(field('pick-result'))).toBe('No open ticket matches.');
 });
 
-test('on an Azure repository, the custom tags are headed Tags', async () => {
-  const azure: BoardData = { ...withFactory, capture: { session: 's1', enabled: true },
-    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: ['area: web'] }] };
-  await open(azure);
-  await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam/web');
-  expect($('.custom-labels legend')!.textContent).toBe('Tags');
-  expect(groups()).toEqual([['area', ['web']]]);
+test('picking a new ticket closes the dialog and announces it, and one on the board already opens its item', async () => {
+  await open();
+  await settle(() => $<HTMLButtonElement>('[data-pane="pick"]')!.click());
+  respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }], error: null });
+  await searchFor('seek');
+  const item = { ...sample.items[0]!, id: 'work-8', number: 8, title: 'Seek stalls' };
+  respond({ item, created: true, error: null, board: { ...sample, items: [...sample.items, item] } });
+  await settle(() => ticketButton(8).click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(calls('/api/pick-ticket')).toEqual([['/api/pick-ticket', { repo: 'maddec01/lar-server', number: 8 }]]);
+  expect(dialog()).toBeNull();
+  expect(text($('[data-slot="toast"][role="status"] [data-toast]'))).toBe('Added #8 Seek stalls to List. View item');
+
+  await settle(() => addButton().click());
+  respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8', workId: 'work-8' }], error: null });
+  await searchFor('seek');
+  respond({ item, created: false, error: null, board: { ...sample, items: [...sample.items, item] } });
+  await settle(() => ticketButton(8).click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(dialog()).toBeNull();
+  expect(text($('[data-item-dialog] [data-slot="modal-header"] h2'))).toBe('#8 Seek stalls');
 });
 
-test('on an Azure repository, Add item says work item, and an uncertain creation points at the project\'s work items', async () => {
-  const azure: BoardData = { ...withFactory, capture: { session: 's1', enabled: true },
-    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam%20Fiber/lar%20web', role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }] };
-  await open(azure);
-  await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam%20Fiber/lar%20web');
-  expect(dialog()!.textContent).toContain('Create a work item in lar web and add it to List.');
-  await fillDraft();
-  respond({ item: null, issueUrl: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/501', error: 'Could not add it to List.' }, 502);
-  await settle(() => submit().click());
-  expect(result().textContent).toBe('Work item created. Could not add it to List. Retry to finish this work item.View created work item');
-  respond({ item: null, issueUrl: null, error: 'az did not answer.', uncertain: true });
-  await settle(() => submit().click());
-  expect(result().querySelector('a')!.href).toBe('https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems');
-  expect(result().querySelector('a')!.textContent).toBe("Check the project's work items");
+test('a pick the server refuses keeps the dialog open and says why', async () => {
+  await open();
+  await settle(() => $<HTMLButtonElement>('[data-pane="pick"]')!.click());
+  respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }], error: null });
+  await searchFor('#8');
+  respond({ error: 'maddec01/lar-server has no open ticket #8.' }, 404);
+  await settle(() => ticketButton(8).click());
+  expect(dialog()).not.toBeNull();
+  expect(text(field('pick-result'))).toBe('maddec01/lar-server has no open ticket #8.');
+});
+
+test('captured work shows no ticket number, and attaching a ticket keeps its item', async () => {
+  const captured = { ...sample.items[0]!, id: 'work-1', number: 0, title: 'Playback stalls', url: null, parent: null, status: 'List' as const, statuses: ['List' as const] };
+  await mountPage({ ...withFactory, items: [...sample.items, captured] });
+  const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+  await settle(() => useItemDialogStore.getState().open('work-1'));
+  expect(text($('[data-item-dialog] [data-slot="modal-header"] h2'))).toBe('Playback stalls');
+  await settle(() => $<HTMLButtonElement>('[data-attach-ticket="work-1"]')!.click());
+  respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }], error: null });
+  await enter(field('attach-query'), 'seek');
+  await settle(() => field<HTMLButtonElement>('attach-search').click());
+  const attached = { ...captured, number: 8, url: 'https://github.com/maddec01/lar-server/issues/8' };
+  respond({ error: null, board: { ...withFactory, items: [...sample.items, attached] } });
+  await settle(() => ticketButton(8).click());
+  expect(calls('/api/attach-ticket')).toEqual([['/api/attach-ticket', { itemId: 'work-1', number: 8 }]]);
+  expect(text($('[data-item-dialog] [data-slot="modal-header"] h2'))).toBe('#8 Playback stalls');
+  expect($('[data-attach-ticket]'), 'an item with a ticket has none to attach').toBeNull();
 });

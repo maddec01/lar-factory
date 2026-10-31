@@ -3,7 +3,7 @@
 // board's CSS adds the coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
-import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
+import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { PrReadiness } from './pr-readiness.tsx';
@@ -24,15 +24,15 @@ export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoCon
 }
 
 export function TitleLink({ item, className = 'title' }: { item: Item; className?: string }) {
-  const text = <><span className="ref">{ref(item)}</span> {item.title}</>;
+  const text = <>{item.number ? <><span className="ref">{ref(item)}</span> </> : null}{item.title}</>;
   return item.url
     ? <a className={className} href={item.url} target="_blank" rel="noopener">{text}</a>
     : <span className={className}>{text}</span>;
 }
 
-/** An item's title with its issue number before it, muted, the way the board lists every item. */
+/** An item's title with its ticket's number before it, muted, the way the board lists every item; captured work has no number. */
 export function ItemTitle({ item }: { item: Item }) {
-  return <><span className="font-normal text-(--muted-foreground) tabular-nums">{ref(item)}</span> {item.title}</>;
+  return <>{item.number ? <><span className="font-normal text-(--muted-foreground) tabular-nums">{ref(item)}</span> </> : null}{item.title}</>;
 }
 
 /** Azure's type, state and assignee as one compact line beside factory status. */
@@ -62,8 +62,8 @@ export function SliceBar({ item, thick }: { item: Item; thick?: boolean }) {
   if (!item.slices.length) return null;
   return (
     <ol className="m-0 flex list-none gap-[2px] p-0">
-      {item.slices.map((s) => (
-        <li key={s.number} title={`#${s.number} ${s.title}`} className={`${thick ? 'h-1.5' : 'h-1'} flex-1 rounded-full ${s.progress === 'active' ? 'status-pulse' : ''}`}
+      {item.slices.map((s, i) => (
+        <li key={i} title={itemName(s)} className={`${thick ? 'h-1.5' : 'h-1'} flex-1 rounded-full ${s.progress === 'active' ? 'status-pulse' : ''}`}
           style={{ background: s.progress === 'waiting' ? 'var(--soft)' : SLICE_COLOR[s.progress] }} />
       ))}
     </ol>
@@ -84,10 +84,10 @@ export function SliceMark({ progress }: { progress: SliceProgress }) {
 export function SliceList({ item }: { item: Item }) {
   return (
     <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-0.5 p-0">
-      {item.slices.map((s) => (
-        <li key={s.number} className="flex items-start gap-2 rounded-md px-2 py-1 text-[13px] hover:bg-(--soft)">
+      {item.slices.map((s, i) => (
+        <li key={i} className="flex items-start gap-2 rounded-md px-2 py-1 text-[13px] hover:bg-(--soft)">
           <span className="mt-0.5"><SliceMark progress={s.progress} /></span>
-          <span className="shrink-0 text-(--muted-foreground) tabular-nums">#{s.number}</span>
+          {s.number > 0 && <span className="shrink-0 text-(--muted-foreground) tabular-nums">#{s.number}</span>}
           <span className={`min-w-0 flex-1 wrap-anywhere ${s.progress === 'done' ? 'text-(--muted-foreground) line-through' : s.progress === 'active' ? 'font-medium' : ''}`}>{s.title}</span>
           <span className="mt-px shrink-0 text-[11px] text-(--muted-foreground)">{s.progress}</span>
         </li>

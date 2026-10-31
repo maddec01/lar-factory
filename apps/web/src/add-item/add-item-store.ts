@@ -1,11 +1,14 @@
-// The Add item dialog: whether it's open, the draft's values, the submission's phase, the attempt it sends to
-// /api/items, and what the dialog says about it. A retry resends the same attempt, so the server finishes one
-// issue rather than making two. A created item closes the dialog and shows the Added toast.
+// The Add item dialog: whether it's open, which pane it shows, the draft's values, the submission's phase, the attempt
+// it sends to /api/items, and what the dialog says about it. A retry resends the same attempt, so the server records
+// the work once. Recorded work closes the dialog and shows the Added toast; so does a picked ticket, unless its record
+// was on the board already, which then opens in the item dialog.
 
 import { create } from 'zustand';
-import { onAzure, validateDraft, writeHeaders } from '@lar-factory/shared';
-import type { CreationResult, ItemDraft, BoardData } from '@lar-factory/shared';
+import { validateDraft, writeHeaders } from '@lar-factory/shared';
+import type { CreationResult, ItemDraft, BoardData, TicketMatch } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
+import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
+import { postAction, receive } from '../items/card-actions.ts';
 import { notify } from '../notices/notices.tsx';
 
 interface Attempt { requestId: string; session: string | undefined; draft: ItemDraft }
@@ -14,17 +17,20 @@ type Submission =
   | { phase: 'editing' | 'complete' }
   | { phase: 'pending' | 'retry' | 'uncertain'; attempt: Attempt };
 
-export interface ResultMessage { text: string; url?: string; label?: string }
+/** New work, or a ticket to pick. */
+export type AddItemPane = 'new' | 'pick';
 
 /** The form's values as last edited, which a closed dialog keeps for the next opening. */
-export interface DraftValues { repo: string; kind: string; title: string; description: string; labels: string[]; onlyFor: boolean }
+export interface DraftValues { repo: string; kind: string; title: string; description: string }
 
 interface AddItemState {
   open: boolean;
-  /** Opens or closes the dialog; opening after a created item starts a new draft. */
+  /** Opens or closes the dialog; opening after recorded work starts a new draft. */
   setOpen: (open: boolean) => void;
+  pane: AddItemPane;
+  setPane: (pane: AddItemPane) => void;
   submission: Submission;
-  message: ResultMessage;
+  message: string;
   /** Counts the drafts started, so the form clears its fields for a new one. */
   draft: number;
   /** The draft's values once edited; null for a new draft. The form starts from them, so a draft survives a close. */
@@ -33,40 +39,32 @@ interface AddItemState {
   keep: (values: DraftValues) => void;
   /** Validates and sends the form's values, or resends the attempt that needs a retry. */
   submit: (values: unknown) => Promise<void>;
+  /** Picks a ticket of `repo` into a work record: the error to show, or null once the dialog closed. */
+  pick: (repo: string, ticket: TicketMatch) => Promise<string | null>;
   /** Clears what the dialog says while the draft is being edited. */
   edit: () => void;
   /** Starts a new draft. */
   reset: () => void;
 }
 
-/** What a new item in `repo` is: an issue on GitHub, a work item on Azure DevOps. */
-export const itemNoun = (repo: string | undefined): string => repo && onAzure(repo) ? 'work item' : 'issue';
-
-/** Where to look for an item the board can't confirm it created: the repository's issues, or its Azure DevOps project's work items. */
-function itemsLink(repo: string): Pick<ResultMessage, 'url' | 'label'> {
-  if (!onAzure(repo)) return { url: `https://github.com/${repo}/issues`, label: 'Check repository issues' };
-  const [organization, project] = repo.split('/');
-  return { url: `https://dev.azure.com/${organization}/${project}/_workitems`, label: "Check the project's work items" };
-}
-
-const idle = (): ResultMessage => ({
-  text: useBoardStore.getState().data.capture?.enabled === false ? 'Adding items is disabled in sample mode.' : '',
-});
+const idle = (): string => (useBoardStore.getState().data.capture?.enabled === false ? 'Adding items is disabled in sample mode.' : '');
 
 export const useAddItemStore = create<AddItemState>()((set, get) => ({
   open: false,
+  pane: 'new',
   submission: { phase: 'editing' },
   message: idle(),
   draft: 0,
   values: null,
   keep: (values) => set({ values }),
   setOpen: (open) => {
-    // A finished item is done with; the next opening starts a new one.
+    // Recorded work is done with; the next opening starts a new draft.
     if (open && get().submission.phase === 'complete') get().reset();
     set({ open });
   },
+  setPane: (pane) => set({ pane }),
   edit: () => {
-    if (get().submission.phase === 'editing') set({ message: { text: '' } });
+    if (get().submission.phase === 'editing') set({ message: '' });
   },
   reset: () => set((state) => ({ submission: { phase: 'editing' }, message: idle(), draft: state.draft + 1, values: null })),
   submit: async (values) => {
@@ -80,19 +78,16 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
       try {
         attempt = { requestId: crypto.randomUUID(), session: data.capture?.session, draft: validateDraft(values, data.repos) };
       } catch (err) {
-        set({ message: { text: (err as Error).message } });
+        set({ message: (err as Error).message });
         return;
       }
     }
-    const noun = itemNoun(attempt.draft.repo);
-    set({ submission: { phase: 'pending', attempt },
-      message: { text: retrying ? 'Finishing this submission…' : `Creating the ${noun} and adding it to List…` } });
+    set({ submission: { phase: 'pending', attempt }, message: retrying ? 'Finishing this submission…' : 'Adding it to List…' });
     // A poll that started before this write would bring older data than its answer.
     useBoardStore.getState().beginWrite();
     try {
-      const response = await fetch('/api/items', { method: 'POST', headers: writeHeaders(),
-        body: JSON.stringify(attempt) });
-      const result = await response.json() as CreationResult & { board?: BoardData };
+      const response = await fetch('/api/items', { method: 'POST', headers: writeHeaders(), body: JSON.stringify(attempt) });
+      const result = await response.json() as CreationResult & { uncertain?: boolean; board?: BoardData };
       if (result.item && result.board) {
         useBoardStore.getState().beginWrite();
         useBoardStore.getState().receive(result.board);
@@ -100,18 +95,21 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
         set({ submission: { phase: 'complete' }, open: false });
         notify({ verb: 'Added', item: result.item, to: 'List' });
       } else {
-        const created = result.issueUrl ? `${noun[0]!.toUpperCase()}${noun.slice(1)} created. ` : '';
-        const retry = result.issueUrl ? ` Retry to finish this ${noun}.` : '';
-        const text = `${created}${result.error ?? `Request failed (HTTP ${response.status}).`}${retry}`;
-        set({
-          submission: result.uncertain ? { phase: 'uncertain', attempt } : result.issueUrl ? { phase: 'retry', attempt } : { phase: 'editing' },
-          message: result.issueUrl ? { text, url: result.issueUrl, label: `View created ${noun}` }
-            : result.uncertain ? { text, ...itemsLink(attempt.draft.repo) } : { text },
-        });
+        set({ submission: result.uncertain ? { phase: 'uncertain', attempt } : { phase: 'editing' },
+          message: result.error ?? `Request failed (HTTP ${response.status}).` });
       }
     } catch {
       set({ submission: { phase: 'retry', attempt },
-        message: { text: `The submission response was lost. Retry this submission to recover its result without creating another ${noun}.` } });
+        message: 'The submission response was lost. Retry this submission to recover its result without adding it twice.' });
     }
+  },
+  pick: async (repo, ticket) => {
+    const result = await postAction<CreationResult & { created: boolean }>('/api/pick-ticket', { repo, number: ticket.number });
+    if (!result.item) return result.error ?? 'Could not pick the ticket.';
+    receive(result);
+    set({ open: false });
+    if (result.created) notify({ verb: 'Added', item: result.item, to: 'List' });
+    else useItemDialogStore.getState().open(result.item.id);
+    return null;
   },
 }));

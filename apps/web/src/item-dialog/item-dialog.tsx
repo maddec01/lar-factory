@@ -4,7 +4,7 @@
 // people, labels, dates, milestone or iteration and area, then its work record's brief, map or decision, and its ticket's
 // description and comments as ticket context; work with no ticket shows its record alone. The work it waits on,
 // sub-tickets and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the
-// comments. The board's fields show at
+// comments. Work that needs you shows why above the meta area, with the board's choices for it. The board's fields show at
 // once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
 // item, and the one action the item's status asks for, with Back to List and Abandon at its left. Its description has
 // Edit, and its header an expand control that grows it, the open editor taking the height. Closing it with unsaved edits
@@ -21,6 +21,7 @@ import { kind } from '../buttons/button-kinds.tsx';
 import { EXPANDED, ExpandButton, useExpand } from '../expand-dialog/expand-dialog.tsx';
 import { AbandonButton, ActionError, BackToListButton, PickStatusButtons, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
+import { NeedsYou } from '../items/needs-you.tsx';
 import { PrLink } from '../items/pr-link.tsx';
 import { AgentWork, PrList, RepoTag } from '../items/item-parts.tsx';
 import { LinkButton } from '../items/link-button.tsx';
@@ -123,6 +124,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
               <span className="min-w-0 flex-1 font-medium text-(--warning-foreground)">{hint}</span>
             </div>
           )}
+          <NeedsYou item={item} data={data} />
           <ItemMeta item={item} read={read} now={now} />
           <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}>
             {record && <RecordText item={item} record={record} className="@min-[45rem]:col-start-1" />}

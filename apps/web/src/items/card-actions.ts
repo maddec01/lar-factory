@@ -1,9 +1,9 @@
-// Queue, Back to List, Keep, Abandon and the ticket close after it from the item dialog: each posts to the board server, shows the result, and keeps
+// Queue, Back to List, Keep, Abandon and the ticket close after it, and Needs you's choices, from the item dialog: each posts to the board server, shows the result, and keeps
 // keyboard focus in the dialog.
 
 import { flushSync } from 'react-dom';
 import { writeHeaders } from '@lar-factory/shared';
-import type { BoardData, Item, Status } from '@lar-factory/shared';
+import type { BoardData, Item, NeedsYouOffer, Status } from '@lar-factory/shared';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
@@ -140,4 +140,10 @@ export async function closeTicket(item: Item): Promise<void> {
     receive(result);
     notify(result.error ? { verb: 'Failed', item, ticket: true, message: result.error } : { verb: 'Closed', item });
   });
+}
+
+/** Acts on work that needs you as `choice` says, then clears its reason; a failure stays in the dialog. */
+export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOffer, 'set-aside'> | 'clear'): Promise<void> {
+  if (!ready(itemId, 'data-needs-you')) return;
+  await runAction(itemId, 'needs-you', { itemId, choice }, (result) => result.error ?? undefined);
 }

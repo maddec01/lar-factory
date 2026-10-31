@@ -1,6 +1,8 @@
-# shellcheck shell=bash
-# Sourced by status.sh and slice.sh: work_record <ref> prints the work record <ref>
-# names, as lar-work read prints it. <ref> is a work ID or a picked ticket:
+#!/bin/bash
+# Usage: work.sh <work ID | ticket>
+# Prints the work record <ref> names, as lar-work read prints it, so a factory thread
+# resolves its argument. status.sh and slice.sh source it for work_record <ref>, which
+# does the same. <ref> is a work ID or a picked ticket:
 # owner/repo#12, its GitHub issue URL, or an Azure work item URL. A ticket that no
 # record holds fails with how to pick it on the board. lar-work opens the
 # work-record database directly, so this works while the board app is closed.
@@ -37,3 +39,8 @@ work_record() {
     fi
     echo "$record"
 }
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    set -euo pipefail
+    work_record "${1:?usage: work.sh <work ID | owner/repo#n | issue or Azure work item URL>}"
+fi

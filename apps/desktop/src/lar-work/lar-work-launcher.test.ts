@@ -50,7 +50,7 @@ describe("the bundled command", () => {
     assert.strictEqual(help.status, 0, help.stderr);
     assert.include(help.stdout, "Usage: lar-work");
 
-    const created = run(["create", "--repository", "maddec01/lar", "--kind", "build", "--data-dir", dataDir]);
+    const created = run(["create", "--title", "A build", "--repository", "maddec01/lar", "--kind", "build", "--data-dir", dataDir]);
     assert.strictEqual(created.status, 0, created.stderr);
     const { workId } = JSON.parse(created.stdout);
     const read = run(["read", workId, "--data-dir", dataDir]);
@@ -66,7 +66,7 @@ describe("install", () => {
     assert.deepStrictEqual(install(home), { kind: "installed", path: LarWorkLauncher.launcherPath(home) });
 
     const dataDir = tempDir("lar-work-data-");
-    const created = runFrom(LarWorkLauncher.launcherPath(home), ["create", "--repository", "maddec01/lar", "--kind", "concept", "--data-dir", dataDir]);
+    const created = runFrom(LarWorkLauncher.launcherPath(home), ["create", "--title", "A concept", "--repository", "maddec01/lar", "--kind", "concept", "--data-dir", dataDir]);
     assert.strictEqual(created.status, 0, created.stderr);
     const read = runFrom(LarWorkLauncher.launcherPath(home), ["read", JSON.parse(created.stdout).workId, "--data-dir", dataDir]);
     assert.strictEqual(read.status, 0, read.stderr);

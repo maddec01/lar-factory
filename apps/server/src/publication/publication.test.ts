@@ -205,3 +205,22 @@ test('a superseded plan returns the fresh exact preview for approval', async () 
   expect((refused.body as PublicationBoardState).pending?.plan.approval).toBeNull();
   expect(create).not.toHaveBeenCalled();
 });
+
+test('a delivery plan from the shared journal uses its delivery engine when reopened on the board', async () => {
+  const { publicationPr } = await import('@lar-factory/work-records/publication-pr');
+  const { records, options, config, work, create } = await fixture();
+  records.attachTicket(work.workId, records.read(work.workId).revision, 'team/app#8');
+  records.setPullRequest(work.workId, records.read(work.workId).revision, 'team/app#12');
+  const github = vi.fn(async () => JSON.stringify({ body: 'Ship search.\n\nCloses team/app#8', base: { ref: 'main', repo: { default_branch: 'main' } } }));
+  const transport = { github, azure: vi.fn() };
+  const delivery = publicationPr(records, { settings: async () => config, transport });
+  const prepared = (await delivery.prepare(work.workId))!;
+  const board = createPublication(records, { ...options, prTransport: transport });
+  const opened = await state(board, 'open', { workId: work.workId });
+  expect(opened.pending!.plan.planId).toBe(prepared.planId);
+  const result = await state(board, 'approve', { workId: work.workId, planId: prepared.planId, revision: prepared.revision, digest: prepared.digest });
+  expect(result.pending!.successful).toHaveLength(1);
+  expect(result.pending!.reasons).toEqual([]);
+  expect(github).toHaveBeenCalled();
+  expect(create).not.toHaveBeenCalled();
+});

@@ -1,6 +1,8 @@
 import { isRecord, publicationConsents, type PublicationBoardState, type PublicationPlan } from '@lar-factory/shared';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { PublicationConflict, publicationEngine, type PreparePublication, type PublicationDependencies, type ReconciliationSelection } from '@lar-factory/work-records/publication';
+import { publicationPr } from '@lar-factory/work-records/publication-pr';
+import type { PublicationTransport } from '@lar-factory/work-records/publication-providers';
 import type { PublicationSettings } from '@lar-factory/shared/publication-settings';
 
 const invalid = (message: string): never => { throw new WorkRecordError('invalid', message); };
@@ -10,8 +12,12 @@ export function createPublication(records: WorkRecords | null, options: Publicat
   allowed: (repository: string) => boolean;
   settings: (repository: string) => Promise<PublicationSettings>;
   changed?: () => void;
+  prTransport?: PublicationTransport;
 }) {
   const engine = records ? publicationEngine(records, options) : null;
+  const delivery = records ? publicationPr(records, { settings: options.settings, transport: options.prTransport }) : null;
+  const isDelivery = (plan: PublicationPlan) => plan.operations.some((operation) => operation.kind === 'pr-closing-reference');
+  const inspect = (workId: string, planId: string) => (isDelivery(records!.publication(workId, planId)) ? delivery! : engine!).inspect(workId, planId);
   const running = new Set<string>();
   function attachReceipts(plan: PublicationPlan) {
     let changed = false;
@@ -36,7 +42,7 @@ export function createPublication(records: WorkRecords | null, options: Publicat
     });
     for (const source of sources) if (!options.allowed(source.repository)) invalid(`${source.repository} is not an onboarded publication destination.`);
     const settings = await Promise.all([...new Set(sources.map((source) => source.repository))].map(options.settings));
-    let pending = plan ? await engine!.inspect(workId, plan.planId) : null;
+    let pending = plan ? await inspect(workId, plan.planId) : null;
     if (pending?.next) {
       const ticket = plan!.tickets.find((ticket) => ticket.workId === pending!.next!.ticketWorkId)!;
       const setup = settings.find((config) => config.setup.repo === ticket.destination.repository)!.setup;
@@ -76,18 +82,22 @@ export function createPublication(records: WorkRecords | null, options: Publicat
           if (plan.supersededBy) return { status: 409, body: { ...await read(workId), error: 'This publication changed. Review its replacement before approval.' } };
           if (action === 'approve' || action === 'resume') {
             if (input.revision !== plan.revision || input.digest !== plan.digest) return { status: 409, body: { ...await read(workId), error: 'The plan changed. Inspect and approve its exact preview again.' } };
-            const inspected = await engine.inspect(workId, planId);
+            const inspected = await inspect(workId, planId);
             const reasons = inspected.reasons.filter((reason) => reason !== 'The exact publication content needs approval.');
             if (reasons.length) return { status: 409, body: { ...await read(workId), error: reasons.join(' ') } };
             if (action === 'approve') records.approvePublication(workId, planId, plan.revision, plan.digest, 'board user');
             else if (!plan.approval) invalid('Approve the exact publication preview before continuing.');
-            await engine.execute(workId, planId, 'board user');
+            await (isDelivery(plan) ? delivery! : engine).execute(workId, planId, 'board user');
           } else if (action === 'fallback') {
             if (input.delivery !== undefined && input.delivery !== 'comment' && input.delivery !== 'handover') invalid('Choose comment or handover fallback.');
             await engine.fallback(workId, planId, input.delivery as 'comment' | 'handover' | undefined);
           } else if (action === 'reconcile') {
             if (input.selections !== undefined && (!Array.isArray(input.selections) || input.selections.some((value) => !isRecord(value)
               || typeof value.operationId !== 'string' || (value.ticket !== undefined && typeof value.ticket !== 'string') || (value.commentId !== undefined && typeof value.commentId !== 'string')))) invalid('Send explicit recovery selections.');
+            if (isDelivery(plan)) {
+              await delivery!.reconcile(workId, planId, 'board user');
+              return { status: 200, body: await read(workId) };
+            }
             const reconciled = await engine.reconcile(workId, planId, 'board user', input.selections as ReconciliationSelection[] | undefined);
             return { status: 200, body: { ...await read(workId), candidates: reconciled.candidates } };
           } else if (action !== 'inspect') return { status: 404, body: { error: 'Unknown publication action.' } };

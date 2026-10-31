@@ -531,7 +531,7 @@ function workRecords(database: Database): WorkRecords {
   const replacedRows = db.prepare('SELECT * FROM replaced_pull_requests WHERE work_id = ? ORDER BY rowid');
   const nextQueueOrder = db.prepare('SELECT coalesce(max(queue_order), 0) + 1 AS next FROM work_records WHERE repository = ?');
   const dependencies = dependencyRecords(database, (workId) => bump.run(new Date().toISOString(), workId));
-  const { treeConflict, kindConflict, retentionReason, ...dependencyChanges } = dependencies;
+  const { treeConflict, kindConflict, retentionReason, recordDependencyTicket, ...dependencyChanges } = dependencies;
   const unmetIds = db.prepare('SELECT b.dependency_id, d.owner FROM dependency_blocks b JOIN dependencies d ON d.dependency_id = b.dependency_id WHERE b.build_id = ? AND d.met_at IS NULL ORDER BY b.rowid');
   const unmet = (workId: string) => unmetIds.all(workId).map((row) => ({ dependencyId: String(row.dependency_id), owner: String(row.owner) }));
 
@@ -643,7 +643,7 @@ function workRecords(database: Database): WorkRecords {
   });
 
   return {
-    ...publicationRecords(database, (workId) => fromRow(find(workId))),
+    ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
     ...dependencyChanges,
     create: (record) => database.write(() => insert(record)),
     read: (workId) => database.read(() => fromRow(find(workId))),

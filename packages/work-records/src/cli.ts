@@ -156,6 +156,14 @@ Publication
                                     domainNotes and relatedTickets (HTTP URLs).
                                     Lists may be empty when nothing applies. Use team
                                     language; private bodies are never copied blindly.
+                                    Optional dependencies list requests for the teams
+                                    that own the work's Dependencies: dependencyId,
+                                    title, change, reason, contract and checks. A
+                                    request is created on the owner's repository, or
+                                    commented on its ticket when delivery says
+                                    comment. Once posted, later plans give revised
+                                    handover text only. Builds a Dependency blocks
+                                    link to its ticket as blocked by it.
   inspect-publication <work-id> --plan P
                                     Recheck sources, settings and pending provider text.
   execute-publication <work-id> --plan P --identity I

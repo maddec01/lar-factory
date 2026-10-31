@@ -3,6 +3,8 @@ import * as NodePath from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
 
+import { locateCommand } from "../src/lar-work/lar-work-launcher.ts";
+import { larWorkPack } from "../vite.config.ts";
 import {
   buildEnvironment,
   createBuildConfig,
@@ -59,11 +61,15 @@ describe("createBuildConfig", () => {
     ]);
   });
 
-  it("ships the bundled lar-work command outside app.asar, where its launcher runs it", () => {
+  it("ships the lar-work command built from packages/work-records outside app.asar, where its launcher runs it", () => {
     const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
 
-    expect(config.extraResources).toContainEqual({ from: "dist-electron/work-records", to: "work-records" });
-    expect(config.files).toContain("!dist-electron/work-records/**/*");
+    expect(larWorkPack.entry).toEqual({ "lar-work": "../../packages/work-records/src/cli.ts" });
+    expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, "..", larWorkPack.entry["lar-work"]))).toBe(true);
+    expect(config.extraResources).toContainEqual({ from: larWorkPack.outDir, to: "work-records" });
+    expect(config.files).toContain(`!${larWorkPack.outDir}/**/*`);
+    // Packaged, Electron's app path is Resources/app.asar.
+    expect(locateCommand("/App/Contents/Resources/app.asar", true)).toBe("/App/Contents/Resources/work-records/lar-work.mjs");
   });
 
   it("ships the bundled server and the built page where the server finds them", () => {

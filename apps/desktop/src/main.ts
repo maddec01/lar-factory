@@ -19,6 +19,7 @@ import { HttpClient } from "effect/http";
 import * as Electron from "electron";
 
 import type { DriftChoice } from "@lar-factory/shared";
+import { boardDataDir } from "@lar-factory/shared/data-dir";
 
 import * as BoardServer from "./board-server/BoardServer.ts";
 import * as BoardSupervisor from "./board-server/BoardSupervisor.ts";
@@ -359,6 +360,8 @@ const program = Effect.gen(function* () {
     home: SkillInstall.installHome(NodeOS.homedir(), process.env),
     executablePath: process.execPath,
     commandFile: LarWorkLauncher.locateCommand(Electron.app.getAppPath(), Electron.app.isPackaged),
+    // The folder the board server, which runs with `env`, keeps the database in.
+    dataDir: boardDataDir(undefined, env),
   });
   yield* quitRequested;
 }).pipe(

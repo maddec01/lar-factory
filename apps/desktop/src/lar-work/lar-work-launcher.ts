@@ -1,6 +1,7 @@
 // Installs the launcher that puts the bundled lar-work command on the user's PATH, so shaping and build threads run
 // it from any repository or worktree while the app is closed. The launcher runs the bundle with the app's own Node
-// (ELECTRON_RUN_AS_NODE=1, as BoardServer runs the server), so it needs no system Node.
+// (ELECTRON_RUN_AS_NODE=1, as BoardServer runs the server), so it needs no system Node. It names the board's data
+// folder, so a thread whose agent runs with another HOME, as a T3 provider instance can, opens the board's database.
 //
 // It goes in ~/.local/bin/lar-work: a folder in the user's home, so the app writes it without an admin prompt, and
 // the one Claude Code installs its own command into, so threads usually have it on their PATH already. /usr/local/bin
@@ -13,6 +14,8 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
 import * as Effect from "effect/Effect";
+
+import { DATA_DIR_ENV } from "@lar-factory/shared/data-dir";
 
 /** The launcher's second line, which tells a launcher the app wrote from a file it didn't. */
 const MARK = "# Installed by the Lar Factory app, which rewrites this file on launch.";
@@ -33,6 +36,8 @@ export interface InstallInput {
   /** The app's binary, which runs the command in Node mode. */
   readonly executablePath: string;
   readonly commandFile: string;
+  /** The board server's data folder, which holds the work-record database. */
+  readonly dataDir: string;
 }
 
 /** "installed" wrote the launcher, "unchanged" found it current, "foreign" found a file the app didn't install. */
@@ -47,7 +52,7 @@ const launcherScript = (input: InstallInput) =>
   [
     "#!/bin/sh",
     MARK,
-    `ELECTRON_RUN_AS_NODE=1 exec ${shellQuote(input.executablePath)} --disable-warning=ExperimentalWarning ${shellQuote(input.commandFile)} "$@"`,
+    `${DATA_DIR_ENV}=${shellQuote(input.dataDir)} ELECTRON_RUN_AS_NODE=1 exec ${shellQuote(input.executablePath)} --disable-warning=ExperimentalWarning ${shellQuote(input.commandFile)} "$@"`,
     "",
   ].join("\n");
 

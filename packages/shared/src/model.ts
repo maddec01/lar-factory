@@ -128,14 +128,26 @@ export const blockerRef = (item: Pick<Item, 'repo'>, b: Pick<Blocker, 'number' |
 export const openBlockerRefs = (item: Pick<Item, 'blockers' | 'repo'>, short = false): string[] =>
   openBlockers(item).map((b) => blockerRef(item, b, short));
 
+/**
+ * The blockers in the two groups the board names, `blockers` defaulting to the item's open ones: the work that must
+ * complete, as `#12, #13`, and the Dependencies the user must mark met, as `the Dependency on acme/auth`. Each says
+ * whether it names more than one; a group with none is null.
+ */
+export function blockerGroups(item: Pick<Item, 'blockers' | 'repo'>, blockers = openBlockers(item)) {
+  const work = blockers.filter((b) => !b.dependency).map((b) => blockerRef(item, b));
+  const owners = blockers.flatMap((b) => (b.dependency ? [b.dependency.owner] : []));
+  return {
+    work: work.length ? { names: work.join(', '), many: work.length > 1 } : null,
+    dependencies: owners.length ? { names: `the ${owners.length > 1 ? 'Dependencies' : 'Dependency'} on ${owners.join(', ')}`, many: owners.length > 1 } : null,
+  };
+}
+
 /** Why the item can't start while a blocker's work isn't complete or a Dependency isn't met, naming each; null once none is left. */
 export function blockedText(item: Pick<Item, 'blockers' | 'repo'>): string | null {
-  const open = openBlockers(item);
-  const work = open.filter((b) => !b.dependency).map((b) => blockerRef(item, b));
-  const owners = open.flatMap((b) => (b.dependency ? [b.dependency.owner] : []));
+  const { work, dependencies } = blockerGroups(item);
   const parts = [
-    ...work.length ? [`${work.join(', ')} until ${work.length > 1 ? 'they complete' : 'it completes'}`] : [],
-    ...owners.length ? [`the ${owners.length > 1 ? 'Dependencies' : 'Dependency'} on ${owners.join(', ')} until you mark ${owners.length > 1 ? 'them' : 'it'} met`] : [],
+    ...work ? [`${work.names} until ${work.many ? 'they complete' : 'it completes'}`] : [],
+    ...dependencies ? [`${dependencies.names} until you mark ${dependencies.many ? 'them' : 'it'} met`] : [],
   ];
   return parts.length ? `Blocked by ${parts.join(', and by ')}` : null;
 }

@@ -5,7 +5,7 @@
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
-import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
+import type { BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
 const C200 = 'I_sample09';
@@ -340,6 +340,15 @@ test('a part waiting on another, with no Start of its own, says what it waits on
 test('a part with no thread yet says when its thread starts', async () => {
   await mountPage(withItem('I_sample13', { threads: [] }));
   expect(text(step('I_sample13').querySelector('[data-part-meta]')!.lastElementChild)).toBe('Thread starts when #202 is done');
+});
+
+test('a part held by a Dependency says its thread starts once you mark the Dependency met', async () => {
+  const dependency: DependencyHold = { dependencyId: 'dep-1', revision: 1, owner: 'server team', need: 'An export endpoint', ticket: null, evidence: '',
+    met: null, needsReview: false, observation: null };
+  await mountPage(withItem('I_sample13', { threads: [], blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' },
+    { number: 0, repo: 'server team', state: 'open', title: dependency.need, dependency }] }));
+  expect(text(step('I_sample13').querySelector('[data-part-meta]')!.lastElementChild))
+    .toBe('Thread starts when #202 is done and you mark the Dependency on server team met');
 });
 
 test('a Ready part with completed prerequisites offers Start without blocking wording', async () => {

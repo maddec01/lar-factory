@@ -849,6 +849,8 @@ export interface RepositorySetup {
   sources: Record<SharedSetting, SettingSource>;
   /** Repository config's defaults as last read while usable, which removing an override brings back. */
   shared: SharedRepositorySettings;
+  /** The other repositories the user connected it to, on this Mac only; the board's reads always fill it. */
+  connections?: string[];
 }
 
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
@@ -900,6 +902,8 @@ export interface OnboardingChoices {
   skills?: string[];
   /** The factory files of an earlier setup to drop through a PR. */
   drop?: FactoryFileKind[];
+  /** The other onboarded repositories ticked in the Connections step. */
+  connections?: string[];
 }
 
 /** What the user picked for a skill Clash: delete the skill's folder in the PR, or rename the skill. */

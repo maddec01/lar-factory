@@ -280,6 +280,8 @@ export interface Item {
   threads?: ItemThread[] | 'unavailable';
   /** Why its work record waits on the user, with what the board offers to do about it; absent when it doesn't wait. */
   needsYou?: { reason: string; offers: NeedsYouOffer[] };
+  /** Set on work off the board in Archive: set aside, which Restore brings back, or finished and hidden by retention. */
+  archived?: { setAside: boolean; hidden: boolean; ticketOpen: boolean };
 }
 
 /** What the board offers for work that needs you, besides clearing the reason once the user has checked. */
@@ -493,6 +495,22 @@ export interface BoardData {
   repositoryProjects?: Record<string, string | null>;
   /** The bundle's skills and checklists, read once at startup; empty when the server can't read them. */
   bundledSkills?: BundledSkill[];
+  /** The onboarded repositories' set-aside work and the finished work retention hides, in the order it was made. Absent in sample mode. */
+  archive?: Item[];
+  /** This Mac's retention setting and what its last timed delete did. Absent in sample mode. */
+  retention?: RetentionState;
+}
+
+/** When finished and set-aside work leaves the board, and when, if ever, it is deleted. */
+export interface RetentionState {
+  /** Days after work is finished or set aside before the board hides it. */
+  hideAfterDays: number;
+  /** Days after work is finished or set aside before it is deleted, or null to keep it. */
+  deleteAfterDays: number | null;
+  /** Why the board can't read the setting, which then keeps everything. */
+  problem?: string;
+  /** What the last timed delete did: the work it deleted, and the due work it kept with the reason. */
+  lastDelete?: { at: string; deleted: string[]; kept: { workId: string; reason: string }[] };
 }
 
 /** The hint for adding the repository's T3 project when a start can't find it, whatever the case; null when it can, or before the first read. */

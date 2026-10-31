@@ -5,8 +5,8 @@ import { afterEach, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { normalizeItems } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
-import { recordItems } from './record-items.ts';
+import { DEFAULT_RETENTION, openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
+import { archivedItems, recordItems } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -59,6 +59,25 @@ test('set-aside work and slices are no board items; a Done record is closed as d
   records.setParent(slice.workId, slice.revision, build.workId);
   const items = recordItems(records, [], [REPO]);
   assert.deepEqual(items.map((i) => [i.title, i.state, i.closedAs]), [['Build', 'closed', 'done']]);
+});
+
+test('finished work retention hides leaves the board for Archive, and set-aside work is in Archive until Restore brings it back', async () => {
+  const records = await open();
+  const finished = records.create({ title: 'Finished', repository: REPO, kind: 'build', status: 'Done' });
+  records.recordFinished(finished.workId, finished.revision);
+  const aside = records.importTicket({ title: 'Aside', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+  records.setAside(aside.workId, aside.revision);
+  const read = tickets([12, 'List']);
+  const week = new Set(records.hidden(DEFAULT_RETENTION).map((r) => r.workId));
+  assert.deepEqual(recordItems(records, read, [REPO], [], week).map((i) => i.title), ['Finished'], 'finished work stays for seven days');
+  const later = new Set(records.hidden(DEFAULT_RETENTION, new Date(Date.now() + 8 * 86_400_000)).map((r) => r.workId));
+  assert.deepEqual(recordItems(records, read, [REPO], [], later), []);
+  assert.deepEqual(archivedItems(records, read, [REPO], later).map((i) => [i.title, i.archived]), [
+    ['Finished', { setAside: false, hidden: true, ticketOpen: false }],
+    ['Aside', { setAside: true, hidden: true, ticketOpen: true }],
+  ]);
+  records.restore(aside.workId, records.read(aside.workId).revision);
+  assert.deepEqual(recordItems(records, read, [REPO], [], new Set(records.hidden(DEFAULT_RETENTION).map((r) => r.workId))).map((i) => i.title), ['Finished', 'Aside']);
 });
 
 test("a record's structure, blockers and slices come from records", async () => {

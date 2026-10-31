@@ -31,7 +31,7 @@ function needsYouOf(record: WorkRecord, previous: Observation | undefined, next:
   }
   const ticket = record.ticket!;
   if (next.state === 'not-found') {
-    return `Its ticket ${ticket} wasn't found in its provider, so the board set the work aside. Run \`lar-work restore ${record.workId}\` to bring it back.`;
+    return `Its ticket ${ticket} wasn't found in its provider, so the board set the work aside. Restore it from Settings › Archive once the ticket is back.`;
   }
   const done = record.status === 'Done' || record.finishedAt !== null;
   if (next.state === 'closed' && was !== 'closed' && !done) return `Its ticket ${ticket} closed in its provider. Set the work aside, or clear this to keep working.`;
@@ -64,12 +64,12 @@ async function observeOne(records: WorkRecords, workId: string, of: Observed, re
 }
 
 /**
- * Observes every active record of `repos`: its current PR until the work finishes, then its ticket, PR first so a merge
- * that closes the ticket finishes the work before the ticket's close is seen, OBSERVED_AT_ONCE records at a time. A
- * record a thread changes meanwhile is read again next time.
+ * Observes every active record of `repos`, less the work IDs in `hidden`, which retention hides: its current PR until
+ * the work finishes, then its ticket, PR first so a merge that closes the ticket finishes the work before the ticket's
+ * close is seen, OBSERVED_AT_ONCE records at a time. A record a thread changes meanwhile is read again next time.
  */
-export async function observeRecords(records: WorkRecords, repos: readonly string[], reads: ObserveReads): Promise<void> {
-  const active = records.list({}).filter((r) => !r.setAside && repos.some((repo) => sameRepo(repo, r.repository)));
+export async function observeRecords(records: WorkRecords, repos: readonly string[], reads: ObserveReads, hidden: ReadonlySet<string> = new Set()): Promise<void> {
+  const active = records.list({}).filter((r) => !r.setAside && !hidden.has(r.workId) && repos.some((repo) => sameRepo(repo, r.repository)));
   let next = 0;
   const observeNext = async (): Promise<void> => {
     for (; next < active.length;) await observeActive(active[next++]!);

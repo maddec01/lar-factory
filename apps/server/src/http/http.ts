@@ -10,6 +10,7 @@ import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
 import type { Capture } from '../items/capture.ts';
+import type { BoardRetention } from '../items/retention.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { ItemDetailsReader } from '../item-details/item-details.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -22,6 +23,7 @@ export interface HttpDeps {
   commands: ItemCommands;
   capture: Capture;
   startAfter: Pick<StartAfter, 'arm' | 'disarm'>;
+  retention: Pick<BoardRetention, 'save'>;
   page: BuiltPage;
   /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
   appSecret: string | null;
@@ -154,7 +156,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
   runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
   resetRepository, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
@@ -262,8 +264,18 @@ export function createBoardServer({ board, commands, capture, startAfter, page, 
     },
     '/api/close-ticket': {
       what: 'the abandoned item whose ticket to close', disabled: 'Closing tickets is disabled in sample mode.',
-      restarted: () => withBoard({ error: 'The board restarted, so it closes no ticket. Close it in its provider.' }),
       run: forItem('Name the item whose ticket to close.', (itemId) => commands.closeTicket(itemId)),
+    },
+    '/api/restore': {
+      what: 'the set-aside item to restore', disabled: 'Restoring is disabled in sample mode.',
+      run: forItem('Name the item to restore.', async (itemId) => commands.restore(itemId)),
+    },
+    '/api/retention': {
+      what: 'the retention setting', disabled: 'Retention is disabled in sample mode.',
+      async run(input) {
+        const saved = retention.save(input);
+        return { ...saved, body: { ...saved.body, board: board.snapshot() } };
+      },
     },
     '/api/needs-you': {
       what: 'the item that needs you and the choice', disabled: 'Acting on Needs you is disabled in sample mode.',
@@ -284,8 +296,9 @@ export function createBoardServer({ board, commands, capture, startAfter, page, 
     '/api/item-export': {
       what: 'the item to export', disabled: 'Exporting is disabled in sample mode.',
       run: forItem('Name the item to export.', async (itemId) => {
-        const item = board.snapshot().items.find((i) => i.id === itemId);
-        if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+        const { items, archive = [] } = board.snapshot();
+        const item = items.find((i) => i.id === itemId) ?? archive.find((i) => i.id === itemId);
+        if (!item) return { status: 404, body: { error: 'That item is not on the board or in Archive.' } };
         const exported = await itemDetails.exportMarkdown(item);
         return 'error' in exported ? { status: exported.status, body: { error: exported.error } } : { status: 200, body: { ...exported, error: null } };
       }),

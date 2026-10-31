@@ -43,18 +43,13 @@ function needsYouOf(records: WorkRecords, record: WorkRecord): Item['needsYou'] 
   return { reason: record.needsYou, offers: [...offers] };
 }
 
-/**
- * Every board item from the records of `repos`, in the records' order, with the ticket items an item source read. In
- * a repository of `unread`, whose source hasn't read yet, a record with a ticket waits until its ticket is read.
- */
-export function recordItems(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[] = []): Item[] {
+/** Maps records to board items with the ticket items an item source read. */
+function itemMapper(records: WorkRecords, tickets: readonly Item[]) {
   const byTicket = ticketsByReference(tickets);
   const ticketOf = (record: WorkRecord) => (record.ticket ? byTicket.get(record.ticket.toLowerCase()) : undefined);
   const ref = (record: WorkRecord): IssueRef => ({ number: ticketNumber(record.ticket), title: record.title, url: ticketOf(record)?.url ?? '',
     repo: record.repository, state: state(record) });
-
-  const waits = (record: WorkRecord) => record.ticket !== null && !ticketOf(record) && unread.some((repo) => sameRepo(repo, record.repository));
-  return records.list({}).filter((r) => !r.setAside && r.kind !== 'slice' && repos.some((repo) => sameRepo(repo, r.repository)) && !waits(r)).map((record) => {
+  const toItem = (record: WorkRecord): Item => {
     const ticket = ticketOf(record);
     const parent = record.parentId ? records.read(record.parentId) : null;
     const children = records.children(record.workId).filter((c) => !c.setAside);
@@ -93,5 +88,29 @@ export function recordItems(records: WorkRecords, tickets: readonly Item[], repo
     const needsYou = needsYouOf(records, record);
     if (needsYou) item.needsYou = needsYou;
     return item;
-  });
+  };
+  return { ticketOf, toItem };
+}
+
+/** Whether the record is work the board lists: not a slice, in one of `repos`. */
+const listed = (record: WorkRecord, repos: readonly string[]) => record.kind !== 'slice' && repos.some((repo) => sameRepo(repo, record.repository));
+
+/**
+ * Every board item from the records of `repos`, in the records' order, with the ticket items an item source read,
+ * less set-aside work and the work IDs in `hidden`, which retention hides. In a repository of `unread`, whose source
+ * hasn't read yet, a record with a ticket waits until its ticket is read.
+ */
+export function recordItems(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[] = [],
+  hidden: ReadonlySet<string> = new Set()): Item[] {
+  const { ticketOf, toItem } = itemMapper(records, tickets);
+  const waits = (record: WorkRecord) => record.ticket !== null && !ticketOf(record) && unread.some((repo) => sameRepo(repo, record.repository));
+  return records.list({}).filter((r) => !r.setAside && !hidden.has(r.workId) && listed(r, repos) && !waits(r)).map(toItem);
+}
+
+/** Archive's items: the set-aside work of `repos` and the work in `hidden`, in the records' order, each with its `archived` facts. */
+export function archivedItems(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], hidden: ReadonlySet<string>): Item[] {
+  const { ticketOf, toItem } = itemMapper(records, tickets);
+  return records.list({}).filter((r) => (r.setAside || hidden.has(r.workId)) && listed(r, repos)).map((record) => ({
+    ...toItem(record), archived: { setAside: record.setAside, hidden: hidden.has(record.workId), ticketOpen: ticketOf(record)?.state === 'open' },
+  }));
 }

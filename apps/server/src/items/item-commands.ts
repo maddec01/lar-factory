@@ -1,5 +1,5 @@
 // The commands the board's buttons send: queue, back to List, pick a status, start, start build, abandon, close an
-// abandoned item's ticket and act on Needs you.
+// abandoned item's ticket, restore set-aside work and act on Needs you.
 // Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
 // commands in flight are private here, so every rule about which command blocks which lives in this file.
 
@@ -55,8 +55,13 @@ export interface ItemCommands {
    * closeTicket closes that ticket after its own confirmation.
    */
   abandon(itemId: string): Reply;
-  /** Closes the ticket of work Abandon set aside during this board run: as not planned on GitHub, to Removed on Azure DevOps. */
+  /**
+   * Closes the open ticket of set-aside work in Archive: as not planned on GitHub, to Removed on Azure DevOps. A close
+   * that succeeded answers a second press without closing again.
+   */
   closeTicket(itemId: string): Promise<Reply>;
+  /** Brings set-aside work in Archive back to the board in the Status it had, unless retention hides it as finished. */
+  restore(itemId: string): Reply;
   /**
    * Acts on work that needs you as `choice` says, then clears its reason: `clear` alone, or one of its offers. Reopening
    * the PR reopens it in its provider, a replacement build moves the work to Ready for Start build, and reopening the
@@ -184,8 +189,6 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
   // Only settled starts can be retried; requests arriving during a retry share its pending result.
   const finishedStarts = new WeakMap<Promise<Start>, string>();
   const settled = new WeakSet<Promise<Start>>();
-  /** The items Abandon set aside this board run, as the board showed them, whose tickets closeTicket may close. */
-  const abandoned = new Map<string, Item>();
   /** Ticket closes by item id: one in flight, so a second press waits for it, or one that succeeded, kept. */
   const closing = new Map<string, Promise<string | null>>();
 
@@ -557,19 +560,34 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
           return withBoard(409, { error: (err as Error).message });
         }
       }
-      abandoned.set(itemId, item);
       board.remove(itemId);
       reread();
       return withBoard(200, { error: null });
     },
 
     async closeTicket(itemId) {
-      const item = abandoned.get(itemId);
-      if (!item) return withBoard(409, { error: "The board didn't set that work aside since it started, so it closes no ticket. Close it in its provider." });
+      const kept = closing.get(itemId);
+      if (kept) {
+        const error = await kept;
+        return withBoard(error ? 502 : 200, { error });
+      }
+      const item = board.snapshot().archive?.find((shown) => shown.id === itemId);
+      if (!item?.archived?.setAside) return withBoard(409, { error: "That work isn't set aside, so the board closes no ticket. Abandon it first." });
       if (!item.number) return withBoard(409, { error: 'That work has no ticket to close.' });
       if (item.abandonRefusal) return withBoard(409, { error: item.abandonRefusal });
-      const error = await (closing.get(itemId) ?? track(closing, itemId, items.abandon(item), (failed) => failed === null));
+      if (!item.archived.ticketOpen) return withBoard(409, { error: "The board doesn't see that work's ticket open, so it closes nothing. Check it in its provider." });
+      const error = await track(closing, itemId, items.abandon(item), (failed) => failed === null);
       return withBoard(error ? 502 : 200, { error });
+    },
+
+    restore(itemId) {
+      if (!records) return withBoard(409, { error: 'The board has no work records to change.' });
+      if (!board.snapshot().archive?.some((shown) => shown.id === itemId && shown.archived?.setAside)) {
+        return withBoard(409, { error: "That work isn't set aside in Archive, so there is nothing to restore." });
+      }
+      try { write(itemId, (revision) => records.restore(itemId, revision)); }
+      catch (err) { return withBoard(409, { error: (err as Error).message }); }
+      return withBoard(200, { error: null });
     },
 
     async resolveNeedsYou(itemId, choice) {

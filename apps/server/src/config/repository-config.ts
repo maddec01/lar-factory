@@ -102,8 +102,11 @@ export function isProgress(value: unknown): value is OnboardingProgress {
     && (value.reusesConfig === undefined || value.reusesConfig === true);
 }
 
-/** The repository list's entries as the file holds them, checked; none when there is no file. */
-function readListFile(file: string): { raw: Record<string, unknown> & { repositories: Record<string, unknown>[] }; list: OnboardedRepository[] } {
+/**
+ * The repository list's entries as the file holds them, checked; none when there is no file. An entry's local
+ * settings stay in `raw`, for repository-settings.ts to check.
+ */
+export function readListFile(file: string): { raw: Record<string, unknown> & { repositories: Record<string, unknown>[] }; list: OnboardedRepository[] } {
   if (!existsSync(file)) return { raw: { repositories: [] }, list: [] };
   const raw = readJson(file) as { repositories?: unknown } | null;
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || !Array.isArray(raw.repositories)) {
@@ -172,7 +175,7 @@ export function savePrClosed(repo: string, closed: boolean, dir = boardDataDir()
 const onboardingOf = (repo: string, dir: string) => readRepositoryList(dir).find((e) => sameRepo(e.repo, repo))?.onboarding;
 
 /**
- * Finishes an onboarding: its repository's entry keeps only the repository, in place of its onboarding entry and of
+ * Finishes an onboarding: its repository's entry keeps only the repository and its local settings, in place of its onboarding entry and of
  * the one saved under `replaces`, and is added when there is none. Throws for a repository that is onboarded already.
  */
 export function saveOnboarded(repo: string, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
@@ -190,7 +193,9 @@ function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: str
   if (onboarded) throw new Error(`${onboarded.repo} is onboarded already.`);
   const at = list.findIndex((e) => sameRepo(e.repo, repo));
   const dropped = (e: OnboardedRepository) => sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces);
-  const written: Record<string, unknown> = { ...entry };
+  // The entry keeps its local settings through every onboarding save.
+  const settings = at < 0 ? undefined : raw.repositories[at]!.settings;
+  const written: Record<string, unknown> = { ...entry, ...settings !== undefined && { settings } };
   const repositories = raw.repositories.flatMap((e, i) => i === at ? [written] : dropped(list[i]!) ? [] : [e]);
   if (at < 0) repositories.push(written);
   return writeListFile(dir, { ...raw, repositories });
@@ -223,7 +228,7 @@ export const stillResetting = (list: readonly OnboardedRepository[]) =>
   list.flatMap(({ repo, resetting }) => resetting ? [{ repo, prUrl: resetting.prUrl }] : []);
 
 /** Writes the repository list with `content` and returns its list. */
-function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {
+export function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {
   const file = join(dir, REPOSITORY_LIST_FILE);
   mkdirSync(dir, { recursive: true });
   // Written beside it, then renamed over it, so repo-config.sh never reads half a file.

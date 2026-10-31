@@ -52,3 +52,21 @@ it('searches and inspects Azure creation evidence without a public identity mark
   expect(calls[1]?.args).toContain('7.2-preview');
   expect(JSON.stringify(calls.map((c) => c.body))).not.toMatch(/workId|private|factory/);
 });
+
+it('appends to Azure raw HTML with a revision test and preserves colours, merged cells and format', async () => {
+  const azureTicket: PublicationTicket = { ...ticket, destination: { provider: 'azure', repository: 'contoso/project/app' } };
+  const target = { ticket: 'contoso/project/app#12', url: 'https://dev.azure.com/contoso/project/_workitems/edit/12' };
+  const html = '<table><tr><td colspan="2" style="color:#ff0000">Author &amp; team</td></tr></table>';
+  const patches: unknown[] = []; let stored = html;
+  const provider = publicationProvider({ github: async () => { throw new Error('Unexpected GitHub call.'); }, azure: async (args) => {
+    if (args.includes('workitemsbatch')) return JSON.stringify({ value: [{ id: 12, rev: 3, fields: { 'System.Description': stored }, multilineFieldsFormat: { 'System.Description': 'HTML' } }] });
+    const patch = JSON.parse(readFileSync(args[args.indexOf('--body') + 1]!.slice(1), 'utf8'));
+    patches.push(patch); stored = patch[1].value;
+    return '{}';
+  } });
+  const expected = await provider.readBody(azureTicket, target);
+  expect(expected).toMatchObject({ body: html, format: 'html', revision: 3, assigned: false, linkedPullRequest: false });
+  await provider.writeBody(azureTicket, target, { kind: 'append', operationId: 'append', ticketWorkId: 'private', dependsOn: [],
+    content: '<h2>Refined description</h2><pre>New content</pre>', location: { kind: 'body', start: html.length, end: html.length }, expectedText: '', expected });
+  expect(patches).toEqual([[{ op: 'test', path: '/rev', value: 3 }, { op: 'add', path: '/fields/System.Description', value: html + '<h2>Refined description</h2><pre>New content</pre>' }]]);
+});

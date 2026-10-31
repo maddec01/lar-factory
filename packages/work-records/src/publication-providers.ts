@@ -2,15 +2,24 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { decodePart, isRecord, type PublicationTicket } from '@lar-factory/shared';
+import { decodePart, isRecord, type AzureBodyField, type PublicationBodySnapshot, type PublicationOperation, type PublicationTicket } from '@lar-factory/shared';
 import { providerCommand } from '@lar-factory/shared/provider-command';
 
 export interface TicketReceipt { ticket: string; url: string }
 export interface InspectedTicket extends TicketReceipt { title: string; body: string; type: string | null; labels: string[] }
 type Relationship = 'child' | 'blocked-by';
 /** Transport errors are uncertain unless the provider explicitly rejects the write before applying it. */
-export class PublicationRefused extends Error {}
+export class PublicationRefused extends Error {
+  readonly alternatives?: { delivery: 'comment' | 'handover'; content: string }[];
+  constructor(message: string, content?: string) {
+    super(message);
+    if (content !== undefined) this.alternatives = [{ delivery: 'comment', content }, { delivery: 'handover', content }];
+  }
+}
 export interface PublicationProvider {
+  readBody(ticket: PublicationTicket, target: TicketReceipt, field?: AzureBodyField): Promise<PublicationBodySnapshot>;
+  writeBody(ticket: PublicationTicket, target: TicketReceipt, operation: Extract<PublicationOperation, { kind: 'append' | 'replace' }>): Promise<void>;
+  replaceComment(ticket: PublicationTicket, target: TicketReceipt, operation: Extract<PublicationOperation, { kind: 'replace-comment' }>): Promise<void>;
   capability(ticket: PublicationTicket, related: PublicationTicket, relationship: Relationship): Promise<{ available: true } | { available: false; reason: string }>;
   create(ticket: PublicationTicket): Promise<TicketReceipt>;
   relate(ticket: PublicationTicket, target: TicketReceipt, related: PublicationTicket, other: TicketReceipt, relationship: Relationship): Promise<void>;
@@ -54,7 +63,7 @@ export function publicationProvider(transport: PublicationTransport = {
     try { return JSON.parse(await transport.github(['api', '--method', method, path, ...(body === undefined ? [] : ['--input', '-'])], body === undefined ? undefined : JSON.stringify(body))); }
     catch (error) {
       // A timeout, 5xx, 429, duplicate conflict or unreadable response may have applied a write.
-      if (method !== 'GET' && /HTTP (?:400|401|403|404|410|422)\b/.test(message(error))) throw new PublicationRefused(message(error));
+      if (method !== 'GET' && /HTTP (?:400|401|403|404|410|412|422)\b/.test(message(error))) throw new PublicationRefused(message(error));
       throw error;
     }
   };
@@ -63,14 +72,14 @@ export function publicationProvider(transport: PublicationTransport = {
     const [organization, project] = ticket.destination.repository.split('/');
     return { organization: organization!, project: decodePart(project!), flags: ['--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json'] };
   };
-  const invoke = async (ticket: PublicationTicket, resource: string, route: string[] = [], body?: unknown, version = '7.1', more: string[] = []) => {
+  const invoke = async (ticket: PublicationTicket, resource: string, route: string[] = [], body?: unknown, version = '7.1', more: string[] = [], method = body === undefined ? 'GET' : 'POST') => {
     const { project, flags } = scope(ticket);
     try {
       const run = (file?: string) => transport.azure(['devops', 'invoke', '--area', 'wit', '--resource', resource, '--route-parameters', `project=${project}`, ...route,
-        '--http-method', body === undefined ? 'GET' : 'POST', ...(file ? ['--in-file', file] : []), ...more, '--api-version', version, ...flags]);
+        '--http-method', method, ...(file ? ['--in-file', file] : []), ...more, '--api-version', version, ...flags]);
       return JSON.parse(body === undefined ? await run() : await withFile(body, run)) as unknown;
     } catch (error) {
-      if (body !== undefined && /TF237111|HTTP (?:400|401|403|404|410|422)\b|permissions? to save work items/i.test(message(error))) throw new PublicationRefused(message(error));
+      if (body !== undefined && /TF237111|HTTP (?:400|401|403|404|410|412|422)\b|permissions? to save work items/i.test(message(error))) throw new PublicationRefused(message(error));
       throw error;
     }
   };
@@ -94,7 +103,76 @@ export function publicationProvider(transport: PublicationTransport = {
   const azureRelation = (relationship: Relationship) => relationship === 'child' ? 'System.LinkTypes.Hierarchy-Reverse' : 'System.LinkTypes.Dependency-Reverse';
   const relationshipPath = (ticket: PublicationTicket, target: TicketReceipt, related: PublicationTicket, other: TicketReceipt, relationship: Relationship) =>
     relationship === 'child' ? `repos/${related.destination.repository}/issues/${numberOf(other)}/sub_issues` : `repos/${ticket.destination.repository}/issues/${numberOf(target)}/dependencies/blocked_by`;
-  return {
+  const readBody = async (ticket: PublicationTicket, target: TicketReceipt, requestedField?: AzureBodyField): Promise<PublicationBodySnapshot> => {
+    if (ticket.destination.provider === 'github') {
+      const timeline = await githubList(`repos/${ticket.destination.repository}/issues/${numberOf(target)}/timeline?per_page=100`);
+      const raw = object(await github(`repos/${ticket.destination.repository}/issues/${numberOf(target)}`));
+      githubReceipt(ticket, raw);
+      return { body: raw.body === null ? '' : text(raw.body), format: 'markdown', assigned: list(raw.assignees).length > 0,
+        linkedPullRequest: timeline.some((event) => isRecord(object(event).source) && isRecord(object(object(event).source).issue)
+          && isRecord(object(object(object(event).source).issue).pull_request)) };
+    }
+    const raw = await azureRaw(ticket, target); const fields = object(raw.fields);
+    const hasContent = (value: unknown) => typeof value === 'string' && (Boolean(value.replace(/<[^>]*>|&nbsp;|&#160;/g, '').trim()) || /<(?:img|video|iframe)\b/i.test(value));
+    const field = requestedField ?? (hasContent(fields['System.Description']) || (!hasContent(fields['Microsoft.VSTS.TCM.ReproSteps']) && fields['System.WorkItemType'] !== 'Bug')
+      ? 'System.Description' : 'Microsoft.VSTS.TCM.ReproSteps');
+    const formats = raw.multilineFieldsFormat === undefined ? {} : object(raw.multilineFieldsFormat);
+    // Azure's legacy description is HTML when no explicit format is recorded.
+    const format = typeof formats[field] === 'string' ? formats[field].toLowerCase() : formats[field];
+    return { field, body: fields[field] === undefined || fields[field] === null ? '' : text(fields[field]),
+      format: format === 'markdown' ? 'markdown' : format === undefined || format === 'html' ? 'html' : 'unsupported',
+      revision: idOf(raw.rev), assigned: Boolean(fields['System.AssignedTo']),
+      linkedPullRequest: (raw.relations === undefined ? [] : list(raw.relations)).some((r) => object(r).rel === 'ArtifactLink'
+        && typeof object(r).url === 'string' && /Git\/PullRequestId\//i.test(String(object(r).url))) };
+  };
+  const adapter: PublicationProvider = {
+    readBody,
+    writeBody: async (ticket, target, operation) => {
+      const current = await readBody(ticket, target, operation.location.field);
+      if (!operation.expected || JSON.stringify(current) !== JSON.stringify(operation.expected)) throw new PublicationRefused('The raw description, format, assignment or linked PR changed. Prepare and approve a new plan.');
+      const { start, end } = operation.location;
+      if (current.format === 'unsupported') throw new PublicationRefused('The raw description format cannot be preserved. Choose a comment or markdown handover.');
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || end > current.body.length || current.body.slice(start, end) !== operation.expectedText) throw new PublicationRefused('The publication boundary changed. Resolve the text and approve a new plan.');
+      const body = current.body.slice(0, start) + operation.content + current.body.slice(end);
+      if (ticket.destination.provider === 'github') {
+        await github(`repos/${ticket.destination.repository}/issues/${numberOf(target)}`, 'PATCH', { body });
+      } else {
+        const patch = [{ op: 'test', path: '/rev', value: current.revision }, { op: 'add', path: `/fields/${current.field}`, value: body }];
+        const { organization, project } = scope(ticket);
+        try {
+          await withFile(patch, (file) => transport.azure(['rest', '--method', 'patch', '--resource', '499b84ac-1321-427f-aa17-267ca6975798',
+            '--url', `https://dev.azure.com/${organization}/${encodeURIComponent(project)}/_apis/wit/workitems/${numberOf(target)}?api-version=7.2-preview.3`,
+            '--headers', 'Content-Type=application/json-patch+json', '--body', `@${file}`, '--output', 'json']));
+        } catch (error) {
+          if (/TF26071|TF237111|HTTP (?:400|401|403|404|412|422)\b|permissions? to save work items/i.test(message(error))) throw new PublicationRefused(message(error));
+          throw error;
+        }
+      }
+      try {
+        const stored = await readBody(ticket, target, current.field);
+        if (stored.body !== body || stored.format !== current.format) throw new Error('The stored raw text or format differs.');
+      } catch (error) {
+        // Even a permission refusal here follows an accepted PATCH. It cannot establish that the write failed.
+        throw new Error(`Provider accepted the description write but exact raw preservation could not be confirmed: ${message(error)} Reconcile before any retry.`);
+      }
+    },
+    replaceComment: async (ticket, target, operation) => {
+      const id = operation.location.commentId;
+      if (!/^[1-9]\d*$/.test(id)) throw new PublicationRefused('The provider comment ID is invalid.');
+      if (ticket.destination.provider === 'github') {
+        // Read through this ticket's comment collection to verify both ownership and exact text.
+        const comments = await githubList(`repos/${ticket.destination.repository}/issues/${numberOf(target)}/comments?per_page=100`);
+        const current = comments.find((c) => String(object(c).id) === id);
+        if (!current || object(current).body !== operation.expectedText) throw new PublicationRefused('The published comment changed or is missing. Resolve it and approve a new plan.');
+        await github(`repos/${ticket.destination.repository}/issues/comments/${id}`, 'PATCH', { body: operation.content });
+      } else {
+        const current = object(await invoke(ticket, 'comments', [`workItemId=${numberOf(target)}`, `commentId=${id}`], undefined, '7.1-preview'));
+        if (current.isDeleted === true || current.text !== operation.expectedText) throw new PublicationRefused('The published comment changed or is missing. Resolve it and approve a new plan.');
+        await invoke(ticket, 'comments', [`workItemId=${numberOf(target)}`, `commentId=${id}`], { text: operation.content }, '7.1-preview', ['--query-parameters', 'format=markdown'], 'PATCH');
+      }
+      const stored = (await adapter.findComments(ticket, target)).find((c) => c.commentId === id);
+      if (stored?.content !== operation.content) throw new Error('Provider accepted the comment replacement but exact stored text could not be confirmed. Reconcile before any retry.');
+    },
     capability: async (ticket, related, relationship) => {
       if (ticket.destination.provider !== related.destination.provider) return { available: false, reason: 'The providers cannot create a native relationship between these tickets.' };
       if (ticket.destination.provider === 'github') return { available: true };
@@ -144,7 +222,10 @@ export function publicationProvider(transport: PublicationTransport = {
       const raw = object(ticket.destination.provider === 'github'
         ? await github(`repos/${ticket.destination.repository}/issues/${numberOf(target)}/comments`, 'POST', { body: content })
         : await invoke(ticket, 'comments', [`workItemId=${numberOf(target)}`], { text: content }, '7.1-preview', ['--query-parameters', 'format=markdown']));
-      return String(idOf(raw.id));
+      const commentId = String(idOf(raw.id));
+      const stored = (await adapter.findComments(ticket, target)).find((c) => c.commentId === commentId);
+      if (stored?.content !== content) throw new Error('Provider accepted the comment but exact stored text could not be confirmed. Reconcile before any retry.');
+      return commentId;
     },
     search: async (ticket, claimedAt) => {
       if (ticket.destination.provider === 'github') {
@@ -179,7 +260,7 @@ export function publicationProvider(transport: PublicationTransport = {
       do {
         const raw = object(await invoke(ticket, 'comments', [`workItemId=${numberOf(target)}`], undefined, '7.1-preview',
           ['--query-parameters', '$top=200', 'order=desc', ...(continuation ? [`continuationToken=${continuation}`] : [])]));
-        comments.push(...list(raw.comments).map((c) => ({ commentId: String(idOf(object(c).id)), content: text(object(c).text) })));
+        comments.push(...list(raw.comments).filter((c) => object(c).isDeleted !== true).map((c) => ({ commentId: String(idOf(object(c).id)), content: text(object(c).text) })));
         continuation = raw.continuationToken === undefined || raw.continuationToken === null ? undefined : String(raw.continuationToken);
         if (continuation && seen.has(continuation)) throw new Error('Azure repeated a comment continuation token; inspection is incomplete.');
         if (continuation) seen.add(continuation);
@@ -198,4 +279,5 @@ export function publicationProvider(transport: PublicationTransport = {
         && String(object(r).url).toLowerCase() === apiUrl(related, other).toLowerCase());
     },
   };
+  return adapter;
 }

@@ -53,3 +53,11 @@ test('every port taken gives null and leaves the server closed', async (t) => {
   assert.equal(await listenOnFreePort(server, '127.0.0.1', [port]), null);
   assert.equal(server.listening, false);
 });
+
+test('port zero binds an OS-assigned port and returns the actual listening port', async (t) => {
+  const server = createServer();
+  t.onTestFinished(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  const port = await listenOnFreePort(server, '127.0.0.1', [0]);
+  assert.ok(port && port > 0);
+  assert.equal((server.address() as { port: number }).port, port);
+});

@@ -719,10 +719,10 @@ async function exitWith(message: string): Promise<never> {
   process.exit(1);
 }
 
-// BOARD_PORT pins the port; otherwise take the first free one, so several boards can run.
+// BOARD_PORT pins the port; zero lets the OS assign it. Otherwise try the normal board range.
 const pinned = process.env.BOARD_PORT;
-if (pinned && !(/^\d+$/.test(pinned) && Number(pinned) >= 1 && Number(pinned) <= 65535)) {
-  await exitWith(`BOARD_PORT=${pinned} is not a port; choose one from 1 to 65535 or unset it`);
+if (pinned && !(/^\d+$/.test(pinned) && Number(pinned) >= 0 && Number(pinned) <= 65535)) {
+  await exitWith(`BOARD_PORT=${pinned} is not a port; choose one from 0 to 65535 or unset it`);
 }
 const ports = pinned ? [Number(pinned)] : BOARD_PORTS;
 const port = await listenOnFreePort(server, HOST, ports) ?? await exitWith(ports.length === 1

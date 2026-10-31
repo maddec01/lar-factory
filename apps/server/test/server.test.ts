@@ -396,3 +396,9 @@ test('a live board records its port for status.sh and removes the record on exit
   await board.stop();
   assert.deepEqual(readdirSync(records), []);
 });
+
+test('BOARD_PORT zero binds an OS-assigned port and serves the board at its logged URL', async (t) => {
+  const board = await startBoard(t, {}, true, false, { BOARD_PORT: '0' });
+  assert.ok(Number(new URL(board.url).port) > 0);
+  assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
+});

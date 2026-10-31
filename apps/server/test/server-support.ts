@@ -185,7 +185,8 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const listed = [...issues, ...Object.values(repoIssues).flat().map((content): RawItem => ({ id: content!.id, updatedAt: content!.updatedAt, content }))];
   const workIds = recorded ? await recordIssues(home, listed, { builds: keys(builds), active: keys(active), blocked: keys(blocked) }, threads)
     : new Map<string, string>();
-  const port = 'BOARD_PORT' in env ? env.BOARD_PORT : String(await freePort());
+  // Bind atomically in the child. Probing and releasing a free port before spawning races other tests.
+  const port = 'BOARD_PORT' in env ? env.BOARD_PORT : '0';
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', new URL('./project-discovery-fixture.ts', import.meta.url).href,
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),

@@ -21,6 +21,15 @@ export class ExecutionRecovery {
     for (const key of ['runs', 'attempts', 'nodes', 'subagents', 'providerSessions', 'providerThreads', 'providerTurns', 'runtimeRequests', 'messages']) {
       if (!Array.isArray(projection[key]) || !projection[key].every(isRecord)) throw new Error('Invalid execution facts');
     }
+    if (sequence === this.sequence && this.retained) {
+      for (const [key, incoming] of Object.entries(projection)) {
+        const previous = this.retained.projection[key as keyof typeof this.retained.projection];
+        if (!Array.isArray(incoming) || !Array.isArray(previous)) continue;
+        const facts = new Map(previous.map(fact => [typeof fact.id === 'string' ? fact.id : JSON.stringify(fact), fact]));
+        for (const fact of incoming) facts.set(typeof fact.id === 'string' ? fact.id : JSON.stringify(fact), fact);
+        projection[key] = [...facts.values()];
+      }
+    }
     this.sequence = sequence;
     this.retained = { projection: { ...projection, thread: projection.thread, messages: projection.messages as Record<string, unknown>[] }, observedAt: new Date(now).toISOString() };
     return true;

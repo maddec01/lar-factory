@@ -9,5 +9,7 @@ it('retains thread facts across stale snapshots and accepts equal-sequence fragm
   expect(recovery.observation()?.observedAt).toBe('1970-01-01T00:00:00.000Z');
   expect(recovery.accept({ kind: 'snapshot', snapshotSequence: 4, projection: { ...projection, messages: [{ id: 'message-1' }] } }, 2)).toBe(true);
   expect(recovery.observation()?.projection.messages).toEqual([{ id: 'message-1' }]);
+  recovery.accept({ kind: 'snapshot', snapshotSequence: 4, projection: { ...projection, messages: [{ id: 'message-2' }] } }, 3);
+  expect(recovery.observation()?.projection.messages).toEqual([{ id: 'message-1' }, { id: 'message-2' }]);
   expect(() => recovery.accept({ kind: 'snapshot', snapshotSequence: 5, projection: { ...projection, thread: { id: 'other' } } })).toThrow();
 });

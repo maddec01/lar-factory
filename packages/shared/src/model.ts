@@ -51,6 +51,8 @@ export interface Pipeline {
 export type MergeState = 'can merge' | 'checking' | 'blocked' | 'conflicts';
 
 export interface LinkedPr extends Pipeline {
+  /** Azure source commit observed with this PR. */
+  sourceRevision?: string;
   number: number;
   url: string;
   /** A merged PR is `merged`, not `closed`. */

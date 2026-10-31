@@ -6,6 +6,7 @@ import { Check, GitPullRequest } from 'lucide-react';
 import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { PrReadiness } from './pr-readiness.tsx';
 import { STATUS_COLOR } from './status-glyph.tsx';
 
 const REPO_TONES = 8;
@@ -116,6 +117,7 @@ export function PrList({ item }: { item: Item }) {
           <GitPullRequest className="size-4 shrink-0 text-(--st-done)" />
           <a href={pr.url} target="_blank" rel="noopener" className="min-w-0 flex-1 basis-24 font-medium wrap-anywhere hover:underline">{prLabel(pr)}</a>
           <ChecksBadge checks={pr.checks} />
+          <PrReadiness item={item} pr={pr} />
         </li>
       ))}
     </ul>

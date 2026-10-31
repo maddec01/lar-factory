@@ -182,6 +182,8 @@ export interface EndToEndCheck {
 
 /** What a concept is for and where its shaping stands. */
 export interface ConceptMap {
+  /** Mermaid source from the Map section. */
+  diagram?: string;
   /** The first paragraph under Destination. */
   destination: string;
   decisions: string[];
@@ -266,6 +268,9 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 }
 
 export interface Item {
+  sync?: { state: 'saved' | 'pending' | 'error' | 'conflict'; message?: string };
+  /** Public tracker structure, also present before this machine queues the issue. */
+  tracker?: import('./tracker-structure.ts').TrackerStructure;
   /** Eligibility from the durable journal, independent of Status. Absent for decisions and slices. */
   publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'> & { recoverable?: boolean };
   /**
@@ -884,6 +889,11 @@ export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket'
 
 export type RepositoryOperation = (typeof REPOSITORY_OPERATIONS)[number];
 
+/** GitHub discovers immutable structure comments through a label; Azure uses revision-checked descriptions. */
+export function structureSyncOperations(repo: string): readonly RepositoryOperation[] {
+  return onAzure(repo) ? ['publish-ticket', 'edit-ticket', 'comment-ticket'] : ['publish-ticket', 'comment-ticket', 'tag-ticket'];
+}
+
 /** The writes first publication offers separately from onboarding. */
 export const PUBLISHING_OPERATIONS: readonly RepositoryOperation[] = ['publish-ticket', 'tag-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket'];
 
@@ -899,6 +909,8 @@ export type OperationAccess = 'unverified' | 'allowed' | 'refused';
  */
 export interface RepositorySetup {
   repo: string;
+  /** Save concepts and relationships on the tracker; optional for existing setups. */
+  structureSync?: boolean;
   /** The T3 project its threads start in, once onboarding picked one. */
   projectId?: string;
   role: string;

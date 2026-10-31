@@ -62,6 +62,8 @@ export function parseConceptMap(body: string): ConceptMap {
     decisions: bullets(found.get('decisions so far')),
     fog: bullets(found.get('fog')),
   };
+  const diagram = /```mermaid\s*\n([\s\S]*?)```/.exec((found.get('map') ?? []).join('\n'))?.[1]?.trim();
+  if (diagram) map.diagram = diagram;
   const check = found.get('end-to-end check');
   if (check) map.check = endToEndCheck(check);
   const dependencies = bullets(unfenced(found.get('map')));

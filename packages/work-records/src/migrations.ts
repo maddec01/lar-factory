@@ -248,4 +248,93 @@ export const MIGRATIONS: readonly Migration[] = [
       PRIMARY KEY (dependency_id, subject)
     ) STRICT;
   `),
+  (db) => {
+    db.exec(`
+      CREATE TABLE tracker_identities (source_key TEXT PRIMARY KEY, work_id TEXT NOT NULL UNIQUE REFERENCES work_records(work_id) ON DELETE CASCADE) STRICT;
+      CREATE TABLE tracker_creations (source_key TEXT PRIMARY KEY) STRICT;
+      CREATE TABLE tracker_sequence (value INTEGER NOT NULL) STRICT;
+      INSERT INTO tracker_sequence VALUES (0);
+      CREATE TABLE tracker_outbox (work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, sequence INTEGER NOT NULL) STRICT;
+      CREATE TABLE tracker_sync (
+        work_id TEXT PRIMARY KEY, local_digest TEXT, remote_digest TEXT,
+        error TEXT, conflict INTEGER NOT NULL DEFAULT 0
+      ) STRICT;
+    `);
+    for (const table of ['work_records', 'bodies', 'blockers', 'review_rounds', 'review_axes', 'review_findings',
+      'replaced_pull_requests', 'brief_gates', 'dependencies']) {
+      for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
+        if (table === 'work_records' && action === 'DELETE') continue;
+        const row = action === 'DELETE' ? 'OLD' : 'NEW';
+        db.exec(`CREATE TRIGGER tracker_${table}_${action.toLowerCase()} AFTER ${action} ON ${table} BEGIN
+          UPDATE tracker_sequence SET value = value + 1;
+          INSERT INTO tracker_outbox (work_id, sequence) VALUES (${row}.work_id, (SELECT value FROM tracker_sequence))
+          ON CONFLICT(work_id) DO UPDATE SET sequence = excluded.sequence;
+        END;`);
+      }
+    }
+    for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
+      const row = action === 'DELETE' ? 'OLD' : 'NEW';
+      db.exec(`CREATE TRIGGER tracker_dependency_blocks_${action.toLowerCase()} AFTER ${action} ON dependency_blocks BEGIN
+        UPDATE tracker_sequence SET value = value + 1;
+        INSERT INTO tracker_outbox (work_id, sequence) SELECT work_id, (SELECT value FROM tracker_sequence)
+        FROM dependencies WHERE dependency_id = ${row}.dependency_id
+        ON CONFLICT(work_id) DO UPDATE SET sequence = excluded.sequence;
+      END;`);
+    }
+    db.exec('INSERT INTO tracker_outbox SELECT work_id, 0 FROM work_records');
+  },
+  (db) => {
+    // An owner issue can leave a dependency graph without its own record changing.
+    // Keep that old member due so the next drain retires its reverse projection.
+    for(const action of ['INSERT','UPDATE','DELETE']){
+      const tickets=action==='INSERT' ? 'lower(NEW.ticket)' : action==='DELETE' ? 'lower(OLD.ticket)' : 'lower(OLD.ticket),lower(NEW.ticket)';
+      db.exec(`CREATE TRIGGER tracker_dependency_members_${action.toLowerCase()} AFTER ${action} ON dependencies BEGIN
+        UPDATE tracker_sequence SET value=value+1;
+        INSERT INTO tracker_outbox(work_id,sequence)
+          SELECT work_id,(SELECT value FROM tracker_sequence) FROM work_records WHERE lower(ticket) IN (${tickets})
+          ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
+      END;`);
+    }
+  },
+  (db) => {
+    // Forward repair for checkouts that opened the first structural-cache schema
+    // before its reservation table and final outbox triggers were present.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS tracker_creations(source_key TEXT PRIMARY KEY) STRICT;
+      CREATE TABLE IF NOT EXISTS tracker_identities(source_key TEXT PRIMARY KEY,work_id TEXT NOT NULL UNIQUE REFERENCES work_records(work_id) ON DELETE CASCADE) STRICT;
+      CREATE TABLE tracker_outbox_upgrade(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE,sequence INTEGER NOT NULL) STRICT;
+      INSERT INTO tracker_outbox_upgrade SELECT o.work_id,o.sequence FROM tracker_outbox o JOIN work_records r ON r.work_id=o.work_id;
+    `);
+    for(const trigger of db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'tracker_%'").all()){
+      db.exec(`DROP TRIGGER "${String(trigger.name).replaceAll('"','""')}"`);
+    }
+    db.exec('DROP TABLE tracker_outbox; ALTER TABLE tracker_outbox_upgrade RENAME TO tracker_outbox');
+    for(const table of ['work_records','bodies','blockers','review_rounds','review_axes','review_findings','replaced_pull_requests','brief_gates','dependencies']){
+      for(const action of ['INSERT','UPDATE','DELETE']){
+        if(table==='work_records'&&action==='DELETE')continue;
+        const row=action==='DELETE'?'OLD':'NEW';
+        db.exec(`CREATE TRIGGER tracker_${table}_${action.toLowerCase()} AFTER ${action} ON ${table} BEGIN
+          UPDATE tracker_sequence SET value=value+1;
+          INSERT INTO tracker_outbox(work_id,sequence) VALUES (${row}.work_id,(SELECT value FROM tracker_sequence))
+          ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
+        END;`);
+      }
+    }
+    for(const action of ['INSERT','UPDATE','DELETE']){
+      const row=action==='DELETE'?'OLD':'NEW';
+      db.exec(`CREATE TRIGGER tracker_dependency_blocks_${action.toLowerCase()} AFTER ${action} ON dependency_blocks BEGIN
+        UPDATE tracker_sequence SET value=value+1;
+        INSERT INTO tracker_outbox(work_id,sequence) SELECT work_id,(SELECT value FROM tracker_sequence) FROM dependencies WHERE dependency_id=${row}.dependency_id
+        ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
+      END;`);
+      const tickets=action==='INSERT'?'lower(NEW.ticket)':action==='DELETE'?'lower(OLD.ticket)':'lower(OLD.ticket),lower(NEW.ticket)';
+      db.exec(`CREATE TRIGGER tracker_dependency_members_${action.toLowerCase()} AFTER ${action} ON dependencies BEGIN
+        UPDATE tracker_sequence SET value=value+1;
+        INSERT INTO tracker_outbox(work_id,sequence) SELECT work_id,(SELECT value FROM tracker_sequence) FROM work_records WHERE lower(ticket) IN (${tickets})
+        ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
+      END;`);
+    }
+    db.exec(`INSERT OR IGNORE INTO tracker_sync(work_id,local_digest,remote_digest,error,conflict)
+      SELECT i.source_key,s.local_digest,s.remote_digest,s.error,s.conflict FROM tracker_sync s JOIN tracker_identities i ON i.work_id=s.work_id WHERE i.source_key<>s.work_id`);
+  },
 ];

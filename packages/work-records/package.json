@@ -9,7 +9,8 @@
     "./publication": "./src/publication-engine.ts",
     "./publication-pr": "./src/publication-pr.ts",
     "./publication-providers": "./src/publication-providers.ts",
-    "./export": "./src/export.ts"
+    "./export": "./src/export.ts",
+    "./tracker-sync": "./src/tracker-sync.ts"
   },
   "bin": {
     "lar-work": "./src/cli.ts"

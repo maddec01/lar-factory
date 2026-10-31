@@ -17,6 +17,7 @@ type PausingSetting = RepositorySetup['paused'][number];
 
 /** One repository's local settings as its list entry keeps them. */
 interface LocalSettings {
+  structureSync?: boolean;
   projectId?: string;
   /** The shared settings the user set on this Mac, each in place of Repository config's. */
   overrides?: SharedRepositorySettings;
@@ -81,7 +82,8 @@ function isLocalSettings(value: unknown, azure: boolean): value is LocalSettings
   if (!isRecord(value)) return false;
   const shared = (v: unknown) => v === undefined || isRecord(v) && sharedProblemOf(v, azure) === null;
   const accepted = value.accepted;
-  return (value.projectId === undefined || typeof value.projectId === 'string') && shared(value.overrides) && shared(value.shared)
+  return (value.structureSync === undefined || typeof value.structureSync === 'boolean')
+    && (value.projectId === undefined || typeof value.projectId === 'string') && shared(value.overrides) && shared(value.shared)
     && (value.access === undefined || isAccess(value.access)) && (value.consent === undefined || Array.isArray(value.consent) && value.consent.every(isOperation))
     && (value.sharedProblem === undefined || typeof value.sharedProblem === 'string')
     && (value.dismissedUpdate === undefined || typeof value.dismissedUpdate === 'number')
@@ -108,7 +110,7 @@ function setupOf(repo: string, local: LocalSettings, connections: string[] = [])
   const domainDocs = pick('domainDocs') ?? { kind: 'private' as const };
   const changed = (key: PausingSetting, now: unknown) => local.accepted !== undefined && JSON.stringify(local.accepted[key]) !== JSON.stringify(now);
   return {
-    repo, ...local.projectId !== undefined && { projectId: local.projectId },
+    repo, ...local.structureSync !== undefined && { structureSync: local.structureSync }, ...local.projectId !== undefined && { projectId: local.projectId },
     role: pick('role') ?? '', itemSource, labels: pick('labels') ?? [], domainDocs, skills: pick('skills') ?? [],
     ...effectiveVocabulary(local.overrides?.vocabulary, local.shared?.vocabulary),
     access: Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, accessOf(op)])) as RepositorySetup['access'],

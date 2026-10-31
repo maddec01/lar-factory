@@ -43,7 +43,7 @@ test('a map body parses into its destination, decisions, fog and end-to-end chec
 
 test('sections between and after the ones the board reads are skipped', () => {
   const map = parseConceptMap('## Destination\nThere.\n\n## Notes\n- not a decision\n\n## Decisions so far\n- One\n\n## Map\n```mermaid\nflowchart\n- not fog\n```\n\n## Fog\n- Two\n');
-  assert.deepEqual(map, { destination: 'There.', decisions: ['One'], fog: ['Two'] });
+  assert.deepEqual(map, { destination: 'There.', decisions: ['One'], fog: ['Two'], diagram: 'flowchart\n- not fog' });
 });
 
 test('a missing section parses to empty, and a map with no end-to-end check has none', () => {
@@ -71,6 +71,6 @@ test('a bullet that only says none is no fog and no decision', () => {
 test("the Map's bullets outside its flowchart are the unmet Dependencies holding the concept's builds", () => {
   const body = '## Map\n```mermaid\nflowchart\n- not a Dependency\nb1[Resume] --> dep1{{Relay API}}\n```\n- A resume endpoint, from team/relay, blocks Resume\n* none\n\n## Fog\n- Two\n';
   assert.deepEqual(parseConceptMap(body), {
-    destination: '', decisions: [], fog: ['Two'], dependencies: ['A resume endpoint, from team/relay, blocks Resume'],
+    destination: '', decisions: [], fog: ['Two'], diagram: 'flowchart\n- not a Dependency\nb1[Resume] --> dep1{{Relay API}}', dependencies: ['A resume endpoint, from team/relay, blocks Resume'],
   });
 });

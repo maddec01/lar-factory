@@ -30,7 +30,7 @@ export interface HttpDeps {
   /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
   reauthorizeT3?(): Promise<void>;
   recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
-  /** Reads one item's details and older comments for the item dialog. */
+  /** Reads one item's details and older comments for the item dialog, and exports its record's markdown. */
   itemDetails: ItemDetailsReader;
   /**
    * Reads the source listing the item at `url` now, or once more after the running read; with no url, loads the
@@ -271,6 +271,15 @@ export function createBoardServer({ board, commands, capture, startAfter, page, 
         const refused = await itemDetails.saveDescription(item, { body, ...bodyField !== undefined && { bodyField }, ...revision !== undefined && { revision: revision as number } });
         return refused ? { status: refused.status, body: { error: refused.error } } : { status: 200, body: { error: null } };
       },
+    },
+    '/api/item-export': {
+      what: 'the item to export', disabled: 'Exporting is disabled in sample mode.',
+      run: forItem('Name the item to export.', async (itemId) => {
+        const item = board.snapshot().items.find((i) => i.id === itemId);
+        if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+        const exported = await itemDetails.exportMarkdown(item);
+        return 'error' in exported ? { status: exported.status, body: { error: exported.error } } : { status: 200, body: { ...exported, error: null } };
+      }),
     },
     '/api/onboarding/projects': {
       what: 'the folder to add', disabled: 'Sample mode onboards no repository.',

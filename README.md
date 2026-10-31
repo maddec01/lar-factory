@@ -108,11 +108,12 @@ choose Replace for Drift. At launch and before Start build it reports Drift, a l
 skill you edited or deleted, and asks before replacing it.
 
 The app also installs `~/.local/bin/lar-work`, a launcher for the `lar-work`
-command, which reads and changes work records with the board app closed. Each
-launch points it at the app again, so it follows the app when you move or update
-it. If a file the app didn't write is already at that path, the app leaves it and
-logs a warning. Put `~/.local/bin` on your PATH if it isn't there yet. Run
-`lar-work --help` for its commands. The board doesn't read work records yet.
+command, which reads and changes work records from any folder, with the board app
+open or closed. Each launch points it at the app again, so it follows the app when
+you move or update it. If a file the app didn't write is already at that path, the
+app leaves it and logs a warning. Put `~/.local/bin` on your PATH if it isn't there
+yet. Run `lar-work --help` for its commands. The board lists only work records, so
+work that `lar-work` creates or moves shows on the board too.
 
 If you run `npx skills add` yourself, always pass `-a`: `-y` without it installs into
 every agent the CLI knows.

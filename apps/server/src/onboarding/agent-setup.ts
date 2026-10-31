@@ -54,8 +54,9 @@ authority, and later ${ticket} edits never change it.
 
 Resolve a thread's argument, a work ID or a ${ticket}, with the lar skill's
 \`shared/scripts/work.sh <ref>\`. For a ${ticket} no record holds, it says to pick
-it on the board first. The lar skill's \`shared/issue-tracker/work-records.md\`
-covers picking, Status, structure and completion.
+it on the board first. Read and change a record with the \`lar-work\` command.
+The lar skill's \`shared/issue-tracker/work-records.md\` covers picking, Status,
+structure and completion.
 
 A build delivers one standalone PR and needs no ${ticket}. Its recorded PR merging
 makes it Done.

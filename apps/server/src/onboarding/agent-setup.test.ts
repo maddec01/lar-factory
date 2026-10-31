@@ -87,7 +87,8 @@ for (const provider of ['GitHub', 'Azure DevOps'] as const) {
     const text = agentSetupWrites({}, provider).map(({ content }) => content).join('\n');
     assert.match(text, /lar-shape/);
     assert.match(text, /lar-build/);
-    assert.doesNotMatch(text, /lar-work|domain-modeling|to-tickets/);
+    assert.match(text, /`lar-work`/);
+    assert.doesNotMatch(text, /domain-modeling|to-tickets/);
   });
 
   test(`${provider} guidance keeps factory progress off tickets`, () => {

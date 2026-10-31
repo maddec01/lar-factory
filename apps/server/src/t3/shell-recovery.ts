@@ -1,5 +1,12 @@
 import { isRecord } from '@lar-factory/shared';
 
+/** Marked shell snapshots update project metadata, not the project/thread membership. */
+export function projectMetadataSnapshot(value: Record<string, unknown>): boolean {
+  if (value.resolvedRepositoryIdentityRoots === undefined) return false;
+  if (!Array.isArray(value.resolvedRepositoryIdentityRoots) || !value.resolvedRepositoryIdentityRoots.every(root => typeof root === 'string')) throw Error('Invalid project metadata roots');
+  return true;
+}
+
 /** T3 97e35bcf23e4, contracts/src/orchestrationV2.ts:2184-2223.
  * Shell sequence numbers cover thread changes too; project-only gaps are valid.
  */
@@ -22,10 +29,16 @@ export class ShellRecovery {
     if (snapshot) {
       if (!Array.isArray(snapshot.projects)) throw new Error('Invalid shell snapshot');
       const projects = snapshot.projects.map(project);
-      changed = JSON.stringify([...this.projects.values()]) !== JSON.stringify(projects);
+      const metadata = projectMetadataSnapshot(value);
+      if (metadata && this.sequence < 0) throw Error('Full shell snapshot required');
+      const next = metadata ? new Map(this.projects) : new Map<string, typeof projects[number]>();
+      for (const item of projects) if (!metadata || next.has(item.id)) next.set(item.id, item);
+      changed = JSON.stringify([...this.projects.values()]) !== JSON.stringify([...next.values()]);
       // The first empty snapshot still establishes an authoritative observation.
       if (this.sequence < 0) changed = true;
-      this.projects = new Map(projects.map(item => [item.id, item]));
+      this.projects = next;
+      // Metadata does not cover intervening membership events in the live stream.
+      if (metadata) return changed;
     } else if (value.kind === 'project.updated') {
       const next = project(value.project);
       this.projects.set(next.id, next);

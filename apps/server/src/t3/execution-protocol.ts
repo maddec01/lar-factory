@@ -1,4 +1,5 @@
 import { isRecord } from '@lar-factory/shared';
+import { projectMetadataSnapshot } from './shell-recovery.ts';
 import { ExecutionRecovery } from './execution-recovery.ts';
 import { type ProjectProtocol, type ProjectRead } from './project-protocol.ts';
 import { subscribeProjects } from './project-subscription.ts';
@@ -114,19 +115,17 @@ export function subscribeExecutionShell(origin: URL, version: string, protocol: 
           return;
         }
         if (!isRecord(value.snapshot)) throw Error('Invalid shell snapshot');
-        const snapshot = value.snapshot;
+        let snapshot = { ...value.snapshot };
         if (!Number.isSafeInteger(snapshot.snapshotSequence) || (snapshot.snapshotSequence as number) < 0 || !['projects', 'threads', 'archivedThreads'].every(key => Array.isArray(snapshot[key]) && snapshot[key].every(isRecord))) throw Error('Invalid shell snapshot');
         if ((snapshot.snapshotSequence as number) < sequence) return;
-        if (snapshot.snapshotSequence === sequence && observation) {
-          for (const key of ['projects', 'threads', 'archivedThreads']) {
-            const previous = observation.snapshot[key] as Record<string, unknown>[];
-            const incoming = snapshot[key] as Record<string, unknown>[];
-            const records = new Map(previous.map(record => [record.id, record]));
-            for (const record of incoming) records.set(record.id, record);
-            snapshot[key] = [...records.values()];
-          }
+        if (projectMetadataSnapshot(value)) {
+          if (!observation) throw Error('Full shell snapshot required');
+          const records = new Map((observation.snapshot.projects as Record<string, unknown>[]).map(record => [record.id, record]));
+          for (const record of snapshot.projects as Record<string, unknown>[]) if (records.has(record.id)) records.set(record.id, record);
+          snapshot = { ...observation.snapshot, projects: [...records.values()] };
+        } else {
+          sequence = snapshot.snapshotSequence as number;
         }
-        sequence = snapshot.snapshotSequence as number;
         observation = { snapshot, observedAt: new Date().toISOString() };
         onChange({ availability: 'available', observation });
       },

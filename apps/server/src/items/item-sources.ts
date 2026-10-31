@@ -2,7 +2,8 @@
 // GitHub repository issues read through gh, and an Azure DevOps team's backlog and current sprint through az.
 
 import { decodePart, itemSource, refKey, shownRepo, type Item, type ItemSourceKind, type RepoConfig } from '@lar-factory/shared';
-import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
+import type { RepositoryConfig } from '../config/repository-config.ts';
+import type { OnboardedConfigs } from '../config/repository-settings.ts';
 import { repoIssues } from '../github/repo-issues.ts';
 import { azureBoard } from '../azure/azure-board.ts';
 import { az, type Az } from '../azure/azure-items.ts';

@@ -1,5 +1,5 @@
-// The warning for an onboarded repository the board left off because its .lar-factory.json couldn't be read,
-// in repo-config.sh's words.
+// The warning for an onboarded repository the board left off because it has no item source, or that keeps its last
+// usable setup because its .lar-factory.json can't be used, and for stale agent guidance.
 
 import { sameRepo, shownRepo, type RepositoryConfigProblem } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -16,6 +16,9 @@ export function RepositoryConfigWarning({ repo, problem, kind: problemKind }: Re
   const dismissKey = `repository-config:${repo.toLowerCase()}`;
   if (problemKind === 'agent-guidance') return <Warning dismissKey={dismissKey} title={`${shownRepo(repo)} needs attention to agent guidance.`}>
     {problem}
+  </Warning>;
+  if (problemKind === 'shared-config') return <Warning dismissKey={dismissKey} title={`${shownRepo(repo)} keeps its last usable setup.`}>
+    {problem} The board reads it again on each refresh.
   </Warning>;
   if (offer?.configProblem) return <Warning dismissKey={dismissKey} title={`${shownRepo(repo)} needs setup`} action={<Button {...kind('other')} onClick={() => start(offer)}>Run onboarding</Button>}>
     {REPLACE_SETTINGS_HELP}

@@ -372,9 +372,12 @@ export const SHOW_SETTINGS = ['all', 'opted-in'] as const;
 
 export type ShowSetting = (typeof SHOW_SETTINGS)[number];
 
-/** Why a repository's .lar-factory.json couldn't be read, in repo-config.sh's words after `owner/name: `. */
+/**
+ * Why a repository needs attention: with no kind, it is off the board; `shared-config` keeps its last usable setup
+ * while its .lar-factory.json can't be used; `agent-guidance` names stale agent guidance.
+ */
 export interface RepositoryConfigProblem {
-  kind?: 'agent-guidance';
+  kind?: 'agent-guidance' | 'shared-config';
   repo: string;
   problem: string;
 }

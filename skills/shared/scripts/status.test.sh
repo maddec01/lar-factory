@@ -45,7 +45,9 @@ open(port_file, 'w').write(str(server.getsockname()[1]))
 while mode == 'live':
     conn, _ = server.accept()
     line = conn.makefile('rb').readline()
-    open(request_file, 'ab').write(line)
+    # Other programs on this Mac may probe the port; only status.sh's two requests are logged.
+    if line.startswith((b'GET /healthz ', b'POST /api/read ')):
+        open(request_file, 'ab').write(line)
     code = b'200 OK' if line.split()[1:2] == [b'/healthz'] else b'202 Accepted'
     conn.sendall(b'HTTP/1.1 ' + code + b'\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}')
     conn.close()

@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { buildSubIssueSearches, normalizeItem, normalizeItems, normalizeMergeState, rawBuildPrs, rawDossiers, sliceLabelSearches } from './github-items.ts';
+import { buildSubIssueSearches, normalizeItem, normalizeItems, normalizeMergeState, rawBuildPrs, rawDossiers } from './github-items.ts';
 import type { RawIssueRef, RawItem, RawLinkedPr } from './github-items.ts';
 import type { Item } from './model.ts';
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
@@ -214,18 +214,6 @@ test('a build sub-issue the `build` search found is a board item and counts as a
   assert.deepEqual(normalizeItems([withSubIssues('I_p', 100, ['build'], [sliceRef(102, 'CLOSED')])], { builds })[0]?.subIssues, { total: 1, completed: 1 });
   assert.deepEqual(normalizeItems([withSubIssues('I_c', 100, ['concept'], [sliceRef(102, 'OPEN')])], { builds })[0]?.subIssues, { total: 1, completed: 0 },
     'other kinds keep GitHub\'s counts');
-});
-
-test('active and blocked slices each come from one search per repo of open slices', () => {
-  const raws = [
-    issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN'), refIn('maddec01/lar-factory', 2, 'OPEN'), refIn('maddec01/lar-apple', 3, 'CLOSED')]),
-    issue900(['build'], [refIn('maddec01/lar-server', 4, 'OPEN')]),
-    issue900(['concept'], [refIn('maddec01/lar-apple', 5, 'OPEN')]),
-    issue900(['concept', 'build'], [refIn('maddec01/lar-apple', 6, 'OPEN')]),
-  ];
-  assert.deepEqual(sliceLabelSearches('active', raws), ['is:issue is:open label:active repo:maddec01/lar-server', 'is:issue is:open label:active repo:maddec01/lar-factory']);
-  assert.deepEqual(sliceLabelSearches('blocked', raws), ['is:issue is:open label:blocked repo:maddec01/lar-server', 'is:issue is:open label:blocked repo:maddec01/lar-factory']);
-  assert.deepEqual(sliceLabelSearches('active', [issue900(['build'], [refIn('maddec01/lar-apple', 3, 'CLOSED')])]), [], 'no open slice, no search');
 });
 
 test("build sub-issues come from one search per repo of the builds' sub-issues, open and closed", () => {

@@ -92,7 +92,7 @@ test('the kept closed issues are read in full in calls of at most 25 issues', as
   assert.deepEqual(calls.map((args) => args.filter((a) => a.startsWith('ids[]=')).length).sort((a, b) => b - a), [25, 5]);
 });
 
-test('a repository read runs each label search once, one repository a search', async (t) => {
+test('a repository read runs each build search once, one repository a search, and no slice label search', async (t) => {
   const serverRef = { ...sliceRef(70, 'OPEN'), url: 'https://github.com/maddec01/lar-server/issues/70', repository: { nameWithOwner: 'maddec01/lar-server' } };
   const repoIssues = { [APPLE]: [
     appleIssue(8, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(11, 'OPEN'), serverRef] } }),
@@ -103,8 +103,7 @@ test('a repository read runs each label search once, one repository a search', a
   const searches = (await board.calls()).flatMap((args) => args.filter((a) => a.startsWith('q=') && !a.includes('is:closed')));
   assert.deepEqual([...searches].sort(), [...new Set(searches)].sort(), 'no search runs twice');
   assert.ok(searches.every((q) => q.match(/repo:/g)?.length === 1), 'one repository a search');
-  assert.deepEqual(searches.filter((q) => q.includes('label:active')).sort(),
-    [`q=is:issue is:open label:active repo:${APPLE}`, 'q=is:issue is:open label:active repo:maddec01/lar-server']);
+  assert.deepEqual(searches.sort(), [`q=is:issue label:build repo:${APPLE}`, 'q=is:issue label:build repo:maddec01/lar-server']);
 });
 
 test("open and kept closed issues normalize together: a closed dossier keeps its map, and an open slice of a closed build has no card", async (t) => {

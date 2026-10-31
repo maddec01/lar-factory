@@ -245,7 +245,7 @@ export function pages(input: PagesInput): Page[] {
         { id: 'refresh', title: 'Refresh every', description: "How often the board reads every item, and each repository's .lar-factory.json, through gh on GitHub and az on Azure DevOps. Between these reads it checks GitHub for changes every 5 seconds, for free, and reads only what changed.", control: refreshEvery(data.refreshSeconds) },
         { id: 'done-window', title: 'Done shows', control: { type: 'unavailable' } },
         { id: 'open-in', title: 'Open an item in', control: { type: 'unavailable' } },
-        { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon closes a GitHub issue as not planned, or moves an Azure DevOps work item to Removed.', control: custom(() => <span className="text-xs text-(--muted-foreground)">Always ask</span>) },
+        { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon sets work aside on this Mac, then asks again before it closes the ticket.', control: custom(() => <span className="text-xs text-(--muted-foreground)">Always ask</span>) },
       ] },
       { title: 'Flow limits', rows: [
         { id: 'in-flight', title: 'Concurrent builds', control: { type: 'unavailable' } },
@@ -327,7 +327,7 @@ export function pages(input: PagesInput): Page[] {
     { id: 'updates', label: 'Updates', icon: <RefreshCw />, description: 'Which Releases Lar Factory offers, and when it installs them.', groups: [
       { title: 'Updates', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) },
     ] },
-    { id: 'archive', label: 'Archive', icon: <Archive />, description: 'Abandoned items stay in their provider.', groups: [
+    { id: 'archive', label: 'Archive', icon: <Archive />, description: 'Abandoned work is set aside on this Mac.', groups: [
       { title: 'Abandoned items', description: 'The board does not list abandoned items yet.', rows: [],
         note: <p className="m-0 text-xs text-(--muted-foreground)">Reopen issues on GitHub or reactivate work items in Azure DevOps.</p> },
     ] },

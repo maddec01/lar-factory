@@ -75,7 +75,7 @@ test('a failed Back to List shows as a toast naming the item, which stays until 
   expect(document.activeElement, 'back to the button that failed').toBe(button('back-to-list', 'I_sample05'));
 });
 
-test('Abandon asks first, naming the issue it closes for its repository; Cancel returns focus', async () => {
+test('Abandon asks first, saying it sets the work aside on this Mac and leaves its ticket open; Cancel returns focus', async () => {
   const warnings = vi.spyOn(console, 'warn');
   await mountPage();
   await openItem('I_sample01');
@@ -84,7 +84,7 @@ test('Abandon asks first, naming the issue it closes for its repository; Cancel 
   expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual([]);
   expect(dialog.getAttribute('role')).toBe('alertdialog');
   expect(text($('#abandon-dialog h2'))).toBe(`Abandon #61 ${sample.items[0]!.title}?`);
-  expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe('This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.');
+  expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe('This sets the work aside on this Mac and leaves its ticket open. The board asks next whether to close the ticket.');
   expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Abandon']);
   await settle(() => vi.advanceTimersByTime(100));
   expect(document.activeElement, 'Close takes focus, not the destructive button').toBe($('#abandon-dialog [aria-label="Close"]'));

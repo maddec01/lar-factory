@@ -471,7 +471,7 @@ test('a failed Back to List is a toast, and focus goes back to Back to List', as
   expect(document.activeElement).toBe(button('back-to-list', 'I_sample05'));
 });
 
-test('Abandon in the dialog asks first, then deletes the item, closes the dialog and says so', async () => {
+test('Abandon in the dialog asks first, sets the item aside and says so, then closes its ticket only after its own confirm', async () => {
   holdPosts();
   const data: BoardData = { ...sample, capture: { enabled: true, session: 'session-1' } };
   await mountPage(data);
@@ -482,8 +482,29 @@ test('Abandon in the dialog asks first, then deletes the item, closes the dialog
   expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
   expect(text(button('abandon', 'I_sample01'))).toBe('Abandoning…');
   await answer({ error: null, board: without('I_sample01') });
-  expect(text(toast())).toBe(`Closed #61 ${sample.items[0]!.title} as "not planned".`);
+  expect(text(toast())).toBe(`Set #61 ${sample.items[0]!.title} aside on this Mac.`);
   expect($('[data-item-dialog]'), 'the dialog closes').toBeNull();
+  expect(text($('#abandon-dialog h2'))).toBe(`Close the ticket of #61 ${sample.items[0]!.title} too?`);
+  expect(posted().map(([path]) => path), 'nothing closes the ticket before its confirm').toEqual(['/api/abandon']);
+  const [keep, close] = $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button');
+  expect([text(keep), text(close)]).toEqual(['Keep it open', 'Close issue']);
+  await settle(() => close!.click());
+  expect(posted().at(-1)).toEqual(['/api/close-ticket', { itemId: 'I_sample01' }]);
+  await answer({ error: null });
+  expect(text(toast())).toBe(`Closed #61 ${sample.items[0]!.title} as "not planned".`);
+});
+
+test('keeping the ticket open after Abandon closes nothing', async () => {
+  holdPosts();
+  await mountPage({ ...sample, capture: { enabled: true, session: 'session-1' } });
+  await openItem('I_sample01');
+  await press(button('abandon', 'I_sample01'));
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
+  await answer({ error: null, board: without('I_sample01') });
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[0]!.click());
+  await settle(() => vi.advanceTimersByTime(300));
+  expect($('#abandon-dialog')).toBeNull();
+  expect(posted().map(([path]) => path)).toEqual(['/api/abandon']);
 });
 
 test('a failed Abandon in the dialog is a toast, and focus goes back to Abandon', async () => {

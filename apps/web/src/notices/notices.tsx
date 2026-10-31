@@ -1,7 +1,7 @@
 // What this page just did to an item, announced in a toast: added, moved or kept with View item,
-// abandoned, started in T3, or a Queued card's action that failed.
+// abandoned or its ticket closed, started in T3, or a Queued card's action that failed.
 
-import { ref, threadLink, abandonPrompt } from '@lar-factory/shared';
+import { ref, threadLink, abandonPrompt, closeTicketPrompt } from '@lar-factory/shared';
 import type { Item, StartedThread, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { useBoardStore } from '../board/board-store.ts';
@@ -18,8 +18,10 @@ export type Notice =
   /** Keep left the item carrying `status` alone. */
   | { verb: 'Kept'; item: Item; status: Status }
   | { verb: 'Abandoned'; item: Item }
-  /** A Queued card's Back to List (`to`) or Abandon (no `to`) failed. */
-  | { verb: 'Failed'; item: Item; to?: Status; message: string }
+  /** The ticket of work Abandon set aside closed. */
+  | { verb: 'Closed'; item: Item }
+  /** A Queued card's Back to List (`to`), Abandon, or the ticket close after it (`ticket`) failed. */
+  | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; message: string }
   | { verb: 'Started'; item: Item; thread: StartedThread; kind: StartKind };
 
 /** Notices share one toast: a new one replaces the last. */
@@ -41,10 +43,13 @@ function toastOf(notice: Notice): Toast {
     // The issue is gone, so there is nothing to link to.
     case 'Abandoned':
       return { slot: SLOT, what: `Abandoned ${ref(item)}`, body: abandonPrompt(item).done };
+    case 'Closed':
+      return { slot: SLOT, what: `Closed the ticket of ${ref(item)}`, body: closeTicketPrompt(item).done };
     case 'Failed':
       return {
         slot: SLOT, failed: true, what: `error for ${ref(item)}`,
-        body: <>Couldn't {notice.to ? <>move <TitleLink item={item} /> to {notice.to}</> : <>abandon <TitleLink item={item} /></>}. {notice.message}</>,
+        body: <>Couldn't {notice.to ? <>move <TitleLink item={item} /> to {notice.to}</> : notice.ticket ? <>close the ticket of <TitleLink item={item} /></>
+          : <>abandon <TitleLink item={item} /></>}. {notice.message}</>,
         // Back to the button that failed.
         focusAfter: [`[data-${notice.to ? 'back-to-list' : 'abandon'}="${CSS.escape(item.id)}"]`],
       };

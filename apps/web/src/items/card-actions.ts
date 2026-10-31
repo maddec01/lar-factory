@@ -1,9 +1,9 @@
-// Queue, Back to List, Keep and Abandon from the item dialog: each posts to the board server, shows the result, and keeps
+// Queue, Back to List, Keep, Abandon and the ticket close after it from the item dialog: each posts to the board server, shows the result, and keeps
 // keyboard focus in the dialog.
 
 import { flushSync } from 'react-dom';
 import { writeHeaders } from '@lar-factory/shared';
-import type { BoardData, Status } from '@lar-factory/shared';
+import type { BoardData, Item, Status } from '@lar-factory/shared';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
@@ -129,4 +129,15 @@ export async function abandonItem(itemId: string): Promise<void> {
   });
   // An abandoned item leaves the item dialog, which closes and hands focus back itself.
   if (result.error) refocus([by('data-abandon', itemId)]);
+  // Its ticket stays open until the user confirms its close as a step of its own.
+  else if (item.number && !item.abandonRefusal) useAbandonStore.getState().askClose(item);
+}
+
+/** Closes the ticket of work Abandon just set aside, which has left the board. */
+export async function closeTicket(item: Item): Promise<void> {
+  const result = await postAction('/api/close-ticket', { itemId: item.id });
+  flushSync(() => {
+    receive(result);
+    notify(result.error ? { verb: 'Failed', item, ticket: true, message: result.error } : { verb: 'Closed', item });
+  });
 }

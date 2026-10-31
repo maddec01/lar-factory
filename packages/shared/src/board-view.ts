@@ -1,5 +1,5 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
-// Abandon asks.
+// Abandon and the ticket close after it ask.
 
 import { STATUSES, inRepo, isRecentlyDone, onAzure, itemName, repoKey, repoName, sameRepo } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
@@ -90,10 +90,19 @@ export function prLabel(pr: LinkedPr): string {
 
 export const UNREADABLE = 'The T3 Code database could not be read';
 
-/** What Abandon asks, and how the provider keeps the issue recoverable. */
+/** What Abandon asks: it sets the work aside on this Mac, and leaves a ticket for closeTicketPrompt to ask about. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
+  return { question: `Abandon ${itemName(item)}?`, confirm: 'Abandon', done: `Set ${itemName(item)} aside on this Mac.`,
+    detail: item.number ? 'This sets the work aside on this Mac and leaves its ticket open. The board asks next whether to close the ticket.'
+      : 'This sets the work aside on this Mac. It has no ticket, so nothing changes in its provider.',
+  };
+}
+
+/** What the board asks after Abandon sets ticketed work aside, and how the provider keeps the closed ticket recoverable. */
+export function closeTicketPrompt(item: Item): { question: string; detail: string; confirm: string; keep: string; done: string } {
   const azure = onAzure(item.repo ?? '');
-  return { question: `Abandon ${itemName(item)}?`, confirm: 'Abandon',
+  return { question: `Close the ticket of ${itemName(item)} too?`, keep: 'Keep it open',
+    confirm: azure ? 'Move to Removed' : 'Close issue',
     detail: azure ? 'This moves the work item to Removed in Azure DevOps. You can reactivate it in Azure DevOps.'
       : 'This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.',
     done: azure ? `Moved ${itemName(item)} to Removed.` : `Closed ${itemName(item)} as "not planned".`,

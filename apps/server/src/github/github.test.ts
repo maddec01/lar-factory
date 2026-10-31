@@ -2,7 +2,7 @@
 
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, OPEN_ISSUES_QUERY, PR_BODIES_QUERY, createTree, getIfChanged } from './github.ts';
+import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, OPEN_ISSUES_QUERY, PR_BODIES_QUERY, createTree, getIfChanged, legacyIssueChildren } from './github.ts';
 
 test('the board query reads the blocked-by issues, and no issue or linked PR bodies', () => {
   assert.match(OPEN_ISSUES_QUERY, /blockedBy\(first: \d+\) \{ nodes \{ number state repository \{ nameWithOwner \} \} \}/, 'each blocked-by issue comes with its repo and state');
@@ -61,4 +61,26 @@ test('a tree sends edits, kept blobs and deletions as JSON without gh form parsi
     { path: 'renamed.md', mode: '100755', type: 'blob', sha: 'blob123' },
     { path: '.lar-factory.json', mode: '100644', type: 'blob', sha: null },
   ] });
+});
+
+
+test('legacy child reads preserve paginated closed structural parts, verify merged PRs, and leave open work unpicked', async () => {
+  const child = (number: number, labels: string[], state = 'closed') => ({ number, title: `Part ${number}`, html_url: `https://github.com/team/repo/issues/${number}`,
+    body: `Text ${number}`, state, state_reason: 'completed', labels: labels.map(name => ({ name })) });
+  const calls: string[][] = [];
+  const parts = await legacyIssueChildren('team/repo', 1, async args => {
+    calls.push(args);
+    if (args[0] === 'api') return JSON.stringify([[child(2, ['build']), child(3, ['decision-grill'])], [child(4, ['build'], 'open'), child(5, ['feature'])]]);
+    if (args[0] === 'issue') return JSON.stringify({ closedByPullRequestsReferences: [{ url: 'https://github.com/team/repo/pull/20' }] });
+    if (args[0] === 'pr') return JSON.stringify({ state: 'MERGED', url: 'https://github.com/team/repo/pull/20' });
+    throw Error('Unexpected operation');
+  });
+  assert.deepEqual(parts.map(part => [part.number, part.text, part.mergedPr]), [[2, 'Text 2', 'team/repo#20'], [3, 'Text 3', undefined]]);
+  assert.ok(calls[0]!.includes('--paginate') && calls[0]!.includes('--slurp'));
+  assert.equal(calls.some(args => args.includes('POST') || args.includes('PATCH')), false);
+});
+
+test('legacy child reads refuse cross-repository parts instead of assigning their number to the parent repository', async () => {
+  await assert.rejects(legacyIssueChildren('team/repo', 1, async () => JSON.stringify([[{ number: 2, title: 'Other work', html_url: 'https://github.com/team/other/issues/2',
+    body: 'Other context', state: 'closed', state_reason: 'completed', labels: [{ name: 'build' }] }]])), /belongs to another repository/);
 });

@@ -9,11 +9,14 @@ import { once } from 'node:events';
 import { promisify } from 'node:util';
 import type { TestContext } from 'vite-plus/test';
 import { DONE_WINDOW_MS, isSkillCheckRequest, normalizeItems, readBuilds, refKey } from '@lar-factory/shared';
-import type { BoardData, DriftChoice, Item, RawItem, Searched, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, Item, RawItem, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
+
+/** The `repo#number` keys of the builds among sub-issues, and of the open slices whose records are active or blocked. */
+type SliceSearches = { builds?: ReadonlySet<string>; active?: ReadonlySet<string>; blocked?: ReadonlySet<string> };
 
 /** The calls the fakes logged, skipping a last line a running fake has not finished writing. */
 async function readCalls(file: string): Promise<string[][]> {
@@ -55,14 +58,14 @@ export function writeRepositoryList(home: string, repos: readonly string[]): voi
  * as done, its ticket, its parent and a build's slices. An issue done before the board's week of Done, a slice and an issue
  * closed as not planned are no work of their own. Returns each issue's work ID by its `owner/name#number`.
  */
-async function recordIssues(home: string, raws: readonly RawItem[], searched: Searched = {},
+async function recordIssues(home: string, raws: readonly RawItem[], searched: SliceSearches = {},
   threads: Record<string, string[]> = {}): Promise<Map<string, string>> {
   const ids = new Map<string, string>();
   if (!raws.length) return ids;
   const records = await openWorkRecords(workRecordsPath(boardDataDir(home, {})));
   try {
     const recent = (item: Item) => item.status !== 'Done' || Date.now() - Date.parse(item.closedAt ?? item.updatedAt) <= DONE_WINDOW_MS;
-    const items = normalizeItems([...raws], { ...searched, builds: new Set([...readBuilds([...raws]), ...searched.builds ?? []]) }).filter(recent);
+    const items = normalizeItems([...raws], { builds: new Set([...readBuilds([...raws]), ...searched.builds ?? []]) }).filter(recent);
     for (const item of items) {
       const ticket = `${item.repo}#${item.number}`;
       ids.set(ticket, records.importTicket({ title: item.title, repository: item.repo, kind: item.kind, status: item.status, ticket }).record.workId);
@@ -74,10 +77,12 @@ async function recordIssues(home: string, raws: readonly RawItem[], searched: Se
       if (parent) try { records.setParent(workId, records.read(workId).revision, parent); } catch { /* a parent of another kind */ }
       if (item.kind !== 'build') continue;
       for (const slice of item.slices) {
-        const status = slice.progress === 'done' ? 'Done' : slice.progress === 'active' ? 'In progress' : 'List';
+        const key = refKey(slice.repo, slice.number);
+        const open = slice.progress !== 'done';
+        const status = !open ? 'Done' : searched.active?.has(key) ? 'In progress' : 'List';
         let made = records.importTicket({ title: slice.title, repository: slice.repo, kind: 'slice', status, ticket: `${slice.repo}#${slice.number}` }).record;
         made = records.setParent(made.workId, made.revision, workId);
-        if (slice.progress === 'blocked') records.setNeedsYou(made.workId, made.revision, 'The implementer could not finish it.');
+        if (open && searched.blocked?.has(key)) records.setNeedsYou(made.workId, made.revision, 'The implementer could not finish it.');
       }
     }
     for (const [ticket, threadIds] of Object.entries(threads)) {

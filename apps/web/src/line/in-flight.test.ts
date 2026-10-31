@@ -5,7 +5,7 @@
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text, toast } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
-import type { BoardData, Item, ItemThread, RawItem } from '@lar-factory/shared';
+import type { BoardData, Item, ItemThread, RawItem, Slice } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
 const table = () => $('[data-in-flight]')!;
@@ -23,9 +23,12 @@ const press = (el: Element) => settle(() => {
 });
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
-const boardOf = (raws: RawItem[], keys: { active?: number[]; blocked?: number[] } = {}): BoardData => {
-  const set = (numbers: number[] = []) => new Set(numbers.map((n) => `maddec01/lar-factory#${n}`));
-  return { ...sample, error: null, items: recorded(normalizeItems(raws, { active: set(keys.active), blocked: set(keys.blocked) })) };
+/** The board with `raws` as items, each open slice numbered in `keys` active or blocked, as its work record holds it. */
+const boardOf = (raws: RawItem[], { active = [], blocked = [] }: { active?: number[]; blocked?: number[] } = {}): BoardData => {
+  const progress = (slice: Slice): Slice => (slice.progress !== 'waiting' ? slice
+    : { ...slice, progress: blocked.includes(slice.number) ? 'blocked' : active.includes(slice.number) ? 'active' : 'waiting' });
+  const items = normalizeItems(raws).map((item) => ({ ...item, slices: item.slices.map(progress) }));
+  return { ...sample, error: null, items: recorded(items) };
 };
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData =>
   ({ ...data, items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)) });

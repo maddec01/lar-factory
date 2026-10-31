@@ -1,3 +1,4 @@
+import { executionStats } from './execution-stats.ts';
 import { isRecord, type ItemThread } from '@lar-factory/shared';
 import { namedIssue, issueKey } from '../threads/item-threads.ts';
 import { readJsonRecord } from '../json-file.ts';
@@ -124,4 +125,14 @@ function protocolThreadById(threadId: string): ExecutionRead {
   const read = current?.reads?.get(threadId);
   return { availability: current?.available && read ? read.availability : 'unavailable',
     ...(read?.observation ? { observation: read.observation } : {}) };
+}
+
+/** Complete current observations only; no database fallback for timing facts. */
+export function protocolStatsInputs() {
+  protocolItemThreads('', 0);
+  if (!current?.available || !current.reads) throw Error('T3 execution unavailable');
+  return executionStats([...current.reads.values()].map(read => {
+    if (read.availability !== 'available' || !read.observation) throw Error('T3 execution unavailable');
+    return read.observation.projection;
+  }));
 }

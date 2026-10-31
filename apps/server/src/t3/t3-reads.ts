@@ -8,7 +8,8 @@ import { warmTranscripts } from '../stats/transcript-usage.ts';
 import type { ItemStatsReader, StatsSources } from '../stats/item-stats.ts';
 import { itemThreads } from '../threads/item-threads.ts';
 import type { ItemThreadsReader } from '../threads/item-threads.ts';
-import { readT3Db, threadRows } from './t3-db.ts';
+import { protocolStatsInputs } from './item-execution.ts';
+import { readT3Db } from './t3-db.ts';
 
 type Issue = Pick<Item, 'repo' | 'number'>;
 
@@ -47,11 +48,11 @@ export function loadT3Reads(sources: StatsSources, now: number, withStats = true
   const unavailable = { stats: every('unavailable' as const), statsUnavailable: true, priced: null };
   try {
     return readT3Db(sources.db, (db) => {
-      const rows = threadRows(db);
+      const { rows, sessions } = protocolStatsInputs();
       const threads = threadsLookup(itemThreads(rows));
       if (!withStats) return { stats: every(undefined), threads, statsUnavailable: false, priced: null };
       let stats: ItemStatsReader;
-      try { stats = itemStats(db, rows, sources, now); }
+      try { stats = itemStats(db, rows, sources, now, sessions); }
       catch { return { ...unavailable, threads }; }
       return { stats: statsLookup(stats), threads, statsUnavailable: false, priced: stats.priced };
     });
@@ -69,7 +70,7 @@ export async function warmT3Stats(sources: StatsSources): Promise<number> {
   if (!existsSync(sources.db)) return 0;
   let files;
   try {
-    files = readT3Db(sources.db, (db) => transcriptsToRead(db, sources));
+    files = readT3Db(sources.db, (db) => transcriptsToRead(db, sources, protocolStatsInputs().sessions));
   } catch {
     return 0;
   }

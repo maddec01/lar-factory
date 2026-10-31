@@ -76,6 +76,7 @@ CREATE TABLE orchestration_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, a
 export function statsDb(t: TestContext, threads: FixtureThread[], requests: FixtureRequest[] = []): string {
   const path = join(tempDir(t, 'lar-stats-'), 'statev2.sqlite');
   writeFileSync(path + '.execution.json', JSON.stringify(threads));
+  writeFileSync(path + '.requests.json', JSON.stringify(requests));
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
   const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?, ?)');

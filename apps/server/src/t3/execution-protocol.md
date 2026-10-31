@@ -16,8 +16,7 @@ array and envelope validation. Following consumers must validate the fields they
 consume. Runs, attempts, subagents, provider turns, runtime requests and messages
 are included. Shell records carry worktree and PR context where populated.
 Azure policy evaluations and reviewer votes are unsupported. The adapter does
-not count tokens. Existing SQL association, transcript mapping and stats reads
-remain until #708 and #709. Launch behavior remains #710.
+not count tokens. Association, transcript mapping and timing use protocol observations. Launch behavior remains #710.
 
 Reconnect obtains a fresh ticket and snapshot. Unknown or incremental execution
 events request a fresh snapshot by reconnecting rather than guessing reducers.
@@ -39,4 +38,40 @@ reads. Association still uses only a root's first user message. Descendants are
 read but do not acquire an independent item association. Onboarding title lookup
 uses the same completed observation. An incomplete or disconnected refresh
 returns unavailable and retains the previous lookup and its observation time;
-only a completed empty snapshot means no matching threads. Stats still use SQL.
+only a completed empty snapshot means no matching threads. Stats use the same completed protocol observation.
+
+
+Stats coverage (#709): `execution-stats.ts` maps providerTurns to turn intervals,
+runtimeRequests to user waits, subagents to child intervals, messages to first-user
+association and last-message bounds, and providerThreads to active IDs and native
+transcript references. providerSessions are runtime attachments, not transcript
+identities. Source: pinned contracts `orchestrationV2.ts` provider-thread,
+provider-turn, runtime-request and thread-projection schemas in /tmp/t3src.
+
+The production stats path retains exactly `CODEX_TURN_SELECTIONS` in `t3-db.ts`:
+provider turns' nativeTurnRef and run_attempt_id join run attempts by attempt,
+thread and provider-thread IDs; attempt payload supplies nativeThreadId. For each
+attempt, the earliest version-2 thread `run.updated` event matching run ID,
+activeAttemptId and running status supplies modelSelection. Native turn IDs are
+bound through json_each(?). This is needed only for unresolved Codex service-tier
+pricing: the current projection's modelSelection cannot recover the selection
+before later steering. No timing or transcript-session SQL fallback runs here.
+Legacy threadRows/threadSessions helpers remain for other callers and parity
+fixtures; they are not the production stats input path.
+
+The item-stats fixture suite compares every returned protocol result against its
+SQL predecessor, including parent overlap, waits, open/abandoned turns, native
+sessions, cross-thread transcript deduplication and pricing. t3-reads fixtures
+exercise unavailable observations and cold/warm transcript caching separately.
+
+Real stats mapping proof, 2026-10-31, supported local server on port 3773:
+two authenticated subscriptions separated by disconnect returned thread
+f25dc5eb-a8fc-4424-ac05-3cfa51551808, sequence 498838. `executionStats`
+accepted both snapshots: 159 provider turns, 2 waits, 58 subagent runs and
+14 transcript sessions. The unchanged agentTime calculator returned agent and
+wall time 8,977,753 ms for this single-thread projection (a synthetic issue
+association was supplied only to address the lookup). This is projection/timing
+proof, not full-family or real transcript pricing parity. Descendant projections,
+real token totals, renewal rejection and restart remain runtime limits; controlled
+fixtures cover calculation parity and unavailable observations. The probe used the
+board's existing Keychain credential in memory and printed only counts/timing.

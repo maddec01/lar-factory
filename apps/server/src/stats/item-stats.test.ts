@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { readT3Db, threadRows } from '../t3/t3-db.ts';
+import { protocolStatsInputs } from '../../test/execution-observations.ts';
 import { itemStats } from './item-stats.ts';
 import type { ItemStatsReader, StatsSources } from './item-stats.ts';
 import { assistant, claudeHome, codexHome, codexSession, codexTokens, statsDb, t3Settings, tempDir, usageRates } from '../../test/stats-db.ts';
@@ -25,7 +26,23 @@ function turn(id: string) {
 }
 
 function reader(db: string, sources: Partial<StatsSources> = {}): ItemStatsReader {
-  return readT3Db(db, (open) => itemStats(open, threadRows(open), { db, ...NOWHERE, ...sources }, NOW));
+  return readT3Db(db, (open) => {
+    const before = itemStats(open, threadRows(open), { db, ...NOWHERE, ...sources }, NOW);
+    const previous = process.env.T3_STATE_DB;
+    process.env.T3_STATE_DB = db;
+    try {
+      const { rows, sessions } = protocolStatsInputs();
+      const after = itemStats(open, rows, { db, ...NOWHERE, ...sources }, NOW, sessions);
+      return Object.assign((repo: string, number: number) => {
+        const actual = after(repo, number);
+        assert.deepEqual(actual, before(repo, number), 'protocol and SQL stats parity');
+        return actual;
+      }, { priced: after.priced });
+    } finally {
+      if (previous === undefined) delete process.env.T3_STATE_DB;
+      else process.env.T3_STATE_DB = previous;
+    }
+  });
 }
 
 test('an item\'s threads are the roots whose first user message names it, in any of the three forms', (t) => {

@@ -85,24 +85,71 @@ export interface IssueRef {
   azure?: AzureWorkItem;
 }
 
-/** Work blocking an item: closed once its work record's local facts complete it. A record's blocker names its work ID and title; its number is 0 without a ticket. */
-export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'> & { workId?: string; title?: string };
+/** What the latest read of a Dependency's ticket or PR showed. A read that failed or lost access is a kind of its own. */
+export const DEPENDENCY_OBSERVATION_KINDS = ['open', 'closed', 'merged', 'reopened', 'deleted', 'access-lost', 'read-failed'] as const;
+export type DependencyObservationKind = (typeof DEPENDENCY_OBSERVATION_KINDS)[number];
 
-/** The blockers whose work isn't complete yet: what holds its start, its badge and Start after. */
+/** A Dependency holding a build: a change the team or repository that owns it delivers. Only the user's met mark releases it. */
+export interface DependencyHold {
+  dependencyId: string;
+  /** The Dependency's revision, which a met mark or its reversal names. */
+  revision: number;
+  /** The repository or team that owns and delivers the change. */
+  owner: string;
+  need: string;
+  ticket: string | null;
+  /** What will establish that the change was delivered; empty until agreed. */
+  evidence: string;
+  met: { by: string; at: string } | null;
+  /** Whether an observation changed after it was marked met. */
+  needsReview: boolean;
+  /** The most recent read of its ticket or one of its PRs, or null before any. It never sets or clears the mark. */
+  observation: { subject: string; kind: DependencyObservationKind; detail: string | null; observedAt: string } | null;
+}
+
+/**
+ * Work blocking an item: closed once its work record's local facts complete it. A record's blocker names its work ID and
+ * title; its number is 0 without a ticket. A Dependency's blocker carries `dependency` and is closed once marked met.
+ */
+export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'> & { workId?: string; title?: string; dependency?: DependencyHold };
+
+/** The blockers whose work isn't complete yet, or whose Dependency isn't marked met: what holds its start, its badge and Start after. */
 export const openBlockers = (item: Pick<Item, 'blockers'>): Blocker[] => item.blockers.filter((b) => b.state === 'open');
 
-/** A blocker as `#n`, or as `owner/repo#n` when another repository's; `short` drops the owner, to fit on a button. */
-export const blockerRef = (item: Pick<Item, 'repo'>, b: Pick<Blocker, 'number' | 'repo' | 'title'>, short = false): string =>
-  !b.number ? b.title ?? 'untracked work' : b.repo === item.repo ? `#${b.number}` : `${short ? b.repo.slice(b.repo.indexOf('/') + 1) : b.repo}#${b.number}`;
+/**
+ * A blocker as `#n`, or as `owner/repo#n` when another repository's; `short` drops the owner, to fit on a button. A
+ * Dependency goes by its owner.
+ */
+export const blockerRef = (item: Pick<Item, 'repo'>, b: Pick<Blocker, 'number' | 'repo' | 'title' | 'dependency'>, short = false): string =>
+  b.dependency ? short ? b.dependency.owner : `Dependency on ${b.dependency.owner}`
+    : !b.number ? b.title ?? 'untracked work' : b.repo === item.repo ? `#${b.number}` : `${short ? b.repo.slice(b.repo.indexOf('/') + 1) : b.repo}#${b.number}`;
 
 /** The item's open blockers, each as blockerRef gives it. */
 export const openBlockerRefs = (item: Pick<Item, 'blockers' | 'repo'>, short = false): string[] =>
   openBlockers(item).map((b) => blockerRef(item, b, short));
 
-/** Why the item can't start while a blocker's work isn't complete, naming each such blocker; null once none is left. */
+/** Why the item can't start while a blocker's work isn't complete or a Dependency isn't met, naming each; null once none is left. */
 export function blockedText(item: Pick<Item, 'blockers' | 'repo'>): string | null {
-  const open = openBlockerRefs(item);
-  return open.length ? `Blocked by ${open.join(', ')} until ${open.length > 1 ? 'they complete' : 'it completes'}` : null;
+  const open = openBlockers(item);
+  const work = open.filter((b) => !b.dependency).map((b) => blockerRef(item, b));
+  const owners = open.flatMap((b) => (b.dependency ? [b.dependency.owner] : []));
+  const parts = [
+    ...work.length ? [`${work.join(', ')} until ${work.length > 1 ? 'they complete' : 'it completes'}`] : [],
+    ...owners.length ? [`the ${owners.length > 1 ? 'Dependencies' : 'Dependency'} on ${owners.join(', ')} until you mark ${owners.length > 1 ? 'them' : 'it'} met`] : [],
+  ];
+  return parts.length ? `Blocked by ${parts.join(', and by ')}` : null;
+}
+
+/**
+ * What the board asks the user about a Dependency: to review a met mark whose observation changed since, or to mark an
+ * unmet one met when its ticket closed or a PR merged. Null when nothing asks. The board never changes the mark itself.
+ */
+export function dependencyNotice(d: DependencyHold): string | null {
+  const seen = d.observation;
+  if (!seen) return null;
+  const subject = `Its ${seen.subject === d.ticket ? 'ticket' : 'PR'} ${seen.subject}`;
+  if (d.met) return d.needsReview ? `${subject} changed to ${seen.kind} after you marked it met. Review the mark.` : null;
+  return seen.kind === 'closed' || seen.kind === 'merged' ? `${subject} is ${seen.kind}. Mark it met once the change is delivered.` : null;
 }
 
 /** The run that shows a concept works once every build lands: a title line, then numbered steps. */

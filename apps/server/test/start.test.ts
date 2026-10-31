@@ -254,18 +254,6 @@ test('Start is refused while a blocker is incomplete, naming each one', async (t
   assert.deepEqual(await board.t3Calls(), []);
 });
 
-test('Start is refused while Abandon is pending for the item', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(13, 'Queued')], writeDelay: 300 });
-  await until(board, (d) => d.items.length === 1);
-  const abandoning = board.postSession({ itemId: board.id(13) }, '/api/abandon');
-  await new Promise((r) => setTimeout(r, 100));
-  const refusedAbandon = await start(board, board.id(13));
-  assert.equal(refusedAbandon.status, 409);
-  assert.equal((await refusedAbandon.json()).error, 'This item is being abandoned, so it can\'t start.');
-  assert.equal((await abandoning).status, 200);
-  assert.deepEqual(await board.t3Calls(), []);
-});
-
 for (const recover of ['late', 'deleted']) {
   test(`an uncertain launch with ${recover} CLI evidence preserves duplicate protection`, async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'garbage', recover } });

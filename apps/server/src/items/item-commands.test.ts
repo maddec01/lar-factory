@@ -63,7 +63,7 @@ function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<
     },
   } as unknown as ItemSource;
   const commands = createItemCommands({ board, items: source, records: records ?? null, reread, offerModelChoices: () => [],
-    showThread, projectOf: async (repo) => ({ projectId: repo }),
+    showThread, reopenPr: async (repo, number) => { log.push(`reopen ${repo}#${number}`); }, projectOf: async (repo) => ({ projectId: repo }),
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
       log.push(`start ${project} ${message.split('\n')[1]}`);
@@ -112,13 +112,77 @@ test('Start on a tagged item writes no tag and ignores a repository sent with it
   assert.deepEqual(log, [`start ${WEB} $lar-shape azure:contoso/7`]);
 });
 
-test("Abandon on an item whose abandonRefusal says why refuses with it, and writes nothing", async () => {
+test('Abandon sets the work aside on this Mac and leaves its ticket alone, which only its own close closes', async () => {
+  const records = await openRecords();
+  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
+  const { board, commands, log } = commandsOn([], undefined, undefined, records);
+  assert.deepEqual((await commands.closeTicket(work.workId)).status, 409, 'work Abandon never set aside has no ticket to close');
+  assert.equal(commands.abandon(work.workId).status, 200);
+  assert.equal(records.read(work.workId).setAside, true);
+  assert.equal(board.find(work.workId), undefined);
+  assert.deepEqual(log, [], 'Abandon writes nothing to the provider');
+  const [first, second] = await Promise.all([commands.closeTicket(work.workId), commands.closeTicket(work.workId)]);
+  assert.deepEqual([first.status, second.status], [200, 200]);
+  assert.deepEqual(log, ['abandon 7'], 'two presses close the ticket once');
+});
+
+test('a ticket close on an item whose abandonRefusal says why refuses with it, though Abandon set the item aside', async () => {
   const refusal = "Issue has no Removed state in Fabrikam, so the board can't abandon it. Close or delete it in Azure DevOps.";
-  const { commands, log } = commandsOn([queued(7, { abandonRefusal: refusal }), queued(8)]);
-  const refused = await commands.abandon('azure:contoso/7');
+  const { commands, log } = commandsOn([queued(7, { abandonRefusal: refusal })]);
+  assert.equal(commands.abandon('azure:contoso/7').status, 200);
+  const refused = await commands.closeTicket('azure:contoso/7');
   assert.deepEqual([refused.status, (refused.body as { error: string }).error], [409, refusal]);
-  assert.equal((await commands.abandon('azure:contoso/8')).status, 200);
-  assert.deepEqual(log, ['abandon 8']);
+  assert.deepEqual(log, []);
+});
+
+/** A Review build on WEB whose PR #40 is observed closed unmerged, with its build thread, waiting on the user. */
+async function closedPrBuild() {
+  const records = await openRecords();
+  const created = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Review' });
+  let record = records.setPullRequest(created.workId, created.revision, `${WEB}#40`);
+  record = records.addThread(created.workId, record.revision, 'thread-0', 'build');
+  record = records.observe(created.workId, record.revision, { of: 'pr', state: 'closed' });
+  records.setNeedsYou(created.workId, record.revision, 'Its PR closed without merging.');
+  return { records, workId: created.workId, ...commandsOn([], undefined, undefined, records) };
+}
+
+test('reopening a closed PR from Needs you reopens it in its provider and clears the reason', async () => {
+  const { records, workId, commands, log } = await closedPrBuild();
+  assert.equal((await commands.resolveNeedsYou(workId, 'reopen-pr')).status, 200);
+  assert.deepEqual(log, [`reopen ${WEB}#40`]);
+  assert.deepEqual([records.read(workId).needsYou, records.read(workId).status], [null, 'Review']);
+});
+
+test('a replacement build from Needs you readies the work, and Start build then starts a new thread on a new branch', async () => {
+  const { records, workId, commands, branches } = await closedPrBuild();
+  assert.equal((await commands.resolveNeedsYou(workId, 'replace-pr')).status, 200);
+  assert.deepEqual([records.read(workId).needsYou, records.read(workId).status], [null, 'Ready']);
+  assert.equal((await commands.startBuild(workId, undefined)).status, 200);
+  assert.equal(branches.length, 1, 'the closed PR\'s thread holds no start');
+  assert.match(branches[0]!, /-retry-[a-f0-9]+$/);
+});
+
+test('setting work aside from Needs you works in any Status, though a thread worked on it', async () => {
+  const { records, workId, commands } = await closedPrBuild();
+  assert.equal(commands.abandon(workId).status, 200);
+  assert.equal(records.read(workId).setAside, true);
+});
+
+test('Needs you refuses a choice it does not offer, and Clear clears any reason', async () => {
+  const { records, workId, commands, log } = await closedPrBuild();
+  assert.equal((await commands.resolveNeedsYou(workId, 'reopen-work')).status, 409);
+  assert.equal((await commands.resolveNeedsYou(workId, 'clear')).status, 200);
+  assert.deepEqual([records.read(workId).needsYou, records.read(workId).status, log], [null, 'Review', []]);
+  assert.equal((await commands.resolveNeedsYou(workId, 'clear')).status, 409, 'work that no longer needs you has nothing to clear');
+});
+
+test('reopening Done work from Needs you moves it back to List', async () => {
+  const records = await openRecords();
+  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Done', ticket: `${WEB}#7` }).record;
+  records.setNeedsYou(work.workId, records.observe(work.workId, work.revision, { of: 'ticket', state: 'open' }).revision, 'Its ticket reopened.');
+  const { commands } = commandsOn([], undefined, undefined, records);
+  assert.equal((await commands.resolveNeedsYou(work.workId, 'reopen-work')).status, 200);
+  assert.deepEqual([records.read(work.workId).needsYou, records.read(work.workId).status], [null, 'List']);
 });
 
 test('Start build reuses a live start, but a confirmed stopped build can start again once', async () => {

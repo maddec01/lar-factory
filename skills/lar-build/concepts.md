@@ -23,9 +23,9 @@ file and save it with `lar-work set-body <work ID> --revision N --body map --fil
 
 ## Map
 <Mermaid flowchart of the concept's decisions, builds and Dependencies by
-title, edges for blockers, complete or met ones styled done. Redraw it whenever
-one changes. Below it, one bullet per unmet Dependency, which the board shows
-as holding the concept.>
+title, with edges for structural dependencies. Keep progress styling local.
+Redraw it whenever the structure changes. Below it, list Dependencies and the
+parts they affect. The board reads their local completion separately.>
 - <need>, from <owner>, blocks <build title>
 ```
 
@@ -34,13 +34,10 @@ The user's original text stays in the record's initial context.
 1. Grill the user ([Grilling with docs](grilling-with-docs.md) in [SKILL.md](grilling-with-docs.md))
    only on the destination and the out-of-scope list.
 
-   Then ask the user to confirm the planned map as an ordinary
-   [question](shared/questions.md) ("Confirm" / "Correct it"), listing the
-   destination, each planned decision with its method and blockers, and the
-   research to start. The map may be saved first; nothing else changes before
-   they confirm. On a correction, update the planned map and ask again. If the
-   user drops the concept, record the kind they had before and go back to
-   [2. Size up](size-up.md).
+   Save the proposed map and explain the parts and open questions. Continue
+   within the user's authorized scope. Ask for a missing product decision or
+   scope change once; reuse answers already given. The map plans investigation,
+   without committing the user to implementation.
 
 2. Make a decision record for each decision you can phrase now:
    `bash <this skill>/shared/scripts/slice.sh <concept work ID> "<title>" <file> --kind decision [--blocked-by <work ID>]...`,
@@ -86,3 +83,5 @@ A blocked build starts once its blockers are complete and the user has marked
 each Dependency holding it met. The concept is complete once its Fog is gone and
 every decision and build it owns is complete
 ([Completion](shared/issue-tracker/work-records.md#completion)).
+
+Follow [Tracker structure sync](shared/issue-tracker/publication.md) after structural changes.

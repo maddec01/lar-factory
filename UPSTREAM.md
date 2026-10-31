@@ -5,8 +5,8 @@ and that commit's date. `skill-sync` compares each one with upstream from this
 commit and updates this file when you take or skip changes.
 
 A Copy, in the Copies table, is never edited by hand, and its commit means
-"matches this commit". lar rules live in `lar-shape`, `lar-build` and in each
-repo's `AGENTS.md`. To set aside part of a Copy, lar writes an Override in its
+"matches this commit". Factory rules live in `lar-shape` and `lar-build`.
+Existing project instructions supply project conventions. To set aside part of a Copy, lar writes an Override in its
 own skill, citing the Copy's file and section heading, and lists it here.
 
 "Overridden in" lists the Copy's Overrides: lar rules, in lar's own skills, that
@@ -26,7 +26,7 @@ Maintainer ports an upstream change or skips it.
 
 | Skill | Source | Path | Repository path | Commit | Date | Overridden in |
 | ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
-| `code-review` | mattpocock/skills | `skills/engineering/code-review` | `skills/lar-build/skills/code-review` | `5beb35b040e3` | 2026-10-19 | SKILL.md (skills/lar-build/agents/reviewer-code.md); SKILL.md#1. Pin the fixed point (skills/lar-build/agents/reviewer-code.md); SKILL.md#2. Identify the spec source (skills/lar-build/agents/reviewer-code.md); SKILL.md#4. Spawn both sub-agents in parallel (skills/lar-build/agents/reviewer-code.md); SKILL.md#5. Aggregate (skills/lar-build/agents/reviewer-code.md) |
+| `code-review` | mattpocock/skills | `skills/engineering/code-review` | `skills/lar-build/skills/code-review` | `5beb35b040e3` | 2026-10-19 | SKILL.md (skills/lar-build/agents/reviewer-code.md); SKILL.md#1. Pin the fixed point (skills/lar-build/agents/reviewer-code.md); SKILL.md#2. Identify the spec source (skills/lar-build/agents/reviewer-code.md); SKILL.md#3. Identify the standards sources (skills/lar-build/agents/reviewer-code.md); SKILL.md#4. Spawn both sub-agents in parallel (skills/lar-build/agents/reviewer-code.md); SKILL.md#5. Aggregate (skills/lar-build/agents/reviewer-code.md) |
 | `security-and-hardening` | addyosmani/agent-skills | `skills/security-and-hardening` | `skills/lar-build/skills/security-and-hardening` | `aeac41d4d005` | 2026-10-13 | SKILL.md#Process: Threat Model First (skills/lar-build/agents/reviewer-security.md); SKILL.md#Ask First (Requires Human Approval) (skills/lar-build/agents/reviewer-security.md); SKILL.md#Verification (skills/lar-build/agents/reviewer-security.md) |
 | `frontend-ui-engineering` | addyosmani/agent-skills | `skills/frontend-ui-engineering` | `skills/lar-build/skills/frontend-ui-engineering` | `aeac41d4d005` | 2026-10-13 | SKILL.md#Red Flags (skills/lar-build/agents/reviewer-ui.md); SKILL.md#Verification (skills/lar-build/agents/reviewer-ui.md) |
 | `references/security-checklist.md` | addyosmani/agent-skills | `references/security-checklist.md` | `skills/lar-build/references/security-checklist.md` | `aeac41d4d005` | 2026-10-13 |  |

@@ -7,192 +7,118 @@
 
 # Lar Factory
 
-A small software factory for [lar](https://github.com/maddec01): the skills,
-build agents and local board that take an idea from a list to a merged PR.
-A person decides and merges; agents do the rest.
+A local software factory for any repository. Shape issues and ideas, keep the
+work on a board, and build chosen changes through review to a PR. You decide
+what to build and merge every PR.
 
-It's built for lar, but the parts are plain [Agent Skills](https://agentskills.io)
-and a small board app, so you can borrow them. Issues and ideas are welcome.
+## Get started
 
-## How work moves
+Install the Mac app from [GitHub Releases](https://github.com/maddec01/lar-factory/releases)
+and open it with T3 Code running. In Settings > Repositories, choose Add repository:
 
-Each piece of work has a work record on your machine, in the repository it
-changes (`lar-server`, `lar-apple`). The record's Status places it on the board:
+1. Choose a repository from your T3 Code projects.
+2. Choose its issue source, domain docs and tracker sync. GitHub uses repository
+   issues; Azure DevOps uses a team's backlog and current sprint together.
+   Domain docs are OFF by default. Tracker structure sync is ON by default.
+3. Review access and add the repository. The saved access choices apply to later
+   work, so routine actions need no repeated permission prompt.
 
-```
-List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review → Verify / Ready to merge → Done
-```
+The configured source supplies the repository List. There is no per-ticket
+import step, setup PR or repository configuration to merge. The factory neither
+reads nor writes nor detects `.lar-factory.json`, and never offers it. Existing
+project instructions are optional. The factory honors project conventions and
+uses package scripts, manifests, CI and nearby tests when instructions are absent.
 
-1. **List.** Capture bugs, features and ideas on the board, or pick an existing
-   ticket there. A picked ticket's text becomes the record's starting context;
-   the factory never writes back to the ticket.
-2. **Queued.** Move the work to Queued, then run `/lar-shape <work ID>` in a new
-   thread in the repository's project (the board's Start does this). Nothing
-   starts without this.
-3. **Shaping.** `lar-shape` reads the record, the ticket and the code through subagents, and
-   proposes a route:
-   - **clear**: a bug a subagent can reproduce and diagnose, or a small change;
-   - **needs decisions**: it grills you with docs: questions that check your
-     terms against the project's glossary and ADRs, and drafts any new terms
-     and decisions into the brief for the builder to write. For anything
-     visual, it builds two or three prototypes for you to pick from;
-   - **foggy**: the work becomes a **concept**. Its record holds a map
-     (destination, decisions so far, fog, out of scope, domain docs drafts, a
-     diagram) and owns its decisions, each worked in its own thread. Builds
-     appear in the record as decisions complete.
-4. **Ready.** It writes a brief into the record (what, how to tell it's done,
-   confirmed assumptions, domain docs drafts). A fresh-context subagent tries
-   to find holes in it.
-5. **In progress.** A new thread builds it in its own git worktree, test-first,
-   from the brief alone, through slices kept in the record. It follows the
-   repository's own rules first.
-6. **Review.** Reviewers run in parallel, each with fresh context. Code
-   always runs; the builder picks Security, UI (browser preview or simulator)
-   and Performance from what the diff touches. Review runs at most 2 rounds:
-   round 2 reruns only the reviewers with a fixed finding, on the fix diff,
-   and findings still open after it go in the PR body.
-7. **Verify or Ready to merge.** An approver opens the PR. Anything visible, risky
-   (auth, migrations, deployment) or not fully checked goes to Verify with test
-   steps; the rest goes to Ready to merge. The item stays in Review until the
-   PR's required checks pass; a CI fixer subagent handles failures, and after
-   two tries or a runner problem the item goes to Needs you.
-8. **Retro and merge.** After the final review status is set and PR monitoring
-   stops, the build thread ends with suggested improvements for you to pick.
-   Picks become List records in the owning repos, or reuse matching unfinished
-   work; capture writes no ticket. Shared/global work goes to Factory, and one
-   suggestion spanning repos becomes one Factory concept for later shaping.
-   Capture leaves the source Status unchanged and implements none of the picks.
-   See [Retro capture](skills/shared/retro-capture.md) for routing, recovery
-   and privacy rules. You merge the PR, and the build reaches **Done**.
+## Shape first, build when ready
 
-**Needs you** means it's waiting on you: a question, a prototype choice or a
-review.
+Add an idea to List or open an issue there. Queue work when you want to shape it,
+then choose Start. Shaping reads the issue and code, investigates uncertainties,
+and asks you for missing decisions. It produces a Ready brief or a concept map
+with parts and relationships. Any issue can be shaped independently of a build.
+Ready commits you to no implementation.
 
-Factory progress stays in work records on your machine, never on tickets.
-[Work records](skills/shared/issue-tracker/work-records.md) covers picking
-tickets, Status, structure and completion.
+Choose Start build later for a Ready item you want implemented. It opens an
+isolated worktree, plans and builds the change, runs project checks and reviews,
+and opens a PR. Visible or risky work goes to Verify with steps for you to check;
+otherwise it goes to Ready to merge. You merge it. Needs you means the work is
+waiting for a decision, an answer or verification.
 
-Every thread starts small: steps hand over through the work record and the PR, never
-through a long conversation, and subagents return summaries instead of files.
+Work records keep ordinary progress on this machine, including queue, board
+Status, brief, decisions, slices, threads and review results. Tracker sync never
+writes queue, board Status, workflow stage or per-item progress to a tracker.
 
-## Skills
+## Tracker structure sync
 
-| Skill | What it does | Source |
-| ----- | ------------ | ------ |
-| `lar-shape` | Size up, shape, brief and gate an item | lar, with upstream Copies |
-| `lar-build` | Build an item through slices and review | lar, with upstream Copies |
-| `.agents/skills/skill-sync` | Sync upstream Copies from this checkout | lar |
+The ON-by-default onboarding option saves concepts and multi-repository structure
+only. It saves kind, map diagram, parts, Connections between repositories,
+Dependencies on other owners, and which issues belong together. It includes only
+shaping results necessary to explain that structure. Ordinary briefs, decision
+records, domain drafts, slices and progress stay local. Turning sync OFF keeps
+structure local too and causes no later publish prompt.
 
-Each installed skill carries the upstream content it needs. `skills/shared/`
-holds their common source; assembly copies it into both release skills.
-`skills/lar-build/coding-style.md` holds developer-profile.
+Local structural changes enter an outbox that drains automatically while sync is
+ON. `lar-work sync-structure <work ID>` requests structural sync explicitly.
+The app saves this local option as `settings.structureSync`. The local-settings
+helper also accepts `progressSync` as a compatibility spelling. Both mean
+structural sync only.
 
-`UPSTREAM.md` lists the upstream path and commit of every copy.
+On a fresh installation, add the repository and add the saved concept or
+multi-repository work from List. This restores kind, map, parts and relationships,
+including Connections and Dependencies. Queue and Status start fresh. Tracker
+sync does not restore ordinary briefs, decisions, slices or build progress.
 
-### Install
+## Domain docs
 
-Install the board app from
-[GitHub Releases](https://github.com/maddec01/lar-factory/releases): download the
-newest Release's dmg and drag Lar Factory into Applications. The app installs
-`lar-shape` and `lar-build` into every Install target: the skills folder of each
-Provider instance T3 Code lists, plus `~/.agents/skills`, `~/.claude` and any
-targets ticked in Settings. Each skill carries its own upstream content and
-checklists. The app writes a target only when its Release changes, or when you
-choose Replace for Drift. At launch and before Start build it reports Drift, a lar
-skill you edited or deleted, and asks before replacing it.
+One local `domainDocs` setting controls glossary and ADR writes. OFF is
+`{ "kind": "private" }`. Terms and decisions stay in local work records; builds
+write no domain docs and never ask to publish them later. ON is
+`{ "kind": "repository", "glossary": "GLOSSARY.md", "adrs": "docs/adr" }`.
+Builds include the relevant glossary entries and ADRs in their build PR, creating
+files only when needed. Shaping itself leaves repository files unchanged.
 
-The app also installs `~/.local/bin/lar-work`, a launcher for the `lar-work`
-command, which reads and changes work records from any folder, with the board app
-open or closed. Each launch points it at the app again, so it follows the app when
-you move or update it. If a file the app didn't write is already at that path, the
-app leaves it and logs a warning. Put `~/.local/bin` on your PATH if it isn't there
-yet. Run `lar-work --help` for its commands. The board lists only work records, so
-work that `lar-work` creates or moves shows on the board too.
+## Local data and commands
 
-If you run `npx skills add` yourself, always pass `-a`: `-y` without it installs into
-every agent the CLI knows.
+The app and `lar-work` share `~/Library/Application Support/Lar Factory/`.
+`repository-settings.json` holds the repository list, local settings, access
+choices and Connections. `work-records.db` holds work records and their
+bodies. An absolute `LAR_FACTORY_DATA_DIR` selects another data folder. Repository
+settings stay on this machine and use your existing local `gh` or `az` login;
+no factory infrastructure or credentials are required.
 
-### Update
+The app installs `lar-shape`, `lar-build` and the `~/.local/bin/lar-work` launcher
+for your agents. Put `~/.local/bin` on PATH to use the command from any folder,
+with the board open or closed. `lar-work --help` lists its commands. Factory
+instructions travel with threads; target repositories need no factory setup or
+guidance files. Existing project skills selected for a build supply extra coding
+guidance.
 
-The copies change only when a `skill-sync` PR merges here. Run `/skill-sync` to
-see what changed upstream and pick what to take. After merging, start a Release (see
-[Releasing](#releasing)) and install it; its first launch updates the skills, adds
-newly listed ones, and replaces the checklists.
+[Work records](skills/shared/issue-tracker/work-records.md) describes the workflow
+commands. [UPSTREAM.md](UPSTREAM.md) credits Copies and Ports. Copies update through
+this checkout's `/skill-sync`; lar-owned steps can change directly.
 
-### Avoiding conflicts
+## Develop the app
 
-The app manages only `lar-shape` and `lar-build`. User-installed skills keep
-their own sources. Copies inside lar's skills change through the checkout's
-`/skill-sync`; lar rules live beside the step that loads each Copy. Workflow Ports are lar step files adapted from upstream, with source credits in their headers and reviewed commits in `UPSTREAM.md`.
-
-### Project rules and provider limits
-
-A repository needs no factory files: Repository config (`.lar-factory.json`),
-the `## Agent skills` block and `docs/agents/` are optional. Without them, each
-thread's prompt carries the factory guidance. Optional Repository config holds
-team-shared defaults, and each user's local settings override them.
-
-Factory threads follow the repository's own rules, checks, commit format and PR
-requirements, and lar's standards fill only the gaps. `lar-build` takes extra
-coding guidance only from the project skills you select during onboarding. When
-a project rule and the factory workflow can't both be met, the thread shows you
-the Clash and asks.
-
-Claude Code and Codex load a repository's startup instructions (`AGENTS.md`,
-`CLAUDE.md`) into every thread and keep their installed skills available.
-Lar Factory can't remove that context or turn those skills off; `lar-build`
-only leaves unselected project skills out of its coding guidance.
-
-## Board
-
-The board is a local app that shows the lar project: what needs you, what's in
-flight, concepts and their progress, and where every item sits in the flow. It
-reads GitHub through your local `gh` login and refreshes itself. The repo is one
-pnpm workspace laid out like T3 Code's monorepo: `apps/server` is the board server,
-`apps/web` its page, `apps/desktop` the board app and `packages/shared` the code
-they share. See [`apps/server/README.md`](apps/server/README.md).
-
-`apps/desktop` is the board app: a Mac window that runs the board, copied from
-[T3 Code](https://github.com/pingdotgg/t3code)'s desktop app. It starts
-`apps/server/src/server.ts` as a child under Electron's own Node and shows its page.
-Quitting the app stops the server. To open it from a checkout, install the
-workspace at the repo root and start the window:
+Use Node 24.15+ and pnpm from the repository root:
 
 ```bash
-pnpm install && pnpm run dev
+pnpm install
+pnpm run dev
 ```
 
-The first run downloads Electron's binary.
+The first install downloads Electron. The workspace contains the server, web UI,
+Electron app and shared packages. See [the server README](apps/server/README.md)
+for local server and sample commands, and [the skill layout](docs/skill-layout.md)
+for assembly.
 
-To build a Mac app that runs without the checkout:
+To build an unsigned Apple Silicon app:
 
 ```bash
-cd apps/desktop && pnpm run build --unsigned
+cd apps/desktop
+pnpm run build --unsigned
 ```
 
-It writes an unsigned Apple Silicon app to `apps/desktop/release/mac-arm64/Lar Factory.app`,
-with the board server bundled into one file and its built page inside. If macOS refuses to open it,
-right-click it in Finder and choose Open. Beside it go a dmg, a zip and the update
-feed, `latest-mac.yml`.
-
-`--build-version <version>` builds another version; a Nightly version such as
-`0.1.0-nightly.20261023.57` writes `nightly-mac.yml` instead. Without `--unsigned`
-the build signs and notarizes, and fails unless `CSC_LINK`, `CSC_KEY_PASSWORD`,
-`APPLE_API_KEY` (the `.p8` file's path), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` and
-`APPLE_TEAM_ID` are set. The Release workflow builds that way.
-
-The app's build assembles `lar-shape` and `lar-build` into `apps/desktop/dist-electron/bundle`,
-which packaging puts in the app's `Resources/bundle`.
-A packaged app installs them into its Install targets after its window opens, and
-writes a target only when the target's recorded Release differs from the bundle's.
-It reports a Clash, a same-named skill the app doesn't own, and leaves it untouched.
-It shows a dialog for an error. A run from a checkout installs only with `--install-skills`,
-and `LAR_FACTORY_INSTALL_ROOT` puts the install in another folder instead of your
-home. From the repo root:
-
-```bash
-LAR_FACTORY_INSTALL_ROOT="$(mktemp -d)" pnpm run dev --install-skills
-```
+The app, dmg and zip go into `apps/desktop/release/`. A signed release uses the
+maintainer's signing secrets and the Release workflow.
 
 ### Release secrets
 
@@ -235,17 +161,16 @@ the waiting one. If a run shows as canceled, run it again.
 
 ## Repo layout
 
-```
-skills/            lar-shape, lar-build (with agents/), shared source
-.agents/skills/    checkout-only skill-sync
-apps/server/       the board server: reads GitHub, serves the page and the API
-apps/web/          the board page (React, built with Vite+)
-apps/desktop/      the board app: the board in a Mac window (Electron)
-packages/shared/   types and logic the apps share; apps import it, never each other
-scripts/setup-worktree.sh installs the workspace in a new worktree (.githooks, t3.json)
-scripts/release-secrets.sh stores the Release signing secrets on GitHub
-UPSTREAM.md        source and commit of every copy
-docs/plan.md       how this was set up
+```text
+skills/               lar-shape, lar-build and shared workflow source
+.agents/skills/       checkout-only skill-sync
+apps/server/          local board server and provider adapters
+apps/web/             board UI
+apps/desktop/         Electron app
+packages/shared/      shared model and local settings
+packages/ui/          design system
+packages/work-records/ local work records and lar-work command
+scripts/              assembly, workspace setup and release tools
 ```
 
 ## Credits and licence

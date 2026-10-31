@@ -6,8 +6,9 @@ user's original text stays in the record's initial context.
 
 This private brief is the builder's handover. Editing it invalidates its prior
 gate evidence. Run [Gate](gate.md) on the final text before marking it Ready.
-The optional [publication](shared/issue-tracker/publication.md) is a separate
-team-language projection. A provider edit never rewrites this brief.
+This ordinary brief stays local. Structural sync shares only the shaping
+results needed to explain a concept or multi-repository relationship. A provider
+edit never rewrites this brief.
 
 ```markdown
 ## What

@@ -1,5 +1,8 @@
-# 5. Start the build
+# Start a build later
 
+Ready means the current brief passed its gate. Shaping ends there and commits
+the user to no implementation. Any later brief edit needs a fresh gate.
+Tracker structure sync is independent of readiness and never starts a build.
 
 The board's **Start build** on a Ready build is the user's Go. A build blocked by
 other work starts only once that work is complete
@@ -15,7 +18,7 @@ build:
 3. records a launch intent, so a restart finds the start instead of making a
    second thread;
 4. starts the build thread in the build's repository project, in a new
-   worktree on a branch named from the build's kind and title from `main`
+   worktree on a branch named from the build's kind and title from the repository's resolved default or explicitly chosen PR target branch
    (`fix` for a `bug`, `feat` for a `feature` or `improvement`, else `chore`),
    with the message
    `Build <work ID>. Read <installed lar-build>/agents/builder.md and follow it.`,

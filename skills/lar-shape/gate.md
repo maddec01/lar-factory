@@ -13,9 +13,6 @@
    Status and publishes nothing.
 4. Set **Ready** on each build: this record if it's a build, and each build
    record made while shaping. Tell the user in chat which builds are Ready and
-   which work each waits on (`lar-work waiting-on`). Once refinement finishes,
-   offer [publication](shared/issue-tracker/publication.md), checking concept
-   readiness when this build belongs to one. Publication is optional and
-   separate from Ready. This shaping thread is done; the user starts each
-   build from the board (**5. Start the build**).
-
+   which work each waits on (`lar-work waiting-on`). This shaping thread is
+   done. Ready is a refinement result. Starting a build is the user's later
+   choice, with no publication or permission prompt at this gate.

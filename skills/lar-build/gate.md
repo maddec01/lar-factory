@@ -9,5 +9,5 @@
 3. Set **Ready** on each build: this record if it's a build, and each build
    record made while shaping. Tell the user in chat which builds are Ready and
    which work each waits on (`lar-work waiting-on`). This shaping thread is
-   done; the user starts each build from the board (**5. Start the build**).
-
+   done. Ready is a refinement result. Starting a build is the user's later
+   choice, with no publication or permission prompt at this gate.

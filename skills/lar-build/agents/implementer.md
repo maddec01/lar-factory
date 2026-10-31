@@ -16,12 +16,12 @@ fixup or `--no-verify`. Work another repository needs is never a commit
 here: report it as `needs <owner/repo>: <the work>`. Cite other-repo work
 per `../shared/cross-repo-citations.md`.
 
-Run only the checks `AGENTS.md` names for the files and platforms the slice
-changed, narrowed to the affected tests where `AGENTS.md` says how. The
+Run only the project checks for the files and platforms the slice
+changed, narrowed to the affected tests where project instructions or scripts provide a narrower command. The
 builder runs the full suite once per build. A changed file that several
 platforms build is a change to each of those platforms. A slice that changes
 only tests or docs builds nothing and runs the affected tests plus the format
-and lint checks `AGENTS.md` names. Then rebase onto the build branch tip.
+and lint checks the project provides. Then rebase onto the build branch tip.
 
 Report your absolute worktree path and slice branch, or that the slice is
 blocked (too big, checks won't pass) and why, with your worktree path.

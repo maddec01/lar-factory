@@ -1,6 +1,6 @@
 ---
 name: lar-shape
-description: Take a queued lar work record through shaping to a Ready brief.
+description: Shape any issue or local work record into a map or Ready brief, independently of building it.
 argument-hint: "<work ID, owner/repo#n or ticket URL>"
 disable-model-invocation: true
 ---
@@ -13,8 +13,9 @@ verifies visible changes and merges every PR.
 Read [prose rules](shared/prose.md) before writing. Read each step and its
 linked references only when reached. The work record is the handover: keep its
 brief, map, decisions and blockers there through `lar-work` and the shared
-scripts, per [work records](shared/issue-tracker/work-records.md), never in a
-ticket. Move Status at each step with `status.sh`.
+scripts, per [work records](shared/issue-tracker/work-records.md). Only the
+structural projection described below reaches a tracker. Move Status locally
+at each step with `status.sh`.
 Facts are yours to find; decisions are the user's. Delegated work follows
 [orchestration](shared/orchestration.md), with reports of at most 300 words,
 without files, logs or screenshots. Ask ordinary questions per the
@@ -28,9 +29,9 @@ Never merge or push to main. Follow the repository's commit rules and
 1. Read [Pick up](pick-up.md) and route the item.
 2. Read [Size up](size-up.md) for a new shaping item.
 3. Read [Brief](brief.md) once its questions are settled.
-4. Read [Gate](gate.md) before marking a build Ready.
-5. Read [Start the build](start-build.md) when explaining the board handover.
+4. Read [Gate](gate.md) before marking refinement Ready. Shaping ends here.
+5. Read [Start a build later](start-build.md) only when the user asks to implement.
 
-When refinement finishes or the user later asks to publish, read
-[publication](shared/issue-tracker/publication.md). Publication keeps its own
-approval and recovery journal and leaves Ready and Start build separate.
+For concept or multi-repository structural changes, follow
+[Tracker structure sync](shared/issue-tracker/publication.md). Ordinary progress
+and briefs stay local. Honor the saved sync choice without a publish prompt.

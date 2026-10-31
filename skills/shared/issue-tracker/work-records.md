@@ -7,25 +7,24 @@ read and write records only through `lar-work` and the shared scripts.
 the `--revision` from your last read; when the record moved on, the change
 writes nothing, so read it again and redo the change.
 
-Factory progress stays on this machine. No step edits a ticket's body,
-comments, labels, tags or Azure State to record shaping, Status or
-build progress.
+Factory progress stays on this machine. Tracker writes carry only the structure
+described below, never queue, Status or build progress.
 
 ## Picking
 
-A **work ID** names one record for its whole life. Work reaches the board when
-the user captures it there or picks a ticket there: a GitHub issue, or an Azure
-DevOps work item. A picked ticket's record keeps the ticket reference, and the
-ticket's text at pick time is the record's initial context
+A **work ID** names one record for its whole life. Work reaches the board through local capture or from the repository List.
+The configured GitHub issues or Azure DevOps team source supplies that List;
+there is no per-ticket import step. A source-backed record keeps its ticket
+reference and initial text
 (`lar-work context <work ID>`). That text is where shaping starts. Refinement in
 the record is the authority, and a later ticket edit never changes it.
 
 Resolve a thread's argument, a work ID or a ticket (`owner/repo#12`, its issue
 URL, or an Azure work item URL), with
 `bash <this skill>/shared/scripts/work.sh <ref>`, which prints the record. For
-a ticket no record holds, it fails with "Pick the ticket on the board, then
-rerun". Pass that on to the user and stop. Records come from the board's
-capture and pick, so a thread never creates one for a ticket.
+a ticket with no local record, use the repository List to add the work, then
+resolve it again. A thread uses the existing local identity instead of creating
+a duplicate record.
 
 Name the work ID in every handoff, delegated-task brief and thread message.
 
@@ -60,15 +59,15 @@ connected to this one.
 
 - An onboarded repository is one the user can change. A Connection grants no
   permission to act. When the work needs a change in a connected onboarded
-  repository, propose a build there and wait for the user's OK before planning
-  it. Then make it with
+  repository, describe the required part and shape it within the user's authorized scope.
+  Ask only when it adds scope the user has not authorized. Make it with
   `lar-work create --title X --repository <owner/repo> --kind build`, put it
   under the concept with `lar-work set-parent` or record the wait with
   `lar-work add-blocker`, and shape it in that repository. An onboarded
   repository that isn't connected comes into play only when the user names it.
 - In a repository that is not onboarded, read code, docs and tickets for
   context and write nothing there. When required work is there, keep refining
-  and offer the user both choices: onboard it to plan a build, or record a
+  and offer the user both choices: add it to shape its part, or record a
   Dependency for the team that owns it. Onboard or change a repository only on
   the user's choice.
 - When the login cannot push a branch or deliver a fork PR to a repository,
@@ -103,17 +102,21 @@ A decision is complete once its answer and domain drafts are recorded and its
 concept's map is written after them. A concept is complete once its Fog is
 recorded gone (`lar-work set-fog`) and every decision and build it owns is
 complete. A Status, a closed ticket or an ended thread completes nothing, and no
-step changes Azure State to complete publication work. A delivery PR uses the
+step changes Azure State to record local completion. A delivery PR uses the
 provider's closing relationship independently of local completion.
 
-## Publication
+## Tracker structure sync
 
-Offer publication of finished refinement and handle later publication requests
-through [publication](publication.md). It uses the common command and journal
-with the board closed. Ready and Start build remain separate choices. Publish
-only concepts and builds, with team terms and exact approval. Decisions,
-slices and progress stay in records. Opening a build's PR follows
-[PR delivery](publication-pr.md), including ticketless work.
+Follow [Tracker structure sync](publication.md) for concepts and multi-repository
+work. The ON-by-default onboarding option saves kind, map, parts, Connections,
+Dependencies and issue grouping, with only the shaping results needed to explain
+them. Local changes enter the structural outbox automatically;
+`lar-work sync-structure <work ID>` requests a drain explicitly. Queue, Status,
+ordinary briefs, decisions, slices and per-item progress stay in local records.
+Shaping and starting a build remain independent choices.
+
+Opening a build's PR follows [PR delivery](publication-pr.md), including
+work without a ticket.
 
 ## Providers
 

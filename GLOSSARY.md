@@ -11,3 +11,12 @@ _Avoid_: refined ticket.
 **Original**:
 The text a ticket had before its first Spec, kept collapsed in the ticket.
 _Avoid_: initial ticket.
+
+
+**Slice**:
+A private part of a build that is completed when its work merges into the build branch. Slices appear within their build and are not separate board items.
+_Avoid_: sub-ticket.
+
+**Active slice**:
+An unfinished, unblocked slice whose implementation thread or its live descendants are currently running. An unavailable activity observation cannot establish that a slice is active.
+_Avoid_: In progress slice.

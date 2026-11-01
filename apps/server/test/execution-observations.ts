@@ -5,13 +5,19 @@ import type { FixtureRequest, FixtureThread } from './stats-db.ts';
 
 export function protocolItemThreads(threadIds: readonly string[]) {
   try {
-    const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
+    const threads: (FixtureThread & { retainedAt?: string })[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
+    const requests: FixtureRequest[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.requests.json', 'utf8'));
     const shells = threads.map(thread => ({
       id: thread.id, title: thread.title ?? thread.id, deletedAt: thread.deletedAt,
-      status: thread.turns?.some(turn => !turn.completedAt) ? 'running' : 'completed',
+      lineage: { parentThreadId: thread.parentThreadId ?? thread.rootThreadId, rootThreadId: thread.rootThreadId },
+      pendingRuntimeRequest: requests.some(request => !request.resolvedAt && thread.turns?.some(turn => turn.id === request.turnId)),
+      status: thread.turns?.some(turn => !turn.completedAt) ? 'running' : thread.turns?.at(-1)?.status ?? 'completed',
       updatedAt: new Date(thread.turns?.at(-1)?.completedAt ?? thread.turns?.at(-1)?.startedAt ?? '2026-10-20T08:00:00.000Z').toISOString(),
     }));
-    return executionItemThreads(shells)(threadIds);
+    return executionItemThreads(shells)(threadIds)?.map(thread => {
+      const retainedAt = threads.find(source => source.id === thread.id)?.retainedAt;
+      return retainedAt ? { ...thread, observedAt: retainedAt } : thread;
+    });
   } catch { return threadIds.length ? 'unavailable' as const : undefined; }
 }
 /** Spawned boards find started threads through the fake t3 CLI alone. */
@@ -19,6 +25,7 @@ export function protocolStartedThread(): never { throw Error("T3 execution unava
 
 /** Spawned boards consume the same protocol mapping as production. */
 export function protocolStatsInputs() {
+  if (process.env.FAKE_EXECUTION_STATS_UNAVAILABLE === '1') throw Error('Usage unavailable');
   const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
   return executionStats(threads.map(thread => ({
     thread: { id: thread.id, title: thread.title ?? thread.id, deletedAt: thread.deletedAt ?? null,

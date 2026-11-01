@@ -486,3 +486,23 @@ test.each([false, true])('a Ready item keeps Start build after shaping stops (re
   await press(row('I_sample13'));
   expect(text(dialog()!.querySelector('[data-slot="modal-footer"]'))).toContain('Start build ▾');
 });
+
+test('live slice transitions update the bar, expanded list and count without a reload', async () => {
+  const initial = boardOf([build(3)]);
+  await mountPage(initial);
+  await press(count());
+  const { useBoardStore } = await import('../board/board-store.ts');
+  for (const progress of ['active', 'unknown', 'blocked', 'waiting', 'done'] as const) {
+    const data = { ...initial, items: initial.items.map(item => ({ ...item, slices: item.slices.map((slice, index) => index === 1 ? { ...slice, progress } : slice) })) };
+    await settle(() => useBoardStore.getState().receive(data));
+    expect(text(list())).toContain(progress);
+    expect(text(count())).toBe(progress === 'done' ? '2/3 slices' : '1/3 slices');
+    const segment = col('I_59', 'bar').querySelectorAll('ol > li')[1]!;
+    expect(segment.classList.contains('status-pulse')).toBe(progress === 'active');
+    if (progress === 'unknown') {
+      expect((segment as HTMLElement).style.background).toBe('var(--muted-foreground)');
+      expect(text(list())).toContain('?');
+      expect(text(col('I_59', 'next'))).toBe('');
+    }
+  }
+});

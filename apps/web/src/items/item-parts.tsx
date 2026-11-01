@@ -59,7 +59,7 @@ export function StepTrack({ status }: { status: Status }) {
   );
 }
 
-const SLICE_COLOR: Record<SliceProgress, string> = { done: 'var(--st-done)', active: 'var(--st-now)', blocked: 'var(--st-review)', waiting: 'var(--input)' };
+const SLICE_COLOR: Record<SliceProgress, string> = { done: 'var(--st-done)', active: 'var(--st-now)', blocked: 'var(--st-review)', unknown: 'var(--muted-foreground)', waiting: 'var(--input)' };
 
 /** A build's slices as one bar, a segment each, in their colours; the bar's waiting segments are faint. `thick` draws it as tall as a step of the item dialog's progress bar. */
 export function SliceBar({ item, thick }: { item: Item; thick?: boolean }) {
@@ -79,6 +79,7 @@ export function SliceMark({ progress }: { progress: SliceProgress }) {
   return (
     <span className="grid size-4 shrink-0 place-items-center rounded-full border-[1.5px]"
       style={{ borderColor: SLICE_COLOR[progress], background: progress === 'done' ? 'var(--st-done)' : 'transparent' }}>
+      {progress === 'unknown' && <span className="text-[9px] leading-none">?</span>}
       {progress === 'done' && <Check className="size-2.5 text-white" strokeWidth={3} />}
       {progress === 'active' && <span className="status-pulse size-1.5 rounded-full bg-(--st-now)" />}
     </span>

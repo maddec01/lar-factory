@@ -2,7 +2,7 @@ import { test, type TestContext } from 'vite-plus/test';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
 import assert from 'node:assert/strict';
-import { onboarded, readsRepositoryConfig, startBoard, until } from './server-support.ts';
+import { changeRecords, onboarded, readsRepositoryConfig, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
@@ -114,7 +114,7 @@ test("a build's slices show their records' progress, and its build sub-issue sta
   const read = await readItems(board);
   assert.deepEqual(read.map((i) => i.number).sort(), [12, 13], 'the build sub-issue stays a board item; the slice does not');
   const built = read.find((i) => i.number === 13);
-  assert.deepEqual(built?.slices.map((s) => [s.number, s.progress]), [[15, 'active'], [16, 'blocked']]);
+  assert.deepEqual(built?.slices.map((s) => [s.number, s.progress]), [[15, 'waiting'], [16, 'blocked']]);
 });
 
 test('a build sub-issue on the board stays a board item while the issue search still misses its new label', async (t) => {
@@ -401,4 +401,52 @@ test('BOARD_PORT zero binds an OS-assigned port and serves the board at its logg
   const board = await startBoard(t, {}, true, false, { BOARD_PORT: '0' });
   assert.ok(Number(new URL(board.url).port) > 0);
   assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
+});
+
+test('default-status slices follow implementation activity on local refresh without available usage', async (t) => {
+  const db = statsDb(t, []);
+  const board = await startBoard(t, { items: [rawBuild(13, 'In progress')] }, false, true, { T3_STATE_DB: db, BOARD_READ_MS: '60000', FAKE_EXECUTION_STATS_UNAVAILABLE: '1' });
+  const parent = (await readItems(board))[0]!;
+  let sliceId = '';
+  await changeRecords(board, records => {
+    let slice = records.create({ title: 'Live slice', repository: parent.repo, kind: 'slice' });
+    slice = records.setParent(slice.workId, slice.revision, parent.id);
+    sliceId = slice.workId;
+    records.addThread(slice.workId, slice.revision, 'implementation', 'implement');
+    const unrelated = records.create({ title: 'Planning slice', repository: parent.repo, kind: 'slice' });
+    const attached = records.setParent(unrelated.workId, unrelated.revision, parent.id);
+    records.addThread(attached.workId, attached.revision, 'planner', 'shape');
+  }, parent.id, item => item.slices.length === 2);
+  const observe = async (threads: unknown[], expected: string, requests: unknown[] = []) => {
+    writeFileSync(db + '.requests.json', JSON.stringify(requests));
+    writeFileSync(db + '.execution.json', JSON.stringify(threads));
+    const data = await until(board, data => data.items.find(item => item.id === parent.id)?.slices.find(slice => slice.workId === sliceId)?.progress === expected);
+    assert.equal(data.items.find(item => item.id === parent.id)!.slices.find(slice => slice.title === 'Planning slice')!.progress, 'waiting');
+  };
+  const running = { id: 'implementation', turns: [{ id: 'turn', startedAt: '2026-11-01T08:00:00Z' }] };
+  const planner = { ...running, id: 'planner' };
+  await observe([running, planner], 'active');
+  await observe([running, planner], 'blocked', [{ turnId: 'turn', createdAt: '2026-11-01T08:01:00Z' }]);
+  for (const status of ['completed', 'failed', 'interrupted', 'cancelled']) {
+    await observe([{ id: 'implementation', turns: [{ id: 'turn', startedAt: '2026-11-01T08:00:00Z', completedAt: '2026-11-01T08:02:00Z', status }] }, planner], 'waiting');
+  }
+  await observe([planner], 'unknown');
+  await observe([{ id: 'implementation' }, { ...running, id: 'child', rootThreadId: 'implementation' }, planner], 'active');
+  await changeRecords(board, records => {
+    records.addThread(sliceId, records.read(sliceId).revision, 'retry', 'implement');
+  }, parent.id, item => item.slices.find(slice => slice.workId === sliceId)?.progress === 'active');
+  await observe([{ id: 'implementation' }, { ...running, id: 'retry' }, planner], 'active');
+  await observe([{ ...running, id: 'retry' }, planner], 'active');
+  await observe([{ ...running, retainedAt: '2026-11-01T08:00:00Z' }, planner], 'unknown');
+  await observe([running, planner], 'active');
+  rmSync(db + '.execution.json');
+  await until(board, data => data.items.find(item => item.id === parent.id)?.slices.find(slice => slice.workId === sliceId)?.progress === 'unknown');
+  await observe([running, planner], 'active');
+  await changeRecords(board, records => {
+    records.setNeedsYou(sliceId, records.read(sliceId).revision, 'Merge conflict');
+  }, parent.id, item => item.slices.find(slice => slice.workId === sliceId)?.progress === 'blocked');
+  rmSync(db + '.execution.json');
+  await changeRecords(board, records => {
+    records.recordFinished(sliceId, records.read(sliceId).revision);
+  }, parent.id, item => item.slices.find(slice => slice.workId === sliceId)?.progress === 'done');
 });

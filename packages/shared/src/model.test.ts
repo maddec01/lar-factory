@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, dependencyNotice, buildBranch, buildMessage, canAbandon, canResumeShaping, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, providerTool, repositoryProjectHint, sameRepo, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, dependencyNotice, buildBranch, buildMessage, canAbandon, canResumeShaping, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, providerTool, repositoryProjectHint, sameRepo, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, earlierWorkMessage, earlierBuildMessage } from './model.ts';
 import type { BoardData, Blocker, Checks, DependencyHold, DependencyObservationKind, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -156,20 +156,39 @@ test('Done counts for 7 days after closing', () => {
   assert.equal(isRecentlyDone(item('Review', [], { closedAt: '2026-10-21T09:00:00Z' }), now), false);
 });
 
-test('the work message titles the thread, then runs lar-shape on the work ID', () => {
-  const work = item('Queued', [], { id: '0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a' });
-  assert.equal(workMessage(work), '#7 t\n$lar-shape 0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a');
-  assert.equal(workTitle(work), '#7 t');
+test('the work message names the thread for shaping, then runs lar-shape on the work ID', () => {
+  const work = item('Queued', [], { id: '0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a', number: 760, title: 'Improve T3 Code thread names' });
+  assert.equal(workMessage(work), 'Shaping #760 Improve T3 Code thread names\n$lar-shape 0b6e2c1a-5d4f-4e3b-9a7c-1f2e3d4c5b6a');
 });
 
-test('the work message for ticketless work titles the thread with its title alone', () => {
+test('the work message for ticketless work names the thread with its title alone', () => {
   const work = item('Queued', [], { id: 'w1', number: 0, url: null, title: 'Tidy the docs' });
-  assert.equal(workMessage(work), 'Tidy the docs\n$lar-shape w1');
+  assert.equal(workMessage(work), 'Shaping Tidy the docs\n$lar-shape w1');
+});
+
+test('a decision launched through shaping is named for shaping', () => {
+  const work = item('Queued', ['decision-architecture'], { id: 'w1', number: 12, title: 'Pick a store' });
+  assert.equal(workMessage(work), 'Shaping #12 Pick a store\n$lar-shape w1');
+});
+
+test('an Azure work item is named by its number as a GitHub ticket is', () => {
+  const work = item('Queued', [], { id: 'w1', number: 4021, title: 'Sync backlog', repo: 'contoso/Fabrikam/web' });
+  assert.equal(workMessage(work).split('\n')[0], 'Shaping #4021 Sync backlog');
+  assert.equal(buildMessage(work, '/l').split('\n')[0], 'Build #4021 Sync backlog');
+});
+
+test('the messages before the phase names are kept for a launch still unresolved', () => {
+  const work = item('Ready', [], { id: 'w1', number: 7, title: 'T' });
+  assert.equal(earlierWorkMessage(work), '#7 T\n$lar-shape w1');
+  assert.equal(earlierBuildMessage(work, '/l'), 'Build w1. Read /l/agents/builder.md and follow it.');
+  const context = { dataDir: '/d', bin: '/b', shapeSkill: '/s/SKILL.md' };
+  assert.equal(earlierWorkMessage(work, context), workMessage(work, context).replace('Shaping ', ''));
+  assert.equal(earlierBuildMessage(work, '/l', context), buildMessage(work, '/l', context).split('\n').slice(1).join('\n'));
 });
 
 test('a $word in the title is kept and $lar-shape still opens line 2', () => {
   const message = workMessage(item('Queued', [], { title: 'Fix $foo parsing' }))!;
-  assert.equal(message, '#7 Fix $foo parsing\n$lar-shape x');
+  assert.equal(message, 'Shaping #7 Fix $foo parsing\n$lar-shape x');
   assert.equal(message.split('\n')[1], '$lar-shape x');
 });
 
@@ -198,9 +217,14 @@ test('a ticketless build branch starts its slug with the first 8 characters of t
   assert.equal(buildBranch(work), 'fix/0b6e2c1a-fix-login');
 });
 
-test('the build message names the build by its work ID and the builder agent of the installed lar-build', () => {
-  assert.equal(buildMessage(item('Ready', [], { id: 'w1' }), '/Users/me/.agents/skills/lar-build'),
-    'Build w1. Read /Users/me/.agents/skills/lar-build/agents/builder.md and follow it.');
+test('the build message names the thread for the build, then the work ID and the builder agent of the installed lar-build', () => {
+  assert.equal(buildMessage(item('Ready', [], { id: 'w1', number: 760, title: 'Improve T3 Code thread names' }), '/Users/me/.agents/skills/lar-build'),
+    'Build #760 Improve T3 Code thread names\nBuild w1. Read /Users/me/.agents/skills/lar-build/agents/builder.md and follow it.');
+});
+
+test('the build message for ticketless work names the thread with its title alone', () => {
+  assert.equal(buildMessage(item('Ready', [], { id: 'w1', number: 0, url: null, title: 'Tidy the docs' }), '/l'),
+    'Build Tidy the docs\nBuild w1. Read /l/agents/builder.md and follow it.');
 });
 
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {

@@ -7,7 +7,7 @@ import { refreshSpecs } from '@lar-factory/work-records/spec-sync';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, FactoryThreadContext, Item, ModelChoice, ModelGroup, OperationAccess, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
@@ -106,7 +106,7 @@ export interface ItemCommandsDeps {
   startThread?: typeof startThread;
   showThread?: typeof lookupThread;
   /** Finds the thread an unresolved start opened, through T3's protocol and then its CLI; tests stand in for both. */
-  recoverThread?: (projectId: string, message: string, known: readonly string[]) => Promise<StartedThread | 'absent' | 'unknown'>;
+  recoverThread?: (projectId: string, messages: readonly string[], known: readonly string[]) => Promise<StartedThread | 'absent' | 'unknown'>;
   /** The project skills selected for the repository as builds start now; tests stand in for the local settings. */
   skillsOf?: (repo: string) => readonly string[];
   /** Reopens the repository's PR `number`; tests stand in for gh and az. */
@@ -161,12 +161,12 @@ async function currentRepositoryProject(repo: string): Promise<RepositoryProject
 }
 
 /** The thread an unresolved start opened as T3's protocol shows it, else as its CLI does. */
-async function recoverStartedThread(projectId: string, message: string, known: readonly string[]): Promise<StartedThread | 'absent' | 'unknown'> {
+async function recoverStartedThread(projectId: string, messages: readonly string[], known: readonly string[]): Promise<StartedThread | 'absent' | 'unknown'> {
   try {
-    const found = protocolStartedThread(projectId, message, known);
+    const found = protocolStartedThread(projectId, messages, known);
     if (found) return found;
   } catch { /* The CLI reads T3 when the protocol can't. */ }
-  return findStartedThread(projectId, message, known);
+  return findStartedThread(projectId, messages, known);
 }
 
 /** The project skills selected for the repository in its local settings, or none. */
@@ -334,13 +334,17 @@ export function createItemCommands({ board, items, records, reread, archive, off
    * Settles an unresolved launch intent through T3: to the thread T3 shows for it, to a failure with Needs you once T3
    * shows none after SHOW_GRACE_MS, or not yet while T3 can't answer.
    */
-  function settle(item: Item, intent: LaunchIntent, projectId: string, message: string): Promise<Start> {
+  function settle(item: Item, intent: LaunchIntent, projectId: string): Promise<Start> {
     const running = settling.get(intent.intentId);
     if (running) return running;
+    // An intent recorded before thread names carried a phase started its thread with the earlier message.
+    const messages = intent.purpose === PURPOSES.startedBuilds
+      ? [buildMessage(item, larBuild(), factoryContext), earlierBuildMessage(item, larBuild(), factoryContext)]
+      : [workMessage(item, factoryContext), earlierWorkMessage(item, factoryContext)];
     return track(settling, intent.intentId, (async (): Promise<Start> => {
       const known = records!.threads(item.id).map((t) => t.threadId);
       let found: Awaited<ReturnType<typeof recoverThread>>;
-      try { found = await recoverThread(projectId, message, known); } catch { found = 'unknown'; }
+      try { found = await recoverThread(projectId, messages, known); } catch { found = 'unknown'; }
       if (typeof found === 'object') {
         write(item.id, (revision) => records!.resolveLaunchIntent(item.id, revision, intent.intentId, { threadId: found.threadId }));
         return { thread: found, error: null };
@@ -372,12 +376,12 @@ export function createItemCommands({ board, items, records, reread, archive, off
    * Starts the item's thread for `record` through `ask`, guarded by its work record: a held or unresolved start answers
    * for it, Needs you and a paused setup refuse it, and a launch intent is on the record before `ask` runs. Without records, `ask` alone.
    */
-  async function launch(item: Item, record: StartRecord, projectId: string, message: string, ask: () => Promise<StartResult>,
+  async function launch(item: Item, record: StartRecord, projectId: string, ask: () => Promise<StartResult>,
     prepare: () => void = () => {}): Promise<Start> {
     if (!records) return ask();
     const purpose = PURPOSES[record];
     const unresolved = records.launchIntents({ workId: item.id, unresolved: true }).find((intent) => intent.purpose === purpose);
-    if (unresolved) return settle(item, unresolved, projectId, message);
+    if (unresolved) return settle(item, unresolved, projectId);
     const needsYou = records.read(item.id).needsYou;
     if (needsYou) return { thread: null, error: `Needs you: ${needsYou}`, refused: true };
     // A build whose PR closed unmerged starts a replacement, so the thread that opened that PR holds no start.
@@ -408,8 +412,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
       const record: StartRecord = intent.purpose === PURPOSES.startedBuilds ? 'startedBuilds' : 'started';
       const repoProject = await projectOf(item.repo);
       if (repoProject.error !== undefined) continue;
-      const message = record === 'startedBuilds' ? buildMessage(item, larBuild(), factoryContext) : workMessage(item, factoryContext);
-      const { thread } = await settle(item, intent, repoProject.projectId, message);
+      const { thread } = await settle(item, intent, repoProject.projectId);
       if (thread) board.update({ [record]: { ...board.snapshot()[record], [item.id]: thread } } satisfies Partial<BoardData>);
       board.push();
     }
@@ -506,7 +509,6 @@ export function createItemCommands({ board, items, records, reread, archive, off
       if (busy) return withBoard(409, { error: busy });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
-      const message = workMessage(item, factoryContext);
       const repo = item.repo;
       return async () => {
         const repoProject = await projectOf(repo);
@@ -515,7 +517,11 @@ export function createItemCommands({ board, items, records, reread, archive, off
           reread();
           return { thread: null, error: 'Shaping changed while the thread was starting. Check the updated item.', refused: true };
         }
-        return launch(item, 'started', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice));
+        // The title can change while the project is read, so the thread is named from the record as it stands now.
+        if (records) reread();
+        const current = board.find(item.id) ?? item;
+        const message = workMessage(current, factoryContext);
+        return launch(current, 'started', repoProject.projectId, () => startIn(repoProject.projectId, message, choice));
       };
     }),
 
@@ -530,7 +536,6 @@ export function createItemCommands({ board, items, records, reread, archive, off
       if (busy) return withBoard(409, { error: busy });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
-      const message = buildMessage(item, larBuild(), factoryContext);
       const previous = board.snapshot().startedBuilds?.[itemId];
       const retry = retryBuilds.has(itemId) || previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped')
         || recordedThreads(itemId).some((t) => t.purpose === PURPOSES.startedBuilds) || prClosed(itemId);
@@ -552,7 +557,10 @@ export function createItemCommands({ board, items, records, reread, archive, off
         const snapshot = () => {
           if (records!.read(item.id).skills === null) write(item.id, (revision) => records!.snapshotSkills(item.id, revision, skillsOf(repo)));
         };
-        return launch(item, 'startedBuilds', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice, { base, branch }), snapshot);
+        // Refreshing the Spec can change the title, so the thread is named from the record as it stands now.
+        const current = board.find(item.id) ?? item;
+        const message = buildMessage(current, larBuild(), factoryContext);
+        return launch(current, 'startedBuilds', repoProject.projectId, () => startIn(repoProject.projectId, message, choice, { base, branch }), snapshot);
       };
     }),
 

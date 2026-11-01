@@ -8,7 +8,7 @@ import type { BoardData } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import { checkouts } from './repo-support.ts';
-import { shapePrompt, larWork, startBoard, until, writesRepository, type Board } from './server-support.ts';
+import { earlierShapePrompt, shapePrompt, larWork, startBoard, until, writesRepository, type Board } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 
 /** A home and T3 database that outlive each board started on them, as this Mac's do across a restart. */
@@ -102,6 +102,23 @@ test('a failed start stays a failure after a restart, so Start there asks T3 aga
   assert.equal((await start(after, workId)).status, 200);
   assert.equal(await starts(after), 1);
   assert.deepEqual(await intents(after, workId), [{ threadId: null, failure: true, resolved: true }, { threadId: 'thread-1', failure: false, resolved: true }]);
+});
+
+test('a start left unresolved before threads took their phase in their name recovers its thread, and no second one starts', { timeout: 30_000 }, async (t) => {
+  const boardOn = machine(t);
+  const before = await boardOn({ t3: { fail: 'garbage' } }, true);
+  const workId = before.id(12);
+  await until(before, (d) => d.items.some((i) => i.id === workId));
+  const message = earlierShapePrompt(before,'#12 Issue 12',workId);
+  assert.equal((await (await start(before, workId)).json()).uncertain, true);
+  await before.stop();
+
+  const after = await boardOn({ t3: { recover: 'late', firstMessage: message } });
+  await until(after, (d) => d.items.some((i) => i.id === workId));
+  const settled = await start(after, workId);
+  assert.deepEqual([settled.status, (await settled.json()).thread?.threadId], [200, 'thread-1']);
+  assert.equal(await starts(after), 0);
+  assert.deepEqual(await intents(after, workId), [{ threadId: 'thread-1', failure: false, resolved: true }]);
 });
 
 test('an uncertain start stays unresolved across a restart: T3 is read before anything, and no second thread starts', { timeout: 30_000 }, async (t) => {

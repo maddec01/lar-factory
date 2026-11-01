@@ -4,6 +4,7 @@ import { readJsonRecord } from '../json-file.ts';
 import { boardProjects } from './board-projects.ts';
 import { readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead } from './execution-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
+import { titledFrom } from './t3.ts';
 
 /** Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out. */
 export function executionItemThreads(shells: Record<string, unknown>[]) {
@@ -122,21 +123,23 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
 }
 
 /**
- * The one root thread in `projectId` whose first user message is `message`, leaving out the `known` thread IDs, as the
- * protocol shows it now; null when none or more than one does. Unavailable observations throw.
+ * The one root thread in `projectId` whose first user message is any of `messages`, leaving out the `known` thread IDs,
+ * as the protocol shows it now; null when none or more than one does. Unavailable observations throw.
  */
-export function protocolStartedThread(projectId: string, message: string, known: readonly string[]): StartedThread | null {
+export function protocolStartedThread(projectId: string, messages: readonly string[], known: readonly string[]): StartedThread | null {
   protocolItemThreads([]);
   if (!current?.available) throw Error('T3 execution unavailable');
   const candidates = (current.shells ?? []).filter((shell) => shell.projectId === projectId && !shell.deletedAt && typeof shell.id === 'string'
-    && !known.includes(shell.id) && shell.title === message.split('\n')[0]);
+    && !known.includes(shell.id) && messages.some(message => titledFrom(shell.title, message)));
   if (candidates.some(shell => !executionAvailable(shell))) throw Error('T3 execution unavailable');
-  const matches = candidates.filter((shell) => {
+  const matches = new Set(candidates.filter((shell) => {
     const first = current!.reads?.get(String(shell.id))?.observation?.projection.messages
       .filter((entry) => entry.role === 'user').sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))[0];
-    return first?.text === message;
-  });
-  return matches.length === 1 ? { threadId: String(matches[0]!.id), title: String(matches[0]!.title) } : null;
+    return messages.some(message => first?.text === message);
+  }).map(shell => String(shell.id)));
+  if (matches.size !== 1) return null;
+  const [threadId] = matches;
+  return { threadId: threadId!, title: String(candidates.find(shell => shell.id === threadId)!.title) };
 }
 
 /** A fresh observation of this thread, independent of another thread's history read. */

@@ -817,12 +817,6 @@ export function canAbandon(item: Item): boolean {
   return item.status === 'List' || item.status === 'Queued';
 }
 
-/** Line 1 of the work message, which T3 titles the thread from: the item's name in a sentence. */
-export function workTitle(item: Item): string {
-  return itemName(item);
-}
-
-/** The work message: the item's name, then `$lar-shape <work ID>`. */
 export interface FactoryThreadContext {
   dataDir: string;
   bin: string;
@@ -841,9 +835,19 @@ function factoryEnvironment(context: FactoryThreadContext): string {
     'Pass these exact paths and environment to every delegated task. The target repository needs no factory files or factory instructions in AGENTS.md or CLAUDE.md.',
   ].join('\n');
 }
+function shapeInstructions(item: Item, context?: FactoryThreadContext | null): string {
+  if (!context) return `$lar-shape ${item.id}`;
+  return `Shape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\nShaping is independent of implementation. Do not build unless the user later chooses Start build.\n\n${factoryEnvironment(context)}`;
+}
+
+/** The work message. Line 1, which T3 titles the thread from, is `Shaping` and the item's name in a sentence; then come its instructions, with its work ID. */
 export function workMessage(item: Item, context?: FactoryThreadContext | null): string {
-  if (!context) return `${workTitle(item)}\n$lar-shape ${item.id}`;
-  return `${workTitle(item)}\nShape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\nShaping is independent of implementation. Do not build unless the user later chooses Start build.\n\n${factoryEnvironment(context)}`;
+  return `Shaping ${itemName(item)}\n${shapeInstructions(item, context)}`;
+}
+
+/** The work message boards sent before thread names carried a phase, which a launch intent still unresolved may have started. */
+export function earlierWorkMessage(item: Item, context?: FactoryThreadContext | null): string {
+  return `${itemName(item)}\n${shapeInstructions(item, context)}`;
 }
 
 /**
@@ -860,10 +864,15 @@ export function buildBranch(item: Item): string {
   return `${prefix}/${[item.number || item.id.slice(0, 8), ...words].join('-')}`;
 }
 
-/** Start build's message, naming the build's work ID and the builder agent of the lar-build installed at `larBuild`. */
-export function buildMessage(item: Item, larBuild: string, context?: FactoryThreadContext | null): string {
+/** The build message boards sent before thread names carried a phase, which a launch intent still unresolved may have started. */
+export function earlierBuildMessage(item: Item, larBuild: string, context?: FactoryThreadContext | null): string {
   const message = `Build ${item.id}. Read ${larBuild}/agents/builder.md and follow it.`;
   return context ? `${message}\n\n${factoryEnvironment(context)}` : message;
+}
+
+/** Start build's message. Line 1, which T3 titles the thread from, is `Build` and the item's name in a sentence; then come the build's work ID and the builder agent of the lar-build installed at `larBuild`. */
+export function buildMessage(item: Item, larBuild: string, context?: FactoryThreadContext | null): string {
+  return `Build ${itemName(item)}\n${earlierBuildMessage(item, larBuild, context)}`;
 }
 
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */

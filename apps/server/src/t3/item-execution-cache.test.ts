@@ -35,6 +35,23 @@ it('loads history once, refreshes changed threads and keeps timestamped last obs
   await vi.waitFor(() => expect(protocolItemThreads(['one', 'archive'])).toHaveLength(2));
 });
 
+it('resolves a started thread across message formats, and only when one thread matches, a cut-short title included', async () => {
+  const { protocolItemThreads, protocolStartedThread } = await import('./item-execution.ts');
+  const observedAt = '2026-10-31T12:00:00Z';
+  const current = 'Build #7 T\nBuild w1. Read /a/long/path/builder.md and follow it.';
+  const earlier = 'Build w1. Read /a/long/path/builder.md and follow it.';
+  const first: Record<string, string> = { 'in-current': current, 'in-earlier': earlier };
+  fixture.read.mockImplementation(async id => ({ availability: 'available', observation: { observedAt,
+    projection: { thread: { id }, messages: [{ role: 'user', text: first[id], createdAt: observedAt }] } } }));
+  protocolItemThreads([]);
+  const shell = (id: string, title: string) => ({ id, projectId: 'p', title, updatedAt: observedAt });
+  fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [shell('in-earlier', 'Build w1. Read /a/long…')], archivedThreads: [] } } });
+  await vi.waitFor(() => expect(protocolStartedThread('p', [current, earlier], [])).toEqual({ threadId: 'in-earlier', title: 'Build w1. Read /a/long…' }));
+  fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [shell('in-earlier', 'Build w1. Read /a/long…'), shell('in-current', 'Build #7 T')], archivedThreads: [] } } });
+  await vi.waitFor(() => expect(protocolStartedThread('p', [current, earlier], [])).toBeNull());
+  expect(protocolStartedThread('p', [current, earlier], ['in-earlier'])).toEqual({ threadId: 'in-current', title: 'Build #7 T' });
+});
+
 it('finds the one started thread whose first message is the start message, leaving out recorded ones', async () => {
   const { protocolItemThreads, protocolStartedThread } = await import('./item-execution.ts');
   const observedAt = '2026-10-31T12:00:00Z';
@@ -42,13 +59,13 @@ it('finds the one started thread whose first message is the start message, leavi
   fixture.read.mockImplementation(async id => ({ availability: 'available', observation: { observedAt,
     projection: { thread: { id }, messages: [{ role: 'user', text: message, createdAt: observedAt }] } } }));
   protocolItemThreads([]);
-  expect(() => protocolStartedThread('p', message, [])).toThrow('unavailable');
+  expect(() => protocolStartedThread('p', [message], [])).toThrow('unavailable');
   const shell = (id: string) => ({ id, projectId: 'p', title: message, updatedAt: observedAt });
   fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [shell('old'), shell('new')], archivedThreads: [] } } });
-  await vi.waitFor(() => expect(protocolStartedThread('p', message, ['old'])).toEqual({ threadId: 'new', title: message }));
-  expect(protocolStartedThread('p', message, ['old'])).toEqual({ threadId: 'new', title: message });
-  expect(protocolStartedThread('p', message, []), 'two matches establish nothing').toBeNull();
-  expect(protocolStartedThread('other', message, [])).toBeNull();
+  await vi.waitFor(() => expect(protocolStartedThread('p', [message], ['old'])).toEqual({ threadId: 'new', title: message }));
+  expect(protocolStartedThread('p', [message], ['old'])).toEqual({ threadId: 'new', title: message });
+  expect(protocolStartedThread('p', [message], []), 'two matches establish nothing').toBeNull();
+  expect(protocolStartedThread('other', [message], [])).toBeNull();
 });
 
 it('shows shell status changes immediately while history reads wait, without treating stale details as current', async () => {
@@ -66,7 +83,7 @@ it('shows shell status changes immediately while history reads wait, without tre
   expect(protocolItemThreads(['one'])).toMatchObject([{ state: 'running' }]);
   expect(protocolThreadById('one').availability).toBe('unavailable');
   expect(() => protocolStatsInputs()).toThrow('unavailable');
-  expect(() => protocolStartedThread('p', 'Shape issue', [])).toThrow('unavailable');
+  expect(() => protocolStartedThread('p', ['Shape issue'], [])).toThrow('unavailable');
 
   publish({ ...shell, pendingRuntimeRequest: { id: 'request' } });
   expect(protocolItemThreads(['one'])).toMatchObject([{ state: 'needs you' }]);

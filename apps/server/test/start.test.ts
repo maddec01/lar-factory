@@ -56,7 +56,7 @@ test("Start begins one lar-shape thread in the card's repository project and lea
   const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(30, 'Queued', 'maddec01/lar-server')]);
   const response = await start(board, board.id(12));
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
+  assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: 'Shaping #12 Issue 12' });
   assert.equal((await start(board, board.id(30, 'maddec01/lar-server'))).status, 200);
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', message(board), '--json'],
@@ -186,7 +186,7 @@ test('Start refuses an unreadable list of onboarded repositories, naming the fil
 test('a thread T3 returns untitled takes the first line of the work message as its title', async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { untitled: true } });
   const response = await start(board, board.id(12));
-  assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
+  assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: 'Shaping #12 Issue 12' });
 });
 
 test('a double press, a retry or another page starts no second thread for the item', async (t) => {
@@ -194,7 +194,7 @@ test('a double press, a retry or another page starts no second thread for the it
   const responses = await Promise.all([start(board, board.id(12)), start(board, board.id(12))]);
   assert.deepEqual(responses.map((r) => r.status), [200, 200]);
   assert.equal((await start(board, board.id(12))).status, 200);
-  const thread = { threadId: 'thread-1', title: '#12 Issue 12' };
+  const thread = { threadId: 'thread-1', title: 'Shaping #12 Issue 12' };
   assert.deepEqual((await board.board() as BoardData).started, { [board.id(12)]: thread }, 'a reloaded page sees the thread');
   assert.equal((await start(board, board.id(13))).status, 200, 'another item starts its own thread');
   assert.equal((await board.t3Calls()).length, 2);

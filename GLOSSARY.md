@@ -24,3 +24,15 @@ _Avoid_: sub-ticket.
 **Active slice**:
 An unfinished, unblocked slice whose implementation thread or its live descendants are currently running. An unavailable activity observation cannot establish that a slice is active.
 _Avoid_: In progress slice.
+
+**Deleted thread**:
+A T3 thread recorded for an item's work that T3 confirms no longer exists.
+_Avoid_: missing thread, lost thread.
+
+**Start again**:
+Opening a new thread for work whose thread was deleted, keeping the work ID.
+_Avoid_: restart, retry.
+
+**Reshape**:
+Sending an item with a passing brief back to shaping, keeping the text and requiring a new gate.
+_Avoid_: reset, reopen.

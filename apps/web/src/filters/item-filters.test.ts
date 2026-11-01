@@ -57,6 +57,12 @@ test('the Labels filter offers each name once without case, across repositories,
   expect(labelChoices(rows, [])).toEqual([{ name: 'Area: Web', color: '#BFDADC' }, { name: 'docs', color: undefined }]);
 });
 
+test("the Labels filter leaves out Azure's repo- tags and offers a GitHub repo- label", () => {
+  const rows = [item('a', { repo: 'contoso/Fabrikam%20Fiber/lar-api', labels: ['repo-lar-api', 'docs'] }), item('b', { repo: 'maddec01/lar-apple', labels: ['repo-web'] })];
+  expect(labelChoices(rows, []).map(({ name }) => name)).toEqual(['docs', 'repo-web']);
+  expect(rowFilter({ kinds: [], labels: ['repo-lar-api'] }, [])(rows[0]!)).toBe(false);
+});
+
 test('a label mapped to the item\'s kind is neither offered nor matched on that row, as its row hides it', () => {
   const setup = { vocabulary: effectiveVocabulary({ bug: { type: null, labels: ['oops'] } }).vocabulary } as NonNullable<BoardData['repos'][number]['setup']>;
   const repos = [{ ...sample.repos[0]!, repo: base.repo, setup }];

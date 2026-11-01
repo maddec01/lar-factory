@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { userInfo, homedir } from 'node:os';
 import { join } from 'node:path';
-import { isManagedLabel, onAzure, readTicketSpec, stripTrackerStructure, trackerCapabilities } from '@lar-factory/shared';
+import { onAzure, readTicketSpec, stripTrackerStructure, trackerCapabilities } from '@lar-factory/shared';
 import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails, LabelChange, RecordDetails, TrackerLabel, TrackerLabels } from '@lar-factory/shared';
 import { trackerLabels } from '@lar-factory/shared/tracker-labels';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
@@ -150,12 +150,15 @@ export function createItemDetails(sampleFile: string | null, ticketOf: (item: It
     async labels(work) {
       const item = ticketOf(work);
       if (!item) return NO_TICKET;
-      try { return { labels: (await labelsOf(item.repo).list()).filter(({ name }) => !isManagedLabel(name)) }; }
+      try { return { labels: (await labelsOf(item.repo).list()).filter(({ name }) => !trackerCapabilities(item.repo).isManaged(name)) }; }
       catch (error) { return { status: 502, error: `Could not read the ${trackerCapabilities(item.repo).noun}s. ${(error as Error).message}` }; }
     },
     async changeLabels(work, { label, action }) {
       const item = ticketOf(work);
       if (!item) return NO_TICKET;
+      // Azure joins a ticket's tags into one field, so a name holding its separator would write the tags after it too.
+      const separated = trackerCapabilities(item.repo).ticketNameProblem(label);
+      if (separated) return { status: 422, error: separated };
       const labels = labelsOf(item.repo);
       try {
         await (action === 'add' ? labels.addToTicket(item.number, [label]) : labels.removeFromTicket(item.number, [label]));

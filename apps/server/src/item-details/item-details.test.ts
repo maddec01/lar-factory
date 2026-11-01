@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import type { Item } from '@lar-factory/shared';
+import type { Item, TrackerLabels } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { exportMarkdown } from '@lar-factory/work-records/export';
 import { trackerLabels } from '@lar-factory/shared/tracker-labels';
@@ -74,6 +74,20 @@ test('on the fake Azure a failed tag write leaves the tags and says why, in the 
 test('the fake Azure\'s tags reach the picker without the managed ones', async () => {
   const { az } = taggedWork();
   assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'area-ui' }, { name: 'docs' }] });
+});
+
+test("the picker leaves out Azure's repo- tags, and a GitHub picker keeps a repo- label", async () => {
+  const az = fakeAz({ items: [], tags: ['repo-lar-api', 'Repo-Other', 'docs'] });
+  assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'docs' }] });
+  const github = createItemDetails(null, (item) => item, { records: null, labelsOf: () => ({ list: async () => [{ name: 'repo-web' }, { name: 'bug' }] }) as unknown as TrackerLabels });
+  assert.deepEqual(await github.labels({ ...workItem, repo: WEB }), { labels: [{ name: 'repo-web' }] });
+});
+
+for (const label of ['foo; linked-work', 'foo, linked-work']) test(`a tag named "${label}" is refused on Azure, and writes no tag`, async () => {
+  const { items, az } = taggedWork('docs');
+  assert.deepEqual(await onAzureFake(az).changeLabels(workItem, { label, action: 'add' }), { status: 422, error: 'Use a tag name without commas or semicolons.' });
+  assert.equal(items[0]!.tags, 'docs');
+  assert.deepEqual(az.patches, []);
 });
 
 test('a failed read of the tags says why', async () => {

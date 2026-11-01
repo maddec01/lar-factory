@@ -249,6 +249,15 @@ test('the picker reads the tracker\'s labels without the managed ones, and a fai
   assert.equal((await fetch(`${board.url}/api/item-labels`)).status, 400);
 });
 
+test('a GitHub label may hold a separator, and the route refuses a managed name in any case', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['docs'])] }, false, false, taggingHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  assert.equal((await labelWrite(board, { itemId: board.id(12), label: 'area, web', action: 'add' })).status, 200);
+  assert.equal((await labelWrite(board, { itemId: board.id(12), label: 'LINKED-WORK', action: 'add' })).status, 422);
+  assert.equal((await labelWrite(board, { itemId: board.id(12), label: 'repo-web', action: 'add' })).status, 200);
+});
+
 test('sample mode changes no labels', async (t) => {
   const board = await startBoard(t, {}, true);
   const response = await labelWrite(board, { itemId: 'I_sample13', label: 'docs', action: 'add' });

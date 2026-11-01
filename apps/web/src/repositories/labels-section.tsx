@@ -2,7 +2,7 @@
 // the capability description for what the tracker's labels have, and never checks a provider's name.
 import { useEffect, useState, type FormEvent } from 'react';
 import { Lock, Pencil, Plus, Trash2 } from 'lucide-react';
-import { isManagedLabel, trackerCapabilities, writeAccessProblem, type RepositorySetup, type TrackerCapabilities, type TrackerLabel } from '@lar-factory/shared';
+import { trackerCapabilities, writeAccessProblem, type RepositorySetup, type TrackerCapabilities, type TrackerLabel } from '@lar-factory/shared';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -143,13 +143,13 @@ function LabelRow({ label, capabilities, mappings, readOnly, editing, onEdit, on
   onEdit: (editing: boolean) => void; onDelete: () => void; onSave: (change: LabelChange) => Promise<string | null>;
 }) {
   const running = useEditStore((s) => s.running);
-  const locked = isManagedLabel(label.name);
+  const locked = capabilities.isManaged(label.name);
   const detail = locked ? `Factory-managed. ${capabilities.nameProblem(label.name)}` : capabilities.description ? label.description : undefined;
   const disabled = !!readOnly || running !== null;
   return <li data-label={label.name} className="border-b last:border-b-0">
     <div className="flex min-w-0 items-center gap-3 px-3 py-1.5">
       <span className="min-w-0 max-w-[45%]">
-        <Badge data-label-chip className="max-w-full" style={tint(capabilities.color && label.color ? `#${label.color}` : undefined)}>
+        <Badge data-label-chip className="max-w-full min-w-0" style={tint(capabilities.color && label.color ? `#${label.color}` : undefined)}>
           <span className="inline-flex min-w-0 items-center gap-1">
             {locked && <Lock className="size-3 shrink-0" aria-label="Factory-managed" />}
             <span className="truncate" title={label.name}>{label.name}</span>
@@ -166,32 +166,47 @@ function LabelRow({ label, capabilities, mappings, readOnly, editing, onEdit, on
   </li>;
 }
 
-/** Lists the tracker's labels with create, rename and delete in place; read-only with the reason when the access check rules them out. */
-export function LabelsSection({ repo, setup }: { repo: string; setup: RepositorySetup }) {
-  const capabilities = trackerCapabilities(repo);
-  const { noun, heading, changeScope, createUnavailable } = capabilities;
-  const { labels, error, retry } = useTrackerLabels(repo);
+/** The field that creates a label. Its typing stays here, so a keystroke re-renders no row. */
+function CreateLabel({ capabilities, cannotCreate, showUnavailable, onCreate }: {
+  capabilities: TrackerCapabilities; cannotCreate: string | null; showUnavailable: boolean; onCreate: (name: string) => Promise<string | null>;
+}) {
+  const { noun, createUnavailable, nameProblem } = capabilities;
   const running = useEditStore((s) => s.running);
   const [fresh, setFresh] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
+  const problem = fresh.trim() ? nameProblem(fresh) : null;
+  const create = async (event: FormEvent) => {
+    event.preventDefault();
+    if (cannotCreate || problem || !fresh.trim()) return;
+    const failed = await onCreate(fresh.trim());
+    setFailure(failed);
+    if (!failed) setFresh('');
+  };
+  return <>
+    <form className="flex gap-2" onSubmit={(event) => void create(event)}>
+      <Input data-new-label aria-label={`New ${noun}`} placeholder={`New ${noun} name`} value={fresh} disabled={!!cannotCreate || running !== null} onChange={(e) => { setFresh(e.target.value); setFailure(null); }} />
+      <Button {...kind('other')} type="submit" className="shrink-0" leftIcon={<Plus />} disabled={!!cannotCreate || !!problem || !fresh.trim() || running !== null}
+        {...cannotCreate && { title: cannotCreate }}>Create {noun}</Button>
+    </form>
+    {showUnavailable && <p className="m-0 text-xs text-base-700">{createUnavailable}</p>}
+    <ProblemText>{problem ?? failure}</ProblemText>
+  </>;
+}
+
+/** Lists the tracker's labels with create, rename and delete in place; read-only with the reason when the access check rules them out. */
+export function LabelsSection({ repo, setup }: { repo: string; setup: RepositorySetup }) {
+  const capabilities = trackerCapabilities(repo);
+  const { heading, changeScope, createUnavailable } = capabilities;
+  const { labels, error, retry } = useTrackerLabels(repo);
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const readOnly = writeAccessProblem(repo, 'manage-labels', setup.access, { azureReadOnly: setup.azureReadOnly });
-  const cannotCreate = readOnly ?? createUnavailable;
-  const problem = fresh.trim() ? capabilities.nameProblem(fresh) : null;
 
   /** Sends one change, and reads the tracker again once it lands. The reason it failed, or null. */
   const change = async (body: LabelChange) => {
     const failed = await useEditStore.getState().labels(repo, body);
     if (!failed) retry();
     return failed;
-  };
-  const create = async (event: FormEvent) => {
-    event.preventDefault();
-    if (cannotCreate || problem || !fresh.trim()) return;
-    const failed = await change({ change: 'create', name: fresh.trim() });
-    setFailure(failed);
-    if (!failed) setFresh('');
   };
 
   return <section data-labels aria-label={heading} className="grid gap-3">
@@ -205,15 +220,9 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
       : !labels
         ? <p role="status" className="m-0 text-sm text-base-700">Reading {heading.toLowerCase()}…</p>
         : <>
-          <form className="flex gap-2" onSubmit={(event) => void create(event)}>
-            <Input data-new-label aria-label={`New ${noun}`} placeholder={`New ${noun} name`} value={fresh} disabled={!!cannotCreate || running !== null} onChange={(e) => { setFresh(e.target.value); setFailure(null); }} />
-            <Button {...kind('other')} type="submit" className="shrink-0" leftIcon={<Plus />} disabled={!!cannotCreate || !!problem || !fresh.trim() || running !== null}
-              {...cannotCreate && { title: cannotCreate }}>Create {noun}</Button>
-          </form>
-          {!readOnly && createUnavailable && <p className="m-0 text-xs text-base-700">{createUnavailable}</p>}
-          <ProblemText>{problem ?? failure}</ProblemText>
+          <CreateLabel capabilities={capabilities} cannotCreate={readOnly ?? createUnavailable} showUnavailable={!readOnly && !!createUnavailable} onCreate={(name) => change({ change: 'create', name })} />
           {labels.length
-            ? <ul className="m-0 grid list-none overflow-hidden rounded-lg border p-0">
+            ? <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] overflow-hidden rounded-lg border p-0">
               {labels.map((label) => <LabelRow key={label.name} label={label} capabilities={capabilities} mappings={mappingsOf(label.name, setup)} readOnly={readOnly} editing={editing === label.name}
                 onEdit={(open) => setEditing(open ? label.name : null)} onDelete={() => setDeleting(label.name)} onSave={change} />)}
             </ul>

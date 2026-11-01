@@ -1,6 +1,6 @@
 // The repository editor keeps all settings on this machine.
 import type { ReactNode } from 'react';
-import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, type OperationAccess, type RepositoryOperation, type RepositorySetup } from '@lar-factory/shared';
+import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, trackerCapabilities, type OperationAccess, type RepositoryOperation, type RepositorySetup } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
@@ -17,9 +17,9 @@ import { LabelsSection } from './labels-section.tsx';
 
 const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: 'Refused', unverified: 'Not checked yet' };
 
-const OPERATIONS = (azure: boolean): Record<RepositoryOperation, string> => ({
+const OPERATIONS = (azure: boolean, labels: string): Record<RepositoryOperation, string> => ({
   'push-branch': 'Push branches', 'open-pr': 'Open PRs', 'edit-ticket': azure ? 'Edit work items' : 'Edit issues',
-  'publish-ticket': azure ? 'Create work items' : 'Create issues', 'tag-ticket': azure ? 'Set tags' : 'Set labels', 'manage-labels': azure ? 'Manage tags' : 'Manage labels',
+  'publish-ticket': azure ? 'Create work items' : 'Create issues', 'tag-ticket': `Set ${labels}`, 'manage-labels': `Manage ${labels}`,
   'comment-ticket': 'Post comments', 'type-ticket': azure ? 'Set work item types' : 'Set issue types', 'relate-ticket': 'Set relationships',
 });
 
@@ -75,7 +75,7 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
 
 function Access({ repo, setup }: { repo: string; setup: RepositorySetup }) {
   const { running, recheck } = useEditStore();
-  const names = OPERATIONS(onAzure(repo));
+  const names = OPERATIONS(onAzure(repo), trackerCapabilities(repo).heading.toLowerCase());
   return <details className="rounded-lg border p-3" data-access>
     <summary className="cursor-pointer text-sm font-medium">Access</summary>
     <ul className="m-0 mt-3 grid list-none gap-2 p-0 text-sm">

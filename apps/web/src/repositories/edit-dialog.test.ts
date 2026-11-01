@@ -261,6 +261,45 @@ test('a successful vocabulary save displays the provider result and clears the n
   expect(sent.filter((body) => body.change === 'vocabulary')).toHaveLength(1);
 });
 
+test('Settings offers no linked-work as a kind mapping, on either tracker, and an old mapping to it can still be cleared', async () => {
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed' }, ...effectiveVocabulary({ feature: { type: null, labels: ['linked-work'] } }) });
+  serve(board, (body) => (body.change === 'discover-vocabulary'
+    ? { body: { discovery: { provider: 'github', types: { state: 'available', choices: [] }, labels: { state: 'available', choices: ['bug', 'docs', 'linked-work', 'status-done', 'repo-web'] } } } } : { body: {} }));
+  await openEdit(board);
+  await openVocabulary();
+  const offered = (key: string) => $$<HTMLLabelElement>(`[data-vocabulary="${key}"] [role="group"] label`).map(text);
+  expect(offered('bug')).toEqual(['bug', 'docs', 'repo-web']);
+  expect(offered('feature'), 'held by the mapping, and on the tracker, so not unavailable').toEqual(['bug', 'docs', 'repo-web', 'linked-work']);
+});
+
+test("an Azure kind mapping offers no repo- tag, and uses the tracker's words", async () => {
+  const repo = 'organization/project/repository';
+  const board = boardWith({ repo, itemSource: { kind: 'azure-board', team: 'Delivery' }, access: { ...SETUP.access, 'tag-ticket': 'allowed' } });
+  serve(board, (body) => (body.change === 'discover-vocabulary'
+    ? { body: { discovery: { provider: 'azure', types: { state: 'available', choices: [] }, labels: { state: 'available', choices: ['repo-repository', 'docs'] } } } } : { body: {} }));
+  await openRepositories(board);
+  await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Edit')!.click());
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  expect([...row.querySelectorAll('[role="group"] label')].map(text)).toEqual(['docs']);
+  expect(row.querySelector('[role="group"]')!.getAttribute('aria-label')).toBe('Bug tags');
+  expect(text(row)).toContain('New tag');
+  expect(row.querySelector('input[type="text"]')!.getAttribute('aria-label')).toBe('Bug new tag');
+  expect(text($('[aria-label="Kind vocabulary"] > p'))).toBe('Map bugs, features and improvements to existing tags and types. Suggestions are optional.');
+});
+
+test('reading an Azure kind mapping says it reads tags', async () => {
+  const repo = 'organization/project/repository';
+  const board = boardWith({ repo, itemSource: { kind: 'azure-board', team: 'Delivery' } });
+  serve(board);
+  const serving = fetchMock.getMockImplementation() as unknown as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation((async (url: string, init?: RequestInit) => (url === '/api/repositories/settings' ? new Promise<Response>(() => {}) : serving(url, init))) as typeof fetchMock);
+  await openRepositories(board);
+  await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Edit')!.click());
+  await openVocabulary();
+  expect(text($('[aria-label="Kind vocabulary"] [role="status"]'))).toBe('Reading existing tags and types…');
+});
+
 test('Azure vocabulary uses discovered work item types and tags for any repository', async () => {
   const repo = 'organization/project/repository';
   const board = boardWith({ repo, itemSource: { kind: 'azure-board', team: 'Delivery' }, access: { ...SETUP.access, 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } });
@@ -274,7 +313,7 @@ test('Azure vocabulary uses discovered work item types and tags for any reposito
   expect(text(row)).toContain('Work item type');
   expect(text(row)).toContain('Tags');
   await chooseOption(row.querySelector('[role="combobox"]')!, 'Defect');
-  await settle(() => buttonIn(row, 'Use suggested label: bug')!.click());
+  await settle(() => buttonIn(row, 'Use suggested tag: bug')!.click());
   await settle(() => buttonIn(row, 'Save')!.click());
   expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo, change: 'vocabulary', key: 'bug', value: { type: 'Defect', labels: ['bug'] } });
 });

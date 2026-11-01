@@ -1,5 +1,5 @@
 // Settings' Labels section. The tracker holds the only copy, so every change goes straight to it and nothing is saved here.
-import { isManagedLabel, isRecord, sameRepo, trackerCapabilities, writeAccessProblem, type RepositorySetup, type TrackerCapabilities, type TrackerLabel, type TrackerLabels } from '@lar-factory/shared';
+import { isRecord, sameRepo, trackerCapabilities, writeAccessProblem, type RepositorySetup, type TrackerCapabilities, type TrackerLabel, type TrackerLabels } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { followLabelInMappings, readRepositorySetups } from '@lar-factory/shared/repository-settings';
 import { trackerLabels } from '@lar-factory/shared/tracker-labels';
@@ -56,7 +56,7 @@ export async function changeRepositoryLabels(input: Record<string, unknown>, dir
       return {};
     }
     if (typeof name !== 'string' || !name) throw new Error(`Choose a ${capabilities.noun}.`);
-    if (isManagedLabel(name)) refuse(capabilities.nameProblem(name));
+    if (capabilities.isManaged(name)) refuse(capabilities.nameProblem(name));
     if (change === 'delete') {
       await labels.delete(name);
       return followInMappings(repo, capabilities, name, null, dir);

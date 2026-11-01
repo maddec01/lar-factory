@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { trackerLabels } from './tracker-labels.ts';
+import { ticketKinds, trackerLabels } from './tracker-labels.ts';
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -92,4 +92,41 @@ test('in a read-only session every Azure label write is refused with the existin
   expect(calls).toEqual([]);
   await labels.list();
   expect(calls).toHaveLength(1);
+});
+
+for (const [name, part] of [['a/b', 'a%2Fb'], ['a/../b', 'a%2F..%2Fb'], ['a?x=1', 'a%3Fx%3D1'], ['50% done', '50%25%20done']] as const) {
+  test(`Azure renames and deletes the tag ${name} by its encoded name, so it stays one part of the tag's route`, async () => {
+    const calls: string[][] = [];
+    const commands = { ...noAz(calls), az: async (args: string[]) => { calls.push(args); return args.includes('PATCH') ? '{"name":"new"}' : ''; } };
+    await trackerLabels(azureRepo, commands).update(name, { name: 'new' });
+    await trackerLabels(azureRepo, commands).delete(name);
+    expect(calls.map((args) => args.find((arg) => arg.startsWith('tagIdOrName=')))).toEqual([`tagIdOrName=${part}`, `tagIdOrName=${part}`]);
+  });
+}
+
+for (const name of ['.', '..']) {
+  test(`neither tracker addresses a label named ${name}, which encoding can't keep inside its route`, async () => {
+    const calls: string[][] = [];
+    const { calls: ghCalls, commands } = fakeGh();
+    await expect(trackerLabels(azureRepo, noAz(calls)).update(name, { name: 'new' })).rejects.toThrow("can't address");
+    await expect(trackerLabels(azureRepo, noAz(calls)).delete(name)).rejects.toThrow("can't address");
+    await expect(trackerLabels('team/app', commands).delete(name)).rejects.toThrow("can't address");
+    await expect(trackerLabels('team/app', commands).update(name, { name: 'new' })).rejects.toThrow("can't address");
+    await expect(trackerLabels('team/app', commands).removeFromTicket(7, [name])).rejects.toThrow("can't address");
+    expect([calls, ghCalls]).toEqual([[], []]);
+  });
+}
+
+test('GitHub reads a ticket\'s labels and type, and changes its type by name', async () => {
+  const { calls, commands } = fakeGh(() => ({ number: 12, labels: [{ name: 'bug' }, { name: 'docs' }], type: { name: 'Bug' } }));
+  const kinds = ticketKinds('team/app', commands);
+  expect(await kinds.read(12)).toEqual({ labels: ['bug', 'docs'], type: 'Bug' });
+  await kinds.setType(12, 'Feature');
+  expect(calls).toEqual([{ method: 'GET', path: 'repos/team/app/issues/12' }, { method: 'PATCH', path: 'repos/team/app/issues/12', body: { type: 'Feature' } }]);
+  expect(await kinds.boardTypes()).toBeNull();
+});
+
+test('GitHub reads a ticket with no type', async () => {
+  const { commands } = fakeGh(() => ({ number: 12, labels: [] }));
+  expect(await ticketKinds('team/app', commands).read(12)).toEqual({ labels: [], type: null });
 });

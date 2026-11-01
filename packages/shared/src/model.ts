@@ -797,8 +797,11 @@ export const decodePart = (part: string): string => {
  */
 export const shownRepo = (repo: string): string => repo.split('/').map(decodePart).join('/');
 
+const REPO_TAG_PREFIX = 'repo-';
 /** The tag that records an Azure work item's repository: repo- and the repository's name as Azure shows it. */
-export const repoTag = (repo: string): string => `repo-${decodePart(repo.split('/').at(-1)!)}`;
+export const repoTag = (repo: string): string => `${REPO_TAG_PREFIX}${decodePart(repo.split('/').at(-1)!)}`;
+/** Whether the tag records a work item's repository; Azure keeps a tag's case, so the board ignores it. */
+export const isRepoTag = (tag: string): boolean => tag.trim().toLowerCase().startsWith(REPO_TAG_PREFIX);
 
 /**
  * A repository's shown name: the part after the last `/` of `owner/name` or `organization/project/repository`, or all

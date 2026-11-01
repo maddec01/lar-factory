@@ -183,7 +183,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
           ...from + top < newest.length && { continuationToken: String(from + top), nextPage: 'https://dev.azure.com/contoso/_apis/wit/workItems/1/comments?continuationToken=x' } });
       }
       if (resource === 'wit/tags' && ['PATCH', 'DELETE'].includes(flag(args, '--http-method'))) {
-        const from = route(args, 'tagIdOrName')!;
+        const from = decodeURIComponent(route(args, 'tagIdOrName')!);
         const at = tags.findIndex((t) => t.toLowerCase() === from.toLowerCase());
         if (at < 0) throw new Error(`az devops invoke failed: TF400516: The tag ${from} does not exist.`);
         const retag = (change: (tag: string) => string[]) => {

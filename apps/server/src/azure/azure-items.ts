@@ -4,7 +4,7 @@
 // and each type's state categories decide what is Done (Completed) and what is hidden (Removed).
 // A repo-<name> tag says which of the repositories reading the source a work item is for; an untagged one is for each.
 
-import { STATUSES, decodePart, readTrackerStructure, trackerKind, parseConceptMap, labelStatuses, repoTag, sameRepo, statusLabel } from '@lar-factory/shared';
+import { STATUSES, decodePart, readTrackerStructure, trackerKind, parseConceptMap, labelStatuses, isRepoTag, repoTag, sameRepo, statusLabel } from '@lar-factory/shared';
 import type { AzureWorkItem, Blocker, Item, LinkedPr } from '@lar-factory/shared';
 import { AccessLost, NotFound, ReadProblem, TICKET_MATCHES, ticketNumberOf, type ItemSource, type ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
@@ -125,8 +125,6 @@ export const linked = (raw: RawWorkItem, rel: string) => (raw.relations ?? []).f
 /** The work item's tags, from System.Tags's "a; b". */
 const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';').map((t) => t.trim()).filter(Boolean);
 const STATUS_TAGS = new Set(STATUSES.flatMap((s) => (s === 'Done' ? [] : [statusLabel(s)])));
-/** Whether the tag records a work item's repository; Azure keeps a tag's case, so the board ignores it. */
-const isRepoTag = (tag: string) => tag.toLowerCase().startsWith('repo-');
 
 /** Where a work item shows: for its tagged repository, untagged for each of the source's, or nowhere (null). */
 type Placement = Pick<Item, 'repo' | 'untaggedFor'> | null;

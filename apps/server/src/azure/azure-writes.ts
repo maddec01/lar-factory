@@ -4,6 +4,7 @@ import { writeTrackerStructure } from '@lar-factory/shared';
 // A description save writes the field the item dialog read, as markdown, failing if the work item changed since the dialog read it.
 
 import { decodePart, onAzure } from '@lar-factory/shared';
+import { MARKDOWN_API_VERSION } from '@lar-factory/shared/provider-command';
 import type { AzureBodyField, Item } from '@lar-factory/shared';
 import type { Refused } from '../config/editable-repository.ts';
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
@@ -17,8 +18,6 @@ function writeFailure(what: string, project: string, err: unknown): string {
 
 type Operation = { op: 'test' | 'replace'; path: string; value: unknown };
 
-/** The REST API version of a description save, the first that takes a markdown field; az rest sends it as is. */
-const DESCRIPTION_API_VERSION = '7.2-preview.3';
 /** A failed /rev test: Azure DevOps answers TF26071, or HTTP 412 Precondition Failed. */
 const CHANGED = /TF26071|\b412\b|changed by someone else/i;
 /** No right to edit work items in the work item's area: TF237111. */
@@ -43,7 +42,7 @@ export async function saveAzureDescription(item: Item, { body, bodyField, revisi
   ];
   const what = 'Could not save the description.';
   try {
-    await withFile(ops, (file) => run(workItemPatch(organization, project, id, file, DESCRIPTION_API_VERSION)).catch((err: unknown) => { throw problemOf(err); }));
+    await withFile(ops, (file) => run(workItemPatch(organization, project, id, file, MARKDOWN_API_VERSION)).catch((err: unknown) => { throw problemOf(err); }));
     return null;
   } catch (err) {
     const text = err instanceof Error ? err.message : String(err);

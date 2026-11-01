@@ -61,6 +61,22 @@ test('managed names are refused with the reason, whether typed or already on the
   expect(await tracker.labels.list()).toEqual([{ name: 'bug' }, { name: 'docs' }]);
 });
 
+test("Azure's repo- tags are locked, and GitHub's repo- labels are ordinary", async (t) => {
+  const azureDir = await folder(t, AZURE);
+  const az = fakeAz({ items: [], tags: ['repo-lar-api', 'docs'] });
+  const azure = { labels: trackerLabels(AZURE, { az: az.run, gh: async () => { throw new Error('gh is not for an Azure repository'); } }), capabilities: trackerCapabilities(AZURE) };
+  const onAzure = (body: object) => changeRepositoryLabels({ repo: AZURE, ...body }, azureDir, azure);
+  const reserved = "repo-lar-api is reserved for the work item's repository.";
+  expect(await onAzure({ change: 'delete', name: 'repo-lar-api' })).toEqual({ status: 400, error: reserved });
+  expect(await onAzure({ change: 'update', name: 'repo-lar-api', update: { name: 'docs-two' } })).toEqual({ status: 400, error: reserved });
+  expect(await onAzure({ change: 'update', name: 'docs', update: { name: 'repo-other' } })).toEqual({ status: 400, error: "repo-other is reserved for the work item's repository." });
+  expect(az.tags).toEqual(['repo-lar-api', 'docs']);
+
+  const github = thirdTracker([{ name: 'repo-web' }]);
+  github.capabilities = trackerCapabilities(REPO);
+  expect(await changeRepositoryLabels({ repo: REPO, change: 'update', name: 'repo-web', update: { name: 'repo-site' } }, await folder(t), github)).toEqual({});
+});
+
 test('changes that the capability rules out are refused before the adapter runs', async (t) => {
   const dir = await folder(t);
   const tracker = thirdTracker();

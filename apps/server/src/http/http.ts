@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { isManagedLabel, kindLabels, pageWithData, sameRepo, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type LabelChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type TrackerLabel, type SetupDetection } from '@lar-factory/shared';
+import { kindLabels, pageWithData, sameRepo, trackerCapabilities, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type LabelChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type TrackerLabel, type SetupDetection } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/editable-repository.ts';
 import type { Capture } from '../items/capture.ts';
@@ -300,7 +300,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         const setup = board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
         const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {});
         if (problem) return { status: 403, body: { error: problem } };
-        if (isManagedLabel(label)) return { status: 422, body: { error: `The factory manages ${label}, so it can't be changed here.` } };
+        if (trackerCapabilities(item.repo).isManaged(label)) return { status: 422, body: { error: `The factory manages ${label}, so it can't be changed here.` } };
         if (kindLabels(item.kind, setup?.vocabulary).includes(label.toLowerCase())) return { status: 422, body: { error: `${label} follows this item's kind, so it can't be changed here.` } };
         const change: LabelChange = { label, action };
         const refused = await itemDetails.changeLabels(item, change);

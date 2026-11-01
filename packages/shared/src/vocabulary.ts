@@ -18,6 +18,8 @@ export interface VocabularyDiscovery {
   provider: 'github' | 'azure';
   types: VocabularyCapability;
   labels: VocabularyCapability;
+  /** Each label's colour, six hex digits, on a tracker whose labels have one. */
+  labelColors?: Record<string, string>;
 }
 
 /** Suggestions are optional drafts for Settings. Saving requires an explicit user choice. */

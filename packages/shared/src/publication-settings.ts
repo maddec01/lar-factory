@@ -38,7 +38,7 @@ function failure(err: unknown): VocabularyCapability {
 }
 
 /** A valid empty response is available with zero choices. A malformed response is a refused read. */
-async function choices(read: () => Promise<unknown>): Promise<VocabularyCapability> {
+async function choices(read: () => Promise<unknown>, keep?: (rows: Record<string, unknown>[]) => void): Promise<VocabularyCapability> {
   try {
     const raw = await read();
     const list = Array.isArray(raw) ? raw.flatMap((page) => isRecord(page) && Array.isArray(page.value) ? page.value : page)
@@ -46,6 +46,7 @@ async function choices(read: () => Promise<unknown>): Promise<VocabularyCapabili
     if (!Array.isArray(list) || list.some((item) => !isRecord(item) || typeof item.name !== 'string' || !item.name.trim())) {
       throw new Error('The provider returned an unreadable list of terms.');
     }
+    keep?.(list as Record<string, unknown>[]);
     return { state: 'available', choices: [...new Set(list.filter((item) => item.isDisabled !== true).map((item) => item.name as string))] };
   } catch (err) { return failure(err); }
 }
@@ -67,8 +68,11 @@ export async function discoverVocabulary(repo: string, reads: VocabularyReads = 
       return choices(() => reads.github(`repos/${repo}/issue-types`));
     } catch (err) { return failure(err); }
   };
-  const [foundTypes, labels] = await Promise.all([types(), choices(() => reads.github(`repos/${repo}/labels?per_page=100`))]);
-  return { provider: 'github', types: foundTypes, labels };
+  const labelColors: Record<string, string> = {};
+  const [foundTypes, labels] = await Promise.all([types(), choices(() => reads.github(`repos/${repo}/labels?per_page=100`), (rows) => {
+    for (const { name, color } of rows) if (typeof color === 'string') labelColors[name as string] = color;
+  })]);
+  return { provider: 'github', types: foundTypes, labels, ...Object.keys(labelColors).length > 0 && { labelColors } };
 }
 
 export interface PublicationSettings {
@@ -156,6 +160,6 @@ export async function discoverTicketOptions(config: import('./model.ts').RepoCon
     }),
     azure ? list(() => reads.azureOptions(repo, team, 'iterations'), row => text(row.path)) : Promise.resolve([]),
   ]);
-  return { provider: vocabulary.provider, labels: vocabulary.labels.state === 'available' ? vocabulary.labels.choices : [],
+  return { provider: vocabulary.provider, labels: vocabulary.labels.state === 'available' ? vocabulary.labels.choices : [], ...vocabulary.labelColors && { labelColors: vocabulary.labelColors },
     types: vocabulary.types.state === 'available' ? vocabulary.types.choices : [], assignees, milestones, iterations, problems };
 }

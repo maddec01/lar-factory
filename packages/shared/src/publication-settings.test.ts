@@ -164,6 +164,17 @@ test('Add item options use provider choices, keep optional values empty and tole
     azureOptions: async () => [],
   });
   expect(options).toEqual({ provider: 'github', labels: ['backend'], types: ['Bug', 'Task'], assignees: ['writer'], milestones: [{ value: '12', name: 'Next' }], iterations: [], problems: [] });
+  const coloured = await discoverTicketOptions({ repo: 'org/repo', labels: [], role: '' }, {
+    ...available, azureOptions: async () => [],
+    github: async path => path.includes('/labels') ? [[{ name: 'backend', color: 'B60205' }, { name: 'plain' }]] : available.github(path),
+  });
+  expect(coloured.labelColors).toEqual({ backend: 'B60205' });
+  const labelReads: string[] = [];
+  await discoverTicketOptions({ repo: 'org/repo', labels: [], role: '' }, {
+    ...available, azureOptions: async () => [],
+    github: async path => { if (path.includes('/labels')) labelReads.push(path); return path.includes('/labels') ? [[{ name: 'backend', color: 'B60205' }]] : available.github(path); },
+  });
+  expect(labelReads, 'the colours come from the read that lists the labels').toHaveLength(1);
   const refused = await discoverTicketOptions({ repo: 'org/project/repo', team: 'Team', labels: [], role: '' }, {
     github: available.github, azure: async () => { throw Error('HTTP 403'); }, azureOptions: async () => { throw Error('HTTP 403'); },
   });

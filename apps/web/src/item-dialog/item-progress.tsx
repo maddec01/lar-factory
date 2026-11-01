@@ -8,12 +8,14 @@ import type { Item, Slice, Status } from '@lar-factory/shared';
 import { SliceBar, SliceMark } from '../items/item-parts.tsx';
 import { STATUS_COLOR } from '../items/status-glyph.tsx';
 import { WORKFLOW_STEPS } from '../items/workflow-steps.ts';
+import { SourceIcon } from '../items/source-icon.tsx';
 
 const SPLIT_STATUSES: readonly Status[] = ['In progress', 'Review'];
 
 function SliceChip({ slice }: { slice: Slice }) {
   return (
     <li title={`${itemName(slice)} (${slice.progress})`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-(--border) bg-(--card) py-0.5 ps-1 pe-2.5 text-xs">
+      <SourceIcon item={slice} />
       <SliceMark progress={slice.progress} />
       {slice.number > 0 && <span className="shrink-0 text-(--muted-foreground) tabular-nums">#{slice.number}</span>}
       <span className={`min-w-0 truncate ${slice.progress === 'done' ? 'text-(--muted-foreground)' : slice.progress === 'active' ? 'font-medium' : ''}`}>{slice.title}</span>

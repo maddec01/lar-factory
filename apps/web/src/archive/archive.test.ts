@@ -51,6 +51,17 @@ test('Archive reads set-aside and hidden work when it opens, with Export markdow
   expect(['Export markdown', 'Close ticket', 'Restore'].map((label) => !!button(row('archived-W_done'), label))).toEqual([true, false, false]);
 });
 
+test('archived rows identify local work and each ticket provider', async () => {
+  const local = { ...aside, id: 'local', repo: 'example/product', number: 0, url: null };
+  await openArchive(withRetention(), {}, [local,
+    { ...local, id: 'github', number: 17, url: 'https://github.com/example/product/issues/17' },
+    { ...local, id: 'azure', repo: 'example/project/product', number: 23, url: 'https://dev.azure.com/example/project/_workitems/edit/23' },
+  ]);
+  expect(row('archived-local').querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
+  expect(row('archived-github').querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('GitHub issue. Saved on GitHub.');
+  expect(row('archived-azure').querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Azure DevOps work item. Saved in Azure DevOps.');
+});
+
 test('Restore posts the work, and the row leaves Archive as Archive is read again', async () => {
   const restored = withRetention({ items: [...sample.items, { ...aside, archived: undefined }] });
   await openArchive(withRetention(), { '/api/restore': () => (shelved = [finished], { error: null, board: restored }) });

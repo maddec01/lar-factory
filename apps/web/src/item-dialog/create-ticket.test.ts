@@ -54,6 +54,7 @@ test('unverified Access explains the refusal, offers Recheck and disables creati
 
 test('a lost response survives a page reload with its request ID and options, then conversion updates the existing item', async () => {
   await open(board(), async () => { throw Error('lost response'); });
+  expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
   await settle(() => submit().click());
   const first = posts()[0]!;
   expect(text(submit())).toBe('Retry this submission');
@@ -66,6 +67,7 @@ test('a lost response survives a page reload with its request ID and options, th
   expect(posts().at(-1)!.options).toEqual(first.options);
   expect($('[data-create-ticket]')).toBeNull();
   expect(text($('[data-item-dialog] header'))).toContain('#17 Fix export');
+  expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('GitHub issue. Saved on GitHub.');
 });
 
 test('an uncertain create keeps its preview and blocks another create across closing details', async () => {

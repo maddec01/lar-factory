@@ -16,6 +16,7 @@ import { StartAfterError, showsStartAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 
 /** Whether the card's action is Start build, or Start after in its place: a Ready item no thread works on yet, carrying no other status. */
 const startsBuild = (item: Item) => item.status === 'Ready' && !hasLiveThread(item);
@@ -72,9 +73,10 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
   // The card takes the click; its summary is a button too, so the keyboard can open the dialog.
   return (
     <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
-      className={`desk-card grid w-70 shrink-0 cursor-pointer content-start gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
+      className={`desk-card relative grid w-70 shrink-0 cursor-pointer content-start gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
+      <SourceIcon item={item} corner />
       <button type="button" className="grid min-w-0 gap-2 text-left">
-        <span className="desk-meta flex h-4 min-w-0 items-center gap-2 text-xs">
+        <span className="desk-meta flex h-4 min-w-0 items-center gap-2 pr-4 text-xs">
           <StatusGlyph status={item.status} /><span className="shrink-0 font-semibold text-(--warning-foreground)">{item.status}</span>
           <span className="truncate text-(--muted-foreground)">· {repoName(repoKey(item), data.repos)} · {shortAgo(item.updatedAt, now)}</span>
         </span>

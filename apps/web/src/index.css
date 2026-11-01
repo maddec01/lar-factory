@@ -24,6 +24,7 @@
 @source "./items/start-build.tsx";
 @source "./items/start-control.tsx";
 @source "./items/status-glyph.tsx";
+@source "./items/source-icon.tsx";
 @source "./line";
 @source "./list";
 @source "./onboarding";

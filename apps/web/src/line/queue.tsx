@@ -17,6 +17,7 @@ import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
 
 const NONE_STARTS = 'Every queued item is blocked, needs a T3 project, waits for onboarding, or has a thread at work.';
@@ -61,7 +62,7 @@ function Row({ item, n, data, now, waits }: { item: Item; n: number; data: Board
       <span className={`${repoTone(repo, data.repos)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
       {/* With no room for the action beside a readable title, it wraps under it, at the right. */}
       <button type="button" className="grid min-w-28 flex-1 gap-0.5 text-left">
-        <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><span className="truncate"><ItemTitle item={item} /></span></span>
+        <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><SourceIcon item={item} /><span className="truncate"><ItemTitle item={item} /></span></span>
         <AzureFields azure={item.azure} />
         <span className="queue-meta truncate text-[11px] text-(--muted-foreground)">{itemRepoNames(item, data.repos)} · queued {shortAgo(item.updatedAt, now)}{labels.length > 0 && ` · ${labels.join(', ')}`}</span>
       </button>

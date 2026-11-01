@@ -10,6 +10,7 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partWaves, upstreamOf, waitText } from './dossier-parts.ts';
 import type { Part, PartKind } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
@@ -95,7 +96,8 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
     <div style={{ width, height: NODE_H }} data-map-part={item.id}
       className={`relative flex flex-col gap-1 rounded-lg border bg-(--card) px-2.5 py-2 text-left shadow-xs ${tone} ${pickedRing(isPicked)}`}>
       <button type="button" aria-label={`Open ${ref(item)}`} onClick={() => useItemDialogStore.getState().open(item.id)} className="absolute inset-0 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_60%,transparent)]" />
-      <span className="pointer-events-none relative flex items-center gap-1.5 text-[11px] text-(--muted-foreground)">
+      <SourceIcon item={item} corner className="pointer-events-none" />
+      <span className="pointer-events-none relative flex items-center gap-1.5 pr-5 text-[11px] text-(--muted-foreground)">
         <Icon className="size-3.5 shrink-0" />{part.kind}
         <span className="ml-auto inline-flex items-center gap-1" title={thread ? `T3 thread: ${thread.title} (${thread.state})` : 'No T3 thread'}>
           {thread ? <><StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />thread</> : 'no thread'}

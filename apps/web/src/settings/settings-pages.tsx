@@ -14,6 +14,7 @@ import { TargetProgress } from './target-progress.tsx';
 import { TargetReaders } from './target-readers.tsx';
 import { Switch, type Control, ToolState } from './controls.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 
 function DialogPreference({ preference, label }: { preference: keyof typeof DIALOG_PREFERENCES; label: string }) {
   const [on, setOn] = useState(() => dialogPreference(preference));
@@ -223,7 +224,7 @@ function archiveGroups(data: BoardData, archive: PagesInput['archive']): Group[]
   const retention = data.retention;
   const work: Row[] = (archive.items ?? []).map((item) => ({
     id: `archived-${item.id}`, title: item.title || item.id,
-    description: [shownRepo(item.repo), item.number ? `#${item.number}` : 'No ticket', archivedAs(item)].join(' · '),
+    description: <span className="inline-flex min-w-0 items-center gap-2"><SourceIcon item={item} /><span className="min-w-0 wrap-anywhere">{[shownRepo(item.repo), item.number ? `#${item.number}` : 'No ticket', archivedAs(item)].join(' · ')}</span></span>,
     control: custom(() => <ArchiveActions item={item} />),
   }));
   return [

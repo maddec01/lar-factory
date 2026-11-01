@@ -8,7 +8,7 @@ import { readRepositorySetups, setOverride } from '../config/repository-settings
 import { saveSetup, type SaveReads } from './save-setup.ts';
 
 const repo = 'team/app';
-const answers = { repo, projectId: 'app', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [] };
+const answers = { repo, projectId: 'app', itemSource: { kind: 'issues' }, domainDocs: { kind: 'off' }, skills: [] };
 const allowed: SaveReads = { access: async () => Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, 'allowed'])) };
 async function folder(t: TestContext) {
   const dir = await mkdtemp(join(tmpdir(), 'local-setup-'));
@@ -19,13 +19,13 @@ async function folder(t: TestContext) {
 test('onboarding saves local settings, optional purpose and sharing on by default', async (t) => {
   const dir = await folder(t);
   expect(await saveSetup(answers, dir, allowed)).toEqual({ onboarding: [] });
-  expect(readRepositorySetups(dir)[0]).toMatchObject({ repo, role: '', structureSync: true, domainDocs: { kind: 'private' } });
+  expect(readRepositorySetups(dir)[0]).toMatchObject({ repo, role: '', structureSync: true, domainDocs: { kind: 'off' } });
   const file = JSON.parse(await readFile(join(dir, 'repository-settings.json'), 'utf8'));
   expect(file.repositories[0].settings.structureSync).toBe(true);
   expect(file.repositories[0].settings).not.toHaveProperty('shared');
   setOverride(repo, 'domainDocs', { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' }, dir);
   setOverride(repo, 'domainDocs', undefined, dir);
-  expect(readRepositorySetups(dir)[0]?.domainDocs).toEqual({ kind: 'private' });
+  expect(readRepositorySetups(dir)[0]?.domainDocs).toEqual({ kind: 'off' });
 });
 
 test('GitHub sharing checks creation, comments and its discovery label before saving', async (t) => {

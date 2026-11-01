@@ -110,7 +110,7 @@ type TreeFacts = Pick<SetupDetection, 'domainDocs' | 'projectSkills'>;
 function domainDocsOf(files: readonly string[]): DomainDocLocation {
   const glossary = ['GLOSSARY.md', 'CONTEXT.md'].find((path) => files.includes(path));
   const adrs = files.some((path) => path.startsWith('docs/adr/'));
-  return glossary || adrs ? { kind: 'repository', glossary: glossary ?? 'GLOSSARY.md', adrs: 'docs/adr' } : { kind: 'private' };
+  return glossary || adrs ? { kind: 'repository', glossary: glossary ?? 'GLOSSARY.md', adrs: 'docs/adr' } : { kind: 'off' };
 }
 
 /** The facts the default branch's tree holds, each Refused with the same problem when gh or az can't read it. */

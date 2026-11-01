@@ -69,7 +69,7 @@ function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
     <div className="grid gap-4 rounded-lg border p-4">
       <Checkbox label="Save concepts and cross-repository links to issues" checked={answers.structureSync} onChange={() => choose({ structureSync: !answers.structureSync })} />
       <p className="m-0 -mt-2 pl-7 text-xs text-base-700">Restore their maps and relationships on another machine. Regular work and progress stay local.</p>
-      <Checkbox label="Write glossary and decisions in build PRs" checked={answers.domainDocs.kind === 'repository'} onChange={() => choose({ domainDocs: answers.domainDocs.kind === 'repository' ? { kind: 'private' } : repositoryDocs(detection) })} />
+      <Checkbox label="Write glossary and decisions in build PRs" checked={answers.domainDocs.kind === 'repository'} onChange={() => choose({ domainDocs: answers.domainDocs.kind === 'repository' ? { kind: 'off' } : repositoryDocs(detection) })} />
       <p className="m-0 -mt-2 pl-7 text-xs text-base-700">Builds include new domain terms and decisions for review.</p>
     </div>
     <details className="rounded-lg border px-4 py-3">

@@ -883,8 +883,8 @@ export type Provider = (typeof PROVIDERS)[number];
  */
 export type RepositoryItemSource = { kind: 'issues' } | { kind: 'azure-board'; team: string };
 
-/** Where a repository's glossary and ADRs go: its own files at these paths, or private drafts on this Mac. */
-export type DomainDocLocation = { kind: 'private' } | { kind: 'repository'; glossary: string; adrs: string };
+/** Where a repository's glossary and ADRs go: its own files at these paths, or disabled. */
+export type DomainDocLocation = { kind: 'off' } | { kind: 'repository'; glossary: string; adrs: string };
 
 /**
  * Settings saved on this machine. Credentials stay with the provider's CLI.
@@ -904,7 +904,7 @@ export interface SharedRepositorySettings {
 }
 
 /** Settings editable on this machine. */
-export const SHARED_SETTINGS = ['role', 'itemSource', 'labels', 'domainDocs', 'skills', 'vocabulary'] as const satisfies readonly (keyof SharedRepositorySettings)[];
+export const SHARED_SETTINGS = ['role', 'itemSource', 'labels', 'domainDocs', 'skills', 'vocabulary', 'createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec'] as const satisfies readonly (keyof SharedRepositorySettings)[];
 
 export type SharedSetting = (typeof SHARED_SETTINGS)[number];
 
@@ -938,6 +938,9 @@ export interface RepositorySetup {
   repo: string;
   /** Save concepts and relationships on the tracker for recovery on another machine. */
   structureSync: boolean;
+  createIssuesFromAddItem?: boolean;
+  createIssuesFromRetro?: boolean;
+  writeRefinedSpec?: boolean;
   /** The T3 project its threads start in, once onboarding picked one. */
   projectId?: string;
   role: string;

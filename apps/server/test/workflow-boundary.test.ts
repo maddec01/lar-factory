@@ -25,8 +25,8 @@ test('a repository with no factory files onboards, captures work and starts it w
 
   const { detection } = await (await board.post({ repo, projectId: 'lar-web' }, board.url, '/api/onboarding/detect')).json() as { detection: SetupDetection };
   assert.deepEqual([detection.domainDocs, detection.projectSkills],
-    [{ found: { kind: 'private' } }, { found: [] }]);
-  const saved = await board.post({ repo, projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' },
+    [{ found: { kind: 'off' } }, { found: [] }]);
+  const saved = await board.post({ repo, projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'off' },
     structureSync: false, skills: [] }, board.url, '/api/onboarding/setup');
   assert.equal(saved.status, 200);
 
@@ -47,7 +47,7 @@ test('an Azure DevOps repository with its own guidance, like IApp, detects its p
   const { detection } = answer as { detection: SetupDetection };
   assert.deepEqual([detection.provider, detection.checkout, detection.itemSources],
     ['Azure DevOps', { found: '/Users/me/Developer/IApp' }, { found: [{ kind: 'azure-board', team: 'IApp Team' }] }]);
-  assert.deepEqual([detection.domainDocs, detection.projectSkills], [{ found: { kind: 'private' } }, { found: ['iapp-review'] }]);
+  assert.deepEqual([detection.domainDocs, detection.projectSkills], [{ found: { kind: 'off' } }, { found: ['iapp-review'] }]);
   assert.ok(!('factoryFiles' in detection));
   assert.ok(!('sharedConfig' in detection));
   assert.deepEqual([az.pushes, az.prs, az.comments], [[], [], []]);

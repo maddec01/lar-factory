@@ -11,10 +11,10 @@ const REPO = 'maddec01/lar-server';
 
 const SETUP: RepositorySetup = {
   repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, labels: ['area: server'],
-  domainDocs: { kind: 'private' }, skills: [], ...effectiveVocabulary(),
+  domainDocs: { kind: 'off' }, skills: [], ...effectiveVocabulary(),
   access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
   structureSync: true,
-  sources: { role: 'local', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default', vocabulary: 'default' },
+  sources: { createIssuesFromAddItem: 'default', createIssuesFromRetro: 'default', writeRefinedSpec: 'default', role: 'local', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default', vocabulary: 'default' },
 };
 
 /** The sample board with `change` made to lar-server's setup. */

@@ -576,3 +576,11 @@ test('an active Start prevents combined abandonment before provider access', asy
   assert.deepEqual(log, before);
   assert.ok(board.find(queued(7).id));
 });
+
+ test('deleted-thread recovery refuses Clear without changing status', async () => {
+  const item = queued(91, { status: 'Review', threads: [], needsYou: { reason: 'Deleted', deletedThread: true, offers: ['back-to-list'] } });
+  const records = await openRecords();
+  const { commands, board } = commandsOn([], undefined, records);
+  board.update({ items: [item] });
+  assert.equal((await commands.resolveNeedsYou(item.id, 'clear')).status, 409);
+});

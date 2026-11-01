@@ -217,6 +217,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
   /** Why a command in flight on the item, or a Start this board run, blocks this action; null when nothing does. */
   function busyReason(itemId: string, action: Action): string | null {
     if (combined.has(itemId)) return 'Abandon and close ticket is running. Wait for it to finish.';
+    if (['List', 'Queued'].includes(board.find(itemId)?.status ?? '') && recordedThreads(itemId).every(t => t.deletedAt)) return null;
     const started = buildStarts.has(itemId) || starts.has(itemId) || !!board.snapshot().started?.[itemId] || recordedStart(itemId);
     if (started && action === 'back to List') return 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
     if (started && action === 'abandon') return 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
@@ -367,7 +368,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
    */
   function heldThread(item: Item, purpose: string): StartedThread | null {
     for (const { threadId } of records!.threads(item.id).filter((t) => t.purpose === purpose).reverse()) {
-      if (deleted.has(threadId)) continue;
+      if (deleted.has(threadId) || records!.threads(item.id).find(t => t.threadId === threadId)?.deletedAt) continue;
       const shown = Array.isArray(item.threads) ? item.threads.find((t) => t.id === threadId) : undefined;
       if (shown?.state === 'stopped' && !shown.hasLiveChildren) continue;
       return { threadId, title: shown?.title ?? item.title };
@@ -659,6 +660,17 @@ export function createItemCommands({ board, items, records, reread, archive, off
       if (!item) return reply(404, { error: GONE });
       if (!records) return withBoard(409, { error: 'The board has no work records to change.' });
       if (!item.needsYou) return withBoard(409, { error: "That work doesn't need you." });
+      if (item.needsYou.deletedThread) {
+        if (choice !== 'back-to-queue' && choice !== 'back-to-list') return withBoard(409, { error: 'Choose a move offered for this work.' });
+        if (!item.needsYou.offers.includes(choice) || !Array.isArray(item.threads) || item.threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)) return withBoard(409, { error: 'This work cannot move while a thread or PR is open.' });
+        try {
+          if (item.kind === 'build') write(itemId, revision => records.resetBuild(itemId, revision));
+          write(itemId, revision => records.update(itemId, revision, { status: choice === 'back-to-queue' ? 'Queued' : 'List' }));
+          starts.delete(itemId);
+          buildStarts.delete(itemId);
+        } catch (error) { return withBoard(409, { error: (error as Error).message }); }
+        return withBoard(200, { error: null });
+      }
       const offered = choice === 'clear' || (choice !== 'set-aside' && item.needsYou.offers.some((offer) => offer === choice));
       if (!offered) return withBoard(409, { error: 'Pick one of the choices the board offers for this work.' });
       try {

@@ -19,7 +19,6 @@ import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemKind, StructureSync, repoTone } from '../items/item-parts.tsx';
-import { StatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { matchesSearch } from './list-search.ts';
@@ -61,9 +60,6 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
     <button type="button" onClick={onOpen} data-item={item.id} title={item.title}
       className="flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-base-200/70 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
       <SourceIcon item={item} />
-      <span className="mt-0.5 shrink-0" aria-hidden="true">
-        <StatusGlyph status={item.status} />
-      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-medium leading-5 text-base-content">
           {item.number ? <span className="font-normal text-base-700">{ref(item)} </span> : null}{item.title}

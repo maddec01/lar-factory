@@ -44,7 +44,7 @@ test('enabled concept sync requires positive write access; local-only shaping re
 test('an Azure source needs a readable team, not individual item picks', async () => {
   const { wizard, ready } = await start(detection({ provider: 'Azure DevOps', itemSources: { found: [] } }));
   expect(ready()).toBe(false);
-  wizard.getState().choose({ itemSource: { kind: 'azure-board', team: 'IApp' }, structureSync: false });
+  wizard.getState().choose({ itemSource: { kind: 'azure-board', team: 'Example App' }, structureSync: false });
   expect(ready()).toBe(true);
 });
 

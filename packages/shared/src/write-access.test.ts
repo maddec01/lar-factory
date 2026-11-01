@@ -6,7 +6,6 @@ test('writes require verified access and respect Azure safety', () => {
   expect(writeAccessProblem('org/repo', 'publish-ticket', { 'publish-ticket': 'refused' })).toContain('refused');
   expect(writeAccessProblem('org/repo', 'publish-ticket', { 'publish-ticket': 'allowed' })).toBeNull();
   expect(writeAccessProblem('org/project/repo', 'publish-ticket', { 'publish-ticket': 'allowed' }, { azureReadOnly: true })).toContain('read-only');
-  expect(writeAccessProblem('VanEckEurope/VanEckDirect%20IApp/repo', 'publish-ticket', { 'publish-ticket': 'allowed' })).toContain('never');
 });
 
 test('legacy consent loads without granting access and disappears on resave', async (t) => {
@@ -27,4 +26,12 @@ test('unverified GitHub access explains supported credentials and editing restri
   expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('classic token or gh OAuth');
   expect(writeAccessProblem('org/repo', 'edit-ticket', {})).toContain("cannot edit other people's issues");
   expect(writeAccessProblem('org/repo', 'edit-ticket', { 'edit-ticket': 'allowed' })).toBeNull();
+});
+
+test('repository identities do not change write authorization', () => {
+  for (const repo of ['owner/project', 'other-owner/other-project', 'organization/project/repository', 'another-org/Project%20Name/another-repository']) {
+    expect(writeAccessProblem(repo, 'publish-ticket', { 'publish-ticket': 'allowed' }, { azureReadOnly: false })).toBeNull();
+    expect(writeAccessProblem(repo, 'publish-ticket', { 'publish-ticket': 'refused' }, { azureReadOnly: false })).toContain('refused');
+    expect(writeAccessProblem(repo, 'publish-ticket', {}, { azureReadOnly: false })).not.toBeNull();
+  }
 });

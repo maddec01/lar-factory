@@ -9,7 +9,7 @@ import { detectReads, detectSetup } from '../src/onboarding/detect-setup.ts';
 import { checkouts } from './repo-support.ts';
 import { shapePrompt, larWork, startBoard, until, writesRepository } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
-import { IAPP_LIKE, NO_FACTORY_FILES } from './workflow-fixtures.ts';
+import { AZURE_WITH_PROJECT_RULES, NO_FACTORY_FILES } from './workflow-fixtures.ts';
 
 test('a repository with no factory files onboards, captures work and starts it with no write to the repository', { timeout: 30_000 }, async (t) => {
   const { repo, origin, files } = NO_FACTORY_FILES;
@@ -40,14 +40,14 @@ test('a repository with no factory files onboards, captures work and starts it w
   assert.deepEqual((await board.calls()).filter(writesRepository), []);
 });
 
-test('an Azure DevOps repository with its own guidance, like IApp, detects its project skill without reading or writing guidance, writing nothing', async () => {
-  const az = fakeAzRepos({ files: IAPP_LIKE.files });
-  const answer = await detectSetup({ repo: IAPP_LIKE.repo, projectId: IAPP_LIKE.checkout.id },
-    { ...detectReads(az.run), checkouts: async () => [IAPP_LIKE.checkout], teams: async () => ['IApp Team'] });
+test('an Azure DevOps repository with its own guidance, with existing project rules, detects its project skill without reading or writing guidance, writing nothing', async () => {
+  const az = fakeAzRepos({ files: AZURE_WITH_PROJECT_RULES.files });
+  const answer = await detectSetup({ repo: AZURE_WITH_PROJECT_RULES.repo, projectId: AZURE_WITH_PROJECT_RULES.checkout.id },
+    { ...detectReads(az.run), checkouts: async () => [AZURE_WITH_PROJECT_RULES.checkout], teams: async () => ['Example App Team'] });
   const { detection } = answer as { detection: SetupDetection };
   assert.deepEqual([detection.provider, detection.checkout, detection.itemSources],
-    ['Azure DevOps', { found: '/Users/me/Developer/IApp' }, { found: [{ kind: 'azure-board', team: 'IApp Team' }] }]);
-  assert.deepEqual([detection.domainDocs, detection.projectSkills], [{ found: { kind: 'off' } }, { found: ['iapp-review'] }]);
+    ['Azure DevOps', { found: '/Users/me/Developer/Example App' }, { found: [{ kind: 'azure-board', team: 'Example App Team' }] }]);
+  assert.deepEqual([detection.domainDocs, detection.projectSkills], [{ found: { kind: 'off' } }, { found: ['example-app-review'] }]);
   assert.ok(!('factoryFiles' in detection));
   assert.ok(!('sharedConfig' in detection));
   assert.deepEqual([az.pushes, az.prs, az.comments], [[], [], []]);

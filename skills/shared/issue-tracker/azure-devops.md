@@ -51,6 +51,6 @@ or deployment.
 
 ## Read-only environments
 
-Never write to `dev.azure.com/VanEckEurope/VanEckDirect IApp`, including its
-URL-encoded equivalent. Respect `LAR_FACTORY_AZURE_READ_ONLY=1` for live reads;
-it grants no write permission. Development and script tests use fake providers.
+Respect `LAR_FACTORY_AZURE_READ_ONLY=1` for live reads; it grants no write
+permission. Verified Access controls writes for every organization and project.
+Development and script tests use fake providers.

@@ -11,7 +11,7 @@ import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
 import { kind } from '../buttons/button-kinds.tsx';
 import { postAction } from '../items/card-actions.ts';
-import { tint } from '../items/item-parts.tsx';
+import { tint } from '../items/label-tint.ts';
 import { useEditStore, type LabelChange } from './edit-store.ts';
 import { KIND_NAMES, type VocabularyKind } from './vocabulary-editor.tsx';
 

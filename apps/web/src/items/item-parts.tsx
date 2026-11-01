@@ -3,11 +3,12 @@
 // board's CSS adds the coloured dot.
 
 import type { ReactNode } from 'react';
-import { Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
 import { UNREADABLE, buildActivity, isStale, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
+import { tint } from './label-tint.ts';
 import { PrReadiness } from './pr-readiness.tsx';
 import { STATUS_COLOR } from './status-glyph.tsx';
 import { WORKFLOW_STEPS } from './workflow-steps.ts';
@@ -168,12 +169,14 @@ export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode
   return <Badge data-kind-badge hue={hue}><Icon aria-hidden="true" />{name}{children}</Badge>;
 }
 
-/** A soft tint of a tracker's label colour, mixed with the foreground so the name stays readable; none keeps the Badge's neutral style. */
-export const tint = (color: string | undefined) => (color ? {
-  backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
-  color: `color-mix(in srgb, ${color} 55%, var(--foreground))`,
-  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 40%, transparent)`,
-} : undefined);
+/** Beside a row's kind badge, in the row's muted text: what the ticket says instead, until someone answers. */
+export function KindMarker({ item }: { item: Pick<Item, 'kindDisagreement'> }) {
+  const { kindDisagreement: disagreement } = item;
+  if (!disagreement || disagreement.kept) return null;
+  const said = disagreement.ticketKind ? KIND_BADGES[disagreement.ticketKind]!.name : 'No kind';
+  const sentence = disagreement.ticketKind ? `The ticket says ${said}.` : 'The ticket has no kind.';
+  return <span data-kind-marker title={`${sentence} Open to choose.`} aria-label={sentence} className="inline-flex items-center gap-0.5 text-[11px] text-(--muted-foreground)"><ArrowLeftRight className="size-2.5" aria-hidden="true" />{said}</span>;
+}
 
 type LabelledItem = Pick<Item, 'kind' | 'labels' | 'labelColors' | 'repo'>;
 
@@ -199,7 +202,7 @@ export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean 
   else if (item.parent) words.push('Part of another issue');
   if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Cross-repository');
   const badge = KIND_BADGES[item.kind];
-  return badge || words.length ? <span data-item-kind className="inline-flex flex-wrap gap-1"><KindBadge kind={item.kind} />{words.map((word) => <Badge key={word}>{word}</Badge>)}</span> : null;
+  return badge || words.length ? <span data-item-kind className="inline-flex flex-wrap gap-1"><KindBadge kind={item.kind} />{onRow && <KindMarker item={item} />}{words.map((word) => <Badge key={word}>{word}</Badge>)}</span> : null;
 }
 
 export function StructureSync({ item }: { item: Item }) {

@@ -5,7 +5,7 @@
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, moved, mountPage, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
 import { effectiveVocabulary } from '@lar-factory/shared';
-import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
+import type { BoardData, Item, KindDisagreement, ModelGroup } from '@lar-factory/shared';
 
 const MODEL_CHOICES: ModelGroup[] = [
   { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
@@ -50,6 +50,23 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['I_sample06']);
+});
+
+test('an unanswered kind disagreement shows a muted marker naming the ticket\'s kind, and an answered one none', async () => {
+  const disagreement: KindDisagreement = { ticketKind: 'bug', changed: 'item', kept: false, swap: { add: [], remove: [], type: null } };
+  const withKinds = (kindDisagreement: KindDisagreement) => ({ ...sample, items: sample.items.map((i) => (i.id === sample05.id ? { ...i, kindDisagreement } : i)) });
+  await mountPage(withKinds(disagreement));
+  const marker = () => row('I_sample05').querySelector<HTMLElement>('[data-kind-marker]');
+  expect(text(marker())).toBe('Bug');
+  expect(marker()!.title).toBe('The ticket says Bug. Open to choose.');
+  expect(marker()!.querySelector('svg')).not.toBeNull();
+  expect(marker()!.previousElementSibling!.matches('[data-kind-badge]')).toBe(true);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.setState({ data: withKinds({ ...disagreement, ticketKind: null }) }));
+  expect(text(marker())).toBe('No kind');
+  expect(marker()!.title).toBe('The ticket has no kind. Open to choose.');
+  await settle(() => useBoardStore.setState({ data: withKinds({ ...disagreement, kept: true }) }));
+  expect(marker()).toBeNull();
 });
 
 test('a row shows its coloured kind badge and label chips, colons and all, and hides managed labels', async () => {

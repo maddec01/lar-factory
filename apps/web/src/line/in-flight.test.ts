@@ -5,7 +5,7 @@
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text, toast } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
-import type { BoardData, Item, ItemThread, RawItem, Slice } from '@lar-factory/shared';
+import type { BoardData, Item, ItemThread, KindDisagreement, RawItem, Slice } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
 const table = () => $('[data-in-flight]')!;
@@ -507,6 +507,13 @@ test('live slice transitions update the bar, expanded list and count without a r
       expect(text(col('I_59', 'next'))).toBe('');
     }
   }
+});
+
+test('an in flight row shows a kind disagreement beside its kind badge', async () => {
+  const kindDisagreement: KindDisagreement = { ticketKind: 'bug', changed: 'item', kept: false, swap: { add: [], remove: [], type: null } };
+  await mountPage({ ...loose, items: loose.items.map((i) => (i.id === 'I_sample14' ? { ...i, kindDisagreement } : i)) });
+  expect(text(meta('I_sample14').querySelector('[data-kind-marker]'))).toBe('Bug');
+  expect(meta('I_sample13').querySelector('[data-kind-marker]')).toBeNull();
 });
 
 test('an in flight row shows its coloured kind badge and label chips, and a build has no kind badge', async () => {

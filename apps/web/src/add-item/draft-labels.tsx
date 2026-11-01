@@ -10,7 +10,7 @@ import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { kind as buttonKind } from '../buttons/button-kinds.tsx';
-import { tint } from '../items/item-parts.tsx';
+import { tint } from '../items/label-tint.ts';
 import { LabelPicker } from '../labels/label-picker.tsx';
 
 const has = (labels: readonly string[], name: string) => labels.some((label) => sameLabel(label, name));

@@ -1,5 +1,5 @@
 // What the item dialog shows from an item's details: the description and comments in its main column, the people,
-// labels, dates, milestone or iteration and area in the meta area under its title, and the
+// labels and their picker, dates, milestone or iteration and area in the meta area under its title, and the
 // sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows its error in the
 // description's place; the board's own fields never wait. Once they load, Edit opens the description editor in the
 // description's place, with Save and Cancel under it; the extra sections, such as Acceptance Criteria, stay read-only.
@@ -7,14 +7,18 @@
 
 import { useState, type ReactNode } from 'react';
 import { CircleCheck, CircleDot, Lock, Pencil } from 'lucide-react';
-import { STRUCTURE_LABEL, onAzure, shortAgo, trackerCapabilities } from '@lar-factory/shared';
+import { STRUCTURE_LABEL, kindLabels, onAzure, sameRepo, shortAgo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { IssueRef, Item, ItemComment, ItemDetails, TextFormat } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';
 import { AzureFields, AgentWork, AgentWorkNote, LabelChips, useShownLabels } from '../items/item-parts.tsx';
+import { LabelPicker } from '../labels/label-picker.tsx';
+import { useBoardStore } from '../board/board-store.ts';
 import type { DescriptionEdit } from './use-description-edit.ts';
+import { useLabelEdit } from './use-label-edit.ts';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
 import type { DetailsEntry } from './details-cache.ts';
@@ -167,16 +171,47 @@ function FromDetails({ read, label, show }: { read: ItemDetailsRead; label: stri
   return shown ? <Fact label={label}>{shown}</Fact> : null;
 }
 
-/** The tracker's labels on the item, without those its row hides; linked-work shows only as a note, for the factory owns it. */
+const LABEL_ERROR = 'm-0 text-xs text-(--error-foreground)';
+
+/**
+ * The tracker's labels on the item, without those its row hides, and the picker that adds and removes them; linked-work
+ * shows only as a note, for the factory owns it. Without access the control is disabled with the reason. Local work has no labels.
+ */
 function ItemLabels({ item }: { item: Item }) {
   const shown = useShownLabels(item);
+  const setup = useBoardStore((state) => state.data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup);
+  const edit = useLabelEdit(item);
+  const [open, setOpen] = useState(false);
+  const { heading, noun } = trackerCapabilities(item.repo);
+  if (!item.number) return <p data-local-labels className="m-0 text-xs text-(--muted-foreground)">Local work has no ticket, so it has a kind alone. Create a ticket to add {noun}s.</p>;
   const linked = item.labels.some((l) => l.toLowerCase() === STRUCTURE_LABEL);
-  if (!shown.length && !linked) return null;
+  const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
+  const openChange = (next: boolean) => {
+    setOpen(next);
+    if (next) void edit.read();
+  };
   return (
-    <Fact label={trackerCapabilities(item.repo).heading}>
-      <span className="flex flex-wrap items-center gap-1" data-labels>
-        <LabelChips item={item} />
-        {linked && <span data-locked-label title="The factory manages this for saved links, so it can't be edited." className="inline-flex items-center gap-1 text-xs text-(--muted-foreground)"><Lock className="size-3 shrink-0" aria-hidden="true" />{STRUCTURE_LABEL}</span>}
+    <Fact label={heading}>
+      <span className="flex flex-wrap items-center gap-1">
+        {(shown.length > 0 || linked) && <span className="contents" data-labels>
+          <LabelChips item={item} />
+          {linked && <span data-locked-label title="The factory manages this for saved links, so it can't be edited." className="inline-flex items-center gap-1 text-xs text-(--muted-foreground)"><Lock className="size-3 shrink-0" aria-hidden="true" />{STRUCTURE_LABEL}</span>}
+        </span>}
+        <Popover open={open} onOpenChange={openChange}>
+          <Popover.Trigger asChild>
+            <button type="button" data-edit-labels disabled={problem !== null} title={problem ?? undefined} aria-label={`Edit ${heading.toLowerCase()}`}
+              className="grid size-5 place-items-center rounded text-(--muted-foreground) hover:bg-(--accent) disabled:opacity-50 disabled:hover:bg-transparent"><Pencil className="size-3" /></button>
+          </Popover.Trigger>
+          <Popover.Content side="bottom" align="start">
+            <div className="grid w-72 gap-2">
+              {edit.choices
+                ? <LabelPicker heading={heading} choices={edit.choices} picked={item.labels} locked={kindLabels(item.kind, setup?.vocabulary)} busy={edit.saving} onToggle={(name) => void edit.toggle(name)} />
+                : !edit.error && <p role="status" className="m-0 text-xs text-(--muted-foreground)">Reading {noun}s…</p>}
+              {edit.error && <p role="alert" className={LABEL_ERROR}>{edit.error}</p>}
+            </div>
+          </Popover.Content>
+        </Popover>
+        {edit.error && !open && <span role="alert" className={LABEL_ERROR}>{edit.error}</span>}
       </span>
     </Fact>
   );
@@ -194,7 +229,7 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
       {item.azure && <><Fact label="Azure type">{item.azure.type}</Fact><Fact label="Azure state">{item.azure.state}</Fact></>}
       <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
       <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
-      <ItemLabels item={item} />
+      <ItemLabels key={item.id} item={item} />
       {azure
         ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>
         : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}

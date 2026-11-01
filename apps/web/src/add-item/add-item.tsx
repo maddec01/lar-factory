@@ -10,7 +10,7 @@ import { NativeSelect } from '@lar-factory/ui/native-select';
 import { FormResult } from '../notices/form-result.tsx';
 import { useAddItemStore } from './add-item-store.ts';
 import type { AddItemPane, DraftValues } from './add-item-store.ts';
-import { IssueFields } from './issue-fields.tsx';
+import { IssueFields, ticketOptions } from './issue-fields.tsx';
 import { TicketPicker } from './ticket-picker.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
@@ -36,10 +36,7 @@ function valuesOf(form: HTMLFormElement, description: string): DraftValues {
   const values = new FormData(form);
   const value = (name: string) => String(values.get(name) ?? '');
   const createIssue = values.has('createIssue');
-  const options = createIssue ? {
-    ...(form.querySelector('[name="labels"]') ? { labels: values.getAll('labels').map(String) } : {}),
-    ...Object.fromEntries(['type', 'assignee', 'milestone', 'iteration'].filter(name => values.has(name)).map(name => [name, value(name)])),
-  } : undefined;
+  const options = createIssue ? ticketOptions(form) : undefined;
   return { repo: value('repo'), kind: value('kind'), title: value('title'), description, createIssue, ...(options ? { options } : {}) };
 }
 

@@ -457,3 +457,18 @@ test('submitting before options load leaves their defaults to the server', async
   await settle(() => submit().click());
   expect((posted().draft as Record<string, unknown>).options).toEqual({});
 });
+
+test('denied creation offers Recheck access without losing the current draft', async () => {
+  await open();
+  await fillDraft();
+  expect(field<HTMLInputElement>('item-create-issue').disabled).toBe(true);
+  const recheck = [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find(button => text(button) === 'Recheck access');
+  expect(recheck).toBeDefined();
+  respond(withFactory);
+  await settle(() => recheck!.click());
+  expect(posted()).toMatchObject({ repo: withFactory.repos[0]!.repo, change: 'recheck' });
+  expect(field<HTMLInputElement>('item-title').value).toBe('Playback stalls');
+  expect(field<HTMLSelectElement>('item-kind').value).toBe('bug');
+  expect(text(editorArea())).toBe('After a seek.');
+  expect(dialog()).not.toBeNull();
+});

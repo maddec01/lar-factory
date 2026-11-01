@@ -37,6 +37,7 @@ import { useDescriptionEdit } from './use-description-edit.ts';
 import type { DescriptionEdit } from './use-description-edit.ts';
 import { ItemProgress } from './item-progress.tsx';
 import { useItemDetails } from './use-item-details.ts';
+import { CreateTicket } from './create-ticket.tsx';
 import { AttachTicket } from './attach-ticket.tsx';
 import { Diagram } from '../diagrams/markdown-diagrams.tsx';
 import { RecordText } from './record-text.tsx';
@@ -116,7 +117,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
         {item.parent && <p className="m-0 min-w-0 wrap-anywhere" data-item-parent>Part of {item.parent.url
           ? <a href={item.parent.url} target="_blank" rel="noopener" className="underline">{itemName(item.parent)}</a> : itemName(item.parent)}</p>}
         <div className="flex flex-wrap items-center gap-2"><ItemKind item={item} /><StructureSync item={item} /></div>
-        <AttachTicket item={item} />
+        <div className="flex flex-wrap items-start gap-2"><AttachTicket item={item} /><CreateTicket item={item} /></div>
       </div>
       <Modal.Body layout={fill ? 'fill' : 'scroll'}>
         {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}

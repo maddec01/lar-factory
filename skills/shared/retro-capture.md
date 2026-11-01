@@ -1,10 +1,10 @@
 # Retro capture
 
 Use after the builder's retro selection. Capture selected work as List records
-on this machine; shaping and implementation come later. Ordinary captures write
-no ticket. A concept follows the saved structural-sync option. Keep the source
-build's final Status throughout, including
-clarification questions and failures.
+on this machine; shaping and implementation come later. Ordinary captures create
+tickets when the destination's retro setting is on. A concept follows the saved
+structural-sync option. Keep the source build's final Status throughout,
+including clarification questions and failures.
 
 ## Select and route
 
@@ -26,25 +26,29 @@ clarification questions and failures.
 
 ## Capture
 
-Generate an opaque batch ID once (a UUID, say), then a stable selection ID per
-pick (`retro-capture:<batch-id>:<index>`). Reuse these exact IDs on reruns;
-never regenerate them from rewritten suggestion text.
+Keep a stable UUID for each pick's local capture and another for its ticket
+submission in this thread. Reuse them and the original capture text on reruns.
+These request IDs belong in command arguments, separate from the description.
 
 For each selection, in order:
 
-1. Look for a record that already holds it: the destination's records
-   (`lar-work list --repository <repo>`) whose initial context
-   (`lar-work context`) carries the exact selection ID. A rerun after a failure
-   finds what the first run made this way.
-2. Reuse an unfinished record that already covers the suggestion, keeping its
+1. Reuse an unfinished record that already covers the suggestion, keeping its
    Status. Tell the user which one, so they add the new context when shaping
-   it.
-3. Otherwise make one record:
-   `lar-work create --title "<actionable title>" --repository <repo> --kind <bug|feature|improvement> --status List --file <context>`.
-   The context holds the selected improvement, useful context, the source
-   build's work ID and the exact selection ID. Capture text is not a passing
-   brief.
+   it. For a rerun, use the work ID already reported for this pick.
+2. Otherwise make one record:
+   `lar-work create --request-id <capture-uuid> --title "<actionable title>" --repository <repo> --kind <bug|feature|improvement> --status List --file <context>`.
+   The context holds the selected improvement and useful context, without work
+   IDs or selection IDs. Capture text is not a passing brief. Repeating this
+   command with the same request ID and text returns the same record.
+3. For an ordinary record made for this pick, read its revision and run
+   `lar-work create-ticket <work-id> --revision <revision> --request-id <ticket-uuid> --retro`.
+   The command obeys the destination's retro setting. With it on, it creates a
+   ticket using only the kind's mapped labels and type, then attaches it to the
+   same record. With it off, the record stays local. Concept captures follow
+   [Capture-only concepts](issue-tracker/capture-only-concepts.md) instead.
 
-Report each made or reused record's title and work ID, and each pick that
-failed with its error. Rerun capture in the same thread for the failed picks;
-step 1 keeps a rerun from making a second record.
+Report each made or reused record's title and work ID, its ticket when created,
+and each failed pick with its error. A failed ticket create leaves its record
+local for conversion from item details. Rerun a failed pick in this thread with
+its saved IDs. An uncertain create only searches for its existing result and
+never creates another ticket. Follow its error when the result cannot be found.

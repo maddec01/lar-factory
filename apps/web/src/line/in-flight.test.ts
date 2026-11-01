@@ -82,7 +82,7 @@ test('line 1 shows the status glyph, the numbered title and muted meta: status, 
   expect([...meta('I_sample13').children].map(text)).toEqual(['Review · Run finished · lar-server', 'blocked by 1. Blocked by #202 until it completes']);
   expect(text(meta('I_sample13').querySelector('.sr-only')), 'what blocks it is read out, not only a hover title').toBe('. Blocked by #202 until it completes');
   expect(meta('I_sample13').lastElementChild!.outerHTML).toContain('danger');
-  expect([...meta('I_sample14').children].map(text), 'a linked PR follows the repository').toEqual(['In progress · Thread running · lar-apple', 'PR #33 (draft)']);
+  expect([...meta('I_sample14').children].map(text), 'a linked PR follows the repository, then the kind and labels').toEqual(['In progress · Thread running · lar-apple', 'PR #33 (draft)', 'Feature', 'os: macos', 'good first issue']);
 });
 
 test('no row has a coloured repository dot', async () => {
@@ -507,4 +507,13 @@ test('live slice transitions update the bar, expanded list and count without a r
       expect(text(col('I_59', 'next'))).toBe('');
     }
   }
+});
+
+test('an in flight row shows its coloured kind badge and label chips, and a build has no kind badge', async () => {
+  await mountPage(loose);
+  const chips = [...meta('I_sample14').querySelectorAll<HTMLElement>('[data-label-chip]')];
+  expect(text(meta('I_sample14').querySelector('[data-kind-badge]'))).toBe('Feature');
+  expect(chips.map(text)).toEqual(['os: macos', 'good first issue']);
+  expect(chips[0]!.style.backgroundColor).toContain('color-mix');
+  expect(meta('I_sample13').querySelector('[data-kind-badge]')).toBeNull();
 });

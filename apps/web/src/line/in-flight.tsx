@@ -12,7 +12,7 @@ import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ActivityFeedback, useActivityFeedback, AzureFields, ItemTitle, SliceBar, SliceList } from '../items/item-parts.tsx';
+import { ActivityFeedback, useActivityFeedback, AzureFields, ItemTitle, KindBadge, LabelChips, SliceBar, SliceList } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartBuild } from '../items/start-build.tsx';
@@ -64,9 +64,11 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
         <span className={`grid ${LINE2_A1} items-center gap-x-4 gap-y-1`} data-line2>
           <span className="col-span-3 flex min-w-0 lg:col-span-4 flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-0.5" data-line="1">
             <span className="flex min-w-0 items-baseline gap-1.5"><span className="relative top-1 shrink-0"><SourceIcon item={item} /></span><span className="min-w-0 wrap-anywhere text-[13px] font-medium" title={item.title} data-title><ItemTitle item={item} /></span></span>
-            <span className="inline-flex flex-wrap items-center gap-x-1.5 text-[11px] text-(--muted-foreground)" data-meta>
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-(--muted-foreground)" data-meta>
               <span>{item.status} · {threadText(item)} · {repo}</span>
               {item.linkedPrs[0] && <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(item.linkedPrs[0])}</span>}
+              <KindBadge kind={item.kind} />
+              <LabelChips item={item} />
               {blocked > 0 && <Badge tone="danger" title={blockedText(item) ?? undefined}>blocked by {blocked}<span className="sr-only">. {blockedText(item)}</span></Badge>}
               <AzureFields azure={item.azure} />
             </span>

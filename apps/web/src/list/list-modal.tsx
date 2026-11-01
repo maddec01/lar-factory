@@ -18,7 +18,7 @@ import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-syst
 import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemKind, StructureSync, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemKind, LabelChips, StructureSync, repoTone } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { matchesSearch } from './list-search.ts';
@@ -64,11 +64,12 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
         <span className="block truncate text-[13px] font-medium leading-5 text-base-content">
           {item.number ? <span className="font-normal text-base-700">{ref(item)} </span> : null}{item.title}
         </span>
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 [&_[data-item-kind]>span]:h-4 [&_[data-item-kind]>span]:text-[10px]">
-          <span className="min-w-0 truncate text-[11px] leading-4 tabular-nums text-base-700">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span className="me-1 min-w-0 truncate text-[11px] leading-4 tabular-nums text-base-700">
             {showRepo && `${repoName(repoKey(item), repos)} · `}{shortAgo(item.updatedAt, now)}
           </span>
-          <ItemKind item={item} />
+          <ItemKind item={item} onRow />
+          <LabelChips item={item} />
           <StructureSync item={item} />
         </span>
         <AzureFields azure={item.azure} />

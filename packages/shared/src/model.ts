@@ -450,7 +450,7 @@ export interface RepoConfig {
   items?: ItemSourceKind;
   /** The Azure DevOps team whose backlog and current sprint its item source is; absent for the other item sources. */
   team?: string;
-  /** Its custom labels, saved in local settings, which Add item offers and the queue shows. */
+  /** The labels a saved Custom labels setting holds. Settings no longer edit them, and the tracker holds the labels in use. */
   labels: string[];
   /** Settings saved on this machine. */
   setup?: RepositorySetup;

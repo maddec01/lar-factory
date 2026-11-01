@@ -16,6 +16,7 @@ import { syncStructures } from '@lar-factory/work-records/tracker-sync';
 import { createBoardState } from './board/board-state.ts';
 import { readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { observePr } from './config/pr-host.ts';
+import { changeRepositoryLabels } from './config/repository-labels.ts';
 import { changeRepositorySettings, readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, observeIssue, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
@@ -748,6 +749,7 @@ const { server, endStreams } = createBoardServer({
   createProject: (input) => createProject(input, choices),
   detectSetup: (input) => detectSetup(input), saveSetup: (input) => saveSetup(input),
   changeRepositorySettings: (input) => changeRepositorySettings(input),
+  changeRepositoryLabels: (input) => changeRepositoryLabels(input),
 });
 
 /** Logs why the board can't start and exits. */

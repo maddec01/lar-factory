@@ -1,17 +1,16 @@
 // Local repository settings, edited from Settings.
 import { create } from 'zustand';
-import { type RepositorySetup, type SharedRepositorySettings, type SharedSetting, type VocabularyKey, type VocabularyTerm } from '@lar-factory/shared';
+import { type RepositorySetup, type SharedRepositorySettings, type SharedSetting, type TrackerLabel, type VocabularyKey, type VocabularyTerm } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
 import type { IssueSetting } from './issue-defaults.tsx';
 
 /** Settings whose editor uses text drafts. Vocabulary saves one complete term at a time. */
-export type DraftSetting = Exclude<SharedSetting, 'vocabulary' | 'createIssuesFromAddItem' | 'createIssuesFromRetro' | 'writeRefinedSpec'>;
+export type DraftSetting = Exclude<SharedSetting, 'labels' | 'vocabulary' | 'createIssuesFromAddItem' | 'createIssuesFromRetro' | 'writeRefinedSpec'>;
 
 /** The text of each field the dialog edits, by field. */
 export interface Drafts {
   role: string;
   team: string;
-  labels: string;
   skills: string;
   /** `off` or `repository`. */
   domainDocs: string;
@@ -21,14 +20,14 @@ export interface Drafts {
 
 /** The fields that make each setting's value. */
 const FIELDS: Record<DraftSetting, (keyof Drafts)[]> = {
-  role: ['role'], itemSource: ['team'], labels: ['labels'], skills: ['skills'], domainDocs: ['domainDocs', 'glossary', 'adrs'],
+  role: ['role'], itemSource: ['team'], skills: ['skills'], domainDocs: ['domainDocs', 'glossary', 'adrs'],
 };
 
 /** The fields' text for the setup's values; a repository's own domain docs start at the usual paths. */
 function draftsOf(setup: RepositorySetup): Drafts {
   const docs = setup.domainDocs.kind === 'repository' ? setup.domainDocs : { kind: 'off', glossary: 'GLOSSARY.md', adrs: 'docs/adr' };
   return { role: setup.role, team: setup.itemSource?.kind === 'azure-board' ? setup.itemSource.team : '',
-    labels: setup.labels.join(', '), skills: setup.skills.join(', '), domainDocs: docs.kind, glossary: docs.glossary, adrs: docs.adrs };
+    skills: setup.skills.join(', '), domainDocs: docs.kind, glossary: docs.glossary, adrs: docs.adrs };
 }
 
 const list = (text: string) => text.split(',').map((part) => part.trim()).filter(Boolean);
@@ -41,7 +40,6 @@ export function valueOf(key: DraftSetting, drafts: Drafts): SharedRepositorySett
   switch (key) {
     case 'role': return drafts.role.trim();
     case 'itemSource': return drafts.team.trim() ? { kind: 'azure-board', team: drafts.team.trim() } : null;
-    case 'labels': return list(drafts.labels);
     case 'skills': return list(drafts.skills);
     case 'domainDocs':
       if (drafts.domainDocs === 'off') return { kind: 'off' };
@@ -55,7 +53,10 @@ export function canSave(key: DraftSetting, setup: RepositorySetup, typed: Partia
   return value !== null && JSON.stringify(value) !== JSON.stringify(setup[key]);
 }
 
-/** A call to the board: one setting's Save or removal, Recheck access, Offer, or Accept. */
+/** One change to the tracker's labels, as the Labels section sends it. */
+export type LabelChange = { change: 'create'; name: string } | { change: 'update'; name: string; update: Partial<TrackerLabel> } | { change: 'delete'; name: string };
+
+/** A call to the board: one setting's Save or removal, a label change, Recheck access, Offer, or Accept. */
 type Running = SharedSetting | 'recheck' | 'structure-sync';
 
 interface EditState {
@@ -74,6 +75,8 @@ interface EditState {
   structureSync: (repo: string, on: boolean) => Promise<void>;
   vocabulary: (repo: string, key: VocabularyKey, value: VocabularyTerm, newLabels: string[]) => Promise<boolean>;
   issueDefault: (repo: string, key: IssueSetting, on: boolean) => Promise<void>;
+  /** Sends a label change to the tracker; the reason it failed, or null. */
+  labels: (repo: string, change: LabelChange) => Promise<string | null>;
 }
 
 export const useEditStore = create<EditState>()((set, get) => {
@@ -107,5 +110,13 @@ export const useEditStore = create<EditState>()((set, get) => {
       return !get().errors[repo];
     },
     issueDefault: (repo, key, on) => call(repo, key, { change: 'override', key, value: on }),
+    labels: async (repo, change) => {
+      if (get().running) return 'Another change is still running.';
+      set({ running: 'labels' });
+      const result = await postAction('/api/repositories/labels', { repo, ...change });
+      receive(result);
+      set({ running: null });
+      return result.error ?? null;
+    },
   };
 });

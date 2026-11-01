@@ -4,7 +4,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mapConcurrent, STRUCTURE_LABEL, structureSyncOperations, trackerKind, readTrackerStructure, stripTrackerStructure, sameRepo, trackerReference, writeTrackerStructure, type Kind, type RepositorySetup, type TrackerPart, type TrackerStructure } from '@lar-factory/shared';
+import { writeAccessProblem, mapConcurrent, STRUCTURE_LABEL, structureSyncOperations, trackerKind, readTrackerStructure, stripTrackerStructure, sameRepo, trackerReference, writeTrackerStructure, type Kind, type RepositorySetup, type TrackerPart, type TrackerStructure } from '@lar-factory/shared';
 import { providerCommand } from '@lar-factory/shared/provider-command';
 import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
@@ -278,7 +278,7 @@ async function drain(records: WorkRecords, options: StructureSyncOptions): Promi
           for(const node of snapshot.nodes){
             if(!node.ticket)continue;
             const setup=setups.find(setup=>sameRepo(setup.repo,node.repository));
-            if(!setup || structureSyncOperations(node.repository).filter(operation=>operation!=='publish-ticket').some(operation=>setup.access[operation]!=='allowed'))throw Error(`${node.repository}: issue editing access is unverified. Check access in repository settings.`);
+            if(!setup || structureSyncOperations(node.repository).filter(operation=>operation!=='publish-ticket').some(operation=>writeAccessProblem(node.repository,operation,setup.access)!==null))throw Error(`${node.repository}: issue editing access is unverified. Check access in repository settings.`);
             const ticket=await provider.read(node.repository,numberOf(node.ticket));const prior=readTrackerStructure(ticket.body);
             if(!prior?.snapshot)continue;
             if(prior.identity!==node.key || prior.snapshot.digest!==checkpoint.remoteDigest){if(current())records.trackerFailed(entry.workId,'This issue changed on another machine. Its pending structural removal was kept.',true,trackerDigest(snapshot));throw Error('Structural removal conflicts with another machine.');}
@@ -299,7 +299,8 @@ async function drain(records: WorkRecords, options: StructureSyncOptions): Promi
         const setup = configs[index];
         if (!setup) throw Error(`Add ${snapshot.nodes[index]!.repository} before saving this concept's structure.`);
         for (const operation of structureSyncOperations(setup.repo)) {
-          if (setup.access[operation] !== 'allowed') throw Error(`${setup.repo}: issue ${operation === 'publish-ticket' ? 'creation' : operation === 'edit-ticket' ? 'editing' : operation==='tag-ticket' ? 'labeling' : 'comments'} access is ${setup.access[operation]}. Check access in repository settings.`);
+          const problem = writeAccessProblem(setup.repo, operation, setup.access);
+          if (problem) throw Error(problem);
         }
       }
       // A dependency's existing owner issue is a durable member too, so it can recover the graph from its own List.

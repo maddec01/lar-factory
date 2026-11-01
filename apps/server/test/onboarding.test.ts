@@ -138,7 +138,7 @@ test('a repository with no factory files is detected and onboards with no write 
   const data = await until(board, (d) => d.repos.some((r) => r.repo === 'maddec01/lar-web'));
   assert.deepEqual(data.repos.find((r) => r.repo === 'maddec01/lar-web')?.role, 'Web client');
   const settings = JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')).repositories[0].settings;
-  assert.deepEqual([settings.projectId, settings.consent, settings.access['push-branch']], ['lar-web', ['push-branch', 'open-pr'], 'refused']);
+  assert.deepEqual([settings.projectId, settings.consent, settings.access['push-branch']], ['lar-web', undefined, 'refused']);
   assert.deepEqual((await board.calls()).filter(writesRepository), []);
 });
 
@@ -148,7 +148,7 @@ test('detection and saving refuse a body they cannot use', async (t) => {
   assert.deepEqual([detected.status, await detected.json()], [400, { error: 'Choose a repository and its T3 project before detecting its setup.' }]);
   const saved = await board.post({ repo: 'maddec01/lar-web', ...ANSWERS, consent: ['merge'] }, board.url, '/api/onboarding/setup');
   assert.deepEqual([saved.status, await saved.json()],
-    [400, { error: 'Send the repository, its T3 project, role, item source, domain-doc location, skills and write consent.' }]);
+    [400, { error: 'Send the repository, its T3 project, role, item source, domain-doc location, skills.' }]);
 });
 
 test('the sample board detects nothing, saves no setup and imports no ticket', async (t) => {

@@ -50,7 +50,7 @@ for (const operation of ['push-branch', 'open-pr'] as const) for (const state of
     const { commands, log, reread } = commandsOn([], undefined, records, [], access);
     const reply = await commands.startBuild(build.workId, undefined);
     assert.equal(reply.status, 403);
-    assert.match(JSON.stringify(reply.body), operation === 'push-branch' ? /push branches/ : /open pull requests/);
+    assert.match(JSON.stringify(reply.body), new RegExp(operation));
     assert.equal(records.read(build.workId).revision, build.revision);
     assert.deepEqual(records.launchIntents({ workId: build.workId }), []);
     assert.deepEqual(log, []);

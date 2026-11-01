@@ -65,3 +65,10 @@ test('a refused list read stops onboarding before saving anything', async (t) =>
   expect(result).toEqual({ status: 403, error: "Can't read the selected issue list. Read work items denied" });
   expect(readRepositoryList(dir)).toEqual([]);
 });
+
+test('onboarding needs no consent payload and persists no consent list', async (t) => {
+  const dir = await folder(t);
+  const { consent: _legacy, ...input } = answers;
+  expect(await saveSetup(input, dir, allowed)).toEqual({ onboarding: [] });
+  expect(await readFile(join(dir, 'repository-settings.json'), 'utf8')).not.toContain('consent');
+});

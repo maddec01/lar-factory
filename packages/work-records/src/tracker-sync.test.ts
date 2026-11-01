@@ -87,7 +87,7 @@ test('disabled saving and unverified issue access never silently write',async()=
   await syncStructures(records,{provider:fake.provider,setups:[settings('team/server',false),settings('team/apple')]});expect(fake.writes).toEqual([]);
   const setup=settings('team/server');setup.access['tag-ticket']='unverified';
   await syncStructures(records,{provider:fake.provider,setups:[setup,settings('team/apple'),settings('team/relay')]});expect(fake.writes).toEqual([]);
-  expect(records.trackerState(root.workId)).toMatchObject({state:'error',message:expect.stringContaining('labeling access is unverified')});
+  expect(records.trackerState(root.workId)).toMatchObject({state:'error',message:expect.stringContaining('Access to tag-ticket is not checked yet')});
 });
 
 test('incomplete chunks never commit; corrupt chunks never import; remote changes preserve pending local structure',async()=>{

@@ -6,7 +6,7 @@
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, buildAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, FactoryThreadContext, Item, ModelChoice, ModelGroup, OperationAccess, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
@@ -522,7 +522,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
       if (drift !== undefined && !isDriftChoice(drift)) return reply(422, { error: 'Choose Replace and start or Start anyway.' });
       if (item.status !== 'Ready') return reply(409, { error: `Only Ready items can start a build; this one is in ${item.status}.` });
       let accessProblem: string | null;
-      try { accessProblem = buildAccessProblem(buildAccessOf(item.repo)); }
+      try { accessProblem = (['push-branch', 'open-pr'] as const).map(operation => writeAccessProblem(item.repo, operation, buildAccessOf(item.repo))).find(problem => problem !== null) ?? null; }
       catch { accessProblem = 'Could not read repository access. Recheck it in Settings.'; }
       if (accessProblem) return withBoard(403, { error: accessProblem });
       const busy = busyReason(itemId, 'start');

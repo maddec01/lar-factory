@@ -1,7 +1,7 @@
-import { SHARED_SETTINGS, structureSyncOperations, REPOSITORY_OPERATIONS, sameRepo, type RepositorySetup, type RepositoryConfigProblem, type SharedSetting, type SharedRepositorySettings, type RepositoryOperation } from '@lar-factory/shared';
+import { SHARED_SETTINGS, structureSyncOperations, writeAccessProblem, sameRepo, type RepositorySetup, type RepositoryConfigProblem, type SharedSetting, type SharedRepositorySettings } from '@lar-factory/shared';
 import { detectAccess } from '../onboarding/detect-setup.ts';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { changeConsent, readRepositorySetups, setOverride, setStructureSync, replaceAccess } from '@lar-factory/shared/repository-settings';
+import { readRepositorySetups, setOverride, setStructureSync, replaceAccess } from '@lar-factory/shared/repository-settings';
 export { readRepositorySetups, saveLocalSetup, setOverride, validateRepositorySettings } from '@lar-factory/shared/repository-settings';
 import { notEditable, type Refused } from './editable-repository.ts';
 import { isRepo, onTheBoard, type OnboardedRepository, type RepositoryConfig } from './repository-config.ts';
@@ -13,9 +13,7 @@ export async function changeRepositorySettings(input: Record<string, unknown>, d
     return { status: 400, error: 'Send the repository and the change to its settings.' };
   }
   if (change === 'override' && !SHARED_SETTINGS.includes(key as SharedSetting)) return { status: 400, error: 'Choose a repository setting.' };
-  if (change === 'consent' && !(Array.isArray(value) && value.every((op) => REPOSITORY_OPERATIONS.includes(op as RepositoryOperation)))) {
-    return { status: 400, error: 'Send the operations to offer.' };
-  }
+  if (change === 'consent') return { status: 400, error: 'Write consent is obsolete. Recheck verified Access in Settings.' };
   const refused = notEditable(repo, dir);
   if (refused) return refused;
   try {
@@ -23,10 +21,9 @@ export async function changeRepositorySettings(input: Record<string, unknown>, d
     else if (change === 'structure-sync') {
       if (typeof value !== 'boolean') throw new Error('Choose whether to save concepts and links.');
       const setup = readRepositorySetups(dir).find((s) => sameRepo(s.repo, repo))!;
-      if (value && structureSyncOperations(repo).some((op) => setup.access[op] !== 'allowed')) throw new Error('Saving concepts and links needs permission to create issues, post comments and save their structure. Recheck access or leave it off.');
+      if (value && structureSyncOperations(repo).some((op) => writeAccessProblem(repo, op, setup.access) !== null)) throw new Error('Saving concepts and links needs permission to create issues, post comments and save their structure. Recheck access or leave it off.');
       setStructureSync(repo, value, dir);
     }
-    else if (change === 'consent') changeConsent(repo, value as RepositoryOperation[], dir);
     else setOverride(repo, key as SharedSetting, value as SharedRepositorySettings[SharedSetting], dir);
   } catch (err) {
     return { status: 400, error: (err as Error).message };

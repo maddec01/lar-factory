@@ -25,7 +25,7 @@ const main = async () => {
     return;
   }
   if (args[1] === 'list' && options.recover) {
-    process.stdout.write(JSON.stringify([{ threadId: 'thread-1', title: '#12 Issue 12' }]));
+    process.stdout.write(JSON.stringify([{ threadId: 'thread-1', title: (options.firstMessage ?? 'Shaping #12 Issue 12').split('\n')[0] }]));
     return;
   }
   if (args[1] === 'show' && options.recover) {

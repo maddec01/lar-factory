@@ -25,7 +25,7 @@ const startBuild = (board: Board, itemId: string, model?: unknown, origin = boar
   board.postSession({ itemId, model, drift }, '/api/start-build', origin);
 
 const message = (home: string, workId: string, dataDir?: string) =>
-  buildMessage({id:workId} as Item,`${home}/.agents/skills/lar-build`,{...testFactoryContext(home),...dataDir ? {dataDir}: {}});
+  buildMessage({id:workId,number:12,title:'Issue 12'} as Item,`${home}/.agents/skills/lar-build`,{...testFactoryContext(home),...dataDir ? {dataDir}: {}});
 
 /** The issue edits Start build might make, which it never does: its work records hold the moves. */
 const writes = async (board: Board) => (await board.calls())

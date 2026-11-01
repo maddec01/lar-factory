@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import { promisify } from 'node:util';
 import type { TestContext } from 'vite-plus/test';
-import { DONE_WINDOW_MS, REPOSITORY_OPERATIONS, isSkillCheckRequest, normalizeItems, readBuilds, refKey, workMessage } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, REPOSITORY_OPERATIONS, earlierWorkMessage, isSkillCheckRequest, normalizeItems, readBuilds, refKey, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, Item, RawItem, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
@@ -351,3 +351,5 @@ export function startableEnv(t: TestContext): Record<string, string> {
 
 export const testFactoryContext = (home: string) => ({dataDir:boardDataDir(home,{}),bin:join(home,'.local/bin'),shapeSkill:join(home,'.agents/skills/lar-shape/SKILL.md'),azureReadOnly:process.env.LAR_FACTORY_AZURE_READ_ONLY==='1'});
 export const shapePrompt = (board: Board, title: string, id: string) => workMessage({id,title,number:0} as Item,testFactoryContext(dirname(dirname(dirname(board.dataDir)))));
+/** The shaping message a board sent before threads took their phase in their name. */
+export const earlierShapePrompt = (board: Board, title: string, id: string) => earlierWorkMessage({id,title,number:0} as Item,testFactoryContext(dirname(dirname(dirname(board.dataDir)))));

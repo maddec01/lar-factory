@@ -55,8 +55,37 @@ test('finding a started thread skips the recorded ones, and tells absent from un
   const listing = (ids: string[], code: number = 0): T3Run => async (args) => ({ code: args[1] === 'list' ? code : 0, stderr: '', detail: '',
     stdout: args[1] === 'list' ? JSON.stringify(ids.map((threadId) => ({ threadId, title: 'Build' })))
       : JSON.stringify({ thread: { threadId: args[2] }, messages: [{ role: 'user', text: 'Build\nissue' }] }) });
-  assert.deepEqual(await findStartedThread('project', 'Build\nissue', ['old'], listing(['old', 'new'])), { threadId: 'new', title: 'Build' });
-  assert.equal(await findStartedThread('project', 'Build\nissue', ['old'], listing(['old'])), 'absent');
-  assert.equal(await findStartedThread('project', 'Build\nissue', [], listing([], 1)), 'unknown');
-  assert.equal(await findStartedThread('project', 'Build\nissue', [], listing(['a', 'b'])), 'unknown', 'two matches establish nothing');
+  assert.deepEqual(await findStartedThread('project', ['Build\nissue'], ['old'], listing(['old', 'new'])), { threadId: 'new', title: 'Build' });
+  assert.equal(await findStartedThread('project', ['Build\nissue'], ['old'], listing(['old'])), 'absent');
+  assert.equal(await findStartedThread('project', ['Build\nissue'], [], listing([], 1)), 'unknown');
+  assert.equal(await findStartedThread('project', ['Build\nissue'], [], listing(['a', 'b'])), 'unknown', 'two matches establish nothing');
+});
+
+/** T3 answering with `threads`, each its title and first message, and listing a duplicated row as `duplicate`. */
+const threadsOf = (threads: Record<string, { title: string; text: string }>, duplicate?: string): T3Run => async (args) => ({ code: 0, stderr: '', detail: '',
+  stdout: args[1] === 'list' ? JSON.stringify([...Object.keys(threads), ...duplicate ? [duplicate] : []].map((threadId) => ({ threadId, title: threads[threadId]!.title })))
+    : JSON.stringify({ thread: { threadId: args[2] }, messages: [{ role: 'user', text: threads[args[2]!]!.text }] }) });
+
+const CURRENT = 'Shaping #7 T\nShape w1.';
+const EARLIER = '#7 T\nShape w1.';
+
+test('finding a started thread considers every message format together, one thread across them resolving it', async () => {
+  const { findStartedThread } = await import('./t3.ts');
+  const current = { title: 'Shaping #7 T', text: CURRENT };
+  const earlier = { title: '#7 T', text: EARLIER };
+  assert.deepEqual(await findStartedThread('p', [CURRENT, EARLIER], [], threadsOf({ a: earlier })), { threadId: 'a', title: '#7 T' });
+  assert.deepEqual(await findStartedThread('p', [CURRENT, EARLIER], [], threadsOf({ a: current })), { threadId: 'a', title: 'Shaping #7 T' });
+  assert.equal(await findStartedThread('p', [CURRENT, EARLIER], [], threadsOf({ a: current, b: earlier })), 'unknown', 'one in each format establishes nothing');
+  assert.deepEqual(await findStartedThread('p', [CURRENT, EARLIER], [], threadsOf({ a: earlier }, 'a')), { threadId: 'a', title: '#7 T' }, 'a thread listed twice is one thread');
+  assert.equal(await findStartedThread('p', [CURRENT, EARLIER], ['a'], threadsOf({ a: earlier })), 'absent');
+  assert.equal(await findStartedThread('p', [CURRENT, EARLIER], [], threadsOf({ a: { title: '#7 T', text: '#7 T\nsomething else' } })), 'absent');
+});
+
+test('a thread whose long first line T3 cut short is still found by its whole first message', async () => {
+  const { findStartedThread, titledFrom } = await import('./t3.ts');
+  const message = 'Build w1. Read /Users/someone/.agents/skills/lar-build/agents/builder.md and follow it.\n\nexport PATH=/b';
+  assert.deepEqual(await findStartedThread('p', [message], [], threadsOf({ a: { title: 'Build w1. Read /Users/someone/.agents/sk…', text: message } })),
+    { threadId: 'a', title: 'Build w1. Read /Users/someone/.agents/sk…' });
+  assert.equal(titledFrom('Build w2. Read…', message), false);
+  assert.equal(titledFrom('Build w1.', message), false, 'a title with no ellipsis must be the whole line');
 });

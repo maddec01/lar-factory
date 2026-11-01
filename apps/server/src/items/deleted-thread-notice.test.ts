@@ -16,7 +16,7 @@ test('confirmed latest deletion survives reopening, but live work and a newer th
     records.close();
     records = await openWorkRecords(join(dir, 'records.db'));
     const item = { ...recordItems(records, [], ['owner/repo'])[0]!, threads: [] };
-    expect(deletedThreadNotice(records, item)).toMatchObject({ deletedThread: true, offers: ['start-again', 'back-to-queue', 'back-to-list'] });
+    expect(deletedThreadNotice(records, item)).toMatchObject({ deletedThread: true, deletedThreadPurpose: 'shape', offers: ['start-again', 'back-to-queue', 'back-to-list'] });
     expect(deletedThreadNotice(records, { ...item, threads: 'unavailable' })).toBeUndefined();
     expect(deletedThreadNotice(records, { ...item, threads: [{ id: 'live', state: 'running' } as never] })).toBeUndefined();
     records.addThread(record.workId, record.revision, 'new', 'shape');

@@ -10,6 +10,6 @@ export function deletedThreadNotice(records: WorkRecords, item: Item): Item['nee
   if (!latest?.deletedAt) return item.needsYou;
   const pr = records.observations(item.id).find(o => o.of === 'pr')?.state;
   if (pr === 'closed' && record.needsYou) return item.needsYou;
-  return { reason: 'The latest work thread was deleted.', deletedThread: true,
+  return { reason: 'The latest work thread was deleted.', deletedThread: true, deletedThreadPurpose: latest.purpose === 'build' ? 'build' : 'shape',
     offers: pr === 'open' ? ['start-again'] : ['start-again', 'back-to-queue', 'back-to-list'] };
 }

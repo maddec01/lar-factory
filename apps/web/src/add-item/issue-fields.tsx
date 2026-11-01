@@ -3,11 +3,14 @@ import { useEffect, useState } from 'react';
 import { effectiveIssueSettings, writeAccessProblem, type RepoConfig, type TicketCreationOptions, type TicketOptions } from '@lar-factory/shared';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { NativeSelect } from '@lar-factory/ui/native-select';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { kind as buttonKind } from '../buttons/button-kinds.tsx';
+import { useEditStore } from '../repositories/edit-store.ts';
 import type { DraftValues } from './add-item-store.ts';
 
 const HINT = 'm-0 text-xs leading-snug text-(--muted-foreground)';
 
-function Options({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: TicketOptions }) {
+export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: TicketOptions }) {
   const [read, setRead] = useState<TicketCreationOptions | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -50,6 +53,8 @@ function Options({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: 
 }
 
 export function IssueFields({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: DraftValues | null }) {
+  const running = useEditStore(state => state.running);
+  const error = useEditStore(state => state.errors[repo.repo]);
   const effective = repo.setup ? effectiveIssueSettings(repo.setup) : null;
   const reason = effective?.createReason ?? (effective ? null : 'Issue access is not checked yet. Recheck access in Settings.');
   const [checked, setChecked] = useState(kept?.createIssue ?? effective?.createIssuesFromAddItem ?? false);
@@ -57,7 +62,20 @@ export function IssueFields({ repo, kind, kept }: { repo: RepoConfig; kind: stri
   return <div className="grid gap-3">
     <Checkbox id="item-create-issue" name="createIssue" label="Create issue" checked={enabled} disabled={!!reason}
       aria-describedby={reason ? 'item-create-reason' : undefined} onChange={event => setChecked(event.target.checked)} />
-    {reason && <p id="item-create-reason" className={HINT}>{reason}</p>}
-    {enabled && <Options repo={repo} kind={kind} kept={kept?.kind === kind ? kept.options : undefined} />}
+    {reason && <div className="grid gap-2">
+      <p id="item-create-reason" className={HINT}>{reason}</p>
+      <Button {...buttonKind('other')} type="button" disabled={running !== null} onClick={() => void useEditStore.getState().recheck(repo.repo)}>Recheck access</Button>
+      {error && <p role="status" className={HINT}>{error}</p>}
+    </div>}
+    {enabled && <TicketOptionFields repo={repo} kind={kind} kept={kept?.kind === kind ? kept.options : undefined} />}
   </div>;
+}
+
+/** Both forms submit exactly the optional fields currently visible. */
+export function ticketOptions(form: HTMLFormElement): TicketOptions {
+  const values = new FormData(form);
+  return {
+    ...(form.querySelector('[name="labels"]') ? { labels: values.getAll('labels').map(String) } : {}),
+    ...Object.fromEntries(['type', 'assignee', 'milestone', 'iteration'].filter(name => values.has(name)).map(name => [name, String(values.get(name) ?? '')])),
+  };
 }

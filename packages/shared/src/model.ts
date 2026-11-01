@@ -270,6 +270,7 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 export interface Item {
   /** Local completion facts, independent of the board Status and absent on provider-only items. Never published. */
   completion?: { complete: boolean; reasons: string[] };
+  specSync?: { pending: boolean; error: string | null; warning: string | null };
   sync?: { state: 'saved' | 'pending' | 'error' | 'conflict'; message?: string };
   /** Public tracker structure, also present before this machine queues the issue. */
   tracker?: import('./tracker-structure.ts').TrackerStructure;

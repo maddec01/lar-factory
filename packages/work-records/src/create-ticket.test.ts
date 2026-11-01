@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { RepoConfig, TicketCreationOptions } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
-import { createRecordTicket, recordTicketPreview } from './create-ticket.ts';
+import { captureWork, createRecordTicket, recordTicketPreview } from './create-ticket.ts';
 import type { StructureProvider, StructureTicket } from './tracker-sync.ts';
 
 const REQUEST = '11111111-1111-4111-8111-111111111111';
@@ -20,7 +20,7 @@ async function setup() {
   const local = records.create({ repository: REPO, kind: 'bug', title: 'Fix export', context: 'Original request.' });
   const repo = { repo: REPO, labels: [], role: '', setup: { repo: REPO, access: { 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed', 'type-ticket': 'allowed' }, vocabulary: { bug: { labels: ['bug'], type: 'Bug' } } } } as unknown as RepoConfig;
   const writes: unknown[][] = [];
-  const provider = { create: async (...args: unknown[]) => { writes.push(args); return { number: 13 }; } } as unknown as StructureProvider;
+  const provider = { create: async (...args: unknown[]) => { writes.push(args); return { repository: args[0], title: args[1], body: args[2], number: 13, version: '1' }; } } as unknown as StructureProvider;
   const deps = { records, repos: () => [repo], provider, discoverOptions: async () => options };
   const convert = (extra: Record<string, unknown> = {}) => createRecordTicket(local.workId, { requestId: REQUEST, revision: records.read(local.workId).revision, ...extra }, deps);
   return { records, local, repo, writes, deps, convert };
@@ -175,4 +175,40 @@ test('conversion preserves the exact stored title shown in its preview', async (
   const record = records.create({ repository: REPO, kind: 'bug', title: '  Fix export  ', context: 'Original.' });
   expect((await createRecordTicket(record.workId, { requestId: REQUEST, revision: record.revision }, deps)).status).toBe(200);
   expect(writes[0]![1]).toBe('  Fix export  ');
+});
+
+
+test('replaying a confirmed conversion activates its recovered Spec before success', async () => {
+  const { records, local, deps, convert } = await setup();
+  const brief = records.setBody(local.workId, local.revision, 'brief', 'Gated Spec.');
+  records.recordGate(local.workId, brief.revision, { briefDigest: records.gate(local.workId).briefDigest!, approvedBy: 'user', evidence: 'pass' });
+  let created: StructureTicket;
+  let creates = 0;
+  deps.provider.create = async (repository, title, body) => {
+    creates++;
+    return created = { repository, number: 31, title, body, version: '1' };
+  };
+  deps.provider.readSpec = async () => created;
+  const complete = records.completeCapture;
+  records.completeCapture = () => { throw Error('Disk full'); };
+  expect((await convert()).status).toBe(502);
+  records.completeCapture = complete;
+  expect((await convert()).status).toBe(200);
+  expect(records.specState(local.workId)).toMatchObject({ active: true, base: { body: created!.body }, original: 'Original request.' });
+  expect(creates).toBe(1);
+});
+
+
+test.each([false, true])('retention purges capture prose and retains replay protection, conversion=%s', async conversion => {
+  const { records, local, deps, convert, writes } = await setup();
+  const draft = { repo: REPO, kind: 'bug', title: 'Private title', description: 'Private description', createIssue: true };
+  const result = conversion ? await convert() : await captureWork({ requestId: REQUEST, draft }, deps);
+  const record = result.body.record!;
+  records.setAside(record.workId, record.revision);
+  expect(records.deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }).deleted).toContain(record.workId);
+  expect(records.captureSubmission(REQUEST)).toMatchObject({ draft: '', ticket: `${REPO}#13` });
+  expect((await captureWork({ requestId: REQUEST, draft }, deps)).status).toBe(409);
+  expect(() => records.completeCapture(REQUEST, { title: 'Replay', repository: REPO, kind: 'bug', ticket: `${REPO}#13` })).toThrow(/expired/i);
+  expect(writes).toHaveLength(1);
+  expect(records.list({}).map(record => record.workId)).toEqual(conversion ? [] : [local.workId]);
 });

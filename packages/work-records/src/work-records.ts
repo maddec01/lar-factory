@@ -4,11 +4,12 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import type { StatementSync } from 'node:sqlite';
-import { STATUSES, type Status } from '@lar-factory/shared';
+import { readTicketSpec, stripTrackerStructure, STATUSES, type Status } from '@lar-factory/shared';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import type { Retention } from './retention.ts';
+import { specRecords, type SpecRecords } from './spec-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 
 export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './database.ts';
@@ -24,7 +25,7 @@ export type WorkKind = (typeof WORK_KINDS)[number];
 export const BUILD_PHASES = ['plan', 'implement', 'domain-docs', 'full-checks', 'review', 'approve', 'checks', 'retro'] as const;
 export type BuildPhase = (typeof BUILD_PHASES)[number];
 
-/** A record's private markdown: a concept's map; a decision's text, confirmed answer and domain drafts; or any other
+/** A record's markdown: a concept's map; a decision's text, confirmed answer and domain drafts; or any other
  * record's brief. */
 export const BODIES = ['brief', 'decision', 'map', 'answer', 'domain-drafts'] as const;
 export type Body = (typeof BODIES)[number];
@@ -191,7 +192,7 @@ export interface WorkRecord {
 }
 
 export interface NewWorkRecord {
-  /** One line. Capture or import sets it, and a later ticket edit never overwrites it. */
+  /** One line. Capture or import sets it; trusted edits to an active Spec can update it. */
   title: string;
   /** The markdown the work began with, such as its ticket's text. Empty by default; never overwritten. */
   context?: string;
@@ -221,7 +222,7 @@ export interface WorkRecordFilter {
 
 export interface CaptureSubmission { draft: string; ticket: string | null; workId: string | null; failure: string | null }
 
-export interface WorkRecords extends TrackerCache, PublicationRecords, DependencyRecords {
+export interface WorkRecords extends TrackerCache, PublicationRecords, DependencyRecords, SpecRecords {
   captureSubmission(requestId: string): CaptureSubmission | null;
   /** Reserves the request before any provider create; replays return its durable outcome. */
   claimCapture(requestId: string, draft: string, targetWorkId?: string): { fresh: boolean; submission: CaptureSubmission };
@@ -517,7 +518,7 @@ function workRecords(database: Database): WorkRecords {
   const bodyNames = db.prepare('SELECT body FROM bodies WHERE work_id = ?');
   const bodyText = db.prepare('SELECT markdown FROM bodies WHERE work_id = ? AND body = ?');
   const writeBodyRow = db.prepare(`INSERT INTO bodies (work_id, body, markdown, written, has_content, has_passing_gate)
-    VALUES (?, ?, ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ?))
+    VALUES (?, ?, ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND source IN ('gate', 'user')))
     ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written, has_content = excluded.has_content, has_passing_gate = excluded.has_passing_gate`);
   const writeBody = (workId: string, body: Body, markdown: string) => {
     const digest = body === 'brief' && markdown.trim() ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex') : '';
@@ -585,7 +586,10 @@ function workRecords(database: Database): WorkRecords {
   const importTicket = (record: NewWorkRecord & { ticket: string }) => {
     const ticket = checkTicket(record.ticket);
     const existing = byTicket.get(ticket) as Row | undefined;
-    if (!existing) return { record: insert(record), created: true };
+    if (!existing) {
+      const parsed = readTicketSpec(stripTrackerStructure(record.context ?? '').replace(/<!-- lar-factory:create [^\n]*? -->/g, '').trimEnd());
+      return { record: insert(parsed.marked ? { ...record, context: parsed.original ?? '' } : record), created: true };
+    }
     if (existing.repository !== record.repository) {
       throw new WorkRecordError('ticket-taken', `The ticket ${ticket} already belongs to the work record ${existing.work_id} in ${existing.repository}.`);
     }
@@ -666,6 +670,7 @@ function workRecords(database: Database): WorkRecords {
 
   return {
     ...trackerCache(database),
+    ...specRecords(database, (workId) => fromRow(find(workId))),
     ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
     ...dependencyChanges,
     captureSubmission: (requestId) => database.read(() => {
@@ -678,6 +683,7 @@ function workRecords(database: Database): WorkRecords {
       if (pending && pending.request_id !== requestId) throw invalid('This item already has a ticket creation submission. Recover that submission before creating another issue.');
       const fresh = Boolean(db.prepare('INSERT OR IGNORE INTO capture_submissions(request_id,draft,target_work_id) VALUES (?,?,?)').run(requestId, draft, targetWorkId ?? null).changes);
       const row = db.prepare('SELECT * FROM capture_submissions WHERE request_id=?').get(requestId)!;
+      if (row.draft === '') throw invalid('This submission expired. It cannot create another item or issue.');
       if (row.draft !== draft) throw invalid('This submission already belongs to another item. Finish it before starting a new one.');
       return { fresh, submission: { draft: String(row.draft), ticket: row.ticket as string | null, workId: row.work_id as string | null, failure: row.failure as string | null } };
     }),
@@ -691,6 +697,7 @@ function workRecords(database: Database): WorkRecords {
     completeCapture: (requestId, record, target) => database.write(() => {
       const row = db.prepare('SELECT * FROM capture_submissions WHERE request_id=?').get(requestId);
       if (!row) throw invalid('This submission has no durable request.');
+      if (row.draft === '') throw invalid('This submission expired. It cannot create another item or issue.');
       if (row.work_id) return { record: fromRow(find(String(row.work_id))), created: false };
       if (row.ticket && row.ticket !== record.ticket) throw invalid('The submission already holds another ticket.');
       if (target) {
@@ -1040,6 +1047,7 @@ function workRecords(database: Database): WorkRecords {
           for (const holder of forgetDependencies(database, workId)) if (!due.has(holder)) touched.add(holder);
           for (const statement of deleteOwned) statement.run(workId);
           deleteBlockers.run(workId, workId);
+          db.prepare("UPDATE capture_submissions SET draft='',failure='This submission expired.' WHERE work_id=? OR target_work_id=?").run(workId, workId);
           deleteRecord.run(workId);
         }
         const at = new Date().toISOString();

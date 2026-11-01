@@ -11,6 +11,7 @@ import { createRecordTicket } from './create-ticket.ts';
 import { isRecord } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
+import { refreshSpecs, syncSpecs } from './spec-sync.ts';
 import { syncStructures } from './tracker-sync.ts';
 import {
   openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
@@ -141,14 +142,16 @@ Content
 Brief gate
   gate <work-id>                    Print the current brief digest and gate history.
   record-gate <work-id> --revision N --digest H --identity I --evidence E
-                                    Attest that this exact local brief passed its gate.
+                                    Attest that this exact brief passed its gate.
+                                    Eligible tickets queue a durable Spec write. A
+                                    failed write keeps Ready and offers retry in details.
 
 Provider observations
   An observation is the last read of the record's ticket or current PR from its
   provider, kept with the time it was read. A newer read replaces it. A failed
-  read keeps it and records when and why the read failed. An observation never
-  changes the record's title, context or refinement. A merged PR finishes the
-  work; replacing the PR drops its observation.
+  read keeps it and records when and why the read failed. Spec reads also sync
+  trusted tracker title and main-text edits, retaining Status and initial context.
+  A merged PR finishes the work; replacing the PR drops its observation.
   observe <work-id> --revision N --of ticket --state open|closed|not-found
           [--assignee A]
   observe <work-id> --revision N --of pr --state open|merged|closed
@@ -376,9 +379,14 @@ async function run(records: WorkRecords, command: string, workId: string | undef
     case 'sync-structure':
       await syncStructures(records, {workId:workId!,dir:values['data-dir'],confirmedMissingIssue:values['confirmed-missing-issue']});
       return {record:records.read(workId!),sync:records.trackerState(workId!)};
-    case 'gate':
-      return records.gate(workId!);
+    case 'gate': {
+      await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
+      const state = records.specState(workId!);
+      return { ...records.gate(workId!), specSync: { pending: state.pending !== null, error: state.error, warning: state.warning, awaitingApproval: state.held !== null } };
+    }
     case 'record-gate':
+      await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
+      if (records.specState(workId!).held) throw new WorkRecordError('invalid', 'Accept or reject the held GitHub edit in item details before recording a later gate.');
       return records.recordGate(workId!, revision(), { briefDigest: need(values, 'digest'), approvedBy: need(values, 'identity'), evidence: need(values, 'evidence') });
     case 'create': {
       const input = { ...captured(), ticket: values.ticket };
@@ -445,6 +453,7 @@ async function run(records: WorkRecords, command: string, workId: string | undef
     case 'set-body':
       return records.setBody(workId!, revision(), need(values, 'body') as Body, readInput(values));
     case 'body': {
+      if (values.body === 'brief') await refreshSpecs(records, { workId: workId!, dir: values['data-dir'] });
       const body = need(values, 'body') as Body;
       const markdown = records.body(workId!, body);
       if (markdown === null) throw new WorkRecordError('not-found', `The work record ${workId} has no ${body}.`);
@@ -551,6 +560,11 @@ async function main(args: string[]): Promise<number> {
       const id=isRecord(result) && typeof result.workId==='string' ? result.workId : isRecord(result) && isRecord(result.record) && typeof result.record.workId==='string' ? result.record.workId : undefined;
       const sync=id ? records.trackerState(id) : undefined;
       if(sync?.state==='error' || sync?.state==='conflict') process.stderr.write(`lar-work: Structure remains on this machine: ${sync.message}\n`);
+    }
+    await syncSpecs(records, { dir: values['data-dir'] });
+    if (workId && !TAKES_DEPENDENCY_ID.includes(command)) {
+      const sync = records.specState(workId);
+      if (sync.error || sync.warning) process.stderr.write(`lar-work: ${sync.warning ?? sync.error}\n`);
     }
     process.stdout.write(typeof result === 'string' ? result : `${JSON.stringify(result, null, 2)}\n`);
     return 0;

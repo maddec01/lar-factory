@@ -343,4 +343,15 @@ export const MIGRATIONS: readonly Migration[] = [
   )`),
   (db) => db.exec(`ALTER TABLE capture_submissions ADD COLUMN target_work_id TEXT;
     CREATE UNIQUE INDEX capture_target ON capture_submissions(target_work_id) WHERE failure IS NULL`),
+  (db) => db.exec(`
+    CREATE TABLE ticket_specs (
+      work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE,
+      generation INTEGER NOT NULL,
+      state TEXT NOT NULL
+    ) STRICT;
+    ALTER TABLE brief_gates ADD COLUMN source TEXT NOT NULL DEFAULT 'gate';
+  `),
+  (db) => db.exec(`UPDATE capture_submissions SET draft='',failure='This submission expired.'
+    WHERE (work_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM work_records WHERE work_records.work_id=capture_submissions.work_id))
+      OR (target_work_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM work_records WHERE work_records.work_id=capture_submissions.target_work_id))`),
 ];

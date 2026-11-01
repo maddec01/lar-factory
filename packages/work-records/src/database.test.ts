@@ -190,3 +190,22 @@ describe('openDatabase', () => {
     });
   });
 });
+
+it('upgrading purges orphaned capture drafts without dropping their replay tombstones', async () => {
+  const path = join(tempDir(), 'records.db');
+  const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+  old.db.prepare('INSERT INTO capture_submissions(request_id,draft,ticket,work_id,target_work_id) VALUES (?,?,?,?,?)')
+    .run('capture', 'Private capture description', 'example/product#1', 'deleted-capture', null);
+  old.db.prepare('INSERT INTO capture_submissions(request_id,draft,ticket,work_id,target_work_id) VALUES (?,?,?,?,?)')
+    .run('conversion', 'Private conversion Spec', 'example/product#2', null, 'deleted-conversion');
+  old.db.prepare('INSERT INTO capture_submissions(request_id,draft) VALUES (?,?)').run('pending', 'Pending description');
+  old.close();
+  const updated = await openDatabase(path);
+  try {
+    expect(updated.db.prepare('SELECT request_id,draft,ticket FROM capture_submissions ORDER BY request_id').all().map(row => ({ ...row }))).toEqual([
+      { request_id: 'capture', draft: '', ticket: 'example/product#1' },
+      { request_id: 'conversion', draft: '', ticket: 'example/product#2' },
+      { request_id: 'pending', draft: 'Pending description', ticket: null },
+    ]);
+  } finally { updated.close(); }
+});

@@ -5,6 +5,7 @@ import type { VocabularyDiscovery } from './vocabulary.ts';
 // Browser-safe requests and results for the publication journal. Provider adapters execute only claimed operations.
 
 export interface GateEvidence {
+  source?: 'gate' | 'tracker' | 'user' | 'conflict';
   gateId: string;
   workId: string;
   sourceRevision: number;

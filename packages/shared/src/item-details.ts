@@ -34,7 +34,7 @@ export interface RecordReviewRound {
   reviewers: { axis: string; verdict: string; findings: number; open: number }[];
 }
 
-/** The work record's own text and progress, which ticket edits never change. */
+/** The work record's text and local progress; trusted Spec edits can update its brief. */
 export interface RecordDetails {
   /** Which body the record holds: a concept's map, a decision's text, or any other record's brief. */
   bodyKind: 'map' | 'decision' | 'brief';
@@ -51,6 +51,15 @@ export interface RecordDetails {
 export interface ItemDetails {
   /** The work record's text and progress; absent in sample mode and for an item with no record. */
   record?: RecordDetails;
+  spec?: {
+    generation: number;
+    pending: boolean;
+    error: string | null;
+    warning: string | null;
+    original: string | null;
+    originalFormat: TextFormat;
+    held: { title: string; body: string } | null;
+  };
   /** The ticket's description; empty when there is none. */
   body: string;
   format: TextFormat;

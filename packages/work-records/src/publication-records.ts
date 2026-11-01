@@ -1,3 +1,4 @@
+import { queueTicketSpec } from './spec-records.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import type {
   GateEvidence, GateResult, PublicationAttachment, PublicationAttempt, PublicationContent, PublicationLocation, PublicationOperation,
@@ -101,9 +102,9 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
     const briefDigest = brief?.trim() ? digest(brief) : null;
     const evidence = db.prepare('SELECT * FROM brief_gates WHERE work_id = ? ORDER BY rowid').all(workId).map((row): GateEvidence => ({
       gateId: String(row.gate_id), workId, sourceRevision: Number(row.source_revision), briefDigest: String(row.brief_digest),
-      approvedBy: String(row.approved_by), evidence: String(row.evidence), recordedAt: String(row.recorded_at),
+      approvedBy: String(row.approved_by), evidence: String(row.evidence), recordedAt: String(row.recorded_at), source: row.source as GateEvidence['source'],
     }));
-    return { briefDigest, current: briefDigest !== null && evidence.some((item) => item.briefDigest === briefDigest), evidence };
+    return { briefDigest, current: briefDigest !== null && evidence.some((item) => item.briefDigest === briefDigest && (item.source === 'gate' || item.source === 'user')), evidence };
   };
   const children = (workId: string): WorkRecord[] => db.prepare('SELECT work_id FROM work_records WHERE parent_id = ? AND set_aside_at IS NULL AND kind <> \'slice\' ORDER BY rowid').all(workId).map((row) => find(String(row.work_id)));
   const source = (workId: string): PublicationSource => {
@@ -115,7 +116,7 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       workId, revision: record.revision,
       digest: digest({ title: record.title, repository: record.repository, kind: record.kind, parentId: record.parentId,
         setAside: record.setAside, fogGone: record.fogGone, bodies, blockers, children: children(workId).map((child) => child.workId) }),
-      gate: evidence.findLast((item) => item.briefDigest === briefDigest) ?? null,
+      gate: evidence.findLast((item) => item.briefDigest === briefDigest && (item.source === 'gate' || item.source === 'user')) ?? null,
     };
   };
   type Refinement = Pick<WorkRecord, 'workId' | 'kind' | 'setAside' | 'fogGone'>;
@@ -448,6 +449,7 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       db.prepare('INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(item.gateId, workId, revision, item.briefDigest, item.approvedBy, item.evidence, item.recordedAt);
       db.prepare("UPDATE bodies SET has_passing_gate = 1 WHERE work_id = ? AND body = 'brief'").run(workId);
+      if (record.ticket) queueTicketSpec(database, workId, record.ticket, body(workId, 'brief')!);
       return item;
     }),
     publicationReceipt: (workId) => database.read(() => { find(workId); return knownTicket(workId); }),

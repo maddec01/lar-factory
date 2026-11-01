@@ -12,6 +12,12 @@ describe('recorded thread lookup', () => {
     expect(lookup(['root', 'gone'])).toEqual([]);
     expect(lookup([])).toBeUndefined();
   });
+  it('distinguishes running descendants from waiting descendants', () => {
+    const parent = { ...shell, status: 'interrupted' };
+    const child = { ...shell, id: 'child', status: 'running', lineage: { parentThreadId: 'root' } };
+    expect(executionItemThreads([parent, child])(['root'])?.[0]).toMatchObject({ hasRunningChildren: true, hasLiveChildren: true });
+    expect(executionItemThreads([parent, { ...child, status: 'waiting' }])(['root'])?.[0]).not.toHaveProperty('hasRunningChildren');
+  });
   it('shows a subagent thread only when it is recorded', () => {
     const child = { ...shell, id: 'child', lineage: { relationshipToParent: 'subagent' } };
     expect(executionItemThreads([child])(['child'])).toHaveLength(1);

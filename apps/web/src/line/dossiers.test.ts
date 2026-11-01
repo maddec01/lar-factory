@@ -182,7 +182,7 @@ const col = (name: string, id = C200) => line(2, id).querySelector<HTMLElement>(
 test("line 2 has the part bar, parts done, what's next, agent figures and repositories in the same fixed columns in every dossier", async () => {
   await mountPage();
   const grid = (id: string) => line(2, id).className.split(' ').filter((c) => c.includes('grid-cols'));
-  expect(grid(C200)).toEqual(['grid-cols-[18rem_5.5rem_minmax(0,1fr)_9.5rem]', 'lg:grid-cols-[18rem_5.5rem_minmax(0,1fr)_9.5rem_9rem]']);
+  expect(grid(C200)).toEqual(['grid-cols-[18rem_8rem_minmax(0,1fr)_9.5rem]', 'lg:grid-cols-[18rem_8rem_minmax(0,1fr)_9.5rem_9rem]']);
   expect(grid(C180)).toEqual(grid(C200));
   expect([...line(2).children].map(text)).toEqual(['', '2/6 parts', 'Needs you#202 Sign-in screen', '1h 31m · 6.23M · $9.11', 'lar-server']);
   expect(col('bar').querySelectorAll('[data-part-bar] li').length, 'a segment per part').toBe(6);

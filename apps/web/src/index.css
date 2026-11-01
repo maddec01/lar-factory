@@ -18,6 +18,7 @@
 @source "./desk";
 @source "./diagrams";
 @source "./expand-dialog";
+@source "./filters";
 @source "./item-dialog";
 @source "./items/item-parts.tsx";
 @source "./items/open-thread.tsx";

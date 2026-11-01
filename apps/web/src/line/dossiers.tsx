@@ -402,9 +402,10 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
 }
 
 /** `items` are the line's items in the main area's scope. */
-export function Dossiers({ items }: { items: Item[] }) {
+/** `shows` says which rows the filters leave; a part has no row of its own, so a dossier follows its parent's. */
+export function Dossiers({ items, shows }: { items: Item[]; shows: (item: Item) => boolean }) {
   const { data, now } = useBoardStore();
-  const dossiers = dossiersOf(items, data.items);
+  const dossiers = dossiersOf(items, data.items).filter(({ parent }) => shows(parent));
   if (!dossiers.length) return null;
   return <div className="grid gap-2" data-dossiers>{dossiers.map(({ parent, parts }) => <Dossier key={parent.id} parent={parent} parts={parts} data={data} now={now} />)}</div>;
 }

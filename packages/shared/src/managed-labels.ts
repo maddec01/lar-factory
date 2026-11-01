@@ -1,7 +1,7 @@
 // The managed labels: those the factory reads as meaning, which it hides from rows and locks in settings. The names
 // come from what reads them, so the reads, customLabelProblem and the lock can't disagree. Trackers match without case.
-import { STATUS_LABEL_PREFIX } from './model.ts';
-import type { Item, Kind } from './model.ts';
+import { STATUS_LABEL_PREFIX, sameRepo } from './model.ts';
+import type { Item, Kind, RepoConfig } from './model.ts';
 import { DECISION_LABEL_PREFIX, STRUCTURE_LABEL, TRACKER_KIND_NAMES } from './tracker-structure.ts';
 import type { EffectiveVocabulary, VocabularyKey } from './vocabulary.ts';
 
@@ -26,3 +26,7 @@ export function shownLabels(item: Pick<Item, 'kind' | 'labels'>, vocabulary?: Ef
   const mapped = new Set((KIND_TERMS[item.kind] ?? []).flatMap((key) => vocabulary?.[key].labels ?? []).map((label) => label.toLowerCase()));
   return item.labels.slice(0, LABEL_LIMIT).filter((label) => !isManagedLabel(label) && !mapped.has(label.toLowerCase()));
 }
+
+/** The labels `item`'s row shows, under its repository's mappings. */
+export const labelsOnRow = (item: Pick<Item, 'kind' | 'labels' | 'repo'>, repos: readonly Pick<RepoConfig, 'repo' | 'setup'>[]): string[] =>
+  shownLabels(item, repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.vocabulary);

@@ -77,9 +77,12 @@ export const opensOnChecked = {
   },
 };
 
-/** Start, a Start button named `label`, or the tag that took its place; `main` makes it its area's Main action. */
-export function StartControl({ item, data, label = 'Start', main, kind = 'refine' }: {
-  item: Item; data: BoardData; label?: string; main?: boolean; kind?: StartKind;
+/**
+ * Start, a Start button named `label`, or the tag that took its place; `main` makes it its area's Main action, and
+ * `naming` adds the item's name to the button, for an item whose row a filter hides.
+ */
+export function StartControl({ item, data, label = 'Start', main, kind = 'refine', naming }: {
+  item: Item; data: BoardData; label?: string; main?: boolean; kind?: StartKind; naming?: boolean;
 }) {
   const start = useStart(item.id, kind);
   const action = useItemAction(item.id);
@@ -115,8 +118,9 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
       {stopped && <><span className="basis-full">Run stopped.</span><OpenThread item={item} data={data} threadId={observed.id} /></>}
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
-          <Button {...buttonKind(main ? 'main' : 'start')} leftIcon={start?.phase !== 'pending' && !main && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}>
-            {verb}{start?.phase !== 'pending' && ' ▾'}
+          <Button {...buttonKind(main ? 'main' : 'start')} leftIcon={start?.phase !== 'pending' && !main && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}
+            {...naming && { className: 'max-w-96', title: `A filter hides ${itemName(item)}` }}>
+            {naming ? <span className="truncate">{verb}: {itemName(item)}</span> : verb}{start?.phase !== 'pending' && ' ▾'}
           </Button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} with`} {...opensOnChecked}>

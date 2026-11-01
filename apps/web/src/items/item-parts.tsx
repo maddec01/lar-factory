@@ -2,8 +2,9 @@
 // slice bar, and the item dialog's repository tag, slices, pull requests, checks, and agent work. The tag is the design system's Badge; the
 // board's CSS adds the coloured dot.
 
+import type { ReactNode } from 'react';
 import { Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, buildActivity, isStale, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, repoName, sameRepo, shownLabels } from '@lar-factory/shared';
+import { UNREADABLE, buildActivity, isStale, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -152,23 +153,23 @@ export function AgentWorkNote({ item }: { item: Item }) {
   return s && s !== 'unavailable' ? null : <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : 'No T3 thread has worked on this yet.'}</p>;
 }
 
-const KIND_BADGES: Partial<Record<Kind, { name: string; icon: LucideIcon; hue: number }>> = {
+export const KIND_BADGES: Partial<Record<Kind, { name: string; icon: LucideIcon; hue: number }>> = {
   bug: { name: 'Bug', icon: Bug, hue: 25 },
   feature: { name: 'Feature', icon: Sparkles, hue: 150 },
   improvement: { name: 'Improvement', icon: TrendingUp, hue: 245 },
   concept: { name: 'Concept', icon: Lightbulb, hue: 300 },
 };
 
-/** A kind in its colour with its icon; builds, decisions and tickets with no recognised kind have none. */
-export function KindBadge({ kind }: { kind: Kind }) {
+/** A kind in its colour with its icon, then `children`; builds, decisions and tickets with no recognised kind have none. */
+export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode }) {
   const badge = KIND_BADGES[kind];
   if (!badge) return null;
   const { name, icon: Icon, hue } = badge;
-  return <Badge data-kind-badge hue={hue}><Icon aria-hidden="true" />{name}</Badge>;
+  return <Badge data-kind-badge hue={hue}><Icon aria-hidden="true" />{name}{children}</Badge>;
 }
 
 /** A soft tint of a tracker's label colour, mixed with the foreground so the name stays readable; none keeps the Badge's neutral style. */
-const tint = (color: string | undefined) => (color ? {
+export const tint = (color: string | undefined) => (color ? {
   backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`,
   color: `color-mix(in srgb, ${color} 55%, var(--foreground))`,
   boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 40%, transparent)`,
@@ -178,7 +179,7 @@ type LabelledItem = Pick<Item, 'kind' | 'labels' | 'labelColors' | 'repo'>;
 
 /** The labels of `item` that its row shows, under its repository's mappings. */
 export function useShownLabels(item: LabelledItem): string[] {
-  return shownLabels(item, useBoardStore((state) => state.data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.vocabulary));
+  return labelsOnRow(item, useBoardStore((state) => state.data.repos));
 }
 
 /** The item's shown labels as chips, in the tracker's colours. */

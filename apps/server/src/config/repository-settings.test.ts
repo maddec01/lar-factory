@@ -106,6 +106,20 @@ test('vocabulary discovery reads existing terms and saving requires field access
   expect(await changeRepositorySettings({ repo: 'team/app', change: 'vocabulary', key: 'bug', value: { type: null, labels: [] } }, dir, reads)).toMatchObject({ setup: { vocabularySources: { bug: 'local' } } });
 });
 
+test('Settings refuses a typed managed name with the reason, even when the tracker has that label', async (t) => {
+  const dir = await folder(t);
+  saveOnboarded('team/app', null, dir);
+  const { replaceAccess } = await import('@lar-factory/shared/repository-settings');
+  replaceAccess('team/app', { 'tag-ticket': 'allowed', 'manage-labels': 'allowed' }, dir);
+  const reads = { github: async (path: string) => path.includes('/labels') ? [{ name: 'linked-work' }] : { owner: { type: 'User' } }, azure: async () => ({ value: [] }) };
+  const created: string[] = [];
+  const save = (name: string) => changeRepositorySettings({ repo: 'team/app', change: 'vocabulary', key: 'bug', value: { type: null, labels: [] }, newLabels: [name] }, dir, reads, async (_repo, label) => { created.push(label); return label; });
+  expect(await save(' Linked-Work ')).toEqual({ status: 400, error: "Linked-Work is reserved for the factory's saved links." });
+  expect(await save('status-done')).toEqual({ status: 400, error: 'status-done is reserved for board status.' });
+  expect(created).toEqual([]);
+  expect(readRepositorySetups(dir)[0]?.vocabulary.bug.labels).toEqual([]);
+});
+
 test('Settings persists created labels only after provider success', async (t) => {
   const dir = await folder(t);
   saveOnboarded('team/app', null, dir);

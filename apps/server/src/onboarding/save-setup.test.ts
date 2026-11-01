@@ -120,6 +120,15 @@ test('onboarding refuses missing terms and unverified field access before persis
   }
 });
 
+test('onboarding refuses linked-work typed as a new label and saves nothing', async (t) => {
+  const dir = await folder(t);
+  const calls: string[] = [];
+  const reads: SaveReads = { ...allowed, vocabulary: { github: async (path) => path.includes('/labels') ? [] : { owner: { type: 'User' } }, azure: async () => ({ value: [] }) }, createLabel: async (_repo, name) => { calls.push(name); return name; } };
+  expect(await saveSetup({ ...answers, structureSync: false, newLabels: { bug: ['linked-work'] } }, dir, reads)).toEqual({ status: 409, error: "linked-work is reserved for the factory's saved links." });
+  expect(calls).toEqual([]);
+  expect(readRepositorySetups(dir)).toEqual([]);
+});
+
 test('explicit labels save with sharing off and failed creation saves no mapping', async (t) => {
   const dir = await folder(t);
   const calls: string[] = [];

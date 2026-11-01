@@ -203,6 +203,21 @@ test('vocabulary explains refused reads and Access while still allowing explicit
   expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: null, labels: [] } });
 });
 
+test('a typed managed name shows the reason and holds Save back', async () => {
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed' } });
+  const sent = serve(board, () => ({ body: { discovery } }));
+  await openEdit(board);
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  await type(row.querySelector<HTMLInputElement>('input[type="text"]')!, 'linked-work');
+  expect(text(row)).toContain("linked-work is reserved for the factory's saved links.");
+  expect(buttonIn(row, 'Save')!.disabled).toBe(true);
+  await type(row.querySelector<HTMLInputElement>('input[type="text"]')!, 'triage');
+  expect(text(row)).not.toContain('reserved');
+  expect(buttonIn(row, 'Save')!.disabled).toBe(false);
+  expect(sent.some((body) => body.change === 'vocabulary')).toBe(false);
+});
+
 test('a successful vocabulary save displays the provider result and clears the new label draft', async () => {
   let board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed', 'type-ticket': 'allowed' } });
   const sent = serve(board, (body) => {

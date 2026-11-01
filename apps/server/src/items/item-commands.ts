@@ -17,7 +17,10 @@ import { prHost, prUrl } from '../config/pr-host.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
 import { readRepositorySetups } from '../config/repository-settings.ts';
 import { installHome } from '../skills/bundled-skills.ts';
-import { repositoryProject } from '../t3/repository-project.ts';
+import { readJsonRecord } from '../json-file.ts';
+import { serverRuntimePath } from '../t3/t3-settings.ts';
+import { inspectWorkRecovery } from './work-recovery.ts';
+import { checkouts, repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
 import { protocolStartedThread } from '../t3/item-execution.ts';
@@ -51,6 +54,8 @@ export interface ItemCommands {
    * and snapshots the repository's selected project skills on the record. Launch intents guard it as they guard Start.
    * Drift refuses it with the skills that changed until `drift` carries the User's DriftChoice.
    */
+  inspectRecovery(itemId: string): Promise<Reply>;
+  startAgain(itemId: string, model: unknown, options: unknown): Promise<Reply>;
   startBuild(itemId: string, model: unknown, drift?: unknown): Promise<Reply>;
   /**
    * Sets List or Queued work aside on this Mac, or work whose Needs you offers it, and leaves its ticket as it is.
@@ -80,6 +85,8 @@ export interface ItemCommands {
 
 export interface ItemCommandsDeps {
   /** Exact installation/data handoff. Null is reserved for deterministic protocol tests. */
+  inspectWorkRecovery?: typeof inspectWorkRecovery;
+  checkoutOf?: (projectId: string) => Promise<string>;
   factoryContext?: FactoryThreadContext | null;
   board: BoardState;
   /** Where the commands write changes to tickets. */
@@ -186,7 +193,12 @@ type StartRecord = keyof typeof PURPOSES;
 const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Check the repository's project in T3 Code; the board settles it once T3 shows it.";
 const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code, then clear Needs you to start again.";
 
-export function createItemCommands({ board, items, records, reread, archive, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
+export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkRecovery,
+  checkoutOf = async projectId => {
+    const checkout = (await checkouts(process.env)).find(p => p.id === projectId);
+    if (!checkout) throw new Error('Cannot find the repository checkout.');
+    return checkout.folder;
+  }, board, items, records, reread, archive, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
   baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
   buildAccessOf = (repo) => readRepositorySetups().find(setup => sameRepo(setup.repo, repo))?.access ?? {},
   showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
@@ -382,16 +394,16 @@ export function createItemCommands({ board, items, records, reread, archive, off
    * Starts the item's thread for `record` through `ask`, guarded by its work record: a held or unresolved start answers
    * for it, Needs you and a paused setup refuse it, and a launch intent is on the record before `ask` runs. Without records, `ask` alone.
    */
-  async function launch(item: Item, record: StartRecord, projectId: string, ask: () => Promise<StartResult>,
-    prepare: () => void = () => {}): Promise<Start> {
+  async function launch(item: Item, record: StartRecord, projectId: string, message: string, ask: () => Promise<StartResult>,
+    prepare: () => void = () => {}, recovery = false): Promise<Start> {
     if (!records) return ask();
     const purpose = PURPOSES[record];
     const unresolved = records.launchIntents({ workId: item.id, unresolved: true }).find((intent) => intent.purpose === purpose);
     if (unresolved) return settle(item, unresolved, projectId);
     const needsYou = records.read(item.id).needsYou;
-    if (needsYou) return { thread: null, error: `Needs you: ${needsYou}`, refused: true };
+    if (needsYou && !recovery) return { thread: null, error: `Needs you: ${needsYou}`, refused: true };
     // A build whose PR closed unmerged starts a replacement, so the thread that opened that PR holds no start.
-    const held = record === 'startedBuilds' && prClosed(item.id) ? null : heldThread(board.find(item.id) ?? item, purpose);
+    const held = recovery ? null : record === 'startedBuilds' && prClosed(item.id) ? null : heldThread(board.find(item.id) ?? item, purpose);
     const shown = board.snapshot()[record]?.[item.id];
     if (held) return { thread: shown?.threadId === held.threadId ? shown : held, error: null };
     prepare();
@@ -401,7 +413,21 @@ export function createItemCommands({ board, items, records, reread, archive, off
     const outcome = result.thread ? { threadId: result.thread.threadId } : !result.uncertain ? { failure: result.error ?? 'T3 started no thread.' } : null;
     // An outcome the record refuses leaves the intent unresolved, for a refresh to settle through T3.
     if (outcome) try { write(item.id, (revision) => records.resolveLaunchIntent(item.id, revision, intent.intentId, outcome)); } catch { /* settled later */ }
+    if (recovery && result.thread && records.read(item.id).needsYou) write(item.id, revision => records.clearNeedsYou(item.id, revision));
     return result;
+  }
+
+  function eligibleRecovery(item: Item): boolean {
+    return !!records && !!item.needsYou?.deletedThread && item.needsYou.offers.includes('start-again')
+      && Array.isArray(item.threads) && !item.threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren);
+  }
+
+  async function recoveryInspection(item: Item) {
+    const project = await projectOf(item.repo);
+    if (project.error !== undefined) throw new Error(project.error);
+    const checkout = await checkoutOf(project.projectId);
+    const record = records!.read(item.id);
+    return inspect({ repository: item.repo, checkout, item, branch: record.buildBranch, recordedPr: record.pullRequest });
   }
 
   /** When each unresolved intent may be settled again on a refresh, by intent ID. */
@@ -530,9 +556,61 @@ export function createItemCommands({ board, items, records, reread, archive, off
         if (records) reread();
         const current = board.find(item.id) ?? item;
         const message = workMessage(current, factoryContext);
-        return launch(current, 'started', repoProject.projectId, () => startIn(repoProject.projectId, message, choice));
+        return launch(current, 'started', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice));
       };
     }),
+
+    async inspectRecovery(itemId) {
+      const item = board.find(itemId);
+      if (!item) return withBoard(404, { error: GONE });
+      if (!eligibleRecovery(item)) return withBoard(409, { error: 'This work has no eligible deleted thread.' });
+      try {
+        const inspection = await recoveryInspection(item);
+        return withBoard(200, { inspection, choices: inspection.pr === 'open' ? ['continue'] : inspection.branchExists ? ['continue', 'new'] : ['new'] });
+      } catch (error) { return withBoard(502, { error: (error as Error).message }); }
+    },
+
+    async startAgain(itemId, model, options) {
+      if (!options || typeof options !== 'object' || Array.isArray(options)) return withBoard(422, { error: 'Choose recovery options.' });
+      const { branchChoice, confirmedOpenPr } = options as Record<string, unknown>;
+      if (branchChoice !== undefined && branchChoice !== 'continue' && branchChoice !== 'new' || confirmedOpenPr !== undefined && typeof confirmedOpenPr !== 'boolean') return withBoard(422, { error: 'Invalid recovery options.' });
+      const current = board.find(itemId);
+      const build = recordedThreads(itemId).at(-1)?.purpose === 'build';
+      return startOnce(build ? buildStarts : starts, build ? 'startedBuilds' : 'started', itemId, model, (item, choice) => {
+        if (!current || !eligibleRecovery(item)) return withBoard(409, { error: 'This work has no eligible deleted thread.' });
+        const blocked = blockedReply(item);
+        if (blocked) return blocked;
+        return async () => {
+          try {
+            const project = await projectOf(item.repo);
+            if (project.error !== undefined) return { thread: null, error: project.error, refused: true };
+            if (!eligibleRecovery(board.find(itemId) ?? item)) return { thread: null, error: 'Recovery changed. Refresh the item.', refused: true };
+            if (!build) return launch(item, 'started', project.projectId, workMessage(item, factoryContext), () => startIn(project.projectId, workMessage(item, factoryContext), choice), undefined, true);
+            const inspection = await recoveryInspection(item);
+            if (inspection.pr === 'open' && (branchChoice !== 'continue' || confirmedOpenPr !== true)) return { thread: null, error: 'Confirm continuing on the open PR branch.', refused: true };
+            if (inspection.branchExists && branchChoice === undefined) return { thread: null, error: 'Choose continue or new branch.', refused: true };
+            const continuing = inspection.branchExists && branchChoice === 'continue';
+            if (inspection.pr === 'open' && !continuing) return { thread: null, error: 'The open PR branch is unavailable.', refused: true };
+            const accessProblem = (['push-branch', 'open-pr'] as const).map(operation => writeAccessProblem(item.repo, operation, buildAccessOf(item.repo))).find(Boolean);
+            if (accessProblem) return { thread: null, error: accessProblem, refused: true };
+            if (continuing && inspection.worktreePath && !choice) return { thread: null, error: 'Choose a model before continuing in an existing worktree.', refused: true };
+            const skills = await checkSkills?.();
+            if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true };
+            const base = await baseOf(item.repo);
+            const branch = continuing ? inspection.branch : buildBranch(item) + '-recovery-' + randomUUID().slice(0, 8);
+            const message = buildMessage(!continuing ? { ...item, slices: [] } : item, larBuild(), factoryContext);
+            const workspace = continuing && inspection.worktreePath
+              ? { type: 'existing_worktree' as const, worktreePath: inspection.worktreePath, branch, origin: String(readJsonRecord(serverRuntimePath(process.env))?.origin ?? ''), commandId: randomUUID() }
+              : { base: continuing ? branch : base, branch };
+            const result = await launch(item, 'startedBuilds', project.projectId, message, () => startIn(project.projectId, message, choice, workspace), () => {
+              if (!continuing) write(itemId, revision => records!.resetBuild(itemId, revision));
+              write(itemId, revision => records!.setBuildBranch(itemId, revision, branch));
+            }, true);
+            return { ...result, warning: inspection.warning, message: continuing && !inspection.worktreePath ? 'The old worktree is gone. Created a new worktree on its branch.' : undefined };
+          } catch (error) { return { thread: null, error: (error as Error).message }; }
+        };
+      });
+    },
 
     startBuild: (itemId, model, drift) => startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
       if (drift !== undefined && !isDriftChoice(drift)) return reply(422, { error: 'Choose Replace and start or Start anyway.' });
@@ -569,7 +647,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
         // Refreshing the Spec can change the title, so use the current record.
         const current = board.find(item.id) ?? item;
         const message = buildMessage(current, larBuild(), factoryContext);
-        return launch(current, 'startedBuilds', repoProject.projectId, () => startIn(repoProject.projectId, message, choice, { base, branch }), () => {
+        return launch(current, 'startedBuilds', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice, { base, branch }), () => {
           snapshot();
           if (records) write(item.id, revision => records.setBuildBranch(item.id, revision, branch));
         });
@@ -668,6 +746,8 @@ export function createItemCommands({ board, items, records, reread, archive, off
         if (briefChoice !== undefined && briefChoice !== 'keep' && briefChoice !== 'reshape') return withBoard(422, { error: 'Choose keep passing or reshape.' });
         if (records.gate(itemId).current && briefChoice === undefined) return withBoard(422, { error: 'Choose keep passing or reshape.' });
         try {
+          const inspection = await recoveryInspection(item);
+          if (inspection.pr === 'open') return withBoard(409, { error: 'An open PR requires Start again.' });
           if (briefChoice === 'reshape') write(itemId, revision => records.invalidateGate(itemId, revision));
           // Cleanup must capture records.children(itemId) before resetBuild deletes owned slices.
           if (item.kind === 'build') write(itemId, revision => records.resetBuild(itemId, revision));

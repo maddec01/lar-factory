@@ -1,0 +1,63 @@
+// Add item uses the repository default once, then keeps this item's choice and optional provider fields.
+import { useEffect, useState } from 'react';
+import { effectiveIssueSettings, writeAccessProblem, type RepoConfig, type TicketCreationOptions, type TicketOptions } from '@lar-factory/shared';
+import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
+import { NativeSelect } from '@lar-factory/ui/native-select';
+import type { DraftValues } from './add-item-store.ts';
+
+const HINT = 'm-0 text-xs leading-snug text-(--muted-foreground)';
+
+function Options({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: TicketOptions }) {
+  const [read, setRead] = useState<TicketCreationOptions | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let current = true;
+    void fetch(`/api/ticket-options?repo=${encodeURIComponent(repo.repo)}`).then(async response => {
+      const result = await response.json() as { options?: TicketCreationOptions; error?: string };
+      if (!response.ok || !result.options) throw Error(result.error ?? 'Could not read issue options.');
+      if (current) setRead(result.options);
+    }).catch(() => { if (current) setError('Could not read issue options. You can still submit the title and description.'); });
+    return () => { current = false; };
+  }, [repo.repo]);
+  if (error) return <p role="status" className={HINT}>{error}</p>;
+  if (!read) return <p role="status" className={HINT}>Reading issue options… You can submit while they load.</p>;
+  const setup = repo.setup;
+  const access = setup?.access ?? {};
+  const safety = { azureReadOnly: setup?.azureReadOnly };
+  const mapping = setup?.vocabulary[kind as 'bug' | 'feature' | 'improvement'];
+  const labels = kept?.labels ?? mapping?.labels ?? [];
+  const type = kept?.type ?? mapping?.type ?? '';
+  const select = (name: string, label: string, choices: { value: string; name: string }[], value = '') => choices.length > 0 && (
+    <label className="grid gap-1.5 text-xs" htmlFor={`item-${name}`}>{label}
+      <NativeSelect id={`item-${name}`} name={name} defaultValue={value}>
+        <option value="">None</option>
+        {choices.map(choice => <option key={choice.value} value={choice.value}>{choice.name}</option>)}
+      </NativeSelect>
+    </label>
+  );
+  const names = (values: string[]) => values.map(value => ({ value, name: value }));
+  return <div className="grid gap-3" key={kind}>
+    {read.problems.length > 0 && <p role="status" className={HINT}>Some issue options could not be read. You can still submit the title and description.</p>}
+    {!writeAccessProblem(repo.repo, 'tag-ticket', access, safety) && read.labels.length > 0 && <div role="group" aria-label={read.provider === 'azure' ? 'Tags' : 'Labels'} id="item-labels" className="grid gap-1.5">
+      <span className="text-xs">{read.provider === 'azure' ? 'Tags' : 'Labels'}</span>
+      {read.labels.map(label => <Checkbox key={label} name="labels" value={label} label={label} defaultChecked={labels.includes(label)} />)}
+    </div>}
+    {!writeAccessProblem(repo.repo, 'type-ticket', access, safety) && select('type', read.provider === 'azure' ? 'Work item type' : 'Issue type', names(read.types), read.types.includes(type) ? type : '')}
+    {select('assignee', 'Assignee', names(read.assignees), kept?.assignee)}
+    {read.provider === 'github' && select('milestone', 'Milestone', read.milestones, kept?.milestone)}
+    {read.provider === 'azure' && select('iteration', 'Iteration', names(read.iterations), kept?.iteration)}
+  </div>;
+}
+
+export function IssueFields({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: DraftValues | null }) {
+  const effective = repo.setup ? effectiveIssueSettings(repo.setup) : null;
+  const reason = effective?.createReason ?? (effective ? null : 'Issue access is not checked yet. Recheck access in Settings.');
+  const [checked, setChecked] = useState(kept?.createIssue ?? effective?.createIssuesFromAddItem ?? false);
+  const enabled = !reason && checked;
+  return <div className="grid gap-3">
+    <Checkbox id="item-create-issue" name="createIssue" label="Create issue" checked={enabled} disabled={!!reason}
+      aria-describedby={reason ? 'item-create-reason' : undefined} onChange={event => setChecked(event.target.checked)} />
+    {reason && <p id="item-create-reason" className={HINT}>{reason}</p>}
+    {enabled && <Options repo={repo} kind={kind} kept={kept?.kind === kind ? kept.options : undefined} />}
+  </div>;
+}

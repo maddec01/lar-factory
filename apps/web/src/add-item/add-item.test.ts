@@ -1,9 +1,11 @@
 // The Add item dialog: the New work form and each phase of a submission, and the Pick a ticket pane.
 
-import { expect, test, vi } from 'vite-plus/test';
+import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
 import { pastePlain, selectEnd, typeInto } from '../../test/editor.ts';
 import type { BoardData } from '@lar-factory/shared';
+
+beforeEach(() => localStorage.removeItem('lar-board:add-item'));
 
 const withFactory: BoardData = { ...sample, repos: [
   ...sample.repos, { repo: 'maddec01/lar-factory', role: 'The factory', labels: [] }, { repo: 'maddec01/lar-empty', role: 'Empty', labels: [] },
@@ -58,15 +60,16 @@ test('Add item opens a dialog with the configured repositories and kinds, and no
   expect([result().getAttribute('role'), result().dataset.slot, result().dataset.tone]).toEqual(['status', 'alert', 'warning']);
   expect(popup.textContent).toContain('Record work in lar-server and add it to List.');
   expect(popup.textContent, 'one line describes it').not.toContain('Capture work for a repository.');
-  expect($$('#add-item-dialog input[type="checkbox"]'), 'a ticket\'s labels are no part of captured work').toEqual([]);
+  expect(field<HTMLInputElement>('item-create-issue').disabled).toBe(true);
+  expect($('#item-labels')).toBeNull();
 });
 
 test('the side panel heads Repository and Kind in small uppercase labels, beside the title and the editor', async () => {
   await open();
   const panel = $('#add-item-dialog aside[aria-label="Details"]')!;
   const labels = [...panel.querySelectorAll<HTMLLabelElement>(':scope > div > label')];
-  expect(labels.map((l) => [l.htmlFor, l.textContent])).toEqual([['item-repo', 'Repository'], ['item-kind', 'Kind']]);
-  expect(labels.every((l) => l.classList.contains('uppercase'))).toBe(true);
+  expect(labels.filter(l => l.htmlFor).map((l) => [l.htmlFor, l.textContent])).toEqual([['item-repo', 'Repository'], ['item-kind', 'Kind']]);
+  expect(labels.filter(l => l.htmlFor).every((l) => l.classList.contains('uppercase'))).toBe(true);
   expect(field('item-repo').tagName).toBe('SELECT');
   expect(field('item-kind').tagName).toBe('SELECT');
   expect(panel.contains(field('item-title')) || panel.contains(editorArea()), 'the title and editor sit left of it').toBe(false);
@@ -172,7 +175,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
 
   expect(fetchMock.mock.calls.at(-1)![0]).toBe('/api/items');
   const body = posted();
-  expect(body.draft).toEqual({ repo: 'maddec01/lar-server', kind: 'bug', title: 'Playback stalls', description: 'After a seek.' });
+  expect(body.draft).toEqual({ createIssue: false, repo: 'maddec01/lar-server', kind: 'bug', title: 'Playback stalls', description: 'After a seek.' });
   expect(typeof body.requestId).toBe('string');
   expect(submit().textContent).toBe('Adding…');
   expect(submit().disabled).toBe(true);
@@ -373,4 +376,84 @@ test('captured work shows no ticket number, and attaching a ticket keeps its ite
   expect(calls('/api/attach-ticket')).toEqual([['/api/attach-ticket', { itemId: 'work-1', number: 8 }]]);
   expect(text($('[data-item-dialog] [data-slot="modal-header"] h2'))).toBe('#8 Playback stalls');
   expect($('[data-attach-ticket]'), 'an item with a ticket has none to attach').toBeNull();
+});
+
+test('Create issue starts from each repository default and an override applies only to this item', async () => {
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  const repos = [true, false].map((enabled, index) => ({ ...withFactory.repos[index]!, setup: {
+    repo: withFactory.repos[index]!.repo, createIssuesFromAddItem: enabled,
+    access: { 'publish-ticket': 'allowed', 'tag-ticket': 'refused', 'type-ticket': 'refused' }, ...effectiveVocabulary(),
+  } })) as BoardData['repos'];
+  respond({ options: { provider: 'github', labels: [], types: [], assignees: [], milestones: [], iterations: [], problems: [] } });
+  await open({ ...withFactory, repos });
+  expect(field<HTMLInputElement>('item-create-issue').checked).toBe(true);
+  expect(field<HTMLInputElement>('item-create-issue').disabled).toBe(false);
+  await enter(field<HTMLSelectElement>('item-repo'), repos[1]!.repo);
+  expect(field<HTMLInputElement>('item-create-issue').checked).toBe(false);
+  respond({ options: { provider: 'github', labels: ['forbidden'], types: ['Bug'], assignees: [], milestones: [], iterations: [], problems: [] } });
+  await settle(() => field<HTMLInputElement>('item-create-issue').click());
+  expect($('#item-labels')).toBeNull();
+  expect($('#item-type')).toBeNull();
+  await fillDraft();
+  respond({ error: 'HTTP 403: denied' }, 502);
+  await settle(() => submit().click());
+  expect((posted().draft as Record<string, unknown>).createIssue).toBe(true);
+  expect(dialog()).not.toBeNull();
+  expect(field('item-title').value).toBe('Playback stalls');
+});
+
+test('a lost response keeps its request ID after the page reloads', async () => {
+  await open();
+  await fillDraft();
+  fetchMock.mockImplementationOnce(async () => { throw Error('Connection lost'); });
+  await settle(() => submit().click());
+  const requestId = posted().requestId;
+  vi.resetModules();
+  await open();
+  expect(field('item-title').value).toBe('Playback stalls');
+  expect(submit().textContent).toBe('Retry this submission');
+  respond({ uncertain: true, error: 'Check the board.' }, 409);
+  await settle(() => submit().click());
+  expect(posted().requestId).toBe(requestId);
+  expect(submit().disabled).toBe(true);
+});
+
+test('provider fields start from only the kind mapping and submit the chosen options', async () => {
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  const config = { ...withFactory.repos[0]!, setup: {
+    repo: withFactory.repos[0]!.repo,
+    access: { 'publish-ticket': 'allowed', 'tag-ticket': 'allowed', 'type-ticket': 'allowed' },
+    ...effectiveVocabulary({ bug: { type: 'Bug', labels: ['backend'] } }),
+  } } as BoardData['repos'][number];
+  const data = { ...withFactory, repos: [config] };
+  fetchMock.mockImplementation(async url => new Response(JSON.stringify(url.startsWith('/api/ticket-options')
+    ? { options: { provider: 'github', labels: ['backend', 'triage'], types: ['Bug', 'Task'], assignees: ['writer'], milestones: [{ value: '12', name: 'Next' }], iterations: [], problems: [] } }
+    : data)));
+  await open(data);
+  await fillDraft();
+  expect(field<HTMLSelectElement>('item-type').value).toBe('Bug');
+  expect($<HTMLInputElement>('#item-labels input[value="backend"]')!.checked).toBe(true);
+  expect($<HTMLInputElement>('#item-labels input[value="triage"]')!.checked).toBe(false);
+  expect(field<HTMLSelectElement>('item-assignee').value).toBe('');
+  expect(field<HTMLSelectElement>('item-milestone').value).toBe('');
+  expect($('#item-iteration')).toBeNull();
+  await enter(field<HTMLSelectElement>('item-assignee'), 'writer');
+  await enter(field<HTMLSelectElement>('item-milestone'), '12');
+  respond({ error: 'Denied' }, 403);
+  await settle(() => submit().click());
+  expect((posted().draft as Record<string, unknown>).options).toEqual({ labels: ['backend'], type: 'Bug', assignee: 'writer', milestone: '12' });
+});
+
+test('submitting before options load leaves their defaults to the server', async () => {
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  const config = { ...withFactory.repos[0]!, setup: {
+    repo: withFactory.repos[0]!.repo, access: { 'publish-ticket': 'allowed' }, ...effectiveVocabulary(),
+  } } as BoardData['repos'][number];
+  const data = { ...withFactory, repos: [config] };
+  fetchMock.mockImplementation(async url => url.startsWith('/api/ticket-options') ? new Promise<Response>(() => {}) : new Response(JSON.stringify(data)));
+  await open(data);
+  await fillDraft();
+  respond({ error: 'Denied' }, 403);
+  await settle(() => submit().click());
+  expect((posted().draft as Record<string, unknown>).options).toEqual({});
 });

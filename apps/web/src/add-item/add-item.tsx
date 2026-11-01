@@ -1,9 +1,4 @@
-// The title bar's Add item button and its dialog, in two panes. New work is a form that records work in an onboarded
-// repository and adds it to List, creating no ticket: a large title and the description editor on the left, the
-// repository and kind in the side panel. Find a ticket looks up open tickets, including direct-number matches outside
-// the configured List, and reuses an existing work record instead of duplicating it.
-// ⌘N opens it too. The store keeps the form's values as they're edited, so a half-written draft survives a close.
-
+// Add item captures a draft locally or creates its tracker ticket, and can find existing tickets.
 import { useEffect, useRef, useState } from 'react';
 import { SquarePen } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
@@ -15,6 +10,7 @@ import { NativeSelect } from '@lar-factory/ui/native-select';
 import { FormResult } from '../notices/form-result.tsx';
 import { useAddItemStore } from './add-item-store.ts';
 import type { AddItemPane, DraftValues } from './add-item-store.ts';
+import { IssueFields } from './issue-fields.tsx';
 import { TicketPicker } from './ticket-picker.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
@@ -39,7 +35,12 @@ function PanelSection({ heading, htmlFor, children }: { heading: string; htmlFor
 function valuesOf(form: HTMLFormElement, description: string): DraftValues {
   const values = new FormData(form);
   const value = (name: string) => String(values.get(name) ?? '');
-  return { repo: value('repo'), kind: value('kind'), title: value('title'), description };
+  const createIssue = values.has('createIssue');
+  const options = createIssue ? {
+    ...(form.querySelector('[name="labels"]') ? { labels: values.getAll('labels').map(String) } : {}),
+    ...Object.fromEntries(['type', 'assignee', 'milestone', 'iteration'].filter(name => values.has(name)).map(name => [name, value(name)])),
+  } : undefined;
+  return { repo: value('repo'), kind: value('kind'), title: value('title'), description, createIssue, ...(options ? { options } : {}) };
 }
 
 /** The repository select both panes start with, and the hint when none is onboarded. */
@@ -62,6 +63,9 @@ function AddItemForm() {
   const { submission, message, submit, edit, keep, reset, setOpen } = useAddItemStore();
   // Read once: the fields are uncontrolled and start from the kept draft.
   const [kept] = useState(() => useAddItemStore.getState().values);
+  const [repo, setRepo] = useState(kept?.repo ?? data.repos[0]?.repo ?? '');
+  const [itemKind, setKind] = useState(kept?.kind ?? '');
+  const selected = data.repos.find(r => r.repo === repo) ?? data.repos[0];
   const form = useRef<HTMLFormElement>(null);
   // The editor is no form field, so its Markdown is kept here.
   const description = useRef(kept?.description ?? '');
@@ -78,8 +82,7 @@ function AddItemForm() {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const values = new FormData(form);
-    void submit({ repo: values.get('repo'), kind: values.get('kind'), title: values.get('title'), description: description.current }).then(() => {
+    void submit(valuesOf(form, description.current)).then(() => {
       if (useAddItemStore.getState().submission.phase === 'editing' && form.isConnected) form.reportValidity();
     });
   };
@@ -99,14 +102,15 @@ function AddItemForm() {
           </div>
           <aside aria-label="Details" className="grid content-start gap-5 overflow-y-auto border-l border-base-300 bg-base-50/60 px-4 py-4 @max-[40rem]:overflow-visible @max-[40rem]:border-l-0 @max-[40rem]:border-t">
             <PanelSection heading="Repository" htmlFor="item-repo">
-              <RepoSelect id="item-repo" repo={kept?.repo ?? data.repos[0]?.repo ?? ''} />
+              <RepoSelect id="item-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
             </PanelSection>
             <PanelSection heading="Kind" htmlFor="item-kind">
-              <NativeSelect id="item-kind" name="kind" required defaultValue={kept?.kind ?? ''}>
+              <NativeSelect id="item-kind" name="kind" required defaultValue={kept?.kind ?? ''} onInput={event => setKind(event.currentTarget.value)}>
                 <option value="">Choose a kind</option>
                 {ITEM_KINDS.map((kind) => <option value={kind} key={kind}>{kind}</option>)}
               </NativeSelect>
             </PanelSection>
+            {selected && <IssueFields key={selected.repo} repo={selected} kind={itemKind} kept={kept?.repo === selected.repo ? kept : null} />}
           </aside>
         </Fieldset>
       </div>

@@ -4,8 +4,9 @@
 // was on the board already, which then opens in the item dialog.
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { validateDraft, writeHeaders } from '@lar-factory/shared';
-import type { CreationResult, ItemDraft, BoardData, TicketMatch } from '@lar-factory/shared';
+import type { CreationResult, ItemDraft, BoardData, TicketMatch, TicketOptions } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
@@ -21,7 +22,7 @@ type Submission =
 export type AddItemPane = 'new' | 'pick';
 
 /** The form's values as last edited, which a closed dialog keeps for the next opening. */
-export interface DraftValues { repo: string; kind: string; title: string; description: string }
+export interface DraftValues { repo: string; kind: string; title: string; description: string; createIssue?: boolean; options?: TicketOptions }
 
 interface AddItemState {
   open: boolean;
@@ -49,7 +50,7 @@ interface AddItemState {
 
 const idle = (): string => (useBoardStore.getState().data.capture?.enabled === false ? 'Adding items is disabled in sample mode.' : '');
 
-export const useAddItemStore = create<AddItemState>()((set, get) => ({
+export const useAddItemStore = create<AddItemState>()(persist((set, get) => ({
   open: false,
   pane: 'new',
   submission: { phase: 'editing' },
@@ -111,5 +112,16 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
     if (result.created) notify({ verb: 'Added', item: result.item, to: 'List' });
     else useItemDialogStore.getState().open(result.item.id);
     return null;
+  },
+}), {
+  name: 'lar-board:add-item',
+  partialize: ({ values, submission, message, draft }) => ({ values, submission, message, draft }),
+  merge: (saved, current) => {
+    const restored = { ...current, ...(saved as Partial<AddItemState>) };
+    if (restored.submission.phase === 'pending') {
+      restored.submission = { phase: 'retry', attempt: restored.submission.attempt };
+      restored.message = 'The submission response was lost. Retry this submission to recover its result without adding it twice.';
+    }
+    return restored;
   },
 }));

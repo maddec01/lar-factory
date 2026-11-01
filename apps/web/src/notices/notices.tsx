@@ -1,3 +1,8 @@
+import { useContext, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { useActionStore, useItemAction } from '../items/action-store.ts';
+import { postAction, receive } from '../items/card-actions.ts';
+import { ToastFailure, ToastLifetime } from './toasts.tsx';
 // What this page just did to an item, announced in a toast: added, moved or kept with View item,
 // abandoned or its ticket closed, started in T3, or a Queued card's action that failed.
 
@@ -60,6 +65,7 @@ function toastOf(notice: Notice): Toast {
       };
     }
     default:
+      if (notice.verb === 'Added' && notice.to === 'List') return { slot: SLOT, what: `Added ${ref(item)}`, body: <AddedNotice item={item} /> };
       return {
         slot: SLOT, what: `${notice.verb} ${ref(item)}`,
         body: <>{notice.verb} <TitleLink item={item} /> to {notice.to}. {viewButton(item)}</>,
@@ -69,4 +75,41 @@ function toastOf(notice: Notice): Toast {
 
 export function notify(notice: Notice): void {
   showToast(toastOf(notice));
+}
+
+/** A mounted notice owns its feedback; late results only update the board after it leaves. */
+function AddedNotice({ item }: { item: Item }) {
+  const current = useBoardStore((state) => state.data.items.find((value) => value.id === item.id));
+  const action = useItemAction(item.id);
+  const hold = useContext(ToastLifetime);
+  const fail = useContext(ToastFailure);
+  const [result, setResult] = useState<'added' | 'pending' | 'success' | string>('added');
+  const mounted = useRef(true);
+  const queue = useRef<HTMLButtonElement>(null);
+  const view = useRef<HTMLSpanElement>(null);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => { hold(result !== 'added' && result !== 'success'); }, [hold, result]);
+  const failed = !['added', 'pending', 'success'].includes(result);
+  useEffect(() => { fail(failed); }, [fail, failed]);
+  const eligible = current?.status === 'List';
+  const pending = action?.phase === 'pending';
+  const activate = async () => {
+    const latest = useBoardStore.getState().data.items.find((value) => value.id === item.id);
+    if (latest?.status !== 'List' || useActionStore.getState().actions[item.id]?.phase === 'pending') return;
+    useActionStore.getState().set(item.id, { phase: 'pending', kind: 'queue' });
+    setResult('pending');
+    const answer = await postAction('/api/queue', { itemId: item.id });
+    const focused = document.activeElement === queue.current;
+    flushSync(() => {
+      receive(answer);
+      useActionStore.getState().set(item.id, answer.error ? { phase: 'error', kind: 'queue', message: answer.error } : undefined);
+      if (mounted.current) setResult(answer.error ?? 'success');
+    });
+    if (mounted.current && focused && !answer.error) view.current?.querySelector('button')?.focus();
+  };
+  return <><span role={failed ? 'alert' : 'status'}>{result === 'added' ? <>Added <TitleLink item={item} /> to List.</>
+    : result === 'pending' ? 'Queueing…' : result === 'success' ? <>Moved <TitleLink item={item} /> to Queued.</> : result}</span>{' '}
+    <span ref={view}>{viewButton(item)}</span>{' '}
+    {eligible && result !== 'success' && <Button ref={queue} {...kind('other')} aria-disabled={pending} onClick={() => void activate()}>{pending ? 'Queueing…' : 'Queue'}</Button>}
+  </>;
 }

@@ -1,7 +1,7 @@
 // Toasts, shown through the design system's Toaster: a success clears itself after 5 s, later while it's hovered or
 // has focus; a failure stays until it's closed. One toast per slot, so a new one replaces the last.
 
-import { useEffect, useRef } from 'react';
+import { createContext, useEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode, RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
@@ -86,6 +86,10 @@ export function NotificationStack() {
   return <Toaster ref={followNewest} position="bottom-right" max={Infinity} className="notification-stack"
     offset="calc(var(--spacing) * 1)" />;
 }
+
+export const ToastFailure = createContext<(failed: boolean) => void>(() => {});
+
+export const ToastLifetime = createContext<(held: boolean) => void>(() => {});
 
 export interface Toast {
   /** One toast per slot: a new one replaces the last. */
@@ -198,11 +202,16 @@ function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClo
 /** One toast's content. `onClose` runs when its close button is clicked or, for a success, when its time is up. */
 function ToastBody({ slot, what, failed = false, body, onClose }: Toast & { onClose: () => void }) {
   const ref = useRef<HTMLSpanElement>(null);
-  useSuccessClose(ref, !failed, onClose);
+  const [held, setHeld] = useState(false);
+  const [bodyFailed, setBodyFailed] = useState(false);
+  useEffect(() => {
+    ref.current?.closest('[data-slot="toast"]')?.setAttribute('data-toast-color', failed || bodyFailed ? 'danger' : 'success');
+  }, [failed, bodyFailed]);
+  useSuccessClose(ref, !failed && !bodyFailed && !held, onClose);
   return (
     <span ref={ref} data-toast={slot}>
       <DismissButton what={`: ${what}`} onClick={onClose} />
-      {body}
+      <ToastFailure.Provider value={setBodyFailed}><ToastLifetime.Provider value={setHeld}>{body}</ToastLifetime.Provider></ToastFailure.Provider>
     </span>
   );
 }

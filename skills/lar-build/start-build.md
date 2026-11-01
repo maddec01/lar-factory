@@ -1,5 +1,7 @@
 # Start a build later
 
+Reshape keeps the brief text and requires a new passing gate before Ready.
+
 Shaping marks Ready after a passing gate and commits the user to no
 implementation. A later agent edit to the local brief needs a fresh gate.
 Trusted tracker edits keep Status; a details Save records the user's approval

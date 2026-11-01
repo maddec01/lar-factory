@@ -7,7 +7,9 @@ If it fails, tell the user its reason and stop. Read the record, its initial
 context (`lar-work context`), its brief, map or decision (`lar-work body`), its
 parent, children and blockers. Before accepting an existing passing brief,
 run `lar-work gate <work ID>` to refresh its ticket Spec, inspect the sync
-warnings and held edits, then reread the brief and revision. Follow
+warnings and held edits, then reread the brief and revision. A Reshape
+item keeps its brief text and gate history but has no current passing gate.
+Send it through Gate again before marking it Ready. Follow
 [Gate](gate.md) when the text changed or an edit needs approval. Then route:
 
 - A decision: [Decisions](concepts.md#decisions).

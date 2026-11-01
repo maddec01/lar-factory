@@ -129,11 +129,12 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
   const text = (name: string) => (typeof workItem.fields[name] === 'string' ? workItem.fields[name] : undefined);
   const hasContent = (value: string) => Boolean(value.replace(/<[^>]*>|&nbsp;|&#160;/g, '').trim()) || /<(?:img|video|iframe)\b/i.test(value);
   const description = text('System.Description') ?? '';
-  // A Bug's form shows Repro Steps as its description, so a Bug with no System.Description saves there too.
-  const bodyField: AzureBodyField = hasContent(description) || (!hasContent(text('Microsoft.VSTS.TCM.ReproSteps') ?? '') && field(workItem, 'System.WorkItemType') !== 'Bug')
+  // A Bug's form shows Repro Steps as its main description.
+  const bodyField: AzureBodyField = field(workItem, 'System.WorkItemType').toLowerCase() !== 'bug' && (hasContent(description) || !hasContent(text('Microsoft.VSTS.TCM.ReproSteps') ?? ''))
     ? 'System.Description' : 'Microsoft.VSTS.TCM.ReproSteps';
   const body = text(bodyField) ?? '';
   const descriptionFields = [
+    ['System.Description', 'Description'],
     ['Microsoft.VSTS.TCM.ReproSteps', 'Repro Steps'],
     ['Microsoft.VSTS.Common.AcceptanceCriteria', 'Acceptance Criteria'],
     ['Microsoft.VSTS.TCM.SystemInfo', 'System Info'],

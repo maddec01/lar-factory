@@ -264,3 +264,28 @@ test('current sprint progress and children come first, with other children behin
   await settle(() => history.querySelector('summary')!.click());
   expect(history.open).toBe(true);
 });
+
+test('Spec details show Original collapsed and expose retry plus exact-generation accept and reject actions', async () => {
+  let held = false;
+  const actions: unknown[] = [];
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (detailsRead(url)) return new Response(JSON.stringify({ details: { body: 'Whole Spec.', format: 'markdown', author: null, assignees: [], createdAt: null,
+      subTickets: [], comments: [], hasOlderComments: false, olderCursor: null,
+      spec: { generation: 12, pending: true, error: 'Offline', warning: held ? 'Unknown editor.' : null, original: 'Authored Original.', originalFormat: 'markdown', held: held ? { title: 'Held title', body: 'Held instructions.' } : null } } }));
+    if (url === '/api/item-spec') { actions.push(JSON.parse(String(init?.body))); return new Response(JSON.stringify({ error: null })); }
+    return new Response(JSON.stringify(sample));
+  });
+  await mountPage(); await openItem('I_sample13');
+  expect(text(description())).toContain('Spec');
+  const original = description()!.querySelector<HTMLDetailsElement>('details')!;
+  expect(original.open).toBe(false);
+  expect(text(original)).toContain('Authored Original.');
+  const button = (name: string) => [...description()!.querySelectorAll<HTMLButtonElement>('button')].find(button => text(button) === name)!;
+  await settle(() => button('Retry Spec sync').click());
+  expect(actions).toEqual([{ itemId: 'I_sample13', generation: 12, action: 'retry' }]);
+  held = true;
+  await settle(() => button('Retry Spec sync').click());
+  await settle(() => button('Accept edit').click());
+  await settle(() => button('Reject edit').click());
+  expect(actions.slice(-2)).toEqual([{ itemId: 'I_sample13', generation: 12, action: 'accept' }, { itemId: 'I_sample13', generation: 12, action: 'reject' }]);
+});

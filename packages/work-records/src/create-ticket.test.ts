@@ -178,7 +178,7 @@ test('conversion preserves the exact stored title shown in its preview', async (
 });
 
 
-test('replaying a confirmed conversion activates its recovered Spec before success', async () => {
+test.each(['attachment', 'checkpoint'])('replaying a confirmed conversion activates its Spec after a failed %s', async stage => {
   const { records, local, deps, convert } = await setup();
   const brief = records.setBody(local.workId, local.revision, 'brief', 'Gated Spec.');
   records.recordGate(local.workId, brief.revision, { briefDigest: records.gate(local.workId).briefDigest!, approvedBy: 'user', evidence: 'pass' });
@@ -190,11 +190,57 @@ test('replaying a confirmed conversion activates its recovered Spec before succe
   };
   deps.provider.readSpec = async () => created;
   const complete = records.completeCapture;
-  records.completeCapture = () => { throw Error('Disk full'); };
+  const save = records.saveSpecState;
+  if (stage === 'attachment') records.completeCapture = () => { throw Error('Disk full'); };
+  else records.saveSpecState = () => { throw Error('Disk full'); };
   expect((await convert()).status).toBe(502);
   records.completeCapture = complete;
+  records.saveSpecState = save;
   expect((await convert()).status).toBe(200);
   expect(records.specState(local.workId)).toMatchObject({ active: true, base: { body: created!.body }, original: 'Original request.' });
+  expect(creates).toBe(1);
+});
+
+test.each(['attachment', 'checkpoint', 'response'].flatMap(stage => [true, false, undefined].map(editorWrite => ({ stage, editorWrite }))))(
+  'recovery checks provenance of edits before retry after a failed $stage, editorWrite=$editorWrite', async ({ stage, editorWrite }) => {
+  const { records, local, deps, convert } = await setup();
+  const brief = records.setBody(local.workId, local.revision, 'brief', 'Gated Spec.');
+  records.recordGate(local.workId, brief.revision, { briefDigest: records.gate(local.workId).briefDigest!, approvedBy: 'user', evidence: 'pass' });
+  let remote!: StructureTicket;
+  let creates = 0;
+  deps.provider.create = async (repository, title, body) => {
+    creates++;
+    remote = { repository, number: 31, title, body, version: '1' };
+    if (stage === 'response') throw Error('Response lost');
+    return remote;
+  };
+  deps.provider.find = async () => [remote];
+  deps.provider.readSpec = async () => remote;
+  const complete = records.completeCapture;
+  const save = records.saveSpecState;
+  if (stage === 'attachment') records.completeCapture = () => { throw Error('Disk full'); };
+  else if (stage === 'checkpoint') records.saveSpecState = () => { throw Error('Disk full'); };
+  expect((await convert()).status).toBe(stage === 'response' ? 409 : 502);
+  records.completeCapture = complete;
+  records.saveSpecState = save;
+  remote = { ...remote, body: remote.body.replace('Gated Spec.', 'Edited on tracker.'), title: 'Edited title', version: '2', editorWrite, titleEditorWrite: editorWrite };
+  const handle = opened[0]!;
+  records.close();
+  handle.records = await openWorkRecords(join(handle.dir, 'work-records.db'));
+  deps.records = handle.records;
+  const recovered = await createRecordTicket(local.workId, { requestId: REQUEST }, deps);
+  expect(recovered.status).toBe(200);
+  if (editorWrite) {
+    expect(recovered.body.record?.title).toBe('Edited title');
+    expect(handle.records.body(local.workId, 'brief')).toBe('Edited on tracker.');
+    expect(handle.records.gate(local.workId).evidence.at(-1)?.source).toBe('tracker');
+  } else {
+    expect(recovered.body.record?.title).toBe('Fix export');
+    expect(handle.records.body(local.workId, 'brief')).toBe('Gated Spec.');
+    expect(handle.records.specState(local.workId)).toMatchObject({ held: { body: remote.body, title: 'Edited title' },
+      base: { version: stage === 'response' ? '' : '1', body: expect.stringContaining('Gated Spec.') } });
+    expect(handle.records.gate(local.workId).evidence.at(-1)?.source).toBe('gate');
+  }
   expect(creates).toBe(1);
 });
 
@@ -202,11 +248,16 @@ test('replaying a confirmed conversion activates its recovered Spec before succe
 test.each([false, true])('retention purges capture prose and retains replay protection, conversion=%s', async conversion => {
   const { records, local, deps, convert, writes } = await setup();
   const draft = { repo: REPO, kind: 'bug', title: 'Private title', description: 'Private description', createIssue: true };
+  if (conversion) {
+    const brief = records.setBody(local.workId, local.revision, 'brief', 'Private conversion Spec.');
+    records.recordGate(local.workId, brief.revision, { briefDigest: records.gate(local.workId).briefDigest!, approvedBy: 'user', evidence: 'pass' });
+  }
   const result = conversion ? await convert() : await captureWork({ requestId: REQUEST, draft }, deps);
+  expect(records.captureSubmission(REQUEST)!.draft).toContain(conversion ? 'Private conversion Spec.' : 'Private description');
   const record = result.body.record!;
   records.setAside(record.workId, record.revision);
   expect(records.deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }).deleted).toContain(record.workId);
-  expect(records.captureSubmission(REQUEST)).toMatchObject({ draft: '', ticket: `${REPO}#13` });
+  expect(records.captureSubmission(REQUEST)).toMatchObject({ draft: '', createdTicket: null, ticket: `${REPO}#13` });
   expect((await captureWork({ requestId: REQUEST, draft }, deps)).status).toBe(409);
   expect(() => records.completeCapture(REQUEST, { title: 'Replay', repository: REPO, kind: 'bug', ticket: `${REPO}#13` })).toThrow(/expired/i);
   expect(writes).toHaveLength(1);

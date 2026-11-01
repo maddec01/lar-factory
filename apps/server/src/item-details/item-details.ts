@@ -3,11 +3,12 @@
 // text and progress, and the provider of its ticket reads and writes the ticket's.
 
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { userInfo, homedir } from 'node:os';
 import { join } from 'node:path';
-import { onAzure } from '@lar-factory/shared';
+import { onAzure, readTicketSpec, stripTrackerStructure } from '@lar-factory/shared';
 import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails, RecordDetails } from '@lar-factory/shared';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
+import { activeSpecState, editSpec, refreshSpecs, resolveSpecEdit, syncSpecs, type SpecSyncOptions } from '@lar-factory/work-records/spec-sync';
 import { exportMarkdown } from '@lar-factory/work-records/export';
 import type { Refused } from '../config/editable-repository.ts';
 import { readAzureItemDetails, readAzureOlderComments } from '../azure/azure-details.ts';
@@ -30,6 +31,7 @@ export interface ItemDetailsReader {
   olderComments: ReadOlderComments;
   saveDescription: SaveDescription;
   exportMarkdown: ExportItem;
+  specAction?(item: Item, generation: number, action: 'retry' | 'accept' | 'reject'): Promise<Refused | null>;
 }
 
 export interface RecordsDeps {
@@ -37,6 +39,7 @@ export interface RecordsDeps {
   records: WorkRecords | null;
   /** Where an export writes; the user's Downloads folder by default. */
   exportFolder?: string;
+  specSync?: SpecSyncOptions;
 }
 
 /** Comments per older page; GitHub and Azure DevOps both answer 10. */
@@ -95,14 +98,27 @@ const NO_TICKET: Refused = { status: 409, error: 'This work has no ticket the bo
  * which reads and writes it by its node id. Work with no ticket has no details.
  */
 export function createItemDetails(sampleFile: string | null, ticketOf: (item: Item) => Item | undefined,
-  { records, exportFolder = join(homedir(), 'Downloads') }: RecordsDeps = { records: null }): ItemDetailsReader {
+  { records, exportFolder = join(homedir(), 'Downloads'), specSync }: RecordsDeps = { records: null }): ItemDetailsReader {
   if (sampleFile) return fromFile(sampleFile);
   const azure = (item: Item) => Boolean(item.repo && onAzure(item.repo));
   return {
     async details(work) {
-      const record = records ? recordDetails(records, work.id) : undefined;
+      let record = records ? recordDetails(records, work.id) : undefined;
+      if (record && records) {
+        await refreshSpecs(records, { ...specSync, workId: work.id });
+        record = recordDetails(records, work.id);
+      }
       const item = ticketOf(work);
       const read = !item ? NO_DETAILS : azure(item) ? await readAzureItemDetails(item) : await readGithubItemDetails(item);
+      const state = record && records ? activeSpecState(records, work.id, specSync) : null;
+      if (state) {
+        const details = 'error' in read ? NO_DETAILS : read;
+        const parsed = readTicketSpec(stripTrackerStructure(details.body));
+        return { ...details, body: record!.body, format: 'markdown', record,
+          spec: { generation: state.generation, pending: state.pending !== null, error: state.error, warning: state.warning,
+            original: parsed.original ?? state.original ?? (!state.active ? state.base?.body ?? details.body : null), originalFormat: azure(work) ? 'html' : 'markdown',
+            held: state.held ? { title: state.held.title, body: readTicketSpec(stripTrackerStructure(state.held.body)).spec } : null } };
+      }
       return record && !('error' in read) ? { ...read, record } : read;
     },
     async olderComments(work, before) {
@@ -113,9 +129,24 @@ export function createItemDetails(sampleFile: string | null, ticketOf: (item: It
     async saveDescription(work, { body, bodyField, revision }) {
       const item = ticketOf(work);
       if (!item) return NO_TICKET;
+      if (records && recordDetails(records, work.id)) {
+        try { if (await editSpec(records, work.id, body, userInfo().username, specSync)) return null; }
+        catch (error) { return { status: 409, error: (error as Error).message }; }
+      }
       if (!azure(item)) return saveGithubDescription(item, body);
       if (!bodyField || revision === undefined) return { status: 400, error: 'Send the field and revision the work item\'s details gave.' };
       return saveAzureDescription(item, { body, bodyField, revision });
+    },
+    async specAction(work, generation, action) {
+      if (!records) return { status: 409, error: 'The board has no work records.' };
+      try {
+        if (action === 'retry') {
+          await refreshSpecs(records, { ...specSync, workId: work.id });
+          await syncSpecs(records, { ...specSync, workId: work.id });
+        }
+        else await resolveSpecEdit(records, work.id, generation, action, userInfo().username, specSync);
+        return null;
+      } catch (error) { return { status: 409, error: (error as Error).message }; }
     },
     async exportMarkdown(work) {
       if (!records) return { status: 409, error: 'The board has no work records to export.' };

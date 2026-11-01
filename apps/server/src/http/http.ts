@@ -242,6 +242,17 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         return marked;
       }),
     },
+    '/api/item-spec': {
+      what: 'the Spec action and its item', disabled: 'Spec sync is disabled in sample mode.',
+      async run({ itemId, generation, action }) {
+        if (typeof itemId !== 'string' || !Number.isSafeInteger(generation) || !['retry', 'accept', 'reject'].includes(String(action))) return { status: 400, body: { error: 'Name the item, Spec generation and action.' } };
+        const item = board.snapshot().items.find(item => item.id === itemId);
+        if (!item || !itemDetails.specAction) return { status: 404, body: { error: 'That item is not available.' } };
+        const refused = await itemDetails.specAction(item, generation as number, action as 'retry' | 'accept' | 'reject');
+        readSoon();
+        return { status: refused?.status ?? 200, body: { error: refused?.error ?? null } };
+      },
+    },
     '/api/item-description': {
       what: 'the description and its item', disabled: 'Saving descriptions is disabled in sample mode.',
       async run({ itemId, body, bodyField, revision }) {
@@ -253,6 +264,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         const problem = writeAccessProblem(item.repo, 'edit-ticket', board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.access ?? {});
         if (problem) return { status: 403, body: { error: problem } };
         const refused = await itemDetails.saveDescription(item, { body, ...bodyField !== undefined && { bodyField }, ...revision !== undefined && { revision: revision as number } });
+        readSoon();
         return refused ? { status: refused.status, body: { error: refused.error } } : { status: 200, body: { error: null } };
       },
     },

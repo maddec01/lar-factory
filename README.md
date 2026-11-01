@@ -45,8 +45,24 @@ otherwise it goes to Ready to merge. You merge it. Needs you means the work is
 waiting for a decision, an answer or verification.
 
 Work records keep ordinary progress on this machine, including queue, board
-Status, brief, decisions, slices, threads and review results. Tracker sync never
+Status, decisions, slices, threads and review results. Tracker sync never
 writes queue, board Status, workflow stage or per-item progress to a tracker.
+
+## Ticket Specs
+
+With “Write the refined spec to the issue” on, a passing gate puts the whole
+brief in the ticket's main description and preserves its earlier text as Original.
+A durable outbox retries failed writes; the item stays Ready and offers retry in
+details. Trusted tracker edits become the local copy without changing Status.
+GitHub edits whose editor lacks verified write access, or whose editor is unknown,
+wait in details for Accept or Reject. Later gates and builds reread the ticket;
+a failed read keeps the last local copy and shows a warning.
+
+GitHub keeps Original collapsed. Azure converts the Spec to HTML and uses a
+collapsed Original containing a visible `Original (Lar Factory)` heading as a
+safe fallback for sanitizers that strip HTML comments or details. Bugs use Repro Steps, leaving separate Description
+content intact. Fake-provider fixtures cover preserved and stripped markup; they
+do not establish how a live Azure deployment sanitizes these fields.
 
 ## Tracker structure sync
 
@@ -54,7 +70,8 @@ The ON-by-default onboarding option saves concepts and multi-repository structur
 only. It saves kind, map diagram, parts, Connections between repositories,
 Dependencies on other owners, and which issues belong together. It includes only
 shaping results necessary to explain that structure. Ordinary briefs, decision
-records, domain drafts, slices and progress stay local. Turning sync OFF keeps
+records, slices and progress stay local. A gated brief and its domain drafts use
+the separate Ticket Spec setting. Turning sync OFF keeps
 structure local too and causes no later publish prompt.
 
 Local structural changes enter an outbox that drains automatically while sync is
@@ -65,7 +82,8 @@ stored as `settings.structureSync`.
 GitHub saves managed projections, manifests and compressed chunks in immutable
 comments. The `linked-work` label makes them discoverable. The factory creates
 the label if absent when structure is first used and preserves existing labels.
-It never patches authored GitHub issue bodies. Azure saves a managed description
+Structure sync never patches authored GitHub issue bodies; Ticket Specs use the
+separate body-write path. Azure saves a managed description
 block with revision checks and stores compressed chunks in Markdown comments.
 Onboarding checks the access each provider needs before enabling sync.
 

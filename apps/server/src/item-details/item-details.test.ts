@@ -109,3 +109,41 @@ test('export refuses work with nothing written, a second export of the same file
   assert.match((again as { error: string }).error, /already exists/);
   assert.deepEqual(await createItemDetails('unused.json', (item) => item).exportMarkdown(boardItem(build.workId)), { status: 403, error: 'Exporting is disabled in sample mode.' });
 });
+
+test('a failed first Spec write shows local Spec, collapsed Original and durable retry; Save approves exact text and keeps Ready', async () => {
+  const { records } = await recordsOn();
+  const repository = 'example/widget';
+  const setup = { repo: repository, writeRefinedSpec: true, access: { 'edit-ticket': 'allowed' } } as unknown as import('@lar-factory/shared').RepositorySetup;
+  let body = 'Authored Original.';
+  let offline = true;
+  const provider = {
+    readSpec: async () => ({ repository, number: 7, title: 'Work', body, version: '1', editorWrite: true }),
+    replaceSpec: async (_ticket: unknown, next: string) => { if (offline) throw Error('Offline'); body = next; return { repository, number: 7, title: 'Work', body, version: '2' }; },
+  } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+  const specSync = { setups: [setup], provider };
+  const { syncSpecs } = await import('@lar-factory/work-records/spec-sync');
+  let record = records.create({ title: 'Work', kind: 'feature', repository, ticket: `${repository}#7` });
+  record = records.setBody(record.workId, record.revision, 'brief', 'Whole brief.');
+  records.recordGate(record.workId, record.revision, { briefDigest: records.gate(record.workId).briefDigest!, approvedBy: 'user', evidence: 'Passed' });
+  record = records.update(record.workId, record.revision, { status: 'Ready' });
+  await syncSpecs(records, specSync);
+  const work = { ...boardItem(record.workId), repo: repository, number: 7 };
+  const reader = createItemDetails(null, () => undefined, { records, specSync });
+  const read = await reader.details(work);
+  if ('error' in read) throw Error(read.error);
+  assert.equal(read.body, 'Whole brief.');
+  assert.equal(read.spec?.pending, true);
+  assert.equal(read.spec?.original, 'Authored Original.');
+  assert.equal(read.spec?.error, 'Offline');
+  offline = false;
+  await reader.specAction!(work, read.spec!.generation, 'retry');
+  assert.equal(records.specState(record.workId).pending, null);
+  const writer = createItemDetails(null, item => item, { records, specSync });
+  assert.equal(await writer.saveDescription(work, { body: 'Exact approved text.  \n' }), null);
+  assert.equal(records.body(record.workId, 'brief'), 'Exact approved text.  \n');
+  assert.equal(records.read(record.workId).status, 'Ready');
+  assert.equal(records.gate(record.workId).current, true);
+  assert.equal(records.gate(record.workId).evidence.at(-1)?.source, 'user');
+  assert.match(body, /Exact approved text\./);
+  records.close();
+});

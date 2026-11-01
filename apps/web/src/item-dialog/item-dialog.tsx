@@ -85,11 +85,12 @@ interface ContentProps {
   now: number;
   read: ItemDetailsRead;
   edit: DescriptionEdit;
+  refresh: () => Promise<boolean>;
   expanded: boolean;
   toggleExpanded: () => void;
 }
 
-function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpanded }: ContentProps) {
+function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, toggleExpanded }: ContentProps) {
   const aside = hasRelations(item, read);
   const record = read.state === 'loaded' ? read.details.record : undefined;
   // Work with no ticket has no ticket text to show beside its record's.
@@ -135,8 +136,8 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
           <NeedsYou item={item} data={data} />
           <ItemMeta item={item} read={read} now={now} />
           <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}>
-            {record && <RecordText item={item} record={record} className="@min-[45rem]:col-start-1" />}
-            {ticket && <ItemDescription read={read} edit={edit} editable={editable} fill={fill} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}
+            {record && <RecordText item={item} record={record} spec={read.state === 'loaded' && Boolean(read.details.spec)} className="@min-[45rem]:col-start-1" />}
+            {ticket && <ItemDescription itemId={item.id} refresh={refresh} read={read} edit={edit} editable={editable} fill={fill} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}
             {aside && (
               <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 @min-[45rem]:col-start-2 @min-[45rem]:row-span-2 @min-[45rem]:row-start-1 @min-[45rem]:border-l @min-[45rem]:border-(--border) @min-[45rem]:pl-6">
                 {waitsOn(item).length > 0 && <Section heading="Waits on"><ul className="m-0 grid list-none gap-1.5 p-0 text-sm" data-waits-on>
@@ -186,7 +187,7 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
   const [expanded, toggleExpanded] = useExpand(asking);
   return <>
     <Modal onClose={() => (edit.dirty ? setAsking(true) : close())} loading={edit.saving}>
-      <ItemDialogContent item={item} data={data} now={now} read={read} edit={edit} expanded={expanded} toggleExpanded={toggleExpanded} />
+      <ItemDialogContent item={item} data={data} now={now} read={read} edit={edit} refresh={refresh} expanded={expanded} toggleExpanded={toggleExpanded} />
     </Modal>
     {asking && <DiscardPrompt keep={() => setAsking(false)} discard={() => { setAsking(false); close(); }} />}
   </>;

@@ -438,7 +438,8 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const [raw] = await openFor(repo, await workItems([number]));
       if (!raw) return null;
       const tracker = readTrackerStructure(field(raw, 'System.Description'));
-      return { number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), text: field(raw, 'System.Description'), kind: tracker?.kind ?? trackerKind(labelsOf(raw), field(raw, 'System.WorkItemType')), ...(tracker && {tracker}) };
+      const bodyField = field(raw, 'System.WorkItemType').toLowerCase() === 'bug' ? 'Microsoft.VSTS.TCM.ReproSteps' : 'System.Description';
+      return { number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), text: field(raw, bodyField), kind: tracker?.kind ?? trackerKind(labelsOf(raw), field(raw, 'System.WorkItemType')), ...(tracker && {tracker}) };
     },
     async observeTicket(_repo, number) {
       try {

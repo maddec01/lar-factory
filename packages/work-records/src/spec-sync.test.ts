@@ -201,3 +201,100 @@ test('the session Azure read-only control overrides a saved false value even wit
   expect(f.writes).toHaveLength(0);
   expect(f.records.specState(f.record.workId).error).toContain('read-only');
 });
+
+test('independent refresh reads are bounded and do not hold the tracker write lease', async () => {
+  const f = await fixture();
+  const ids = [f.record.workId];
+  for (let number = 8; number < 27; number++) {
+    const record = f.records.create({ repository: setup.repo, title: 'Work', kind: 'feature', ticket: `${setup.repo}#${number}` });
+    const state = f.records.specState(record.workId);
+    f.records.saveSpecState(record.workId, state.generation, { ...state, active: true });
+    ids.push(record.workId);
+  }
+  let running = 0;
+  let peak = 0;
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  let reads = 0;
+  f.provider.readSpec = async (repository, number) => {
+    peak = Math.max(peak, ++running);
+    entered();
+    await blocked;
+    running--; reads++;
+    return { ...f.remote(), repository, number };
+  };
+  const refresh = refreshSpecs(f.records, { provider: f.provider, setups: [setup], workIds: ids });
+  await started;
+  const { acquireTrackerSyncLock } = await import('./tracker-lock.ts');
+  const lease = await acquireTrackerSyncLock(f.path);
+  try {
+    expect(lease).not.toBeNull();
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(6);
+  } finally {
+    await lease?.release();
+    release();
+    await refresh;
+  }
+  expect(reads).toBe(20);
+});
+
+test('overlapping refresh passes share ticket reads and one concurrency limit', async () => {
+  const f = await fixture();
+  const ids = [f.record.workId];
+  for (let number = 8; number < 47; number++) {
+    const record = f.records.create({ repository: setup.repo, title: 'Work', kind: 'feature', ticket: `${setup.repo}#${number}` });
+    const state = f.records.specState(record.workId);
+    f.records.saveSpecState(record.workId, state.generation, { ...state, active: true });
+    ids.push(record.workId);
+  }
+  let running = 0;
+  let peak = 0;
+  const reads: number[] = [];
+  let release!: () => void;
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  f.provider.readSpec = async (repository, number) => {
+    reads.push(number);
+    peak = Math.max(peak, ++running);
+    await blocked;
+    running--;
+    return { ...f.remote(), repository, number };
+  };
+  const options = { provider: f.provider, setups: [setup] };
+  const first = refreshSpecs(f.records, { ...options, workIds: ids.slice(0, 20) });
+  const overlapping = refreshSpecs(f.records, { ...options, workIds: ids.slice(0, 20) });
+  const independent = refreshSpecs(f.records, { ...options, workIds: ids.slice(20) });
+  release();
+  await Promise.all([first, overlapping, independent]);
+  expect(reads).toHaveLength(40);
+  expect(new Set(reads).size).toBe(40);
+  expect(peak).toBeGreaterThan(1);
+  expect(peak).toBeLessThanOrEqual(6);
+  expect(running).toBe(0);
+});
+
+test.each([false, true])('a delayed refresh cannot replace a newer write checkpoint, read failure=%s', async failure => {
+  const f = await fixture();
+  await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  const read = f.provider.readSpec!;
+  const stale = { ...f.remote(), body: formatTicketSpec('Older remote edit.', 'Authored request.') };
+  f.provider.readSpec = async () => { entered(); await blocked; if (failure) throw Error('Old failure'); return stale; };
+  const refresh = refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+  await started;
+  try {
+    f.provider.readSpec = read;
+    const record = f.records.read(f.record.workId);
+    const updated = f.records.setBody(record.workId, record.revision, 'brief', 'Newer gated Spec.');
+    f.records.recordGate(record.workId, updated.revision, { briefDigest: f.records.gate(record.workId).briefDigest!, approvedBy: 'user', evidence: 'pass' });
+    await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+  } finally { release(); await refresh; }
+  expect(f.records.specState(f.record.workId)).toMatchObject({ active: true, pending: null, error: null, base: { body: f.remote().body } });
+  expect(f.records.body(f.record.workId, 'brief')).toBe('Newer gated Spec.');
+  expect(readTicketSpec(f.remote().body).spec).toBe('Newer gated Spec.');
+});

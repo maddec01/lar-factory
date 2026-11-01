@@ -50,3 +50,12 @@ test('sharing cannot be enabled with unchecked access', async (t) => {
   expect(await changeRepositorySettings({ repo: 'team/app', change: 'structure-sync', value: true }, dir)).toMatchObject({ status: 400 });
   expect(readRepositorySetups(dir)[0]?.structureSync).toBe(false);
 });
+
+test('vocabulary rejects malformed mappings before provider reads', async (t) => {
+  const dir = await folder(t);
+  saveOnboarded('team/app', null, dir);
+  for (const value of [null, {}, { type: null, labels: [''] }, { type: null, labels: [], extra: true }]) {
+    expect(await changeRepositorySettings({ repo: 'team/app', change: 'vocabulary', key: 'bug', value }, dir)).toMatchObject({ status: 400 });
+  }
+  expect(readRepositorySetups(dir)[0]?.vocabulary.bug).toEqual({ type: null, labels: [] });
+});

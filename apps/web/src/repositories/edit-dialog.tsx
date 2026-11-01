@@ -18,7 +18,7 @@ const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: '
 
 const OPERATIONS = (azure: boolean): Record<RepositoryOperation, string> => ({
   'push-branch': 'Push branches', 'open-pr': 'Open PRs', 'edit-ticket': azure ? 'Edit work items' : 'Edit issues',
-  'publish-ticket': azure ? 'Create work items' : 'Create issues', 'tag-ticket': azure ? 'Set tags' : 'Set labels',
+  'publish-ticket': azure ? 'Create work items' : 'Create issues', 'tag-ticket': azure ? 'Set tags' : 'Set labels', 'manage-labels': azure ? 'Manage tags' : 'Manage labels',
   'comment-ticket': 'Post comments', 'type-ticket': azure ? 'Set work item types' : 'Set issue types', 'relate-ticket': 'Set relationships',
 });
 

@@ -931,7 +931,7 @@ export type SharedSetting = (typeof SHARED_SETTINGS)[number];
 export type SettingSource = 'local' | 'default';
 
 /** The repository writes the factory may need, each with its own verified credential access. */
-export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket'] as const;
+export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket', 'manage-labels', 'comment-ticket', 'type-ticket', 'relate-ticket'] as const;
 
 export type RepositoryOperation = (typeof REPOSITORY_OPERATIONS)[number];
 

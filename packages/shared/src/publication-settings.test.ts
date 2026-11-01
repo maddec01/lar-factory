@@ -116,8 +116,26 @@ test('explicit label creation requires verified access and reuses existing label
   const create = async (_repo: string, name: string) => { created.push(name); return name; };
   await expect(saveVocabularyLabels('org/repo', ['new'], discovery, {}, create)).rejects.toThrow();
   expect(created).toEqual([]);
-  expect(await saveVocabularyLabels('org/repo', ['BACKEND', 'new'], discovery, { 'tag-ticket': 'allowed' }, create)).toEqual(['backend', 'new']);
+  await expect(saveVocabularyLabels('org/repo', ['new'], discovery, { 'tag-ticket': 'allowed' }, create)).rejects.toThrow('Access to manage-labels is not checked yet');
+  expect(created).toEqual([]);
+  expect(await saveVocabularyLabels('org/repo', ['BACKEND', 'new'], discovery, { 'manage-labels': 'allowed' }, create)).toEqual(['backend', 'new']);
   expect(created).toEqual(['new']);
+});
+
+test('an upgraded setup, with label management not checked, still saves names the tracker already has', async () => {
+  const { saveVocabularyLabels } = await import('./publication-settings.ts');
+  const discovery = await discoverVocabulary('org/repo', available);
+  const create = async () => { throw new Error('nothing to create'); };
+  expect(await saveVocabularyLabels('org/repo', [' BACKEND '], discovery, {}, create)).toEqual(['backend']);
+});
+
+test('Azure refuses a new tag with the reason it has no create, even with access, and reuses an existing one', async () => {
+  const { saveVocabularyLabels } = await import('./publication-settings.ts');
+  const repo = 'org/project/repo';
+  const discovery = await discoverVocabulary(repo, available);
+  const create = async () => { throw new Error('nothing to create'); };
+  await expect(saveVocabularyLabels(repo, ['new'], discovery, { 'manage-labels': 'allowed' }, create)).rejects.toThrow('Azure DevOps has no way to create a tag on its own.');
+  expect(await saveVocabularyLabels(repo, ['BACKEND'], discovery, {}, create)).toEqual(['backend']);
 });
 
 for (const repo of ['org/project/repo', 'another-org/Project%20Name/repository']) {
@@ -128,7 +146,7 @@ for (const repo of ['org/project/repo', 'another-org/Project%20Name/repository']
     process.env.LAR_FACTORY_AZURE_READ_ONLY = '1';
     let calls = 0;
     try {
-      await expect(saveVocabularyLabels(repo, ['new'], discovery, { 'tag-ticket': 'allowed' }, async () => { calls++; return 'new'; })).rejects.toThrow();
+      await expect(saveVocabularyLabels(repo, ['new'], discovery, { 'manage-labels': 'allowed' }, async () => { calls++; return 'new'; })).rejects.toThrow('Azure DevOps is read-only in this test session.');
       expect(calls).toBe(0);
     } finally {
       if (previous === undefined) delete process.env.LAR_FACTORY_AZURE_READ_ONLY;

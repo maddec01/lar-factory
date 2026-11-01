@@ -22,15 +22,19 @@ export async function azureAccess(repo: string, run: Az = az): Promise<Access> {
     } catch { return undefined; }
   };
   const git = `repoV2/${shown.project.id}/${shown.id}`;
-  const [contribute, branch, pr, area] = await Promise.all([
+  const [contribute, branch, pr, tagging, area] = await Promise.all([
     evaluate('Git Repositories', git, 'GenericContribute'), evaluate('Git Repositories', git, 'CreateBranch'),
     evaluate('Git Repositories', git, 'PullRequestContribute'),
+    // Create is the project's "Create tag definition", which a new tag on a work item needs; Update and Delete are rename and delete.
+    Promise.all(['Create', 'Update', 'Delete'].map((action) => evaluate('Tagging', `/${shown.project.id}`, action))),
     azureGet<{ identifier: string }>(`${origin}/${encodeURIComponent(project)}/_apis/wit/classificationnodes/areas?api-version=${API_VERSION}`, run).catch(() => null),
   ]);
   const access: Access = {};
   if (contribute === 'refused' || branch === 'refused') access['push-branch'] = 'refused';
   else if (contribute === 'allowed' && branch === 'allowed') access['push-branch'] = 'allowed';
   if (pr) access['open-pr'] = pr;
+  if (tagging.includes('refused')) access['manage-labels'] = 'refused';
+  else if (tagging.every((answer) => answer === 'allowed')) access['manage-labels'] = 'allowed';
   if (area?.identifier) {
     const edit = await evaluate('CSS', `vstfs:///Classification/Node/${area.identifier}`, 'WORK_ITEM_WRITE');
     if (edit) for (const op of ['publish-ticket', 'edit-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket', 'tag-ticket'] as const) access[op] = edit;

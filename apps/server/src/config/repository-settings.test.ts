@@ -110,7 +110,7 @@ test('Settings persists created labels only after provider success', async (t) =
   const dir = await folder(t);
   saveOnboarded('team/app', null, dir);
   const { replaceAccess } = await import('@lar-factory/shared/repository-settings');
-  replaceAccess('team/app', { 'tag-ticket': 'allowed' }, dir);
+  replaceAccess('team/app', { 'tag-ticket': 'allowed', 'manage-labels': 'allowed' }, dir);
   const reads = { github: async (path: string) => path.includes('/labels') ? [] : { owner: { type: 'User' } }, azure: async () => ({ value: [] }) };
   const request = { repo: 'team/app', change: 'vocabulary', key: 'bug', value: { type: null, labels: [] }, newLabels: ['triage'] };
   expect(await changeRepositorySettings(request, dir, reads, async () => { throw new Error('Label creation denied'); })).toMatchObject({ status: 400 });

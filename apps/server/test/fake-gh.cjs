@@ -67,7 +67,7 @@ const main = async () => {
     }
     if (method === 'POST' && vocabularyPath.endsWith('/labels')) {
       if (vocabulary.failCreate) { process.stderr.write('HTTP 403: Label creation refused'); process.exitCode = 1; return; }
-      const name = args.find((arg) => arg.startsWith('name=')).slice(5);
+      const { name } = JSON.parse(fs.readFileSync(0, 'utf8'));
       vocabulary.labels.push(name);
       fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
       return output({ name });

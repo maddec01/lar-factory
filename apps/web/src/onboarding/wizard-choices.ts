@@ -52,5 +52,5 @@ export const missingSyncAccess = (detection: SetupDetection): RepositoryOperatio
 export function operationTitle(op: RepositoryOperation, detection: Pick<SetupDetection, 'provider'>): string {
   const issue = detection.provider === 'GitHub' ? 'issues' : 'work items';
   return ({ 'push-branch': 'Push branches', 'open-pr': 'Open pull requests', 'publish-ticket': `Create ${issue}`,
-    'edit-ticket': `Edit ${issue}`, 'comment-ticket': 'Post comments', 'tag-ticket': 'Set labels or tags', 'type-ticket': 'Set item types', 'relate-ticket': 'Link items' })[op];
+    'edit-ticket': `Edit ${issue}`, 'comment-ticket': 'Post comments', 'tag-ticket': 'Set labels or tags', 'manage-labels': 'Manage labels or tags', 'type-ticket': 'Set item types', 'relate-ticket': 'Link items' })[op];
 }

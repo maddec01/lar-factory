@@ -9,7 +9,7 @@ const REPO = 'team/app';
 const SETUP: RepositorySetup = {
   repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, labels: ['area: server'],
   domainDocs: { kind: 'off' }, skills: [], ...effectiveVocabulary(),
-  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
+  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused', 'manage-labels': 'unverified', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
   structureSync: true,
   sources: { createIssuesFromAddItem: 'default', createIssuesFromRetro: 'default', writeRefinedSpec: 'default', role: 'local', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default', vocabulary: 'default' },
 };
@@ -164,7 +164,7 @@ async function openVocabulary() {
 }
 
 test('vocabulary suggestions are drafts and new labels wait for Save; failures retain the draft', async () => {
-  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } });
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed', 'type-ticket': 'allowed' } });
   const sent = serve(board, (body) => body.change === 'discover-vocabulary'
     ? { body: { discovery } } : { status: 403, body: { error: 'Label creation refused.' } });
   await openEdit(board);
@@ -204,7 +204,7 @@ test('vocabulary explains refused reads and Access while still allowing explicit
 });
 
 test('a successful vocabulary save displays the provider result and clears the new label draft', async () => {
-  let board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } });
+  let board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed', 'type-ticket': 'allowed' } });
   const sent = serve(board, (body) => {
     if (body.change === 'discover-vocabulary') return { body: { discovery } };
     board = boardWith({ ...board.repos[0]!.setup!, ...effectiveVocabulary({ improvement: { type: 'Task', labels: ['triage'] } }) });
@@ -239,6 +239,33 @@ test('Azure vocabulary uses discovered work item types and tags for any reposito
   await settle(() => buttonIn(row, 'Use suggested label: bug')!.click());
   await settle(() => buttonIn(row, 'Save')!.click());
   expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo, change: 'vocabulary', key: 'bug', value: { type: 'Defect', labels: ['bug'] } });
+});
+
+test('an upgraded setup with label management not checked can map existing labels but not type a new one', async () => {
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } });
+  const sent = serve(board, (body) => body.change === 'discover-vocabulary' ? { body: { discovery } } : { body: { setup: board.repos[0]!.setup } });
+  await openEdit(board);
+  expect(text($('[data-operation="manage-labels"]')!)).toBe('Manage labelsNot checked yet');
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.disabled).toBe(true);
+  expect(text(row)).toContain('Access to manage-labels is not checked yet.');
+  await settle(() => buttonIn(row, 'Use suggested label: bug')!.click());
+  await settle(() => buttonIn(row, 'Save')!.click());
+  expect(sent.find((body) => body.change === 'vocabulary')).toMatchObject({ key: 'bug', value: { labels: ['bug'] } });
+});
+
+test('Azure lists tag management and disables a new tag with the reason it has no create', async () => {
+  const repo = 'organization/project/repository';
+  const board = boardWith({ repo, itemSource: { kind: 'azure-board', team: 'Delivery' }, access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed' } });
+  serve(board, () => ({ body: { discovery: { ...discovery, provider: 'azure' } } }));
+  await openRepositories(board);
+  await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Edit')!.click());
+  expect(text($('[data-operation="manage-labels"]')!)).toBe('Manage tagsAllowed');
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.disabled).toBe(true);
+  expect(text(row)).toContain('Azure DevOps has no way to create a tag on its own.');
 });
 
 test('Azure read-only vocabulary permits clearing mappings and blocks term selection', async () => {

@@ -76,15 +76,16 @@ async function githubAccess(repo: string, reads: DetectReads): Promise<{ itemSou
   catch (err) { return { itemSources: { refused: `Can't read ${repo} with gh: ${message(err)}` }, access: {} }; }
   const { push, triage, issues, tokenWrites } = found;
   const access: Access = {};
-  if (!push) access['push-branch'] = 'refused';
+  // GitHub grants applying labels at triage and managing them at write.
+  if (!push) for (const operation of ['push-branch', 'manage-labels'] as const) access[operation] = 'refused';
   if (!triage) access['tag-ticket'] = 'refused';
   if (tokenWrites === false) for (const operation of REPOSITORY_OPERATIONS) access[operation] = 'refused';
   if (tokenWrites === true) {
-    if (push) for (const operation of ['push-branch', 'open-pr', 'edit-ticket', 'type-ticket', 'relate-ticket'] as const) access[operation] = 'allowed';
+    if (push) for (const operation of ['push-branch', 'open-pr', 'edit-ticket', 'manage-labels', 'type-ticket', 'relate-ticket'] as const) access[operation] = 'allowed';
     if (triage) access['tag-ticket'] = 'allowed';
     if (issues) for (const operation of ['publish-ticket', 'comment-ticket'] as const) access[operation] = 'allowed';
   }
-  if (!issues) for (const operation of ['publish-ticket', 'edit-ticket', 'comment-ticket', 'tag-ticket', 'type-ticket', 'relate-ticket'] as const) access[operation] = 'refused';
+  if (!issues) for (const operation of ['publish-ticket', 'edit-ticket', 'comment-ticket', 'tag-ticket', 'manage-labels', 'type-ticket', 'relate-ticket'] as const) access[operation] = 'refused';
   return { itemSources: issues ? { found: [{ kind: 'issues' }] } : { refused: `${repo} has issues turned off.` }, access };
 }
 

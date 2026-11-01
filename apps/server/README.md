@@ -45,7 +45,7 @@ holds role, issue source, labels, domain docs, selected project skills and
 vocabulary mappings. This retained field name has only built-in defaults beneath
 it. Cached shared values are ignored, and the server reads no repository config.
 
-`domainDocs.kind` is `private` for OFF or `repository` for ON. OFF keeps domain
+`domainDocs.kind` is `off` for OFF or `repository` for ON. OFF keeps domain
 drafts local without later publish prompts. ON names the glossary and ADR paths
 that builds include in their PR. The tracker option is ON by default and uses
 only `structureSync`, stored as `settings.structureSync`. Its scope is kind, map

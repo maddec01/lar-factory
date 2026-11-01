@@ -27,7 +27,7 @@ const isOperation = (value: unknown): value is RepositoryOperation => REPOSITORY
 const isDocPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && !/[\\\0]/.test(value) && !value.startsWith('/') && value.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
 
 const isDomainDocs = (value: unknown): value is DomainDocLocation => isRecord(value)
-  && (value.kind === 'private' || value.kind === 'repository' && isDocPath(value.glossary) && isDocPath(value.adrs));
+  && (value.kind === 'off' || value.kind === 'private' || value.kind === 'repository' && isDocPath(value.glossary) && isDocPath(value.adrs));
 
 /** What is wrong with a local setting's value, or null when nothing is. An Azure DevOps repository's item source names a team. */
 function settingsProblemOf(raw: Record<string, unknown>, azure: boolean): string | null {
@@ -38,7 +38,7 @@ function settingsProblemOf(raw: Record<string, unknown>, azure: boolean): string
     return azure ? 'field itemSource must name the Azure DevOps team whose board the board reads' : 'field itemSource must be {"kind": "issues"}';
   }
   if ('labels' in raw && !isStrings(raw.labels)) return 'field labels must be an array of strings';
-  if ('domainDocs' in raw && !isDomainDocs(raw.domainDocs)) return 'field domainDocs must be {"kind": "private"} or name the repository\'s glossary and adrs paths';
+  if ('domainDocs' in raw && !isDomainDocs(raw.domainDocs)) return 'field domainDocs must be {"kind": "off"} or name the repository\'s glossary and adrs paths';
   if ('vocabulary' in raw && !isVocabularyMapping(raw.vocabulary)) return 'field vocabulary must map concept, build and kinds to {type: string or null, labels: string[]}';
   for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
     if (key in raw && typeof raw[key] !== 'boolean') return `field ${key} must be a boolean`;
@@ -80,10 +80,14 @@ function setupOf(repo: string, local: LocalSettings, connections: string[] = [])
   const pick = <K extends keyof SharedRepositorySettings>(key: K) => local.overrides?.[key];
   const accessOf = (op: RepositoryOperation): OperationAccess => local.access?.[op] ?? 'unverified';
   const itemSource = pick('itemSource') ?? (onAzure(repo) ? null : { kind: 'issues' as const });
-  const domainDocs = pick('domainDocs') ?? { kind: 'private' as const };
+  const savedDocs = pick('domainDocs');
+  const domainDocs = savedDocs?.kind === 'repository' ? savedDocs : { kind: 'off' as const };
   return {
     repo, structureSync: local.structureSync ?? true, ...local.projectId !== undefined && { projectId: local.projectId },
     role: pick('role') ?? '', itemSource, labels: pick('labels') ?? [], domainDocs, skills: pick('skills') ?? [],
+    createIssuesFromAddItem: pick('createIssuesFromAddItem') ?? true,
+    createIssuesFromRetro: pick('createIssuesFromRetro') ?? true,
+    writeRefinedSpec: pick('writeRefinedSpec') ?? true,
     ...effectiveVocabulary(local.overrides?.vocabulary),
     access: Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, accessOf(op)])) as RepositorySetup['access'],
     sources: Object.fromEntries(SHARED_SETTINGS.map((key) => [key,

@@ -28,7 +28,7 @@ const strings = (value: unknown): value is string[] => Array.isArray(value) && v
 
 /** The body's answers, or null when one is missing or has the wrong shape. */
 function answersOf({ projectId, role, itemSource, domainDocs, skills, structureSync }: Record<string, unknown>): LocalSetupAnswers | null {
-  const docs = isRecord(domainDocs) && (domainDocs.kind === 'private'
+  const docs = isRecord(domainDocs) && (domainDocs.kind === 'off'
     || domainDocs.kind === 'repository' && typeof domainDocs.glossary === 'string' && typeof domainDocs.adrs === 'string');
   if (structureSync !== undefined && typeof structureSync !== 'boolean') return null;
   if (typeof projectId !== 'string' || role !== undefined && typeof role !== 'string' || !isRecord(itemSource) || !docs || !strings(skills)) return null;

@@ -86,3 +86,25 @@ test('issue defaults require boolean values', async () => {
   expect(validateRepositorySettings({ createIssuesFromAddItem: 'yes' }, false)).toBe('field createIssuesFromAddItem must be a boolean');
   expect(validateRepositorySettings({ createIssuesFromRetro: false, writeRefinedSpec: true }, false)).toBeNull();
 });
+
+test('legacy settings load default preferences and private domain docs as off', async (t) => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { writeListFile, readRepositorySetups, setOverride, replaceAccess } = await import('./repository-settings.ts');
+  const { effectiveIssueSettings } = await import('./write-access.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'issue-defaults-'));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  writeListFile(dir, { repositories: [{ repo: 'org/repo', settings: { overrides: { domainDocs: { kind: 'private' } } } }] });
+  const read = () => readRepositorySetups(dir)[0]!;
+  expect(read()).toMatchObject({ domainDocs: { kind: 'off' }, createIssuesFromAddItem: true, createIssuesFromRetro: true, writeRefinedSpec: true });
+  expect(effectiveIssueSettings(read())).toMatchObject({ createIssuesFromAddItem: false, createIssuesFromRetro: false, writeRefinedSpec: false });
+  replaceAccess('org/repo', { 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' }, dir);
+  expect(effectiveIssueSettings(read())).toEqual({ createIssuesFromAddItem: true, createIssuesFromRetro: true, writeRefinedSpec: true, createReason: null, specReason: null });
+  replaceAccess('org/repo', { 'publish-ticket': 'refused', 'edit-ticket': 'allowed' }, dir);
+  expect(effectiveIssueSettings(read())).toMatchObject({ createIssuesFromRetro: false, writeRefinedSpec: true, createReason: 'Access to publish-ticket was refused. Recheck access in Settings.' });
+  replaceAccess('org/repo', { 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' }, dir);
+  setOverride('org/repo', 'createIssuesFromAddItem', false, dir);
+  expect(effectiveIssueSettings(read()).createIssuesFromAddItem).toBe(false);
+  expect(effectiveIssueSettings({ ...read(), repo: 'org/project/repo' }, { azureReadOnly: true })).toMatchObject({ createIssuesFromRetro: false, writeRefinedSpec: false, createReason: 'Azure DevOps is read-only in this test session.', specReason: 'Azure DevOps is read-only in this test session.' });
+});

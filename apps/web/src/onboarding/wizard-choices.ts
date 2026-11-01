@@ -35,7 +35,7 @@ export function connectionsOf(repo: string, _role: string, choices: OnboardingCh
 }
 function defaultsOf(detection: SetupDetection): Answers {
   return { itemSource: sourceOptions(detection)[0]?.value ?? null, role: '',
-    domainDocs: found(detection.domainDocs) ?? { kind: 'private' }, skills: [], structureSync: true };
+    domainDocs: found(detection.domainDocs) ?? { kind: 'off' }, skills: [], structureSync: true };
 }
 export const answersOf = (detection: SetupDetection, choices: OnboardingChoices): Answers => ({ ...defaultsOf(detection), ...choices });
 export function answerProblem(step: StepId, answers: Answers): string | null {

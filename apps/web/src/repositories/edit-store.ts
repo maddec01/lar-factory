@@ -4,7 +4,7 @@ import { type RepositorySetup, type SharedRepositorySettings, type SharedSetting
 import { postAction, receive } from '../items/card-actions.ts';
 
 /** Settings whose editor uses text drafts. Vocabulary saves one complete term at a time. */
-export type DraftSetting = Exclude<SharedSetting, 'vocabulary'>;
+export type DraftSetting = Exclude<SharedSetting, 'vocabulary' | 'createIssuesFromAddItem' | 'createIssuesFromRetro' | 'writeRefinedSpec'>;
 
 /** The text of each field the dialog edits, by field. */
 export interface Drafts {
@@ -12,7 +12,7 @@ export interface Drafts {
   team: string;
   labels: string;
   skills: string;
-  /** `private` or `repository`. */
+  /** `off` or `repository`. */
   domainDocs: string;
   glossary: string;
   adrs: string;
@@ -25,7 +25,7 @@ const FIELDS: Record<DraftSetting, (keyof Drafts)[]> = {
 
 /** The fields' text for the setup's values; a repository's own domain docs start at the usual paths. */
 function draftsOf(setup: RepositorySetup): Drafts {
-  const docs = setup.domainDocs.kind === 'repository' ? setup.domainDocs : { kind: 'private', glossary: 'GLOSSARY.md', adrs: 'docs/adr' };
+  const docs = setup.domainDocs.kind === 'repository' ? setup.domainDocs : { kind: 'off', glossary: 'GLOSSARY.md', adrs: 'docs/adr' };
   return { role: setup.role, team: setup.itemSource?.kind === 'azure-board' ? setup.itemSource.team : '',
     labels: setup.labels.join(', '), skills: setup.skills.join(', '), domainDocs: docs.kind, glossary: docs.glossary, adrs: docs.adrs };
 }
@@ -43,7 +43,7 @@ export function valueOf(key: DraftSetting, drafts: Drafts): SharedRepositorySett
     case 'labels': return list(drafts.labels);
     case 'skills': return list(drafts.skills);
     case 'domainDocs':
-      if (drafts.domainDocs === 'private') return { kind: 'private' };
+      if (drafts.domainDocs === 'off') return { kind: 'off' };
       return drafts.glossary.trim() && drafts.adrs.trim() ? { kind: 'repository', glossary: drafts.glossary.trim(), adrs: drafts.adrs.trim() } : null;
   }
 }

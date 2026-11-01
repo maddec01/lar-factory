@@ -15,3 +15,15 @@ export function writeAccessProblem(repo: string, operation: RepositoryOperation,
   if (!onAzure(repo) && operation === 'edit-ticket' && access['push-branch'] !== 'allowed') return "This login cannot edit other people's issues without verified push access. Recheck access in Settings.";
   return `Access to ${operation} is not checked yet. ${!onAzure(repo) ? 'GitHub permissions require a classic token or gh OAuth login to verify. ' : ''}Recheck access in Settings.`;
 }
+
+/** Saved preferences remain intact when access prevents their use. */
+export function effectiveIssueSettings(setup: import('./model.ts').RepositorySetup, options: { azureReadOnly?: boolean } = {}) {
+  const createReason = writeAccessProblem(setup.repo, 'publish-ticket', setup.access, options);
+  const specReason = writeAccessProblem(setup.repo, 'edit-ticket', setup.access, options);
+  return {
+    createIssuesFromAddItem: (setup.createIssuesFromAddItem ?? true) && createReason === null,
+    createIssuesFromRetro: (setup.createIssuesFromRetro ?? true) && createReason === null,
+    writeRefinedSpec: (setup.writeRefinedSpec ?? true) && specReason === null,
+    createReason, specReason,
+  };
+}

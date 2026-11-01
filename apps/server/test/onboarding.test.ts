@@ -120,7 +120,7 @@ test('the sample board keeps no onboarding', async (t) => {
 });
 
 /** Whether a gh call writes to a repository: a POST, PATCH, PUT or DELETE through the API, or a label, issue or PR change. */
-const ANSWERS = { structureSync: false, projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [] };
+const ANSWERS = { structureSync: false, projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'off' }, skills: [] };
 
 test('a repository with no factory files is detected and onboards with no write to it, its answers saved as local settings', async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
@@ -131,7 +131,7 @@ test('a repository with no factory files is detected and onboards with no write 
   assert.equal(detected.status, 200);
   const { detection } = await detected.json() as { detection: SetupDetection };
   assert.deepEqual([detection.domainDocs, detection.access['push-branch']],
-    [{ found: { kind: 'private' } }, 'refused']);
+    [{ found: { kind: 'off' } }, 'refused']);
   const saved = await board.post({ repo: 'maddec01/lar-web', ...ANSWERS }, board.url, '/api/onboarding/setup');
   assert.equal(saved.status, 200);
   assert.deepEqual((await saved.json() as { board: BoardData }).board.onboarding, []);

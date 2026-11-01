@@ -22,7 +22,7 @@ test('onboarding chooses a source without importing individual tickets or changi
   expect(wizard.getState().run?.step).toBe('access');
   await settle(() => wizard.getState().save());
   expect(wizard.getState().finish.state).toBe('done');
-  expect(posted('/api/onboarding/setup')[0]).toMatchObject({ repo: 'maddec01/lar-web', projectId: 'lar-web', role: '', itemSource: { kind: 'issues' }, structureSync: true, domainDocs: { kind: 'private' } });
+  expect(posted('/api/onboarding/setup')[0]).toMatchObject({ repo: 'maddec01/lar-web', projectId: 'lar-web', role: '', itemSource: { kind: 'issues' }, structureSync: true, domainDocs: { kind: 'off' } });
   const routes = fetchMock.mock.calls.map(([url]) => url);
   expect(routes.some((url) => /onboarding\/(?:import|pr(?:\/|$))|config/.test(url))).toBe(false);
 });

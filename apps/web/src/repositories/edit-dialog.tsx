@@ -62,7 +62,7 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
       </Setting>
       <Setting repo={repo} setup={setup} settingKey="domainDocs" name="Glossary and decisions" hint="Choose whether builds include domain docs in their PRs.">
         <NativeSelect aria-label="Domain docs" value={drafts.domainDocs} disabled={running !== null} onChange={(e) => type('domainDocs', e.target.value)}>
-          <option value="private">Off</option>
+          <option value="off">Off</option>
           <option value="repository">Write in build PRs</option>
         </NativeSelect>
         {drafts.domainDocs === 'repository' && <span className="grid gap-2 sm:grid-cols-2">{text('glossary', 'Glossary path')}{text('adrs', 'ADR folder')}</span>}

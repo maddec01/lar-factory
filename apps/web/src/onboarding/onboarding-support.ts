@@ -39,7 +39,7 @@ export const posted = (url: string) => (fetchMock.mock.calls as unknown as [stri
 export const detection = (parts: Partial<SetupDetection> = {}): SetupDetection => ({
   repo: 'maddec01/lar-web', provider: 'GitHub', checkout: { found: '/Users/me/Developer/lar-web' }, itemSources: { found: [{ kind: 'issues' }] },
   access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed', 'comment-ticket': 'allowed', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
-  domainDocs: { found: { kind: 'private' } }, projectSkills: { found: [] }, ...parts,
+  domainDocs: { found: { kind: 'off' } }, projectSkills: { found: [] }, ...parts,
 });
 
 export const dialog = () => $('[data-onboarding-dialog]');

@@ -137,6 +137,26 @@ export function setVocabularyOverride(repo: string, key: VocabularyKey, value: V
   });
 }
 
+/**
+ * Follows a label's rename to `to`, or its deletion with null, in the mappings of the listed repositories `shares` picks.
+ * All of them change in one write. Names repositories whose mappings changed.
+ */
+export function followLabelInMappings(shares: (repo: string) => boolean, name: string, to: string | null, dir = boardDataDir()): string[] {
+  const { raw, list, settings } = readSettings(dir);
+  const same = (label: string) => label.toLowerCase() === name.toLowerCase();
+  const changed: string[] = [];
+  const repositories = raw.repositories.map((entry, at) => {
+    const local = settings[at]!;
+    const vocabulary = local.overrides?.vocabulary ?? {};
+    if (!shares(list[at]!.repo) || !Object.values(vocabulary).some((term) => term.labels.some(same))) return entry;
+    changed.push(list[at]!.repo);
+    const followed = Object.entries(vocabulary).map(([key, term]) => [key, { ...term, labels: [...new Set(term.labels.flatMap((label) => !same(label) ? [label] : to === null ? [] : [to]))] }]);
+    return { ...entry, settings: { ...local, overrides: { ...local.overrides, vocabulary: Object.fromEntries(followed) } } };
+  });
+  if (changed.length) writeListFile(dir, { ...raw, repositories });
+  return changed;
+}
+
 /** The access an onboarding's detection found, each operation it left unverified out. */
 type FoundAccess = NonNullable<LocalSettings['access']>;
 

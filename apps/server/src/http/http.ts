@@ -59,7 +59,7 @@ export interface HttpDeps {
   saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
   /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
   changeRepositorySettings(input: Record<string, unknown>): Promise<{ setup: RepositorySetup } | Refused>;
-  changeRepositoryLabels(input: Record<string, unknown>): Promise<{ labels?: TrackerLabel[] } | Refused>;
+  changeRepositoryLabels(input: Record<string, unknown>): Promise<{ labels?: TrackerLabel[]; setups?: RepositorySetup[] } | Refused>;
 }
 
 export interface BoardServer {
@@ -382,6 +382,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         const changed = await changeRepositoryLabels(input);
         if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
         if (input.change === 'list') return { status: 200, body: { ...changed, error: null } };
+        for (const setup of changed.setups ?? []) changeRow(setup.repo, (r) => ({ ...r, setup }));
         readSoon();
         return { status: 200, body: withBoard({ error: null }) };
       },

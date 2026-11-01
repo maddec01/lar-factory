@@ -1,6 +1,7 @@
 import { expect, test } from 'vite-plus/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { BoardData } from '@lar-factory/shared';
 import { startBoard, writesRepository } from './server-support.ts';
 
 const repo = 'team/app';
@@ -32,6 +33,18 @@ test('Settings creates only explicitly saved labels and keeps its old mapping af
   expect(failed.status).toBe(400);
   expect(await failed.json()).toMatchObject({ error: expect.stringContaining('Label creation refused') });
   expect(await readFile(join(board.dataDir, 'repository-settings.json'), 'utf8')).toBe(before);
+});
+
+test('renaming and deleting a mapped label changes the board row\'s mapping at once', async (t) => {
+  const board = await startBoard(t, { repositories: [repo], vocabulary: { ...choices, labels: ['bug', 'feature', 'triage'] } });
+  await board.post({ repo, change: 'vocabulary', key: 'improvement', value: { type: null, labels: ['triage', 'feature'] } }, board.url, '/api/repositories/settings');
+  const mapped = async (response: Response) => {
+    const { board: data } = await response.json() as { board: BoardData };
+    return data.repos.find((r) => r.repo === repo)?.setup?.vocabulary.improvement.labels;
+  };
+  const labels = (body: object) => board.post({ repo, ...body }, board.url, '/api/repositories/labels');
+  expect(await mapped(await labels({ change: 'update', name: 'triage', update: { name: 'sorting' } }))).toEqual(['sorting', 'feature']);
+  expect(await mapped(await labels({ change: 'delete', name: 'sorting' }))).toEqual(['feature']);
 });
 
 test('onboarding creates a typed label only on explicit save and refuses unverified Access', async (t) => {

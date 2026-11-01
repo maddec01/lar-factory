@@ -1,6 +1,6 @@
 // What a tracker's labels can do, so the UI reads this instead of checking a provider's name.
 import { customLabelProblem, customTagProblem } from './custom-labels.ts';
-import { onAzure } from './model.ts';
+import { decodePart, onAzure, sameRepo } from './model.ts';
 import { STRUCTURE_LABEL } from './tracker-structure.ts';
 
 export interface TrackerCapabilities {
@@ -16,6 +16,8 @@ export interface TrackerCapabilities {
   deleteWarning: string;
   /** How far a change to a label reaches. */
   changeScope: 'repository' | 'project';
+  /** Whether a change to one of `repo`'s labels is also a change to `other`'s. */
+  sharesLabels(repo: string, other: string): boolean;
   /** The label structure sync needs, or null when it needs none. */
   syncLabel: string | null;
   /** Why a label can't be created by itself, or null when it can. */
@@ -51,14 +53,18 @@ export interface LabelChange {
   action: 'add' | 'remove';
 }
 
+/** An Azure DevOps repository's organization and project, however its origin writes them. */
+const azureProject = (repo: string) => repo.split('/').slice(0, 2).map(decodePart).join('/');
+
 const GITHUB: TrackerCapabilities = {
   noun: 'label', heading: 'Labels', color: true, description: true,
-  deleteWarning: 'This removes it from every ticket.', changeScope: 'repository', syncLabel: STRUCTURE_LABEL, createUnavailable: null, nameProblem: customLabelProblem,
+  deleteWarning: 'This removes it from every ticket.', changeScope: 'repository', sharesLabels: sameRepo, syncLabel: STRUCTURE_LABEL, createUnavailable: null, nameProblem: customLabelProblem,
 };
 
 const AZURE_DEVOPS: TrackerCapabilities = {
   noun: 'tag', heading: 'Tags', color: false, description: false,
   deleteWarning: 'This removes it from every work item and pull request.', changeScope: 'project', syncLabel: null,
+  sharesLabels: (repo, other) => onAzure(other) && sameRepo(azureProject(repo), azureProject(other)),
   createUnavailable: 'Azure DevOps has no way to create a tag on its own. A new tag appears when it is first added to a work item.',
   nameProblem: customTagProblem,
 };

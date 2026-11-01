@@ -1,7 +1,7 @@
 // Settings' Labels section. The tracker holds the only copy, so every change goes straight to it and nothing is saved here.
-import { isManagedLabel, isRecord, sameRepo, trackerCapabilities, writeAccessProblem, type TrackerCapabilities, type TrackerLabel, type TrackerLabels } from '@lar-factory/shared';
+import { isManagedLabel, isRecord, sameRepo, trackerCapabilities, writeAccessProblem, type RepositorySetup, type TrackerCapabilities, type TrackerLabel, type TrackerLabels } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
+import { followLabelInMappings, readRepositorySetups } from '@lar-factory/shared/repository-settings';
 import { trackerLabels } from '@lar-factory/shared/tracker-labels';
 import { notEditable, type Refused } from './editable-repository.ts';
 import { isRepo } from './repository-config.ts';
@@ -30,8 +30,18 @@ function labelChange(update: unknown, capabilities: TrackerCapabilities): Partia
   return { ...name !== undefined && { name: newName(name, capabilities) }, ...color !== undefined && { color: color as string }, ...description !== undefined && { description: description as string } };
 }
 
-/** Reads the tracker's labels, or changes one when the signed-in account may manage them and the name isn't managed. */
-export async function changeRepositoryLabels(input: Record<string, unknown>, dir = boardDataDir(), tracker?: Tracker): Promise<{ labels?: TrackerLabel[] } | Refused> {
+/** Follows a change the tracker already made in every mapping it reaches: the setups that changed, when any did. */
+function followInMappings(repo: string, capabilities: TrackerCapabilities, name: string, to: string | null, dir: string): { setups?: RepositorySetup[] } {
+  try {
+    const changed = followLabelInMappings((other) => capabilities.sharesLabels(repo, other), name, to, dir);
+    return changed.length ? { setups: readRepositorySetups(dir).filter((setup) => changed.includes(setup.repo)) } : {};
+  } catch (err) {
+    throw new Error(`The tracker made this change, but kind mappings did not follow. ${(err as Error).message}`);
+  }
+}
+
+/** Reads the tracker's labels, or changes one when the signed-in account may manage them and the name isn't managed. A change to a mapped label also changes its mappings. */
+export async function changeRepositoryLabels(input: Record<string, unknown>, dir = boardDataDir(), tracker?: Tracker): Promise<{ labels?: TrackerLabel[]; setups?: RepositorySetup[] } | Refused> {
   const { repo, change, name, update } = input;
   if (!isRepo(repo) || !['list', 'create', 'update', 'delete'].includes(change as string)) return { status: 400, error: 'Send the repository and the change to its labels.' };
   const refused = notEditable(repo, dir);
@@ -47,9 +57,13 @@ export async function changeRepositoryLabels(input: Record<string, unknown>, dir
     }
     if (typeof name !== 'string' || !name) throw new Error(`Choose a ${capabilities.noun}.`);
     if (isManagedLabel(name)) refuse(capabilities.nameProblem(name));
-    if (change === 'delete') await labels.delete(name);
-    else await labels.update(name, labelChange(update, capabilities));
-    return {};
+    if (change === 'delete') {
+      await labels.delete(name);
+      return followInMappings(repo, capabilities, name, null, dir);
+    }
+    const sent = labelChange(update, capabilities);
+    const saved = await labels.update(name, sent);
+    return sent.name === undefined ? {} : followInMappings(repo, capabilities, name, saved.name, dir);
   } catch (err) {
     return { status: 400, error: (err as Error).message };
   }

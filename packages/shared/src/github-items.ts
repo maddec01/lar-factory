@@ -227,6 +227,7 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
     repo: c.repository.nameWithOwner,
     labels: rawLabels(raw),
     ...Object.keys(labelColors).length > 0 && { labelColors },
+    ...c.issueType && { issueType: c.issueType.name },
     ...closed,
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
     parentId: null,

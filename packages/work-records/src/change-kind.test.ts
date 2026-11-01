@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { effectiveVocabulary, type RepositorySetup, type TicketKinds, type TrackerLabels } from '@lar-factory/shared';
+import { effectiveVocabulary, kindDisagreement, type RepositorySetup, type TicketKinds, type TrackerLabels } from '@lar-factory/shared';
 import { changeKind } from './change-kind.ts';
 import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
@@ -65,6 +65,35 @@ test('a new kind with no mapped type leaves the ticket\'s type alone', async () 
   expect(records.read(workId).kind).toBe('improvement');
   expect(result.line).toBe('#12: removed label bug.');
 });
+
+test('a type the change leaves alone settles the question it would raise, until a kind changes', async () => {
+  const records = await open();
+  const { workId, revision } = records.importTicket({ title: 'T', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+  const tracker = fakeTracker({ labels: ['bug'], type: 'Bug' });
+  const { record, ticketType } = await changeKind(records, workId, revision, 'improvement', { setup: setupOf(REPO), ...tracker });
+  expect(ticketType).toBeNull();
+  expect(record.kindAnswer).toEqual({ answer: 'update', itemKind: 'improvement', ticketKind: 'bug' });
+  expect(kindDisagreement(record, tracker.ticket, setupOf(REPO).vocabulary)).toBeNull();
+  expect(kindDisagreement(record, { labels: [], type: 'Feature' }, setupOf(REPO).vocabulary)).toMatchObject({ ticketKind: 'feature', changed: 'ticket' });
+});
+
+const AFTER_SWAP: [string, Parameters<typeof effectiveVocabulary>[0], string[], string | null, { labels: string[]; type: string | null }][] = [
+  ['a mapping', { bug: { type: 'Bug', labels: ['type: bug'] }, feature: { type: 'Feature', labels: ['type: feature'] } }, ['type: bug', 'docs'], 'Bug', { labels: ['docs', 'type: feature'], type: 'Feature' }],
+  ['no mapping', {}, ['bug', 'docs'], null, { labels: ['docs'], type: null }],
+];
+for (const [name, mapping, labels, type, after] of AFTER_SWAP) {
+  test(`no disagreement remains after a swap, with ${name}`, async () => {
+    const records = await open();
+    const { workId, revision } = records.importTicket({ title: 'T', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+    const setup = setupOf(REPO, ALLOWED, mapping);
+    const tracker = fakeTracker({ labels: [...labels], type });
+    const { record, ticketType } = await changeKind(records, workId, revision, 'feature', { setup, ...tracker });
+    expect(tracker.ticket).toEqual(after);
+    expect(ticketType).toBe(after.type);
+    expect(record.kindAnswer).toBeNull();
+    expect(kindDisagreement(record, tracker.ticket, setup.vocabulary)).toBeNull();
+  });
+}
 
 test('a type the team\'s backlog doesn\'t show stays unchanged, and the update line says so', async () => {
   const records = await open();

@@ -18,7 +18,7 @@ test('a discovered concept stays in List until it has been added locally', () =>
 test('Abandon sets work aside on this Mac and says whether the board asks about its ticket next', () => {
   assert.deepEqual(abandonPrompt(ticketed('owner/repo')), {
     question: 'Abandon #7 Keep history?', confirm: 'Abandon', done: 'Set #7 Keep history aside on this Mac.',
-    detail: 'This sets the work aside on this Mac and leaves its ticket open. The board asks next whether to close the ticket.',
+    detail: 'Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.',
   });
   assert.equal(abandonPrompt({ ...ticketed('owner/repo'), number: 0 }).detail, 'This sets the work aside on this Mac. It has no ticket, so nothing changes in its provider.');
 });

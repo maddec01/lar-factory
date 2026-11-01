@@ -57,6 +57,7 @@ export interface ItemCommands {
    * closeTicket closes that ticket after its own confirmation.
    */
   abandon(itemId: string): Reply;
+  abandonAndClose(itemId: string): Promise<Reply>;
   /**
    * Closes the open ticket of set-aside work in Archive: as not planned on GitHub, to Removed on Azure DevOps. A close
    * that succeeded answers a second press without closing again.
@@ -207,6 +208,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
   const finishedStarts = new WeakMap<Promise<Start>, string>();
   const settled = new WeakSet<Promise<Start>>();
   /** Ticket closes by item id: one in flight, so a second press waits for it, or one that succeeded, kept. */
+  const combined = new Map<string, Promise<Reply>>();
   const closing = new Map<string, Promise<string | null>>();
 
   const reply = (status: number, body: object): Reply => ({ status, body });
@@ -214,6 +216,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
 
   /** Why a command in flight on the item, or a Start this board run, blocks this action; null when nothing does. */
   function busyReason(itemId: string, action: Action): string | null {
+    if (combined.has(itemId)) return 'Abandon and close ticket is running. Wait for it to finish.';
     const started = starts.has(itemId) || !!board.snapshot().started?.[itemId] || recordedStart(itemId);
     if (started && action === 'back to List') return 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
     if (started && action === 'abandon') return 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
@@ -572,7 +575,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
       // Needs you offers setting work aside whatever its Status and threads, as after its PR closed unmerged.
       const offered = item.needsYou?.offers.includes('set-aside');
       if (!canAbandon(item) && !offered) return reply(409, { error: `Only List and Queued items can be abandoned; this one is in ${item.status}.` });
-      const busy = offered ? null : busyReason(itemId, 'abandon');
+      const busy = combined.has(itemId) ? "Abandon and close ticket is running." : offered ? null : busyReason(itemId, 'abandon');
       if (busy) return withBoard(409, { error: busy });
       if (records) {
         try { records.setAside(item.id, item.revision); }
@@ -584,6 +587,35 @@ export function createItemCommands({ board, items, records, reread, archive, off
       board.remove(itemId);
       reread();
       return withBoard(200, { error: null });
+    },
+
+    abandonAndClose(itemId) {
+      const pending = combined.get(itemId);
+      if (pending) return pending;
+      const item = board.find(itemId);
+      if (!item && (board.removed(itemId) || archive().some(i => i.id === itemId && i.archived?.setAside))) return Promise.resolve(withBoard(200, { error: null }));
+      if (!item) return Promise.resolve(withBoard(404, { error: GONE }));
+      const offered = item.needsYou?.offers.includes('set-aside');
+      const busy = busyReason(itemId, 'abandon');
+      if ((!canAbandon(item) && !offered) || busy || !item.number || item.abandonRefusal) return Promise.resolve(withBoard(409, { error: busy ?? item.abandonRefusal ?? 'This work cannot be abandoned with ticket closure.' }));
+      return track(combined, itemId, Promise.resolve().then(async () => {
+        try {
+          const observation = await items.observeTicket(item.repo, item.number);
+          if (observation.state !== 'closed') {
+            const error = await items.abandon(item);
+            if (error) return withBoard(502, { error });
+          }
+          try {
+            if (records) records.setAside(item.id, item.revision);
+          } catch (error) {
+            reread();
+            return withBoard(409, { error: `The ticket is closed, but the work remains on the board. Try again to finish abandonment. ${(error as Error).message}` });
+          }
+          board.remove(itemId);
+          reread();
+          return withBoard(200, { error: null });
+        } catch (error) { return withBoard(502, { error: (error as Error).message }); }
+      }));
     },
 
     async closeTicket(itemId) {

@@ -68,6 +68,7 @@ export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> 
 /** Maps records and their local completion facts to board items, alongside their latest ticket context. */
 function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly {repo:string;structureSync?:boolean;writeRefinedSpec?:boolean}[] = []) {
   const byTicket = ticketsByReference(tickets);
+  const requested = new Set(records.launchIntents({ unresolved: true }).filter(intent => intent.purpose === 'build').map(intent => intent.workId));
   const completions = new Map<string, ReturnType<WorkRecords['completion']>>();
   const completionOf = (record: WorkRecord) => {
     let completion = completions.get(record.workId);
@@ -99,6 +100,8 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       ...ticket?.abandonRefusal && { abandonRefusal: ticket.abandonRefusal }, ...ticket?.currentSprint && { currentSprint: ticket.currentSprint },
       id: record.workId,
       recorded: true,
+      buildPhase: record.buildPhase,
+      buildRequested: requested.has(record.workId),
       completion: completionOf(record),
       ...(ticket?.tracker && {tracker: ticket.tracker}),
       ...(sync && {sync}),

@@ -5,7 +5,7 @@
 
 import { itemName } from '@lar-factory/shared';
 import type { Item, Slice, Status } from '@lar-factory/shared';
-import { SliceBar, SliceMark } from '../items/item-parts.tsx';
+import { ActivityFeedback, useActivityFeedback, SliceBar, SliceMark } from '../items/item-parts.tsx';
 import { STATUS_COLOR } from '../items/status-glyph.tsx';
 import { WORKFLOW_STEPS } from '../items/workflow-steps.ts';
 import { SourceIcon } from '../items/source-icon.tsx';
@@ -25,6 +25,7 @@ function SliceChip({ slice }: { slice: Slice }) {
 }
 
 export function ItemProgress({ item }: { item: Item }) {
+  const feedback = useActivityFeedback(item);
   const at = WORKFLOW_STEPS.indexOf(item.status);
   const split = item.slices.length > 0 && SPLIT_STATUSES.includes(item.status);
   const done = item.slices.filter((s) => s.progress === 'done').length;
@@ -51,6 +52,7 @@ export function ItemProgress({ item }: { item: Item }) {
           );
         })}
       </ol>}
+      {!item.slices.length && <div className="grid gap-1"><ActivityFeedback feedback={feedback} /><ActivityFeedback feedback={feedback} labelOnly /></div>}
       {item.slices.length > 0 && (
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-slices>
           <p className="m-0 text-xs text-(--muted-foreground)"><span className="font-medium text-(--foreground)">Slices</span> · {done}/{item.slices.length} done</p>

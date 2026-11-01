@@ -3,7 +3,7 @@
 // board's CSS adds the coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
-import { UNREADABLE, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
+import { UNREADABLE, buildActivity, isStale, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -61,13 +61,13 @@ export function StepTrack({ status }: { status: Status }) {
 
 const SLICE_COLOR: Record<SliceProgress, string> = { done: 'var(--st-done)', active: 'var(--st-now)', blocked: 'var(--st-review)', unknown: 'var(--muted-foreground)', waiting: 'var(--input)' };
 
-/** A build's slices as one bar, a segment each, in their colours; the bar's waiting segments are faint. `thick` draws it as tall as a step of the item dialog's progress bar. */
-export function SliceBar({ item, thick }: { item: Item; thick?: boolean }) {
+/** A 6px segment for each recorded slice; waiting segments are faint. */
+export function SliceBar({ item }: { item: Item; thick?: boolean }) {
   if (!item.slices.length) return null;
   return (
     <ol className="m-0 flex list-none gap-[2px] p-0">
       {item.slices.map((s, i) => (
-        <li key={i} title={itemName(s)} className={`${thick ? 'h-1.5' : 'h-1'} flex-1 rounded-full ${s.progress === 'active' ? 'status-pulse' : ''}`}
+        <li key={i} title={itemName(s)} className={`h-1.5 flex-1 rounded-full ${s.progress === 'active' ? 'status-pulse' : ''}`}
           style={{ background: s.progress === 'waiting' ? 'var(--soft)' : SLICE_COLOR[s.progress] }} />
       ))}
     </ol>
@@ -170,4 +170,14 @@ export function StructureSync({ item }: { item: Item }) {
     {item.sync && item.sync.state !== 'saved' && <span data-structure-sync title={item.sync.message} role={item.sync.state === 'error' || item.sync.state === 'conflict' ? 'status' : undefined}
     className="text-xs text-base-700">{item.sync.state === 'pending' ? 'Saving concept links…' : item.sync.state === 'conflict' ? 'Concept links changed on another machine' : 'Concept links could not save'}{item.sync.message && `. ${item.sync.message}`}</span>}
   </>;
+}
+
+export function useActivityFeedback(item: Item) {
+  const unavailable = useBoardStore(({ data, now, clientError }) => !!clientError || isStale(data, now) || !data.firstRead.settled);
+  return buildActivity(item, unavailable);
+}
+
+export function ActivityFeedback({ feedback, labelOnly = false }: { feedback: ReturnType<typeof buildActivity>; labelOnly?: boolean }) {
+  if (labelOnly) return <span className="block h-4 whitespace-nowrap text-[11px] leading-4 text-(--muted-foreground)">{feedback.label}</span>;
+  return <div role="img" aria-label={feedback.label} className="activity-track h-1.5 overflow-hidden rounded-full bg-(--soft)">{feedback.running && <span className="activity-sweep block h-1.5 w-1/3 rounded-full bg-(--st-now)" />}</div>;
 }

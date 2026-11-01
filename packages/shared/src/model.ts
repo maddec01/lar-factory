@@ -341,6 +341,8 @@ export interface Item {
    * The T3 threads its work record holds, newest first; absent when it holds none, 'unavailable' while T3 can't be read
    * and the board never saw one of them.
    */
+  buildPhase?: string | null;
+  buildRequested?: boolean;
   threads?: ItemThread[] | 'unavailable';
   /**
    * Why it waits for its repository's changed item source or domain-doc location to be accepted in Settings, which
@@ -371,6 +373,8 @@ export interface ItemThread {
   observedAt?: string;
   /** A running or waiting descendant still belongs to this thread's work. */
   hasLiveChildren?: true;
+  currentRunning?: true;
+  hasRunningChildren?: true;
   /** The work record's thread role, when recorded by the factory. */
   purpose?: string;
 }
@@ -1092,3 +1096,16 @@ export interface LocalSetupAnswers {
   skills: string[];
 }
 
+
+export function buildActivity(item: Item, stale = false): { label: string; running: boolean } {
+  if (!['In progress', 'Review', 'Ready'].includes(item.status)) return { label: item.status, running: false };
+  const threads = Array.isArray(item.threads) ? item.threads.filter(t => t.purpose === 'build') : [];
+  const current = threads.find(t => !t.observedAt);
+  if (stale || item.paused || item.archived || item.needsYou) return { label: 'Activity unavailable', running: false };
+  if (item.buildRequested) return { label: 'Start requested', running: false };
+  if (!current) return { label: 'Activity unavailable', running: false };
+  const running = !!(current.currentRunning || current.hasRunningChildren);
+  if (!running) return { label: current.state === 'stopped' ? 'Stopped' : current.state === 'needs you' ? 'Needs you' : 'Activity unavailable', running: false };
+  const phases: Record<string, string> = { plan: 'Planning', implement: 'Implementing', review: 'Review', checks: 'Checks', 'full-checks': 'Checks', 'domain-docs': 'Updating docs', approve: 'Awaiting approval', retro: 'Retro' };
+  return { label: phases[item.buildPhase ?? ''] ?? 'Working', running };
+}

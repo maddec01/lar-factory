@@ -90,10 +90,12 @@ test('no row has a coloured repository dot', async () => {
   expect(table().querySelector('[class*="repo-tone"]')).toBeNull();
 });
 
-test('a long title wraps to two lines and is clamped after that', async () => {
+test('a long title wraps naturally without clamping or truncation', async () => {
   await mountPage(withItem('I_sample13', { title: 'Owner accounts with a title long enough to run past one line of the title column at the app\'s narrowest width' }, loose));
   const name = row('I_sample13').querySelector('[data-title]')!;
-  expect(name.className.split(' ')).toEqual(expect.arrayContaining(['line-clamp-2']));
+  expect(name.className.split(' ')).toEqual(expect.arrayContaining(['min-w-0', 'wrap-anywhere']));
+  expect(name.className).not.toMatch(/line-clamp-/);
+  expect(text(name)).toBe("#140 Owner accounts with a title long enough to run past one line of the title column at the app's narrowest width");
   expect(name.className.split(' ')).not.toContain('truncate');
 });
 
@@ -134,7 +136,7 @@ test('every row keeps line 2 on the dossiers\' columns at every width, its side 
   expect(side('I_sample13').className.split(' '), 'no column of its own past the dossiers\' four').not.toContain('col-start-5');
   expect([...lines('I_sample14').children].map((c) => (c as HTMLElement).dataset.col ?? (c as HTMLElement).dataset.line), 'a row with no slices keeps line 2')
     .toEqual(['1', 'side', 'bar', 'count', 'next', 'figures']);
-  expect([text(col('I_sample14', 'bar')), text(col('I_sample14', 'count')), text(col('I_sample14', 'next'))]).toEqual(['', '', '']);
+  expect([text(col('I_sample14', 'bar')), text(col('I_sample14', 'count')), text(col('I_sample14', 'next'))]).toEqual(['', 'Activity unavailable', '']);
   expect(row('I_sample13').className.split(' ')).toEqual(expect.arrayContaining(['py-1.5', 'gap-y-1']));
 });
 

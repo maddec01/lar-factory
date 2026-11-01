@@ -51,3 +51,12 @@ code { font: var(--text-xs) var(--font-mono); }
 .sr-only { position: absolute; width: --spacing(0.25); height: --spacing(0.25); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* The copied Button, ninna-ui's, takes no pointer events while disabled; one that says why keeps them, so its title shows. */
 button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
+
+@keyframes activity-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+.activity-sweep { animation: activity-sweep 1.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .activity-sweep { animation: none; }
+}

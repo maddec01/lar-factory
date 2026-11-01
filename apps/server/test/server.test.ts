@@ -152,7 +152,7 @@ test('each refresh attaches the threads each work record holds and T3\'s environ
   const data = await until(board, (d) => d.items.length > 0 && d.firstRead?.settled === true);
   assert.equal(data.t3EnvironmentId, 'env-1');
   assert.deepEqual(data.items.find((i) => i.number === 12)?.threads,
-    [{ id: 'build', title: 'Build: owner accounts', state: 'running', updated: '2026-10-20T09:00:00.000Z', purpose: 'shape' }]);
+    [{ id: 'build', title: 'Build: owner accounts', state: 'running', currentRunning: true, updated: '2026-10-20T09:00:00.000Z', purpose: 'shape' }]);
   assert.equal(data.items.find((i) => i.number === 13)?.threads, undefined);
   const without = await until(await startBoard(t, { items: [boardIssue(12, 'In progress')] }), (d) => d.items.length > 0);
   assert.equal(without.t3EnvironmentId, undefined);

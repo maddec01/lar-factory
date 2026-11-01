@@ -616,3 +616,15 @@ export async function openPrByHead(repo: string, branch: string, run: (args: str
   const prs = JSON.parse(await run(['pr', 'list', '--repo', repo, '--state', 'open', '--head', branch, '--json', 'headRefName,url'])) as { headRefName: string; url: string }[];
   return prs.find(pr => pr.headRefName === branch)?.url ?? null;
 }
+
+/** Caller verifies ownership, default branch, live work, open PRs and write access before deletion. */
+export async function deleteRemoteBranch(repo: string, branch: string, expectedHead?: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  const ref = `repos/${repo}/git/refs/heads/${encodeURIComponent(branch)}`;
+  if (expectedHead !== undefined) {
+    const current = (await run(['api', ref, '--jq', '.object.sha'])).trim();
+    if (current !== expectedHead) throw new Error('GitHub branch changed. Inspect and confirm again.');
+  }
+  // GitHub's delete-ref API has no expected-object-ID precondition. Recheck through
+  // the same authenticated provider immediately before deletion; Azure uses a CAS.
+  await run(['api', '--method', 'DELETE', ref]);
+}

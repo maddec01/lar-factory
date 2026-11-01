@@ -1,3 +1,4 @@
+import { assertAzureCommandAllowed } from '@lar-factory/shared/azure-safety';
 // Azure Repos through az, beside github.ts's gh calls: the default branch's head, files and blobs, and the commit, branch
 // and PR operations. A repository is organization/project/repository as its origin URL has them.
 
@@ -131,7 +132,7 @@ async function reopenPr(url: string, run: Az = az): Promise<void> {
 
 /** The calls that open and follow the board's PRs on Azure Repos, each named and shaped as github.ts's gh call is. */
 export const AZURE_REPOS = {
-  branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr, openPrByHead,
+  deleteRemoteBranch, branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr, openPrByHead,
 };
 
 /** Finds an active PR with the exact source branch. */
@@ -139,4 +140,19 @@ async function openPrByHead(repo: string, branch: string, run: Az = az): Promise
   const prs = await repos<{ sourceRefName: string; pullRequestId: number }[]>(run, repo, ['pr', 'list', '--status', 'active', '--source-branch', branch]);
   const pr = prs.find(pr => pr.sourceRefName === `refs/heads/${branch}`);
   return pr ? prUrl(repo, pr.pullRequestId) : null;
+}
+
+/** Caller verifies ownership, default branch, live work, open PRs and write access before deletion. */
+async function deleteRemoteBranch(repo: string, branch: string, expectedHead?: string, run: Az = az): Promise<void> {
+  const guardArgs = ['repos', 'ref', 'delete'];
+  assertAzureCommandAllowed(guardArgs);
+  const sha = await branchHead(repo, branch, run);
+  if (!sha) {
+    if (expectedHead !== undefined) throw new Error('Azure branch changed. Inspect and confirm again.');
+    return;
+  }
+  if (expectedHead !== undefined && sha !== expectedHead) throw new Error('Azure branch changed. Inspect and confirm again.');
+  const result = await repos<{ success: boolean; updateStatus?: string }>(run, repo,
+    [...guardArgs.slice(1), '--name', `refs/heads/${branch}`, '--object-id', sha]);
+  if (result.success !== true) throw new Error(`Azure branch deletion failed: ${result.updateStatus ?? 'unknown status'}`);
 }

@@ -4,10 +4,10 @@ import { onAzure } from '@lar-factory/shared';
 import type { PullRequestState } from '@lar-factory/work-records';
 import { AZURE_REPOS, prUrl as azurePrUrl } from '../azure/azure-repos.ts';
 import {
-  branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr, openPrByHead,
+  deleteRemoteBranch, branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr, openPrByHead,
 } from '../github/github.ts';
 
-const GITHUB = { branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr, openPrByHead };
+const GITHUB = { deleteRemoteBranch, branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr, openPrByHead };
 
 /** The calls that open and follow the repository's PRs. A caller's `run` stands in for that tool. */
 export const prHost = (repo: string): typeof GITHUB => (onAzure(repo) ? AZURE_REPOS : GITHUB);

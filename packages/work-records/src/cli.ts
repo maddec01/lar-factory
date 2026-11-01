@@ -234,6 +234,12 @@ Threads and launch intents
   instead of making a second one. lar-work never starts or checks a thread.
   A purpose is a lowercase word naming what the thread does, such as build.
   add-thread <work-id> --revision N --thread T --purpose P
+  confirm-thread-deleted <work-id> --revision N --thread T
+  set-build-branch <work-id> --revision N --branch B
+  invalidate-gate <work-id> --revision N
+                                    Require a new gate, retaining text and history.
+  reset-build <work-id> --revision N
+                                    Delete owned slices and clear the build phase.
   threads <work-id>                 Print the record's threads.
   record-intent <work-id> --revision N --purpose P
                                     Print the record and the new intent.
@@ -286,7 +292,7 @@ class UsageError extends Error {}
 const TAKES_WORK_ID = ['create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
   'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
-  'review-rounds', 'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
+  'review-rounds', 'observe', 'observe-failure', 'observations', 'confirm-thread-deleted', 'set-build-branch', 'invalidate-gate', 'reset-build', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
   'gate', 'record-gate', 'add-dependency', 'dependencies'];
 const TAKES_DEPENDENCY_ID = ['dependency', 'update-dependency', 'add-dependency-block', 'remove-dependency-block', 'observe-dependency', 'mark-met',
   'clear-met', 'replace-dependency'];
@@ -327,6 +333,7 @@ const OPTIONS = {
   state: { type: 'string' },
   assignee: { type: 'string' },
   thread: { type: 'string' },
+  branch: { type: 'string' },
   purpose: { type: 'string' },
   intent: { type: 'string' },
   failure: { type: 'string' },
@@ -508,6 +515,14 @@ async function run(records: WorkRecords, command: string, workId: string | undef
       return records.recordReadFailure(workId!, revision(), need(values, 'of') as Observed, need(values, 'failure'));
     case 'observations':
       return records.observations(workId!);
+    case 'confirm-thread-deleted':
+      return records.confirmThreadDeleted(workId!, revision(), need(values, 'thread'));
+    case 'set-build-branch':
+      return records.setBuildBranch(workId!, revision(), need(values, 'branch'));
+    case 'invalidate-gate':
+      return records.invalidateGate(workId!, revision());
+    case 'reset-build':
+      return records.resetBuild(workId!, revision());
     case 'add-thread':
       return records.addThread(workId!, revision(), need(values, 'thread'), need(values, 'purpose'));
     case 'threads':

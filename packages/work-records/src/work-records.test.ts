@@ -843,3 +843,41 @@ it('restores imported refinement and relationships atomically and preserves late
   expect(records.read(build.workId).parentId).toBe(null);
   expect(records.blockers(build.workId)).toEqual([]);
 });
+
+it('persists confirmed deletion and launched branch with revision checks', async () => {
+  const path = join(tempDir(), 'records.db');
+  const records = await open(path);
+  const build = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
+  records.addThread(build.workId, 1, 'thread-1', 'build');
+  records.confirmThreadDeleted(build.workId, 2, 'thread-1');
+  expect(() => records.setBuildBranch(build.workId, 2, 'feat/build')).toThrow();
+  records.setBuildBranch(build.workId, 3, 'feat/build');
+  const reopened = await open(path);
+  expect(reopened.read(build.workId).buildBranch).toBe('feat/build');
+  expect(reopened.threads(build.workId)[0]!.deletedAt).toEqual(expect.any(String));
+});
+
+it('invalidates gates without losing evidence or brief text', async () => {
+  const records = await open();
+  const build = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
+  records.setBody(build.workId, 1, 'brief', 'Build this.');
+  const gate = records.gate(build.workId);
+  records.recordGate(build.workId, 2, { briefDigest: gate.briefDigest!, approvedBy: 'person', evidence: 'Passed' });
+  records.invalidateGate(build.workId, 2);
+  expect(records.gate(build.workId)).toMatchObject({ current: false, evidence: [expect.any(Object)] });
+  expect(() => records.invalidateGate(build.workId, 2)).toThrow();
+  records.recordGate(build.workId, 3, { briefDigest: gate.briefDigest!, approvedBy: 'person', evidence: 'Passed again' });
+  expect(records.gate(build.workId).current).toBe(true);
+});
+
+it('resets only slices owned by the selected build', async () => {
+  const records = await open();
+  const build = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
+  const slice = records.create({ title: 'Slice', repository: 'a/b', kind: 'slice' });
+  const other = records.create({ title: 'Other', repository: 'a/b', kind: 'slice' });
+  records.setParent(slice.workId, 1, build.workId);
+  expect(() => records.resetBuild(build.workId, 1)).toThrow();
+  records.resetBuild(build.workId, 2);
+  expect(() => records.read(slice.workId)).toThrow();
+  expect(records.read(other.workId).workId).toBe(other.workId);
+});

@@ -63,7 +63,7 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
         const digest = createHash('sha256').update(JSON.stringify(change.text)).digest('hex');
         const approved = change.source === 'user';
         db.prepare(`INSERT INTO bodies (work_id, body, markdown, written, has_content, has_passing_gate)
-          VALUES (?, 'brief', ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, ? OR EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND source IN ('gate', 'user')))
+          VALUES (?, 'brief', ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, ? OR EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND source IN ('gate', 'user') AND invalidated = 0))
           ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written, has_content = excluded.has_content, has_passing_gate = excluded.has_passing_gate`)
           .run(workId, change.text, Number(Boolean(change.text.trim())), Number(approved), workId, digest);
         const at = new Date().toISOString();

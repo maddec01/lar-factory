@@ -193,3 +193,10 @@ test('the board data says, per repository, whether Start build finds its reposit
     'maddec01/lar-factory': null,
   });
 });
+
+test('recovery endpoints validate item and options before starting a thread', async t => {
+  const { board } = await buildBoard(t, [readyIssue(12, ['build'])]);
+  assert.equal((await board.postSession({}, '/api/inspect-recovery')).status, 400);
+  assert.equal((await board.postSession({ itemId: board.id(12), options: { branchChoice: 'erase' } }, '/api/start-again')).status, 422);
+  assert.equal((await board.postSession({ itemId: board.id(12) }, '/api/inspect-recovery')).status, 409);
+});

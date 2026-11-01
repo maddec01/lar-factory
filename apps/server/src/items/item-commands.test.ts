@@ -81,7 +81,8 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
       return null;
     },
   } as unknown as ItemSource;
-  const commands = createItemCommands({ factoryContext:null, board, items: source, records: records ?? null, reread, archive, offerModelChoices: () => [],
+  const commands = createItemCommands({ factoryContext:null, checkoutOf: async () => '/repo',
+    inspectWorkRecovery: async () => ({ branch: 'old', branchExists: true, worktreePath: null, pr: 'none' }), board, items: source, records: records ?? null, reread, archive, offerModelChoices: () => [],
     showThread, reopenPr: async (repo, number) => { log.push(`reopen ${repo}#${number}`); }, projectOf: async (repo) => ({ projectId: repo }), baseOf: async () => 'release', buildAccessOf: () => access,
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
@@ -334,7 +335,8 @@ function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids
   }) });
   reread();
   const started: string[] = [];
-  const commands = createItemCommands({ factoryContext:null, board, items: {} as ItemSource, records, reread, archive: () => [], offerModelChoices: () => [],
+  const commands = createItemCommands({ factoryContext:null, checkoutOf: async () => '/repo',
+    inspectWorkRecovery: async () => ({ branch: 'old', branchExists: true, worktreePath: null, pr: 'none' }), board, items: {} as ItemSource, records, reread, archive: () => [], offerModelChoices: () => [],
     showThread: lookup, projectOf: async (repo) => { beforeLaunch(board); return { projectId: repo }; }, baseOf: async () => 'release', buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }), recoverThread: recover, skillsOf: () => skills,
     startThread: async (_project, message) => {
       during();
@@ -611,4 +613,28 @@ test('Shape after moving back starts fresh despite an older idle thread', async 
   const { commands, started } = recordedCommands(records, { shown: () => [{ id: 'older', title: 'Old work', updated: '2026-11-01T00:00:00Z', state: 'done' }] });
   assert.equal((await commands.start(work.workId, undefined)).status, 200);
   assert.equal(started.length, 1);
+});
+
+test('Start again preserves launch intents and continues a deleted build on its branch', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Recover build', repository: WEB, kind: 'build', status: 'In progress' });
+  records.addThread(work.workId, records.read(work.workId).revision, 'deleted-build', 'build');
+  records.confirmThreadDeleted(work.workId, records.read(work.workId).revision, 'deleted-build');
+  const { board, commands, bases, branches } = commandsOn([], undefined, records);
+  const item = board.find(work.workId)!;
+  board.update({ items: [{ ...item, threads: [], needsYou: { reason: 'Deleted', deletedThread: true, offers: ['start-again'] } }] });
+  assert.equal((await commands.startAgain(work.workId, undefined, {})).status, 409);
+  assert.equal(records.launchIntents({ workId: work.workId }).length, 0);
+  assert.equal((await commands.startAgain(work.workId, undefined, { branchChoice: 'continue' })).status, 200);
+  assert.deepEqual(branches, ['old']);
+  assert.deepEqual(bases, ['old']);
+  assert.equal(records.threads(work.workId).length, 2);
+  assert.equal(records.launchIntents({ workId: work.workId, unresolved: true }).length, 0);
+});
+
+test('recovery options reject invalid values before launching', async () => {
+  const { commands, log } = commandsOn([queued(1)]);
+  assert.equal((await commands.startAgain(queued(1).id, undefined, { branchChoice: 'erase' })).status, 422);
+  assert.equal((await commands.inspectRecovery(queued(1).id)).status, 409);
+  assert.deepEqual(log, []);
 });

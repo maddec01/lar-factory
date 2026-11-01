@@ -195,6 +195,14 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),
       run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model)),
     },
+    '/api/inspect-recovery': {
+      what: 'the item to inspect', disabled: 'Recovery is disabled in sample mode.',
+      run: forItem('Name the item to inspect.', itemId => commands.inspectRecovery(itemId)),
+    },
+    '/api/start-again': {
+      what: 'the item to start again', disabled: 'Recovery is disabled in sample mode.',
+      run: forItem('Name the item to start again.', (itemId, input) => commands.startAgain(itemId, input.model, input.options)),
+    },
     '/api/start-build': {
       what: 'the build to start', disabled: 'Starting builds is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),

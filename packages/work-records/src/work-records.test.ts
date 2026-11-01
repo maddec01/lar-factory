@@ -901,3 +901,15 @@ it('preserves cleanup names across reset and database reopen with revision prote
   const reopened = await open(path);
   expect(reopened.cleanupOwnership(build.workId)).toEqual([{ branch: 'old-build', sliceIds: [slice.workId], sliceBranches: [name] }]);
 });
+
+it('resolves only named cleanup targets and rejects stale revisions', async () => {
+  const records = await open(join(tempDir(), 'work-records.db'));
+  const build = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
+  records.captureCleanup(build.workId, 1, 'old-build', []);
+  expect(() => records.resolveCleanup(build.workId, 1, ['old-build'])).toThrow();
+  records.resolveCleanup(build.workId, 2, []);
+  expect(records.cleanupOwnership(build.workId)).toHaveLength(1);
+  expect(() => records.resolveCleanup(build.workId, 3, ['unowned'])).toThrow();
+  records.resolveCleanup(build.workId, 3, ['old-build']);
+  expect(records.cleanupOwnership(build.workId)).toEqual([]);
+});

@@ -584,3 +584,13 @@ test('slice details follow live unknown and recovered progress while open', asyn
     if (progress === 'unknown') expect(text(chip)).toContain('?');
   }
 });
+
+test('deleted work thread offers the later recovery actions without Clear', async () => {
+  const id = 'I_sample05';
+  await mountPage({ ...sample, items: sample.items.map(i => i.id === id
+    ? { ...i, status: 'Review', needsYou: { reason: 'The latest work thread was deleted.', deletedThread: true,
+      offers: ['start-again', 'back-to-queue', 'back-to-list'] } } : i) });
+  await openItem(id);
+  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Start again', 'Back to Queue', 'Back to List']);
+  expect($$<HTMLButtonElement>('[data-needs-you-reason] button').every(button => button.disabled)).toBe(true);
+});

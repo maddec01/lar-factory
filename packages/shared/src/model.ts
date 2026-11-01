@@ -347,13 +347,13 @@ export interface Item {
    */
   paused?: string;
   /** Why its work record waits on the user, with what the board offers to do about it; absent when it doesn't wait. */
-  needsYou?: { reason: string; offers: NeedsYouOffer[] };
+  needsYou?: { reason: string; offers: NeedsYouOffer[]; deletedThread?: boolean };
   /** Set on work off the board in Archive: set aside, which Restore brings back, or finished and hidden by retention. */
   archived?: { setAside: boolean; hidden: boolean; ticketOpen: boolean };
 }
 
 /** What the board offers for work that needs you, besides clearing the reason once the user has checked. */
-export const NEEDS_YOU_OFFERS = ['reopen-pr', 'replace-pr', 'set-aside', 'reopen-work'] as const;
+export const NEEDS_YOU_OFFERS = ['reopen-pr', 'replace-pr', 'set-aside', 'reopen-work', 'start-again', 'back-to-queue', 'back-to-list'] as const;
 export type NeedsYouOffer = (typeof NEEDS_YOU_OFFERS)[number];
 
 /** `running` during a turn, `needs you` at a request, `stopped` after an interrupted or failed turn, else `done`. */

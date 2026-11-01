@@ -854,6 +854,9 @@ it('persists confirmed deletion and launched branch with revision checks', async
   records.setBuildBranch(build.workId, 3, 'feat/build');
   const reopened = await open(path);
   expect(reopened.read(build.workId).buildBranch).toBe('feat/build');
+  const feature = records.create({ title: 'Feature', repository: 'a/b', kind: 'feature' });
+  records.setBuildBranch(feature.workId, feature.revision, 'feat/ordinary-item');
+  expect(reopened.read(feature.workId).buildBranch).toBe('feat/ordinary-item');
   expect(reopened.threads(build.workId)[0]!.deletedAt).toEqual(expect.any(String));
 });
 

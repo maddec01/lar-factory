@@ -473,6 +473,9 @@ export function createItemCommands({ board, items, records, reread, archive, off
         if (answer === 'unknown') failures[id] = item.title;
         else delete failures[id];
         if (answer === 'deleted') {
+          if (records?.threads(id).some(thread => thread.threadId === threadId && !thread.deletedAt)) {
+            write(id, revision => records.confirmThreadDeleted(id, revision, threadId));
+          }
           deleted.add(threadId);
           const runs = runsOf[record];
           const run = runs.get(id);
@@ -560,10 +563,13 @@ export function createItemCommands({ board, items, records, reread, archive, off
         const snapshot = () => {
           if (records!.read(item.id).skills === null) write(item.id, (revision) => records!.snapshotSkills(item.id, revision, skillsOf(repo)));
         };
-        // Refreshing the Spec can change the title, so the thread is named from the record as it stands now.
+        // Refreshing the Spec can change the title, so use the current record.
         const current = board.find(item.id) ?? item;
         const message = buildMessage(current, larBuild(), factoryContext);
-        return launch(current, 'startedBuilds', repoProject.projectId, () => startIn(repoProject.projectId, message, choice, { base, branch }), snapshot);
+        return launch(current, 'startedBuilds', repoProject.projectId, () => startIn(repoProject.projectId, message, choice, { base, branch }), () => {
+          snapshot();
+          if (records) write(item.id, revision => records.setBuildBranch(item.id, revision, branch));
+        });
       };
     }),
 

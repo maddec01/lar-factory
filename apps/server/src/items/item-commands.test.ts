@@ -446,8 +446,10 @@ test('a recorded thread T3 confirms deleted releases Start, and one T3 cannot be
   const kept = await unavailable.commands.start(work.workId, undefined);
   assert.deepEqual([kept.status, (kept.body as { thread: { threadId: string } }).thread.threadId], [200, 'gone']);
   assert.deepEqual(unavailable.started, [], 'an unavailable thread may still run');
+  assert.equal(records.threads(work.workId)[0]!.deletedAt, null);
   const deleted = recordedCommands(records, { shown: () => [], lookup: async () => 'deleted' });
   await deleted.commands.reconcileStarts(deleted.board.snapshot().items);
+  assert.ok(records.threads(work.workId)[0]!.deletedAt);
   assert.equal((await deleted.commands.start(work.workId, undefined)).status, 200);
   assert.equal(deleted.started.length, 1);
 });

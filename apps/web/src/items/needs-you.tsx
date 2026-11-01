@@ -10,6 +10,7 @@ import { writeState } from './item-actions.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
 const LABELS: Record<NeedsYouOffer, string> = {
+  'start-again': 'Start again', 'back-to-queue': 'Back to Queue', 'back-to-list': 'Back to List',
   'reopen-pr': 'Reopen PR', 'replace-pr': 'Start a replacement build', 'set-aside': 'Set aside', 'reopen-work': 'Reopen the work',
 };
 
@@ -22,12 +23,12 @@ export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
       <p className="m-0 font-medium text-(--warning-foreground)">Needs you: {item.needsYou.reason}</p>
       <span className="flex flex-wrap gap-1.5">
         {item.needsYou.offers.map((offer) => (
-          <Button {...kind('other')} key={offer} {...state} aria-label={`${LABELS[offer]}: ${itemName(item)}`}
+          <Button {...kind('other')} key={offer} {...state} disabled={state.disabled || item.needsYou?.deletedThread} aria-label={`${LABELS[offer]}: ${itemName(item)}`}
             {...offer === 'set-aside' ? { 'data-abandon': item.id, onClick: () => askAbandon(item.id) }
               : { 'data-needs-you': item.id, onClick: () => void resolveNeedsYou(item.id, offer) }}>{LABELS[offer]}</Button>
         ))}
-        <Button {...kind('other')} {...state} data-needs-you={item.id} aria-label={`Clear Needs you on ${itemName(item)}`}
-          onClick={() => void resolveNeedsYou(item.id, 'clear')}>Clear</Button>
+        {!item.needsYou.deletedThread && <Button {...kind('other')} {...state} data-needs-you={item.id} aria-label={`Clear Needs you on ${itemName(item)}`}
+          onClick={() => void resolveNeedsYou(item.id, 'clear')}>Clear</Button>}
       </span>
     </div>
   );

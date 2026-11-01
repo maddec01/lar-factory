@@ -1,3 +1,4 @@
+import { deletedThreadNotice } from './items/deleted-thread-notice.ts';
 import { repositoryProjects, reauthorizeRepositoryProjects } from './t3/repository-project-discovery.ts';
 // The board server: reads each item source through `gh` or `az` at its own pace, every 15 s while it holds active work
 // and every 5 min while idle, refreshes T3's threads and stats every 2 s without either, keeps the last good copy in
@@ -311,6 +312,10 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     // A slice records its implementer thread, so a build is running while a thread runs for it or any slice.
     const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
     if (running(shown.threads) || item.slices.some((slice) => running(threads(slice.workId)))) lastRunning.set(item.id, now);
+    if (records) {
+      const notice = deletedThreadNotice(records, shown);
+      if (notice) shown.needsYou = notice;
+    }
     return shown;
   });
 }

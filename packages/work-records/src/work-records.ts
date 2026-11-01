@@ -971,8 +971,7 @@ function workRecords(database: Database): WorkRecords {
       if (!result.changes) throw invalid('The thread does not belong to this record.');
       return {};
     }),
-    setBuildBranch: (workId, revision, branch) => change(workId, revision, row => {
-      if (row.kind !== 'build') throw invalid('Only builds have a launched branch.');
+    setBuildBranch: (workId, revision, branch) => change(workId, revision, () => {
       db.prepare('UPDATE work_records SET build_branch = ? WHERE work_id = ?').run(checkFilled(branch, 'build branch'), workId);
       return {};
     }),

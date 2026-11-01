@@ -85,7 +85,7 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
     showThread, reopenPr: async (repo, number) => { log.push(`reopen ${repo}#${number}`); }, projectOf: async (repo) => ({ projectId: repo }), baseOf: async () => 'release', buildAccessOf: () => access,
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
-      bases.push(worktree?.base);
+      bases.push(worktree && 'base' in worktree ? worktree.base : undefined);
       log.push(`start ${project} ${message.split('\n')[1]}`);
       return { thread: { threadId: `thread-${branches.length}`, title: 't' }, error: null };
     } });

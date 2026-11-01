@@ -220,6 +220,20 @@ describe('work-record structure', () => {
     expect(records.children(build.workId).map((r) => r.workId)).toEqual([slice.workId]);
   });
 
+  it.each(['bug', 'feature', 'improvement', 'issue', 'build'] as const)('lets a %s own private slices without changing its kind', async (kind) => {
+    const records = await open();
+    const parent = lar(records, kind);
+    const slice = lar(records, 'slice');
+
+    records.setParent(slice.workId, slice.revision, parent.workId);
+    expect(records.read(parent.workId)).toMatchObject({ kind, revision: 2 });
+    expect(records.children(parent.workId)).toMatchObject([{ workId: slice.workId, kind: 'slice', parentId: parent.workId }]);
+    const before = records.list({});
+    expect(() => records.update(parent.workId, 2, { kind: 'decision' })).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(records.list({})).toEqual(before);
+    expect(records.update(parent.workId, 2, { kind: kind === 'bug' ? 'feature' : 'bug' }).kind).toBe(kind === 'bug' ? 'feature' : 'bug');
+  });
+
   it('refuses a parent whose kind does not own the child, or a second parent, and changes nothing', async () => {
     const records = await open();
     const concept = lar(records, 'concept');
@@ -242,7 +256,7 @@ describe('work-record structure', () => {
     const slice = lar(records, 'slice');
     records.setParent(slice.workId, 1, build.workId);
     expect(() => records.update(slice.workId, 2, { kind: 'decision' })).toThrow(expect.objectContaining({ code: 'invalid' }));
-    expect(() => records.update(build.workId, 2, { kind: 'feature' })).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(() => records.update(build.workId, 2, { kind: 'decision' })).toThrow(expect.objectContaining({ code: 'invalid' }));
   });
 
   it('clears a parent, bumping both records', async () => {

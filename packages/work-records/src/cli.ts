@@ -75,7 +75,8 @@ Structure
                                     This path omits briefs and decision answers.
                                     Queue order, Status, slices and progress stay local.
                                     Whole gated briefs use the separate Spec path.
-  A concept owns decisions and builds, and a build owns slices. A record has at
+  A concept owns decisions and builds. Buildable work owns slices, including
+  bugs, features, improvements and issues. A record has at
   most one parent. A blocker is a record the work waits on; a record can't block
   itself or close a cycle. Each change bumps the revision of both records.
   set-parent <work-id> --revision N --parent P

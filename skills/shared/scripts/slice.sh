@@ -2,9 +2,10 @@
 # Usage: slice.sh <parent> <title> <body-file> [--kind decision|build] [--blocked-by <work>]...
 # Creates a private work record under <parent> through lar-work and prints its work
 # ID. It creates no ticket, label, tag or comment. <parent> and each <work> are a
-# work ID or a picked ticket, as work.sh takes them. Under a build the record is a
-# slice; under a concept --kind names a decision or a build. The record takes the
-# parent's repository, the markdown in <body-file> as its brief (a decision's as its
+# work ID or a picked ticket, as work.sh takes them. Buildable work, including a
+# bug, feature, improvement or issue, gets a slice. Under a concept --kind names a
+# decision or a build. The record takes the parent's repository, the markdown in
+# <body-file> as its brief (a decision's as its
 # decision text), and a blocker edge to each --blocked-by record.
 # Once the record is made, it asks each running local board to read the parent, as
 # boards.sh says, so the new record shows on the parent's card.
@@ -36,7 +37,7 @@ fi
 parent=$(work_record "$parent_ref")
 parent_id=$(jq -r .workId <<<"$parent")
 case $(jq -r .kind <<<"$parent") in
-build)
+bug|feature|improvement|issue|build)
     if [[ -n $kind && $kind != slice ]]; then
         echo "slice.sh: a build owns only slices, so it takes no --kind $kind." >&2
         exit 1
@@ -48,7 +49,7 @@ concept)
         exit 1
     fi ;;
 *)
-    echo "slice.sh: $parent_ref is a $(jq -r .kind <<<"$parent"); only a build or a concept owns work." >&2
+    echo "slice.sh: $parent_ref is a $(jq -r .kind <<<"$parent"); only buildable work or a concept owns work." >&2
     exit 1 ;;
 esac
 # Resolve every blocker before writing, so an unpicked one leaves nothing made.

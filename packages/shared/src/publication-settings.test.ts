@@ -108,3 +108,31 @@ test('legacy settings load default preferences and private domain docs as off', 
   expect(effectiveIssueSettings(read()).createIssuesFromAddItem).toBe(false);
   expect(effectiveIssueSettings({ ...read(), repo: 'org/project/repo' }, { azureReadOnly: true })).toMatchObject({ createIssuesFromRetro: false, writeRefinedSpec: false, createReason: 'Azure DevOps is read-only in this test session.', specReason: 'Azure DevOps is read-only in this test session.' });
 });
+
+test('explicit label creation requires verified access and reuses existing labels', async () => {
+  const { saveVocabularyLabels } = await import('./publication-settings.ts');
+  const discovery = await discoverVocabulary('org/repo', available);
+  const created: string[] = [];
+  const create = async (_repo: string, name: string) => { created.push(name); return name; };
+  await expect(saveVocabularyLabels('org/repo', ['new'], discovery, {}, create)).rejects.toThrow();
+  expect(created).toEqual([]);
+  expect(await saveVocabularyLabels('org/repo', ['BACKEND', 'new'], discovery, { 'tag-ticket': 'allowed' }, create)).toEqual(['backend', 'new']);
+  expect(created).toEqual(['new']);
+});
+
+for (const repo of ['org/project/repo', 'VanEckEurope/VanEckDirect%20IApp/repo']) {
+  test(`${repo} blocks unsafe Azure creation before invoking the provider`, async () => {
+    const { saveVocabularyLabels } = await import('./publication-settings.ts');
+    const discovery = await discoverVocabulary(repo, available);
+    const previous = process.env.LAR_FACTORY_AZURE_READ_ONLY;
+    process.env.LAR_FACTORY_AZURE_READ_ONLY = '1';
+    let calls = 0;
+    try {
+      await expect(saveVocabularyLabels(repo, ['new'], discovery, { 'tag-ticket': 'allowed' }, async () => { calls++; return 'new'; })).rejects.toThrow();
+      expect(calls).toBe(0);
+    } finally {
+      if (previous === undefined) delete process.env.LAR_FACTORY_AZURE_READ_ONLY;
+      else process.env.LAR_FACTORY_AZURE_READ_ONLY = previous;
+    }
+  });
+}

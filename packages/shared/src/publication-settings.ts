@@ -86,3 +86,31 @@ export async function readPublicationSettings(repo: string, options: { dir?: str
 }
 
 export { readRepositorySetups, setOverride, setVocabularyOverride, validateRepositorySettings } from './repository-settings.ts';
+
+/** Creates only names explicitly submitted with Save, after access and Azure safety checks. */
+export async function saveVocabularyLabels(repo: string, names: unknown, discovery: VocabularyDiscovery, access: Partial<RepositorySetup['access']>, create = createVocabularyLabel): Promise<string[]> {
+  if (!Array.isArray(names) || names.some((name) => typeof name !== 'string' || !name.trim() || name.length > 100)) throw new Error('Enter nonempty new label names of at most 100 characters.');
+  if (!names.length) return [];
+  const { writeAccessProblem } = await import('./write-access.ts');
+  const problem = writeAccessProblem(repo, 'tag-ticket', access);
+  if (problem) throw new Error(problem);
+  if (discovery.labels.state !== 'available') throw new Error('Recheck label access before creating labels.');
+  const choices = [...discovery.labels.choices];
+  const resolved: string[] = [];
+  for (const raw of names as string[]) {
+    const name = raw.trim();
+    const existing = choices.find((choice) => choice.toLowerCase() === name.toLowerCase());
+    const saved = existing ?? await create(repo, name);
+    choices.push(saved);
+    resolved.push(saved);
+  }
+  return [...new Set(resolved)];
+}
+
+async function createVocabularyLabel(repo: string, name: string): Promise<string> {
+  if (onAzure(repo)) {
+    const [organization, project] = repo.split('/');
+    await jsonCommand('az', ['devops', 'invoke', '--area', 'wit', '--resource', 'tags', '--route-parameters', `project=${decodePart(project!)}`, `tagId=${name}`, '--http-method', 'PUT', '--api-version', '7.1', '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json']);
+  } else await jsonCommand('gh', ['api', '--method', 'POST', `repos/${repo}/labels`, '-f', `name=${name}`, '-f', 'color=ededed']);
+  return name;
+}

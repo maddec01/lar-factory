@@ -98,3 +98,15 @@ test('onboarding refuses missing terms and unverified field access before persis
     expect(readRepositoryList(dir)).toEqual([]);
   }
 });
+
+test('explicit labels save with sharing off and failed creation saves no mapping', async (t) => {
+  const dir = await folder(t);
+  const calls: string[] = [];
+  const reads: SaveReads = { ...allowed, vocabulary: { github: async (path) => path.includes('/labels') ? [] : { owner: { type: 'User' } }, azure: async () => ({ value: [] }) }, createLabel: async (_repo, name) => { calls.push(name); return name; } };
+  expect(await saveSetup({ ...answers, structureSync: false, newLabels: { bug: ['triage'] } }, dir, reads)).toEqual({ onboarding: [] });
+  expect(calls).toEqual(['triage']);
+  expect(readRepositorySetups(dir)[0]?.vocabulary.bug.labels).toEqual(['triage']);
+  const failed = await saveSetup({ ...answers, structureSync: false, newLabels: { bug: ['broken'] } }, dir, { ...reads, createLabel: async () => { throw new Error('Provider denied creation; recheck label access.'); } });
+  expect(failed).toMatchObject({ status: 409, error: expect.stringContaining('recheck label access') });
+  expect(readRepositorySetups(dir)[0]?.vocabulary.bug.labels).toEqual(['triage']);
+});

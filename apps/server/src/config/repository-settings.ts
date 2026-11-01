@@ -1,4 +1,4 @@
-import { discoverVocabulary, type VocabularyReads } from '@lar-factory/shared/publication-settings';
+import { discoverVocabulary, saveVocabularyLabels, type VocabularyReads } from '@lar-factory/shared/publication-settings';
 import { isVocabularyMapping, vocabularySelectionProblem, VOCABULARY_KEYS, type VocabularyKey, type VocabularySettingsResponse } from '@lar-factory/shared/vocabulary';
 import { setVocabularyOverride } from '@lar-factory/shared/repository-settings';
 import { SHARED_SETTINGS, structureSyncOperations, writeAccessProblem, sameRepo, type RepositorySetup, type RepositoryConfigProblem, type SharedSetting, type SharedRepositorySettings } from '@lar-factory/shared';
@@ -10,7 +10,7 @@ import { notEditable, type Refused } from './editable-repository.ts';
 import { isRepo, onTheBoard, type OnboardedRepository, type RepositoryConfig } from './repository-config.ts';
 
 /** Changes local values or reads the signed-in account's access again. */
-export async function changeRepositorySettings(input: Record<string, unknown>, dir = boardDataDir(), reads?: VocabularyReads): Promise<VocabularySettingsResponse | Refused> {
+export async function changeRepositorySettings(input: Record<string, unknown>, dir = boardDataDir(), reads?: VocabularyReads, create?: (repo: string, name: string) => Promise<string>): Promise<VocabularySettingsResponse | Refused> {
   const { repo, change, key, value } = input;
   if (!isRepo(repo) || !['override', 'recheck', 'structure-sync', 'vocabulary', 'discover-vocabulary'].includes(change as string)) {
     return { status: 400, error: 'Send the repository and the change to its settings.' };
@@ -31,7 +31,8 @@ export async function changeRepositorySettings(input: Record<string, unknown>, d
         const problem = writeAccessProblem(repo, operation, setup.access);
         if (problem) throw new Error(problem);
       }
-      setVocabularyOverride(repo, key as VocabularyKey, term, dir);
+      const labels = await saveVocabularyLabels(repo, input.newLabels ?? [], discovery, setup.access, create);
+      setVocabularyOverride(repo, key as VocabularyKey, { ...term, labels: [...new Set([...term.labels, ...labels])] }, dir);
     }
     else if (change === 'recheck') replaceAccess(repo, await detectAccess(repo), dir);
     else if (change === 'structure-sync') {

@@ -217,3 +217,35 @@ test('local retry failure preserves the explanation after tracker closure', asyn
   expect($('#abandon-dialog')).not.toBeNull();
   expect(text($('#abandon-dialog [role="alert"]'))).toContain('ticket is closed');
 });
+
+test.each([false, true])('deleted-thread move inspects cleanup and cleans only after success %s', async success => {
+  const data = structuredClone(sample);
+  const item = data.items[0]!;
+  item.status = 'In progress';
+  item.passingBrief = false;
+  item.needsYou = { reason: 'Thread deleted', deletedThread: true, deletedThreadPurpose: 'build', offers: ['back-to-list'] };
+  await mountPage(data);
+  await openItem(item.id);
+  holdPosts();
+  await press(button('needs-you', item.id));
+  expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
+  await answer({ token: 'saved', plans: [{ branch: 'slice/old', localAvailable: true, remoteAvailable: true, dirtyFiles: ['draft.txt'], unpushedCommits: [] }] });
+  const inputs = $$<HTMLInputElement>('[data-needs-you-reason] input');
+  expect(inputs.map(input => input.checked)).toEqual([false, false]);
+  if (success) await press(inputs[0]!);
+  await press($$<HTMLButtonElement>('[data-needs-you-reason] button').find(el => text(el) === 'Proceed')!);
+  if (success) {
+    expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
+    expect(text($('[data-needs-you-reason]'))).toContain('draft.txt');
+    await press($$<HTMLButtonElement>('[data-needs-you-reason] button').find(el => text(el) === 'Confirm loss and proceed')!);
+  }
+  expect(posted().at(-1)?.[0]).toBe('/api/needs-you');
+  await answer(success ? { error: null, board: data } : { error: 'Move refused' }, success ? 200 : 409);
+  expect(posted().some(call => call[0] === '/api/execute-owned-cleanup')).toBe(success);
+  if (success) {
+    expect(posted().at(-1)?.[1]).toEqual({ itemId: item.id, options: { token: 'saved', local: true, remote: false, confirmedLoss: true } });
+    await answer({ errors: ['Remote refused'], remainingBranches: ['slice/old'] });
+    expect(text($('[data-needs-you-reason]'))).toContain('Remote refused');
+    expect(text($('[data-needs-you-reason]'))).toContain('slice/old');
+  }
+});

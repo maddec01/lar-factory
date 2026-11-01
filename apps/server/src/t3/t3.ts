@@ -1,3 +1,4 @@
+import { launchExistingWorktree, type ExistingWorktree } from './existing-worktree.ts';
 // Starts T3 Code threads, and adds onboarding's new T3 projects, through the local `t3` CLI.
 
 import { isRecord, type ModelChoice, type StartedThread, type StartResult } from '@lar-factory/shared';
@@ -19,7 +20,8 @@ export interface NewWorktree {
  * `worktree`, `--worktree <base> --branch <branch>` runs the thread in a new worktree
  * instead of the project's folder.
  */
-export async function startThread(project: string, message: string, choice?: ModelChoice, worktree?: NewWorktree, run: T3Run = runT3): Promise<StartResult> {
+export async function startThread(project: string, message: string, choice?: ModelChoice, worktree?: NewWorktree | ExistingWorktree, run: T3Run = runT3): Promise<StartResult> {
+  if (worktree && 'type' in worktree) return launchExistingWorktree(project, message, choice, worktree);
   const model = choice ? ['--provider', choice.instanceId, '--model', choice.model] : [];
   const where = worktree ? ['--worktree', worktree.base, '--branch', worktree.branch] : [];
   const missing = `${missingTool('t3')}. Install the T3 Code CLI or set T3_PATH.`;

@@ -1,3 +1,5 @@
+import { discoverVocabulary } from '@lar-factory/shared/publication-settings';
+import { suggestVocabularyLabels } from '@lar-factory/shared/vocabulary';
 // The board's HTTP side: serves the page and the board data on this machine only,
 // streams changes over /api/events, and routes the page's writes to the item commands.
 
@@ -275,6 +277,15 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         board.update({ onboarding: kept.onboarding });
         board.push();
         return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+    '/api/onboarding/vocabulary': {
+      what: 'the repository vocabulary to discover', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        try {
+          const discovery = await discoverVocabulary(input.repo as string);
+          return { status: 200, body: { discovery, suggestions: suggestVocabularyLabels(discovery.labels) } };
+        } catch (err) { return { status: 400, body: { error: (err as Error).message } }; }
       },
     },
     '/api/onboarding/detect': {

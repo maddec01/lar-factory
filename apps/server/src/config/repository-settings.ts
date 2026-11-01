@@ -1,5 +1,5 @@
 import { discoverVocabulary, type VocabularyReads } from '@lar-factory/shared/publication-settings';
-import { isVocabularyMapping, VOCABULARY_KEYS, type VocabularyKey, type VocabularySettingsResponse } from '@lar-factory/shared/vocabulary';
+import { isVocabularyMapping, vocabularySelectionProblem, VOCABULARY_KEYS, type VocabularyKey, type VocabularySettingsResponse } from '@lar-factory/shared/vocabulary';
 import { setVocabularyOverride } from '@lar-factory/shared/repository-settings';
 import { SHARED_SETTINGS, structureSyncOperations, writeAccessProblem, sameRepo, type RepositorySetup, type RepositoryConfigProblem, type SharedSetting, type SharedRepositorySettings } from '@lar-factory/shared';
 import { detectAccess } from '../onboarding/detect-setup.ts';
@@ -24,8 +24,8 @@ export async function changeRepositorySettings(input: Record<string, unknown>, d
       if (!VOCABULARY_KEYS.includes(key as VocabularyKey) || !isVocabularyMapping({ [key as string]: value })) throw new Error('Choose a vocabulary kind and its existing type and labels, or none.');
       const discovery = await discoverVocabulary(repo, reads);
       const term = (value as { type: string | null; labels: string[] });
-      if (term.type !== null && (discovery.types.state !== 'available' || !discovery.types.choices.includes(term.type))) throw new Error('Choose an existing issue type or none.');
-      if (term.labels.some((label) => discovery.labels.state !== 'available' || !discovery.labels.choices.includes(label))) throw new Error('Choose existing labels or none.');
+      const problem = vocabularySelectionProblem(term, discovery);
+      if (problem) throw new Error(problem);
       const setup = readRepositorySetups(dir).find((s) => sameRepo(s.repo, repo))!;
       for (const operation of [...(term.type === null ? [] : ['type-ticket' as const]), ...(term.labels.length ? ['tag-ticket' as const] : [])]) {
         const problem = writeAccessProblem(repo, operation, setup.access);

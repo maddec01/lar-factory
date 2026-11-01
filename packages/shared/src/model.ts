@@ -990,6 +990,7 @@ export interface OnboardingAnswers {
 
 /** The onboarding wizard's answers, each one absent while its detected default stands. */
 export interface OnboardingChoices {
+  vocabulary?: VocabularyMapping;
   structureSync?: boolean;
   itemSource?: RepositoryItemSource;
   role?: string;
@@ -1060,6 +1061,7 @@ export interface SetupDetection {
 
 /** Onboarding's answers, which become the repository's local settings. */
 export interface LocalSetupAnswers {
+  vocabulary?: VocabularyMapping;
   structureSync?: boolean;
   projectId: string;
   role: string;

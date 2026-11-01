@@ -72,3 +72,29 @@ test('onboarding needs no consent payload and persists no consent list', async (
   expect(await saveSetup(input, dir, allowed)).toEqual({ onboarding: [] });
   expect(await readFile(join(dir, 'repository-settings.json'), 'utf8')).not.toContain('consent');
 });
+
+ test('onboarding refuses malformed vocabulary before saving', async (t) => {
+  const dir = await folder(t);
+  expect(await saveSetup({ ...answers, vocabulary: { bug: { type: null, labels: [42] } } }, dir, allowed)).toMatchObject({ status: 400 });
+  expect(readRepositoryList(dir)).toEqual([]);
+});
+
+const vocabularyReads = {
+  github: async (path: string) => path.endsWith('/labels?per_page=100') ? [[{ name: 'bug' }]] : [{ owner: { type: 'User' } }],
+  azure: async () => ({ value: [{ name: 'Bug' }] }),
+};
+test('onboarding saves existing vocabulary and explicit none using read-only discovery', async (t) => {
+  const dir = await folder(t);
+  const vocabulary = { bug: { type: null, labels: ['bug'] }, feature: { type: null, labels: [] } };
+  expect(await saveSetup({ ...answers, vocabulary }, dir, { ...allowed, vocabulary: vocabularyReads })).toEqual({ onboarding: [] });
+  expect(readRepositorySetups(dir)[0]?.vocabulary.bug).toEqual(vocabulary.bug);
+  expect(readRepositorySetups(dir)[0]?.vocabularySources.feature).toBe('local');
+});
+test('onboarding refuses missing terms and unverified field access before persistence', async (t) => {
+  for (const labels of [['missing'], ['bug']]) {
+    const dir = await folder(t);
+    expect(await saveSetup({ ...answers, structureSync: false, vocabulary: { bug: { type: null, labels } } }, dir,
+      { access: async () => ({}), vocabulary: vocabularyReads })).toMatchObject({ status: labels[0] === 'missing' ? 400 : 403 });
+    expect(readRepositoryList(dir)).toEqual([]);
+  }
+});

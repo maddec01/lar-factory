@@ -85,3 +85,10 @@ export interface VocabularySettingsResponse {
   setup: RepositorySetup;
   discovery?: VocabularyDiscovery;
 }
+
+/** Checks selected terms against the same read-only discovery used for suggestions. */
+export function vocabularySelectionProblem(term: VocabularyTerm, discovery: VocabularyDiscovery): string | null {
+  if (term.type !== null && (discovery.types.state !== 'available' || !discovery.types.choices.includes(term.type))) return 'Choose an existing issue type or none.';
+  if (term.labels.some((label) => discovery.labels.state !== 'available' || !discovery.labels.choices.includes(label))) return 'Choose existing labels or none.';
+  return null;
+}

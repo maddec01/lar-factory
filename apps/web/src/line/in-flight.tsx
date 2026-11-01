@@ -93,16 +93,22 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
   );
 }
 
-/** `items` are the line's items in the main area's scope; those a dossier shows are left out. */
-export function InFlight({ items }: { items: Item[] }) {
-  const { data, now } = useBoardStore();
+/** The items with a row here, furthest along first, whatever a filter hides: none a dossier or Your desk shows. */
+export function flightRows(items: Item[], data: BoardData, now: number): Item[] {
   const shown = inDossiers(dossiersOf(items, data.items));
   const deskIds = new Set(boardSections({ ...data, items }, now).needsYou.map((item) => item.id));
-  const rows = items.filter((i) => stageOf(i.status) >= 0 && i.status !== 'Done' && !shown.has(i.id) && !deskIds.has(i.id)).sort((a, b) => stageOf(b.status) - stageOf(a.status));
+  return items.filter((i) => stageOf(i.status) >= 0 && i.status !== 'Done' && !shown.has(i.id) && !deskIds.has(i.id)).sort((a, b) => stageOf(b.status) - stageOf(a.status));
+}
+
+/** `items` are the line's items in the main area's scope, `shows` says which rows the filters leave. */
+export function InFlight({ items, shows }: { items: Item[]; shows: (item: Item) => boolean }) {
+  const { data, now } = useBoardStore();
+  const all = flightRows(items, data, now);
+  const rows = all.filter(shows);
   return (
     <div className="overflow-hidden rounded-xl border border-(--border) bg-(--card)" data-in-flight>
       <div className="border-b border-(--border) px-3 py-1.5 text-[11px] font-medium text-(--muted-foreground)" data-in-flight-title>Everything else in flight · {rows.length}</div>
-      {rows.length ? rows.map((i) => <FlightRow key={i.id} item={i} data={data} />) : <p className="m-0 p-6 text-center text-(--muted-foreground)">Nothing else in flight.</p>}
+      {rows.length ? rows.map((i) => <FlightRow key={i.id} item={i} data={data} />) : <p className="m-0 p-6 text-center text-(--muted-foreground)">{all.length ? 'Nothing in flight matches.' : 'Nothing else in flight.'}</p>}
     </div>
   );
 }

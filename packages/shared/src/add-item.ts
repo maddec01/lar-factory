@@ -54,12 +54,14 @@ export interface CreationResult {
   error: string | null;
 }
 
-export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft {
+export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft;
+export function validateDraft<K extends string>(input: unknown, repos: RepoConfig[], kinds: readonly K[]): Omit<ItemDraft, 'kind'> & { kind: K };
+export function validateDraft(input: unknown, repos: RepoConfig[], kinds: readonly string[] = ITEM_KINDS): Omit<ItemDraft, 'kind'> & { kind: string } {
   if (!input || typeof input !== 'object') throw new Error('Enter the item details.');
   const value = input as Record<string, unknown>;
   const repo = repos.find((r) => r.repo === value.repo);
   if (!repo) throw new Error('Choose a configured repository.');
-  if (!ITEM_KINDS.includes(value.kind as ItemDraft['kind'])) throw new Error('Choose bug, feature or improvement.');
+  if (!kinds.includes(value.kind as string)) throw new Error(kinds === ITEM_KINDS ? 'Choose bug, feature or improvement.' : 'Choose a valid work kind.');
   if (typeof value.title !== 'string' || !value.title.trim() || /[\r\n]/.test(value.title) || value.title.length > 256) {
     throw new Error('Enter a nonblank title of at most 256 characters.');
   }
@@ -77,5 +79,5 @@ export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft {
     if (raw.milestone && !/^[1-9]\d*$/.test(String(raw.milestone))) throw new Error('Choose a valid milestone.');
     options = raw as TicketOptions;
   }
-  return { ...(value.createIssue === undefined ? {} : { createIssue: value.createIssue }), ...(options === undefined ? {} : { options }), repo: repo.repo, kind: value.kind as ItemDraft['kind'], title: value.title.trim(), description: value.description };
+  return { ...(value.createIssue === undefined ? {} : { createIssue: value.createIssue }), ...(options === undefined ? {} : { options }), repo: repo.repo, kind: value.kind as string, title: value.title.trim(), description: value.description };
 }

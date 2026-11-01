@@ -97,6 +97,7 @@ listen() {
 }
 # status.sh and lar-work read board records and the database from this home, never the real one.
 export HOME="$bin/home"
+export LAR_FACTORY_DATA_DIR="$HOME/Library/Application Support/Lar Factory"
 records="$HOME/Library/Application Support/Lar Factory/boards"
 record() { mkdir -p "$records"; printf '{"port":%s}' "$2" >"$records/$1.json"; }
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }

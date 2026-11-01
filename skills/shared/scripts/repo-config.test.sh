@@ -14,7 +14,8 @@ exit 99
 FAKE
     chmod +x "$fixture/bin/$tool"
 done
-data="$HOME/Library/Application Support/Lar Factory"
+export LAR_FACTORY_DATA_DIR="$HOME/Library/Application Support/Lar Factory"
+data="$LAR_FACTORY_DATA_DIR"
 mkdir -p "$data"
 list_file="$data/repository-settings.json"
 failures=0
@@ -39,7 +40,7 @@ refuses() {
         failures=$((failures + 1))
     fi
 }
-defaults='{"version":1,"role":"","itemSource":{"kind":"issues"},"labels":[],"domainDocs":{"kind":"private"},"skills":[],"structureSync":true}'
+defaults='{"version":1,"role":"","itemSource":{"kind":"issues"},"labels":[],"domainDocs":{"kind":"off"},"skills":[],"structureSync":true}'
 run --list
 check 'missing local file has an empty list' '[]'
 run team/app
@@ -92,6 +93,11 @@ for settings in '[]' '{"overrides":[]}' '{"structureSync":"yes"}' '{"structureSy
     printf '{"repositories":[{"repo":"team/app","settings":%s}]}' "$settings" >"$list_file"
     run team/app
     refuses 'invalid local settings fail before output' "$list_file: team/app:"
+done
+for mode in off private; do
+    printf '{"repositories":[{"repo":"team/app","settings":{"overrides":{"domainDocs":{"kind":"%s"}}}}]}' "$mode" >"$list_file"
+    run team/app
+    check "$mode domain docs normalizes to off" "$defaults"
 done
 run 'team/..'
 refuses 'invalid argument fails without a provider call' 'usage:'

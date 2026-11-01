@@ -1,10 +1,13 @@
 // A searchable checklist of labels. It holds only its search text: the caller gives the choices, what is picked and
-// what a toggle does, so it reads and writes whichever way its surface needs.
+// what a toggle does, so it reads and writes whichever way its surface needs. A surface can also let a typed name in.
 
 import { useState } from 'react';
 import { sameLabel } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
+import { Plus } from 'lucide-react';
+import { kind } from '../buttons/button-kinds.tsx';
 
 export interface LabelChoice {
   name: string;
@@ -13,7 +16,20 @@ export interface LabelChoice {
   description?: string | undefined;
 }
 
-export function LabelPicker({ heading, choices, picked, onToggle, locked = [], busy = false }: {
+/** Lets a typed name no choice has become a new label. */
+interface LabelCreation {
+  /** What the tracker calls a label, in a sentence. */
+  noun: string;
+  /** Why this person can't add new labels at all, or null when they can. */
+  refused: string | null;
+  /** Why this name can't be a label, or null when it can. */
+  problem: (name: string) => string | null;
+  /** What adding one does. */
+  note: string;
+  onCreate: (name: string) => void;
+}
+
+export function LabelPicker({ heading, choices, picked, onToggle, locked = [], busy = false, create }: {
   /** What the tracker calls its labels. */
   heading: string;
   choices: readonly LabelChoice[];
@@ -22,12 +38,26 @@ export function LabelPicker({ heading, choices, picked, onToggle, locked = [], b
   /** Choices shown ticked or not but not changeable here, as the kind sets them. */
   locked?: readonly string[];
   busy?: boolean;
+  create?: LabelCreation;
 }) {
   const [query, setQuery] = useState('');
-  const hits = choices.filter(({ name }) => name.toLowerCase().includes(query.trim().toLowerCase()));
+  const typed = query.trim();
+  const hits = choices.filter(({ name }) => name.toLowerCase().includes(typed.toLowerCase()));
+  const fresh = !!create && !!typed && !choices.some(({ name }) => sameLabel(name, typed));
+  const refusal = fresh ? create.refused ?? create.problem(typed) : null;
+  const add = () => {
+    create?.onCreate(typed);
+    setQuery('');
+  };
   return (
     <div className="grid w-72 gap-2" data-label-picker aria-busy={busy}>
-      <Input autoFocus placeholder={`Filter ${heading.toLowerCase()}`} aria-label={`Filter ${heading.toLowerCase()}`} value={query} onChange={(e) => setQuery(e.target.value)} />
+      <Input autoFocus placeholder={create && !create.refused ? `Filter or type a new ${create.noun}` : `Filter ${heading.toLowerCase()}`} aria-label={`Filter ${heading.toLowerCase()}`}
+        value={query} onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          if (fresh && !refusal) add();
+        }} />
       <div className="grid max-h-56 gap-0.5 overflow-y-auto">
         {hits.map(({ name, color, description }) => {
           const fixed = locked.some((label) => sameLabel(label, name));
@@ -42,8 +72,11 @@ export function LabelPicker({ heading, choices, picked, onToggle, locked = [], b
             </label>
           );
         })}
-        {!hits.length && <p className="m-0 p-1.5 text-[11px] text-(--muted-foreground)">No match.</p>}
+        {!hits.length && !fresh && <p className="m-0 p-1.5 text-[11px] text-(--muted-foreground)">No match.</p>}
       </div>
+      {fresh && !refusal && <Button {...kind('other')} className="justify-self-start" leftIcon={<Plus />} onClick={add}>Create "{typed}"</Button>}
+      {refusal && <p role="alert" className="m-0 text-[11px] text-(--muted-foreground)">{refusal}</p>}
+      {create && !create.refused && <p className="m-0 text-[11px] text-(--muted-foreground)">{create.note}</p>}
     </div>
   );
 }

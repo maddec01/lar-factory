@@ -1,7 +1,7 @@
 // Add item captures a draft locally or creates its tracker ticket, and can find existing tickets.
 import { useEffect, useRef, useState } from 'react';
-import { Bug, Sparkles, SquarePen, TrendingUp } from 'lucide-react';
-import type { FormEvent, ReactNode } from 'react';
+import { SquarePen } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { ITEM_KINDS, noneOnboarded, repoName } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
@@ -10,41 +10,28 @@ import { FormSelect } from '@lar-factory/ui/form-select';
 import { FormResult } from '../notices/form-result.tsx';
 import { useAddItemStore } from './add-item-store.ts';
 import type { AddItemPane, DraftValues } from './add-item-store.ts';
-import { IssueFields, ticketOptions } from './issue-fields.tsx';
+import { CreateIssueBox, IssueFields, PanelSection, ticketOptions } from './issue-fields.tsx';
 import { TicketPicker } from './ticket-picker.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';
 import { EXPANDED, ExpandButton, useExpand } from '../expand-dialog/expand-dialog.tsx';
-import { KIND_NAMES } from '../repositories/vocabulary-editor.tsx';
+import { KIND_BADGES } from '../items/item-parts.tsx';
 
-const SMALL_HEADING = 'm-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)';
 const HINT = 'm-0 text-xs leading-snug text-(--muted-foreground)';
-const KIND_ICONS = {
-  bug: <Bug style={{ color: 'oklch(0.62 0.15 25)' }} />,
-  feature: <Sparkles style={{ color: 'oklch(0.62 0.15 150)' }} />,
-  improvement: <TrendingUp style={{ color: 'oklch(0.62 0.15 245)' }} />,
-};
-const KIND_CHOICES = ITEM_KINDS.map((kind) => ({ value: kind, name: KIND_NAMES[kind], icon: KIND_ICONS[kind] }));
+const KIND_CHOICES = ITEM_KINDS.map((value) => {
+  const { name, icon: Icon, hue } = KIND_BADGES[value]!;
+  return { value, name, icon: <Icon style={{ color: `oklch(0.62 0.15 ${hue})` }} /> };
+});
 
-/** A side panel section under a small uppercase heading, which labels the field `htmlFor` names. */
-function PanelSection({ heading, htmlFor, children }: { heading: string; htmlFor: string; children: ReactNode }) {
-  return (
-    <div className="grid gap-1.5">
-      <label htmlFor={htmlFor} className={SMALL_HEADING}>{heading}</label>
-      {children}
-    </div>
-  );
-}
-
-/** The form's values and the editor's `description`, for the store to keep. */
-function valuesOf(form: HTMLFormElement, description: string): DraftValues {
+/** The form's values, the editor's `description` and the Create issue `createChoice`, for the store to keep. */
+function valuesOf(form: HTMLFormElement, description: string, createChoice: boolean | null): DraftValues {
   const values = new FormData(form);
   const value = (name: string) => String(values.get(name) ?? '');
   const createIssue = values.has('createIssue');
   const options = createIssue ? ticketOptions(form) : undefined;
-  return { repo: value('repo'), kind: value('kind'), title: value('title'), description, createIssue, ...(options ? { options } : {}) };
+  return { repo: value('repo'), kind: value('kind'), title: value('title'), description, createIssue, ...(options ? { options } : {}), ...(createChoice === null ? {} : { createChoice }) };
 }
 
 /** The repository select both panes start with, and the hint when none is onboarded. */
@@ -65,6 +52,7 @@ function AddItemForm() {
   const [kept] = useState(() => useAddItemStore.getState().values);
   const [repo, setRepo] = useState(kept?.repo ?? data.repos[0]?.repo ?? '');
   const [itemKind, setKind] = useState(kept?.kind ?? '');
+  const [createChoice, setCreateChoice] = useState(kept?.createChoice ?? null);
   const selected = data.repos.find(r => r.repo === repo) ?? data.repos[0];
   const form = useRef<HTMLFormElement>(null);
   const kindSelect = useRef<HTMLButtonElement>(null);
@@ -72,7 +60,9 @@ function AddItemForm() {
   const description = useRef(kept?.description ?? '');
   const { phase } = submission;
   const locked = phase !== 'editing';
-  const keepForm = () => keep(valuesOf(form.current!, description.current));
+  const keepForm = () => keep(valuesOf(form.current!, description.current, createChoice));
+  // The checkbox's input event comes before this render, so the choice is kept once it has rendered.
+  useEffect(() => { if (createChoice !== null) keepForm(); }, [createChoice]);
   // An edit in the editor counts as one in the form.
   const onDescription = (markdown: string) => {
     description.current = markdown;
@@ -83,7 +73,7 @@ function AddItemForm() {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
-    void submit(valuesOf(form, description.current)).then(() => {
+    void submit(valuesOf(form, description.current, createChoice)).then(() => {
       if (useAddItemStore.getState().submission.phase === 'editing' && form.isConnected && form.reportValidity() && !itemKind) kindSelect.current?.focus();
     });
   };
@@ -99,6 +89,7 @@ function AddItemForm() {
               className="w-full shrink-0 border-0 bg-transparent p-0 text-xl font-semibold tracking-tight text-base-content outline-none placeholder:font-medium placeholder:text-(--muted-foreground)" />
             <DescriptionEditor label="Description" placeholder="Add a description… - for a list, 1. for steps, # for a heading"
               value={kept?.description ?? ''} onChange={onDescription} disabled={locked} fill="wide" />
+            <p className={`${HINT} shrink-0`}>Formats as you type · saved as Markdown</p>
             <FormResult id="item-result" text={message} />
           </div>
           <aside aria-label="Details" className="grid content-start gap-5 overflow-y-auto border-l border-base-300 bg-base-50/60 px-4 py-4 @max-[40rem]:overflow-visible @max-[40rem]:border-l-0 @max-[40rem]:border-t">
@@ -108,16 +99,16 @@ function AddItemForm() {
             <PanelSection heading="Kind" htmlFor="item-kind">
               <FormSelect ref={kindSelect} id="item-kind" name="kind" placeholder="Choose a kind" value={itemKind} onChange={setKind} choices={KIND_CHOICES} />
             </PanelSection>
-            {selected && <IssueFields key={selected.repo} repo={selected} kind={itemKind} kept={kept?.repo === selected.repo ? kept : null} />}
+            {selected && <IssueFields key={selected.repo} repo={selected} kind={itemKind} kept={kept?.repo === selected.repo ? kept : null} choice={createChoice} />}
           </aside>
         </Fieldset>
       </div>
-      <Modal.Footer leading={<span className="text-xs text-(--muted-foreground)">Formats as you type · saved as Markdown</span>}>
+      <Modal.Footer leading={selected && <CreateIssueBox repo={selected} choice={createChoice} onChoice={setCreateChoice} disabled={locked} />}>
         <Button {...kind('other')} id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>New item</Button>
         <Button {...kind('other')} onClick={() => setOpen(false)}>Cancel</Button>
         <Button {...kind('main')} type="submit" id="item-submit"
           disabled={phase === 'pending' || phase === 'uncertain' || data.capture?.enabled === false || !data.repos.length}>
-          {phase === 'pending' ? 'Adding…' : phase === 'retry' ? 'Retry this submission' : 'Add to List'}
+          {phase === 'pending' ? 'Adding…' : phase === 'retry' ? 'Retry this submission' : 'Add item'}
         </Button>
       </Modal.Footer>
     </Modal.Form>

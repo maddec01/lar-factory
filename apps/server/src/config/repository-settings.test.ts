@@ -59,3 +59,14 @@ test('vocabulary rejects malformed mappings before provider reads', async (t) =>
   }
   expect(readRepositorySetups(dir)[0]?.vocabulary.bug).toEqual({ type: null, labels: [] });
 });
+
+test('vocabulary discovery reads existing terms and saving requires field access', async (t) => {
+  const dir = await folder(t);
+  saveOnboarded('team/app', null, dir);
+  const reads = { github: async (path: string) => path === 'repos/team/app' ? { owner: { type: 'Organization' } } : [[{ name: 'bug' }]], azure: async () => { throw new Error('Unexpected Azure read'); } };
+  const before = await readFile(join(dir, 'repository-settings.json'), 'utf8');
+  expect(await changeRepositorySettings({ repo: 'team/app', change: 'discover-vocabulary' }, dir, reads)).toMatchObject({ discovery: { labels: { state: 'available', choices: ['bug'] } } });
+  expect(await readFile(join(dir, 'repository-settings.json'), 'utf8')).toBe(before);
+  expect(await changeRepositorySettings({ repo: 'team/app', change: 'vocabulary', key: 'bug', value: { type: null, labels: ['bug'] } }, dir, reads)).toMatchObject({ status: 400 });
+  expect(await changeRepositorySettings({ repo: 'team/app', change: 'vocabulary', key: 'bug', value: { type: null, labels: [] } }, dir, reads)).toMatchObject({ setup: { vocabularySources: { bug: 'local' } } });
+});

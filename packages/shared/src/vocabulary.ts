@@ -66,3 +66,13 @@ export function publicationSettingsSnapshot(setup: RepositorySetup): string {
   return JSON.stringify({ repository: setup.repo, itemSource: setup.itemSource,
     vocabulary: VOCABULARY_KEYS.map((key) => [key, setup.vocabulary[key]]) });
 }
+
+/** Settings can discover existing terms or save a complete explicit mapping. */
+export type VocabularySettingsRequest =
+  | { repo: string; change: 'discover-vocabulary' }
+  | { repo: string; change: 'vocabulary'; key: VocabularyKey; value: VocabularyTerm };
+
+export interface VocabularySettingsResponse {
+  setup: RepositorySetup;
+  discovery?: VocabularyDiscovery;
+}

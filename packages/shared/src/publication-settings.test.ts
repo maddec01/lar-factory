@@ -79,3 +79,10 @@ test('Azure metadata uses the extension login and only a GET, including encoded 
   });
   expect(found).toEqual({ value: [{ name: 'backend' }] });
 });
+
+// Repository write defaults reject malformed values at the settings boundary.
+test('issue defaults require boolean values', async () => {
+  const { validateRepositorySettings } = await import('./repository-settings.ts');
+  expect(validateRepositorySettings({ createIssuesFromAddItem: 'yes' }, false)).toBe('field createIssuesFromAddItem must be a boolean');
+  expect(validateRepositorySettings({ createIssuesFromRetro: false, writeRefinedSpec: true }, false)).toBeNull();
+});

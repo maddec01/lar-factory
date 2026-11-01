@@ -898,6 +898,9 @@ export interface SharedRepositorySettings {
   /** The project skills the user selected as coding guidance for builds. */
   skills?: string[];
   vocabulary?: VocabularyMapping;
+  createIssuesFromAddItem?: boolean;
+  createIssuesFromRetro?: boolean;
+  writeRefinedSpec?: boolean;
 }
 
 /** Settings editable on this machine. */

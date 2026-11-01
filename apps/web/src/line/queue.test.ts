@@ -43,18 +43,18 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(text(queue().querySelector('#queue-h'))).toBe('Queue 3');
   expect(rows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
   expect(text(row('I_sample05').querySelector('.queue-title'))).toBe(`#129 ${sample05.title}`);
-  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · improvement');
-  expect(text(row('I_sample21').querySelector('.queue-meta'))).toBe('lar-server · queued 24h ago · improvement');
+  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago');
+  expect(text(row('I_sample21').querySelector('.queue-meta'))).toBe('lar-server · queued 24h ago');
 
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['I_sample06']);
 });
 
-test("a row shows the item's kind label and its repository's custom labels, colons and all, without case, and hides every other label", async () => {
+test('a row shows every label, colons and all, except managed ones', async () => {
   const labelled = { ...sample05, labels: ['needs-triage', 'area: web', 'status-queued', 'Improvement', 'app: music', 'active', 'build', 'Area: Server', 'decision-grill'] };
   await mountPage({ ...sample, items: sample.items.map((i) => i.id === sample05.id ? labelled : i) });
-  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · area: web, Improvement, Area: Server');
+  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · needs-triage, area: web, app: music, active, Area: Server');
 });
 
 test("a dossier's parts are left out and show in the dossier; a Queued parent stays, and an item whose parent isn't on the board stays", async () => {

@@ -32,6 +32,17 @@ const KINDS = ['bug', 'feature', 'improvement', 'concept', 'decision', 'build', 
 const START = '<!-- lar-factory:structure';
 const BLOCK = /<!-- lar-factory:structure\s*\n([\s\S]*?)\n-->/g;
 export const STRUCTURE_LABEL = 'linked-work';
+/** The start of a decision's label, such as `decision-grill`. */
+export const DECISION_LABEL_PREFIX = 'decision-';
+/** The label and native type names that give a ticket each kind, the strongest kind first. */
+export const TRACKER_KIND_NAMES: readonly (readonly [Kind, readonly string[]])[] = [
+  ['concept', ['concept']],
+  ['decision', ['decision']],
+  ['bug', ['bug', 'defect']],
+  ['feature', ['feature', 'enhancement', 'user story', 'product backlog item']],
+  ['improvement', ['improvement']],
+  ['build', ['build']],
+];
 export const MAX_TRACKER_STRUCTURE = 262_144;
 const text = (value: unknown, limit = 16_384): value is string => typeof value === 'string' && value.length <= limit;
 
@@ -107,12 +118,8 @@ export function writeTrackerStructure(body: string, structure: TrackerStructure)
 /** Native issue types and ordinary labels work without factory labels or setup. */
 export function trackerKind(labels: readonly string[], nativeType?: string | null): Kind {
   const names = [...labels, nativeType ?? ''].map(name => name.toLowerCase());
-  if (names.includes('concept')) return 'concept';
-  if (names.some(name => name.startsWith('decision-')) || names.includes('decision')) return 'decision';
-  if (names.some(name => ['bug', 'defect'].includes(name))) return 'bug';
-  if (names.some(name => ['feature', 'enhancement', 'user story', 'product backlog item'].includes(name))) return 'feature';
-  if (names.includes('improvement')) return 'improvement';
-  return names.includes('build') ? 'build' : 'issue';
+  const found = TRACKER_KIND_NAMES.find(([kind, kindNames]) => names.some(name => kindNames.includes(name) || kind === 'decision' && name.startsWith(DECISION_LABEL_PREFIX)));
+  return found?.[0] ?? 'issue';
 }
 
 /** Keep factory transport bytes out of descriptions, editors and ordinary comment lists. */

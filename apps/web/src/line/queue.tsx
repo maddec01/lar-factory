@@ -5,7 +5,7 @@
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { isKindLabel, itemRepoNames, openBlockers, repoKey, sameRepo, startHold, shortAgo } from '@lar-factory/shared';
+import { itemRepoNames, openBlockers, repoKey, sameRepo, shownLabels, startHold, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -21,15 +21,6 @@ import { SourceIcon } from '../items/source-icon.tsx';
 import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
 
 const NONE_STARTS = 'Every queued item is blocked, needs a T3 project, waits for onboarding, or has a thread at work.';
-
-/**
- * The labels a row shows: the item's kind label and its repository's custom labels, in the item's order; GitHub
- * matches label names without case.
- */
-const shownLabels = (item: Item, data: BoardData) => {
-  const custom = new Set(data.repos.find((r) => sameRepo(r.repo, repoKey(item)))?.labels.map((l) => l.toLowerCase()));
-  return item.labels.filter((l) => isKindLabel(l) || custom.has(l.toLowerCase()));
-};
 
 /** Keeps a click on a row's controls from opening the item dialog. */
 const stop = (e: MouseEvent) => e.stopPropagation();
@@ -51,7 +42,7 @@ function RowAction({ item, data }: { item: Item; data: BoardData }) {
 function Row({ item, n, data, now, waits }: { item: Item; n: number; data: BoardData; now: number; waits: boolean }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   const repo = repoKey(item);
-  const labels = shownLabels(item, data);
+  const labels = shownLabels(item, data.repos.find((r) => sameRepo(r.repo, repo))?.setup?.vocabulary);
   return (
     <li data-item={item.id} onClick={() => useItemDialogStore.getState().open(item.id)}
       className={`flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 border-b border-(--border) px-3 py-2 last:border-b-0 hover:bg-(--accent) ${picked ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : ''}`}>

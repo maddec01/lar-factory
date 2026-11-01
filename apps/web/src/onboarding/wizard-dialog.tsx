@@ -18,6 +18,7 @@ import { useSettingsStore } from '../settings/settings-store.ts';
 const STEP_HELP: Record<StepId, string> = {
   project: 'Choose where agents will work.',
   work: 'Choose what to show and what builds may save.',
+  vocabulary: 'Optionally map kinds to labels and types.',
   access: 'Check the access the factory needs.',
 };
 
@@ -36,12 +37,13 @@ function Nav({ run }: { run: Run }) {
   if (finish.state === 'done') return <Button {...kind('main')} leftIcon={<Check />} onClick={() => { close(); useSettingsStore.getState().setOpen(false); }}>Go to the board</Button>;
   const steps = runSteps(run, detection);
   const at = steps.indexOf(run.step);
+  const savingLabels = Object.values(run.choices.newLabels ?? {}).some((names) => names?.some((name) => name.trim()));
   const ready = stepReady(run, projects, detection);
   return (
     <>
       {at > 0 && <Button {...kind('other')} disabled={finish.state === 'saving'} onClick={back}>Back</Button>}
       {at === steps.length - 1
-        ? <Button {...kind('main')} disabled={!ready} loading={finish.state === 'saving'} leftIcon={<Check />} onClick={() => void save()}>Add repository</Button>
+        ? <Button {...kind('main')} disabled={!ready} loading={finish.state === 'saving'} leftIcon={<Check />} onClick={() => void save()}>{savingLabels ? 'Save and add repository' : 'Add repository'}</Button>
         : <Button {...kind('main')} disabled={!ready} rightIcon={<ArrowRight />} onClick={() => void next()}>Next</Button>}
     </>
   );

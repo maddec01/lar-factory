@@ -1,6 +1,6 @@
 // Local repository settings, edited from Settings.
 import { create } from 'zustand';
-import { type RepositorySetup, type SharedRepositorySettings, type SharedSetting } from '@lar-factory/shared';
+import { type RepositorySetup, type SharedRepositorySettings, type SharedSetting, type VocabularyKey, type VocabularyTerm } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
 import type { IssueSetting } from './issue-defaults.tsx';
 
@@ -72,6 +72,7 @@ interface EditState {
   reset: (repo: string, key: DraftSetting) => Promise<void>;
   recheck: (repo: string) => Promise<void>;
   structureSync: (repo: string, on: boolean) => Promise<void>;
+  vocabulary: (repo: string, key: VocabularyKey, value: VocabularyTerm, newLabels: string[]) => Promise<boolean>;
   issueDefault: (repo: string, key: IssueSetting, on: boolean) => Promise<void>;
 }
 
@@ -100,6 +101,11 @@ export const useEditStore = create<EditState>()((set, get) => {
     reset: (repo, key) => call(repo, key, { change: 'override', key }, key),
     recheck: (repo) => call(repo, 'recheck', { change: 'recheck' }),
     structureSync: (repo, on) => call(repo, 'structure-sync', { change: 'structure-sync', value: on }),
+    vocabulary: async (repo, key, value, newLabels) => {
+      if (get().running) return false;
+      await call(repo, 'vocabulary', { change: 'vocabulary', key, value, ...newLabels.length && { newLabels } });
+      return !get().errors[repo];
+    },
     issueDefault: (repo, key, on) => call(repo, key, { change: 'override', key, value: on }),
   };
 });

@@ -10,17 +10,18 @@ async function pick(name = 'lar-web') {
   await settle(() => button('Next').click());
 }
 
-test('three accessible screens lead straight to the board with no ticket picker or repository PR', async () => {
+test('four accessible screens lead straight to the board with no ticket picker or repository PR', async () => {
   await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: detection() }, '/api/onboarding/setup': { error: null } });
   expect(dialog()!.getAttribute('aria-modal')).toBe('true');
   expect(heading()).toBe('Repository');
-  expect((dialog()!.textContent?.match(/Step 1 of 3/g) ?? [])).toHaveLength(1);
+  expect((dialog()!.textContent?.match(/Step 1 of 4/g) ?? [])).toHaveLength(1);
   expect(button('Next').disabled).toBe(true);
   await pick();
   expect(heading()).toBe('Work and docs');
   expect(dialog()!.textContent).toContain('Save concepts and cross-repository links to issues');
   expect(dialog()!.querySelector('[data-import-step]')).toBeNull();
   expect(document.activeElement).toBe(dialog()!.querySelector('[data-slot="modal-header"] h2'));
+  await settle(() => button('Next').click());
   await settle(() => button('Next').click());
   expect(heading()).toBe('Access and add');
   expect(dialog()!.textContent).toContain('Save concept maps and links');
@@ -44,6 +45,7 @@ test('onboarding starts issue defaults on, explains linked-work, and sends indiv
     expect([issueSetting(key).checked, issueSetting(key).disabled]).toEqual([true, false]);
   }
   await settle(() => issueSetting('createIssuesFromRetro').click());
+  await settle(() => button('Next').click());
   await settle(() => button('Next').click());
   await settle(() => button('Add repository').click());
   expect(posted('/api/onboarding/setup')[0]).toMatchObject({ createIssuesFromAddItem: true, createIssuesFromRetro: false, writeRefinedSpec: true });
@@ -91,6 +93,7 @@ test('resuming onboarding keeps issue choices and turns legacy private docs off'
   expect(issueSetting('createIssuesFromAddItem').checked).toBe(false);
   expect([...dialog()!.querySelectorAll<HTMLInputElement>('[data-work-step] input[type="checkbox"]')][1]!.checked).toBe(false);
   await settle(() => button('Next').click());
+  await settle(() => button('Next').click());
   await settle(() => button('Add repository').click());
   expect(posted('/api/onboarding/setup')[0]).toMatchObject({ createIssuesFromAddItem: false, domainDocs: { kind: 'off' } });
 });
@@ -100,11 +103,14 @@ test('the access screen names the missing permission once and blocks enabled syn
   await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
   await pick();
   await settle(() => button('Next').click());
+  await settle(() => button('Next').click());
   expect(button('Add repository').disabled).toBe(true);
   expect(dialog()!.textContent).toContain('Issues: Read and write');
   await settle(() => button('Back').click());
+  await settle(() => button('Back').click());
   const toggle = [...dialog()!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')][0]!;
   await settle(() => toggle.click());
+  await settle(() => button('Next').click());
   await settle(() => button('Next').click());
   expect(button('Add repository').disabled).toBe(false);
 });
@@ -115,9 +121,91 @@ test('unverified token writes never show Ready for concept sync or builds', asyn
   await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
   await pick();
   await settle(() => button('Next').click());
+  await settle(() => button('Next').click());
   expect(button('Add repository').disabled).toBe(true);
   const rows = [...dialog()!.querySelectorAll('[data-access-step] li')];
   expect(rows.slice(1).every((row) => row.textContent?.includes('Not verified'))).toBe(true);
   expect(dialog()!.textContent).toContain('Contents and Pull requests: Read and write');
   expect(dialog()!.textContent).toContain('cannot verify fine-grained token permissions');
+});
+
+const vocabularyDiscovery = { provider: 'github', types: { state: 'unsupported', reason: 'No issue types here.' }, labels: { state: 'available', choices: ['bug'] } };
+const kindRow = (key: string) => dialog()!.querySelector<HTMLElement>(`[data-vocabulary="${key}"]`)!;
+const rowButton = (key: string, label: string) => [...kindRow(key).querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!;
+
+async function vocabularyStep() {
+  await openOnboarding([project('app', { repo: 'team/app' })], {
+    '/api/onboarding/detect': { detection: detection({ repo: 'team/app' }) },
+    '/api/onboarding/vocabulary': { discovery: vocabularyDiscovery },
+    '/api/onboarding/setup': { error: 'Provider unavailable. Draft kept.' },
+  });
+  await pick('app');
+  await settle(() => button('Next').click());
+}
+
+test('untouched vocabulary suggestions never enter the onboarding save payload', async () => {
+  await vocabularyStep();
+  expect(heading()).toBe('Kind vocabulary');
+  expect(kindRow('bug').querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false);
+  await settle(() => button('Next').click());
+  await settle(() => button('Add repository').click());
+  const body = posted('/api/onboarding/setup')[0]!;
+  expect(body).not.toHaveProperty('vocabulary');
+  expect(body).not.toHaveProperty('newLabels');
+});
+
+test('onboarding saves explicit suggestions and none and keeps failed new label drafts', async () => {
+  await vocabularyStep();
+  await settle(() => rowButton('bug', 'Use suggested label: bug').click());
+  await settle(() => rowButton('feature', 'None').click());
+  const input = kindRow('bug').querySelector<HTMLInputElement>('input[type="text"]')!;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'triage');
+  await settle(() => input.dispatchEvent(new Event('input', { bubbles: true })));
+  expect(posted('/api/onboarding/setup')).toEqual([]);
+  await settle(() => button('Next').click());
+  await settle(() => button('Save and add repository').click());
+  expect(posted('/api/onboarding/setup')[0]).toMatchObject({ vocabulary: { bug: { type: null, labels: ['bug'] }, feature: { type: null, labels: [] } }, newLabels: { bug: ['triage'] } });
+  expect(text(dialog())).toContain('Provider unavailable. Draft kept.');
+  await settle(() => button('Back').click());
+  expect(kindRow('bug').querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('triage');
+});
+
+test('unreadable vocabulary can be skipped and a retry never submits a mapping', async () => {
+  let unreadable = true;
+  await openOnboarding([project('app', { repo: 'team/app' })], {
+    '/api/onboarding/detect': { detection: detection({ repo: 'team/app' }) },
+    '/api/onboarding/vocabulary': () => unreadable ? { error: 'Metadata unavailable.' } : { discovery: vocabularyDiscovery },
+    '/api/onboarding/setup': { error: null },
+  });
+  await pick('app');
+  await settle(() => button('Next').click());
+  expect(text(dialog())).toContain('Metadata unavailable.');
+  expect(button('Next').disabled).toBe(false);
+  unreadable = false;
+  await settle(() => [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === 'Retry')!.click());
+  expect(kindRow('bug')).not.toBeNull();
+  await settle(() => button('Next').click());
+  await settle(() => button('Add repository').click());
+  expect(posted('/api/onboarding/setup')[0]).not.toHaveProperty('vocabulary');
+});
+
+test('resumed onboarding preserves vocabulary drafts and blocks mappings after Access is lost', async () => {
+  const repo = 'team/app';
+  const choices: OnboardingChoices = { structureSync: false, vocabulary: { bug: { type: null, labels: ['bug'] } }, newLabels: { bug: ['triage'] } };
+  const data = { ...empty, onboarding: [{ repo, progress: { step: 'vocabulary', done: ['project', 'work'], answers: { projectId: 'app', choices } } }] };
+  const found = detection({ repo }); found.access['tag-ticket'] = 'refused';
+  serve(data, [project('app', { repo, onBoard: true })], { error: null }, 200, {
+    '/api/onboarding/detect': { detection: found }, '/api/onboarding/vocabulary': { discovery: vocabularyDiscovery }, '/api/onboarding/setup': { error: null },
+  });
+  await mountPage(data);
+  await settle(() => $<HTMLButtonElement>(`[data-onboarding-card="${repo}"] [data-resume]`)!.click());
+  expect(kindRow('bug').querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('triage');
+  expect(button('Next').disabled).toBe(true);
+  expect(text(kindRow('bug'))).toContain('refused');
+  await settle(() => rowButton('bug', 'None').click());
+  expect(button('Next').disabled).toBe(false);
+  await settle(() => button('Next').click());
+  await settle(() => button('Add repository').click());
+  expect(posted('/api/onboarding/setup')[0]).toMatchObject({ vocabulary: { bug: { type: null, labels: [] } } });
+  expect(posted('/api/onboarding/setup')[0]).not.toHaveProperty('newLabels');
 });

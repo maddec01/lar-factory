@@ -992,6 +992,7 @@ export interface OnboardingAnswers {
 
 /** The onboarding wizard's answers, each one absent while its detected default stands. */
 export interface OnboardingChoices {
+  newLabels?: LocalSetupAnswers['newLabels'];
   createIssuesFromAddItem?: boolean;
   createIssuesFromRetro?: boolean;
   writeRefinedSpec?: boolean;

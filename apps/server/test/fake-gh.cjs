@@ -54,6 +54,26 @@ const main = async () => {
     process.exitCode = 1;
     return;
   }
+  // Vocabulary fixtures answer only metadata discovery and explicitly saved new labels.
+  const vocabularyPath = args[0] === 'api' && args.find((arg) => /^repos\/[\w.-]+\/[\w.-]+(?:\/(?:labels\?per_page=100|labels|issue-types))?$/.test(arg));
+  if (options.vocabulary && vocabularyPath && args.includes('--method')) {
+    const vocabulary = options.vocabulary;
+    const method = args[args.indexOf('--method') + 1];
+    if (method === 'GET') {
+      if (vocabulary.readFails) { process.stderr.write('HTTP 403: Metadata read refused'); process.exitCode = 1; return; }
+      if (vocabularyPath.includes('/labels')) return output([vocabulary.labels.map((name) => ({ name }))]);
+      if (vocabularyPath.endsWith('/issue-types')) return output([vocabulary.types.map((name) => ({ name }))]);
+      return output([{ owner: { type: 'Organization' } }]);
+    }
+    if (method === 'POST' && vocabularyPath.endsWith('/labels')) {
+      if (vocabulary.failCreate) { process.stderr.write('HTTP 403: Label creation refused'); process.exitCode = 1; return; }
+      const name = args.find((arg) => arg.startsWith('name=')).slice(5);
+      vocabulary.labels.push(name);
+      fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+      return output({ name });
+    }
+    throw new Error('Unexpected vocabulary write');
+  }
   // Repository configuration reads are forbidden. Keep this sentinel to catch regressions.
   if (args[0] === 'api' && args.some((arg) => arg.includes('/contents/.lar-factory.json'))) {
     throw new Error('Factory configuration must come from local settings');

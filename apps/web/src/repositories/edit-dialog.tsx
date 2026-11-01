@@ -11,6 +11,7 @@ import { NativeSelect } from '@lar-factory/ui/native-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { canSave, shownDrafts, useEditStore, type Drafts, type DraftSetting } from './edit-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
+import { EditVocabulary } from './vocabulary-editor.tsx';
 import { IssueDefaults } from './issue-defaults.tsx';
 
 const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: 'Refused', unverified: 'Not checked yet' };
@@ -104,6 +105,7 @@ export function EditDialog() {
               onChange={() => void useEditStore.getState().structureSync(repo, !setup.structureSync)} />
             <p className="m-0 -mt-3 pl-7 text-xs text-base-700">This creates a linked-work label to restore maps and relationships on another machine.</p>
             <IssueDefaults setup={setup} disabled={running !== null} onChange={(key, value) => void useEditStore.getState().issueDefault(repo, key, value)} />
+            <EditVocabulary key={repo} setup={setup} />
             <Settings repo={repo} setup={setup} />
             <Access repo={repo} setup={setup} />
             {errors[repo] && <Alert tone="danger" title="Can't change this setting">{errors[repo]}</Alert>}

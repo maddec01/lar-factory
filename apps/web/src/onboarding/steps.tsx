@@ -1,4 +1,4 @@
-// Three onboarding screens built from the board's existing controls.
+// Onboarding screens built from the board's existing controls.
 import { FolderPlus, LoaderCircle, Check, Minus } from 'lucide-react';
 import { effectiveIssueSettings, isOnboarding, shownRepo, type OperationAccess, type SetupDetection } from '@lar-factory/shared';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
@@ -11,6 +11,7 @@ import { NativeSelect } from '@lar-factory/ui/native-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { Choice, Field, Group } from './setup-fields.tsx';
+import { VocabularyStep } from './vocabulary-step.tsx';
 import { IssueDefaults } from '../repositories/issue-defaults.tsx';
 import { answersOf, connectionOptions, connectionsOf, found, missingSyncAccess, operationTitle, repositoryDocs, skillOptions, sourceOptions } from './wizard-choices.ts';
 import { detectedOf, unpickable, useWizardStore, type Run } from './wizard-store.ts';
@@ -127,6 +128,6 @@ export function StepBody({ run }: { run: Run }) {
     {finish.state === 'failed' && <Alert tone="danger" title="Could not add repository">{finish.error}</Alert>}
     {run.step === 'project' ? <ProjectStep run={run} /> : !detection ? <DetectionPending />
       : 'refused' in detection.checkout ? <Alert tone="danger" title="Check the repository folder">{detection.checkout.refused}</Alert>
-        : run.step === 'work' ? <WorkStep run={run} detection={detection} /> : <AccessStep run={run} detection={detection} />}
+        : run.step === 'work' ? <WorkStep run={run} detection={detection} /> : run.step === 'vocabulary' ? <VocabularyStep key={run.repo} run={run} detection={detection} /> : <AccessStep run={run} detection={detection} />}
   </div>;
 }

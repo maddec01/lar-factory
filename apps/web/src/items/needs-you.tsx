@@ -23,7 +23,7 @@ export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
       <p className="m-0 font-medium text-(--warning-foreground)">Needs you: {item.needsYou.reason}</p>
       <span className="flex flex-wrap gap-1.5">
         {item.needsYou.offers.map((offer) => (
-          <Button {...kind('other')} key={offer} {...state} disabled={state.disabled || item.needsYou?.deletedThread} aria-label={`${LABELS[offer]}: ${itemName(item)}`}
+          <Button {...kind('other')} key={offer} {...state} disabled={state.disabled || (item.needsYou?.deletedThread && offer === 'start-again')} aria-label={`${LABELS[offer]}: ${itemName(item)}`}
             {...offer === 'set-aside' ? { 'data-abandon': item.id, onClick: () => askAbandon(item.id) }
               : { 'data-needs-you': item.id, onClick: () => void resolveNeedsYou(item.id, offer) }}>{LABELS[offer]}</Button>
         ))}

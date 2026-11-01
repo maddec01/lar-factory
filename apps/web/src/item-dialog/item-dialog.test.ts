@@ -592,5 +592,5 @@ test('deleted work thread offers the later recovery actions without Clear', asyn
       offers: ['start-again', 'back-to-queue', 'back-to-list'] } } : i) });
   await openItem(id);
   expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Start again', 'Back to Queue', 'Back to List']);
-  expect($$<HTMLButtonElement>('[data-needs-you-reason] button').every(button => button.disabled)).toBe(true);
+  expect($$<HTMLButtonElement>('[data-needs-you-reason] button').map(button => button.disabled)).toEqual([true, false, false]);
 });

@@ -64,3 +64,40 @@ export async function inspectCleanup(input: {
   if (branch === input.defaultBranch || trees.some(tree => tree.branch === branch && tree.path && input.liveWorktreePaths.includes(tree.path))) remoteAvailable = false;
   return { branch, localBranches, worktreePaths, dirtyFiles, unpushedCommits, remoteBranch, localAvailable: localBranches.length > 0, remoteAvailable, ...(warning ? { warning } : {}) };
 }
+
+/** Execute a freshly inspected selection, retaining failed targets for retry. */
+export async function executeCleanup(input: {
+  plan: CleanupPlan;
+  expectedPlan: CleanupPlan;
+  checkout: string;
+  repository: string;
+  local: boolean;
+  remote: boolean;
+  confirmedLoss: boolean;
+  git?: typeof runTool;
+  provider?: Pick<ReturnType<typeof prHost>, 'deleteRemoteBranch'>;
+}): Promise<{ errors: string[]; remainingBranches: string[] }> {
+  if (JSON.stringify(input.plan) !== JSON.stringify(input.expectedPlan)) throw new Error('Cleanup changed. Inspect and confirm again.');
+  const { plan } = input;
+  if (input.local && (plan.dirtyFiles.length || plan.unpushedCommits.length) && !input.confirmedLoss) throw new Error('Confirm loss of dirty files and unpushed commits.');
+  if (input.remote && !plan.remoteAvailable) throw new Error('Remote cleanup is unavailable.');
+  const git = input.git ?? runTool;
+  const errors: string[] = [];
+  const remaining = new Set(plan.localBranches);
+  if (input.local) {
+    for (const path of plan.worktreePaths) {
+      const result = await git('git', ['-C', input.checkout, 'worktree', 'remove', ...(input.confirmedLoss ? ['--force'] : []), '--', path], { timeout: 10_000 });
+      if (result.code !== 0) errors.push(`Could not remove worktree ${path}`);
+    }
+    for (const branch of plan.localBranches) {
+      const result = await git('git', ['-C', input.checkout, 'branch', input.confirmedLoss ? '-D' : '-d', '--', branch], { timeout: 10_000 });
+      if (result.code === 0) remaining.delete(branch);
+      else errors.push(`Could not delete branch ${branch}`);
+    }
+  }
+  if (input.remote) {
+    try { await (input.provider ?? prHost(input.repository)).deleteRemoteBranch(input.repository, plan.remoteBranch ?? plan.branch); }
+    catch { errors.push(`Could not delete remote branch ${plan.branch}`); remaining.add(plan.branch); }
+  } else if (plan.remoteBranch || plan.warning) remaining.add(plan.branch);
+  return { errors, remainingBranches: [...remaining] };
+}

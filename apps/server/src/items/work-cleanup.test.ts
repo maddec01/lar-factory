@@ -1,6 +1,6 @@
 import { expect, it } from 'vite-plus/test';
 import type { Item } from '@lar-factory/shared';
-import { inspectCleanup } from './work-cleanup.ts';
+import { executeCleanup, inspectCleanup } from './work-cleanup.ts';
 
 it('limits ownership to the saved build and its slices and protects live and default branches', async () => {
   const plan = await inspectCleanup({ repository: 'a/b', checkout: '/project', item: {} as Item,
@@ -38,4 +38,19 @@ for (const branch of ['main', 'live']) it(`protects the ${branch} branch from cl
   });
   expect(plan.localBranches).toEqual([]);
   expect(plan.remoteAvailable).toBe(false);
+});
+
+it('rejects changed losses before running any deletion', async () => {
+  const plan = { branch: 'old', localBranches: ['old'], worktreePaths: [], dirtyFiles: [], unpushedCommits: [], remoteBranch: null, localAvailable: true, remoteAvailable: false };
+  await expect(executeCleanup({ plan: { ...plan, dirtyFiles: ['new loss'] }, expectedPlan: plan,
+    checkout: '/unused', repository: 'a/b', local: true, remote: false, confirmedLoss: true,
+    git: async () => { throw new Error('Deletion must not run'); },
+  })).rejects.toThrow('Cleanup changed');
+});
+
+it('requires explicit confirmation before discarding local losses', async () => {
+  const plan = { branch: 'old', localBranches: ['old'], worktreePaths: [], dirtyFiles: ['dirty'], unpushedCommits: [], remoteBranch: null, localAvailable: true, remoteAvailable: false };
+  await expect(executeCleanup({ plan, expectedPlan: plan, checkout: '/unused', repository: 'a/b', local: true, remote: false, confirmedLoss: false,
+    git: async () => { throw new Error('Deletion must not run'); },
+  })).rejects.toThrow('Confirm loss');
 });

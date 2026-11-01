@@ -20,6 +20,15 @@ export interface VocabularyDiscovery {
   labels: VocabularyCapability;
 }
 
+/** Suggestions are optional drafts for Settings. Saving requires an explicit user choice. */
+export function suggestVocabularyLabels(labels: VocabularyCapability): VocabularyMapping {
+  if (labels.state !== 'available') return {};
+  return Object.fromEntries((['bug', 'feature', 'improvement'] as const).flatMap((key) => {
+    const matches = labels.choices.filter((label) => label.toLowerCase() === key);
+    return matches.length === 1 ? [[key, { type: null, labels: matches }]] : [];
+  }));
+}
+
 export const emptyVocabularyTerm = (): VocabularyTerm => ({ type: null, labels: [] });
 
 export function isVocabularyMapping(raw: unknown): raw is VocabularyMapping {

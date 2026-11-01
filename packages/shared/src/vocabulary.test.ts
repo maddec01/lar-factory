@@ -19,3 +19,15 @@ test('compatible types resolve once, and concept scope and concept kind remain d
   expect(result.ready && result.typeResolution).toEqual({ candidates: ['Epic'], selected: 'Epic' });
   expect(result.labels).toEqual(['planning']);
 });
+
+
+test('same-name label suggestions preserve provider spelling without applying mappings', async () => {
+  const { suggestVocabularyLabels } = await import('./vocabulary.ts');
+  expect(suggestVocabularyLabels({ state: 'available', choices: ['Bug', 'feature', 'improvement', 'bugfix', 'build'] })).toEqual({
+    bug: { type: null, labels: ['Bug'] }, feature: { type: null, labels: ['feature'] }, improvement: { type: null, labels: ['improvement'] },
+  });
+  expect(suggestVocabularyLabels({ state: 'refused', reason: 'denied' })).toEqual({});
+  expect(suggestVocabularyLabels({ state: 'unsupported', reason: 'unsupported' })).toEqual({});
+  expect(suggestVocabularyLabels({ state: 'available', choices: [] })).toEqual({});
+  expect(effectiveVocabulary().vocabulary.bug).toEqual({ type: null, labels: [] });
+});

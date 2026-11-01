@@ -638,3 +638,35 @@ test('recovery options reject invalid values before launching', async () => {
   assert.equal((await commands.inspectRecovery(queued(1).id)).status, 409);
   assert.deepEqual(log, []);
 });
+
+test('cleanup rejects malformed selections and unknown tokens before side effects', async () => {
+  const { commands, log } = commandsOn([queued(1)]);
+  for (const input of [null, [], { token: 'x', local: 'yes' }, { token: 'x', branch: 'main' }, { remote: true }]) {
+    assert.equal((await commands.executeOwnedCleanup(queued(1).id, input)).status, 422);
+  }
+  assert.equal((await commands.executeOwnedCleanup(queued(1).id, { token: 'unknown', local: true })).status, 409);
+  assert.deepEqual(log, []);
+});
+
+test('empty cleanup ownership is inspectable despite unrelated live repository threads', async () => {
+  const records = await openRecords();
+  const record = records.create({ title: 'Shaping', repository: WEB, kind: 'issue', status: 'Shaping' });
+  const { board, commands } = commandsOn([], undefined, records);
+  board.update({ items: [...board.snapshot().items, queued(999, { threads: [{ id: 'other', state: 'running', title: 'Live', updated: new Date().toISOString() }] })] });
+  const reply = await commands.inspectOwnedCleanup(record.workId);
+  assert.equal(reply.status, 200);
+  assert.deepEqual((reply.body as { plans: unknown[] }).plans, []);
+});
+
+test('cleanup confirmations replace previous item tokens and expire', async () => {
+  const records = await openRecords();
+  const record = records.create({ title: 'Empty', repository: WEB, kind: 'issue' });
+  const { commands } = commandsOn([], undefined, records);
+  const first = (await commands.inspectOwnedCleanup(record.workId)).body as { token: string };
+  const second = (await commands.inspectOwnedCleanup(record.workId)).body as { token: string };
+  assert.equal((await commands.executeOwnedCleanup(record.workId, { token: first.token })).status, 409);
+  const now = Date.now();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 11 * 60_000);
+  try { assert.equal((await commands.executeOwnedCleanup(record.workId, { token: second.token })).status, 409); }
+  finally { clock.mockRestore(); }
+});

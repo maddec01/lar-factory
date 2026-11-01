@@ -1,3 +1,4 @@
+import { inspectCleanup, executeCleanup, type CleanupPlan } from './work-cleanup.ts';
 // The commands the board's buttons send: queue, back to List, start, start build, abandon, close an
 // abandoned item's ticket, restore set-aside work and act on Needs you.
 // Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
@@ -24,6 +25,7 @@ import { inspectWorkRecovery } from './work-recovery.ts';
 import { checkouts, repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
+import { liveWorktreePaths } from '../t3/item-execution.ts';
 import { protocolStartedThread } from '../t3/item-execution.ts';
 import { findStartedThread, lookupThread, startThread } from '../t3/t3.ts';
 import type { ItemSource } from './item-source.ts';
@@ -55,6 +57,8 @@ export interface ItemCommands {
    * and snapshots the repository's selected project skills on the record. Launch intents guard it as they guard Start.
    * Drift refuses it with the skills that changed until `drift` carries the User's DriftChoice.
    */
+  inspectOwnedCleanup(itemId: string): Promise<Reply>;
+  executeOwnedCleanup(itemId: string, input: unknown): Promise<Reply>;
   inspectRecovery(itemId: string): Promise<Reply>;
   startAgain(itemId: string, model: unknown, options: unknown): Promise<Reply>;
   startBuild(itemId: string, model: unknown, drift?: unknown): Promise<Reply>;
@@ -361,7 +365,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     return track(settling, intent.intentId, (async (): Promise<Start> => {
       const known = records!.threads(item.id).map((t) => t.threadId);
       let found: Awaited<ReturnType<typeof recoverThread>>;
-      try { found = await recoverThread(projectId, messages, known); } catch { found = 'unknown'; }
+      try { found = await recoverThread(projectId, intent.recovery?.message ? [intent.recovery.message] : messages, known); } catch { found = 'unknown'; }
       if (typeof found === 'object') {
         write(item.id, (revision) => records!.resolveLaunchIntent(item.id, revision, intent.intentId, { threadId: found.threadId }));
         return { thread: found, error: null };
@@ -396,7 +400,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
    * for it, Needs you and a paused setup refuse it, and a launch intent is on the record before `ask` runs. Without records, `ask` alone.
    */
   async function launch(item: Item, record: StartRecord, projectId: string, message: string, ask: () => Promise<StartResult>,
-    prepare: () => void = () => {}, recovery = false): Promise<Start> {
+    prepare: () => void = () => {}, recovery = false, stagedRecovery?: { branch: string; reset: boolean; message?: string }): Promise<Start> {
     if (!records) return ask();
     const purpose = PURPOSES[record];
     const unresolved = records.launchIntents({ workId: item.id, unresolved: true }).find((intent) => intent.purpose === purpose);
@@ -408,7 +412,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const shown = board.snapshot()[record]?.[item.id];
     if (held) return { thread: shown?.threadId === held.threadId ? shown : held, error: null };
     prepare();
-    const { intent } = write(item.id, (revision) => records.recordLaunchIntent(item.id, revision, purpose));
+    const { intent } = write(item.id, (revision) => records.recordLaunchIntent(item.id, revision, purpose, stagedRecovery));
     asking.add(intent.intentId);
     const result = await ask().finally(() => asking.delete(intent.intentId));
     const outcome = result.thread ? { threadId: result.thread.threadId } : !result.uncertain ? { failure: result.error ?? 'T3 started no thread.' } : null;
@@ -432,6 +436,35 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const result = await runTool('git', ['-C', checkout, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/'], { timeout: 10_000 });
     if (result.code !== 0) throw new Error('Cannot capture cleanup ownership');
     return result.stdout.split('\n').filter(name => slices.some(slice => name.startsWith(`slice/${slice.workId.slice(0, 8)}-`)));
+  }
+
+  const cleanupTokens = new Map<string, { itemId: string; plans: CleanupPlan[]; expiresAt: number }>();
+  function pruneCleanupTokens(itemId?: string) {
+    for (const [token, saved] of cleanupTokens) if (saved.expiresAt <= Date.now() || saved.itemId === itemId) cleanupTokens.delete(token);
+    while (cleanupTokens.size >= 100) cleanupTokens.delete(cleanupTokens.keys().next().value!);
+  }
+  const cleaning = new Set<string>();
+  async function ownedCleanup(item: Item, onlyBranch?: string) {
+    if (!records) throw new Error('Work records are unavailable.');
+    const project = await projectOf(item.repo);
+    if (project.error !== undefined) throw new Error(project.error);
+    const checkout = await checkoutOf(project.projectId);
+    const snapshots = records.cleanupOwnership(item.id);
+    const currentRecord = records.read(item.id);
+    if (item.needsYou?.deletedThread && recordedThreads(item.id).at(-1)?.purpose === 'build') {
+      snapshots.push({ branch: currentRecord.buildBranch || buildBranch(item), sliceIds: [], sliceBranches: await cleanupSliceBranches(item) });
+    }
+    const branches = [...new Set(snapshots.flatMap(snapshot => [snapshot.branch, ...snapshot.sliceBranches]).filter(Boolean))].filter(branch => !onlyBranch || branch === onlyBranch);
+    if (!branches.length) return { checkout, plans: [] as CleanupPlan[] };
+    const livePaths = liveWorktreePaths();
+    if (!livePaths) throw new Error('Cannot verify live T3 worktree bindings. Try again when T3 is available.');
+    const writable = !writeAccessProblem(item.repo, 'push-branch', buildAccessOf(item.repo)) && process.env.LAR_FACTORY_AZURE_READ_ONLY !== '1';
+    const plans = [];
+    const defaultBranch = await baseOf(item.repo);
+    for (const branch of branches) {
+      plans.push(await inspectCleanup({ repository: item.repo, checkout, item, branch, sliceIds: [], sliceBranches: [], liveWorktreePaths: livePaths, defaultBranch, writable }));
+    }
+    return { checkout, plans };
   }
 
   async function recoveryInspection(item: Item) {
@@ -572,6 +605,48 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       };
     }),
 
+    async inspectOwnedCleanup(itemId) {
+      const item = board.find(itemId);
+      if (!item) return withBoard(404, { error: GONE });
+      try {
+        const { plans } = await ownedCleanup(item);
+        const token = randomUUID();
+        pruneCleanupTokens(itemId);
+        cleanupTokens.set(token, { itemId, plans, expiresAt: Date.now() + 10 * 60_000 });
+        return withBoard(200, { plans, token });
+      } catch (error) { return withBoard(409, { error: (error as Error).message }); }
+    },
+    async executeOwnedCleanup(itemId, input) {
+      if (!input || typeof input !== 'object' || Array.isArray(input)) return withBoard(422, { error: 'Invalid cleanup options.' });
+      const options = input as Record<string, unknown>;
+      if (Object.keys(options).some(key => !['local', 'remote', 'confirmedLoss', 'token'].includes(key)) || ['local', 'remote', 'confirmedLoss'].some(key => options[key] !== undefined && typeof options[key] !== 'boolean') || typeof options.token !== 'string') return withBoard(422, { error: 'Invalid cleanup options.' });
+      pruneCleanupTokens();
+      const saved = cleanupTokens.get(options.token);
+      if (!saved || saved.itemId !== itemId || cleaning.has(itemId)) return withBoard(409, { error: 'Inspect cleanup again.' });
+      const item = board.find(itemId);
+      if (!item) return withBoard(404, { error: GONE });
+      cleaning.add(itemId);
+      try {
+        const { checkout, plans } = await ownedCleanup(item);
+        if (JSON.stringify(plans) !== JSON.stringify(saved.plans)) throw new Error('Cleanup changed. Inspect and confirm again.');
+        if (options.local && plans.some(plan => plan.dirtyFiles.length || plan.unpushedCommits.length) && options.confirmedLoss !== true) throw new Error('Confirm loss of dirty files and unpushed commits.');
+        if (options.remote && plans.some(plan => plan.remoteBranch && !plan.remoteAvailable)) throw new Error('Remote cleanup is unavailable.');
+        cleanupTokens.delete(options.token);
+        const errors: string[] = [];
+        const remainingBranches: string[] = [];
+        for (const plan of plans) {
+          const fresh = (await ownedCleanup(item, plan.branch)).plans.find(candidate => candidate.branch === plan.branch);
+          if (!fresh) throw new Error('Cleanup ownership changed.');
+          const result = await executeCleanup({ plan: fresh, expectedPlan: plan, checkout, repository: item.repo, local: options.local === true, remote: options.remote === true && plan.remoteAvailable, confirmedLoss: options.confirmedLoss === true });
+          errors.push(...result.errors);
+          remainingBranches.push(...result.remainingBranches);
+          if (!result.remainingBranches.includes(plan.branch) && !result.errors.length) write(itemId, revision => records!.resolveCleanup(itemId, revision, [plan.branch]));
+        }
+        return withBoard(200, { errors, remainingBranches, message: remainingBranches.length ? 'Unticked or failed cleanup targets remain for you to remove.' : 'Cleanup complete.' });
+      } catch (error) { return withBoard(409, { error: (error as Error).message }); }
+      finally { cleaning.delete(itemId); }
+    },
+
     async inspectRecovery(itemId) {
       const item = board.find(itemId);
       if (!item) return withBoard(404, { error: GONE });
@@ -618,10 +693,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
             const result = await launch(item, 'startedBuilds', project.projectId, message, () => startIn(project.projectId, message, choice, workspace), () => {
               if (!continuing) {
                 write(itemId, revision => records!.captureCleanup(itemId, revision, inspection.branch, cleanupBranches));
-                write(itemId, revision => records!.resetBuild(itemId, revision));
               }
-              write(itemId, revision => records!.setBuildBranch(itemId, revision, branch));
-            }, true);
+            }, true, { branch, reset: !continuing, message });
             return { ...result, warning: inspection.warning, message: continuing && !inspection.worktreePath ? 'The old worktree is gone. Created a new worktree on its branch.' : undefined };
           } catch (error) { return { thread: null, error: (error as Error).message }; }
         };

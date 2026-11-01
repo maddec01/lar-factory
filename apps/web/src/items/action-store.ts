@@ -16,12 +16,16 @@ export function setKey<T>(record: Record<string, T>, key: string, value: T | und
 
 interface ActionState {
   actions: Record<string, ItemAction>;
+  cleanupResults: Record<string, string>;
+  setCleanupResult: (itemId: string, message: string | undefined) => void;
   /** Sets the item's action, or clears it with `undefined`. */
   set: (itemId: string, action: ItemAction | undefined) => void;
 }
 
 export const useActionStore = create<ActionState>()((set) => ({
   actions: {},
+  cleanupResults: {},
+  setCleanupResult: (itemId, message) => set(state => ({ cleanupResults: setKey(state.cleanupResults, itemId, message) })),
   set: (itemId, action) => set((state) => ({ actions: setKey(state.actions, itemId, action) })),
 }));
 

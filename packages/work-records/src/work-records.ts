@@ -102,6 +102,7 @@ export interface RecordedThread {
 
 /** A start the board asked T3 for. This module only stores it and its outcome; it never launches or checks a thread. */
 export interface LaunchIntent {
+  recovery?: { branch: string; reset: boolean; message?: string };
   intentId: string;
   workId: string;
   /** What the thread will do, as a recorded thread's purpose. */
@@ -300,7 +301,7 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   /** Its recorded threads, oldest first. */
   threads(workId: string): RecordedThread[];
   /** Records that the board is about to ask T3 for a thread, before it asks. */
-  recordLaunchIntent(workId: string, revision: number, purpose: string): { record: WorkRecord; intent: LaunchIntent };
+  recordLaunchIntent(workId: string, revision: number, purpose: string, recovery?: { branch: string; reset: boolean; message?: string }): { record: WorkRecord; intent: LaunchIntent };
   /** The matching intents in the order they were recorded. */
   launchIntents(filter: LaunchIntentFilter): LaunchIntent[];
   /** Resolves an unresolved intent once: to T3's thread ID, which it records as the record's thread, or to a failure. */
@@ -380,6 +381,7 @@ const fromRow = (row: Row): WorkRecord => ({
 });
 
 interface IntentRow {
+  recovery?: string | null;
   intent_id: string;
   work_id: string;
   purpose: string;
@@ -390,6 +392,7 @@ interface IntentRow {
 }
 
 const fromIntentRow = (row: IntentRow): LaunchIntent => ({
+  ...(row.recovery ? { recovery: JSON.parse(row.recovery) as NonNullable<LaunchIntent["recovery"]> } : {}),
   intentId: row.intent_id,
   workId: row.work_id,
   purpose: row.purpose,
@@ -685,6 +688,25 @@ function workRecords(database: Database): WorkRecords {
     return (query.all(workId) as unknown as Row[]).map(fromRow);
   });
 
+  function resetOwnedBuild(workId: string, row: Row, touched: string[]) {
+    if (row.kind !== 'build') throw invalid('Only builds own slices.');
+    const slices = childRows.all(workId) as unknown as Row[];
+    if (slices.some(slice => slice.kind !== 'slice')) throw invalid('The build owns a record that is not a slice.');
+    const owned = new Set(slices.map(slice => slice.work_id));
+    for (const slice of slices) {
+      for (const blocker of blockerRows.all(slice.work_id) as unknown as Row[]) {
+        if (!owned.has(blocker.work_id) && blocker.work_id !== workId) touched.push(blocker.work_id);
+      }
+      for (const holder of forgetDependencies(database, slice.work_id)) bump.run(new Date().toISOString(), holder);
+      for (const table of ['publication_attachments', 'publication_plans', 'review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests', 'observations', 'brief_gates']) {
+        db.prepare(`DELETE FROM ${table} WHERE work_id = ?`).run(slice.work_id);
+      }
+      db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?').run(slice.work_id, slice.work_id);
+      db.prepare("UPDATE capture_submissions SET draft='',created_ticket=NULL,failure='This submission expired.' WHERE work_id=? OR target_work_id=?").run(slice.work_id, slice.work_id);
+      db.prepare('DELETE FROM work_records WHERE work_id = ?').run(slice.work_id);
+    }
+    return { build_phase: null };
+  }
   return {
     ...trackerCache(database),
     ...specRecords(database, (workId) => fromRow(find(workId))),
@@ -1013,25 +1035,7 @@ function workRecords(database: Database): WorkRecords {
       db.prepare('UPDATE work_records SET cleanup_ownership = ? WHERE work_id = ?').run(JSON.stringify(snapshots), workId);
       return {};
     }),
-    resetBuild: (workId, revision) => change(workId, revision, (row, touched) => {
-      if (row.kind !== 'build') throw invalid('Only builds own slices.');
-      const slices = childRows.all(workId) as unknown as Row[];
-      if (slices.some(slice => slice.kind !== 'slice')) throw invalid('The build owns a record that is not a slice.');
-      const owned = new Set(slices.map(slice => slice.work_id));
-      for (const slice of slices) {
-        for (const blocker of blockerRows.all(slice.work_id) as unknown as Row[]) {
-          if (!owned.has(blocker.work_id) && blocker.work_id !== workId) touched.push(blocker.work_id);
-        }
-        for (const holder of forgetDependencies(database, slice.work_id)) bump.run(new Date().toISOString(), holder);
-        for (const table of ['publication_attachments', 'publication_plans', 'review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests', 'observations', 'brief_gates']) {
-          db.prepare(`DELETE FROM ${table} WHERE work_id = ?`).run(slice.work_id);
-        }
-        db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?').run(slice.work_id, slice.work_id);
-        db.prepare("UPDATE capture_submissions SET draft='',created_ticket=NULL,failure='This submission expired.' WHERE work_id=? OR target_work_id=?").run(slice.work_id, slice.work_id);
-        db.prepare('DELETE FROM work_records WHERE work_id = ?').run(slice.work_id);
-      }
-      return { build_phase: null };
-    }),
+    resetBuild: (workId, revision) => change(workId, revision, (row, touched) => resetOwnedBuild(workId, row, touched)),
     addThread: (workId, revision, threadId, purpose) => {
       const id = checkThreadId(threadId);
       const checked = checkPurpose(purpose);
@@ -1042,11 +1046,12 @@ function workRecords(database: Database): WorkRecords {
       return threadRows.all(workId)
         .map((row) => ({ threadId: String(row.thread_id), purpose: String(row.purpose), recordedAt: String(row.recorded_at), deletedAt: row.deleted_at as string | null }));
     }),
-    recordLaunchIntent: (workId, revision, purpose) => {
+    recordLaunchIntent: (workId, revision, purpose, recovery) => {
       const checked = checkPurpose(purpose);
       const intentId = randomUUID();
       const record = change(workId, revision, () => {
         insertIntent.run(intentId, workId, checked, new Date().toISOString());
+        if (recovery) db.prepare('UPDATE launch_intents SET recovery = ? WHERE intent_id = ?').run(JSON.stringify({ branch: checkFilled(recovery.branch, "recovery branch"), reset: recovery.reset === true, ...(recovery.message ? { message: recovery.message } : {}) }), intentId);
         return {};
       });
       return { record, intent: intent(intentId) };
@@ -1059,12 +1064,19 @@ function workRecords(database: Database): WorkRecords {
     resolveLaunchIntent: (workId, revision, intentId, outcome) => {
       const threadId = 'threadId' in outcome ? checkThreadId(outcome.threadId) : null;
       const failure = threadId === null ? checkFilled((outcome as { failure: unknown }).failure, 'launch failure') : null;
-      const record = change(workId, revision, () => {
+      const record = change(workId, revision, (work, touched) => {
         const row = selectIntent.get(intentId) as IntentRow | undefined;
         if (row?.work_id !== workId) throw new WorkRecordError('not-found', `The work record ${workId} has no launch intent "${intentId}".`);
         if (row.resolved_at) throw invalid(`The launch intent ${intentId} is already resolved.`);
         if (threadId) insertThread(workId, threadId, row.purpose);
         resolveIntent.run(threadId, failure, new Date().toISOString(), intentId);
+        const staged = db.prepare('SELECT recovery FROM launch_intents WHERE intent_id = ?').get(intentId)?.recovery;
+        if (threadId && staged) {
+          const recovery = JSON.parse(String(staged)) as { branch: string; reset: boolean };
+          if (recovery.reset) resetOwnedBuild(workId, work, touched);
+          db.prepare('UPDATE work_records SET build_branch = ? WHERE work_id = ?').run(recovery.branch, workId);
+          return { ...(recovery.reset ? { build_phase: null } : {}), needs_you: null };
+        }
         return {};
       });
       return { record, intent: intent(intentId) };

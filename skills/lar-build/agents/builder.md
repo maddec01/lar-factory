@@ -24,6 +24,16 @@ then `review`, `approve`, `checks` and `retro` for those sections.
 Read the prose rules once as `<lar-build>/SKILL.md` says, also in a fresh
 thread resuming after a handoff, and pass them in every subagent's brief.
 
+## Resume from the record
+
+When Start again opens this thread without a handoff, read the build record,
+its phase, children and recorded PR before choosing a step. Continue on the
+branch and worktree supplied by the board, keeping uncommitted work. Resume
+the recorded phase and reuse its slices and open PR. Read the PR before
+changing it so existing commits and review findings guide the remaining work.
+If the board started a new branch, the phase and slices are empty. Begin at
+Build step 1 and plan from the brief.
+
 ## Subagents
 
 - **Spawn**: a native subagent or a child task, per

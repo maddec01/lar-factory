@@ -23,3 +23,5 @@ export * from './vocabulary.ts';
 export * from './tracker-structure.ts';
 
 export * from './map-concurrent.ts';
+
+export * from "./write-access.ts";

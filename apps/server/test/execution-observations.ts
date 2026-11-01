@@ -45,3 +45,10 @@ export function protocolStatsInputs() {
       ? [child.subagent ?? []].flat().map(run => ({ ...run, childThreadId: child.id, completedAt: run.completedAt ?? null })) : []),
   })));
 }
+
+export function liveWorktreePaths(): string[] | undefined {
+  try {
+    const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
+    return threads.some(thread => thread.turns?.some(turn => !turn.completedAt)) ? undefined : [];
+  } catch { return undefined; }
+}

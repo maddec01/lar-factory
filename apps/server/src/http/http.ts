@@ -195,6 +195,14 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),
       run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model)),
     },
+    '/api/inspect-owned-cleanup': {
+      what: 'the item to inspect', disabled: 'Cleanup is disabled in sample mode.',
+      run: forItem('Name the item to inspect.', itemId => commands.inspectOwnedCleanup(itemId)),
+    },
+    '/api/execute-owned-cleanup': {
+      what: 'the item to clean up', disabled: 'Cleanup is disabled in sample mode.',
+      run: forItem('Name the item to clean up.', (itemId, input) => commands.executeOwnedCleanup(itemId, input.options)),
+    },
     '/api/inspect-recovery': {
       what: 'the item to inspect', disabled: 'Recovery is disabled in sample mode.',
       run: forItem('Name the item to inspect.', itemId => commands.inspectRecovery(itemId)),

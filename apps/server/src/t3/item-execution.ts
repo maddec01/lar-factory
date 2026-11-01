@@ -183,3 +183,22 @@ export function protocolStatsInputs(threadIds?: readonly string[]) {
     return read.observation.projection;
   }));
 }
+
+/** All live shell bindings, including slice and child threads. Unknown bindings refuse cleanup. */
+export function liveWorktreePaths(): string[] | undefined {
+  protocolItemThreads([]);
+  if (!current?.available || !current.shells) return undefined;
+  return liveBindings(current.shells, current.shell?.observation?.snapshot.projects as Record<string, unknown>[] ?? []);
+}
+
+export function liveBindings(shells: Record<string, unknown>[], projects: Record<string, unknown>[] = []): string[] | undefined {
+  const paths: string[] = [];
+  for (const shell of shells) {
+    if (shell.deletedAt || !shell.pendingRuntimeRequest && !['preparing', 'starting', 'running', 'waiting'].includes(String(shell.status))) continue;
+    const workspace = shell.workspace as { worktreePath?: unknown; rootPath?: unknown } | undefined;
+    const path = shell.worktreePath ?? workspace?.worktreePath ?? workspace?.rootPath ?? projects.find(project => project.id === shell.projectId)?.workspaceRoot;
+    if (typeof path !== 'string' || !path) return undefined;
+    paths.push(path);
+  }
+  return paths;
+}

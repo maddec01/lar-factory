@@ -913,3 +913,24 @@ it('resolves only named cleanup targets and rejects stale revisions', async () =
   records.resolveCleanup(build.workId, 3, ['old-build']);
   expect(records.cleanupOwnership(build.workId)).toEqual([]);
 });
+
+it('commits staged recovery only after a confirmed launch across reopen', async () => {
+  const path = join(tempDir(), 'recovery.db');
+  const records = await openWorkRecords(path);
+  const build = records.create({ title: 'Recovery', repository: 'a/b', kind: 'build' });
+  const slice = records.create({ title: 'Slice', repository: 'a/b', kind: 'slice' });
+  records.setParent(slice.workId, slice.revision, build.workId);
+  let current = records.setBuildBranch(build.workId, records.read(build.workId).revision, 'old');
+  current = records.setBuildPhase(build.workId, current.revision, 'implement');
+  const failed = records.recordLaunchIntent(build.workId, current.revision, 'build', { branch: 'new-failed', reset: true });
+  current = records.resolveLaunchIntent(build.workId, failed.record.revision, failed.intent.intentId, { failure: 'refused' }).record;
+  expect(current).toMatchObject({ buildBranch: 'old', buildPhase: 'implement' });
+  expect(records.children(build.workId)).toHaveLength(1);
+  const staged = records.recordLaunchIntent(build.workId, current.revision, 'build', { branch: 'new-confirmed', reset: true });
+  records.close();
+  const reopened = await openWorkRecords(path);
+  current = reopened.resolveLaunchIntent(build.workId, staged.record.revision, staged.intent.intentId, { threadId: 'confirmed' }).record;
+  expect(current).toMatchObject({ buildBranch: 'new-confirmed', buildPhase: null });
+  expect(reopened.children(build.workId)).toEqual([]);
+  reopened.close();
+});

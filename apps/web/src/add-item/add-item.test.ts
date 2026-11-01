@@ -191,7 +191,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   expect(dialog(), 'the dialog closes').toBeNull();
   expect(document.activeElement, 'focus goes back to Add item').toBe(addButton());
   const toast = $('[data-slot="toast"][role="status"] [data-toast]')!;
-  expect(toast.textContent).toBe('Added Playback stalls to List. View item');
+  expect(toast.textContent).toBe('Added Playback stalls to List. View item Queue');
   expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added Playback stalls');
   expect(text($('.title-bar .list-button')), 'the board shows the new data').toBe('List5');
 });
@@ -337,7 +337,7 @@ test('picking a new ticket closes the dialog and announces it, and one on the bo
   await settle(() => vi.advanceTimersByTime(50));
   expect(calls('/api/pick-ticket')).toEqual([['/api/pick-ticket', { repo: 'maddec01/lar-server', number: 8 }]]);
   expect(dialog()).toBeNull();
-  expect(text($('[data-slot="toast"][role="status"] [data-toast]'))).toBe('Added #8 Seek stalls to List. View item');
+  expect(text($('[data-slot="toast"][role="status"] [data-toast]'))).toBe('Added #8 Seek stalls to List. View item Queue');
 
   await settle(() => addButton().click());
   respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8', workId: 'work-8' }], error: null });

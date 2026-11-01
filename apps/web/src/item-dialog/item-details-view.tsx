@@ -5,7 +5,7 @@
 // description's place, with Save and Cancel under it; the extra sections, such as Acceptance Criteria, stay read-only.
 // Beside a work record's own text, the description and comments are the ticket's context and say so.
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CircleCheck, CircleDot, Pencil } from 'lucide-react';
 import { onAzure, shortAgo } from '@lar-factory/shared';
 import type { IssueRef, Item, ItemComment, ItemDetails, TextFormat } from '@lar-factory/shared';
@@ -19,6 +19,8 @@ import type { DescriptionEdit } from './use-description-edit.ts';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
 import type { DetailsEntry } from './details-cache.ts';
+import { postAction } from '../items/card-actions.ts';
+import { detailsCache } from './details-cache.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
 const Heading = ({ children }: { children: ReactNode }) => <h2 className="m-0 text-[13px] font-medium text-(--muted-foreground)">{children}</h2>;
@@ -94,6 +96,26 @@ function EditDescription({ body, format, edit, fill }: { body: string; format: T
   </>;
 }
 
+function SpecNotice({ itemId, spec, refresh }: { itemId: string; spec: NonNullable<ItemDetails['spec']>; refresh: () => Promise<boolean> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const act = async (action: 'retry' | 'accept' | 'reject') => {
+    setBusy(true); setError(null);
+    const result = await postAction('/api/item-spec', { itemId, generation: spec.generation, action });
+    if (result.error) setError(result.error);
+    else { detailsCache.drop(itemId); if (!await refresh()) setError('Could not reload the Spec. Reopen the item to read it.'); }
+    setBusy(false);
+  };
+  return <div className="grid gap-2 text-sm" data-spec-sync>
+    {(spec.error || spec.warning || spec.pending) && <p className="m-0" role="status">{spec.warning ?? spec.error ?? 'The Spec is waiting to save to the tracker.'}</p>}
+    {spec.held ? <>
+      <details><summary className="cursor-pointer">Review held GitHub edit</summary><h3>{spec.held.title}</h3><RichText text={spec.held.body} format="markdown" /></details>
+      <div className="flex gap-2"><Button {...kind('other')} disabled={busy} onClick={() => void act('accept')}>Accept edit</Button><Button {...kind('other')} disabled={busy} onClick={() => void act('reject')}>Reject edit</Button></div>
+    </> : (spec.pending || spec.error) && <Button {...kind('other')} loading={busy} onClick={() => void act('retry')}>Retry Spec sync</Button>}
+    {error && <p className="m-0 text-(--error-foreground)" role="alert">{error}</p>}
+  </div>;
+}
+
 const RELOAD_FAILED = 'Saved; could not reload the details';
 
 /**
@@ -101,7 +123,7 @@ const RELOAD_FAILED = 'Saved; could not reload the details';
  * lets the factory edit the repository's tickets. While `edit` is open the editor takes the description's place,
  * filling the height left when `fill`.
  */
-export function ItemDescription({ read, edit, editable, fill, ticketContext = false, className }: { read: ItemDetailsRead; edit: DescriptionEdit; editable: boolean; fill: boolean; ticketContext?: boolean; className: string }) {
+export function ItemDescription({ itemId, refresh, read, edit, editable, fill, ticketContext = false, className }: { itemId: string; refresh: () => Promise<boolean>; read: ItemDetailsRead; edit: DescriptionEdit; editable: boolean; fill: boolean; ticketContext?: boolean; className: string }) {
   if (read.state === 'loading') return <div className={className}><Loading /></div>;
   if (read.state === 'failed') return <p className={`m-0 text-sm text-(--error-foreground) ${className}`} role="alert">Could not load the details: {read.error}</p>;
   const { sections } = read.details;
@@ -110,15 +132,17 @@ export function ItemDescription({ read, edit, editable, fill, ticketContext = fa
   return (
     <div className={`grid min-w-0 gap-2 ${fill ? 'min-h-0 grid-rows-[auto_minmax(0,1fr)]' : ''} ${className}`} data-description>
       <div className="flex h-7 items-center justify-between gap-2">
-        <h2 className="m-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)">{ticketContext ? 'Ticket description' : 'Description'}</h2>
+        <h2 className="m-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)">{read.details.spec ? 'Spec' : ticketContext ? 'Ticket description' : 'Description'}</h2>
         {!edit.editing && <span className="flex min-w-0 items-center gap-3">
           {edit.saved !== null && <span className="truncate text-xs text-(--muted-foreground)" role="status" title={RELOAD_FAILED}>{RELOAD_FAILED}</span>}
           {editable && <Button {...kind('other')} leftIcon={<Pencil />} onClick={edit.start}>Edit</Button>}
         </span>}
       </div>
+      {read.details.spec && <SpecNotice itemId={itemId} spec={read.details.spec} refresh={refresh} />}
       {edit.editing
         ? <EditDescription body={body} format={format} edit={edit} fill={fill} />
         : body ? <>{format === 'markdown' ? <MarkdownDiagrams text={body} /> : <RichText text={body} format={format} />}</> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
+      {read.details.spec?.original && <details><summary className="cursor-pointer text-sm text-(--muted-foreground)">Original</summary><RichText text={read.details.spec.original} format={read.details.spec.originalFormat} /></details>}
       {sections?.map((section) => <section key={section.title} className="grid min-w-0 gap-2"><Heading>{section.title}</Heading><RichText text={section.body} format={section.format} /></section>)}
     </div>
   );

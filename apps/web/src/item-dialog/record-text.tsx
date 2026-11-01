@@ -34,9 +34,9 @@ export function ExportedLine({ exported }: { exported: Exported }) {
   return null;
 }
 
-export function RecordText({ item, record, className }: { item: Item; record: RecordDetails; className: string }) {
+export function RecordText({ item, record, className, spec = false }: { spec?: boolean; item: Item; record: RecordDetails; className: string }) {
   const [exported, setExported] = useState<Exported>({ state: 'idle' });
-  const title = TITLE[record.bodyKind];
+  const title = spec ? 'Work record' : TITLE[record.bodyKind];
   return (
     <section className={`grid min-w-0 gap-2 ${className}`} data-record>
       <div className="flex h-7 items-center justify-between gap-2">
@@ -44,9 +44,9 @@ export function RecordText({ item, record, className }: { item: Item; record: Re
         <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
       </div>
       <ExportedLine exported={exported} />
-      <div data-record-body>
+      {!spec && <div data-record-body>
         {record.body ? <MarkdownDiagrams text={record.body} /> : <p className="m-0 text-sm text-(--muted-foreground)">No {title.toLowerCase()} written yet.</p>}
-      </div>
+      </div>}
       {record.buildPhase && <Fact label="Build phase" data-build-phase>{record.buildPhase}</Fact>}
       {record.reviewRounds.length > 0 && (
         <div className="grid gap-1" data-review-rounds>
@@ -59,7 +59,7 @@ export function RecordText({ item, record, className }: { item: Item; record: Re
           ))}
         </div>
       )}
-      {record.context && (
+      {!spec && record.context && (
         <details className="grid min-w-0 gap-2">
           <summary className="cursor-pointer text-sm text-(--muted-foreground)">Initial context</summary>
           <RichText className="pt-2" text={record.context} format="markdown" />

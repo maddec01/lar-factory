@@ -11,6 +11,7 @@ import { publicationRecords, type PublicationRecords } from './publication-recor
 import type { Retention } from './retention.ts';
 import { specRecords, type SpecRecords } from './spec-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
+import type { StructureTicket } from './tracker-sync.ts';
 
 export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './database.ts';
 export { DEPENDENCY_OBSERVATION_KINDS, type Dependency, type DependencyChange, type DependencyObservationKind, type NewDependency } from './dependencies.ts';
@@ -220,14 +221,14 @@ export interface WorkRecordFilter {
   kind?: WorkKind;
 }
 
-export interface CaptureSubmission { draft: string; ticket: string | null; workId: string | null; failure: string | null }
+export interface CaptureSubmission { draft: string; ticket: string | null; workId: string | null; failure: string | null; createdTicket: StructureTicket | null }
 
 export interface WorkRecords extends TrackerCache, PublicationRecords, DependencyRecords, SpecRecords {
   captureSubmission(requestId: string): CaptureSubmission | null;
   /** Reserves the request before any provider create; replays return its durable outcome. */
   claimCapture(requestId: string, draft: string, targetWorkId?: string): { fresh: boolean; submission: CaptureSubmission };
   /** Remembers a confirmed provider result before its record is imported. */
-  saveCaptureTicket(requestId: string, ticket: string): void;
+  saveCaptureTicket(requestId: string, ticket: string, createdTicket?: StructureTicket): void;
   /** Saves only a definite failure. An uncertain create keeps its reservation. */
   failCapture(requestId: string, failure: string): void;
   /** Imports by ticket, or captures locally, and resolves the request in the same transaction. */
@@ -675,7 +676,8 @@ function workRecords(database: Database): WorkRecords {
     ...dependencyChanges,
     captureSubmission: (requestId) => database.read(() => {
       const row = db.prepare('SELECT * FROM capture_submissions WHERE request_id=?').get(requestId);
-      return row ? { draft: String(row.draft), ticket: row.ticket as string | null, workId: row.work_id as string | null, failure: row.failure as string | null } : null;
+      return row ? { draft: String(row.draft), ticket: row.ticket as string | null, workId: row.work_id as string | null, failure: row.failure as string | null,
+        createdTicket: row.created_ticket ? JSON.parse(String(row.created_ticket)) as StructureTicket : null } : null;
     }),
     claimCapture: (requestId, draft, targetWorkId) => database.write(() => {
       if (!/^[a-f0-9-]{36}$/.test(requestId)) throw invalid('The submission needs a valid request ID.');
@@ -685,11 +687,13 @@ function workRecords(database: Database): WorkRecords {
       const row = db.prepare('SELECT * FROM capture_submissions WHERE request_id=?').get(requestId)!;
       if (row.draft === '') throw invalid('This submission expired. It cannot create another item or issue.');
       if (row.draft !== draft) throw invalid('This submission already belongs to another item. Finish it before starting a new one.');
-      return { fresh, submission: { draft: String(row.draft), ticket: row.ticket as string | null, workId: row.work_id as string | null, failure: row.failure as string | null } };
+      return { fresh, submission: { draft: String(row.draft), ticket: row.ticket as string | null, workId: row.work_id as string | null, failure: row.failure as string | null,
+        createdTicket: row.created_ticket ? JSON.parse(String(row.created_ticket)) as StructureTicket : null } };
     }),
-    saveCaptureTicket: (requestId, ticket) => database.write(() => {
+    saveCaptureTicket: (requestId, ticket, createdTicket) => database.write(() => {
       checkTicket(ticket);
-      db.prepare('UPDATE capture_submissions SET ticket=? WHERE request_id=? AND ticket IS NULL').run(ticket, requestId);
+      db.prepare('UPDATE capture_submissions SET ticket=?,created_ticket=coalesce(created_ticket,?) WHERE request_id=? AND (ticket IS NULL OR ticket=?)')
+        .run(ticket, createdTicket ? JSON.stringify(createdTicket) : null, requestId, ticket);
     }),
     failCapture: (requestId, failure) => database.write(() => {
       db.prepare('UPDATE capture_submissions SET failure=? WHERE request_id=? AND ticket IS NULL AND work_id IS NULL').run(failure, requestId);
@@ -1047,7 +1051,7 @@ function workRecords(database: Database): WorkRecords {
           for (const holder of forgetDependencies(database, workId)) if (!due.has(holder)) touched.add(holder);
           for (const statement of deleteOwned) statement.run(workId);
           deleteBlockers.run(workId, workId);
-          db.prepare("UPDATE capture_submissions SET draft='',failure='This submission expired.' WHERE work_id=? OR target_work_id=?").run(workId, workId);
+          db.prepare("UPDATE capture_submissions SET draft='',created_ticket=NULL,failure='This submission expired.' WHERE work_id=? OR target_work_id=?").run(workId, workId);
           deleteRecord.run(workId);
         }
         const at = new Date().toISOString();

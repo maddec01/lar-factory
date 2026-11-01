@@ -256,3 +256,12 @@ test('attachments survive a failed relation read and only link to Azure over HTT
   assert.deepEqual(details.attachments, [{ name: 'Evidence.pdf', url }]);
   assert.equal(details.relationsError, 'Relations unavailable');
 });
+
+test('a Bug displays Repro Steps even when Description also contains text', async () => {
+  const run = fakeAz({ items: [workItem({ type: 'Bug', description: 'Separate description.', reproSteps: '<p>Displayed steps.</p>' })] });
+  const details = await readAzureItemDetails(item(5), run.run);
+  if ('error' in details) throw Error(details.error);
+  assert.equal(details.bodyField, 'Microsoft.VSTS.TCM.ReproSteps');
+  assert.equal(details.body, '<p>Displayed steps.</p>');
+  assert.deepEqual(details.sections, [{ title: 'Description', body: 'Separate description.', format: 'markdown' }]);
+});

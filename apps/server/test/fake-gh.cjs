@@ -214,6 +214,14 @@ const main = async () => {
   // REST issue reads include the native type and original body used by picking and structural recovery.
   const restIssue = args[0] === 'api' && /^repos\/(.+\/.+)\/issues\/(\d+)$/.exec(args[1]);
   if (restIssue && !args.includes('PATCH')) {
+    if (options.specReadHold && fs.existsSync(options.specReadHold)) {
+      fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', '["spec-held"]\n');
+      await new Promise(resolve => {
+        const ready = () => { if (!fs.existsSync(options.specReadHold)) { watcher.close(); resolve(); } };
+        const watcher = fs.watch(dirname(options.specReadHold), ready);
+        ready();
+      });
+    }
     const issue = (options.repoIssues?.[restIssue[1]] ?? []).find(issue => issue.number === Number(restIssue[2]));
     if (!issue) { process.stderr.write('HTTP 404: Not Found'); process.exitCode=1; return; }
     return output({number:issue.number,title:issue.title,html_url:issue.url,body:issue.body ?? '',labels:issue.labels?.nodes ?? [],state:issue.state.toLowerCase(),type:issue.issueType ?? null,updated_at:issue.updatedAt});

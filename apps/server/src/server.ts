@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
+import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
 import { syncStructures } from '@lar-factory/work-records/tracker-sync';
 import { createBoardState } from './board/board-state.ts';
 import { readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
@@ -561,6 +562,7 @@ async function refresh(): Promise<void> {
   refreshing = true;
   readAgain = false;
   let read = false;
+  let specWorkIds: string[] = [];
   const readRevision = board.revision();
   try {
     await checkQuota();
@@ -586,7 +588,12 @@ async function refresh(): Promise<void> {
     // board keeps showing no read, as before it. After one, a source its tool blocks keeps its last read, which stays fresh.
     if (fetchedAt === null && repos.length > 0 && repos.every((repo) => snapshot.waiting?.includes(repo.repo) || blockedByTool(itemSource(repo)))) return;
     const recovered = error !== null && error !== (settings.problem ?? recordsProblem) || fetchedAt === null;
-    await prObserver?.known(snapshot.items.filter(item => items.readAfresh(item)));
+    const fresh = snapshot.items.filter(item => items.readAfresh(item));
+    await prObserver?.known(fresh);
+    if (records) {
+      const refs = new Set(ticketsByReference(fresh).keys());
+      specWorkIds = records.list({}).filter(record => record.ticket && refs.has(record.ticket.toLowerCase())).map(record => record.workId);
+    }
     board.applyRead(recordedItems(snapshot), readRevision, withT3Reads, items.readAfresh);
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting });
     board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? recordsProblem, itemSourceProblems: snapshot.problems ?? [],
@@ -614,6 +621,13 @@ async function refresh(): Promise<void> {
     if (readAgain && !localUpdatesBlocked) queueMicrotask(() => runLocal(() => refresh()));
   }
   board.push();
+  if (read && records && specWorkIds.length) {
+    const local = records;
+    runLocal(async () => {
+      await refreshSpecs(local, { workIds: specWorkIds });
+      refreshLocal(true);
+    });
+  }
   // Repositories not answered yet take a gh call each, so the offers follow the read instead of holding it up, at the idle
   // pace or after a read request naming no item, not after each read of active work.
 
@@ -659,6 +673,7 @@ async function observeProviders(): Promise<void> {
     // While gh's quota runs low, GitHub repositories' reads wait and their records and Dependencies keep their last
     // observation; az reads go on. A GitHub ticket reads through gh whether or not its repository is onboarded, as a
     // Dependency's owner may not be.
+    await refreshSpecs(records, { workIds: records.list({}).filter(record => !quotaLow || onAzure(record.repository)).map(record => record.workId) });
     await observeRecords(records, quotaLow ? repos.filter(onAzure) : repos, {
       ticket: (repo, number) => (onAzure(repo) ? items.observeTicket(repo, number) : observeIssue(repo, number)),
       pr: (repo, number) => observePr(repo, number),
@@ -761,6 +776,7 @@ const localTimer = setInterval(() => {
     runLocal(() => {
       refreshLocal();
       runLocal(() => prObserver?.poll());
+      if (records?.specPending().length) runLocal(() => syncSpecs(records));
       if (records?.trackerPending().length) runLocal(() => syncStructures(records));
     });
   }

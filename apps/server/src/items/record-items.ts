@@ -1,6 +1,6 @@
 // The board's items: the work records of the onboarded repositories, each with its ticket's context when an item source
 // read the ticket. The record owns Status, kind, title, structure, blockers, Dependencies and slices; the ticket adds its URL, labels,
-// PRs and provider fields, so a ticket edit never moves, retitles, restructures or blocks work.
+// PRs and provider fields. Spec sync can update title and brief; it never moves, restructures or blocks work.
 
 import { onAzure, parseConceptMap, refKey, sameRepo } from '@lar-factory/shared';
 import type { Blocker, DependencyHold, IssueRef, Item, NeedsYouOffer, Slice, SliceProgress } from '@lar-factory/shared';
@@ -66,7 +66,7 @@ export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> 
 }
 
 /** Maps records and their local completion facts to board items, alongside their latest ticket context. */
-function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly {repo:string;structureSync?:boolean}[] = []) {
+function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly {repo:string;structureSync?:boolean;writeRefinedSpec?:boolean}[] = []) {
   const byTicket = ticketsByReference(tickets);
   const completions = new Map<string, ReturnType<WorkRecords['completion']>>();
   const completionOf = (record: WorkRecord) => {
@@ -92,6 +92,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     const map = mapBody !== null ? parseConceptMap(mapBody) : record.kind === 'concept' ? ticket?.map ?? parseConceptMap('') : ticket?.map;
     const done = isDone(record);
     const sync = setups.find(setup=>sameRepo(setup.repo,record.repository))?.structureSync === false ? undefined : records.trackerState(record.workId);
+    const spec = setups.find(setup => sameRepo(setup.repo, record.repository))?.writeRefinedSpec === false ? null : records.specState(record.workId);
     const item: Item = {
       content: 'ticket', labels: [], linkedPrs: [], ...ticket && { labels: ticket.labels, linkedPrs: ticket.linkedPrs },
       ...ticket?.azure && { azure: ticket.azure }, ...ticket?.sourceOrder !== undefined && { sourceOrder: ticket.sourceOrder },
@@ -101,6 +102,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       completion: completionOf(record),
       ...(ticket?.tracker && {tracker: ticket.tracker}),
       ...(sync && {sync}),
+      ...(spec && (spec.pending !== null || spec.error || spec.warning) && { specSync: { pending: spec.pending !== null, error: spec.error, warning: spec.warning } }),
       revision: record.revision,
       status: record.status,
       statuses: done ? [] : [record.status],
@@ -115,7 +117,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       parentId: record.parentId,
       subIssues: { total: work.length, completed: work.filter(child => completionOf(child).complete).length },
       blockers,
-      updatedAt: record.updatedAt,
+      updatedAt: [record.updatedAt, spec?.changedAt ?? ''].sort().at(-1)!,
       closedAt: done ? record.finishedAt ?? record.updatedAt : null,
       slices,
     };
@@ -136,7 +138,7 @@ const listed = (record: WorkRecord, repos: readonly string[]) => record.kind !==
  * hasn't read yet, a record with a ticket waits until its ticket is read.
  */
 export function recordItems(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[] = [],
-  hidden: ReadonlySet<string> = new Set(), setups: readonly {repo:string;structureSync?:boolean}[] = []): Item[] {
+  hidden: ReadonlySet<string> = new Set(), setups: readonly {repo:string;structureSync?:boolean;writeRefinedSpec?:boolean}[] = []): Item[] {
   const { ticketOf, toItem } = itemMapper(records, tickets, setups);
   const waits = (record: WorkRecord) => record.ticket !== null && !ticketOf(record) && unread.some((repo) => sameRepo(repo, record.repository));
   const all = records.list({});

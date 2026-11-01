@@ -9,8 +9,9 @@ import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
 import { changeRecords, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
+import { setOverride } from '@lar-factory/shared/repository-settings';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { WorkRecordError } from '@lar-factory/work-records';
+import { openWorkRecords, WorkRecordError } from '@lar-factory/work-records';
 
 /** The project item reads the board has started, one per read of GitHub. */
 async function reads(board: Board): Promise<number> {
@@ -168,4 +169,28 @@ test("a read request naming an item reads that item alone, without loading the c
   assert.equal((await askRead(board)).status, 202);
   await waitFor(async () => await reads(board) > readsBefore);
   assert.equal(await configReads(), 0, 'refreshes use local settings');
+});
+
+
+test('a completed board read publishes while its Spec reads are still blocked', { timeout: 30_000 }, async t => {
+  const repository = 'example/product';
+  const issue = boardIssue(1, 'List', repository);
+  const board = await startBoard(t, { repositories: [repository], items: [issue] });
+  await firstRead(board);
+  const hold = await holdPath(t);
+  await writeFile(hold, '');
+  setOverride(repository, 'writeRefinedSpec', true, board.dataDir);
+  const records = await openWorkRecords(join(board.dataDir, 'work-records.db'));
+  try {
+    const id = board.id(1, repository);
+    const state = records.specState(id);
+    records.saveSpecState(id, state.generation, { ...state, active: true });
+  } finally { records.close(); }
+  await board.update({ repositories: [repository], items: [boardIssue(1, 'List', repository, ['bug'])], specReadHold: hold });
+  try {
+    await askRead(board);
+    await board.untilCalled(args => args[0] === 'spec-held');
+    const shown = await until(board, data => data.items.some(item => item.number === 1 && item.labels.includes('bug')));
+    assert.equal(shown.error, null);
+  } finally { await rm(hold, { force: true }); }
 });

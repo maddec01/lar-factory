@@ -33,7 +33,31 @@ function allowed(setup: RepositorySetup | undefined): setup is RepositorySetup {
 function save(records: WorkRecords, workId: string, state: SpecState, update?: Parameters<WorkRecords['saveSpecState']>[3]) {
   return records.saveSpecState(workId, state.generation, state, update);
 }
-async function readOne(records: WorkRecords, workId: string, options: SpecSyncOptions, provider: StructureProvider): Promise<StructureTicket | null> {
+const reading = new WeakMap<WorkRecords, Map<string, Promise<StructureTicket | null>>>();
+let activeReads = 0;
+const waitingReads: (() => void)[] = [];
+async function limitedRead(read: () => Promise<StructureTicket>): Promise<StructureTicket> {
+  if (activeReads >= 6) await new Promise<void>(resolve => { waitingReads.push(resolve); });
+  else activeReads++;
+  try { return await read(); }
+  finally {
+    const next = waitingReads.shift();
+    if (next) next();
+    else activeReads--;
+  }
+}
+function readOne(records: WorkRecords, workId: string, options: SpecSyncOptions, provider: StructureProvider): Promise<StructureTicket | null> {
+  let reads = reading.get(records);
+  if (!reads) { reads = new Map(); reading.set(records, reads); }
+  // Different generations must not share a result computed against an older provenance checkpoint.
+  const key = `${workId}:${records.specState(workId).generation}:${Boolean(options.initialize)}`;
+  const prior = reads.get(key);
+  if (prior) return prior;
+  const task = readFresh(records, workId, options, provider).finally(() => reads.delete(key));
+  reads.set(key, task);
+  return task;
+}
+async function readFresh(records: WorkRecords, workId: string, options: SpecSyncOptions, provider: StructureProvider): Promise<StructureTicket | null> {
   if (!records.specEligible(workId)) return null;
   const record = records.read(workId);
   const setup = (options.setups ?? readRepositorySetups(options.dir ?? boardDataDir())).find(setup => sameRepo(setup.repo, record.repository));
@@ -42,7 +66,7 @@ async function readOne(records: WorkRecords, workId: string, options: SpecSyncOp
   if (!before.active && before.pending === null && !options.initialize) return null;
   try {
     if (!provider.readSpec) throw Error('The provider cannot read ticket Specs.');
-    const ticket = await provider.readSpec(record.repository, Number(record.ticket!.split('#').at(-1)), before.held ?? before.base ?? undefined);
+    const ticket = await limitedRead(() => provider.readSpec!(record.repository, Number(record.ticket!.split('#').at(-1)), before.held ?? before.base ?? undefined));
     const remote = checkpoint(ticket);
     if (records.specState(workId).generation !== before.generation) return null;
     if (!before.base || !before.active && before.pending === null) {
@@ -91,23 +115,13 @@ async function readOne(records: WorkRecords, workId: string, options: SpecSyncOp
 
 /** Reread before later gates/builds, and during board ticket refreshes. A failed read keeps the last copy. */
 export async function refreshSpecs(records: WorkRecords, options: SpecSyncOptions = {}): Promise<void> {
-  const lease = await acquireTrackerSyncLock(records.trackerDatabasePath());
-  if (!lease) {
-    const ids = options.workId ? [options.workId] : options.workIds ?? records.specPending();
-    for (const id of ids) {
-      if (!records.specEligible(id)) continue;
-      const state = records.specState(id);
-      if (state.active || state.pending !== null) save(records, id, { ...state, failure: 'read', warning: 'Could not read the ticket while another tracker sync is running. Using the last local copy.' });
-    }
-    return;
-  }
-  try {
-    const provider = options.provider ?? structureProvider();
-    for (const workId of options.workId ? [options.workId] : options.workIds ?? records.list({}).filter(record => { const state = records.specState(record.workId); return state.active || state.pending !== null; }).map(record => record.workId)) {
-      await lease.assertOwned();
-      await readOne(records, workId, options, provider);
-    }
-  } finally { await lease.release(); }
+  const provider = options.provider ?? structureProvider();
+  const workIds = options.workId ? [options.workId] : options.workIds ?? records.list({}).filter(record => {
+    const state = records.specState(record.workId);
+    return state.active || state.pending !== null;
+  }).map(record => record.workId);
+  // Each read commits against its starting generation. Writes retain their cross-process lease.
+  await Promise.all(workIds.map(workId => readOne(records, workId, options, provider)));
 }
 const running = new WeakMap<WorkRecords, Promise<void>>();
 /** A failed write stays Ready and pending. The shared lease serializes spec and structure writes across processes. */

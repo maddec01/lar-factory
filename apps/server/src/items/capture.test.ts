@@ -290,3 +290,13 @@ test('an Add item reservation from before local conversion support still recover
   assert.equal(result.status, 200, JSON.stringify(result.body));
   assert.equal(records.read(itemOf(result.body).id).ticket, `${WEB}#22`);
 });
+
+test('picking a marked ticket imports only Original as initial context and restores no local brief', async () => {
+  const { formatTicketSpec } = await import('@lar-factory/shared');
+  const { capture, records } = await captureOn([ticket(7, { text: formatTicketSpec('Previously gated Spec.', 'Authored Original.') })]);
+  const reply = await capture.pick({ repo: WEB, number: 7 });
+  assert.equal(reply.status, 200);
+  const workId = itemOf(reply.body).id;
+  assert.equal(records.initialContext(workId), 'Authored Original.');
+  assert.equal(records.body(workId, 'brief'), null);
+});

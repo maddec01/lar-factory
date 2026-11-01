@@ -3,6 +3,7 @@
 // Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
 // commands in flight are private here, so every rule about which command blocks which lives in this file.
 
+import { refreshSpecs } from '@lar-factory/work-records/spec-sync';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -536,6 +537,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
       const branch = `${buildBranch(item)}${retry ? `-retry-${randomUUID().slice(0, 8)}` : ''}`;
       const { repo } = item;
       return async () => {
+        if (records) { await refreshSpecs(records, { workId: item.id }); reread(); }
         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
         const skills = await checkSkills?.(drift);
         if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true, ...skills.drift && { drift: skills.drift } };

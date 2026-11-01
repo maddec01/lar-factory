@@ -1,5 +1,5 @@
 // Picking imports durable structure once. It starts every recovered record in List and preserves later local work.
-import { mapConcurrent, stripTrackerStructure, type PickedTicket } from '@lar-factory/shared';
+import { mapConcurrent, readTicketSpec, stripTrackerStructure, type PickedTicket } from '@lar-factory/shared';
 import { readRepositorySetups, readConnections, saveConnections } from '@lar-factory/shared/repository-settings';
 import type { WorkRecord, WorkRecords } from '@lar-factory/work-records';
 import { readStructureSnapshot, structureProvider } from '@lar-factory/work-records/tracker-sync';
@@ -16,7 +16,9 @@ export async function importPickedTicket(records: WorkRecords, repository: strin
     const contexts=Object.fromEntries(await mapConcurrent(snapshot.nodes.filter(node=>node.ticket),async node=>{
       const number=Number(node.ticket!.slice(node.ticket!.lastIndexOf('#')+1));
       const read=node.repository===repository && number===ticket.number ? current : await provider.read(node.repository,number);
-      return [node.ticket!,stripTrackerStructure(read.body)] as const;
+      const body = stripTrackerStructure(read.body).replace(/<!-- lar-factory:create [^\n]*? -->/g, '').trimEnd();
+      const parsed = readTicketSpec(body);
+      return [node.ticket!, parsed.marked ? parsed.original ?? '' : body] as const;
     }));
     records.trackerRestore(snapshot, digest,contexts);
     const repositories=[...new Set(snapshot.nodes.map(node=>node.repository))].filter(repo=>setups.some(setup=>setup.repo.toLowerCase()===repo.toLowerCase()));
@@ -26,7 +28,8 @@ export async function importPickedTicket(records: WorkRecords, repository: strin
     return { record: restored, created: true };
   }
   const context = requestId ? ticket.text : ticket.text.replace(/<!-- lar-factory:structure\s*\n[\s\S]*?\n-->/g, '').replace(/<!-- lar-factory:create [^\n]*? -->/g, '').trimEnd();
-  const input = { title: ticket.title, context, repository, kind: ticket.kind, ticket: reference };
+  const parsed = readTicketSpec(context);
+  const input = { title: ticket.title, context: parsed.marked ? parsed.original ?? '' : context, repository, kind: ticket.kind, ticket: reference };
   const imported = requestId ? records.completeCapture(requestId, input) : records.importTicket(input);
   if (ticket.kind === 'concept') {
     const map = ticket.tracker?.map ?? context;

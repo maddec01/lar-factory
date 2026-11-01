@@ -2,7 +2,7 @@
 import { readTicketSpec, formatTicketSpec, validateDraft, effectiveIssueSettings, writeAccessProblem, onAzure, type TicketCreationOptions, type ItemDraft, type RepoConfig, type VocabularyKey } from '@lar-factory/shared';
 import { discoverTicketOptions } from '@lar-factory/shared/publication-settings';
 import { WORK_KINDS, WorkRecordError, type WorkKind, type WorkRecords } from './work-records.ts';
-import { rememberCreatedSpec } from './spec-sync.ts';
+import { refreshSpecs, rememberCreatedSpec } from './spec-sync.ts';
 import { structureProvider, type StructureProvider } from './tracker-sync.ts';
 
 type TicketDraft = Omit<ItemDraft, 'kind'> & { kind: WorkKind };
@@ -36,13 +36,22 @@ export async function captureWork(input: Record<string, unknown>, { records, rep
   try { claim = records.claimCapture(input.requestId, JSON.stringify(target ? { draft, target } : draft), target?.workId); }
   catch (err) { return reply(409, { error: (err as Error).message }); }
   const { fresh, submission } = claim;
+  const body = `${draft.description}\n\n<!-- lar-factory:create {"identity":"${input.requestId}"} -->`;
+  let createdTicket = submission.createdTicket ?? undefined;
+  const finishSpec = async (workId: string) => {
+    if (target && readTicketSpec(draft.description).marked) {
+      if (!records.specState(workId).active) {
+        // A lost create response has no provider checkpoint. Compare against the exact authorized submission instead.
+        rememberCreatedSpec(records, workId, createdTicket ?? { repository: draft.repo, number: Number(records.read(workId).ticket!.split('#').at(-1)),
+          title: draft.title, body, version: '' });
+      }
+      if (!fresh) await refreshSpecs(records, { workId, provider, setups: repos().flatMap(repo => repo.setup ? [repo.setup] : []) });
+    }
+    return records.read(workId);
+  };
   if (submission.workId) {
     try {
-      const record = records.read(submission.workId);
-      if (target && readTicketSpec(draft.description).marked && !records.specState(record.workId).active) {
-        const ticket = await (provider.readSpec ?? provider.read)(record.repository, Number(record.ticket!.split('#').at(-1)));
-        rememberCreatedSpec(records, record.workId, ticket);
-      }
+      const record = await finishSpec(submission.workId);
       return reply(200, { record, error: null });
     } catch (err) { return failed(err); }
   }
@@ -54,13 +63,11 @@ export async function captureWork(input: Record<string, unknown>, { records, rep
     } catch (err) { return failed(err); }
   }
   const uncertain = (extra = '') => reply(409, { uncertain: true, error: `The issue creation outcome is uncertain. This submission cannot create another issue. Check the board and use Find a ticket to recover it.${extra}` });
-  let createdTicket: import('./tracker-sync.ts').StructureTicket | undefined;
   let number = submission.ticket ? Number(submission.ticket.slice(submission.ticket.lastIndexOf('#') + 1)) : undefined;
   if (!number && !fresh) {
     try {
       const matches = (await provider.find(draft.repo, input.requestId)).filter(ticket => ticket.body.includes(`<!-- lar-factory:create {"identity":"${input.requestId}"} -->`));
       if (matches.length !== 1) return uncertain(onAzure(draft.repo) ? ' Azure may have stripped its hidden marker.' : '');
-      createdTicket = matches[0];
       number = matches[0]!.number;
       if (!isTicketNumber(number)) return uncertain();
     } catch { return uncertain(); }
@@ -114,7 +121,6 @@ export async function captureWork(input: Record<string, unknown>, { records, rep
       if (problem) { records.failCapture(input.requestId, problem); return reply(403, { error: problem }); }
       if (writeAccessProblem(draft.repo, 'tag-ticket', latest?.access ?? {}, safety)) options.labels = [];
       if (writeAccessProblem(draft.repo, 'type-ticket', latest?.access ?? {}, safety)) options.type = backlogType;
-      const body = `${draft.description}\n\n<!-- lar-factory:create {"identity":"${input.requestId}"} -->`;
       const ticket = await provider.create(draft.repo, draft.title, body, options.type, areaPath, options);
       createdTicket = ticket;
       number = ticket.number;
@@ -129,14 +135,10 @@ export async function captureWork(input: Record<string, unknown>, { records, rep
     }
   }
   try {
-    records.saveCaptureTicket(input.requestId, `${draft.repo}#${number}`);
-    if (target && readTicketSpec(draft.description).marked && !createdTicket) {
-      createdTicket = await (provider.readSpec ?? provider.read)(draft.repo, number!);
-    }
+    records.saveCaptureTicket(input.requestId, `${draft.repo}#${number}`, createdTicket);
     const { record } = records.completeCapture(input.requestId, { title: draft.title, context: draft.description,
       repository: draft.repo, kind: draft.kind, ticket: `${draft.repo}#${number}` }, target);
-    if (target && readTicketSpec(draft.description).marked && createdTicket?.body !== undefined) rememberCreatedSpec(records, record.workId, createdTicket);
-    return reply(200, { record, error: null });
+    return reply(200, { record: await finishSpec(record.workId), error: null });
   } catch {
     return reply(502, { uncertain: true, error: `Created ${draft.repo}#${number}, but could not save its record. Use Find a ticket to add it. This submission will not create another issue.` });
   }

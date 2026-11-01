@@ -20,8 +20,10 @@ export const STATUSES = [
 
 export type Status = (typeof STATUSES)[number];
 
+export const STATUS_LABEL_PREFIX = 'status-';
+
 /** A status kept on an issue as a label: `status-` and its name in lowercase, with hyphens for spaces. Done has no label. */
-export const statusLabel = (status: Exclude<Status, 'Done'>): string => `status-${status.toLowerCase().replaceAll(' ', '-')}`;
+export const statusLabel = (status: Exclude<Status, 'Done'>): string => `${STATUS_LABEL_PREFIX}${status.toLowerCase().replaceAll(' ', '-')}`;
 
 /** The statuses an issue's labels hold, in flow order. */
 export const labelStatuses = (labels: readonly string[]): Status[] => STATUSES.filter((s) => s !== 'Done' && labels.includes(statusLabel(s)));

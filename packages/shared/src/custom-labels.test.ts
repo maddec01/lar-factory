@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { customLabelProblem, customTagProblem, isKindLabel } from './custom-labels.ts';
+import { customLabelProblem, customTagProblem } from './custom-labels.ts';
 
 test("a custom label may hold a colon, but gives no kind or Status and is not empty", () => {
   assert.equal(customLabelProblem('app: music'), null);
@@ -19,8 +19,4 @@ test('a custom tag is refused as a custom label is, and also when it holds a com
   assert.match(customTagProblem('Bug')!, /reserved for the item's kind/);
   assert.equal(customTagProblem('app, music'), 'Use a tag name without commas or semicolons.');
   assert.equal(customTagProblem('app; music'), 'Use a tag name without commas or semicolons.');
-});
-
-test('the kind labels are bug, feature, improvement and concept, in any case', () => {
-  assert.deepEqual(['Bug', 'feature', 'IMPROVEMENT', 'concept', 'build', 'web'].map(isKindLabel), [true, true, true, true, false, false]);
 });

@@ -40,6 +40,9 @@ function settingsProblemOf(raw: Record<string, unknown>, azure: boolean): string
   if ('labels' in raw && !isStrings(raw.labels)) return 'field labels must be an array of strings';
   if ('domainDocs' in raw && !isDomainDocs(raw.domainDocs)) return 'field domainDocs must be {"kind": "private"} or name the repository\'s glossary and adrs paths';
   if ('vocabulary' in raw && !isVocabularyMapping(raw.vocabulary)) return 'field vocabulary must map concept, build and kinds to {type: string or null, labels: string[]}';
+  for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
+    if (key in raw && typeof raw[key] !== 'boolean') return `field ${key} must be a boolean`;
+  }
   if ('skills' in raw && !isStrings(raw.skills)) return 'field skills must be an array of strings';
   return null;
 }

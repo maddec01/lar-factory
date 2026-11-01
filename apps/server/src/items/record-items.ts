@@ -104,6 +104,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       ...(sync && {sync}),
       ...(spec && (spec.pending !== null || spec.error || spec.warning) && { specSync: { pending: spec.pending !== null, error: spec.error, warning: spec.warning } }),
       revision: record.revision,
+      passingBrief: records.gate(record.workId).current,
       status: record.status,
       statuses: done ? [] : [record.status],
       kind: record.kind === 'slice' ? 'issue' : record.kind,

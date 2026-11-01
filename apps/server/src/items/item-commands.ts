@@ -70,7 +70,7 @@ export interface ItemCommands {
    * the PR reopens it in its provider, a replacement build moves the work to Ready for Start build, and reopening the
    * work moves it to List. Setting it aside is Abandon.
    */
-  resolveNeedsYou(itemId: string, choice: unknown): Promise<Reply>;
+  resolveNeedsYou(itemId: string, choice: unknown, briefChoice?: unknown): Promise<Reply>;
   /**
    * Marks a Dependency holding the item met, as the user decided, or clears the mark when `met` is false. `revision` is
    * the Dependency's as the board showed it, so a change since then refuses the write.
@@ -217,7 +217,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
   /** Why a command in flight on the item, or a Start this board run, blocks this action; null when nothing does. */
   function busyReason(itemId: string, action: Action): string | null {
     if (combined.has(itemId)) return 'Abandon and close ticket is running. Wait for it to finish.';
-    if (['List', 'Queued'].includes(board.find(itemId)?.status ?? '') && recordedThreads(itemId).length > 0 && recordedThreads(itemId).every(t => t.deletedAt) && !records?.launchIntents({ workId: itemId, unresolved: true }).length) return null;
+    if (['List', 'Queued'].includes(board.find(itemId)?.status ?? '') && recordedThreads(itemId).length > 0 && !!recordedThreads(itemId).at(-1)?.deletedAt && !records?.launchIntents({ workId: itemId, unresolved: true }).length) return null;
     const started = buildStarts.has(itemId) || starts.has(itemId) || !!board.snapshot().started?.[itemId] || recordedStart(itemId);
     if (started && action === 'back to List') return 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
     if (started && action === 'abandon') return 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
@@ -367,10 +367,12 @@ export function createItemCommands({ board, items, records, reread, archive, off
    * threads as T3 shows them. Null when every one stopped or was deleted, so a start may run again.
    */
   function heldThread(item: Item, purpose: string): StartedThread | null {
-    for (const { threadId } of records!.threads(item.id).filter((t) => t.purpose === purpose).reverse()) {
+    const history = records!.threads(item.id).filter((t) => t.purpose === purpose);
+    if (history.at(-1)?.deletedAt && Array.isArray(item.threads) && !item.threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)) return null;
+    for (const { threadId } of history.reverse()) {
       if (deleted.has(threadId) || records!.threads(item.id).find(t => t.threadId === threadId)?.deletedAt) continue;
       const shown = Array.isArray(item.threads) ? item.threads.find((t) => t.id === threadId) : undefined;
-      if (shown?.state === 'stopped' && !shown.hasLiveChildren) continue;
+      if (shown && shown.state !== 'running' && shown.state !== 'needs you' && !shown.hasLiveChildren) continue;
       return { threadId, title: shown?.title ?? item.title };
     }
     return null;
@@ -655,7 +657,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
       return withBoard(200, { error: null });
     },
 
-    async resolveNeedsYou(itemId, choice) {
+    async resolveNeedsYou(itemId, choice, briefChoice) {
       const item = board.find(itemId);
       if (!item) return reply(404, { error: GONE });
       if (!records) return withBoard(409, { error: 'The board has no work records to change.' });
@@ -663,7 +665,11 @@ export function createItemCommands({ board, items, records, reread, archive, off
       if (item.needsYou.deletedThread) {
         if (choice !== 'back-to-queue' && choice !== 'back-to-list') return withBoard(409, { error: 'Choose a move offered for this work.' });
         if (!item.needsYou.offers.includes(choice) || !Array.isArray(item.threads) || item.threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)) return withBoard(409, { error: 'This work cannot move while a thread or PR is open.' });
+        if (briefChoice !== undefined && briefChoice !== 'keep' && briefChoice !== 'reshape') return withBoard(422, { error: 'Choose keep passing or reshape.' });
+        if (records.gate(itemId).current && briefChoice === undefined) return withBoard(422, { error: 'Choose keep passing or reshape.' });
         try {
+          if (briefChoice === 'reshape') write(itemId, revision => records.invalidateGate(itemId, revision));
+          // Cleanup must capture records.children(itemId) before resetBuild deletes owned slices.
           if (item.kind === 'build') write(itemId, revision => records.resetBuild(itemId, revision));
           write(itemId, revision => records.update(itemId, revision, { status: choice === 'back-to-queue' ? 'Queued' : 'List' }));
           starts.delete(itemId);

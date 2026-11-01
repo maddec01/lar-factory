@@ -584,3 +584,31 @@ test('an active Start prevents combined abandonment before provider access', asy
   board.update({ items: [item] });
   assert.equal((await commands.resolveNeedsYou(item.id, 'clear')).status, 409);
 });
+
+for (const briefChoice of ['keep', 'reshape'] as const) test(`deleted-thread move requires a brief choice and can ${briefChoice}`, async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Recover work', repository: WEB, kind: 'build', status: 'Review' });
+  records.setBody(work.workId, work.revision, 'brief', 'Keep this brief.');
+  records.recordGate(work.workId, records.read(work.workId).revision, { briefDigest: records.gate(work.workId).briefDigest!, approvedBy: 'test', evidence: 'Passed.' });
+  const { commands, board } = recordedCommands(records);
+  const item = board.find(work.workId)!;
+  board.update({ items: [{ ...item, threads: [], needsYou: { reason: 'Deleted', deletedThread: true, offers: ['back-to-list'] } }] });
+  assert.equal((await commands.resolveNeedsYou(work.workId, 'back-to-list', 'invalid')).status, 422);
+  assert.equal((await commands.resolveNeedsYou(work.workId, 'back-to-list')).status, 422);
+  assert.equal(records.read(work.workId).status, 'Review');
+  assert.equal((await commands.resolveNeedsYou(work.workId, 'back-to-list', briefChoice)).status, 200);
+  assert.equal(records.read(work.workId).status, 'List');
+  assert.equal(records.body(work.workId, 'brief'), 'Keep this brief.');
+  assert.equal(records.gate(work.workId).current, briefChoice === 'keep');
+});
+
+test('Shape after moving back starts fresh despite an older idle thread', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Recover shaping', repository: WEB, kind: 'feature', status: 'Queued' });
+  records.addThread(work.workId, work.revision, 'older', 'shape');
+  records.addThread(work.workId, records.read(work.workId).revision, 'deleted', 'shape');
+  records.confirmThreadDeleted(work.workId, records.read(work.workId).revision, 'deleted');
+  const { commands, started } = recordedCommands(records, { shown: () => [{ id: 'older', title: 'Old work', updated: '2026-11-01T00:00:00Z', state: 'done' }] });
+  assert.equal((await commands.start(work.workId, undefined)).status, 200);
+  assert.equal(started.length, 1);
+});

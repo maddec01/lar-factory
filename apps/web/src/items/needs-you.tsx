@@ -1,3 +1,4 @@
+import { useState } from 'react';
 // Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
 // offers for it, then Clear for after the user checked, such as T3 after an uncertain start. Set aside is Abandon.
 
@@ -15,6 +16,7 @@ const LABELS: Record<NeedsYouOffer, string> = {
 };
 
 export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
+  const [move, setMove] = useState<'back-to-queue' | 'back-to-list' | null>(null);
   const action = useItemAction(item.id);
   if (!item.needsYou) return null;
   const state = writeState(data, action);
@@ -25,11 +27,15 @@ export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
         {item.needsYou.offers.map((offer) => (
           <Button {...kind('other')} key={offer} {...state} disabled={state.disabled || (item.needsYou?.deletedThread && offer === 'start-again')} aria-label={`${LABELS[offer]}: ${itemName(item)}`}
             {...offer === 'set-aside' ? { 'data-abandon': item.id, onClick: () => askAbandon(item.id) }
-              : { 'data-needs-you': item.id, onClick: () => void resolveNeedsYou(item.id, offer) }}>{LABELS[offer]}</Button>
+              : { 'data-needs-you': item.id, onClick: () => { if (item.needsYou?.deletedThread && item.passingBrief && (offer === 'back-to-queue' || offer === 'back-to-list')) setMove(offer); else void resolveNeedsYou(item.id, offer); } }}>{LABELS[offer]}</Button>
         ))}
         {!item.needsYou.deletedThread && <Button {...kind('other')} {...state} data-needs-you={item.id} aria-label={`Clear Needs you on ${itemName(item)}`}
           onClick={() => void resolveNeedsYou(item.id, 'clear')}>Clear</Button>}
       </span>
+      {move && <div><p>Keep the brief passing or reshape from its text?</p>
+        <Button {...kind('other')} {...state} onClick={() => void resolveNeedsYou(item.id, move, 'keep')}>Keep passing</Button>
+        <Button {...kind('other')} {...state} onClick={() => void resolveNeedsYou(item.id, move, 'reshape')}>Reshape</Button>
+      </div>}
     </div>
   );
 }

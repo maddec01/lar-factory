@@ -4,6 +4,10 @@ Write the brief to a file, then save it in the record with
 `lar-work set-body <work ID> --revision N --body brief --file <file>`. The
 user's original text stays in the record's initial context.
 
+Read the local [domain-doc setting](shared/domain-docs.md#where-domain-docs-live)
+before drafting. With it OFF, write `none` under Domain docs and create no drafts.
+With it ON, use the entries and ADR drafts in the template below.
+
 ```markdown
 ## What
 <the change, in the user's domain language>
@@ -24,3 +28,7 @@ user's original text stays in the record's initial context.
 ## Verify
 <"yes" with why (visible, auth, migrations, deployment, hard to check), or "no">
 ```
+
+Run [Gate](gate.md) on the final text. With Spec writing ON, the whole passing
+brief becomes the ticket's main description, retaining its prior text as
+Original. Follow [Ticket Specs](shared/issue-tracker/work-records.md#ticket-specs).

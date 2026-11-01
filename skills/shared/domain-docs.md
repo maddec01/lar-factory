@@ -7,16 +7,20 @@ Actively build and sharpen the project's domain model as you design. This is the
 ## Where domain docs live
 
 `repo-config.sh <repository>` reads this machine's local `domainDocs` setting.
-This one setting controls all domain-doc writes. `private` is OFF and
-`repository` is ON. No repository instructions or setup files are required.
+This setting controls drafting and file writes. `off` is OFF and `repository`
+is ON. A saved `private` value reads as OFF, never as a private drafting mode.
+No repository instructions or setup files are required.
 
 `{"kind": "repository", "glossary": "GLOSSARY.md", "adrs": "docs/adr"}`
 names the glossary file and ADR folder. Use the configured paths in place of the
 examples below. Builds include the relevant entries and ADRs in their build PR.
 
-`{"kind": "private"}` keeps drafts in local work records. Read existing domain
-docs for context, but write no glossary or ADR files and offer no later
-publication. Shaping alone writes no repository files in either mode.
+`{"kind": "off"}` means write no domain drafts or glossary or ADR files. Read
+existing domain docs for context and write "none" in the brief's or map's Domain
+docs and a decision's domain-drafts body. Offer no later publication. When ON,
+shaping drafts entries in work records, the whole gated brief includes them in
+the ticket Spec when enabled, and the builder writes them in the build PR.
+Shaping alone writes no repository files in either mode.
 
 ## File structure
 
@@ -70,7 +74,14 @@ When the user states how something works, check whether the code agrees. If you 
 
 ### Capture domain docs
 
-Shaping, concept and decision threads draft each resolved entry in the work record: a decision's domain drafts (`lar-work set-body --body domain-drafts`), then the brief's or map's Domain docs. They leave the checkout as found. The builder writes those drafts in the build PR unless the drafts are private. An entry or ADR that cites where it came from names the published ticket, or the build PR when there is none, never a work ID or local path. Capture each term as it settles. Use the format in [glossary-format.md](./glossary-format.md).
+When domain docs are ON, shaping, concept and decision threads draft each
+resolved entry in the work record. Save a decision's domain drafts with
+`lar-work set-body --body domain-drafts`, then include them in the brief's or
+map's Domain docs. They leave the checkout as found. The builder writes those
+drafts in the build PR. An entry or ADR that cites its origin names the published
+ticket, or the build PR when there is none, never a work ID or local path.
+Capture each term as it settles using [glossary-format.md](./glossary-format.md).
+With domain docs OFF, keep Domain docs and domain-drafts as "none".
 
 `GLOSSARY.md` should be totally devoid of implementation details. Do not treat `GLOSSARY.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
 

@@ -19,9 +19,18 @@ and open it with T3 Code running. In Settings > Repositories, choose Add reposit
 1. Choose a repository from your T3 Code projects.
 2. Choose its issue source, domain docs and tracker sync. GitHub uses repository
    issues; Azure DevOps uses a team's backlog and current sprint together.
-   Domain docs are OFF by default. Tracker structure sync is ON by default.
-3. Review access and add the repository. The saved access choices apply to later
-   work, so routine actions need no repeated permission prompt.
+   Choose whether to write domain docs. Tracker structure sync is ON by default
+   and creates a `linked-work` label when first used.
+3. Choose issue defaults and optional vocabulary mappings, then review Access
+   and add the repository. Create issues from Add item, Create issues from retro
+   captures and Write the refined spec to the issue all default to ON, including
+   for existing repositories. Settings lets you change them later.
+
+Verified Access controls writes. Refused or unchecked access disables the
+corresponding options and explains why; Recheck access refreshes it. The session
+setting `LAR_FACTORY_AZURE_READ_ONLY=1` bars Azure writes. Repository, organization
+and project names and old consent lists grant no permission. Routine writes
+covered by the saved settings need no repeated permission prompt.
 
 The configured source supplies the repository List. Settings stay on this machine.
 The factory uses existing project conventions, package scripts, manifests, CI and
@@ -48,15 +57,60 @@ Work records keep ordinary progress on this machine, including queue, board
 Status, decisions, slices, threads and review results. Tracker sync never
 writes queue, board Status, workflow stage or per-item progress to a tracker.
 
+## Add work and create issues
+
+Add item's Create issue checkbox follows the selected repository's default and
+can change it for one submission. GitHub offers labels, assignee and milestone,
+plus issue type for organization repositories. Azure offers work item type,
+tags, assignee and iteration, using the team's default area. Only title,
+repository and kind are required. Kind mappings fill labels and type; the other
+fields start empty. Fields without write Access are hidden and omitted.
+Optional vocabulary mappings allow none, suggest existing same-name labels and
+create typed labels only when saved. Skipping that step creates no labels.
+
+An unreadable options list still allows title and description; Azure requires a
+readable backlog type. A failed create keeps the draft open and adds nothing to
+List. An uncertain outcome blocks resubmission while its durable request ID and
+hidden marker look for the existing ticket. If Azure strips the marker, check
+the board as the error requests. If the ticket exists but its local record could
+not be saved, use Find a ticket with the issue named in the error.
+
+A ticketless item's details offer Create issue beside Attach a ticket, with the
+same options and a preview of its stored title and text, without text editing.
+It keeps the work ID and works regardless of the Add item default. It sends the
+description, or the current passing brief as Spec with Original when Spec writing
+is ON. Picked retro suggestions use the separate retro default, kind mappings
+and their description. Failed retro creates stay local and report the error for
+later conversion. `lar-work create` alone stays local. Concept captures follow
+structure sync. Each card, row and item details shows GitHub, Azure or a laptop
+for local work; conversion updates the source icon.
+
 ## Ticket Specs
 
-With “Write the refined spec to the issue” on, a passing gate puts the whole
-brief in the ticket's main description and preserves its earlier text as Original.
-A durable outbox retries failed writes; the item stays Ready and offers retry in
-details. Trusted tracker edits become the local copy without changing Status.
-GitHub edits whose editor lacks verified write access, or whose editor is unknown,
-wait in details for Accept or Reject. Later gates and builds reread the ticket;
-a failed read keeps the last local copy and shows a warning.
+With Write the refined spec to the issue ON, a passing gate puts the whole
+brief in the ticket's main description as Spec and preserves its earlier text
+as Original. This includes other people's tickets in onboarded repositories;
+concept maps, decisions, slices and Dependency tickets are excluded.
+The ticket becomes the source of truth and the record keeps a copy for gates
+and builds. Before the first Spec, or with the setting OFF, briefs stay local.
+
+A durable outbox retries failed writes; the item stays Ready and offers retry
+in details. The last synced digest or revision distinguishes an unchanged
+ticket from a tracker edit, preserving an unsent brief after failure. A
+concurrent main-text edit on the tracker wins and gate history keeps the
+replaced unsent text. GitHub rereads just before writing but has a small race
+because it has no conditional body update; Azure tests the work-item revision.
+
+Trusted tracker title and Spec edits become the local copy without changing
+Status, with their provenance in gate history. GitHub edits whose editor lacks
+verified write access, or whose editor is unknown, wait in details for Accept or
+Reject. Saving a description in details approves that exact Spec and queues its
+ticket write, keeping Ready. Later gates and builds reread the ticket; a failed
+read keeps the last local copy and shows a warning. An edit during a build leaves
+the running build as it started. Removing markers from an active Spec makes its
+whole description count as Spec. Importing a marked ticket on another machine
+uses Original as context and restores no local brief. See
+[Ticket Specs](skills/shared/issue-tracker/work-records.md#ticket-specs) for the protocol.
 
 GitHub keeps Original collapsed. Azure converts the Spec to HTML and uses a
 collapsed Original containing a visible `Original (Lar Factory)` heading as a
@@ -69,8 +123,8 @@ do not establish how a live Azure deployment sanitizes these fields.
 The ON-by-default onboarding option saves concepts and multi-repository structure
 only. It saves kind, map diagram, parts, Connections between repositories,
 Dependencies on other owners, and which issues belong together. It includes only
-shaping results necessary to explain that structure. Ordinary briefs, decision
-records, slices and progress stay local. A gated brief and its domain drafts use
+shaping results necessary to explain that structure. Decision records, slices
+and progress stay local. A whole gated brief and its enabled domain drafts use
 the separate Ticket Spec setting. Turning sync OFF keeps
 structure local too and causes no later publish prompt.
 
@@ -98,12 +152,15 @@ sync does not restore ordinary briefs, decisions, slices or build progress.
 
 ## Domain docs
 
-One local `domainDocs` setting controls glossary and ADR writes. OFF is
-`{ "kind": "private" }`. Terms and decisions stay in local work records; builds
-write no domain docs and never ask to publish them later. ON is
+One local `domainDocs` setting controls domain drafting and file writes. OFF is
+`{ "kind": "off" }`; a saved `private` value also reads as OFF. With it OFF,
+shaping creates no drafts, Domain docs says "none", and builds write no glossary
+or ADR files and offer no later publication. ON is
 `{ "kind": "repository", "glossary": "GLOSSARY.md", "adrs": "docs/adr" }`.
-Builds include the relevant glossary entries and ADRs in their build PR, creating
-files only when needed. Shaping itself leaves repository files unchanged.
+With it ON, shaping drafts entries in work records, the whole gated brief puts
+them in the ticket Spec when enabled, and builds include the relevant glossary
+entries and ADRs in their build PR, creating files only when needed. Shaping
+itself leaves repository files unchanged.
 
 ## Local data and commands
 

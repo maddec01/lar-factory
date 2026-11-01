@@ -11,7 +11,9 @@ of unreviewed fixes, its **Domain docs added by the build** list and its
 out-of-scope notes. Read the build's record (`lar-work read`) and brief
 (`lar-work body <work ID> --body brief`). Glossary and ADR edits
 from the brief's **Domain docs** are part of the change only when the local
-`domainDocs` setting is repository. Private drafts stay local.
+`domainDocs` setting is repository. With it OFF, including legacy private
+values, Domain docs is "none" and no drafts or glossary or ADR writes belong
+in this build.
 
 Resolve and carry `base_branch` per `project-rules.md` before the commands below.
 

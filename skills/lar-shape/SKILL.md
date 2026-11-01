@@ -13,8 +13,8 @@ verifies visible changes and merges every PR.
 Read [prose rules](shared/prose.md) before writing. Read each step and its
 linked references only when reached. The work record is the handover: keep its
 brief, map, decisions and blockers there through `lar-work` and the shared
-scripts, per [work records](shared/issue-tracker/work-records.md). Only the
-structural projection described below reaches a tracker. Move Status locally
+scripts, per [work records](shared/issue-tracker/work-records.md). That guide
+covers issue creation, whole gated Specs and tracker edits. Move Status locally
 at each step with `status.sh`.
 Facts are yours to find; decisions are the user's. Delegated work follows
 [orchestration](shared/orchestration.md), with reports of at most 300 words,
@@ -35,4 +35,5 @@ Never merge or push to the repository's default branch. Follow its commit rules 
 
 For concept or multi-repository structural changes, follow
 [Tracker structure sync](shared/issue-tracker/publication.md). Ordinary progress
-and briefs stay local. Honor the saved sync choice without a publish prompt.
+stays local. Whole gated briefs use [Ticket Specs](shared/issue-tracker/work-records.md#ticket-specs),
+independently of structural sync. Honor saved settings without a publish prompt.

@@ -23,10 +23,12 @@ Assume the author is overconfident. Hunt for:
   belongs in a build in that repository within the user's authorized scope, or in a
   Dependency for the team that owns it, and **Notes for the builder** names
   which one.
-- **Provider writes**: a step that edits a ticket's body, comments, labels,
-  tags or Azure State to record progress; factory progress stays in the work
-  record.
-- **Domain docs**: every term the brief uses matches the glossary, or
+- **Provider writes**: a step that writes factory progress to a ticket's body,
+  comments, labels, tags or Azure State. Issue creation, whole gated Specs with
+  Original and structural sync follow the repository's saved settings and
+  verified Access. Those writes are allowed; progress stays in work records.
+- **Domain docs**: with the setting OFF, Domain docs says "none" and contains
+  no drafts. With it ON, every term the brief uses matches the glossary, or
   **Domain docs** adds or changes it as a `glossary-format.md` entry. Nothing
   contradicts an ADR without superseding it. Every ADR draft meets
   `domain-docs.md`'s three conditions: hard to reverse, surprising without

@@ -2,8 +2,9 @@
 
 Use after the builder's retro selection. Capture selected work as List records
 on this machine; shaping and implementation come later. Ordinary captures create
-tickets when the destination's retro setting is on. A concept follows the saved
-structural-sync option. Keep the source build's final Status throughout,
+tickets when the destination's retro setting is on, as it is by default.
+Verified Access and the session-wide Azure read-only setting still apply.
+A concept follows the saved structural-sync option. Keep the source build's final Status throughout,
 including clarification questions and failures.
 
 ## Select and route
@@ -49,6 +50,7 @@ For each selection, in order:
 
 Report each made or reused record's title and work ID, its ticket when created,
 and each failed pick with its error. A failed ticket create leaves its record
-local for conversion from item details. Rerun a failed pick in this thread with
-its saved IDs. An uncertain create only searches for its existing result and
+local for conversion from item details. Report Access refusals and provider
+errors without changing the source build's final Status. A saved failure stays
+with its submission; rerunning uses the saved IDs and reports that outcome. An uncertain create only searches for its existing result and
 never creates another ticket. Follow its error when the result cannot be found.

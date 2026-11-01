@@ -1,4 +1,4 @@
-// Public structural facts travel with an issue. Private briefs, local IDs and thread progress never do.
+// Structure sync carries public relationships, omitting briefs, local IDs and progress. Gated briefs use the separate Spec path.
 import type { Kind } from './model.ts';
 import { isRecord } from './is-record.ts';
 

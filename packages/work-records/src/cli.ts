@@ -72,8 +72,9 @@ Changes
 Structure
   sync-structure <work-id>          Save concept and cross-repository structure now.
                                     Automatic saves use the same durable outbox.
-                                    Queue order, Status, briefs, decision answers,
-                                    slices and thread progress stay on this machine.
+                                    This path omits briefs and decision answers.
+                                    Queue order, Status, slices and progress stay local.
+                                    Whole gated briefs use the separate Spec path.
   A concept owns decisions and builds, and a build owns slices. A record has at
   most one parent. A blocker is a record the work waits on; a record can't block
   itself or close a cycle. Each change bumps the revision of both records.
@@ -108,14 +109,24 @@ Completion
   finish <work-id> --revision N     Record that a slice merged into its build branch.
 
 Content
-  Bodies stay in the record. create-ticket can send a current passing brief
-  as Spec with a collapsed Original section. A concept holds a map; a decision holds its text, its confirmed answer and its
-  domain drafts; any other record holds a brief. A --file of - reads standard
-  input.
+  A concept holds a map; a decision holds text, a confirmed answer and domain
+  drafts; other records hold briefs. Domain docs OFF means no drafts and Domain
+  docs says none; legacy private reads as OFF. With it ON, drafts go in the
+  whole gated brief and build PR. A --file of - reads standard input.
+  Onboarded repositories default issue creation for Add item and retro, and Spec
+  writing, to ON. Verified Access and Azure read-only restrictions control writes.
+  create-ticket sends a description, or a current passing brief as Spec with
+  collapsed Original when enabled. Gating a ticket-backed ordinary brief queues
+  the whole Spec automatically, including tickets authored by other people.
+  Concepts, decisions, slices and Dependency tickets are excluded.
+  Once synced, the ticket is the source of truth; the record keeps a copy for
+  gates and builds. Before the first Spec or with the setting OFF, briefs stay
+  local. Neither structure sync nor Spec sync writes factory progress.
   set-body <work-id> --revision N --body brief|decision|map|answer|domain-drafts
            --file F
                                     Replace the body with the markdown in F.
-  body <work-id> --body B           Print the body as markdown.
+  body <work-id> --body B           Print the body as markdown. Brief reads refresh
+                                    active Specs; reread the revision after a refresh.
   set-phase <work-id> --revision N --phase P
                                     P is one of plan, implement, domain-docs,
                                     full-checks, review, approve, checks, retro.
@@ -140,11 +151,25 @@ Content
   review-rounds <work-id>           Print the build's review rounds.
 
 Brief gate
-  gate <work-id>                    Print the current brief digest and gate history.
+  gate <work-id>                    Reread the ticket Spec, then print the brief digest,
+                                    gate history and specSync warnings or held edits.
+                                    Review the refreshed brief and revision before gating.
   record-gate <work-id> --revision N --digest H --identity I --evidence E
                                     Attest that this exact brief passed its gate.
+                                    Rereads again; stale revisions or digests fail.
                                     Eligible tickets queue a durable Spec write. A
                                     failed write keeps Ready and offers retry in details.
+  Spec writes preserve prior text as Original. A digest on GitHub or revision on
+  Azure identifies tracker edits; an unchanged ticket keeps an unsent brief.
+  Concurrent tracker text wins, with the unsent text retained in gate history.
+  GitHub rereads just before writing but has no conditional body update, leaving
+  a small race. Azure tests the revision and uses Repro Steps for Bugs.
+  GitHub edits without verified write provenance wait for Accept or Reject in
+  details before use. Details saves approve the exact Spec and queue its write.
+  Build starts reread the ticket, using the last copy with a warning on failure.
+  Edits leave an already running build as it started. Removing Spec markers makes
+  the whole description the Spec. Adding a marked ticket on another machine uses
+  Original as context and restores no local brief or gate history.
 
 Provider observations
   An observation is the last read of the record's ticket or current PR from its
@@ -249,7 +274,10 @@ Options
 Errors
   A failure prints "lar-work: <reason>" on stderr and exits with 1. The reason
   names the record, ticket or file involved, never a credential. Usage mistakes
-  exit with 2. Records stay as they were after any failure.
+  exit with 2. Failed local changes write nothing. A failed ticket create leaves
+  its capture local; an uncertain create must reuse its request ID and never
+  create another issue. A failed Spec write keeps the local brief pending and
+  reports its error without undoing the gate or Ready.
 `;
 
 class UsageError extends Error {}

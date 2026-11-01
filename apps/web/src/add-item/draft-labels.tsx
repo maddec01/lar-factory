@@ -4,7 +4,7 @@
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
-import { isManagedLabel, sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
+import { sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { RepoConfig, TicketCreationOptions, TicketOptions, VocabularyKey } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -24,7 +24,7 @@ export function DraftLabels({ repo, kind, read, kept, headingClass }: {
   kept?: TicketOptions | undefined;
   headingClass: string;
 }) {
-  const { heading, noun, nameProblem } = trackerCapabilities(repo.repo);
+  const { heading, noun, nameProblem, isManaged } = trackerCapabilities(repo.repo);
   const { setup } = repo;
   /** The labels mapped to `of` that the tracker has: one renamed or deleted outside the factory is left out. */
   const mapped = (of: string) => (setup?.vocabulary[of as VocabularyKey]?.labels ?? []).flatMap((label) => read.labels.find((name) => sameLabel(name, label)) ?? []);
@@ -42,8 +42,8 @@ export function DraftLabels({ repo, kind, read, kept, headingClass }: {
     group.current?.dispatchEvent(new Event('input', { bubbles: true }));
   };
   // A managed label is never offered, but one the kind maps to stays on the ticket, as the board reads its kind from it.
-  const locked = mapped(kind).filter(isManagedLabel);
-  const choices = [...read.labels.filter((name) => !isManagedLabel(name)), ...locked, ...typed].map((name) => ({ name, color: colorOf(read, name) }));
+  const locked = mapped(kind).filter(isManaged);
+  const choices = [...read.labels.filter((name) => !isManaged(name)), ...locked, ...typed].map((name) => ({ name, color: colorOf(read, name) }));
   return (
     <div ref={group} id="item-labels" role="group" aria-label={heading} className="grid gap-1.5">
       <span className={headingClass}>{heading}</span>

@@ -188,10 +188,21 @@ export interface WorkRecord {
   skills: string[] | null;
   /** When its work was finished, as its delivery PR showed, or null while unfinished. A Status never implies it. */
   finishedAt: string | null;
+  /** The kind the record and its ticket last agreed on, or null when a change never settled one. */
+  agreedTicketKind: WorkKind | null;
+  /** The user's answer to a kind disagreement, or null while none holds. Changing the record's kind drops it. */
+  kindAnswer: KindAnswer | null;
   /** Counts the record's changes; every change names the revision it read. */
   revision: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** What the user said about a disagreement between the two kinds it covers; a null ticket kind is a ticket with none. */
+export interface KindAnswer {
+  answer: 'keep' | 'update';
+  itemKind: WorkKind;
+  ticketKind: WorkKind | null;
 }
 
 export interface NewWorkRecord {
@@ -242,7 +253,9 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   initialContext(workId: string): string;
   /** The matching records, Queued ones in Queue order first, then the rest in the order they were made. */
   list(filter: WorkRecordFilter): WorkRecord[];
-  update(workId: string, revision: number, change: { status?: Status; kind?: WorkKind }): WorkRecord;
+  update(workId: string, revision: number, change: { status?: Status; kind?: WorkKind; agreedTicketKind?: WorkKind }): WorkRecord;
+  /** Records the user's answer about the record's kind and `ticketKind`, as they are now. */
+  recordKindAnswer(workId: string, revision: number, answer: Pick<KindAnswer, 'answer' | 'ticketKind'>): WorkRecord;
   /** Gives a ticketless record its ticket. The work ID stays; a record can't swap one ticket for another. */
   attachTicket(workId: string, revision: number, ticket: string): WorkRecord;
   /** The record holding `ticket`, made first when none does yet. An existing record keeps its title and context. */
@@ -353,6 +366,8 @@ interface Row {
   needs_you: string | null;
   skills: string | null;
   finished_at: string | null;
+  agreed_ticket_kind: WorkKind | null;
+  kind_answer: string | null;
   revision: number;
   created_at: string;
   updated_at: string;
@@ -375,6 +390,8 @@ const fromRow = (row: Row): WorkRecord => ({
   needsYou: row.needs_you,
   skills: row.skills === null ? null : JSON.parse(row.skills) as string[],
   finishedAt: row.finished_at,
+  agreedTicketKind: row.agreed_ticket_kind,
+  kindAnswer: row.kind_answer === null ? null : JSON.parse(row.kind_answer) as KindAnswer,
   revision: row.revision,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -617,7 +634,7 @@ function workRecords(database: Database): WorkRecords {
   };
 
   const updateRow = db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
-    pull_request = ?, set_aside_at = ?, fog_gone_at = ?, needs_you = ?, skills = ?, finished_at = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
+    pull_request = ?, set_aside_at = ?, fog_gone_at = ?, needs_you = ?, skills = ?, finished_at = ?, agreed_ticket_kind = ?, kind_answer = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
   /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. Records `apply`
    * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. When
    * `apply` returns null the record already holds the change, so nothing is written or bumped. */
@@ -633,7 +650,7 @@ function workRecords(database: Database): WorkRecords {
       if (patch === null) return fromRow(row);
       const next = { ...row, ...patch, revision: row.revision + 1, updated_at: new Date().toISOString() };
       updateRow.run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.build_phase, next.pull_request, next.set_aside_at,
-        next.fog_gone_at, next.needs_you, next.skills, next.finished_at, next.revision, next.updated_at, workId, expected);
+        next.fog_gone_at, next.needs_you, next.skills, next.finished_at, next.agreed_ticket_kind, next.kind_answer, next.revision, next.updated_at, workId, expected);
       for (const id of touched) bump.run(next.updated_at, id);
       return fromRow(find(workId));
     });
@@ -765,9 +782,10 @@ function workRecords(database: Database): WorkRecords {
       ['status = ?', filter.status === undefined ? undefined : checkStatus(filter.status)],
       ['kind = ?', filter.kind === undefined ? undefined : checkKind(filter.kind)],
     ]) as unknown as Row[]).map(fromRow)),
-    update: (workId, revision, { status, kind }) => {
+    update: (workId, revision, { status, kind, agreedTicketKind }) => {
       const nextStatus = status === undefined ? undefined : checkStatus(status);
       const nextKind = kind === undefined ? undefined : checkKind(kind);
+      const agreed = agreedTicketKind === undefined ? undefined : checkKind(agreedTicketKind);
       return change(workId, revision, (row) => {
         if (nextKind && nextKind !== row.kind) {
           const child = { work_id: row.work_id, kind: nextKind };
@@ -785,8 +803,15 @@ function workRecords(database: Database): WorkRecords {
           status: moved,
           kind: nextKind ?? row.kind,
           queue_order: queueOrder(row.repository, moved, moved === row.status ? row.queue_order : null),
+          agreed_ticket_kind: agreed ?? row.agreed_ticket_kind,
+          kind_answer: agreed || nextKind && nextKind !== row.kind ? null : row.kind_answer,
         };
       });
+    },
+    recordKindAnswer: (workId, revision, { answer, ticketKind }) => {
+      const checked = checkOneOf(['keep', 'update'], answer, 'answer');
+      const covered = ticketKind === null ? null : checkOneOf(['bug', 'feature', 'improvement'], ticketKind, 'ticket kind');
+      return change(workId, revision, (row) => ({ kind_answer: JSON.stringify({ answer: checked, itemKind: row.kind, ticketKind: covered } satisfies KindAnswer) }));
     },
     attachTicket: (workId, revision, ticket) => {
       const reference = checkTicket(ticket);

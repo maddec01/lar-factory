@@ -576,6 +576,17 @@ test('the picker starts from the kind\'s mapped labels, leaving out one the trac
   expect(choice('docs').querySelector<HTMLElement>('[data-label-dot]')!.style.background).toBe('rgb(14, 138, 22)');
 });
 
+test("on Azure the picker never offers a repo- tag, and refuses a typed name holding one or a separator", async () => {
+  await labelSetup(['repo-lar-api', 'docs'], { repo: 'contoso/Fabrikam%20Fiber/lar-api' });
+  await openPicker();
+  expect(choices().map(text)).toEqual(['docs']);
+  for (const [typed, reason] of [['repo-other', /reserved for the work item's repository/], ['foo; linked-work', /without commas or semicolons/]] as const) {
+    await settle(() => { const input = search(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, typed); input.dispatchEvent(new Event('input', { bubbles: true })); });
+    expect(createButton()).toBeUndefined();
+    expect(text($('[data-label-picker] [role="alert"]'))).toMatch(reason);
+  }
+});
+
 test('a managed label the kind maps to stays on the ticket, locked, without being offered', async () => {
   await labelSetup(['bug', 'docs', 'linked-work'], { bug: ['bug'] });
   await chooseOption(field('item-kind'), 'Bug');

@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { customLabelProblem, customTagProblem } from './custom-labels.ts';
-import { isManagedLabel, shownLabels } from './managed-labels.ts';
+import { isManagedLabel, kindLabelSwap, shownLabels } from './managed-labels.ts';
 import { trackerKind } from './tracker-structure.ts';
 import { effectiveVocabulary } from './vocabulary.ts';
 
@@ -65,4 +65,40 @@ test('a row reads the first 100 labels a ticket has, before hiding any', () => {
   const shown = shownLabels({ kind: 'bug', labels });
   assert.equal(shown.length, 99);
   assert.equal(shown.at(-1), 'area 98');
+});
+
+const MEANINGS = [['bug', ['bug', 'defect']], ['feature', ['feature', 'enhancement', 'user story', 'product backlog item']], ['improvement', ['improvement']]] as const;
+
+for (const [kind, names] of MEANINGS) {
+  const others: string[] = MEANINGS.flatMap(([other, otherNames]) => (other === kind ? [] : [...otherNames]));
+  for (const [how, vocabulary] of [['with no mapping', undefined], ['with a mapping', effectiveVocabulary({ [kind]: { type: null, labels: [`type: ${kind}`] } }).vocabulary]] as const) {
+    test(`changing to ${kind} ${how} keeps the names meaning ${kind}, in any case, and removes the other kinds' names`, () => {
+      const labels = [...names, ...names.map((name) => name.toUpperCase()), ...others, 'docs'];
+      const { remove } = kindLabelSwap(labels, kind, vocabulary);
+      assert.deepEqual(remove, others);
+      assert.equal(trackerKind(labels.filter((label) => !remove.includes(label))), kind);
+    });
+  }
+}
+
+const swapVocabulary = effectiveVocabulary({
+  bug: { type: 'Bug', labels: ['type: bug'] }, feature: { type: null, labels: ['type: feature', 'feature'] },
+  improvement: { type: null, labels: [] }, build: { type: null, labels: ['shipping'] },
+}).vocabulary;
+
+test('a kind swap removes the mapped labels of the other kinds and every kind name, and adds the new kind\'s own', () => {
+  assert.deepEqual(kindLabelSwap(['Type: Bug', 'Defect', 'bug', 'ENHANCEMENT', 'User Story', 'product backlog item', 'improvement', 'needs-design'], 'feature', swapVocabulary), {
+    add: ['type: feature', 'feature'], remove: ['Type: Bug', 'Defect', 'bug', 'improvement'],
+  });
+});
+
+test('a kind swap keeps build, concept and decision labels, and a label the new kind maps', () => {
+  assert.deepEqual(kindLabelSwap(['build', 'concept', 'decision', 'decision-grill', 'shipping', 'linked-work', 'Feature'], 'feature', swapVocabulary), {
+    add: ['type: feature'], remove: [],
+  });
+});
+
+test('a kind swap with no mapping for the new kind only removes', () => {
+  assert.deepEqual(kindLabelSwap(['bug', 'docs'], 'improvement', swapVocabulary), { add: [], remove: ['bug'] });
+  assert.deepEqual(kindLabelSwap(['bug', 'docs'], 'improvement'), { add: [], remove: ['bug'] });
 });

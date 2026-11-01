@@ -26,6 +26,8 @@ export async function providerCommand(command: 'gh' | 'az', args: string[], inpu
  * number, so a preview call passes `7.2-preview` and az adds the server's resource version: `7.2-preview.1` fails as 7.2.1.
  */
 export const API_VERSION = '7.1';
+/** The REST API version of a write that sets a field's format, the first that takes a markdown field; az rest sends it as is. */
+export const MARKDOWN_API_VERSION = '7.2-preview.3';
 /** The Entra resource of Azure DevOps, which az rest gets its token for. */
 export const DEVOPS_RESOURCE = '499b84ac-1321-427f-aa17-267ca6975798';
 

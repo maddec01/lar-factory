@@ -165,6 +165,34 @@ test('managed labels appear locked, with no controls', async () => {
   expect(rowOf('docs')!.querySelector('[aria-label="Factory-managed"]')).toBeNull();
 });
 
+test("Azure's repo- tags appear locked with the reason, and a GitHub repo- label stays editable", async () => {
+  const azure = boardWith({ repo: AZURE, itemSource: { kind: 'azure-board', team: 'Delivery' } });
+  serve(azure, [{ name: 'repo-lar-api' }, { name: 'docs' }]);
+  await openEdit(azure);
+  expect(rowOf('repo-lar-api')!.querySelector('[aria-label="Factory-managed"]')).not.toBeNull();
+  expect(rowOf('repo-lar-api')!.querySelector('button')).toBeNull();
+  expect(text(rowOf('repo-lar-api')!)).toContain("reserved for the work item's repository");
+});
+
+test('a long description or name stays inside its row, which keeps Edit and Delete in view', async () => {
+  const board = boardWith();
+  const long = 'x'.repeat(200);
+  serve(board, [{ name: `name-${long}`, description: long }]);
+  await openEdit(board);
+  const row = rowOf(`name-${long}`)!;
+  expect(row.closest('ul')!.className, 'the track may not grow past the section').toContain('grid-cols-[minmax(0,1fr)]');
+  expect(row.querySelector('[data-label-chip]')!.className, 'the chip may shrink, so its name truncates').toContain('min-w-0');
+  expect(row.querySelector('[data-label-chip] .truncate')!.getAttribute('title')).toBe(`name-${long}`);
+});
+
+test('a GitHub repo- label is an ordinary label', async () => {
+  const board = boardWith();
+  serve(board, [{ name: 'repo-web' }]);
+  await openEdit(board);
+  expect(rowOf('repo-web')!.querySelector('[aria-label="Factory-managed"]')).toBeNull();
+  expect(rowOf('repo-web')!.querySelector('button')).not.toBeNull();
+});
+
 test('a failed read offers Retry, and each read shows what the tracker holds now', async () => {
   const board = boardWith();
   let down = true;

@@ -360,4 +360,6 @@ export const MIGRATIONS: readonly Migration[] = [
     ALTER TABLE brief_gates ADD COLUMN invalidated INTEGER NOT NULL DEFAULT 0;`),
   (db) => db.exec('ALTER TABLE work_records ADD COLUMN cleanup_ownership TEXT'),
   (db) => db.exec('ALTER TABLE launch_intents ADD COLUMN recovery TEXT'),
+  (db) => db.exec(`ALTER TABLE work_records ADD COLUMN agreed_ticket_kind TEXT;
+    ALTER TABLE work_records ADD COLUMN kind_answer TEXT`),
 ];

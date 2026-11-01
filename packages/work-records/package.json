@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/work-records.ts",
     "./export": "./src/export.ts",
+    "./change-kind": "./src/change-kind.ts",
     "./create-ticket": "./src/create-ticket.ts",
     "./spec-sync": "./src/spec-sync.ts",
     "./tracker-sync": "./src/tracker-sync.ts"

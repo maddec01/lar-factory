@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { newLabelProblem, typedLabelsProblem, writeAccessProblem, type RepositorySetup, type VocabularyTerm } from '@lar-factory/shared';
+import { kindMappingOffers, newLabelProblem, trackerCapabilities, typedLabelsProblem, writeAccessProblem, type RepositorySetup, type VocabularyTerm } from '@lar-factory/shared';
 import { emptyVocabularyTerm, suggestVocabularyLabels, type VocabularyCapability, type VocabularyDiscovery, type VocabularyMapping } from '@lar-factory/shared/vocabulary';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -35,9 +35,9 @@ export function useVocabularyDiscovery(repo: string, onboarding = false) {
   return { discovery, error, retry: () => retry((n) => n + 1) };
 }
 
-export function VocabularyRead({ error, retry }: { error: string | null; retry: () => void }) {
+export function VocabularyRead({ repo, error, retry }: { repo: string; error: string | null; retry: () => void }) {
   return error ? <Alert tone="danger" title="Could not read vocabulary" action={<Button {...kind('other')} onClick={retry}>Retry</Button>}>{error}</Alert>
-    : <p role="status" className="m-0 text-sm text-base-700">Reading existing labels and types…</p>;
+    : <p role="status" className="m-0 text-sm text-base-700">Reading existing {trackerCapabilities(repo).heading.toLowerCase()} and types…</p>;
 }
 
 function unavailable(capability: VocabularyCapability): string | null {
@@ -58,12 +58,14 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
   const access = vocabularyAccess(setup);
   const labelsProblem = [unavailable(discovery.labels), access.labels].filter(Boolean).join(' ');
   const typesProblem = [unavailable(discovery.types), access.types].filter(Boolean).join(' ');
-  const labels = discovery.labels.state === 'available' ? discovery.labels.choices : [];
+  const { noun, heading } = trackerCapabilities(setup.repo);
+  const onTracker = discovery.labels.state === 'available' ? discovery.labels.choices : [];
+  const labels = onTracker.filter((label) => kindMappingOffers(setup.repo, label));
   const types = discovery.types.state === 'available' ? discovery.types.choices : [];
   const suggested = suggestVocabularyLabels(discovery.labels)[name]?.labels[0];
   const title = KIND_NAMES[name];
   const typedProblem = typedLabelsProblem(setup.repo, newLabels);
-  const gone = (label: string) => discovery.labels.state === 'available' && !labels.includes(label);
+  const gone = (label: string) => discovery.labels.state === 'available' && !onTracker.includes(label);
   return <fieldset disabled={disabled} className="m-0 grid min-w-0 gap-3 rounded-lg border p-3">
     <legend className="px-1 text-sm font-medium">{title}</legend>
     <label className="grid gap-1.5 text-sm">{discovery.provider === 'azure' ? 'Work item type' : 'Issue type'}
@@ -75,19 +77,19 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
         ]} />
     </label>
     {typesProblem && <p id={`${id}-types`} className="m-0 text-xs text-base-700">{typesProblem}</p>}
-    <div className="grid gap-2" role="group" aria-label={`${title} ${discovery.provider === 'azure' ? 'tags' : 'labels'}`} aria-describedby={labelsProblem ? `${id}-labels` : undefined}>
-      <span className="text-sm">{discovery.provider === 'azure' ? 'Tags' : 'Labels'}</span>
+    <div className="grid gap-2" role="group" aria-label={`${title} ${heading.toLowerCase()}`} aria-describedby={labelsProblem ? `${id}-labels` : undefined}>
+      <span className="text-sm">{heading}</span>
       {[...new Set([...labels, ...value.labels])].map((label) => <Checkbox key={label} label={gone(label) ? `${label} (unavailable)` : label} checked={value.labels.includes(label)} disabled={!!labelsProblem}
         onChange={() => onChange({ ...value, labels: value.labels.includes(label) ? value.labels.filter((v) => v !== label) : [...value.labels, label] }, newLabels)} />)}
-      {!labels.length && !labelsProblem && <p className="m-0 text-xs text-base-700">No existing labels or tags.</p>}
+      {!labels.length && !labelsProblem && <p className="m-0 text-xs text-base-700">No existing {heading.toLowerCase()}.</p>}
       {labelsProblem && <p id={`${id}-labels`} className="m-0 text-xs text-base-700">{labelsProblem}</p>}
-      {suggested && !labelsProblem && !value.labels.includes(suggested) && <span><Button {...kind('other')} onClick={() => onChange({ ...value, labels: [...value.labels, suggested] }, newLabels)}>Use suggested label: {suggested}</Button></span>}
+      {suggested && !labelsProblem && !value.labels.includes(suggested) && <span><Button {...kind('other')} onClick={() => onChange({ ...value, labels: [...value.labels, suggested] }, newLabels)}>Use suggested {noun}: {suggested}</Button></span>}
     </div>
-    <label className="grid gap-1.5 text-sm">New {discovery.provider === 'azure' ? 'tag' : 'label'}
-      <Input type="text" aria-label={`${title} new label`} aria-describedby={`${id}-new`} maxLength={100} disabled={!!labelsProblem || !!access.newLabels} value={newLabels[0] ?? ''}
+    <label className="grid gap-1.5 text-sm">New {noun}
+      <Input type="text" aria-label={`${title} new ${noun}`} aria-describedby={`${id}-new`} maxLength={100} disabled={!!labelsProblem || !!access.newLabels} value={newLabels[0] ?? ''}
         onChange={(e) => onChange(value, e.target.value ? [e.target.value] : [])} />
     </label>
-    <p id={`${id}-new`} className="m-0 text-xs text-base-700">{access.newLabels ?? 'Created only when you save. Leave empty to use existing labels or none.'}</p>
+    <p id={`${id}-new`} className="m-0 text-xs text-base-700">{access.newLabels ?? `Created only when you save. Leave empty to use existing ${heading.toLowerCase()} or none.`}</p>
     {typedProblem && <p className="m-0 text-xs text-(--error-foreground)" role="alert">{typedProblem}</p>}
     <span><Button {...kind('other')} onClick={() => onChange(emptyVocabularyTerm(), [])}>None</Button></span>
   </fieldset>;
@@ -99,7 +101,7 @@ function VocabularySettings({ setup }: { setup: RepositorySetup }) {
   const [drafts, setDrafts] = useState<VocabularyMapping>({});
   const [newLabels, setNewLabels] = useState<Partial<Record<VocabularyKind, string[]>>>({});
   const [saved, setSaved] = useState<VocabularyKind | null>(null);
-  if (!discovery) return <VocabularyRead error={error} retry={retry} />;
+  if (!discovery) return <VocabularyRead repo={setup.repo} error={error} retry={retry} />;
   const access = vocabularyAccess(setup);
   return <div className="grid gap-4">
     {(Object.keys(KIND_NAMES) as VocabularyKind[]).map((key) => {
@@ -127,7 +129,7 @@ function VocabularySettings({ setup }: { setup: RepositorySetup }) {
 export function EditVocabulary({ setup }: { setup: RepositorySetup }) {
   const [open, setOpen] = useState(false);
   return <section className="grid gap-3" aria-label="Kind vocabulary">
-    <p className="m-0 text-sm">Map bugs, features and improvements to existing labels and types. Suggestions are optional.</p>
+    <p className="m-0 text-sm">Map bugs, features and improvements to existing {trackerCapabilities(setup.repo).heading.toLowerCase()} and types. Suggestions are optional.</p>
     {open ? <VocabularySettings setup={setup} /> : <span><Button {...kind('other')} onClick={() => setOpen(true)}>Edit vocabulary</Button></span>}
   </section>;
 }

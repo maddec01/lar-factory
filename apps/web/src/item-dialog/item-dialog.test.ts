@@ -594,3 +594,14 @@ test('deleted work thread offers the later recovery actions without Clear', asyn
   expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Start again', 'Back to Queue', 'Back to List']);
   expect($$<HTMLButtonElement>('[data-needs-you-reason] button').map(button => button.disabled)).toEqual([true, false, false]);
 });
+
+test('moving deleted-thread work with a passing brief asks before sending the move', async () => {
+  const id = 'I_sample05';
+  await mountPage({ ...sample, items: sample.items.map(i => i.id === id
+    ? { ...i, status: 'Review', passingBrief: true, needsYou: { reason: 'Deleted', deletedThread: true,
+      offers: ['back-to-list'] } } : i) });
+  await openItem(id);
+  await press(button('needs-you', id));
+  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Back to List', 'Keep passing', 'Reshape']);
+  expect(posted()).toEqual([]);
+});

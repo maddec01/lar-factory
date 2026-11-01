@@ -235,7 +235,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     },
     '/api/needs-you': {
       what: 'the item that needs you and the choice', disabled: 'Acting on Needs you is disabled in sample mode.',
-      run: forItem('Name the item that needs you.', (itemId, input) => commands.resolveNeedsYou(itemId, input.choice)),
+      run: forItem('Name the item that needs you.', (itemId, input) => commands.resolveNeedsYou(itemId, input.choice, input.briefChoice)),
     },
     '/api/dependency-met': {
       what: 'the Dependency to mark', disabled: 'Marking a Dependency met is disabled in sample mode.',

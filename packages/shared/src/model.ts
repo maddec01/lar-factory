@@ -277,6 +277,7 @@ export interface Item {
   /** False for an issue from the list that has no local work record yet. */
   recorded?: boolean;
   /** Eligibility from the durable journal, independent of Status. Absent for decisions and slices. */
+  passingBrief?: boolean;
   publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'> & { recoverable?: boolean };
   /**
    * The board item's work ID, from its work record. An item source's read, before it joins a record, holds its ticket's

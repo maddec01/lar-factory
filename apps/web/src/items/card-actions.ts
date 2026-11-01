@@ -133,9 +133,9 @@ export async function closeTicket(item: Item): Promise<void> {
 }
 
 /** Acts on work that needs you as `choice` says, then clears its reason; a failure stays in the dialog. */
-export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOffer, 'set-aside'> | 'clear'): Promise<void> {
+export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOffer, 'set-aside'> | 'clear', briefChoice?: 'keep' | 'reshape'): Promise<void> {
   if (!ready(itemId, 'data-needs-you')) return;
-  await runAction(itemId, 'needs-you', { itemId, choice }, (result) => result.error ?? undefined);
+  await runAction(itemId, 'needs-you', { itemId, choice, briefChoice }, (result) => result.error ?? undefined);
 }
 
 /** Marks the Dependency holding the item met, or clears the mark; a failure stays in the dialog. */

@@ -1,3 +1,6 @@
+import { discoverVocabulary } from '@lar-factory/shared/publication-settings';
+import { isVocabularyMapping, VOCABULARY_KEYS, type VocabularyKey } from '@lar-factory/shared/vocabulary';
+import { setVocabularyOverride } from '@lar-factory/shared/repository-settings';
 import { SHARED_SETTINGS, structureSyncOperations, writeAccessProblem, sameRepo, type RepositorySetup, type RepositoryConfigProblem, type SharedSetting, type SharedRepositorySettings } from '@lar-factory/shared';
 import { detectAccess } from '../onboarding/detect-setup.ts';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
@@ -7,16 +10,25 @@ import { notEditable, type Refused } from './editable-repository.ts';
 import { isRepo, onTheBoard, type OnboardedRepository, type RepositoryConfig } from './repository-config.ts';
 
 /** Changes local values or reads the signed-in account's access again. */
-export async function changeRepositorySettings(input: Record<string, unknown>, dir = boardDataDir()): Promise<{ setup: RepositorySetup } | Refused> {
+export async function changeRepositorySettings(input: Record<string, unknown>, dir = boardDataDir()): Promise<{ setup: RepositorySetup; discovery?: Awaited<ReturnType<typeof discoverVocabulary>> } | Refused> {
   const { repo, change, key, value } = input;
-  if (!isRepo(repo) || !['override', 'recheck', 'structure-sync'].includes(change as string)) {
+  if (!isRepo(repo) || !['override', 'recheck', 'structure-sync', 'vocabulary', 'discover-vocabulary'].includes(change as string)) {
     return { status: 400, error: 'Send the repository and the change to its settings.' };
   }
   if (change === 'override' && !SHARED_SETTINGS.includes(key as SharedSetting)) return { status: 400, error: 'Choose a repository setting.' };
   const refused = notEditable(repo, dir);
   if (refused) return refused;
   try {
-    if (change === 'recheck') replaceAccess(repo, await detectAccess(repo), dir);
+    if (change === 'discover-vocabulary') return { setup: readRepositorySetups(dir).find((s) => sameRepo(s.repo, repo))!, discovery: await discoverVocabulary(repo) };
+    if (change === 'vocabulary') {
+      if (!VOCABULARY_KEYS.includes(key as VocabularyKey) || !isVocabularyMapping({ [key as string]: value })) throw new Error('Choose a vocabulary kind and its existing type and labels, or none.');
+      const discovery = await discoverVocabulary(repo);
+      const term = (value as { type: string | null; labels: string[] });
+      if (term.type !== null && (discovery.types.state !== 'available' || !discovery.types.choices.includes(term.type))) throw new Error('Choose an existing issue type or none.');
+      if (term.labels.some((label) => discovery.labels.state !== 'available' || !discovery.labels.choices.includes(label))) throw new Error('Choose existing labels or none.');
+      setVocabularyOverride(repo, key as VocabularyKey, term, dir);
+    }
+    else if (change === 'recheck') replaceAccess(repo, await detectAccess(repo), dir);
     else if (change === 'structure-sync') {
       if (typeof value !== 'boolean') throw new Error('Choose whether to save concepts and links.');
       const setup = readRepositorySetups(dir).find((s) => sameRepo(s.repo, repo))!;

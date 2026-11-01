@@ -66,11 +66,11 @@ test('settings edit local values and show no repository setup file controls', as
 test('save changes a local setting and keeps a refused edit visible', async () => {
   const sent = serve(boardWith(), () => ({ status: 403, body: { error: 'This setting needs access.' } }));
   await openEdit(boardWith());
-  await type(setting('labels').querySelector('input')!, 'area: server, area: api');
-  await settle(() => buttonIn(setting('labels'), 'Save')!.click());
-  expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'labels', value: ['area: server', 'area: api'] }]);
+  await type(setting('skills').querySelector('input')!, 'testing, typing');
+  await settle(() => buttonIn(setting('skills'), 'Save')!.click());
+  expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'skills', value: ['testing', 'typing'] }]);
   expect(text(dialog())).toContain('This setting needs access.');
-  expect(setting('labels').querySelector<HTMLInputElement>('input')!.value).toBe('area: server, area: api');
+  expect(setting('skills').querySelector<HTMLInputElement>('input')!.value).toBe('testing, typing');
 });
 
 test('access is a single optional summary and recheck runs a real probe', async () => {

@@ -1,4 +1,5 @@
 // What a tracker's labels can do, so the UI reads this instead of checking a provider's name.
+import { customLabelProblem, customTagProblem } from './custom-labels.ts';
 import { onAzure } from './model.ts';
 import { STRUCTURE_LABEL } from './tracker-structure.ts';
 
@@ -19,10 +20,13 @@ export interface TrackerCapabilities {
   syncLabel: string | null;
   /** Why a label can't be created by itself, or null when it can. */
   createUnavailable: string | null;
+  /** Why a person can't give a label this name, or null when they can. */
+  nameProblem(name: string): string | null;
 }
 
 export interface TrackerLabel {
   name: string;
+  /** Six hex digits, with no `#`. */
   color?: string;
   description?: string;
 }
@@ -43,13 +47,14 @@ export interface TrackerLabels {
 
 const GITHUB: TrackerCapabilities = {
   noun: 'label', heading: 'Labels', color: true, description: true,
-  deleteWarning: 'This removes it from every ticket.', changeScope: 'repository', syncLabel: STRUCTURE_LABEL, createUnavailable: null,
+  deleteWarning: 'This removes it from every ticket.', changeScope: 'repository', syncLabel: STRUCTURE_LABEL, createUnavailable: null, nameProblem: customLabelProblem,
 };
 
 const AZURE_DEVOPS: TrackerCapabilities = {
   noun: 'tag', heading: 'Tags', color: false, description: false,
   deleteWarning: 'This removes it from every work item and pull request.', changeScope: 'project', syncLabel: null,
   createUnavailable: 'Azure DevOps has no way to create a tag on its own. A new tag appears when it is first added to a work item.',
+  nameProblem: customTagProblem,
 };
 
 /** The capabilities of the tracker holding `repo`, a repository key. */

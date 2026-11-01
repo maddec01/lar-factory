@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type SetupDetection } from '@lar-factory/shared';
+import { pageWithData, sameRepo, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type TrackerLabel, type SetupDetection } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/editable-repository.ts';
 import type { Capture } from '../items/capture.ts';
@@ -57,6 +57,7 @@ export interface HttpDeps {
   saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
   /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
   changeRepositorySettings(input: Record<string, unknown>): Promise<{ setup: RepositorySetup } | Refused>;
+  changeRepositoryLabels(input: Record<string, unknown>): Promise<{ labels?: TrackerLabel[] } | Refused>;
 }
 
 export interface BoardServer {
@@ -132,7 +133,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  detectSetup, saveSetup, changeRepositorySettings }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -351,6 +352,17 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         changeRow(input.repo as string, (r) => ({ ...r, setup: changed.setup }));
         readSoon();
         return { status: 200, body: withBoard({ ...changed, error: null }) };
+      },
+    },
+    // The tracker holds the labels, so a change shows on rows at the read it starts.
+    '/api/repositories/labels': {
+      what: 'the repository and the change to its labels', disabled: 'Sample mode reads and changes no labels.',
+      async run(input) {
+        const changed = await changeRepositoryLabels(input);
+        if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
+        if (input.change === 'list') return { status: 200, body: { ...changed, error: null } };
+        readSoon();
+        return { status: 200, body: withBoard({ error: null }) };
       },
     },
     // Looks the tools up again for the notices' Recheck button and onboarding's detection.

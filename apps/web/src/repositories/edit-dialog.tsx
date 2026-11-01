@@ -13,6 +13,7 @@ import { canSave, shownDrafts, useEditStore, type Drafts, type DraftSetting } fr
 import { kind } from '../buttons/button-kinds.tsx';
 import { EditVocabulary } from './vocabulary-editor.tsx';
 import { IssueDefaults } from './issue-defaults.tsx';
+import { LabelsSection } from './labels-section.tsx';
 
 const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: 'Refused', unverified: 'Not checked yet' };
 
@@ -48,8 +49,8 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
   const { typed, running, type } = useEditStore();
   const drafts = shownDrafts(setup, typed);
   const azure = onAzure(repo);
-  const text = (field: keyof Drafts, label: string, placeholder?: string) => (
-    <Input aria-label={label} placeholder={placeholder} value={drafts[field]} disabled={running !== null} onChange={(e) => type(field, e.target.value)} />
+  const text = (field: keyof Drafts, label: string) => (
+    <Input aria-label={label} value={drafts[field]} disabled={running !== null} onChange={(e) => type(field, e.target.value)} />
   );
   return (
     <fieldset className="m-0 grid min-w-0 gap-5 border-0 p-0">
@@ -59,9 +60,7 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
       <Setting repo={repo} setup={setup} settingKey="itemSource" name="Work to read">
         {azure ? text('team', 'Team') : <p className="m-0 text-xs text-base-700">This repository's GitHub issues.</p>}
       </Setting>
-      <Setting repo={repo} setup={setup} settingKey="labels" name={azure ? 'Custom tags' : 'Custom labels'} hint="Separate them with commas.">
-        {text('labels', azure ? 'Custom tags' : 'Custom labels', 'area: server, area: web')}
-      </Setting>
+      <LabelsSection key={repo} repo={repo} setup={setup} />
       <Setting repo={repo} setup={setup} settingKey="domainDocs" name="Glossary and decisions" hint="Choose whether builds include domain docs in their PRs.">
         <FormSelect aria-label="Domain docs" value={drafts.domainDocs} disabled={running !== null} onChange={(value) => type('domainDocs', value)}
           choices={[{ value: 'off', name: 'Off' }, { value: 'repository', name: 'Write in build PRs' }]} />

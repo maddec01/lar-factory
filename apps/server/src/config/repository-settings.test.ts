@@ -70,3 +70,15 @@ test('vocabulary discovery reads existing terms and saving requires field access
   expect(await changeRepositorySettings({ repo: 'team/app', change: 'vocabulary', key: 'bug', value: { type: null, labels: ['bug'] } }, dir, reads)).toMatchObject({ status: 400 });
   expect(await changeRepositorySettings({ repo: 'team/app', change: 'vocabulary', key: 'bug', value: { type: null, labels: [] } }, dir, reads)).toMatchObject({ setup: { vocabularySources: { bug: 'local' } } });
 });
+
+test('Settings persists created labels only after provider success', async (t) => {
+  const dir = await folder(t);
+  saveOnboarded('team/app', null, dir);
+  const { replaceAccess } = await import('@lar-factory/shared/repository-settings');
+  replaceAccess('team/app', { 'tag-ticket': 'allowed' }, dir);
+  const reads = { github: async (path: string) => path.includes('/labels') ? [] : { owner: { type: 'User' } }, azure: async () => ({ value: [] }) };
+  const request = { repo: 'team/app', change: 'vocabulary', key: 'bug', value: { type: null, labels: [] }, newLabels: ['triage'] };
+  expect(await changeRepositorySettings(request, dir, reads, async () => { throw new Error('Label creation denied'); })).toMatchObject({ status: 400 });
+  expect(readRepositorySetups(dir)[0]?.vocabulary.bug.labels).toEqual([]);
+  expect(await changeRepositorySettings(request, dir, reads, async (_repo, name) => name)).toMatchObject({ setup: { vocabulary: { bug: { labels: ['triage'] } } } });
+});

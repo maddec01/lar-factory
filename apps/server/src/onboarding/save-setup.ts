@@ -1,4 +1,4 @@
-import { discoverVocabulary, type VocabularyReads } from '@lar-factory/shared/publication-settings';
+import { discoverVocabulary, saveVocabularyLabels, type VocabularyReads } from '@lar-factory/shared/publication-settings';
 import { isVocabularyMapping, vocabularySelectionProblem } from '@lar-factory/shared/vocabulary';
 import { writeAccessProblem, structureSyncOperations, isRecord, onAzure, type LocalSetupAnswers, type OnboardingRepository, type RepositoryItemSource } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
@@ -11,6 +11,7 @@ import { detectAccess } from './detect-setup.ts';
 /** Access checks never make test writes. */
 export interface SaveReads {
   vocabulary?: VocabularyReads;
+  createLabel?(repo: string, name: string): Promise<string>;
   source?(repo: string, source: RepositoryItemSource): Promise<void>;
   access(repo: string): Promise<Parameters<typeof saveLocalSetup>[2]>;
 }
@@ -76,6 +77,18 @@ export async function saveSetup(input: Record<string, unknown>, dir = boardDataD
     if (missing.length) return { status: 403, error: `Saving concepts and links needs verified permission to ${missing.join(', ')}. ${onAzure(repo) ? 'Grant work item write and comment access.' : 'GitHub needs Issues: Read and write. This read-only check cannot verify fine-grained token permissions; sign in with a classic token or gh OAuth login with repo scope.'} Recheck access or turn off sharing concepts and links.` };
   }
   try {
+    if (input.newLabels !== undefined) {
+      if (!isRecord(input.newLabels)) throw new Error('Choose vocabulary kinds for new labels.');
+      const discovery = await discoverVocabulary(repo, reads.vocabulary);
+      const vocabulary = { ...answers.vocabulary };
+      for (const [key, names] of Object.entries(input.newLabels)) {
+        if (!isVocabularyMapping({ [key]: { type: null, labels: [] } })) throw new Error('Choose a vocabulary kind.');
+        const labels = await saveVocabularyLabels(repo, names, discovery, access, reads.createLabel);
+        const term = vocabulary[key as keyof typeof vocabulary] ?? { type: null, labels: [] };
+        vocabulary[key as keyof typeof vocabulary] = { ...term, labels: [...new Set([...term.labels, ...labels])] };
+      }
+      answers.vocabulary = vocabulary;
+    }
     const list = saveOnboarded(repo, replaces ?? null, dir);
     saveLocalSetup(repo, answers, access, dir);
     if (connections) saveConnections(repo, connections, dir);

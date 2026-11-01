@@ -79,7 +79,7 @@ export function publicationSettingsSnapshot(setup: RepositorySetup): string {
 /** Settings can discover existing terms or save a complete explicit mapping. */
 export type VocabularySettingsRequest =
   | { repo: string; change: 'discover-vocabulary' }
-  | { repo: string; change: 'vocabulary'; key: VocabularyKey; value: VocabularyTerm };
+  | { repo: string; change: 'vocabulary'; key: VocabularyKey; value: VocabularyTerm; newLabels?: string[] };
 
 export interface VocabularySettingsResponse {
   setup: RepositorySetup;

@@ -1061,6 +1061,7 @@ export interface SetupDetection {
 
 /** Onboarding's answers, which become the repository's local settings. */
 export interface LocalSetupAnswers {
+  newLabels?: Partial<Record<import('./vocabulary.ts').VocabularyKey, string[]>>;
   vocabulary?: VocabularyMapping;
   structureSync?: boolean;
   projectId: string;

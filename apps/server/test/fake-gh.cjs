@@ -54,6 +54,19 @@ const main = async () => {
     process.exitCode = 1;
     return;
   }
+  // A ticket's labels, by the REST calls item details makes: later reads see the change, like GitHub.
+  const ticketLabels = args[0] === 'api' && args[1] === '--method' && /^repos\/([\w.-]+\/[\w.-]+)\/issues\/(\d+)\/labels(?:\/([^/]+))?$/.exec(args[3]);
+  if (ticketLabels) {
+    if (options.fail === 'ticket-labels') { process.stderr.write('HTTP 403: Resource not accessible by integration'); process.exitCode = 1; return; }
+    const content = (options.repoIssues?.[ticketLabels[1]] ?? []).find((c) => c?.number === Number(ticketLabels[2]));
+    if (content) {
+      const added = args[2] === 'POST' ? JSON.parse(fs.readFileSync(0, 'utf8')).labels : [];
+      const removed = ticketLabels[3] ? decodeURIComponent(ticketLabels[3]) : null;
+      content.labels.nodes = [...content.labels.nodes.filter((l) => l.name !== removed), ...added.map((name) => ({ name }))];
+      fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    }
+    return output([]);
+  }
   // Vocabulary fixtures answer only metadata discovery and explicitly saved new labels.
   const vocabularyPath = args[0] === 'api' && args.find((arg) => /^repos\/[\w.-]+\/[\w.-]+(?:\/(?:labels\?per_page=100|labels|issue-types))?$/.test(arg));
   if (options.vocabulary && vocabularyPath && args.includes('--method')) {

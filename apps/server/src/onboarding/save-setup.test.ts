@@ -28,6 +28,15 @@ test('onboarding saves local settings, optional purpose and sharing on by defaul
   expect(readRepositorySetups(dir)[0]?.domainDocs).toEqual({ kind: 'off' });
 });
 
+test('onboarding with sync on and no mapping creates no labels', async (t) => {
+  const dir = await folder(t);
+  const created: string[] = [];
+  const reads: SaveReads = { ...allowed, createLabel: async (_repo, name) => { created.push(name); return name; } };
+  expect(await saveSetup({ ...answers, structureSync: true }, dir, reads)).toEqual({ onboarding: [] });
+  expect(readRepositorySetups(dir)[0]?.structureSync).toBe(true);
+  expect(created).toEqual([]);
+});
+
 test('onboarding persists each issue preference and defaults omitted preferences to on', async (t) => {
   const dir = await folder(t);
   await saveSetup(answers, dir, allowed);

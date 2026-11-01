@@ -193,7 +193,7 @@ describe('openDatabase', () => {
 
 it('upgrading purges orphaned capture drafts without dropping their replay tombstones', async () => {
   const path = join(tempDir(), 'records.db');
-  const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -3) });
+  const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -4) });
   old.db.prepare('INSERT INTO capture_submissions(request_id,draft,ticket,work_id,target_work_id) VALUES (?,?,?,?,?)')
     .run('capture', 'Private capture description', 'example/product#1', 'deleted-capture', null);
   old.db.prepare('INSERT INTO capture_submissions(request_id,draft,ticket,work_id,target_work_id) VALUES (?,?,?,?,?)')

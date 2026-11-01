@@ -610,3 +610,9 @@ export async function observeIssue(repo: string, number: number, run: (args: str
   const assignee = issue.assignees.map((a) => a.login).sort().join(', ');
   return { state: issue.state === 'OPEN' ? 'open' : 'closed', ...assignee && { assignee } };
 }
+
+/** Finds an open PR whose head is exactly branch. Provider failures propagate. */
+export async function openPrByHead(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+  const prs = JSON.parse(await run(['pr', 'list', '--repo', repo, '--state', 'open', '--head', branch, '--json', 'headRefName,url'])) as { headRefName: string; url: string }[];
+  return prs.find(pr => pr.headRefName === branch)?.url ?? null;
+}

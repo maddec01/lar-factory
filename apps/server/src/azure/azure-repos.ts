@@ -131,5 +131,12 @@ async function reopenPr(url: string, run: Az = az): Promise<void> {
 
 /** The calls that open and follow the board's PRs on Azure Repos, each named and shaped as github.ts's gh call is. */
 export const AZURE_REPOS = {
-  branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr,
+  branchExists, closePr, commitTree, defaultBranchHead, editPrBody, prState, reopenPr, openPrByHead,
 };
+
+/** Finds an active PR with the exact source branch. */
+async function openPrByHead(repo: string, branch: string, run: Az = az): Promise<string | null> {
+  const prs = await repos<{ sourceRefName: string; pullRequestId: number }[]>(run, repo, ['pr', 'list', '--status', 'active', '--source-branch', branch]);
+  const pr = prs.find(pr => pr.sourceRefName === `refs/heads/${branch}`);
+  return pr ? prUrl(repo, pr.pullRequestId) : null;
+}

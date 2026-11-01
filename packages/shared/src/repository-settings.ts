@@ -2,7 +2,7 @@
 
 import { join } from 'node:path';
 import {
-  VOCABULARY_KEYS, effectiveVocabulary, isVocabularyMapping, type VocabularyKey, type VocabularyTerm, REPOSITORY_OPERATIONS, structureSyncOperations, SHARED_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
+  VOCABULARY_KEYS, effectiveVocabulary, isVocabularyMapping, type VocabularyKey, type VocabularyTerm, REPOSITORY_OPERATIONS, SHARED_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
   type LocalSetupAnswers, type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
@@ -85,7 +85,7 @@ function setupOf(repo: string, local: LocalSettings, connections: string[] = [])
     role: pick('role') ?? '', itemSource, labels: pick('labels') ?? [], domainDocs, skills: pick('skills') ?? [],
     ...effectiveVocabulary(local.overrides?.vocabulary),
     access: Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, accessOf(op)])) as RepositorySetup['access'],
-    consent: (local.consent ?? []).filter((op) => accessOf(op) !== 'refused'),
+    consent: REPOSITORY_OPERATIONS.filter((op) => accessOf(op) === 'allowed'),
     sources: Object.fromEntries(SHARED_SETTINGS.map((key) => [key,
       local.overrides?.[key] !== undefined ? 'local' : 'default'])) as RepositorySetup['sources'],
     connections,
@@ -107,7 +107,7 @@ function updateSettings(repo: string, dir: string, change: (local: LocalSettings
   if (at < 0) throw new Error(`${repo} is not on this Mac's list.`);
   const saved = settings[at]!;
   const setup = setupOf(list[at]!.repo, saved);
-  const next = change(saved, setup);
+  const { consent: _legacyConsent, ...next } = change(saved, setup);
   if (JSON.stringify(next) === JSON.stringify(saved)) return;
   writeListFile(dir, { ...raw, repositories: raw.repositories.map((e, i) => i === at ? { ...e, settings: next } : e) });
 }
@@ -137,32 +137,23 @@ type FoundAccess = NonNullable<LocalSettings['access']>;
 /** Saves onboarding answers and access on this machine. */
 export function saveLocalSetup(repo: string, answers: LocalSetupAnswers, access: FoundAccess, dir = boardDataDir()): void {
   const { projectId, consent, structureSync = true, ...answered } = answers;
-  const operations = structureSync ? [...new Set([...consent, ...structureSyncOperations(repo)] as RepositoryOperation[])] : [...consent];
-  updateSettings(repo, dir, (local) => ({ ...local, projectId, structureSync, overrides: { ...local.overrides, ...answered }, access, consent: operations }));
+  void consent;
+  updateSettings(repo, dir, (local) => ({ ...local, projectId, structureSync, overrides: { ...local.overrides, ...answered }, access }));
 }
 
-/** Sets the operations the user allows the factory to offer for the repository. */
-export function setConsent(repo: string, consent: readonly RepositoryOperation[], dir = boardDataDir()): void {
-  updateSettings(repo, dir, (local) => ({ ...local, consent: [...consent] }));
+/** @deprecated Access alone authorizes operations. Kept for existing callers. */
+export function setConsent(repo: string, _consent: readonly RepositoryOperation[], dir = boardDataDir()): void {
+  updateSettings(repo, dir, (local) => local);
 }
 
-/**
- * Sets the operations Settings offers for the repository, each one the credentials don't refuse. The consent given for
- * an operation the credentials refuse now stays, so it comes back once a recheck finds the access again.
- */
+/** @deprecated Access alone authorizes operations. */
 export function changeConsent(repo: string, consent: readonly RepositoryOperation[], dir: string): void {
-  updateSettings(repo, dir, (local) => {
-    const refused = (op: RepositoryOperation) => local.access?.[op] === 'refused';
-    const blocked = consent.find(refused);
-    if (blocked) throw new Error(`The credentials for ${repo} refuse ${blocked}, so the board can't offer it.`);
-    const kept = (local.consent ?? []).filter(refused);
-    return { ...local, consent: REPOSITORY_OPERATIONS.filter((op) => consent.includes(op) || kept.includes(op)) };
-  });
+  setConsent(repo, consent, dir);
 }
 
 /** Changes whether concepts and cross-repository links are saved to issues. */
 export function setStructureSync(repo: string, enabled: boolean, dir = boardDataDir()): void {
-  updateSettings(repo, dir, (local) => ({ ...local, structureSync: enabled, consent: enabled ? [...new Set([...(local.consent ?? []), ...structureSyncOperations(repo)] as RepositoryOperation[])] : local.consent }));
+  updateSettings(repo, dir, (local) => ({ ...local, structureSync: enabled }));
 }
 
 /** Replaces the saved result of the read-only access check. */

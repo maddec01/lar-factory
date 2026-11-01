@@ -4,6 +4,10 @@ The board tracks work saved on this machine and in a repository's issue tracker.
 
 ## Language
 
+**Abandon**:
+Setting work aside on this machine. Closing its linked tracker ticket is a separate, optional action.
+_Avoid_: delete work.
+
 **Spec**:
 The refined brief as it appears as a ticket's main description after shaping.
 _Avoid_: refined ticket.

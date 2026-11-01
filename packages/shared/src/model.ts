@@ -1,6 +1,7 @@
 // The board's data model and the rules that place an item in the flow.
 // Shared by the server and the browser, so it imports nothing but types.
 
+import type { KindDisagreement } from './kind-disagreement.ts';
 import type { EffectiveVocabulary, VocabularyMapping, VocabularySources } from './vocabulary.ts';
 
 import type { SkillStatus } from './install-skills.ts';
@@ -312,6 +313,10 @@ export interface Item {
   labels: string[];
   /** Each label's colour on a tracker whose labels have one, by name, as CSS. Read with the labels, never stored on a record. */
   labelColors?: Record<string, string>;
+  /** Its GitHub issue's type, read with the labels; absent when it has none. An Azure work item's is its `azure.type`. */
+  issueType?: string;
+  /** How its kind and its ticket's disagree; absent when they don't, or an answer ended the question. */
+  kindDisagreement?: KindDisagreement;
   azure?: AzureWorkItem;
   /** Azure backlog priority position, retained through partial reads and UI sorting. */
   sourceOrder?: number;

@@ -1,7 +1,7 @@
 // The one path that changes an item's kind and swaps it on its ticket, for item details and lar-work. Each write adds or
 // removes one name, from a fresh read, so running the same change again after a failure finishes it. The record takes the
 // new kind only after the ticket has. Without access for a write it needs, only the record changes.
-import { SWAP_KINDS, kindCanChange, kindLabelSwap, sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
+import { SWAP_KINDS, kindCanChange, kindDisagreement, kindSwapAccessProblem, kindTicketSwap, sameLabel, trackerCapabilities } from '@lar-factory/shared';
 import type { Kind, LabelChange, RepositorySetup, SwapKind, TicketKinds, TrackerLabels } from '@lar-factory/shared';
 import { ticketKinds, trackerLabels } from '@lar-factory/shared/tracker-labels';
 import { WorkRecordError, type WorkRecord, type WorkRecords } from './work-records.ts';
@@ -22,6 +22,8 @@ export interface KindChangeResult {
   error: string | null;
   /** The label writes the tracker took, for showing them before the next read reports them. */
   labelChanges: LabelChange[];
+  /** The type the tracker took, for the same reason, or null when it took none. */
+  ticketType: string | null;
 }
 
 const KIND_NAMES: Record<SwapKind, string> = { bug: 'Bug', feature: 'Feature', improvement: 'Improvement' };
@@ -33,7 +35,7 @@ export async function changeKind(records: WorkRecords, workId: string, revision:
   if (record.revision !== revision) throw new WorkRecordError('stale-revision', `The work record ${workId} is at revision ${record.revision}, not ${revision}; read it again and retry.`);
   const name = KIND_NAMES[kind];
   // A read or observation can bump the record while the tracker answers, so the writes below take its revision then.
-  const itemOnly = (why: string): KindChangeResult => ({ record: records.update(workId, records.read(workId).revision, { kind }), line: `This item is now ${name}. ${why}`, error: null, labelChanges: [] });
+  const itemOnly = (why: string): KindChangeResult => ({ record: records.update(workId, records.read(workId).revision, { kind }), line: `This item is now ${name}. ${why}`, error: null, labelChanges: [], ticketType: null });
   if (!record.ticket) return itemOnly('Local work has no ticket to change.');
 
   const repo = record.repository;
@@ -48,19 +50,17 @@ export async function changeKind(records: WorkRecords, workId: string, revision:
   const line = (note = '') => `${done.length ? `#${number}: ${done.join('; ')}.` : ''}${note}`;
   try {
     const ticket = await read(number);
-    const swap = kindLabelSwap(ticket.labels, kind, setup?.vocabulary);
-    const wanted = setup?.vocabulary[kind].type ?? null;
-    let newType = wanted !== null && !(ticket.type !== null && sameLabel(ticket.type, wanted)) ? wanted : null;
+    const swap = kindTicketSwap(ticket, kind, setup?.vocabulary);
     let note = '';
-    if (newType !== null) {
+    if (swap.type) {
+      const { to } = swap.type;
       const shown = await boardTypes(setup?.itemSource?.kind === 'azure-board' ? setup.itemSource.team : undefined);
-      if (shown && !shown.some((type) => sameLabel(type, wanted!))) {
-        note = ` The type stays ${ticket.type}, because the team's backlog doesn't show ${wanted}.`;
-        newType = null;
+      if (shown && !shown.some((type) => sameLabel(type, to))) {
+        note = ` The type stays ${ticket.type}, because the team's backlog doesn't show ${to}.`;
+        swap.type = null;
       }
     }
-    const problem = (swap.add.length || swap.remove.length ? writeAccessProblem(repo, 'tag-ticket', access, safety) : null)
-      ?? (newType !== null ? writeAccessProblem(repo, 'type-ticket', access, safety) : null);
+    const problem = kindSwapAccessProblem(repo, swap, access, safety);
     if (problem) return itemOnly(`Its ticket stays as it is: ${problem}`);
 
     for (const label of swap.add) {
@@ -73,16 +73,22 @@ export async function changeKind(records: WorkRecords, workId: string, revision:
       done.push(`removed ${noun} ${label}`);
       labelChanges.push({ label, action: 'remove' });
     }
-    if (newType !== null) {
-      await setType(number, newType);
-      done.push(`type ${ticket.type ?? 'none'} to ${newType}`);
+    if (swap.type) {
+      await setType(number, swap.type.to);
+      done.push(`type ${ticket.type ?? 'none'} to ${swap.type.to}`);
     }
+    const swapped = records.update(workId, records.read(workId).revision, { kind, agreedTicketKind: kind });
+    // A type this change leaves alone can still read as another kind. The user chose this update, so that doesn't ask again.
+    const left = kindDisagreement(swapped, {
+      labels: [...ticket.labels.filter((label) => !swap.remove.includes(label)), ...swap.add],
+      type: swap.type?.to ?? ticket.type,
+    }, setup?.vocabulary);
     return {
-      record: records.update(workId, records.read(workId).revision, { kind, agreedTicketKind: kind }),
+      record: left ? records.recordKindAnswer(workId, swapped.revision, { answer: 'update', ticketKind: left.ticketKind }) : swapped,
       line: done.length ? line(note) : `#${number}: nothing to change on the ticket.${note}`,
-      error: null, labelChanges,
+      error: null, labelChanges, ticketType: swap.type?.to ?? null,
     };
   } catch (error) {
-    return { record: records.read(workId), line: line(), error: `Could not finish changing #${number} to ${name}. ${(error as Error).message}`, labelChanges };
+    return { record: records.read(workId), line: line(), error: `Could not finish changing #${number} to ${name}. ${(error as Error).message}`, labelChanges, ticketType: null };
   }
 }

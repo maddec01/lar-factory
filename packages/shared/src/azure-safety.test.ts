@@ -26,6 +26,10 @@ test.each([
   expect(() => assertAzureCommandAllowed(args, readonly)).not.toThrow();
 });
 
+test('issue option identity reads stay available in read-only sessions', () => {
+  expect(() => assertAzureCommandAllowed(['devops', 'team', 'list-member', '--team', 'Team', '--project', 'Project', '--org', 'https://dev.azure.com/example'], readonly)).not.toThrow();
+});
+
 const writes = [
   ['boards', 'work-item', 'create'], ['boards', 'work-item', 'update'], ['boards', 'work-item', 'delete'],
   ['repos', 'pr', 'create'], ['repos', 'pr', 'update'], ['repos', 'pr', 'work-item', 'add'],

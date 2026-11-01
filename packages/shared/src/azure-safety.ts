@@ -57,7 +57,7 @@ export function assertAzureCommandAllowed(args: readonly string[], env: Environm
     args.length === 1 && args[0] === 'version'
     || args[0] === '--version' && args.length === 1
     || ['account show', 'extension show'].includes(args.slice(0, 2).join(' '))
-    || args.slice(0, 3).join(' ') === 'devops team list'
+    || ['devops team list', 'devops team list-member'].includes(args.slice(0, 3).join(' '))
     || args.slice(0, 3).join(' ') === 'repos ref list'
     || args.slice(0, 2).join(' ') === 'repos show'
     || ['repos pr show', 'repos pr list'].includes(args.slice(0, 3).join(' '))

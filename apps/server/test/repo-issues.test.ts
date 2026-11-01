@@ -139,7 +139,7 @@ const labelEdits = async (board: Board) => (await board.calls()).filter((args) =
 test("in a repository with no factory labels or config, Add item records work locally and a picked ticket gets one record", async (t) => {
   const board = await startBoard(t, { repositories: [APPLE], repoIssues: { [APPLE]: [appleIssue(8, { title: 'Seek stalls', labels: { nodes: [] }, body: 'Steps.' })] }, recorded: false });
   await until(board, (d) => d.fetchedAt !== null);
-  const draft = { repo: APPLE, kind: 'feature', title: 'Capture an item', description: '' };
+  const draft = { createIssue: false, repo: APPLE, kind: 'feature', title: 'Capture an item', description: '' };
   const captured = await board.postSession({ requestId: randomUUID(), draft }, '/api/items');
   assert.equal(captured.status, 200);
   const { item } = await captured.json() as { item: { id: string; number: number; status: string } };

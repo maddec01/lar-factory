@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { itemTotal } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 
-const draft = { repo: 'maddec01/lar-factory', kind: 'feature', title: 'Capture an item', description: '' };
+const draft = { createIssue: false, repo: 'maddec01/lar-factory', kind: 'feature', title: 'Capture an item', description: '' };
 
 test('writes reject foreign and missing origins before touching GitHub', async (t) => {
   const board = await startBoard(t);
@@ -57,7 +57,7 @@ test('HTTP validation rejects malformed, oversized and mismatched drafts without
     assert.equal(response.status, 422);
     assert.equal(typeof (await response.json()).error, 'string');
   }
-  assert.equal((await board.post({ ...body, session: 'old-board-session' })).status, 409);
+  assert.equal((await board.post({ ...body, session: 'old-board-session' })).status, 200, 'durable submissions can recover across board sessions');
   assert.equal((await board.post({ ...body, draft: { ...draft, description: 'x'.repeat(100_001) } })).status, 413);
   assert.equal((await fetch(`${board.url}/api/items`, { method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json' }, body: '{' })).status, 400);
   assert.equal((await fetch(`${board.url}/api/items`, { method: 'POST', headers: { Origin: board.url }, body: '{}' })).status, 415);

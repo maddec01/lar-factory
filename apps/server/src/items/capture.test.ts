@@ -10,8 +10,9 @@ import { createCapture } from './capture.ts';
 import type { ItemSource } from './item-source.ts';
 import { recordItems } from './record-items.ts';
 
-const WEB = 'maddec01/lar-web';
+const WEB = 'example/source';
 const REPOS: RepoConfig[] = [{ repo: WEB, role: 'app', items: 'issues', labels: [] }];
+const emptyOptions = async () => ({ provider: 'github' as const, labels: [], types: [], assignees: [], milestones: [], iterations: [], problems: [] });
 const REQUEST = '00000000-0000-4000-8000-000000000001';
 
 const ticket = (number: number, extra: Partial<PickedTicket> = {}): PickedTicket =>
@@ -81,7 +82,7 @@ test("a ticket search lists the source's matches, each naming the work ID of the
     { number: 7, title: 'Seek stalls', url: `https://github.com/${WEB}/issues/7`, workId: held.workId },
     { number: 8, title: 'Seek is slow', url: `https://github.com/${WEB}/issues/8` },
   ]);
-  assert.equal((await capture.searchTickets({ repo: 'maddec01/other', query: 'Seek' })).status, 422);
+  assert.equal((await capture.searchTickets({ repo: 'example/other', query: 'Seek' })).status, 422);
 });
 
 test("picking a ticket records it with the ticket's text as initial context, and picking it again opens that record", async () => {
@@ -124,4 +125,136 @@ test('attaching a ticket to captured work keeps its work ID, and a ticket anothe
   assert.equal(records.initialContext(captured.id), 'Mine.', 'the captured context stays');
   const again = await capture.attachTicket(captured.id, 8);
   assert.equal(again.status, 409, 'a record keeps the ticket it has');
+});
+
+test('ticket capture imports original text once and replays after the handler restarts', async () => {
+  const { records, board } = await captureOn();
+  let creates = 0;
+  const provider = {
+    create: async (repository: string, title: string, body: string) => {
+      creates++;
+      return { repository, number: 81, title, body, version: '1' };
+    },
+  } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+  const repo = { ...REPOS[0]!, setup: { repo: WEB, access: { 'publish-ticket': 'allowed' }, vocabulary: {} } } as RepoConfig;
+  const restart = () => createCapture({ board, items: {} as ItemSource, records,
+    reread: () => board.update({ items: recordItems(records, [], [WEB]) }), repos: () => [repo], provider, discoverOptions: emptyOptions });
+  const draft = { repo: WEB, kind: 'feature', title: 'Export', description: '## Why\nAudits.' };
+  const first = await restart().capture({ requestId: REQUEST, draft });
+  assert.equal(first.status, 200);
+  const item = itemOf(first.body);
+  assert.equal(records.read(item.id).ticket, `${WEB}#81`);
+  assert.equal(records.initialContext(item.id), draft.description);
+  assert.equal(itemOf((await restart().capture({ requestId: REQUEST, draft })).body).id, item.id);
+  assert.equal(creates, 1);
+  assert.equal(records.list({}).length, 1);
+});
+
+test('uncertain creates reconcile by marker and never create again across a database restart', async () => {
+  const { records, board } = await captureOn();
+  let created: import('@lar-factory/work-records/tracker-sync').StructureTicket | undefined;
+  let writes = 0;
+  const provider = {
+    create: async (repository: string, title: string, body: string) => {
+      writes++;
+      created = { repository, number: 91, title, body, version: '1' };
+      throw Error('Response lost');
+    },
+    find: async () => created ? [created] : [],
+  } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+  const repo = { ...REPOS[0]!, setup: { access: { 'publish-ticket': 'allowed' }, vocabulary: {} } } as RepoConfig;
+  const handler = (store: WorkRecords) => createCapture({ board, items: {} as ItemSource, records: store,
+    reread: () => board.update({ items: recordItems(store, [], [WEB]) }), repos: () => [repo], provider, discoverOptions: emptyOptions });
+  const draft = { repo: WEB, kind: 'bug', title: 'Stall', description: 'Original.', createIssue: true };
+  assert.equal((await handler(records).capture({ requestId: REQUEST, draft })).status, 409);
+  assert.equal(records.list({}).length, 0);
+  const handle = opened.find(handle => handle.records === records)!;
+  records.close();
+  handle.records = await openWorkRecords(join(handle.dir, 'work-records.db'));
+  const result = await handler(handle.records).capture({ requestId: REQUEST, draft });
+  assert.equal(result.status, 200);
+  assert.equal(handle.records.read(itemOf(result.body).id).ticket, `${WEB}#91`);
+  assert.equal(writes, 1);
+});
+
+test('Azure without a surviving marker stays blocked, and forbidden mappings never reach a create', async () => {
+  const { records, board } = await captureOn();
+  const repo = 'example/Project/source';
+  const drafts = { repo, kind: 'bug', title: 'Failure', description: 'Steps', createIssue: true };
+  let writes = 0;
+  const provider = {
+    creationTarget: async () => ({ type: 'Backlog Item', areaPath: 'Project\\Team' }),
+    create: async (_repo: string, _title: string, _body: string, type: string, area: string, options: unknown) => {
+      writes++;
+      assert.equal(type, 'Backlog Item');
+      assert.equal(area, 'Project\\Team');
+      assert.deepEqual(options, { type: 'Backlog Item', labels: [] });
+      throw Error('Timed out');
+    },
+    find: async () => [{ number: 9, body: '<p>Steps</p>' }],
+  } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+  const config = { repo, team: 'Team', labels: [], setup: { access: { 'publish-ticket': 'allowed', 'tag-ticket': 'refused', 'type-ticket': 'refused' }, vocabulary: { bug: { labels: ['blocked'], type: 'Bug' } } } } as unknown as RepoConfig;
+  const restart = () => createCapture({ board, items: {} as ItemSource, records, reread: () => {}, repos: () => [config], provider, discoverOptions: emptyOptions });
+  assert.equal((await restart().capture({ requestId: REQUEST, draft: drafts })).status, 409);
+  const result = await restart().capture({ requestId: REQUEST, draft: drafts });
+  assert.match((result.body as { error: string }).error, /Azure may have stripped/);
+  assert.equal(writes, 1);
+  assert.equal(records.list({}).length, 0);
+});
+
+test('options read failures create with title/body only', async () => {
+  const { records, board } = await captureOn();
+  const provider = {
+    create: async (_repo: string, _title: string, _body: string, type: string, _area: string, options: unknown) => {
+      assert.equal(type, undefined);
+      assert.deepEqual(options, { labels: [], type: undefined });
+      return { number: 3 };
+    },
+  } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+  const repo = { ...REPOS[0]!, setup: { access: { 'publish-ticket': 'allowed', 'tag-ticket': 'allowed', 'type-ticket': 'allowed' }, vocabulary: { bug: { labels: ['backend'], type: 'Bug' } } } } as unknown as RepoConfig;
+  const capture = createCapture({ board, items: {} as ItemSource, records, reread: () => board.update({ items: recordItems(records, [], [WEB]) }),
+    repos: () => [repo], provider, discoverOptions: async () => { throw Error('HTTP 403'); } });
+  const result = await capture.capture({ requestId: REQUEST, draft: { repo: WEB, kind: 'bug', title: 'Failure', description: '', createIssue: true } });
+  assert.equal(result.status, 200);
+});
+
+test('Access refusals and unreadable Azure targets leave List empty', async () => {
+  const { records, board } = await captureOn();
+  let writes = 0;
+  const provider = {
+    creationTarget: async () => { throw Error('The team backlog type could not be read.'); },
+    create: async () => { writes++; throw Error('Unexpected create'); },
+  } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+  const configs = [
+    { repo: WEB, setup: { access: { 'publish-ticket': 'refused' }, vocabulary: {} } },
+    { repo: 'example/Project/source', team: 'Team', setup: { access: { 'publish-ticket': 'allowed' }, vocabulary: {} } },
+    { repo: 'example/Project/readonly', team: 'Team', setup: { azureReadOnly: true, access: { 'publish-ticket': 'allowed' }, vocabulary: {} } },
+  ] as unknown as RepoConfig[];
+  const capture = createCapture({ board, items: {} as ItemSource, records, reread: () => {}, repos: () => configs, provider, discoverOptions: emptyOptions });
+  for (const [index, repo] of configs.entries()) {
+    const result = await capture.capture({ requestId: REQUEST.slice(0, -1) + (index + 1), draft: { repo: repo.repo, kind: 'bug', title: 'Failure', description: '', createIssue: true } });
+    assert.equal(result.status, index === 1 ? 502 : 403);
+  }
+  assert.equal(writes, 0);
+  assert.equal(records.list({}).length, 0);
+});
+
+test('a record-write failure names the created issue and replay recovers it without another create', async () => {
+  const { records, board } = await captureOn();
+  let writes = 0;
+  let fail = true;
+  const complete = records.completeCapture;
+  records.completeCapture = (...args) => { if (fail) throw Error('Disk full'); return complete(...args); };
+  const provider = { create: async () => { writes++; return { number: 7 }; } } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+  const repo = { ...REPOS[0]!, setup: { access: { 'publish-ticket': 'allowed' }, vocabulary: {} } } as RepoConfig;
+  const capture = createCapture({ board, items: {} as ItemSource, records, reread: () => board.update({ items: recordItems(records, [], [WEB]) }), repos: () => [repo], provider, discoverOptions: emptyOptions });
+  const request = { requestId: REQUEST, draft: { repo: WEB, kind: 'feature', title: 'Export', description: '  Original.\n\n', createIssue: true } };
+  const result = await capture.capture(request);
+  assert.match((result.body as { error: string }).error, /Created .*#7.*Find a ticket/);
+  assert.equal(records.list({}).length, 0);
+  fail = false;
+  const recovered = await capture.capture(request);
+  assert.equal(recovered.status, 200);
+  assert.equal(records.initialContext(itemOf(recovered.body).id), request.draft.description);
+  assert.equal(writes, 1);
 });

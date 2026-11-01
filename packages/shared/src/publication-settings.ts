@@ -114,3 +114,48 @@ async function createVocabularyLabel(repo: string, name: string): Promise<string
   } else await jsonCommand('gh', ['api', '--method', 'POST', `repos/${repo}/labels`, '-f', `name=${name}`, '-f', 'color=ededed']);
   return name;
 }
+
+interface TicketOptionReads extends VocabularyReads {
+  azureOptions(repo: string, team: string, field: 'assignees' | 'iterations'): Promise<unknown>;
+}
+
+const ticketOptionReads: TicketOptionReads = {
+  ...vocabularyReads,
+  azureOptions: (repo, team, field) => {
+    const [organization, project] = repo.split('/');
+    return jsonCommand('az', field === 'assignees'
+      ? ['devops', 'team', 'list-member', '--team', team, '--project', decodePart(project!), '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json']
+      : ['boards', 'iteration', 'team', 'list', '--team', team, '--project', decodePart(project!), '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json']);
+  },
+};
+
+/** Reads the existing provider options. Failures leave title/description submission available. */
+export async function discoverTicketOptions(config: import('./model.ts').RepoConfig, reads: TicketOptionReads = ticketOptionReads): Promise<import('./add-item.ts').TicketCreationOptions> {
+  const { repo } = config;
+  const vocabulary = await discoverVocabulary(repo, reads);
+  const problems = [vocabulary.labels, vocabulary.types].flatMap(capability => capability.state === 'refused' ? [capability.reason] : []);
+  const list = async <T>(read: () => Promise<unknown>, parse: (row: Record<string, unknown>) => T): Promise<T[]> => {
+    try {
+      const raw = await read();
+      const rows = Array.isArray(raw) ? raw.flat() : isRecord(raw) && Array.isArray(raw.value) ? raw.value : null;
+      if (!rows || !rows.every(isRecord)) throw Error('The provider returned unreadable issue options.');
+      return rows.map(parse);
+    } catch (err) { problems.push(err instanceof Error ? err.message : String(err)); return []; }
+  };
+  const text = (value: unknown) => {
+    if (typeof value !== 'string' || !value.trim()) throw Error('The provider returned an unreadable issue option.');
+    return value;
+  };
+  const azure = onAzure(repo);
+  const team = config.team ?? (config.setup?.itemSource?.kind === 'azure-board' ? config.setup.itemSource.team : '');
+  const [assignees, milestones, iterations] = await Promise.all([
+    list(() => azure ? reads.azureOptions(repo, team, 'assignees') : reads.github(`repos/${repo}/assignees?per_page=100`), row => azure && isRecord(row.identity) ? text(row.identity.uniqueName) : text(row.login)),
+    azure ? Promise.resolve([]) : list(() => reads.github(`repos/${repo}/milestones?state=open&per_page=100`), row => {
+      if (!Number.isSafeInteger(row.number) || Number(row.number) <= 0) throw Error('The provider returned an unreadable milestone.');
+      return { value: String(row.number), name: text(row.title) };
+    }),
+    azure ? list(() => reads.azureOptions(repo, team, 'iterations'), row => text(row.path)) : Promise.resolve([]),
+  ]);
+  return { provider: vocabulary.provider, labels: vocabulary.labels.state === 'available' ? vocabulary.labels.choices : [],
+    types: vocabulary.types.state === 'available' ? vocabulary.types.choices : [], assignees, milestones, iterations, problems };
+}

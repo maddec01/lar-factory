@@ -136,3 +136,19 @@ for (const repo of ['org/project/repo', 'another-org/Project%20Name/repository']
     }
   });
 }
+
+test('Add item options use provider choices, keep optional values empty and tolerate refused reads', async () => {
+  const { discoverTicketOptions } = await import('./publication-settings.ts');
+  const options = await discoverTicketOptions({ repo: 'org/repo', labels: [], role: '' }, {
+    ...available,
+    github: async path => path.includes('/assignees') ? [[{ login: 'writer' }]]
+      : path.includes('/milestones') ? [[{ number: 12, title: 'Next' }]] : available.github(path),
+    azureOptions: async () => [],
+  });
+  expect(options).toEqual({ provider: 'github', labels: ['backend'], types: ['Bug', 'Task'], assignees: ['writer'], milestones: [{ value: '12', name: 'Next' }], iterations: [], problems: [] });
+  const refused = await discoverTicketOptions({ repo: 'org/project/repo', team: 'Team', labels: [], role: '' }, {
+    github: available.github, azure: async () => { throw Error('HTTP 403'); }, azureOptions: async () => { throw Error('HTTP 403'); },
+  });
+  expect(refused.types).toEqual([]);
+  expect(refused.problems.length).toBeGreaterThan(0);
+});

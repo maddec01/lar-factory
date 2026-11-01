@@ -4,7 +4,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeAccessProblem, mapConcurrent, STRUCTURE_LABEL, structureSyncOperations, trackerKind, readTrackerStructure, stripTrackerStructure, sameRepo, trackerReference, writeTrackerStructure, type Kind, type RepositorySetup, type TrackerPart, type TrackerStructure } from '@lar-factory/shared';
+import { trackerMarkdownHtml, type TicketOptions, writeAccessProblem, mapConcurrent, STRUCTURE_LABEL, structureSyncOperations, trackerKind, readTrackerStructure, stripTrackerStructure, sameRepo, trackerReference, writeTrackerStructure, type Kind, type RepositorySetup, type TrackerPart, type TrackerStructure } from '@lar-factory/shared';
 import { providerCommand } from '@lar-factory/shared/provider-command';
 import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
@@ -17,7 +17,7 @@ export interface StructureTicket { repository: string; number: number; body: str
 export interface StructureProvider {
   read(repository: string, number: number): Promise<StructureTicket>;
   find(repository: string, identity: string): Promise<StructureTicket[]>;
-  create(repository: string, title: string, body: string, type?: string, areaPath?: string): Promise<StructureTicket>;
+  create(repository: string, title: string, body: string, type?: string, areaPath?: string, options?: TicketOptions): Promise<StructureTicket>;
   creationTarget?(repository: string, team: string): Promise<{type:string;areaPath:string}>;
   comment(ticket: StructureTicket, body: string): Promise<string>;
   readComment(ticket: StructureTicket, id: string): Promise<string>;
@@ -101,7 +101,7 @@ export function structureProvider(): StructureProvider {
   };
   const asTicket = (repository: string, raw: Record<string, unknown>): StructureTicket => {
     const azure = repository.split('/').length !== 2;
-    return { repository, number: Number(raw[azure ? 'id' : 'number']), body: azure ? String((raw.fields as Record<string, unknown>)['System.Description'] ?? '') : String(raw.body ?? ''),
+    return { repository, number: Number(raw[azure ? 'id' : 'number']), body: azure ? String((raw.fields as Record<string, unknown>)[String((raw.fields as Record<string, unknown>)['System.WorkItemType']).toLowerCase() === 'bug' ? 'Microsoft.VSTS.TCM.ReproSteps' : 'System.Description'] ?? '') : String(raw.body ?? ''),
       title:azure ? String((raw.fields as Record<string,unknown>)['System.Title'] ?? '') : String(raw.title ?? ''),
       kind:azure ? trackerKind([],String((raw.fields as Record<string,unknown>)['System.WorkItemType'] ?? '')) : trackerKind((raw.labels as {name:string}[] ?? []).map(label=>label.name),String((raw.type as {name?:string}|undefined)?.name ?? '')),
       version: String(raw[azure ? 'rev' : 'updated_at']) };
@@ -130,7 +130,7 @@ export function structureProvider(): StructureProvider {
       }
       // A lost Azure create never triggers another create automatically. Query recent descriptions by durable identity.
       const project = decodeURIComponent(repository.split('/')[1]!);
-      const raw = await azure(repository, 'wiql', [], { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project.replaceAll("'", "''")}' AND [System.Description] CONTAINS '${identity}'` });
+      const raw = await azure(repository, 'wiql', [], { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project.replaceAll("'", "''")}' AND ([System.Description] CONTAINS '${identity.replaceAll("'", "''")}' OR [Microsoft.VSTS.TCM.ReproSteps] CONTAINS '${identity.replaceAll("'", "''")}')` });
       return mapConcurrent(raw.workItems as {id:number}[] ?? [],item=>read(repository,item.id));
     },
     creationTarget: async (repository,team) => {
@@ -141,11 +141,14 @@ export function structureProvider(): StructureProvider {
       if(typeof type!=='string' || typeof fields.defaultValue!=='string') throw Error('The Azure team has no readable issue type or default area. Check its list source.');
       return {type,areaPath:fields.defaultValue};
     },
-    create: async (repository, title, body, type, areaPath) => {
+    create: async (repository, title, body, type, areaPath, options = {}) => {
       if (repository.split('/').length !== 2 && !type) throw Error('The Azure team has no verified issue type for concept parts.');
-      const raw = repository.split('/').length === 2 ? await github(`repos/${repository}/issues`, 'POST', { title, body })
+      const raw = repository.split('/').length === 2 ? await github(`repos/${repository}/issues`, 'POST', { title, body, ...(type ? { type } : {}), ...(options.labels?.length ? { labels: options.labels } : {}), ...(options.assignee ? { assignees: [options.assignee] } : {}), ...(options.milestone ? { milestone: Number(options.milestone) } : {}) })
         : await azure(repository, 'workitems', [`type=${type}`], [
-          { op: 'add', path: '/fields/System.Title', value: title }, { op: 'add', path: '/fields/System.Description', value: body },
+          { op: 'add', path: '/fields/System.Title', value: title }, { op: 'add', path: type?.toLowerCase() === 'bug' ? '/fields/Microsoft.VSTS.TCM.ReproSteps' : '/fields/System.Description', value: trackerMarkdownHtml(body) },
+          ...(options.labels?.length ? [{ op: 'add', path: '/fields/System.Tags', value: options.labels.join('; ') }] : []),
+          ...(options.assignee ? [{ op: 'add', path: '/fields/System.AssignedTo', value: options.assignee }] : []),
+          ...(options.iteration ? [{ op: 'add', path: '/fields/System.IterationPath', value: options.iteration }] : []),
           ...(areaPath ? [{op:'add',path:'/fields/System.AreaPath',value:areaPath}] : []),
         ]);
       return asTicket(repository, raw);

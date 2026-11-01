@@ -702,7 +702,7 @@ const reread = () => {
   board.push();
 };
 const commands = createItemCommands({ board, items, records, reread, archive, offerModelChoices, checkSkills: parentSkillCheck() });
-const adding = createCapture({ board, items, records, reread, repos: items.repos });
+const adding = createCapture({ board, items, records, reread, repos: () => board.snapshot().repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({

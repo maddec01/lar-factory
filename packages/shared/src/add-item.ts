@@ -3,12 +3,33 @@ import type { Item, Kind, RepoConfig } from './model.ts';
 
 export const ITEM_KINDS = ['bug', 'feature', 'improvement'] as const;
 
-/** Work to capture: a ticketless work record with this title, and the description as its initial context. */
+/** New work keeps its title and original description, with an optional tracker ticket. */
 export interface ItemDraft {
   repo: string;
   kind: (typeof ITEM_KINDS)[number];
   title: string;
   description: string;
+  createIssue?: boolean;
+  options?: TicketOptions;
+}
+
+/** Optional provider fields. Missing fields use only the repository's kind mapping. */
+export interface TicketOptions {
+  labels?: string[];
+  type?: string;
+  assignee?: string;
+  milestone?: string;
+  iteration?: string;
+}
+
+export interface TicketCreationOptions {
+  provider: 'github' | 'azure';
+  labels: string[];
+  types: string[];
+  assignees: string[];
+  milestones: { value: string; name: string }[];
+  iterations: string[];
+  problems: string[];
 }
 
 /** One of a repository's open tickets, as the ticket picker lists it. */
@@ -39,11 +60,22 @@ export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft {
   const repo = repos.find((r) => r.repo === value.repo);
   if (!repo) throw new Error('Choose a configured repository.');
   if (!ITEM_KINDS.includes(value.kind as ItemDraft['kind'])) throw new Error('Choose bug, feature or improvement.');
-  if (typeof value.title !== 'string' || !value.title.trim() || value.title.length > 256) {
+  if (typeof value.title !== 'string' || !value.title.trim() || /[\r\n]/.test(value.title) || value.title.length > 256) {
     throw new Error('Enter a nonblank title of at most 256 characters.');
   }
   if (typeof value.description !== 'string' || value.description.length > 65_536) {
     throw new Error('Description must be text of at most 65,536 characters.');
   }
-  return { repo: repo.repo, kind: value.kind as ItemDraft['kind'], title: value.title.trim(), description: value.description };
+  if (value.createIssue !== undefined && typeof value.createIssue !== 'boolean') throw new Error('Choose whether to create an issue.');
+  let options: TicketOptions | undefined;
+  if (value.options !== undefined) {
+    if (!value.options || typeof value.options !== 'object' || Array.isArray(value.options)) throw new Error('Choose valid issue options.');
+    const raw = value.options as Record<string, unknown>;
+    if (Object.keys(raw).some(key => !['labels', 'type', 'assignee', 'milestone', 'iteration'].includes(key))) throw new Error('Choose valid issue options.');
+    if (raw.labels !== undefined && (!Array.isArray(raw.labels) || raw.labels.length > 100 || raw.labels.some(label => typeof label !== 'string' || !label.trim() || label.length > 256))) throw new Error('Choose valid labels.');
+    if (['type', 'assignee', 'milestone', 'iteration'].some(key => raw[key] !== undefined && (typeof raw[key] !== 'string' || (raw[key] as string).length > 512 || /[\r\n]/.test(raw[key] as string)))) throw new Error('Choose valid issue options.');
+    if (raw.milestone && !/^[1-9]\d*$/.test(String(raw.milestone))) throw new Error('Choose a valid milestone.');
+    options = raw as TicketOptions;
+  }
+  return { ...(value.createIssue === undefined ? {} : { createIssue: value.createIssue }), ...(options === undefined ? {} : { options }), repo: repo.repo, kind: value.kind as ItemDraft['kind'], title: value.title.trim(), description: value.description };
 }

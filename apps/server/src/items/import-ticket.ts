@@ -4,10 +4,10 @@ import { readRepositorySetups, readConnections, saveConnections } from '@lar-fac
 import type { WorkRecord, WorkRecords } from '@lar-factory/work-records';
 import { readStructureSnapshot, structureProvider } from '@lar-factory/work-records/tracker-sync';
 
-export async function importPickedTicket(records: WorkRecords, repository: string, ticket: PickedTicket): Promise<{ record: WorkRecord; created: boolean }> {
+export async function importPickedTicket(records: WorkRecords, repository: string, ticket: PickedTicket, requestId?: string): Promise<{ record: WorkRecord; created: boolean }> {
   const reference = `${repository}#${ticket.number}`;
   const held = records.list({repository}).find(record => record.ticket?.toLowerCase() === reference.toLowerCase());
-  if (held) return { record: held, created: false };
+  if (held && !requestId) return { record: held, created: false };
   if (ticket.tracker?.snapshot) {
     const provider = structureProvider();
     const current = await provider.read(repository, ticket.number);
@@ -25,8 +25,9 @@ export async function importPickedTicket(records: WorkRecords, repository: strin
     if (!restored) throw Error('The saved structure does not contain this issue.');
     return { record: restored, created: true };
   }
-  const context = ticket.text.replace(/<!-- lar-factory:structure\s*\n[\s\S]*?\n-->/g, '').trimEnd();
-  const imported = records.importTicket({ title: ticket.title, context, repository, kind: ticket.kind, ticket: reference });
+  const context = requestId ? ticket.text : ticket.text.replace(/<!-- lar-factory:structure\s*\n[\s\S]*?\n-->/g, '').replace(/<!-- lar-factory:create [^\n]*? -->/g, '').trimEnd();
+  const input = { title: ticket.title, context, repository, kind: ticket.kind, ticket: reference };
+  const imported = requestId ? records.completeCapture(requestId, input) : records.importTicket(input);
   if (ticket.kind === 'concept') {
     const map = ticket.tracker?.map ?? context;
     if (map.trim()) imported.record = records.setBody(imported.record.workId, imported.record.revision, 'map', map);

@@ -106,3 +106,11 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
   assert.equal((await abandon(unsure, unsure.id(12))).status, 409, 'uncertain');
   assert.deepEqual([...await writes(board), ...await writes(unsure)], []);
 });
+
+ test('combined close failure leaves work active', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], fail: 'abandon' });
+  await until(board, (d) => d.items.length === 1);
+  const response = await board.postSession({ itemId: board.id(12) }, '/api/abandon-and-close');
+  assert.equal(response.status, 502);
+  assert.ok(has(await board.board(), board.id(12)));
+});

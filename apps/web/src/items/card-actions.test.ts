@@ -84,8 +84,8 @@ test('Abandon asks first, saying it sets the work aside on this Mac and leaves i
   expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual([]);
   expect(dialog.getAttribute('role')).toBe('alertdialog');
   expect(text($('#abandon-dialog h2'))).toBe(`Abandon #61 ${sample.items[0]!.title}?`);
-  expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe('This sets the work aside on this Mac and leaves its ticket open. The board asks next whether to close the ticket.');
-  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Abandon']);
+  expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe('Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.');
+  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Abandon', 'Abandon and close ticket']);
   await settle(() => vi.advanceTimersByTime(100));
   expect(document.activeElement, 'Close takes focus, not the destructive button').toBe($('#abandon-dialog [aria-label="Close"]'));
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[0]!.click());
@@ -97,7 +97,7 @@ test('Abandon asks first, saying it sets the work aside on this Mac and leaves i
   await openItem('I_sample04');
   await press(button('abandon', 'I_sample04'));
   expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #900004 Shared playback history across devices\?$/);
-  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Abandon']);
+  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Abandon', 'Abandon and close ticket']);
   await settle(() => vi.advanceTimersByTime(100));
   await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await settle(() => vi.advanceTimersByTime(100));
@@ -159,4 +159,18 @@ test('queuing a source issue switches the open dialog to its new local work ID',
   expect(useItemDialogStore.getState().itemId).toBe('I_imported');
   expect(button('start', 'I_imported')).not.toBeNull();
   expect($('[data-item-dialog] .action-error')).toBeNull();
+});
+
+test('combined tracker failure keeps the confirmation open and allows Cancel', async () => {
+  holdPosts();
+  await mountPage();
+  await openItem('I_sample01');
+  await press(button('abandon', 'I_sample01'));
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[2]!.click());
+  await answer({ error: 'Provider refused closure.' });
+  expect(text($('#abandon-dialog [role="alert"]'))).toBe('Provider refused closure.');
+  expect($('#abandon-dialog')).not.toBeNull();
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[0]!.click());
+  expect($('#abandon-dialog')).toBeNull();
+  expect(button('abandon', 'I_sample01')).not.toBeNull();
 });

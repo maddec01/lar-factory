@@ -120,7 +120,7 @@ export async function abandonItem(itemId: string): Promise<void> {
   // An abandoned item leaves the item dialog, which closes and hands focus back itself.
   if (result.error) refocus([by('data-abandon', itemId)]);
   // Its ticket stays open until the user confirms its close as a step of its own.
-  else if (item.number && !item.abandonRefusal) useAbandonStore.getState().askClose(item);
+
 }
 
 /** Closes the ticket of work Abandon just set aside, which has left the board. */

@@ -93,7 +93,7 @@ export const UNREADABLE = 'Usage details are unavailable.';
 /** What Abandon asks: it sets the work aside on this Mac, and leaves a ticket for closeTicketPrompt to ask about. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
   return { question: `Abandon ${itemName(item)}?`, confirm: 'Abandon', done: `Set ${itemName(item)} aside on this Mac.`,
-    detail: item.number ? 'This sets the work aside on this Mac and leaves its ticket open. The board asks next whether to close the ticket.'
+    detail: item.number ? 'Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.'
       : 'This sets the work aside on this Mac. It has no ticket, so nothing changes in its provider.',
   };
 }

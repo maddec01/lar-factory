@@ -1,4 +1,5 @@
 import { onAzure, type OperationAccess, type RepositoryOperation } from './model.ts';
+import { trackerCapabilities } from './tracker-capabilities.ts';
 
 /** Returns the reason a write is denied, or null after verified access and safety checks pass. */
 export function writeAccessProblem(repo: string, operation: RepositoryOperation,
@@ -12,6 +13,11 @@ export function writeAccessProblem(repo: string, operation: RepositoryOperation,
   if (!onAzure(repo) && options.fineGrainedToken) return 'Fine-grained GitHub token permissions cannot be verified. Sign in with a classic token or gh OAuth login and recheck access.';
   if (!onAzure(repo) && operation === 'edit-ticket' && access['push-branch'] !== 'allowed') return "This login cannot edit other people's issues without verified push access. Recheck access in Settings.";
   return `Access to ${operation} is not checked yet. ${!onAzure(repo) ? 'GitHub permissions require a classic token or gh OAuth login to verify. ' : ''}Recheck access in Settings.`;
+}
+
+/** Returns the reason the factory can't create a new label by itself, or null when it can. */
+export function newLabelProblem(repo: string, access: Partial<Record<RepositoryOperation, OperationAccess>>, options: { azureReadOnly?: boolean } = {}): string | null {
+  return writeAccessProblem(repo, 'manage-labels', access, options) ?? trackerCapabilities(repo).createUnavailable;
 }
 
 /** Saved preferences remain intact when access prevents their use. */

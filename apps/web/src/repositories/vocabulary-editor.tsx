@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { writeAccessProblem, type RepositorySetup, type VocabularyTerm } from '@lar-factory/shared';
+import { newLabelProblem, writeAccessProblem, type RepositorySetup, type VocabularyTerm } from '@lar-factory/shared';
 import { emptyVocabularyTerm, suggestVocabularyLabels, type VocabularyCapability, type VocabularyDiscovery, type VocabularyMapping } from '@lar-factory/shared/vocabulary';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -45,7 +45,7 @@ function unavailable(capability: VocabularyCapability): string | null {
 
 function vocabularyAccess(setup: VocabularyAccess) {
   const options = setup.azureReadOnly === undefined ? {} : { azureReadOnly: setup.azureReadOnly };
-  return { labels: writeAccessProblem(setup.repo, 'tag-ticket', setup.access, options), types: writeAccessProblem(setup.repo, 'type-ticket', setup.access, options) };
+  return { labels: writeAccessProblem(setup.repo, 'tag-ticket', setup.access, options), newLabels: newLabelProblem(setup.repo, setup.access, options), types: writeAccessProblem(setup.repo, 'type-ticket', setup.access, options) };
 }
 
 /** An explicit none can always clear a stale or forbidden mapping. */
@@ -81,10 +81,10 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
       {suggested && !labelsProblem && !value.labels.includes(suggested) && <span><Button {...kind('other')} onClick={() => onChange({ ...value, labels: [...value.labels, suggested] }, newLabels)}>Use suggested label: {suggested}</Button></span>}
     </div>
     <label className="grid gap-1.5 text-sm">New {discovery.provider === 'azure' ? 'tag' : 'label'}
-      <Input type="text" aria-label={`${title} new label`} aria-describedby={`${id}-new`} maxLength={100} disabled={!!labelsProblem} value={newLabels[0] ?? ''}
+      <Input type="text" aria-label={`${title} new label`} aria-describedby={`${id}-new`} maxLength={100} disabled={!!labelsProblem || !!access.newLabels} value={newLabels[0] ?? ''}
         onChange={(e) => onChange(value, e.target.value ? [e.target.value] : [])} />
     </label>
-    <p id={`${id}-new`} className="m-0 text-xs text-base-700">Created only when you save. Leave empty to use existing labels or none.</p>
+    <p id={`${id}-new`} className="m-0 text-xs text-base-700">{access.newLabels ?? 'Created only when you save. Leave empty to use existing labels or none.'}</p>
     <span><Button {...kind('other')} onClick={() => onChange(emptyVocabularyTerm(), [])}>None</Button></span>
   </fieldset>;
 }
@@ -101,7 +101,7 @@ function VocabularySettings({ setup }: { setup: RepositorySetup }) {
     {(Object.keys(KIND_NAMES) as VocabularyKind[]).map((key) => {
       const value = drafts[key] ?? setup.vocabulary[key];
       const names = (newLabels[key] ?? []).map((name) => name.trim()).filter(Boolean);
-      const forbidden = value.type !== null && access.types || (value.labels.length > 0 || names.length > 0) && access.labels;
+      const forbidden = value.type !== null && access.types || value.labels.length > 0 && access.labels || names.length > 0 && access.newLabels;
       return <div key={key} data-vocabulary={key} className="grid gap-2">
         <VocabularyFields name={key} setup={setup} discovery={discovery} value={value} newLabels={newLabels[key] ?? []} disabled={running !== null}
           onChange={(term, labels) => { setDrafts({ ...drafts, [key]: term }); setNewLabels({ ...newLabels, [key]: labels }); setSaved(null); }} />

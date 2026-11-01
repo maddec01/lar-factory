@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  isOnboarding, sameRepo, writeAccessProblem, type BoardData, type OnboardingChoices,
+  isOnboarding, sameRepo, newLabelProblem, writeAccessProblem, type BoardData, type OnboardingChoices,
   type OnboardingProgress, type ProjectChoice, type Provider, type SetupDetection,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -72,8 +72,8 @@ export function stepReady(run: Run, projects: Projects, detection: Read<SetupDet
     const options = detected.azureReadOnly === undefined ? {} : { azureReadOnly: detected.azureReadOnly };
     const terms = Object.values(run.choices.vocabulary ?? {});
     if (terms.some((term) => term.type !== null) && writeAccessProblem(detected.repo, 'type-ticket', detected.access, options)) return false;
-    if ((terms.some((term) => term.labels.length) || Object.values(run.choices.newLabels ?? {}).some((names) => names?.length))
-      && writeAccessProblem(detected.repo, 'tag-ticket', detected.access, options)) return false;
+    if (terms.some((term) => term.labels.length) && writeAccessProblem(detected.repo, 'tag-ticket', detected.access, options)) return false;
+    if (Object.values(run.choices.newLabels ?? {}).some((names) => names?.length) && newLabelProblem(detected.repo, detected.access, options)) return false;
   }
   if (answerProblem(run.step, answers) || !answers.itemSource) return false;
   return run.step !== 'access' || !answers.structureSync || missingSyncAccess(detected).length === 0;

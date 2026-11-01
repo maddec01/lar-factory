@@ -1,5 +1,5 @@
 import { expect, test } from 'vite-plus/test';
-import { writeAccessProblem } from './write-access.ts';
+import { newLabelProblem, writeAccessProblem } from './write-access.ts';
 
 test('writes require verified access and respect Azure safety', () => {
   expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('not checked');
@@ -34,4 +34,11 @@ test('repository identities do not change write authorization', () => {
     expect(writeAccessProblem(repo, 'publish-ticket', { 'publish-ticket': 'refused' }, { azureReadOnly: false })).toContain('refused');
     expect(writeAccessProblem(repo, 'publish-ticket', {}, { azureReadOnly: false })).not.toBeNull();
   }
+});
+
+test('a new label needs label management, and on Azure stays unavailable with its reason even then', () => {
+  expect(newLabelProblem('team/app', { 'manage-labels': 'allowed' })).toBeNull();
+  expect(newLabelProblem('team/app', { 'tag-ticket': 'allowed' })).toContain('Access to manage-labels is not checked yet');
+  expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' })).toContain('Azure DevOps has no way to create a tag on its own');
+  expect(newLabelProblem('org/project/app', { 'manage-labels': 'allowed' }, { azureReadOnly: true })).toBe('Azure DevOps is read-only in this test session.');
 });

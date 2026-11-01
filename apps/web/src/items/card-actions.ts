@@ -134,9 +134,9 @@ export async function closeTicket(item: Item): Promise<void> {
 }
 
 /** Acts on work that needs you as `choice` says, then clears its reason; a failure stays in the dialog. */
-export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOffer, 'set-aside'> | 'clear', briefChoice?: 'keep' | 'reshape'): Promise<void> {
+export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOffer, 'set-aside'> | 'clear', briefChoice?: 'keep' | 'reshape'): Promise<ActionResult | undefined> {
   if (!ready(itemId, 'data-needs-you')) return;
-  await runAction(itemId, 'needs-you', { itemId, choice, briefChoice }, (result) => result.error ?? undefined);
+  return runAction(itemId, 'needs-you', { itemId, choice, briefChoice }, (result) => result.error ?? undefined);
 }
 
 /** Marks the Dependency holding the item met, or clears the mark; a failure stays in the dialog. */
@@ -167,4 +167,5 @@ export async function startAgain(itemId: string, options: { branchChoice?: 'cont
     if (remembersChoice(result)) useStartStore.getState().remember(model);
     actions.set(itemId, result.error ? { phase: 'error', kind: 'needs-you', message: result.error } : undefined);
   });
+  return result;
 }

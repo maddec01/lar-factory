@@ -652,6 +652,8 @@ test('inspection errors preserve the recovery notice', async () => {
 test('absent branch starts new directly and receives the successful board', async () => {
   const id = await recoveryItem();
   await answer({ inspection: { branch: 'build/old', branchExists: false, worktreePath: null, pr: 'none' } });
+  expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
+  await answer({ token: 'empty', plans: [] });
   expect(posted().at(-1)).toEqual(['/api/start-again', { itemId: id, options: { branchChoice: 'new' } }]);
   await answer({ board: { ...sample, items: sample.items.map(i => i.id === id ? { ...i, needsYou: undefined } : i) } });
   expect(inDialog('[data-needs-you-reason]')).toBeNull();
@@ -670,6 +672,8 @@ test('choosing a branch uses the model menu and sends recovery options', async (
   await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
   await pressMenu($$<HTMLButtonElement>('[data-needs-you-reason] button').find(b => text(b) === 'Start on new branch')!);
   await press($<HTMLElement>('[data-start-pick]')!);
+  expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
+  await answer({ token: 'empty', plans: [] });
   expect(posted().at(-1)).toEqual(['/api/start-again', { itemId: id, options: { branchChoice: 'new', confirmedOpenPr: false } }]);
   await answer({ error: 'Start refused' }, 409);
   expect(text(dialog())).toContain('Start refused');

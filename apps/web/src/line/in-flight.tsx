@@ -12,7 +12,7 @@ import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ActivityFeedback, useActivityFeedback, AzureFields, ItemTitle, KindBadge, LabelChips, SliceBar, SliceList } from '../items/item-parts.tsx';
+import { ActivityFeedback, useActivityFeedback, AzureFields, ItemTitle, KindBadge, KindMarker, LabelChips, SliceBar, SliceList } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartBuild } from '../items/start-build.tsx';
@@ -68,6 +68,7 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
               <span>{item.status} · {threadText(item)} · {repo}</span>
               {item.linkedPrs[0] && <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(item.linkedPrs[0])}</span>}
               <KindBadge kind={item.kind} />
+              <KindMarker item={item} />
               <LabelChips item={item} />
               {blocked > 0 && <Badge tone="danger" title={blockedText(item) ?? undefined}>blocked by {blocked}<span className="sr-only">. {blockedText(item)}</span></Badge>}
               <AzureFields azure={item.azure} />

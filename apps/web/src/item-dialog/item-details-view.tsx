@@ -5,10 +5,10 @@
 // description's place, with Save and Cancel under it; the extra sections, such as Acceptance Criteria, stay read-only.
 // Beside a work record's own text, the description and comments are the ticket's context and say so.
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CircleCheck, CircleDot, Lock, Pencil } from 'lucide-react';
-import { STRUCTURE_LABEL, SWAP_KINDS, kindCanChange, kindLabels, onAzure, sameRepo, shortAgo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
-import type { IssueRef, Item, ItemComment, ItemDetails, SwapKind, TextFormat } from '@lar-factory/shared';
+import { STRUCTURE_LABEL, SWAP_KINDS, kindCanChange, kindLabels, kindSwapAccessProblem, onAzure, sameRepo, shortAgo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
+import type { IssueRef, Item, ItemComment, ItemDetails, KindTicketSwap, SwapKind, TextFormat } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
@@ -20,6 +20,7 @@ import { LabelPicker } from '../labels/label-picker.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import type { DescriptionEdit } from './use-description-edit.ts';
 import { useKindChangeStore } from './kind-change-store.ts';
+import { OPEN_ITEM_DIALOG } from './item-dialog-store.ts';
 import { useLabelEdit } from './use-label-edit.ts';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
@@ -227,15 +228,24 @@ const KIND_CHOICES = SWAP_KINDS.map((value) => {
 /**
  * The control that changes an ordinary item's kind, and what the last change did: the line it answered with, or why it stopped,
  * what it changed on the ticket before that, and Retry for the same change. Concepts, decisions and builds don't have it.
+ * A write disables this control and takes away the button that answered, which drops focus to the page or the dialog, so it comes
+ * back here when the write ends. A control the user has moved to since keeps it.
  */
 function ItemKindControl({ item }: { item: Item }) {
   const change = useKindChangeStore((state) => state.changes[item.id]);
+  const saving = useKindChangeStore((state) => Boolean(state.changes[item.id]?.saving || state.answers[item.id]?.saving));
+  const control = useRef<HTMLButtonElement>(null);
+  const wasSaving = useRef(false);
+  useEffect(() => {
+    if (wasSaving.current && !saving && (document.activeElement === document.body || document.activeElement?.matches(OPEN_ITEM_DIALOG))) control.current?.focus();
+    wasSaving.current = saving;
+  }, [saving]);
   const { start } = useKindChangeStore.getState();
   if (!kindCanChange(item.kind)) return null;
   return <>
     <Fact label="Kind">
       <span className="block w-44" data-item-kind-control>
-        <FormSelect aria-label="Kind" placeholder="No kind" value={item.kind === 'issue' ? '' : item.kind} choices={KIND_CHOICES} disabled={change?.saving} onChange={(kind) => void start(item.id, kind as SwapKind)} />
+        <FormSelect ref={control} writesOnPick aria-label="Kind" placeholder="No kind" value={item.kind === 'issue' ? '' : item.kind} choices={KIND_CHOICES} disabled={change?.saving} onChange={(kind) => void start(item.id, kind as SwapKind)} />
       </span>
     </Fact>
     {change?.error
@@ -246,6 +256,55 @@ function ItemKindControl({ item }: { item: Item }) {
       </div>
       : change?.line && <p role="status" data-kind-change-line className="m-0 w-full text-xs text-(--muted-foreground)">{change.line}</p>}
   </>;
+}
+
+const kindName = (value: SwapKind) => KIND_BADGES[value]!.name;
+const NOTICE_HINT = 'm-0 text-xs text-(--muted-foreground)';
+
+/** What an update changes on the ticket, in the tracker's own words. */
+function swapLine(item: Item, { add, remove, type }: KindTicketSwap): string {
+  const { noun } = trackerCapabilities(item.repo);
+  const parts = [...add.length || remove.length ? [`${noun} ${remove.join(', ') || 'none'} → ${add.join(', ') || 'none'}`] : [], ...type ? [`type ${type.from ?? 'none'} → ${type.to}`] : []];
+  return parts.length ? `Update changes #${item.number}: ${parts.join(', ')}.` : `Update writes nothing to #${item.number}, as ${kindName(item.kind as SwapKind)} has no mapped ${noun} or type.`;
+}
+
+/**
+ * How the item's kind and its ticket's disagree and the two answers, worded from whichever side moved. A kept answer holds until
+ * either kind changes and leaves a line whose Change shows the choice again here, with the answer standing until a new one replaces it.
+ */
+function KindNotice({ item }: { item: Item }) {
+  const disagreement = item.kindDisagreement;
+  const saving = useKindChangeStore((state) => state.changes[item.id]?.saving);
+  const answering = useKindChangeStore((state) => state.answers[item.id]);
+  const setup = useBoardStore((state) => state.data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup);
+  const [reopened, setReopened] = useState(false);
+  if (!disagreement) return null;
+  const { ticketKind, changed, kept, swap } = disagreement;
+  const { start, answer } = useKindChangeStore.getState();
+  if (kept && !reopened) {
+    return <p data-kind-kept className={`${NOTICE_HINT} w-full`}>{ticketKind ? `Ticket says ${kindName(ticketKind)}. Kept as is.` : 'Ticket has no kind. Left as is.'}{' '}
+      <button type="button" className="underline underline-offset-2 hover:text-(--foreground)" onClick={() => setReopened(true)}>Change</button></p>;
+  }
+  const mine = kindName(item.kind as SwapKind);
+  const said = ticketKind && kindName(ticketKind);
+  const keep = () => { setReopened(false); void answer(item.id, 'keep', ticketKind); };
+  const busy = saving || answering?.saving;
+  const ticketMoved = changed === 'ticket' && said !== null;
+  const shaped = `Shaping decided this is ${mine === 'Improvement' ? 'an' : 'a'} ${mine}.`;
+  const problem = ticketMoved ? null : kindSwapAccessProblem(item.repo, swap, setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
+  return (
+    <div data-kind-notice className="grid w-full gap-2 rounded-lg border border-(--border) p-3">
+      <p className="m-0 text-sm">{ticketMoved ? `The ticket now says ${said}. This item still says ${mine}.` : `${shaped} ${said ? `The ticket still says ${said}.` : 'The ticket has no kind.'}`}</p>
+      <span className="flex flex-wrap gap-2">
+        {ticketMoved
+          ? <Button {...kind('other')} disabled={busy} onClick={() => void answer(item.id, 'update-item', ticketKind)}>Update item to {said}</Button>
+          : <Button {...kind('other')} disabled={busy || problem !== null} onClick={() => void start(item.id, item.kind as SwapKind)}>{said ? `Update ticket to ${mine}` : `Add ${mine} to ticket`}</Button>}
+        <Button {...kind('other')} disabled={busy} onClick={keep}>{ticketMoved ? `Keep item as ${mine}` : said ? `Keep ticket as ${said}` : 'Leave ticket as is'}</Button>
+      </span>
+      <p data-kind-notice-hint className={NOTICE_HINT}>{ticketMoved ? 'Changes this item only. Nothing is written to the ticket.' : problem ?? swapLine(item, swap)}</p>
+      {answering?.error && <p role="alert" className={LABEL_ERROR}>{answering.error}</p>}
+    </div>
+  );
 }
 
 /**
@@ -269,6 +328,7 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
       <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
       <AgentWorkNote item={item} />
       <AgentWork item={item} className="@min-[40rem]:hidden" />
+      <KindNotice key={`${item.id} notice`} item={item} />
     </div>
   );
 }

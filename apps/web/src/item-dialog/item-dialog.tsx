@@ -104,7 +104,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
   const fill = expanded && edit.editing;
   const rows = fill ? 'min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]' : aside ? '@min-[45rem]:grid-rows-[auto_1fr]' : '';
   return (
-    <Modal.Content title={`${itemName(item)}`} presentation="workspace" data-item-dialog style={expanded ? EXPANDED : undefined}
+    <Modal.Content title={`${itemName(item)}`} presentation="workspace" data-item-dialog style={expanded ? EXPANDED : undefined} focusFirstField={false}
       headerActions={<>
         <AgentWork item={item} className="whitespace-nowrap text-xs text-base-700 @max-[40rem]:hidden" />
         <ExpandButton expanded={expanded} toggle={toggleExpanded} />

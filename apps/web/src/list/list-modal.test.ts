@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, moved, mountPage, push, sample, settle, text } from '../../test/support.ts';
+import type { KindDisagreement } from '@lar-factory/shared';
 afterEach(() => {
   delete (Element.prototype as Partial<Element>).getAnimations;
 });
@@ -296,6 +297,13 @@ for (const match of [false, true]) {
     }
   }
 }
+
+test('a List row shows a kind disagreement beside its kind badge', async () => {
+  const kindDisagreement: KindDisagreement = { ticketKind: 'bug', changed: 'item', kept: false, swap: { add: [], remove: [], type: null } };
+  await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample01' ? { ...i, kindDisagreement } : i)) });
+  await open();
+  expect(text($('[data-list-modal] button[data-item="I_sample01"] [data-kind-marker]'))).toBe('Bug');
+});
 
 test('a List row shows its coloured kind badge and label chips', async () => {
   await mountPage();

@@ -66,6 +66,8 @@ interface EditState {
   running: Running | null;
   /** Why the last call failed, by the repository it was for. */
   errors: Record<string, string>;
+  /** How many label changes have landed, so what read the tracker's labels reads them again. */
+  labelChanges: number;
   open: (repo: string) => void;
   close: () => void;
   type: (field: keyof Drafts, text: string) => void;
@@ -92,7 +94,7 @@ export const useEditStore = create<EditState>()((set, get) => {
     set({ running: null, typed, errors: result.error ? { ...get().errors, [repo]: result.error } : get().errors });
   }
   return {
-    repo: null, typed: {}, running: null, errors: {},
+    repo: null, typed: {}, running: null, errors: {}, labelChanges: 0,
     open: (repo) => set({ repo, typed: {} }),
     // A call that is running keeps the dialog open until it answers.
     close: () => { if (!get().running) set({ repo: null, typed: {} }); },
@@ -115,7 +117,7 @@ export const useEditStore = create<EditState>()((set, get) => {
       set({ running: 'labels' });
       const result = await postAction('/api/repositories/labels', { repo, ...change });
       receive(result);
-      set({ running: null });
+      set({ running: null, labelChanges: get().labelChanges + (result.error ? 0 : 1) });
       return result.error ?? null;
     },
   };

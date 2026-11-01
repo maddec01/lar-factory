@@ -217,7 +217,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
   /** Why a command in flight on the item, or a Start this board run, blocks this action; null when nothing does. */
   function busyReason(itemId: string, action: Action): string | null {
     if (combined.has(itemId)) return 'Abandon and close ticket is running. Wait for it to finish.';
-    if (['List', 'Queued'].includes(board.find(itemId)?.status ?? '') && recordedThreads(itemId).every(t => t.deletedAt)) return null;
+    if (['List', 'Queued'].includes(board.find(itemId)?.status ?? '') && recordedThreads(itemId).length > 0 && recordedThreads(itemId).every(t => t.deletedAt) && !records?.launchIntents({ workId: itemId, unresolved: true }).length) return null;
     const started = buildStarts.has(itemId) || starts.has(itemId) || !!board.snapshot().started?.[itemId] || recordedStart(itemId);
     if (started && action === 'back to List') return 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
     if (started && action === 'abandon') return 'Start is running or has run for this item. Check its T3 thread before abandoning it.';

@@ -56,6 +56,10 @@
         "area: server",
         "area: web"
       ],
+      "labelColors": {
+        "area: server": "#C2E0C6",
+        "area: web": "#1D76DB"
+      },
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -87,6 +91,9 @@
         "bug",
         "area: server"
       ],
+      "labelColors": {
+        "area: server": "#C2E0C6"
+      },
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -120,6 +127,11 @@
         "os: ios",
         "os: macos"
       ],
+      "labelColors": {
+        "app: music": "#E99695",
+        "os: ios": "#5319E7",
+        "os: macos": "#BFDADC"
+      },
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -178,8 +190,14 @@
       "url": "https://github.com/maddec01/lar-server/issues/129",
       "repo": "maddec01/lar-server",
       "labels": [
-        "improvement"
+        "improvement",
+        "area: server",
+        "needs-design"
       ],
+      "labelColors": {
+        "area: server": "#C2E0C6",
+        "needs-design": "#D93F0B"
+      },
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -208,8 +226,14 @@
       "url": "https://github.com/maddec01/lar-apple/issues/20",
       "repo": "maddec01/lar-apple",
       "labels": [
-        "bug"
+        "bug",
+        "os: ios",
+        "priority: high"
       ],
+      "labelColors": {
+        "os: ios": "#5319E7",
+        "priority: high": "#B60205"
+      },
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -793,8 +817,15 @@
       "url": "https://github.com/maddec01/lar-apple/issues/30",
       "repo": "maddec01/lar-apple",
       "labels": [
-        "feature"
+        "feature",
+        "os: macos",
+        "good first issue",
+        "linked-work"
       ],
+      "labelColors": {
+        "os: macos": "#BFDADC",
+        "good first issue": "#7057FF"
+      },
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -1261,6 +1292,9 @@
         "bug",
         "os: watchos"
       ],
+      "labelColors": {
+        "os: watchos": "#FBCA04"
+      },
       "state": "closed",
       "closedAs": "done",
       "parent": null,

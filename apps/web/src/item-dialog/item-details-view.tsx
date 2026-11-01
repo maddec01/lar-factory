@@ -6,15 +6,14 @@
 // Beside a work record's own text, the description and comments are the ticket's context and say so.
 
 import { useState, type ReactNode } from 'react';
-import { CircleCheck, CircleDot, Pencil } from 'lucide-react';
-import { onAzure, shortAgo } from '@lar-factory/shared';
+import { CircleCheck, CircleDot, Lock, Pencil } from 'lucide-react';
+import { STRUCTURE_LABEL, onAzure, shortAgo, trackerCapabilities } from '@lar-factory/shared';
 import type { IssueRef, Item, ItemComment, ItemDetails, TextFormat } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';
-import { AzureFields, AgentWork, AgentWorkNote } from '../items/item-parts.tsx';
+import { AzureFields, AgentWork, AgentWorkNote, LabelChips, useShownLabels } from '../items/item-parts.tsx';
 import type { DescriptionEdit } from './use-description-edit.ts';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
@@ -168,6 +167,21 @@ function FromDetails({ read, label, show }: { read: ItemDetailsRead; label: stri
   return shown ? <Fact label={label}>{shown}</Fact> : null;
 }
 
+/** The tracker's labels on the item, without those its row hides; linked-work shows only as a note, for the factory owns it. */
+function ItemLabels({ item }: { item: Item }) {
+  const shown = useShownLabels(item);
+  const linked = item.labels.some((l) => l.toLowerCase() === STRUCTURE_LABEL);
+  if (!shown.length && !linked) return null;
+  return (
+    <Fact label={trackerCapabilities(item.repo).heading}>
+      <span className="flex flex-wrap items-center gap-1" data-labels>
+        <LabelChips item={item} />
+        {linked && <span data-locked-label title="The factory manages this for saved links, so it can't be edited." className="inline-flex items-center gap-1 text-xs text-(--muted-foreground)"><Lock className="size-3 shrink-0" aria-hidden="true" />{STRUCTURE_LABEL}</span>}
+      </span>
+    </Fact>
+  );
+}
+
 /**
  * The meta area under the title: author, assignees, labels, milestone or iteration and area, dates, a pull request item's
  * checks, and the agent work figures, which only show here while the dialog is too narrow for the header to hold them, or why
@@ -180,9 +194,7 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
       {item.azure && <><Fact label="Azure type">{item.azure.type}</Fact><Fact label="Azure state">{item.azure.state}</Fact></>}
       <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
       <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
-      {item.labels.length > 0 && (
-        <Fact label="Labels"><span className="flex flex-wrap gap-1" data-labels>{item.labels.map((l) => <Badge key={l} className="h-auto max-w-full whitespace-normal py-px text-start wrap-anywhere">{l}</Badge>)}</span></Fact>
-      )}
+      <ItemLabels item={item} />
       {azure
         ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>
         : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}

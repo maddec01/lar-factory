@@ -296,3 +296,13 @@ for (const match of [false, true]) {
     }
   }
 }
+
+test('a List row shows its coloured kind badge and label chips', async () => {
+  await mountPage();
+  await open();
+  const row = (id: string) => $(`[data-list-modal] button[data-item="${id}"]`)!;
+  expect(text(row('I_sample01').querySelector('[data-kind-badge]'))).toBe('Feature');
+  const chips = [...row('I_sample01').querySelectorAll<HTMLElement>('[data-label-chip]')];
+  expect(chips.map(text)).toEqual(['area: server', 'area: web']);
+  expect(chips[0]!.style.backgroundColor).toContain('color-mix');
+});

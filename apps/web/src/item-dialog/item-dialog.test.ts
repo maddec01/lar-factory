@@ -36,7 +36,7 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   expect([text(parent), parent.href]).toEqual(['#200 lar cloud: website sign-in and relay', 'https://github.com/maddec01/lar-server/issues/200']);
   expect(steps()).toHaveLength(8);
   expect(text(inDialog('[data-meta]'))).toContain('Usage totals are still loading.');
-  expect(text(inDialog('[data-labels]'))).toBe('build');
+  expect(inDialog('[data-labels]'), "a build's only label is managed").toBeNull();
 });
 
 /** The progress bar's active step segments. */
@@ -77,7 +77,7 @@ test('the labels, people and dates sit in a meta area under the title, and the s
   await mountPage();
   await openItem('I_sample13');
   const meta = text(inDialog('[data-meta]'));
-  expect(meta).toMatch(/Author.*maddec01.*Assignees.*maddec01.*claude-bot.*Labels.*build.*Milestone.*Cloud v0\.1.*Created.*Updated/);
+  expect(meta).toMatch(/Author.*maddec01.*Assignees.*maddec01.*claude-bot.*Milestone.*Cloud v0\.1.*Created.*Updated/);
   expect(inDialog('[data-meta]')!.closest('aside'), 'not in the sidebar').toBeNull();
   expect(text(inDialog('aside'))).not.toMatch(/Author|Assignees|Labels|Created|Updated|Agent work/);
 });

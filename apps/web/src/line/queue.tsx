@@ -5,14 +5,14 @@
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { itemRepoNames, openBlockers, repoKey, sameRepo, shownLabels, startHold, shortAgo } from '@lar-factory/shared';
+import { itemRepoNames, openBlockers, repoKey, startHold, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
-import { AzureFields, ItemTitle, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, KindBadge, LabelChips, repoTone } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
@@ -42,7 +42,6 @@ function RowAction({ item, data }: { item: Item; data: BoardData }) {
 function Row({ item, n, data, now, waits }: { item: Item; n: number; data: BoardData; now: number; waits: boolean }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   const repo = repoKey(item);
-  const labels = shownLabels(item, data.repos.find((r) => sameRepo(r.repo, repo))?.setup?.vocabulary);
   return (
     <li data-item={item.id} onClick={() => useItemDialogStore.getState().open(item.id)}
       className={`flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 border-b border-(--border) px-3 py-2 last:border-b-0 hover:bg-(--accent) ${picked ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : ''}`}>
@@ -55,7 +54,7 @@ function Row({ item, n, data, now, waits }: { item: Item; n: number; data: Board
       <button type="button" className="grid min-w-28 flex-1 gap-0.5 text-left">
         <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><SourceIcon item={item} /><span className="truncate"><ItemTitle item={item} /></span></span>
         <AzureFields azure={item.azure} />
-        <span className="queue-meta truncate text-[11px] text-(--muted-foreground)">{itemRepoNames(item, data.repos)} · queued {shortAgo(item.updatedAt, now)}{labels.length > 0 && ` · ${labels.join(', ')}`}</span>
+        <span className="queue-meta flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-(--muted-foreground)"><span className="queue-age me-1">{itemRepoNames(item, data.repos)} · queued {shortAgo(item.updatedAt, now)}</span><KindBadge kind={item.kind} /><LabelChips item={item} /></span>
       </button>
       {waits && <span className="shrink-0 text-[11px] text-(--muted-foreground)">next when a build slot frees</span>}
       <span className="ml-auto min-w-0 max-w-full" onClick={stop}><RowAction item={item} data={data} /></span>

@@ -291,6 +291,7 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   invalidateGate(workId: string, revision: number): WorkRecord;
   /** Preserves old branch ownership before deleting slice records. */
   captureCleanup(workId: string, revision: number, branch: string, sliceBranches: string[]): WorkRecord;
+  resolveCleanup(workId: string, revision: number, resolvedBranches: string[]): WorkRecord;
   cleanupOwnership(workId: string): { branch: string; sliceIds: string[]; sliceBranches: string[] }[];
   /** Deletes only this build's owned slices and clears its phase atomically. */
   resetBuild(workId: string, revision: number): WorkRecord;
@@ -987,6 +988,20 @@ function workRecords(database: Database): WorkRecords {
       find(workId);
       const row = db.prepare('SELECT cleanup_ownership FROM work_records WHERE work_id = ?').get(workId);
       return JSON.parse(String(row?.cleanup_ownership ?? '[]'));
+    }),
+    resolveCleanup: (workId, revision, resolvedBranches) => change(workId, revision, (row) => {
+      if (row.kind !== 'build') throw invalid('Only builds own cleanup.');
+      const stored = db.prepare('SELECT cleanup_ownership FROM work_records WHERE work_id = ?').get(workId);
+      const snapshots = JSON.parse(String(stored?.cleanup_ownership ?? '[]')) as { branch: string; sliceIds: string[]; sliceBranches: string[] }[];
+      const owned = new Set(snapshots.flatMap(snapshot => [snapshot.branch, ...snapshot.sliceBranches]));
+      if (resolvedBranches.some(branch => !owned.has(branch))) throw invalid('Cleanup branch is not owned by this build.');
+      const resolved = new Set(resolvedBranches);
+      const remaining = snapshots.map(snapshot => ({ ...snapshot,
+        branch: resolved.has(snapshot.branch) ? '' : snapshot.branch,
+        sliceBranches: snapshot.sliceBranches.filter(branch => !resolved.has(branch)),
+      })).filter(snapshot => snapshot.branch || snapshot.sliceBranches.length);
+      db.prepare('UPDATE work_records SET cleanup_ownership = ? WHERE work_id = ?').run(JSON.stringify(remaining), workId);
+      return {};
     }),
     captureCleanup: (workId, revision, branch, sliceBranches) => change(workId, revision, (row) => {
       if (row.kind !== 'build') throw invalid('Only builds own cleanup.');

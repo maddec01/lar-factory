@@ -19,6 +19,7 @@ test('onboarding chooses a source without importing individual tickets or changi
   expect(wizard.getState().run?.step).toBe('work');
   expect(ready()).toBe(true);
   await settle(() => wizard.getState().next());
+  await settle(() => wizard.getState().next());
   expect(wizard.getState().run?.step).toBe('access');
   await settle(() => wizard.getState().save());
   expect(wizard.getState().finish.state).toBe('done');
@@ -31,6 +32,7 @@ test('enabled concept sync requires positive write access; local-only shaping re
   const found = detection();
   found.access['comment-ticket'] = 'unverified';
   const { wizard, ready } = await start(found);
+  await settle(() => wizard.getState().next());
   await settle(() => wizard.getState().next());
   expect(ready()).toBe(false);
   await settle(() => wizard.getState().save());

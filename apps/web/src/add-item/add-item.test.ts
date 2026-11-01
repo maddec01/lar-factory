@@ -1,7 +1,7 @@
 // The Add item dialog: the New work form and each phase of a submission, and the Pick a ticket pane.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
+import { $, $$, addStylesheet, chooseOption, fetchMock, formValue, mountPage, openOptions, push, sample, settle, text } from '../../test/support.ts';
 import { pastePlain, selectEnd, typeInto } from '../../test/editor.ts';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -26,17 +26,15 @@ async function open(data: BoardData = withFactory): Promise<void> {
   await settle(() => vi.advanceTimersByTime(50));
 }
 
-/** Sets a field's value the way typing or picking does, so React hears it. A pick in a select fires
- * `input`, then `change` in a later task, so a re-render between them shows. */
-async function enter(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): Promise<void> {
+/** Sets a field's value the way typing does, so React hears it. */
+async function enter(el: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
   const proto = Object.getPrototypeOf(el) as object;
   Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value);
   await settle(() => el.dispatchEvent(new Event('input', { bubbles: true })));
-  if (el instanceof HTMLSelectElement) await settle(() => el.dispatchEvent(new Event('change', { bubbles: true })));
 }
 
 async function fillDraft(): Promise<void> {
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await chooseOption(field('item-kind'), 'Bug');
   await enter(field('item-title'), 'Playback stalls');
   await typeInto(editorArea(), 'After a seek.');
 }
@@ -50,10 +48,11 @@ test('Add item opens a dialog with the configured repositories and kinds, and no
   expect(popup.getAttribute('role')).toBe('dialog');
   expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Add item');
   expect(document.activeElement, 'focus starts on the title').toBe(field('item-title'));
-  expect($$<HTMLOptionElement>('#item-repo option').map((o) => [o.value, o.textContent])).toEqual([
-    ['maddec01/lar-server', 'lar-server'], ['maddec01/lar-apple', 'lar-apple'], ['maddec01/lar-factory', 'lar-factory'],
-    ['maddec01/lar-empty', 'lar-empty']]);
-  expect($$<HTMLOptionElement>('#item-kind option').map((o) => o.value)).toEqual(['', 'bug', 'feature', 'improvement']);
+  expect(await openOptions(field('item-repo'))).toEqual(['lar-server', 'lar-apple', 'lar-factory', 'lar-empty']);
+  await chooseOption(field('item-repo'), 'lar-server');
+  expect(await openOptions(field('item-kind'))).toEqual(['Bug', 'Feature', 'Improvement']);
+  await settle(() => $('[role="listbox"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  field('item-title').focus();
   expect(field('item-title').getAttribute('aria-label')).toBe('Title');
   expect(field('item-title').required).toBe(true);
   expect(editorArea().getAttribute('aria-label')).toBe('Description');
@@ -70,14 +69,14 @@ test('the side panel heads Repository and Kind in small uppercase labels, beside
   const labels = [...panel.querySelectorAll<HTMLLabelElement>(':scope > div > label')];
   expect(labels.filter(l => l.htmlFor).map((l) => [l.htmlFor, l.textContent])).toEqual([['item-repo', 'Repository'], ['item-kind', 'Kind']]);
   expect(labels.filter(l => l.htmlFor).every((l) => l.classList.contains('uppercase'))).toBe(true);
-  expect(field('item-repo').tagName).toBe('SELECT');
-  expect(field('item-kind').tagName).toBe('SELECT');
+  expect(field('item-repo').getAttribute('role')).toBe('combobox');
+  expect(field('item-kind').getAttribute('role')).toBe('combobox');
   expect(panel.contains(field('item-title')) || panel.contains(editorArea()), 'the title and editor sit left of it').toBe(false);
 });
 
 test.each([['- a\nb', '- a\n- b'], ['1. a\nb', '1. a\n2. b'], ['# h', '# h']])('typing %j in the description creates the item with %j', async (typed, body) => {
   await open();
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await chooseOption(field('item-kind'), 'Bug');
   await enter(field('item-title'), 'Playback stalls');
   await typeInto(editorArea(), typed);
   respond({ item: null, error: null }, 500);
@@ -93,7 +92,7 @@ test('a description typed in Add item survives closing and reopening it', async 
   expect(dialog()).toBeNull();
   await settle(() => addButton().click());
   expect([...editorArea().querySelectorAll('ul > li')].map((li) => li.textContent)).toEqual(['a', 'b']);
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await chooseOption(field('item-kind'), 'Bug');
   await enter(field('item-title'), 'Playback stalls');
   respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
@@ -114,7 +113,7 @@ test('a description added to over several openings creates the item with all of 
   await reopen();
   await selectEnd(editorArea());
   await typeInto(editorArea(), 'z');
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await chooseOption(field('item-kind'), 'Bug');
   await enter(field('item-title'), 'Playback stalls');
   respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
@@ -154,12 +153,56 @@ test('a draft without a kind is not sent and says why', async () => {
   expect(result().textContent, 'editing clears the message').toBe('');
 });
 
+test('a missing kind moves focus to the Kind control once the title is filled', async () => {
+  await open();
+  await enter(field('item-title'), 'Playback stalls');
+  await settle(() => submit().click());
+  expect(document.activeElement).toBe(field('item-kind'));
+});
+
+test('the kind dropdown shows each kind with its icon, in the list and in the closed control', async () => {
+  await open();
+  expect(text(field('item-kind'))).toContain('Choose a kind');
+  await openOptions(field('item-kind'));
+  expect($$('[role="option"]').map((option) => [text(option), option.querySelectorAll('svg.lucide').length])).toEqual([['Bug', 1], ['Feature', 1], ['Improvement', 1]]);
+  await settle(() => $$('[role="option"]')[0]!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(text(field('item-kind'))).toBe('Bug');
+  expect(field('item-kind').querySelector('[aria-hidden="true"] svg.lucide-bug')).not.toBeNull();
+});
+
+test('picking in a Select clears the message and keeps the draft, and reopening shows the kept values', async () => {
+  await open();
+  await settle(() => submit().click());
+  expect(result().textContent).toBe('Choose bug, feature or improvement.');
+  await chooseOption(field('item-kind'), 'Feature');
+  expect(result().textContent).toBe('');
+  await chooseOption(field('item-repo'), 'lar-apple');
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  await settle(() => addButton().click());
+  expect([formValue('repo'), formValue('kind')]).toEqual(['maddec01/lar-apple', 'feature']);
+  expect([text(field('item-repo')), text(field('item-kind'))]).toEqual(['lar-apple', 'Feature']);
+});
+
+test('the list opens above the dialog, after it in the page, and Escape closes only the list', async () => {
+  await open();
+  await openOptions(field('item-kind'));
+  const list = $('[role="listbox"]')!;
+  expect(dialog()!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING, 'later in the page at the same z-index').toBeTruthy();
+  expect(dialog()!.contains(list)).toBe(false);
+  expect(list.className).toContain('z-50');
+  await settle(() => list.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect($('[role="listbox"]')).toBeNull();
+  expect(dialog()).not.toBeNull();
+});
+
 test('a repo picked while a message shows is the one posted', async () => {
   await open();
   await settle(() => submit().click());
   expect(result().textContent).toBe('Choose bug, feature or improvement.');
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-apple');
+  await chooseOption(field('item-repo'), 'lar-apple');
+  expect(formValue('repo')).toBe('maddec01/lar-apple');
   await fillDraft();
   respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
@@ -233,7 +276,7 @@ test('sample mode disables adding and says so', async () => {
 
 test('the description names the repository picked', async () => {
   await open();
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
+  await chooseOption(field('item-repo'), 'lar-apple');
   expect(dialog()!.textContent).toContain('Record work in lar-apple and add it to List.');
 });
 
@@ -257,7 +300,7 @@ test('with no repository onboarded, adding is disabled and says where to add one
 test('opened before the repositories arrive, the dialog picks the first one once they do', async () => {
   await open({ ...withFactory, repos: [], fetchedAt: null });
   await push(withFactory);
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-server');
+  expect(formValue('repo')).toBe('maddec01/lar-server');
   expect(dialog()!.textContent).toContain('Record work in lar-server and add it to List.');
   expect(submit().disabled).toBe(false);
 });
@@ -316,7 +359,10 @@ test('Pick a ticket searches the repository picked and lists its open tickets, s
   expect([...$('#pick-ticket')!.classList], 'a long result list scrolls above the footer').toEqual(expect.arrayContaining(['min-h-0', 'overflow-y-auto']));
   expect(dialog()!.textContent).toContain('Find an open ticket in lar-server.');
   expect(text($('#pick-ticket'))).toContain('Find tickets outside your list, or open one you’ve already added.');
-  await enter(field<HTMLSelectElement>('pick-repo'), 'maddec01/lar-apple');
+  await openOptions(field('pick-repo'));
+  expect(dialog()!.compareDocumentPosition($('[role="listbox"]')!) & Node.DOCUMENT_POSITION_FOLLOWING, 'the list opens above the dialog').toBeTruthy();
+  await settle(() => $$('[role="option"]').find((option) => text(option) === 'lar-apple')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
   respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }, { number: 9, title: 'Seek is slow', url: 'u9', workId: 'work-9' }], error: null });
   await searchFor('seek');
   expect(calls('/api/tickets')).toEqual([['/api/tickets?repo=maddec01%2Flar-apple&q=seek', null]]);
@@ -388,7 +434,7 @@ test('Create issue starts from each repository default and an override applies o
   await open({ ...withFactory, repos });
   expect(field<HTMLInputElement>('item-create-issue').checked).toBe(true);
   expect(field<HTMLInputElement>('item-create-issue').disabled).toBe(false);
-  await enter(field<HTMLSelectElement>('item-repo'), repos[1]!.repo);
+  await chooseOption(field('item-repo'), 'lar-apple');
   expect(field<HTMLInputElement>('item-create-issue').checked).toBe(false);
   respond({ options: { provider: 'github', labels: ['forbidden'], types: ['Bug'], assignees: [], milestones: [], iterations: [], problems: [] } });
   await settle(() => field<HTMLInputElement>('item-create-issue').click());
@@ -431,17 +477,44 @@ test('provider fields start from only the kind mapping and submit the chosen opt
     : data)));
   await open(data);
   await fillDraft();
-  expect(field<HTMLSelectElement>('item-type').value).toBe('Bug');
+  expect(formValue('type')).toBe('Bug');
   expect($<HTMLInputElement>('#item-labels input[value="backend"]')!.checked).toBe(true);
   expect($<HTMLInputElement>('#item-labels input[value="triage"]')!.checked).toBe(false);
-  expect(field<HTMLSelectElement>('item-assignee').value).toBe('');
-  expect(field<HTMLSelectElement>('item-milestone').value).toBe('');
+  expect(formValue('assignee')).toBe('');
+  expect(formValue('milestone')).toBe('');
   expect($('#item-iteration')).toBeNull();
-  await enter(field<HTMLSelectElement>('item-assignee'), 'writer');
-  await enter(field<HTMLSelectElement>('item-milestone'), '12');
+  await chooseOption(field('item-assignee'), 'writer');
+  await chooseOption(field('item-milestone'), 'Next');
   respond({ error: 'Denied' }, 403);
   await settle(() => submit().click());
   expect((posted().draft as Record<string, unknown>).options).toEqual({ labels: ['backend'], type: 'Bug', assignee: 'writer', milestone: '12' });
+});
+
+test('ticket options keep their picks in a kept draft, and changing repository reads the new one', async () => {
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  const repos = withFactory.repos.slice(0, 2).map((repo) => ({ ...repo, setup: {
+    repo: repo.repo, createIssuesFromAddItem: true,
+    access: { 'publish-ticket': 'allowed', 'tag-ticket': 'allowed', 'type-ticket': 'allowed' }, ...effectiveVocabulary(),
+  } })) as BoardData['repos'];
+  const data = { ...withFactory, repos };
+  const assignees = (repo: string) => repo.includes('apple') ? ['apple-dev'] : ['writer'];
+  fetchMock.mockImplementation(async url => new Response(JSON.stringify(url.startsWith('/api/ticket-options')
+    ? { options: { provider: 'github', labels: [], types: [], assignees: assignees(url), milestones: [], iterations: [], problems: [] } }
+    : data)));
+  await open(data);
+  await chooseOption(field('item-kind'), 'Bug');
+  await chooseOption(field('item-assignee'), 'writer');
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  await settle(() => addButton().click());
+  expect(formValue('assignee')).toBe('writer');
+  await chooseOption(field('item-repo'), 'lar-apple');
+  expect(formValue('assignee'), 'the other repository starts at None').toBe('');
+  await chooseOption(field('item-assignee'), 'apple-dev');
+  await enter(field('item-title'), 'Playback stalls');
+  respond({ error: 'Denied' }, 403);
+  await settle(() => submit().click());
+  expect(posted().draft).toMatchObject({ repo: 'maddec01/lar-apple', kind: 'bug', options: { assignee: 'apple-dev' } });
 });
 
 test('submitting before options load leaves their defaults to the server', async () => {
@@ -468,7 +541,7 @@ test('denied creation offers Recheck access without losing the current draft', a
   await settle(() => recheck!.click());
   expect(posted()).toMatchObject({ repo: withFactory.repos[0]!.repo, change: 'recheck' });
   expect(field<HTMLInputElement>('item-title').value).toBe('Playback stalls');
-  expect(field<HTMLSelectElement>('item-kind').value).toBe('bug');
+  expect(formValue('kind')).toBe('bug');
   expect(text(editorArea())).toBe('After a seek.');
   expect(dialog()).not.toBeNull();
 });

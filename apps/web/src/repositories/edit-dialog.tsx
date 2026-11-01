@@ -7,7 +7,7 @@ import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
-import { NativeSelect } from '@lar-factory/ui/native-select';
+import { FormSelect } from '@lar-factory/ui/form-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { canSave, shownDrafts, useEditStore, type Drafts, type DraftSetting } from './edit-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -63,10 +63,8 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
         {text('labels', azure ? 'Custom tags' : 'Custom labels', 'area: server, area: web')}
       </Setting>
       <Setting repo={repo} setup={setup} settingKey="domainDocs" name="Glossary and decisions" hint="Choose whether builds include domain docs in their PRs.">
-        <NativeSelect aria-label="Domain docs" value={drafts.domainDocs} disabled={running !== null} onChange={(e) => type('domainDocs', e.target.value)}>
-          <option value="off">Off</option>
-          <option value="repository">Write in build PRs</option>
-        </NativeSelect>
+        <FormSelect aria-label="Domain docs" value={drafts.domainDocs} disabled={running !== null} onChange={(value) => type('domainDocs', value)}
+          choices={[{ value: 'off', name: 'Off' }, { value: 'repository', name: 'Write in build PRs' }]} />
         {drafts.domainDocs === 'repository' && <span className="grid gap-2 sm:grid-cols-2">{text('glossary', 'Glossary path')}{text('adrs', 'ADR folder')}</span>}
       </Setting>
       <Setting repo={repo} setup={setup} settingKey="skills" name="Project skills" hint="Coding guidance for builds. Separate them with commas.">

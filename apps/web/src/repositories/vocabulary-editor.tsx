@@ -5,7 +5,7 @@ import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
-import { NativeSelect } from '@lar-factory/ui/native-select';
+import { FormSelect } from '@lar-factory/ui/form-select';
 import { kind } from '../buttons/button-kinds.tsx';
 import { postAction } from '../items/card-actions.ts';
 import { useEditStore } from './edit-store.ts';
@@ -64,12 +64,12 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
   return <fieldset disabled={disabled} className="m-0 grid min-w-0 gap-3 rounded-lg border p-3">
     <legend className="px-1 text-sm font-medium">{title}</legend>
     <label className="grid gap-1.5 text-sm">{discovery.provider === 'azure' ? 'Work item type' : 'Issue type'}
-      <NativeSelect aria-label={`${title} type`} aria-describedby={typesProblem ? `${id}-types` : undefined} value={value.type ?? ''}
-        onChange={(e) => onChange({ ...value, type: e.target.value || null }, newLabels)}>
-        <option value="">None</option>
-        {value.type && !types.includes(value.type) && <option disabled value={value.type}>{value.type} (unavailable)</option>}
-        {types.map((type) => <option key={type} disabled={!!typesProblem} value={type}>{type}</option>)}
-      </NativeSelect>
+      <FormSelect aria-label={`${title} type`} aria-describedby={typesProblem ? `${id}-types` : undefined} value={value.type ?? ''} none="None"
+        onChange={(type) => onChange({ ...value, type: type || null }, newLabels)}
+        choices={[
+          ...value.type && !types.includes(value.type) ? [{ value: value.type, name: `${value.type} (unavailable)`, disabled: true }] : [],
+          ...types.map((type) => ({ value: type, name: type, disabled: !!typesProblem })),
+        ]} />
     </label>
     {typesProblem && <p id={`${id}-types`} className="m-0 text-xs text-base-700">{typesProblem}</p>}
     <div className="grid gap-2" role="group" aria-label={`${title} ${discovery.provider === 'azure' ? 'tags' : 'labels'}`} aria-describedby={labelsProblem ? `${id}-labels` : undefined}>

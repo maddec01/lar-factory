@@ -7,7 +7,7 @@ import { Button } from '@lar-factory/ui/design-system/Button';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { RadioGroup } from '@lar-factory/ui/design-system/RadioGroup';
-import { NativeSelect } from '@lar-factory/ui/native-select';
+import { FormSelect } from '@lar-factory/ui/form-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { Choice, Field, Group } from './setup-fields.tsx';
@@ -65,10 +65,9 @@ function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
   const issueDefaults = effectiveIssueSettings(issueSetup);
   return <div data-work-step className="grid gap-5">
     <Field label="Show in the list" problem={!sources.length ? ('refused' in detection.itemSources ? detection.itemSources.refused : 'No teams found. Add a team in Azure DevOps, then retry.') : undefined}>
-      {() => detection.provider === 'GitHub' ? <p className="m-0 text-sm">GitHub issues</p> : <NativeSelect aria-label="Team" value={answers.itemSource?.kind === 'azure-board' ? answers.itemSource.team : ''}
-        onChange={(event) => choose({ itemSource: { kind: 'azure-board', team: event.target.value } })}>
-        {!answers.itemSource && <option value="">Choose a team</option>}{sources.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}
-      </NativeSelect>}
+      {() => detection.provider === 'GitHub' ? <p className="m-0 text-sm">GitHub issues</p> : <FormSelect aria-label="Team" placeholder="Choose a team" value={answers.itemSource?.kind === 'azure-board' ? answers.itemSource.team : ''}
+        onChange={(team) => choose({ itemSource: { kind: 'azure-board', team } })}
+        choices={sources.map((source) => ({ value: source.id, name: source.title }))} />}
     </Field>
     <div className="grid gap-4 rounded-lg border p-4">
       <Checkbox label="Save concepts and cross-repository links to issues" checked={answers.structureSync} onChange={() => choose({ structureSync: !answers.structureSync })} />

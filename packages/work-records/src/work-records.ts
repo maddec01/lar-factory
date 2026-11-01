@@ -289,6 +289,9 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   setBuildBranch(workId: string, revision: number, branch: string): WorkRecord;
   /** Requires fresh approval while retaining the brief, history and ticket Spec. */
   invalidateGate(workId: string, revision: number): WorkRecord;
+  /** Preserves old branch ownership before deleting slice records. */
+  captureCleanup(workId: string, revision: number, branch: string, sliceBranches: string[]): WorkRecord;
+  cleanupOwnership(workId: string): { branch: string; sliceIds: string[]; sliceBranches: string[] }[];
   /** Deletes only this build's owned slices and clears its phase atomically. */
   resetBuild(workId: string, revision: number): WorkRecord;
   /** Records a T3 thread that works on this record only. */
@@ -978,6 +981,21 @@ function workRecords(database: Database): WorkRecords {
     invalidateGate: (workId, revision) => change(workId, revision, () => {
       db.prepare('UPDATE brief_gates SET invalidated = 1 WHERE work_id = ?').run(workId);
       db.prepare("UPDATE bodies SET has_passing_gate = 0 WHERE work_id = ? AND body = 'brief'").run(workId);
+      return {};
+    }),
+    cleanupOwnership: (workId) => database.read(() => {
+      find(workId);
+      const row = db.prepare('SELECT cleanup_ownership FROM work_records WHERE work_id = ?').get(workId);
+      return JSON.parse(String(row?.cleanup_ownership ?? '[]'));
+    }),
+    captureCleanup: (workId, revision, branch, sliceBranches) => change(workId, revision, (row) => {
+      if (row.kind !== 'build') throw invalid('Only builds own cleanup.');
+      const previous = db.prepare('SELECT cleanup_ownership FROM work_records WHERE work_id = ?').get(workId);
+      const snapshots = JSON.parse(String(previous?.cleanup_ownership ?? '[]'));
+      const sliceIds = (childRows.all(workId) as unknown as Row[]).filter(slice => slice.kind === 'slice').map(slice => slice.work_id);
+      if (sliceBranches.some(name => !sliceIds.some(id => name.startsWith(`slice/${id.slice(0, 8)}-`)))) throw invalid('Cleanup branch is not owned by this build.');
+      snapshots.push({ sliceBranches, branch: row.build_branch || checkFilled(branch, 'build branch'), sliceIds });
+      db.prepare('UPDATE work_records SET cleanup_ownership = ? WHERE work_id = ?').run(JSON.stringify(snapshots), workId);
       return {};
     }),
     resetBuild: (workId, revision) => change(workId, revision, (row, touched) => {

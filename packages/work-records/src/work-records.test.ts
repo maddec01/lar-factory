@@ -884,3 +884,20 @@ it('resets only slices owned by the selected build', async () => {
   expect(() => records.read(slice.workId)).toThrow();
   expect(records.read(other.workId).workId).toBe(other.workId);
 });
+
+it('preserves cleanup names across reset and database reopen with revision protection', async () => {
+  const path = join(tempDir(), 'work-records.db');
+  const records = await open(path);
+  const build = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
+  const slice = records.create({ title: 'Slice', repository: 'a/b', kind: 'slice' });
+  records.setParent(slice.workId, 1, build.workId);
+  records.setBuildBranch(build.workId, 2, 'old-build');
+  const name = `slice/${slice.workId.slice(0, 8)}-work`;
+  expect(() => records.captureCleanup(build.workId, 2, 'fallback', [name])).toThrow();
+  expect(() => records.captureCleanup(build.workId, 3, 'fallback', ['slice/unrelated-work'])).toThrow();
+  records.captureCleanup(build.workId, 3, 'fallback', [name]);
+  records.resetBuild(build.workId, 4);
+  records.setBuildBranch(build.workId, 5, 'new-build');
+  const reopened = await open(path);
+  expect(reopened.cleanupOwnership(build.workId)).toEqual([{ branch: 'old-build', sliceIds: [slice.workId], sliceBranches: [name] }]);
+});

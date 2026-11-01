@@ -358,4 +358,5 @@ export const MIGRATIONS: readonly Migration[] = [
   (db) => db.exec(`ALTER TABLE threads ADD COLUMN deleted_at TEXT;
     ALTER TABLE work_records ADD COLUMN build_branch TEXT;
     ALTER TABLE brief_gates ADD COLUMN invalidated INTEGER NOT NULL DEFAULT 0;`),
+  (db) => db.exec('ALTER TABLE work_records ADD COLUMN cleanup_ownership TEXT'),
 ];

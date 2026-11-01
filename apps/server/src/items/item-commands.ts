@@ -19,6 +19,7 @@ import { readRepositorySetups } from '../config/repository-settings.ts';
 import { installHome } from '../skills/bundled-skills.ts';
 import { readJsonRecord } from '../json-file.ts';
 import { serverRuntimePath } from '../t3/t3-settings.ts';
+import { runTool } from '../tools/run-tool.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
 import { checkouts, repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
@@ -422,6 +423,17 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       && Array.isArray(item.threads) && !item.threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren);
   }
 
+  async function cleanupSliceBranches(item: Item): Promise<string[]> {
+    const slices = records!.children(item.id).filter(child => child.kind === 'slice');
+    if (!slices.length) return [];
+    const project = await projectOf(item.repo);
+    if (project.error !== undefined) throw new Error(project.error);
+    const checkout = await checkoutOf(project.projectId);
+    const result = await runTool('git', ['-C', checkout, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/'], { timeout: 10_000 });
+    if (result.code !== 0) throw new Error('Cannot capture cleanup ownership');
+    return result.stdout.split('\n').filter(name => slices.some(slice => name.startsWith(`slice/${slice.workId.slice(0, 8)}-`)));
+  }
+
   async function recoveryInspection(item: Item) {
     const project = await projectOf(item.repo);
     if (project.error !== undefined) throw new Error(project.error);
@@ -602,8 +614,12 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
             const workspace = continuing && inspection.worktreePath
               ? { type: 'existing_worktree' as const, worktreePath: inspection.worktreePath, branch, origin: String(readJsonRecord(serverRuntimePath(process.env))?.origin ?? ''), commandId: randomUUID() }
               : { base: continuing ? branch : base, branch };
+            const cleanupBranches = continuing ? [] : await cleanupSliceBranches(item);
             const result = await launch(item, 'startedBuilds', project.projectId, message, () => startIn(project.projectId, message, choice, workspace), () => {
-              if (!continuing) write(itemId, revision => records!.resetBuild(itemId, revision));
+              if (!continuing) {
+                write(itemId, revision => records!.captureCleanup(itemId, revision, inspection.branch, cleanupBranches));
+                write(itemId, revision => records!.resetBuild(itemId, revision));
+              }
               write(itemId, revision => records!.setBuildBranch(itemId, revision, branch));
             }, true);
             return { ...result, warning: inspection.warning, message: continuing && !inspection.worktreePath ? 'The old worktree is gone. Created a new worktree on its branch.' : undefined };
@@ -749,7 +765,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           const inspection = await recoveryInspection(item);
           if (inspection.pr === 'open') return withBoard(409, { error: 'An open PR requires Start again.' });
           if (briefChoice === 'reshape') write(itemId, revision => records.invalidateGate(itemId, revision));
-          // Cleanup must capture records.children(itemId) before resetBuild deletes owned slices.
+          const cleanupBranches = item.kind === 'build' ? await cleanupSliceBranches(item) : [];
+          if (item.kind === 'build') write(itemId, revision => records.captureCleanup(itemId, revision, inspection.branch, cleanupBranches));
           if (item.kind === 'build') write(itemId, revision => records.resetBuild(itemId, revision));
           write(itemId, revision => records.update(itemId, revision, { status: choice === 'back-to-queue' ? 'Queued' : 'List' }));
           starts.delete(itemId);

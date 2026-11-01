@@ -297,6 +297,17 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     const known = retainStats(previousStats.get(item.id), item.stats);
     const live = fresh ? stats(threadIds(item.id)) : item.stats;
     const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item.id) };
+    shown.slices = item.slices.map((slice): typeof slice => {
+      if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
+      const ids = slice.workId && records ? records.threads(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];
+      const observed = protocolItemThreads(ids);
+      const current = Array.isArray(observed) ? observed.filter(t => !t.observedAt) : [];
+      const progress = !ids.length ? 'waiting'
+        : current.some(t => t.state === 'running' || t.hasLiveChildren) ? 'active'
+        : current.some(t => t.state === 'needs you') ? 'blocked'
+        : current.length !== ids.length ? 'unknown' : 'waiting';
+      return { ...slice, progress };
+    });
     // A slice records its implementer thread, so a build is running while a thread runs for it or any slice.
     const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
     if (running(shown.threads) || item.slices.some((slice) => running(threads(slice.workId)))) lastRunning.set(item.id, now);

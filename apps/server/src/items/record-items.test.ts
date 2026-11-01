@@ -95,7 +95,7 @@ test("a record's structure, blockers and slices come from records", async () => 
   assert.equal(shown('Build').parentId, concept.workId);
   assert.deepEqual(shown('Build').parent && [shown('Build').parent!.title, shown('Build').parent!.number], ['Concept', 0]);
   assert.deepEqual(shown('Build').blockers, [{ number: 5, repo: REPO, state: 'open', workId: blocker.workId, title: 'Blocker' }]);
-  assert.deepEqual(shown('Build').slices.map((s) => [s.title, s.progress]), [['First slice', 'active']]);
+  assert.deepEqual(shown('Build').slices.map((s) => [s.title, s.progress]), [['First slice', 'waiting']]);
   assert.deepEqual(shown('Concept').subIssues, { total: 1, completed: 0 });
   assert.deepEqual(shown('Concept').map, { destination: 'Where it goes.', decisions: [], fog: ['What is left'] });
 });

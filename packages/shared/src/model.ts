@@ -196,7 +196,7 @@ export interface ConceptMap {
 }
 
 /** Where a build's slice stands; see `sliceProgress`. */
-export type SliceProgress = 'done' | 'blocked' | 'active' | 'waiting';
+export type SliceProgress = 'done' | 'blocked' | 'active' | 'unknown' | 'waiting';
 
 /** One of a build's slices. */
 export interface Slice extends IssueRef {

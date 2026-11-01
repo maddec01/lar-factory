@@ -574,3 +574,18 @@ test.each(['Shaping', 'Queued'] as const)('a stopped parent with an active child
   expect(inDialog('[data-start="I_sample05"]')).toBeNull();
   expect(text(inDialog('[data-open-thread="I_sample05"]'))).toBe('Open thread');
 });
+
+test('slice details follow live unknown and recovered progress while open', async () => {
+  await mountPage();
+  await openItem('I_sample13');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  for (const progress of ['unknown', 'active', 'blocked', 'waiting', 'done'] as const) {
+    await settle(() => useBoardStore.getState().receive({ ...sample, items: sample.items.map(item => item.id === 'I_sample13'
+      ? { ...item, slices: item.slices.map((slice, index) => index === 1 ? { ...slice, progress } : slice) } : item) }));
+    const chip = inDialog('[data-slices] ul')!.children[1]!;
+    expect(text(chip)).toContain(progress);
+    expect(chip.querySelector('.status-pulse') !== null).toBe(progress === 'active');
+    expect(text(inDialog('[data-slices] p'))).toBe(progress === 'done' ? 'Slices · 2/3 done' : 'Slices · 1/3 done');
+    if (progress === 'unknown') expect(text(chip)).toContain('?');
+  }
+});

@@ -37,7 +37,7 @@ const state = (record: WorkRecord): 'open' | 'closed' => (isDone(record) ? 'clos
 function sliceProgress(record: WorkRecord): SliceProgress {
   if (isDone(record) || record.finishedAt) return 'done';
   if (record.needsYou) return 'blocked';
-  return record.status === 'In progress' ? 'active' : 'waiting';
+  return 'waiting';
 }
 
 /**

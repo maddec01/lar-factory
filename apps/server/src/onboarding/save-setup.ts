@@ -1,3 +1,5 @@
+import { discoverVocabulary, type VocabularyReads } from '@lar-factory/shared/publication-settings';
+import { isVocabularyMapping, vocabularySelectionProblem } from '@lar-factory/shared/vocabulary';
 import { writeAccessProblem, structureSyncOperations, isRecord, onAzure, type LocalSetupAnswers, type OnboardingRepository, type RepositoryItemSource } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { isRepo, saveConnections, saveOnboarded, stillOnboarding } from '../config/repository-config.ts';
@@ -8,6 +10,7 @@ import { detectAccess } from './detect-setup.ts';
 
 /** Access checks never make test writes. */
 export interface SaveReads {
+  vocabulary?: VocabularyReads;
   source?(repo: string, source: RepositoryItemSource): Promise<void>;
   access(repo: string): Promise<Parameters<typeof saveLocalSetup>[2]>;
 }
@@ -27,12 +30,13 @@ const saveReads: SaveReads = {
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
 /** The body's answers, or null when one is missing or has the wrong shape. */
-function answersOf({ projectId, role, itemSource, domainDocs, skills, structureSync }: Record<string, unknown>): LocalSetupAnswers | null {
+function answersOf({ projectId, role, itemSource, domainDocs, skills, structureSync, vocabulary }: Record<string, unknown>): LocalSetupAnswers | null {
+  if (vocabulary !== undefined && !isVocabularyMapping(vocabulary)) return null;
   const docs = isRecord(domainDocs) && (domainDocs.kind === 'off'
     || domainDocs.kind === 'repository' && typeof domainDocs.glossary === 'string' && typeof domainDocs.adrs === 'string');
   if (structureSync !== undefined && typeof structureSync !== 'boolean') return null;
   if (typeof projectId !== 'string' || role !== undefined && typeof role !== 'string' || !isRecord(itemSource) || !docs || !strings(skills)) return null;
-  return { projectId, structureSync: structureSync !== false, role: typeof role === 'string' ? role.trim() : '', itemSource, domainDocs, skills } as unknown as LocalSetupAnswers;
+  return { ...(vocabulary === undefined ? {} : { vocabulary }), projectId, structureSync: structureSync !== false, role: typeof role === 'string' ? role.trim() : '', itemSource, domainDocs, skills } as unknown as LocalSetupAnswers;
 }
 
 const ANSWERS = 'Send the repository, its T3 project, role, item source, domain-doc location, skills.';
@@ -55,6 +59,17 @@ export async function saveSetup(input: Record<string, unknown>, dir = boardDataD
   try { await reads.source?.(repo, answers.itemSource); }
   catch (err) { return { status: 403, error: `Can't read the selected issue list. ${message(err)}` }; }
   const access = await reads.access(repo).catch(() => ({} as Awaited<ReturnType<SaveReads['access']>>));
+  if (answers.vocabulary && Object.keys(answers.vocabulary).length) {
+    const discovery = await discoverVocabulary(repo, reads.vocabulary);
+    for (const term of Object.values(answers.vocabulary)) {
+      const selectionProblem = vocabularySelectionProblem(term, discovery);
+      if (selectionProblem) return { status: 400, error: selectionProblem };
+      for (const operation of [...(term.type === null ? [] : ['type-ticket' as const]), ...(term.labels.length ? ['tag-ticket' as const] : [])]) {
+        const problem = writeAccessProblem(repo, operation, access);
+        if (problem) return { status: 403, error: problem };
+      }
+    }
+  }
   if (answers.structureSync !== false) {
     const needed = { 'publish-ticket': 'create issues or work items', 'edit-ticket': 'edit issues or work items', 'comment-ticket': 'post comments', 'tag-ticket': 'set issue labels' } as const;
     const missing = structureSyncOperations(repo).filter((op) => writeAccessProblem(repo, op, access) !== null).map((op) => needed[op as keyof typeof needed]);

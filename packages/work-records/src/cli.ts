@@ -6,6 +6,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
+import { createRecordTicket } from './create-ticket.ts';
 import { isRecord } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
@@ -39,13 +41,21 @@ Changes
   create --title X --repository R --kind K [--status S] [--ticket T] [--file F]
                                     Make a record titled X, a single line, with the
                                     markdown in F as its initial context. Status
-                                    defaults to List.
+                                    defaults to List. create alone stays local.
+                                    --request-id ID reuses a capture on reruns.
   import --title X --repository R --kind K --ticket T [--status S] [--file F]
                                     Print the record holding T, making it first if
                                     none does. Repeating it never makes a second one
                                     and never changes the title or initial context.
   update <work-id> --revision N [--status S] [--kind K]
   attach-ticket <work-id> --revision N --ticket T
+  create-ticket <work-id> --revision N --request-id ID [--retro]
+                                    Create and attach an issue, keeping the work ID.
+                                    Sends the description, or a current passing Spec
+                                    with Original when enabled. Uses kind mappings.
+                                    --retro obeys the retro capture setting and sends
+                                    the description. Reuse ID to recover a lost result.
+                                    A failed create leaves the record local.
   set-aside <work-id> --revision N  Set the record aside. Its Status stays.
   restore <work-id> --revision N    Bring a set-aside record back.
   set-needs-you <work-id> --revision N --reason X
@@ -97,8 +107,8 @@ Completion
   finish <work-id> --revision N     Record that a slice merged into its build branch.
 
 Content
-  A record keeps its markdown here only; nothing is written to a ticket. A
-  concept holds a map; a decision holds its text, its confirmed answer and its
+  Bodies stay in the record. create-ticket can send a current passing brief
+  as Spec with a collapsed Original section. A concept holds a map; a decision holds its text, its confirmed answer and its
   domain drafts; any other record holds a brief. A --file of - reads standard
   input.
   set-body <work-id> --revision N --body brief|decision|map|answer|domain-drafts
@@ -241,7 +251,7 @@ Errors
 
 class UsageError extends Error {}
 
-const TAKES_WORK_ID = ['sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
+const TAKES_WORK_ID = ['create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
   'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
   'review-rounds', 'observe', 'observe-failure', 'observations', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
@@ -293,6 +303,8 @@ const OPTIONS = {
   'delete-after': { type: 'string' },
   to: { type: 'string' },
   'data-dir': { type: 'string' },
+  'request-id': { type: 'string' },
+  retro: { type: 'boolean' },
   help: { type: 'boolean' },
 } as const;
 
@@ -368,8 +380,20 @@ async function run(records: WorkRecords, command: string, workId: string | undef
       return records.gate(workId!);
     case 'record-gate':
       return records.recordGate(workId!, revision(), { briefDigest: need(values, 'digest'), approvedBy: need(values, 'identity'), evidence: need(values, 'evidence') });
-    case 'create':
-      return records.create({ ...captured(), ticket: values.ticket });
+    case 'create': {
+      const input = { ...captured(), ticket: values.ticket };
+      if (!values['request-id']) return records.create(input);
+      records.claimCapture(values['request-id'], JSON.stringify(input));
+      return records.completeCapture(values['request-id'], input).record;
+    }
+    case 'create-ticket': {
+      const result = await createRecordTicket(workId!, { revision: revision(), requestId: need(values, 'request-id'), retro: values.retro }, {
+        records, repos: () => readRepositorySetups(values['data-dir']).map(setup => ({ repo: setup.repo, setup, labels: [], role: setup.role ?? '',
+          ...(setup.itemSource?.kind === 'azure-board' ? { team: setup.itemSource.team } : {}) })),
+      });
+      if (result.body.error) throw new WorkRecordError('invalid', result.body.error);
+      return result.body.record;
+    }
     case 'import':
       return records.importTicket({ ...captured(), ticket: need(values, 'ticket') });
     case 'read':

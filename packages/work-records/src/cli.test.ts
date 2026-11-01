@@ -1,10 +1,10 @@
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { openWorkRecords } from './work-records.ts';
-import { afterEach, describe, expect, it } from 'vite-plus/test';
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 
 const CLI = join(import.meta.dirname, 'cli.ts');
 const dirs: string[] = [];
@@ -14,6 +14,7 @@ const tempDir = () => {
   return dir;
 };
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -23,6 +24,8 @@ async function larWork(dataDir: string, ...args: string[]) {
   try {
     const { stdout, stderr } = await promisify(execFile)(process.execPath, ['--disable-warning=ExperimentalWarning', CLI, ...args, '--data-dir', dataDir], {
       cwd, env: { ...process.env, HOME: cwd },
+      // A stuck invocation must terminate before the integration test's deadline.
+      timeout: 10_000,
     });
     return { code: 0, stdout, stderr, record: /^[[{]/.test(stdout) ? JSON.parse(stdout) : null };
   } catch (error) {
@@ -245,4 +248,52 @@ it('keeps the brief gate local and refuses removed refinement publication comman
   expect(await larWork(data, 'record-gate', work.workId, '--revision', String(work.revision), '--digest', gate.record.briefDigest, '--identity', 'reviewer', '--evidence', 'Passed.')).toMatchObject({ code: 0 });
   expect((await larWork(data, 'gate', work.workId)).record.current).toBe(true);
   expect(await larWork(data,'execute-publication',work.workId)).toMatchObject({code:2,stderr:expect.stringContaining('Unknown command')});
+});
+
+
+// These integrations start several CLI processes, so use the lar-work suite's budget.
+it('captures retro text idempotently, creates its ticket with a fake provider and keeps the work ID', { timeout: 30_000 }, async () => {
+  const data = tempDir();
+  const fake = join(data, 'fake-gh');
+  const sent = join(data, 'sent.json');
+  writeFileSync(fake, `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const method = args[args.indexOf('--method') + 1];
+if (method === 'POST') {
+  const body = JSON.parse(fs.readFileSync(0, 'utf8'));
+  fs.writeFileSync(${JSON.stringify(sent)}, JSON.stringify(body));
+  console.log(JSON.stringify({number: 17, title: body.title, body: body.body}));
+} else console.log('[]');
+`);
+  chmodSync(fake, 0o700);
+  vi.stubEnv('GH_PATH', fake);
+  vi.stubEnv('AZ_PATH', fake);
+  writeFileSync(join(data, 'repository-settings.json'), JSON.stringify({ repositories: [{ repo: 'example/product', settings: { access: { 'publish-ticket': 'allowed' }, overrides: { createIssuesFromRetro: true } } }] }));
+  const context = join(data, 'description.md');
+  writeFileSync(context, 'Selected improvement.');
+  const args = ['create', '--request-id', '11111111-1111-4111-8111-111111111111', '--repository', 'example/product', '--kind', 'improvement', '--title', 'Improve export', '--file', context];
+  const first = await larWork(data, ...args);
+  const again = await larWork(data, ...args);
+  expect(first).toMatchObject({ code: 0, record: { ticket: null, status: 'List' } });
+  expect(again.record.workId).toBe(first.record.workId);
+  const converted = await larWork(data, 'create-ticket', first.record.workId, '--revision', String(first.record.revision), '--request-id', '22222222-2222-4222-8222-222222222222', '--retro');
+  expect(converted).toMatchObject({ code: 0, record: { workId: first.record.workId, ticket: 'example/product#17' } });
+  expect(JSON.parse(readFileSync(sent, 'utf8'))).toEqual({ title: 'Improve export', body: 'Selected improvement.\n\n<!-- lar-factory:create {"identity":"22222222-2222-4222-8222-222222222222"} -->' });
+  const repeated = await larWork(data, 'create-ticket', first.record.workId, '--revision', '1', '--request-id', '22222222-2222-4222-8222-222222222222', '--retro');
+  expect(repeated.record.workId).toBe(first.record.workId);
+  expect((await larWork(data, 'list')).record).toHaveLength(1);
+});
+
+it('create-ticket obeys the retro preference and reports refused access while leaving a local record', { timeout: 30_000 }, async () => {
+  const data = tempDir();
+  const settings = (enabled: boolean) => writeFileSync(join(data, 'repository-settings.json'), JSON.stringify({ repositories: [{ repo: 'example/product', settings: { overrides: { createIssuesFromRetro: enabled } } }] }));
+  const created = await larWork(data, 'create', '--repository', 'example/product', '--kind', 'bug', '--title', 'Fix export');
+  const args = ['create-ticket', created.record.workId, '--revision', '1', '--request-id', '11111111-1111-4111-8111-111111111111', '--retro'];
+  settings(false);
+  expect(await larWork(data, ...args)).toMatchObject({ code: 0, record: { ticket: null } });
+  settings(true);
+  expect(await larWork(data, ...args)).toMatchObject({ code: 1, stderr: expect.stringContaining('not checked yet') });
+  expect((await larWork(data, 'read', created.record.workId)).record.ticket).toBeNull();
+  expect((await larWork(data, '--help')).stdout).toContain('create-ticket <work-id>');
 });

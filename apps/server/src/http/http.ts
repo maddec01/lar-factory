@@ -174,6 +174,10 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       what: 'the repository and the ticket to pick', disabled: 'Picking tickets is disabled in sample mode.',
       run: (input) => capture.pick(input),
     },
+    '/api/create-ticket': {
+      what: 'the item to create an issue for', disabled: 'Creating issues is disabled in sample mode.',
+      run: forItem('Name the item to create an issue for.', (itemId, input) => capture.createTicket(itemId, input)),
+    },
     '/api/attach-ticket': {
       what: 'the item and the ticket to attach', disabled: 'Attaching tickets is disabled in sample mode.',
       run: forItem('Name the item to attach a ticket to.', (itemId, input) => capture.attachTicket(itemId, input.number)),
@@ -482,6 +486,11 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     if (path === '/api/onboarding/projects') return projectsRequest(res);
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
+    if (path === '/api/ticket-preview') {
+      if (sample) return json(res, 403, { error: 'Creating issues is disabled in sample mode.' });
+      const result = await capture.ticketPreview(url.searchParams.get('itemId') ?? '');
+      return json(res, result.status, result.body);
+    }
     if (path === '/api/ticket-options') {
       if (sample) return json(res, 403, { error: 'Sample mode reads no issue options.' });
       const result = await capture.options(url.searchParams.get('repo'));

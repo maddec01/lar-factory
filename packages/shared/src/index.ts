@@ -27,3 +27,4 @@ export * from './map-concurrent.ts';
 export * from "./write-access.ts";
 
 export * from './tracker-markdown.ts';
+export * from './ticket-spec.ts';

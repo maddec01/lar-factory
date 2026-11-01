@@ -258,3 +258,35 @@ test('a record-write failure names the created issue and replay recovers it with
   assert.equal(records.initialContext(itemOf(recovered.body).id), request.draft.description);
   assert.equal(writes, 1);
 });
+
+
+test('converting local work preserves its ID and context even with Add item creation off', async () => {
+  const { records, board } = await captureOn();
+  const local = records.create({ repository: WEB, kind: 'bug', title: 'Local failure', context: 'Steps.' });
+  const writes: unknown[][] = [];
+  const provider = { create: async (...args: unknown[]) => { writes.push(args); return { number: 11 }; } } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+  const repo = { ...REPOS[0]!, setup: { repo: WEB, createIssuesFromAddItem: false, access: { 'publish-ticket': 'allowed' }, vocabulary: {} } } as RepoConfig;
+  const reread = () => board.update({ items: recordItems(records, [], [WEB]) });
+  reread();
+  const capture = createCapture({ board, items: {} as ItemSource, records, reread, repos: () => [repo], provider, discoverOptions: emptyOptions });
+  const result = await capture.createTicket(local.workId, { requestId: REQUEST, revision: local.revision });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(itemOf(result.body).id, local.workId);
+  assert.equal(records.read(local.workId).ticket, `${WEB}#11`);
+  assert.equal(records.initialContext(local.workId), 'Steps.');
+  assert.equal(records.list({}).length, 1);
+  assert.deepEqual(writes[0]?.slice(0, 2), [WEB, 'Local failure']);
+  assert.match(String(writes[0]?.[2]), /^Steps\./);
+});
+
+test('an Add item reservation from before local conversion support still recovers its known ticket', async () => {
+  const { records, board } = await captureOn();
+  const draft = { createIssue: true, repo: WEB, kind: 'bug', title: 'Recover export', description: 'Original.' };
+  records.claimCapture(REQUEST, JSON.stringify(draft));
+  records.saveCaptureTicket(REQUEST, `${WEB}#22`);
+  const capture = createCapture({ board, items: {} as ItemSource, records,
+    reread: () => board.update({ items: recordItems(records, [], [WEB]) }), repos: () => REPOS, provider: {} as import('@lar-factory/work-records/tracker-sync').StructureProvider });
+  const result = await capture.capture({ requestId: REQUEST, draft });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(records.read(itemOf(result.body).id).ticket, `${WEB}#22`);
+});

@@ -341,4 +341,6 @@ export const MIGRATIONS: readonly Migration[] = [
     request_id TEXT PRIMARY KEY, draft TEXT NOT NULL, ticket TEXT, work_id TEXT,
     failure TEXT
   )`),
+  (db) => db.exec(`ALTER TABLE capture_submissions ADD COLUMN target_work_id TEXT;
+    CREATE UNIQUE INDEX capture_target ON capture_submissions(target_work_id) WHERE failure IS NULL`),
 ];

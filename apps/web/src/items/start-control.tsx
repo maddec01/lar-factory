@@ -35,7 +35,7 @@ export function useStartHolds(item: Item, data: BoardData): boolean {
 }
 
 /** "T3 default", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
-export function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onPick: (choice: ModelChoice | undefined) => void }) {
+export function StartEntries({ item, data, onPick, requireModel = false }: { item: Item; data: BoardData; requireModel?: boolean; onPick: (choice: ModelChoice | undefined) => void }) {
   const lastChoice = useStartStore((state) => state.lastChoice);
   const checked = storedChoice(highlightedChoice(data.modelChoices, lastChoice));
   const held = data.capture?.enabled === false ? 'Disabled in sample mode' : undefined;
@@ -44,9 +44,9 @@ export function StartEntries({ item, data, onPick }: { item: Item; data: BoardDa
   const entry = (label: string, choice?: ModelChoice) => (
     // A held entry stays hoverable and focusable rather than disabled, so its title says why; picking it does nothing.
     <DropdownMenu.RadioItem value={storedChoice(choice)} data-opens-here={storedChoice(choice) === checked || undefined}
-      aria-disabled={held !== undefined || undefined} title={held}
+      aria-disabled={held !== undefined || requireModel && !choice || undefined} title={held ?? (requireModel && !choice ? 'Choose a model to continue in the existing worktree.' : undefined)}
       data-start-pick={item.id} data-instance-id={choice?.instanceId} data-model={choice?.model}
-      onSelect={(event) => (held === undefined ? onPick(choice) : keepOpen(event))} key={label}>
+      onSelect={(event) => (held === undefined && (!requireModel || choice) ? onPick(choice) : keepOpen(event))} key={label}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </DropdownMenu.RadioItem>
   );

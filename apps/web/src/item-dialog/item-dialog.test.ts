@@ -592,7 +592,7 @@ test('deleted work thread offers the later recovery actions without Clear', asyn
       offers: ['start-again', 'back-to-queue', 'back-to-list'] } } : i) });
   await openItem(id);
   expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Start again', 'Back to Queue', 'Back to List']);
-  expect($$<HTMLButtonElement>('[data-needs-you-reason] button').map(button => button.disabled)).toEqual([true, false, false]);
+  expect($$<HTMLButtonElement>('[data-needs-you-reason] button').map(button => button.disabled)).toEqual([false, false, false]);
 });
 
 test('moving deleted-thread work with a passing brief asks before sending the move', async () => {
@@ -604,4 +604,73 @@ test('moving deleted-thread work with a passing brief asks before sending the mo
   await press(button('needs-you', id));
   expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Back to List', 'Keep passing', 'Reshape']);
   expect(posted()).toEqual([]);
+});
+
+async function recoveryItem(build = true) {
+  const id = 'I_sample05';
+  const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
+    ? { ...i, status: 'Review', threads: [],
+      needsYou: { reason: 'Deleted work thread', deletedThread: true, deletedThreadPurpose: build ? 'build' : 'shape', offers: ['start-again', 'back-to-list'] } } : i) };
+  await mountPage(data);
+  holdPosts(data);
+  await openItem(id);
+  await press(button('needs-you', id));
+  return id;
+}
+
+test('shaping Start again posts immediately and keeps the notice on failure', async () => {
+  const id = await recoveryItem(false);
+  expect(posted()).toEqual([['/api/start-again', { itemId: id, options: {} }]]);
+  await answer({ error: 'T3 is unavailable.' }, 502);
+  expect(text(dialog())).toContain('T3 is unavailable.');
+  expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+});
+
+test('build recovery inspects before offering branches and explains a missing worktree', async () => {
+  const id = await recoveryItem();
+  expect(posted()).toEqual([['/api/inspect-recovery', { itemId: id }]]);
+  await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
+  expect(text(dialog())).toContain('The old worktree is gone.');
+  expect($$('[data-needs-you-reason] button').map(text)).toContain('Continue on old branch');
+  expect($$('[data-needs-you-reason] button').map(text)).toContain('Start on new branch');
+});
+
+test('open PR recovery offers only continue and preserves the PR in its confirmation', async () => {
+  await recoveryItem();
+  await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: '/old', pr: 'open' } });
+  expect(text(dialog())).toContain('Its commits and reviews stay, and the PR stays open.');
+  expect($$('[data-needs-you-reason] button').map(text)).not.toContain('Start on new branch');
+});
+
+test('inspection errors preserve the recovery notice', async () => {
+  await recoveryItem();
+  await answer({ error: 'Cannot inspect local worktrees' }, 502);
+  expect(text(inDialog('[role="alert"]'))).toContain('Cannot inspect local worktrees');
+  expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+});
+
+test('absent branch starts new directly and receives the successful board', async () => {
+  const id = await recoveryItem();
+  await answer({ inspection: { branch: 'build/old', branchExists: false, worktreePath: null, pr: 'none' } });
+  expect(posted().at(-1)).toEqual(['/api/start-again', { itemId: id, options: { branchChoice: 'new' } }]);
+  await answer({ board: { ...sample, items: sample.items.map(i => i.id === id ? { ...i, needsYou: undefined } : i) } });
+  expect(inDialog('[data-needs-you-reason]')).toBeNull();
+});
+
+test('unknown PR state warns before choosing a new branch', async () => {
+  await recoveryItem();
+  await answer({ inspection: { branch: 'build/old', branchExists: false, worktreePath: null, pr: 'unknown', warning: 'Observation failed' } });
+  expect(text(dialog())).toContain('A new branch or move could create a second PR.');
+  expect(posted()).toHaveLength(1);
+  expect($$('[data-needs-you-reason] button').map(text)).not.toContain('Continue on old branch');
+});
+
+test('choosing a branch uses the model menu and sends recovery options', async () => {
+  const id = await recoveryItem();
+  await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
+  await pressMenu($$<HTMLButtonElement>('[data-needs-you-reason] button').find(b => text(b) === 'Start on new branch')!);
+  await press($<HTMLElement>('[data-start-pick]')!);
+  expect(posted().at(-1)).toEqual(['/api/start-again', { itemId: id, options: { branchChoice: 'new', confirmedOpenPr: false } }]);
+  await answer({ error: 'Start refused' }, 409);
+  expect(text(dialog())).toContain('Start refused');
 });

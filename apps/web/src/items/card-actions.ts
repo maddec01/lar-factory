@@ -2,8 +2,9 @@
 // keyboard focus in the dialog.
 
 import { flushSync } from 'react-dom';
-import { writeHeaders } from '@lar-factory/shared';
-import type { BoardData, Item, NeedsYouOffer, Status } from '@lar-factory/shared';
+import { writeHeaders, remembersChoice } from '@lar-factory/shared';
+import type { BoardData, Item, NeedsYouOffer, Status, ModelChoice, StartResult } from '@lar-factory/shared';
+import { useStartStore } from './start-store.ts';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
@@ -142,4 +143,28 @@ export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOf
 export async function markDependencyMet(itemId: string, dependencyId: string, revision: number, met: boolean): Promise<void> {
   if (!ready(itemId, 'data-dependency-met')) return;
   await runAction(itemId, 'dependency-met', { itemId, dependencyId, revision, met }, (result) => result.error ?? undefined);
+}
+
+export interface RecoveryInspection {
+  branch: string;
+  branchExists: boolean;
+  worktreePath: string | null;
+  pr: 'open' | 'none' | 'unknown';
+  warning?: string;
+}
+
+export async function inspectRecovery(itemId: string) {
+  return postAction<{ inspection: RecoveryInspection }>('/api/inspect-recovery', { itemId });
+}
+
+export async function startAgain(itemId: string, options: { branchChoice?: 'continue' | 'new'; confirmedOpenPr?: boolean }, model?: ModelChoice) {
+  const actions = useActionStore.getState();
+  if (pending(itemId)) return;
+  actions.set(itemId, { phase: 'pending', kind: 'needs-you' });
+  const result = await postAction<StartResult>('/api/start-again', { itemId, options, model });
+  flushSync(() => {
+    receive(result);
+    if (remembersChoice(result)) useStartStore.getState().remember(model);
+    actions.set(itemId, result.error ? { phase: 'error', kind: 'needs-you', message: result.error } : undefined);
+  });
 }

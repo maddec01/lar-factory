@@ -90,10 +90,12 @@ test('a ticket observation reads a work item open or not, with its assignee, and
   const items: WorkItem[] = [
     { id: 1, type: 'User Story', state: 'Active', title: 'Export', assignedTo: 'Ana Silva' },
     { id: 2, type: 'User Story', state: 'Closed', title: 'Old', tags: 'repo-web' },
+    { id: 3, type: 'User Story', state: 'Removed', title: 'Abandoned', tags: 'repo-web' },
   ];
   const source = azureBoard([WEB, API], TEAM, fakeAz({ items }).run);
-  assert.deepEqual(await source.observeTicket(API, 1), { state: 'open', assignee: 'Ana Silva' });
-  assert.deepEqual(await source.observeTicket(API, 2), { state: 'closed' });
+  assert.deepEqual(await source.observeTicket(API, 1), { abandonmentComplete: false, state: 'open', assignee: 'Ana Silva' });
+  assert.deepEqual(await source.observeTicket(API, 2), { abandonmentComplete: false, state: 'closed' });
+  assert.deepEqual(await source.observeTicket(API, 3), { abandonmentComplete: true, state: 'closed' });
   assert.deepEqual(await source.observeTicket(API, 99), { state: 'not-found' });
 });
 

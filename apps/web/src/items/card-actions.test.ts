@@ -174,3 +174,46 @@ test('combined tracker failure keeps the confirmation open and allows Cancel', a
   expect($('#abandon-dialog')).toBeNull();
   expect(button('abandon', 'I_sample01')).not.toBeNull();
 });
+
+test('board-only failure retains the abandonment confirmation and inline error', async () => {
+  holdPosts();
+  await mountPage();
+  await openItem('I_sample01');
+  await press(button('abandon', 'I_sample01'));
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
+  await answer({ error: 'Disk unavailable' });
+  expect(text($('#abandon-dialog [role="alert"]'))).toBe('Disk unavailable');
+  expect($('#abandon-dialog')).not.toBeNull();
+});
+
+test('two lost combined responses block dismissal and board-only recovery until reconciliation', async () => {
+  holdPosts();
+  await mountPage();
+  await openItem('I_sample01');
+  await press(button('abandon', 'I_sample01'));
+  const buttons = () => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button');
+  await settle(() => buttons()[2]!.click());
+  await answer({ error: "Can't reach the board server. Try again." });
+  await answer({ error: "Can't reach the board server. Try again." });
+  expect(buttons()[0]!.disabled).toBe(true);
+  expect(buttons()[1]!.disabled).toBe(true);
+  expect(buttons()[2]!.disabled).toBe(false);
+  await settle(() => buttons()[2]!.click());
+  await answer({ error: 'Provider refused closure.' });
+  expect(buttons()[0]!.disabled).toBe(false);
+  expect(buttons()[1]!.disabled).toBe(false);
+});
+
+test('local retry failure preserves the explanation after tracker closure', async () => {
+  holdPosts();
+  await mountPage();
+  await openItem('I_sample01');
+  await press(button('abandon', 'I_sample01'));
+  const buttons = () => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button');
+  await settle(() => buttons()[2]!.click());
+  await answer({ error: 'The ticket is closed, but the work remains on the board. Try again to finish abandonment. Disk unavailable' });
+  await settle(() => buttons()[1]!.click());
+  await answer({ error: 'Disk unavailable' });
+  expect($('#abandon-dialog')).not.toBeNull();
+  expect(text($('#abandon-dialog [role="alert"]'))).toContain('ticket is closed');
+});

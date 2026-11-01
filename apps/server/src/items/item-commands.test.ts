@@ -506,3 +506,71 @@ test("Start build snapshots the repository's selected project skills on the reco
   assert.match(started[0]!, new RegExp(`^Build Fix login\\nBuild ${build.workId}\\. Read `));
   assert.deepEqual(records.threads(build.workId).map((t) => t.purpose), ['build']);
 });
+
+test('a closed ticket recovers from local failure without a second transition', async () => {
+  const records = await openRecords();
+  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'List', ticket: `${WEB}#7` }).record;
+  const board = createBoardState({ items: [], repos: [], modelChoices: [] } as unknown as BoardData);
+  const tickets = [queued(7)];
+  const reread = () => board.update({ items: recordItems(records, tickets, [WEB]) });
+  reread();
+  let transitions = 0;
+  const commands = createItemCommands({ factoryContext: null, board, records, reread,
+    archive: () => archivedItems(records, tickets, [WEB], new Set()), offerModelChoices: () => [],
+    items: { observeTicket: async () => ({ state: 'closed' }), abandon: async () => { transitions++; return null; } } as unknown as ItemSource });
+  const setAside = vi.spyOn(records, 'setAside').mockImplementationOnce(() => { throw new Error('Disk unavailable'); });
+  const failed = await commands.abandonAndClose(work.workId);
+  assert.equal(failed.status, 409);
+  assert.match(JSON.stringify(failed.body), /ticket is closed.*work remains on the board/);
+  assert.ok(board.find(work.workId));
+  setAside.mockRestore();
+  assert.equal((await commands.abandonAndClose(work.workId)).status, 200);
+  assert.equal((await commands.abandonAndClose(work.workId)).status, 200);
+  assert.equal(transitions, 0);
+  assert.equal(board.find(work.workId), undefined);
+});
+
+for (const removed of [false, true]) test(`Azure ${removed ? 'Removed' : 'Completed'} recovery uses the intended abandonment outcome`, async () => {
+  let transitions = 0;
+  const board = createBoardState({ items: [queued(7)], repos: [], modelChoices: [] } as unknown as BoardData);
+  const commands = createItemCommands({ factoryContext: null, board, records: null, reread: () => {}, archive: () => [], offerModelChoices: () => [],
+    items: { observeTicket: async () => ({ state: 'closed', abandonmentComplete: removed }), abandon: async () => { transitions++; return null; } } as unknown as ItemSource });
+  assert.equal((await commands.abandonAndClose(queued(7).id)).status, 200);
+  assert.equal(transitions, removed ? 0 : 1);
+});
+
+test('combined requests share a transition and exclude Start while the provider is pending', async () => {
+  let finish!: (error: string | null) => void;
+  let transitions = 0;
+  const board = createBoardState({ items: [queued(7)], repos: [], modelChoices: [] } as unknown as BoardData);
+  const commands = createItemCommands({ factoryContext: null, board, records: null, reread: () => {}, archive: () => [], offerModelChoices: () => [],
+    items: { observeTicket: async () => ({ state: 'open' }), abandon: () => { transitions++; return new Promise<string | null>(resolve => { finish = resolve; }); } } as unknown as ItemSource });
+  const first = commands.abandonAndClose(queued(7).id);
+  const duplicate = commands.abandonAndClose(queued(7).id);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(transitions, 1);
+  assert.equal((await commands.start(queued(7).id, undefined)).status, 409);
+  assert.equal(commands.abandon(queued(7).id).status, 409);
+  finish(null);
+  assert.equal((await first).status, 200);
+  assert.equal((await duplicate).status, 200);
+});
+
+for (const extra of [{ number: null }, { abandonRefusal: 'Refused' }, { status: 'In progress' }]) test(`ineligible combined abandonment causes no provider write: ${JSON.stringify(extra)}`, async () => {
+  let calls = 0;
+  const item = queued(7, extra as Partial<Item>);
+  const board = createBoardState({ items: [item], repos: [], modelChoices: [] } as unknown as BoardData);
+  const commands = createItemCommands({ factoryContext: null, board, records: null, reread: () => {}, archive: () => [], offerModelChoices: () => [],
+    items: { observeTicket: async () => { calls++; return { state: 'open' }; }, abandon: async () => { calls++; return null; } } as unknown as ItemSource });
+  assert.equal((await commands.abandonAndClose(item.id)).status, 409);
+  assert.equal(calls, 0);
+});
+
+test('an active Start prevents combined abandonment before provider access', async () => {
+  const { commands, log, board } = commandsOn([queued(7)]);
+  assert.equal((await commands.start(queued(7).id, undefined)).status, 200);
+  const before = [...log];
+  assert.equal((await commands.abandonAndClose(queued(7).id)).status, 409);
+  assert.deepEqual(log, before);
+  assert.ok(board.find(queued(7).id));
+});

@@ -114,3 +114,16 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
   assert.equal(response.status, 502);
   assert.ok(has(await board.board(), board.id(12)));
 });
+
+test('combined success can be retried after the item leaves the board without closing twice', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
+  await until(board, (d) => d.items.length === 1);
+  const id = board.id(12);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await board.postSession({ itemId: id }, '/api/abandon-and-close');
+    const result = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(result));
+    assert.ok(!has(result.board, id));
+  }
+  assert.equal((await writes(board)).length, 1);
+});

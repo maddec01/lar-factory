@@ -28,6 +28,18 @@ test('onboarding saves local settings, optional purpose and sharing on by defaul
   expect(readRepositorySetups(dir)[0]?.domainDocs).toEqual({ kind: 'off' });
 });
 
+test('onboarding persists each issue preference and defaults omitted preferences to on', async (t) => {
+  const dir = await folder(t);
+  await saveSetup(answers, dir, allowed);
+  expect(readRepositorySetups(dir)[0]).toMatchObject({ createIssuesFromAddItem: true, createIssuesFromRetro: true, writeRefinedSpec: true });
+  const chosen = await folder(t);
+  expect(await saveSetup({ ...answers, createIssuesFromAddItem: false, createIssuesFromRetro: false, writeRefinedSpec: false }, chosen, allowed)).toEqual({ onboarding: [] });
+  expect(readRepositorySetups(chosen)[0]).toMatchObject({ createIssuesFromAddItem: false, createIssuesFromRetro: false, writeRefinedSpec: false });
+  for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
+    expect(await saveSetup({ ...answers, [key]: 'yes' }, dir, allowed)).toMatchObject({ status: 400 });
+  }
+});
+
 test('GitHub sharing checks creation, comments and its discovery label before saving', async (t) => {
   const dir = await folder(t);
   const result = await saveSetup(answers, dir, { access: async () => ({ 'publish-ticket': 'allowed', 'edit-ticket': 'refused' }) });

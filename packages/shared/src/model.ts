@@ -936,6 +936,8 @@ export function buildAccessProblem(access: Partial<Record<'push-branch' | 'open-
  */
 export interface RepositorySetup {
   repo: string;
+  /** The server session's Azure write restriction, never a saved preference. */
+  azureReadOnly?: boolean;
   /** Save concepts and relationships on the tracker for recovery on another machine. */
   structureSync: boolean;
   createIssuesFromAddItem?: boolean;
@@ -990,6 +992,9 @@ export interface OnboardingAnswers {
 
 /** The onboarding wizard's answers, each one absent while its detected default stands. */
 export interface OnboardingChoices {
+  createIssuesFromAddItem?: boolean;
+  createIssuesFromRetro?: boolean;
+  writeRefinedSpec?: boolean;
   vocabulary?: VocabularyMapping;
   structureSync?: boolean;
   itemSource?: RepositoryItemSource;
@@ -1047,13 +1052,14 @@ export type Detected<T> = { found: T } | { refused: string };
  */
 export interface SetupDetection {
   repo: string;
+  azureReadOnly?: boolean;
   provider: Provider;
   /** The T3 project's folder, once it is the repository's only main checkout. */
   checkout: Detected<string>;
   /** The item sources the board can read: the repository's issues, or one per Azure DevOps team. */
   itemSources: Detected<RepositoryItemSource[]>;
   access: Record<RepositoryOperation, OperationAccess>;
-  /** The repository's own glossary and ADRs when it has either, else private drafts. */
+  /** The repository's own glossary and ADRs when it has either, else off. */
   domainDocs: Detected<DomainDocLocation>;
   /** The names of the repository's project skills, which the user may select as coding guidance. */
   projectSkills: Detected<string[]>;
@@ -1061,6 +1067,9 @@ export interface SetupDetection {
 
 /** Onboarding's answers, which become the repository's local settings. */
 export interface LocalSetupAnswers {
+  createIssuesFromAddItem?: boolean;
+  createIssuesFromRetro?: boolean;
+  writeRefinedSpec?: boolean;
   newLabels?: Partial<Record<import('./vocabulary.ts').VocabularyKey, string[]>>;
   vocabulary?: VocabularyMapping;
   structureSync?: boolean;

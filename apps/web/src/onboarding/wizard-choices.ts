@@ -13,6 +13,9 @@ export interface Answers {
   domainDocs: DomainDocLocation;
   skills: string[];
   structureSync: boolean;
+  createIssuesFromAddItem: boolean;
+  createIssuesFromRetro: boolean;
+  writeRefinedSpec: boolean;
 }
 export interface Option<T> { id: string; value: T; title: string; cost: string }
 export function sourceOptions(detection: SetupDetection): Option<RepositoryItemSource>[] {
@@ -35,9 +38,13 @@ export function connectionsOf(repo: string, _role: string, choices: OnboardingCh
 }
 function defaultsOf(detection: SetupDetection): Answers {
   return { itemSource: sourceOptions(detection)[0]?.value ?? null, role: '',
+    createIssuesFromAddItem: true, createIssuesFromRetro: true, writeRefinedSpec: true,
     domainDocs: found(detection.domainDocs) ?? { kind: 'off' }, skills: [], structureSync: true };
 }
-export const answersOf = (detection: SetupDetection, choices: OnboardingChoices): Answers => ({ ...defaultsOf(detection), ...choices });
+export function answersOf(detection: SetupDetection, choices: OnboardingChoices): Answers {
+  const answers = { ...defaultsOf(detection), ...choices };
+  return { ...answers, domainDocs: answers.domainDocs.kind === 'repository' ? answers.domainDocs : { kind: 'off' } };
+}
 export function answerProblem(step: StepId, answers: Answers): string | null {
   return step === 'work' && !answers.itemSource ? 'Choose a team to continue.' : null;
 }

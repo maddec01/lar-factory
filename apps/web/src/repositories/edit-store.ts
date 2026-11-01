@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { type RepositorySetup, type SharedRepositorySettings, type SharedSetting } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
+import type { IssueSetting } from './issue-defaults.tsx';
 
 /** Settings whose editor uses text drafts. Vocabulary saves one complete term at a time. */
 export type DraftSetting = Exclude<SharedSetting, 'vocabulary' | 'createIssuesFromAddItem' | 'createIssuesFromRetro' | 'writeRefinedSpec'>;
@@ -71,6 +72,7 @@ interface EditState {
   reset: (repo: string, key: DraftSetting) => Promise<void>;
   recheck: (repo: string) => Promise<void>;
   structureSync: (repo: string, on: boolean) => Promise<void>;
+  issueDefault: (repo: string, key: IssueSetting, on: boolean) => Promise<void>;
 }
 
 export const useEditStore = create<EditState>()((set, get) => {
@@ -98,5 +100,6 @@ export const useEditStore = create<EditState>()((set, get) => {
     reset: (repo, key) => call(repo, key, { change: 'override', key }, key),
     recheck: (repo) => call(repo, 'recheck', { change: 'recheck' }),
     structureSync: (repo, on) => call(repo, 'structure-sync', { change: 'structure-sync', value: on }),
+    issueDefault: (repo, key, on) => call(repo, key, { change: 'override', key, value: on }),
   };
 });

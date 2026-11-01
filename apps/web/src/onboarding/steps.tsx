@@ -1,6 +1,6 @@
 // Three onboarding screens built from the board's existing controls.
 import { FolderPlus, LoaderCircle, Check, Minus } from 'lucide-react';
-import { isOnboarding, shownRepo, type OperationAccess, type SetupDetection } from '@lar-factory/shared';
+import { effectiveIssueSettings, isOnboarding, shownRepo, type OperationAccess, type SetupDetection } from '@lar-factory/shared';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -11,6 +11,7 @@ import { NativeSelect } from '@lar-factory/ui/native-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { Choice, Field, Group } from './setup-fields.tsx';
+import { IssueDefaults } from '../repositories/issue-defaults.tsx';
 import { answersOf, connectionOptions, connectionsOf, found, missingSyncAccess, operationTitle, repositoryDocs, skillOptions, sourceOptions } from './wizard-choices.ts';
 import { detectedOf, unpickable, useWizardStore, type Run } from './wizard-store.ts';
 
@@ -52,13 +53,15 @@ function DetectionPending() {
 }
 
 function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
-  const choose = useWizardStore((s) => s.choose);
+  const { choose, detect } = useWizardStore();
   const repos = useBoardStore((s) => s.data.repos);
   const answers = answersOf(detection, run.choices);
   const sources = sourceOptions(detection);
   const connections = connectionOptions(run.repo!, repos);
   const selected = connectionsOf(run.repo!, answers.role, run.choices, repos);
   const skills = skillOptions(detection);
+  const issueSetup = { ...detection, ...answers };
+  const issueDefaults = effectiveIssueSettings(issueSetup);
   return <div data-work-step className="grid gap-5">
     <Field label="Show in the list" problem={!sources.length ? ('refused' in detection.itemSources ? detection.itemSources.refused : 'No teams found. Add a team in Azure DevOps, then retry.') : undefined}>
       {() => detection.provider === 'GitHub' ? <p className="m-0 text-sm">GitHub issues</p> : <NativeSelect aria-label="Team" value={answers.itemSource?.kind === 'azure-board' ? answers.itemSource.team : ''}
@@ -68,10 +71,12 @@ function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
     </Field>
     <div className="grid gap-4 rounded-lg border p-4">
       <Checkbox label="Save concepts and cross-repository links to issues" checked={answers.structureSync} onChange={() => choose({ structureSync: !answers.structureSync })} />
-      <p className="m-0 -mt-2 pl-7 text-xs text-base-700">Restore their maps and relationships on another machine. Regular work and progress stay local.</p>
+      <p className="m-0 -mt-2 pl-7 text-xs text-base-700">This creates a linked-work label to restore maps and relationships on another machine.</p>
       <Checkbox label="Write glossary and decisions in build PRs" checked={answers.domainDocs.kind === 'repository'} onChange={() => choose({ domainDocs: answers.domainDocs.kind === 'repository' ? { kind: 'off' } : repositoryDocs(detection) })} />
       <p className="m-0 -mt-2 pl-7 text-xs text-base-700">Builds include new domain terms and decisions for review.</p>
     </div>
+    <IssueDefaults setup={issueSetup} onChange={(key, value) => choose({ [key]: value })} />
+    {(issueDefaults.createReason || issueDefaults.specReason) && <span><Button {...kind('other')} onClick={() => void detect()}>Recheck access</Button></span>}
     <details className="rounded-lg border px-4 py-3">
       <summary className="cursor-pointer text-sm font-medium">Optional settings</summary>
       <div className="mt-4 grid gap-4">

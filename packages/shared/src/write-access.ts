@@ -15,9 +15,11 @@ export function writeAccessProblem(repo: string, operation: RepositoryOperation,
 }
 
 /** Saved preferences remain intact when access prevents their use. */
-export function effectiveIssueSettings(setup: import('./model.ts').RepositorySetup, options: { azureReadOnly?: boolean } = {}) {
-  const createReason = writeAccessProblem(setup.repo, 'publish-ticket', setup.access, options);
-  const specReason = writeAccessProblem(setup.repo, 'edit-ticket', setup.access, options);
+export function effectiveIssueSettings(setup: Pick<import('./model.ts').RepositorySetup, 'repo' | 'access' | 'azureReadOnly' | 'createIssuesFromAddItem' | 'createIssuesFromRetro' | 'writeRefinedSpec'>, options: { azureReadOnly?: boolean } = {}) {
+  const azureReadOnly = options.azureReadOnly ?? setup.azureReadOnly;
+  const safety = azureReadOnly === undefined ? {} : { azureReadOnly };
+  const createReason = writeAccessProblem(setup.repo, 'publish-ticket', setup.access, safety);
+  const specReason = writeAccessProblem(setup.repo, 'edit-ticket', setup.access, safety);
   return {
     createIssuesFromAddItem: (setup.createIssuesFromAddItem ?? true) && createReason === null,
     createIssuesFromRetro: (setup.createIssuesFromRetro ?? true) && createReason === null,

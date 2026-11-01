@@ -12,6 +12,10 @@ test('the board query reads the blocked-by issues, and no issue or linked PR bod
   assert.match(OPEN_ISSUES_QUERY, /id number url state isDraft mergeStateStatus\n/, "linked PRs' bodies and merge times are read for builds only, by id");
 });
 
+test("the board query reads up to 100 labels of an issue, each with its colour", () => {
+  assert.match(OPEN_ISSUES_QUERY, /labels\(first: 100\) \{ nodes \{ name color \} \}/);
+});
+
 test("the PR bodies query reads only each linked PR's id, body and merge time", () => {
   assert.match(PR_BODIES_QUERY, /nodes\(ids: \$ids\) \{ \.\.\. on PullRequest \{ id body mergedAt \} \}/);
 });

@@ -41,6 +41,16 @@ test("a ticket edit never changes the record's Status, kind or title", async () 
   assert.ok(item!.labels.includes('bug'), 'the ticket supplies its labels as context');
 });
 
+test("a recorded item takes its ticket's labels and colours from the read, and the record stores neither", async () => {
+  const records = await open();
+  const { record } = records.importTicket({ title: 'Coloured', repository: REPO, kind: 'feature', status: 'Queued', ticket: `${REPO}#12` });
+  const [ticket] = tickets([12, 'Queued', REPO, ['area: web']]);
+  const [item] = recordItems(records, [{ ...ticket!, labelColors: { 'area: web': '#BFDADC' } }], [REPO]);
+  assert.deepEqual(item!.labelColors, { 'area: web': '#BFDADC' });
+  assert.deepEqual(recordItems(records, [], [REPO]).find((i) => i.id === record.workId)!.labelColors, undefined);
+  assert.equal(JSON.stringify(records.read(record.workId)).includes('BFDADC'), false);
+});
+
 test('a ticketless record and a record whose ticket the read did not list show from the record alone', async () => {
   const records = await open();
   const local = records.create({ title: 'Local', repository: REPO, kind: 'improvement', status: 'Shaping' });

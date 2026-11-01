@@ -96,6 +96,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     const spec = setups.find(setup => sameRepo(setup.repo, record.repository))?.writeRefinedSpec === false ? null : records.specState(record.workId);
     const item: Item = {
       content: 'ticket', labels: [], linkedPrs: [], ...ticket && { labels: ticket.labels, linkedPrs: ticket.linkedPrs },
+      ...ticket?.labelColors && { labelColors: ticket.labelColors },
       ...ticket?.azure && { azure: ticket.azure }, ...ticket?.sourceOrder !== undefined && { sourceOrder: ticket.sourceOrder },
       ...ticket?.abandonRefusal && { abandonRefusal: ticket.abandonRefusal }, ...ticket?.currentSprint && { currentSprint: ticket.currentSprint },
       id: record.workId,

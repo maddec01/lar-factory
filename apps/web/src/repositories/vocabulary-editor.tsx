@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { newLabelProblem, writeAccessProblem, type RepositorySetup, type VocabularyTerm } from '@lar-factory/shared';
+import { newLabelProblem, typedLabelsProblem, writeAccessProblem, type RepositorySetup, type VocabularyTerm } from '@lar-factory/shared';
 import { emptyVocabularyTerm, suggestVocabularyLabels, type VocabularyCapability, type VocabularyDiscovery, type VocabularyMapping } from '@lar-factory/shared/vocabulary';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -61,6 +61,7 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
   const types = discovery.types.state === 'available' ? discovery.types.choices : [];
   const suggested = suggestVocabularyLabels(discovery.labels)[name]?.labels[0];
   const title = KIND_NAMES[name];
+  const typedProblem = typedLabelsProblem(setup.repo, newLabels);
   return <fieldset disabled={disabled} className="m-0 grid min-w-0 gap-3 rounded-lg border p-3">
     <legend className="px-1 text-sm font-medium">{title}</legend>
     <label className="grid gap-1.5 text-sm">{discovery.provider === 'azure' ? 'Work item type' : 'Issue type'}
@@ -85,6 +86,7 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
         onChange={(e) => onChange(value, e.target.value ? [e.target.value] : [])} />
     </label>
     <p id={`${id}-new`} className="m-0 text-xs text-base-700">{access.newLabels ?? 'Created only when you save. Leave empty to use existing labels or none.'}</p>
+    {typedProblem && <p className="m-0 text-xs text-(--error-foreground)" role="alert">{typedProblem}</p>}
     <span><Button {...kind('other')} onClick={() => onChange(emptyVocabularyTerm(), [])}>None</Button></span>
   </fieldset>;
 }
@@ -101,7 +103,7 @@ function VocabularySettings({ setup }: { setup: RepositorySetup }) {
     {(Object.keys(KIND_NAMES) as VocabularyKind[]).map((key) => {
       const value = drafts[key] ?? setup.vocabulary[key];
       const names = (newLabels[key] ?? []).map((name) => name.trim()).filter(Boolean);
-      const forbidden = value.type !== null && access.types || value.labels.length > 0 && access.labels || names.length > 0 && access.newLabels;
+      const forbidden = value.type !== null && access.types || value.labels.length > 0 && access.labels || names.length > 0 && (access.newLabels ?? typedLabelsProblem(setup.repo, names));
       return <div key={key} data-vocabulary={key} className="grid gap-2">
         <VocabularyFields name={key} setup={setup} discovery={discovery} value={value} newLabels={newLabels[key] ?? []} disabled={running !== null}
           onChange={(term, labels) => { setDrafts({ ...drafts, [key]: term }); setNewLabels({ ...newLabels, [key]: labels }); setSaved(null); }} />

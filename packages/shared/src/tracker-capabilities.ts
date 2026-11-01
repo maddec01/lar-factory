@@ -65,3 +65,7 @@ const AZURE_DEVOPS: TrackerCapabilities = {
 
 /** The capabilities of the tracker holding `repo`, a repository key. */
 export const trackerCapabilities = (repo: string): TrackerCapabilities => (onAzure(repo) ? AZURE_DEVOPS : GITHUB);
+
+/** Why a person can't type one of `names` as a new label for `repo`, or null when they can. A blank field names nothing. */
+export const typedLabelsProblem = (repo: string, names: readonly string[]): string | null =>
+  names.filter((name) => name.trim()).map((name) => trackerCapabilities(repo).nameProblem(name)).find(Boolean) ?? null;

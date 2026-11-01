@@ -237,6 +237,16 @@ test('the mapping never offers the label sync needs', async () => {
   expect(text(kindRow('bug'))).not.toContain('linked-work');
 });
 
+test('onboarding refuses linked-work typed as a new label with the reason', async () => {
+  await workStep();
+  await openMapping();
+  const input = kindRow('bug').querySelector<HTMLInputElement>('input[type="text"]')!;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'linked-work');
+  await settle(() => input.dispatchEvent(new Event('input', { bubbles: true })));
+  expect(text(kindRow('bug'))).toContain("linked-work is reserved for the factory's saved links.");
+  expect(button('Next').disabled).toBe(true);
+});
+
 test('onboarding saves explicit suggestions and none and keeps failed new label drafts', async () => {
   await workStep();
   await openMapping();

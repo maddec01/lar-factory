@@ -2,6 +2,7 @@
 import { providerCommand as commandOutput } from './provider-command.ts';
 import { decodePart, isRecord, onAzure, sameRepo, type RepositorySetup } from './index.ts';
 import { isRepo, readRepositorySetups } from './repository-settings.ts';
+import { typedLabelsProblem } from './tracker-capabilities.ts';
 import { trackerLabels } from './tracker-labels.ts';
 import { publicationSettingsSnapshot, type VocabularyCapability, type VocabularyDiscovery } from './vocabulary.ts';
 
@@ -92,6 +93,8 @@ export { readRepositorySetups, setOverride, setVocabularyOverride, validateRepos
 export async function saveVocabularyLabels(repo: string, names: unknown, discovery: VocabularyDiscovery, access: Partial<RepositorySetup['access']>, create = createVocabularyLabel): Promise<string[]> {
   if (!Array.isArray(names) || names.some((name) => typeof name !== 'string' || !name.trim() || name.length > 100)) throw new Error('Enter nonempty new label names of at most 100 characters.');
   if (!names.length) return [];
+  const refused = typedLabelsProblem(repo, names as string[]);
+  if (refused) throw new Error(refused);
   if (discovery.labels.state !== 'available') throw new Error('Recheck label access before creating labels.');
   const choices = [...discovery.labels.choices];
   if ((names as string[]).some((name) => !choices.some((choice) => choice.toLowerCase() === name.trim().toLowerCase()))) {

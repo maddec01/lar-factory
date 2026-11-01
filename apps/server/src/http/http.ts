@@ -310,6 +310,18 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         return { status: 200, body: withBoard({ error: null }) };
       },
     },
+    '/api/item-kind': {
+      what: 'the kind and its item', disabled: 'Changing kinds is disabled in sample mode.',
+      async run({ itemId, kind }) {
+        if (typeof itemId !== 'string' || !itemId) return { status: 400, body: { error: 'Name the item and its new kind.' } };
+        const { status, body, labelChanges } = await commands.changeKind(itemId, kind);
+        const shown = board.snapshot().items.find((i) => i.id === ('itemId' in body ? body.itemId : itemId));
+        if (shown) for (const change of labelChanges) showLabelChange(shown, change);
+        // A failure can have changed the ticket too, so the read runs either way. Local work has no ticket to read.
+        if (shown?.url) readSoon(shown.url);
+        return { status, body: withBoard(body) };
+      },
+    },
     '/api/item-export': {
       what: 'the item to export', disabled: 'Exporting is disabled in sample mode.',
       run: forItem('Name the item to export.', async (itemId) => {

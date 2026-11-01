@@ -67,6 +67,17 @@ const main = async () => {
     }
     return output([]);
   }
+  // A ticket's labels and type as a kind change reads them, and its type as that change writes it.
+  const ticketRead = args[0] === 'api' && args[1] === '--method' && /^repos\/([\w.-]+\/[\w.-]+)\/issues\/(\d+)$/.exec(args[3]);
+  if (ticketRead && ['GET', 'PATCH'].includes(args[2])) {
+    const content = (options.repoIssues?.[ticketRead[1]] ?? []).find((c) => c?.number === Number(ticketRead[2]));
+    if (content && args[2] === 'PATCH') {
+      if (options.fail === 'ticket-type') { process.stderr.write('HTTP 403: Resource not accessible by integration'); process.exitCode = 1; return; }
+      content.issueType = { name: JSON.parse(fs.readFileSync(0, 'utf8')).type };
+      fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    }
+    return output({ number: Number(ticketRead[2]), labels: content?.labels.nodes ?? [], type: content?.issueType ?? null });
+  }
   // Vocabulary fixtures answer only metadata discovery and explicitly saved new labels.
   const vocabularyPath = args[0] === 'api' && args.find((arg) => /^repos\/[\w.-]+\/[\w.-]+(?:\/(?:labels\?per_page=100|labels|issue-types))?$/.test(arg));
   if (options.vocabulary && vocabularyPath && args.includes('--method')) {

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
+import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item, OperationAccess } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
@@ -669,4 +670,37 @@ test('cleanup confirmations replace previous item tokens and expire', async () =
   const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 11 * 60_000);
   try { assert.equal((await commands.executeOwnedCleanup(record.workId, { token: second.token })).status, 409); }
   finally { clock.mockRestore(); }
+});
+
+test('changing the kind of an item with no record makes its record first, and a failed swap leaves it with the old kind', async () => {
+  const records = await openRecords();
+  const ticket = queued(9, { recorded: false, status: 'List', statuses: [], kind: 'bug', labels: ['bug'] });
+  const board = createBoardState({ items: [ticket], repos: [{ repo: WEB, setup: { access: { 'tag-ticket': 'allowed' }, vocabulary: effectiveVocabulary({}).vocabulary } }], modelChoices: [] } as unknown as BoardData);
+  const source = { readTicket: async () => ({ number: 9, title: 'Item 9', url: ticket.url!, text: '', kind: 'bug' }) } as unknown as ItemSource;
+  let fail = true;
+  const commands = createItemCommands({ factoryContext: null, board, items: source, records, reread: () => {}, archive: () => [], offerModelChoices: () => [],
+    kindTracker: () => ({
+      labels: { addToTicket: async () => {}, removeFromTicket: async () => { if (fail) throw new Error('az failed: TF26071'); } },
+      kinds: { read: async () => ({ labels: ['bug'], type: 'Bug' }), setType: async () => {}, boardTypes: async () => null },
+    }) });
+  const failed = await commands.changeKind(ticket.id, 'feature');
+  const { itemId } = failed.body as { itemId: string };
+  assert.equal(failed.status, 502);
+  assert.equal(records.read(itemId).kind, 'bug');
+  assert.equal(records.read(itemId).ticket, `${WEB}#9`);
+  fail = false;
+  board.update({ items: recordItems(records, [], [WEB]) });
+  const retried = await commands.changeKind(itemId, 'feature');
+  assert.equal(retried.status, 200);
+  assert.equal(records.read(itemId).kind, 'feature');
+  assert.deepEqual(retried.labelChanges, [{ label: 'bug', action: 'remove' }]);
+});
+
+test('an item that can\'t change kind makes no record', async () => {
+  const records = await openRecords();
+  const concept = queued(9, { recorded: false, status: 'List', kind: 'concept' });
+  const { commands, board } = commandsOn([], undefined, records);
+  board.update({ items: [concept] });
+  assert.equal((await commands.changeKind(concept.id, 'bug')).status, 422);
+  assert.deepEqual(records.list({}), []);
 });

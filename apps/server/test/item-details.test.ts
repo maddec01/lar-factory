@@ -264,6 +264,72 @@ test('sample mode changes no labels', async (t) => {
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Changing labels is disabled in sample mode.' }]);
 });
 
+/** A home where this repository maps Bug and Feature, with `access` to label and type its tickets. */
+function mappedHome(t: TestContext, access: object = { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' }): Record<string, string> {
+  const home = taggingHome(t);
+  writeFileSync(join(home.HOME!, 'Library/Application Support/Lar Factory/repository-settings.json'), JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory', settings: { access,
+    overrides: { vocabulary: { bug: { type: 'Bug', labels: ['type: bug'] }, feature: { type: 'Feature', labels: ['type: feature'] } } } } }] }));
+  return home;
+}
+const kindWrite = (board: Board, body: object) => board.post(body, board.url, '/api/item-kind');
+const kindItem = (board: BoardData, id: string) => board.items.find((i) => i.id === id)!;
+
+test('changing a kind swaps the ticket through the tracker, and the reply and later reads keep the new kind', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug', 'docs'])] }, false, false, mappedHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const id = board.id(12);
+  const reply = await kindWrite(board, { itemId: id, kind: 'feature' });
+  const body = await reply.json() as { error: string | null; line: string; itemId: string; board: BoardData };
+  assert.equal(reply.status, 200, body.error ?? '');
+  assert.equal(body.line, '#12: added label type: feature; removed label type: bug; type none to Feature.');
+  const shown = kindItem(body.board, body.itemId);
+  assert.equal(shown.kind, 'feature');
+  assert.deepEqual(shown.labels.filter((l) => l !== 'status-list').sort(), ['docs', 'type: feature']);
+  await until(board, (d) => d.items[0]!.labels.includes('type: feature') && d.items[0]!.kind === 'feature');
+  assert.ok((await board.calls()).some((args) => args[2] === 'PATCH' && args[3] === 'repos/maddec01/lar-factory/issues/12'));
+});
+
+test('a failed type write keeps the old kind and says what changed', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug'])], fail: 'ticket-type' }, false, false, mappedHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const before = kindItem(await board.board() as BoardData, board.id(12)).kind;
+  const failed = await kindWrite(board, { itemId: board.id(12), kind: 'feature' });
+  const body = await failed.json() as { error: string; line: string; itemId: string; board: BoardData };
+  assert.equal(failed.status, 502);
+  assert.match(body.error, /^Could not finish changing #12 to Feature\./);
+  assert.equal(body.line, '#12: added label type: feature; removed label type: bug.');
+  assert.equal(kindItem(body.board, body.itemId).kind, before);
+});
+
+test('without access only the item changes, and the reply says so', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug'])] }, false, false, mappedHome(t, { 'tag-ticket': 'refused', 'type-ticket': 'allowed' }));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const reply = await kindWrite(board, { itemId: board.id(12), kind: 'feature' });
+  const body = await reply.json() as { line: string; itemId: string; board: BoardData };
+  assert.equal(reply.status, 200);
+  assert.match(body.line, /^This item is now Feature\. Its ticket stays as it is: Access to tag-ticket was refused/);
+  assert.equal(kindItem(body.board, body.itemId).kind, 'feature');
+  assert.deepEqual(await labelCalls(board), []);
+});
+
+test('a kind change refuses a kind details doesn\'t offer and an item the board doesn\'t hold', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, false, mappedHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  assert.equal((await kindWrite(board, { itemId: board.id(12), kind: 'concept' })).status, 422);
+  assert.equal((await kindWrite(board, { itemId: 'I_nope', kind: 'bug' })).status, 404);
+  assert.equal((await kindWrite(board, { kind: 'bug' })).status, 400);
+});
+
+test('sample mode changes no kinds', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const response = await kindWrite(board, { itemId: 'I_sample13', kind: 'bug' });
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Changing kinds is disabled in sample mode.' }]);
+});
+
 test('sample mode exports nothing', async (t) => {
   const board = await startBoard(t, {}, true);
   const response = await board.post({ itemId: 'I_sample13' }, board.url, '/api/item-export');

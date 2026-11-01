@@ -57,7 +57,7 @@ test('Abandon sets captured work aside and closes no ticket, as it has none', as
   const board = await startBoard(t, { items: [] }, false, true);
   await onboarded(board);
   const created = await board.postSession({ requestId: '00000000-0000-4000-8000-000000000001',
-    draft: { repo: 'maddec01/lar-server', kind: 'bug', title: 'Throwaway', description: '' } }, '/api/items');
+    draft: { createIssue: false, repo: 'maddec01/lar-server', kind: 'bug', title: 'Throwaway', description: '' } }, '/api/items');
   assert.equal(created.status, 200);
   const { id } = (await created.json() as { item: { id: string } }).item;
   assert.equal((await abandon(board, id)).status, 200);

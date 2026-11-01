@@ -448,3 +448,11 @@ test('thread handoffs carry an explicit isolated factory environment and absolut
   const build=buildMessage(work,'/tmp/factory home/.agents/skills/lar-build',context);
   assert.ok(build.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
 });
+
+test('ticket capture rejects malformed optional fields and multiline titles before a provider write', () => {
+  const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 'Failure', description: '', createIssue: true };
+  for (const changed of [
+    { title: 'First\nSecond' }, { createIssue: 'yes' }, { options: [] }, { options: { labels: [''] } },
+    { options: { milestone: '-1' } }, { options: { assignee: 'x\nfield=y' } }, { options: { areaPath: 'Other area' } },
+  ]) assert.throws(() => validateDraft({ ...draft, ...changed }, sample.repos));
+});

@@ -337,4 +337,8 @@ export const MIGRATIONS: readonly Migration[] = [
     db.exec(`INSERT OR IGNORE INTO tracker_sync(work_id,local_digest,remote_digest,error,conflict)
       SELECT i.source_key,s.local_digest,s.remote_digest,s.error,s.conflict FROM tracker_sync s JOIN tracker_identities i ON i.work_id=s.work_id WHERE i.source_key<>s.work_id`);
   },
+  (db) => db.exec(`CREATE TABLE capture_submissions (
+    request_id TEXT PRIMARY KEY, draft TEXT NOT NULL, ticket TEXT, work_id TEXT,
+    failure TEXT
+  )`),
 ];

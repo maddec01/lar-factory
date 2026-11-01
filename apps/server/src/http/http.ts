@@ -168,7 +168,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     },
     '/api/items': {
       what: 'item details', disabled: 'Adding items is disabled in sample mode.',
-      restarted: () => ({ uncertain: true, error: 'The board restarted. Check List for this item before adding it again.' }),
       run: (input) => capture.capture(input),
     },
     '/api/pick-ticket': {
@@ -483,6 +482,11 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     if (path === '/api/onboarding/projects') return projectsRequest(res);
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
+    if (path === '/api/ticket-options') {
+      if (sample) return json(res, 403, { error: 'Sample mode reads no issue options.' });
+      const result = await capture.options(url.searchParams.get('repo'));
+      return json(res, result.status, result.body);
+    }
     if (path === '/api/tickets') return ticketsRequest(url, res);
     if (path === '/api/archive') return json(res, 200, { items: archive() });
     if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));

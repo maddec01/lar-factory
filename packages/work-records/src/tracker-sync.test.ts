@@ -415,3 +415,43 @@ test('a stale failure checkpoint cannot overwrite a later structural outbox entr
   expect(records.trackerState(root.workId)).toEqual({state:'pending'});
   expect(records.trackerCheckpoint(root.workId).error).toBeNull();
 });
+
+test('the existing create transport sends GitHub options and Azure Bug HTML with tags, identity, iteration and default area', async () => {
+  await cache();
+  const dir = handles.at(-1)!.dir;
+  const cli = join(dir, 'provider.mjs');
+  writeFileSync(cli, `#!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const args=process.argv.slice(2), value=flag=>args[args.indexOf(flag)+1];
+if(args[0]==='api') {
+ const input=JSON.parse(readFileSync(0,'utf8'));
+ assert.equal(value('--method'),'POST');
+ assert.deepEqual(input,{title:'Failure',body:'## Steps',labels:['backend'],type:'Bug',assignees:['writer'],milestone:12});
+ process.stdout.write(JSON.stringify({number:8,title:input.title,body:input.body,updated_at:'1'}));
+} else {
+ assert.equal(value('--http-method'),'POST');
+ const patch=JSON.parse(readFileSync(value('--in-file'),'utf8'));
+ const fields=Object.fromEntries(patch.map(op=>[op.path.slice('/fields/'.length),op.value]));
+ assert.equal(fields['System.Title'],'Failure');
+ assert.equal(fields['System.Description'],undefined);
+ assert.equal(fields['System.Tags'],'backend; triage');
+ assert.equal(fields['System.AssignedTo'],'writer@example.test');
+ assert.equal(fields['System.IterationPath'],'Project\\\\Sprint');
+ assert.equal(fields['System.AreaPath'],'Project\\\\Team');
+ assert.match(fields['Microsoft.VSTS.TCM.ReproSteps'],/<h2>Steps<\\/h2>/);
+ assert.match(fields['Microsoft.VSTS.TCM.ReproSteps'],/<!-- lar-factory:create/);
+ process.stdout.write(JSON.stringify({id:9,rev:1,fields:{...fields,'System.WorkItemType':'Bug'}}));
+}
+`, { mode: 0o755 });
+  vi.stubEnv('GH_PATH', cli);
+  vi.stubEnv('AZ_PATH', cli);
+  vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '');
+  const provider = structureProvider();
+  expect((await provider.create('example/source', 'Failure', '## Steps', 'Bug', undefined,
+    { labels: ['backend'], assignee: 'writer', milestone: '12' })).number).toBe(8);
+  const bug = await provider.create('example/Project/source', 'Failure', '## Steps\n\n<!-- lar-factory:create {"identity":"request"} -->', 'Bug', 'Project\\Team',
+    { labels: ['backend', 'triage'], assignee: 'writer@example.test', iteration: 'Project\\Sprint' });
+  expect(bug.body).toContain('<h2>Steps</h2>');
+  expect(bug.number).toBe(9);
+});

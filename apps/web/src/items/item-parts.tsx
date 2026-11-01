@@ -10,6 +10,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { PrReadiness } from './pr-readiness.tsx';
 import { STATUS_COLOR } from './status-glyph.tsx';
 import { WORKFLOW_STEPS } from './workflow-steps.ts';
+import { SourceIcon } from './source-icon.tsx';
 
 const REPO_TONES = 8;
 
@@ -89,6 +90,7 @@ export function SliceList({ item }: { item: Item }) {
     <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-0.5 p-0">
       {item.slices.map((s, i) => (
         <li key={i} className="flex items-start gap-2 rounded-md px-2 py-1 text-[13px] hover:bg-(--soft)">
+          <SourceIcon item={s} />
           <span className="mt-0.5"><SliceMark progress={s.progress} /></span>
           {s.number > 0 && <span className="shrink-0 text-(--muted-foreground) tabular-nums">#{s.number}</span>}
           <span className={`min-w-0 flex-1 wrap-anywhere ${s.progress === 'done' ? 'text-(--muted-foreground) line-through' : s.progress === 'active' ? 'font-medium' : ''}`}>{s.title}</span>

@@ -31,6 +31,7 @@ import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 import { ItemComments, ItemDescription, ItemMeta, ItemRelations } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
 import { useDescriptionEdit } from './use-description-edit.ts';
@@ -109,7 +110,8 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
         <ExpandButton expanded={expanded} toggle={toggleExpanded} />
       </>}>
       <div className="@container grid shrink-0 gap-1 border-b border-base-300 px-5 pb-3 text-xs text-base-700 sm:px-6" data-item-summary>
-        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <SourceIcon item={item} />
           <RepoTag repo={repoKey(item)} repos={data.repos} />
           <StatusGlyph status={item.status} /> <span className="font-medium text-base-content">{item.status}</span>
           <span className="min-w-0 truncate @max-[30rem]:hidden">· updated {shortAgo(item.updatedAt, now)}</span>

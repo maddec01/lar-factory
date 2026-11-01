@@ -19,6 +19,7 @@ import { StartBuild } from '../items/start-build.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
 import { dossiersOf, inDossiers } from './dossier-parts.ts';
 import { OnYourDesk, YOURS, picked, stageOf, threadText } from './stage-track.tsx';
@@ -61,7 +62,7 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
             Below 1024 px, where a dossier drops that column, line 1 spans three and the action sits above the figures. */}
         <span className={`grid ${LINE2_A1} items-center gap-x-4 gap-y-1`} data-line2>
           <span className="col-span-3 flex min-w-0 lg:col-span-4 flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-0.5" data-line="1">
-            <span className="line-clamp-2 text-[13px] font-medium" title={item.title} data-title><ItemTitle item={item} /></span>
+            <span className="flex min-w-0 items-start gap-1.5"><SourceIcon item={item} /><span className="line-clamp-2 text-[13px] font-medium" title={item.title} data-title><ItemTitle item={item} /></span></span>
             <span className="inline-flex flex-wrap items-center gap-x-1.5 text-[11px] text-(--muted-foreground)" data-meta>
               <span>{item.status} · {threadText(item)} · {repo}</span>
               {item.linkedPrs[0] && <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(item.linkedPrs[0])}</span>}

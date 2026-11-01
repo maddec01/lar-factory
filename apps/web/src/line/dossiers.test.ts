@@ -139,11 +139,13 @@ test('a selection elsewhere never stops the dossier toggling, nor does one in th
 test('line 1 holds the kind, the full title, its T3 threads, and chips that hide at zero', async () => {
   await mountPage();
   const title = header().querySelector('[data-title]')!;
-  expect([text(line(1).firstElementChild!.firstElementChild!.firstElementChild), text(title)]).toEqual(['Concept', '#200 lar cloud: website sign-in and relay']);
+  expect(text(line(1))).toContain('Concept#200 lar cloud: website sign-in and relay');
+  expect(text(title)).toBe('#200 lar cloud: website sign-in and relay');
   expect(title.className.split(' '), 'the title wraps, never truncates').not.toContain('truncate');
   expect(text(header().querySelector('[data-threads]'))).toBe('4 T3 threads · 1 running · 1 awaiting your reply');
   expect(chips(), 'parts in Needs you, open decisions and the fog left').toEqual(['1 need you', '2 decisions', '2 fog']);
-  expect([text(line(1, C180).firstElementChild!.firstElementChild!.firstElementChild), chips(C180)]).toEqual(['Coupled work', []]);
+  expect(text(line(1, C180))).toContain('Coupled work');
+  expect(chips(C180)).toEqual([]);
   expect(text(header(C180).querySelector('[data-threads]')), 'a zero count is left out').toBe('3 T3 threads · 1 running');
   await receive({ ...sample, items: sample.items.map((i) => ({ ...i, threads: [] })) });
   const none = header().querySelector('[data-threads]')!;
@@ -483,7 +485,8 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
   await mountPage({ ...sample, error: null, items: recorded(normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) })) });
-  expect([text(line(1, 'I_100').firstElementChild!.firstElementChild!.firstElementChild), text(line(2, 'I_100'))]).toEqual(['Coupled work', '0/2 partsMoving#102 Issue 102lar-factory']);
+  expect(text(line(1, 'I_100'))).toContain('Coupled work');
+  expect(text(line(2, 'I_100'))).toBe('0/2 partsMoving#102 Issue 102lar-factory');
   expect(listed('I_100'), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
   expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();
 });

@@ -15,6 +15,7 @@ import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar, StructureSync } from '../items/item-parts.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
@@ -104,6 +105,7 @@ function PartLink({ part }: { part: Part }) {
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); open(part.item); }} title={`${itemName(part.item)}`}
       className="flex min-w-0 items-start gap-1.5 rounded text-left text-[13px] hover:underline">
+      <SourceIcon item={part.item} />
       <span className="mt-0.5 inline-flex"><StatusGlyph status={part.item.status} className="size-3.5" /></span>
       <span className="line-clamp-2"><ItemTitle item={part.item} /></span>
     </button>
@@ -360,6 +362,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
           <span className="flex min-w-0 flex-1 items-baseline gap-x-2">
             {/* The badge and title stay together, so a long title wraps beside the badge instead of below it. */}
             <span className="flex min-w-0 items-start gap-2">
+              <SourceIcon item={parent} />
               <Badge tone="neutral" className="mt-px shrink-0">{kindLabel(parent)}</Badge>
               <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
                 className="min-w-0 rounded text-left text-[14px] font-medium hover:underline"><ItemTitle item={parent} /></button>

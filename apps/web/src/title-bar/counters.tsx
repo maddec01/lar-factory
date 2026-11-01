@@ -18,6 +18,7 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
 import { ItemTitle, repoTone } from '../items/item-parts.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
+import { SourceIcon } from '../items/source-icon.tsx';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? item.stats.costUsd ?? 0 : 0);
 
@@ -70,6 +71,7 @@ function Row({ item, data, now, trailing }: { item: Item; data: BoardData; now: 
         <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
           className="flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left text-[13px] text-base-content outline-none hover:bg-base-200 focus-visible:bg-base-200">
           <StatusGlyph status={item.status} />
+          <SourceIcon item={item} />
           <span className="min-w-0 flex-1 truncate"><ItemTitle item={item} /></span>
           <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums">
             {trailing ?? <>

@@ -290,6 +290,28 @@ test('changing a kind swaps the ticket through the tracker, and the reply and la
   assert.ok((await board.calls()).some((args) => args[2] === 'PATCH' && args[3] === 'repos/maddec01/lar-factory/issues/12'));
 });
 
+test('Update ticket clears the disagreement in the reply, and later reads keep it clear', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug', 'docs'])] }, false, false, mappedHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const first = await (await kindWrite(board, { itemId: board.id(12), kind: 'feature' })).json() as { itemId: string; board: BoardData };
+  assert.equal(kindItem(first.board, first.itemId).kindDisagreement, undefined);
+  await until(board, (d) => d.items[0]!.labels.includes('type: feature'));
+  assert.equal(kindItem(await board.board() as BoardData, first.itemId).kindDisagreement, undefined);
+});
+
+test('without access the item keeps its new kind and the board shows the disagreement, until Keep answers it', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug'])] }, false, false, mappedHome(t, { 'tag-ticket': 'refused', 'type-ticket': 'allowed' }));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const changed = await (await kindWrite(board, { itemId: board.id(12), kind: 'feature' })).json() as { itemId: string; board: BoardData };
+  const { kindDisagreement } = kindItem(changed.board, changed.itemId);
+  assert.deepEqual(kindDisagreement, { ticketKind: 'bug', changed: 'item', kept: false, swap: { add: ['type: feature'], remove: ['type: bug'], type: { from: null, to: 'Feature' } } });
+  const kept = await board.post({ itemId: changed.itemId, answer: 'keep', ticketKind: 'bug' }, board.url, '/api/item-kind-answer');
+  assert.equal(kept.status, 200);
+  assert.equal(kindItem((await kept.json() as { board: BoardData }).board, changed.itemId).kindDisagreement?.kept, true);
+});
+
 test('a failed type write keeps the old kind and says what changed', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug'])], fail: 'ticket-type' }, false, false, mappedHome(t));
   await onboarded(board);

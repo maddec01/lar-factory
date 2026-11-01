@@ -328,3 +328,26 @@ test("a Dependency in a repository whose reads wait takes no read and keeps its 
   assert.equal(gh.calls.length, 2);
   assert.deepEqual(records.dependency(id), before);
 });
+
+test('a read showing the record and its ticket agree keeps that kind, so a later ticket change is the ticket\'s', async () => {
+  const records = await open();
+  const { workId } = records.importTicket({ title: 'T', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+  const { reads } = provider({ ticket: { state: 'open' } });
+  let agreed: 'bug' | null = null;
+  const observing = { ...reads, agreedKind: () => agreed };
+  await observeRecords(records, [REPO], observing);
+  assert.equal(records.read(workId).agreedTicketKind, null);
+  agreed = 'bug';
+  await observeRecords(records, [REPO], observing);
+  assert.equal(records.read(workId).agreedTicketKind, 'bug');
+});
+
+test('an agreement already kept writes nothing more', async () => {
+  const records = await open();
+  const { workId, revision } = records.importTicket({ title: 'T', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+  records.update(workId, revision, { agreedTicketKind: 'bug' });
+  const answered = records.recordKindAnswer(workId, revision + 1, { answer: 'keep', ticketKind: 'feature' });
+  const { reads } = provider({ ticket: { state: 'open' } });
+  await observeRecords(records, [REPO], { ...reads, agreedKind: () => 'bug' });
+  assert.deepEqual(records.read(workId).kindAnswer, answered.kindAnswer);
+});

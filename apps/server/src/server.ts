@@ -27,7 +27,7 @@ import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
 import { createPrObserver } from './items/pr-observer.ts';
 import { createRetention } from './items/retention.ts';
-import { archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
+import { agreedKind, archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
@@ -431,6 +431,14 @@ function showLabelChange(item: Item, { label, action }: LabelChange): void {
   board.push();
 }
 
+/** Shows a type the tracker just took, the way showLabelChange shows a label, until the next read reports it. */
+function showTicketType(item: Item, type: string): void {
+  const ticket = ticketOf(item);
+  recordedItems({ items: tickets.map((t) => (t === ticket ? { ...t, ...t.azure ? { azure: { ...t.azure, type } } : { issueType: type } } : t)), waiting: unread });
+  showRecords();
+  board.push();
+}
+
 /** Shows the work records as they are now with the last tickets read, and their T3 threads; stats only when `withStats`. */
 function showRecords(withStats = false): void {
   board.applyRead(recordedItems(), board.revision(), (shown) => withT3Reads(shown, withStats));
@@ -705,6 +713,7 @@ async function observeProviders(): Promise<void> {
       pr: (repo, number) => observePr(repo, number),
       known: (repo, number) => knownTicket(repo, number),
       waits: (repo) => quotaLow && !onAzure(repo),
+      agreedKind: (record) => agreedKind(record, ticketsByRef, board.snapshot().repos.find((r) => sameRepo(r.repo, record.repository))?.setup?.vocabulary),
     }, retention.hidden(), showRecords);
     // After the PR reads, so a concept whose last build merged finishes in the same pass.
     finishCompleted(records, repos);
@@ -753,7 +762,7 @@ const { server, endStreams } = createBoardServer({
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
     if (read.availability !== 'available') throw new Error('T3 unavailable');
   },
-  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), showLabelChange, readSoon, ready: () => firstGhCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), showLabelChange, showTicketType, readSoon, ready: () => firstGhCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   detectSetup: (input) => detectSetup(input), saveSetup: (input) => saveSetup(input),

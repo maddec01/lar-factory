@@ -40,6 +40,7 @@
   "items": [
     {
       "id": "I_sample01",
+      "kindDisagreement": { "ticketKind": "improvement", "changed": "ticket", "kept": false, "swap": { "add": [], "remove": ["improvement"], "type": null } },
       "revision": 1,
       "status": "List",
       "statuses": [
@@ -214,12 +215,13 @@
     },
     {
       "id": "I_sample06",
+      "kindDisagreement": { "ticketKind": "bug", "changed": "item", "kept": false, "swap": { "add": [], "remove": ["bug"], "type": null } },
       "revision": 1,
       "status": "Queued",
       "statuses": [
         "Queued"
       ],
-      "kind": "bug",
+      "kind": "feature",
       "content": "ticket",
       "number": 20,
       "title": "Player controls stay visible after scrubbing <on tvOS>",

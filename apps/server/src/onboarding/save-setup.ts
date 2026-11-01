@@ -1,4 +1,4 @@
-import { REPOSITORY_OPERATIONS, writeAccessProblem, structureSyncOperations, isRecord, onAzure, type LocalSetupAnswers, type OnboardingRepository, type RepositoryOperation, type RepositoryItemSource } from '@lar-factory/shared';
+import { writeAccessProblem, structureSyncOperations, isRecord, onAzure, type LocalSetupAnswers, type OnboardingRepository, type RepositoryItemSource } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { isRepo, saveConnections, saveOnboarded, stillOnboarding } from '../config/repository-config.ts';
 import { saveLocalSetup, validateRepositorySettings } from '../config/repository-settings.ts';
@@ -27,13 +27,12 @@ const saveReads: SaveReads = {
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
 /** The body's answers, or null when one is missing or has the wrong shape. */
-function answersOf({ projectId, role, itemSource, domainDocs, skills, consent, structureSync }: Record<string, unknown>): LocalSetupAnswers | null {
+function answersOf({ projectId, role, itemSource, domainDocs, skills, structureSync }: Record<string, unknown>): LocalSetupAnswers | null {
   const docs = isRecord(domainDocs) && (domainDocs.kind === 'private'
     || domainDocs.kind === 'repository' && typeof domainDocs.glossary === 'string' && typeof domainDocs.adrs === 'string');
   if (structureSync !== undefined && typeof structureSync !== 'boolean') return null;
-  if (typeof projectId !== 'string' || role !== undefined && typeof role !== 'string' || !isRecord(itemSource) || !docs || !strings(skills)
-    || consent !== undefined && (!Array.isArray(consent) || !consent.every((op) => REPOSITORY_OPERATIONS.includes(op as RepositoryOperation)))) return null;
-  return { projectId, structureSync: structureSync !== false, role: typeof role === 'string' ? role.trim() : '', itemSource, domainDocs, skills, consent: [] } as unknown as LocalSetupAnswers;
+  if (typeof projectId !== 'string' || role !== undefined && typeof role !== 'string' || !isRecord(itemSource) || !docs || !strings(skills)) return null;
+  return { projectId, structureSync: structureSync !== false, role: typeof role === 'string' ? role.trim() : '', itemSource, domainDocs, skills } as unknown as LocalSetupAnswers;
 }
 
 const ANSWERS = 'Send the repository, its T3 project, role, item source, domain-doc location, skills.';

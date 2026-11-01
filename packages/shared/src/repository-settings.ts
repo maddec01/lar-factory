@@ -18,8 +18,6 @@ interface LocalSettings {
   overrides?: SharedRepositorySettings;
   /** What the credentials were found to allow; an operation it leaves out is unverified. */
   access?: Partial<Record<RepositoryOperation, Exclude<OperationAccess, 'unverified'>>>;
-  /** The operations the user allows the factory to offer, whatever the credentials allow. */
-  consent?: RepositoryOperation[];
 
 }
 
@@ -59,7 +57,7 @@ function isLocalSettings(value: unknown, azure: boolean): value is LocalSettings
   if (!isRecord(value)) return false;
   const settings = (v: unknown) => v === undefined || isRecord(v) && settingsProblemOf(v, azure) === null;
   return (value.structureSync === undefined || typeof value.structureSync === 'boolean') && (value.projectId === undefined || typeof value.projectId === 'string') && settings(value.overrides)
-    && (value.access === undefined || isAccess(value.access)) && (value.consent === undefined || Array.isArray(value.consent) && value.consent.every(isOperation));
+    && (value.access === undefined || isAccess(value.access));
 }
 
 /** The list's entries with their checked local settings; throws, naming the entry, for settings it can't use. */
@@ -85,7 +83,6 @@ function setupOf(repo: string, local: LocalSettings, connections: string[] = [])
     role: pick('role') ?? '', itemSource, labels: pick('labels') ?? [], domainDocs, skills: pick('skills') ?? [],
     ...effectiveVocabulary(local.overrides?.vocabulary),
     access: Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, accessOf(op)])) as RepositorySetup['access'],
-    consent: REPOSITORY_OPERATIONS.filter((op) => accessOf(op) === 'allowed'),
     sources: Object.fromEntries(SHARED_SETTINGS.map((key) => [key,
       local.overrides?.[key] !== undefined ? 'local' : 'default'])) as RepositorySetup['sources'],
     connections,
@@ -107,7 +104,8 @@ function updateSettings(repo: string, dir: string, change: (local: LocalSettings
   if (at < 0) throw new Error(`${repo} is not on this Mac's list.`);
   const saved = settings[at]!;
   const setup = setupOf(list[at]!.repo, saved);
-  const { consent: _legacyConsent, ...next } = change(saved, setup);
+  const changed = change(saved, setup);
+  const next = Object.fromEntries(Object.entries(changed).filter(([key]) => key !== 'consent'));
   if (JSON.stringify(next) === JSON.stringify(saved)) return;
   writeListFile(dir, { ...raw, repositories: raw.repositories.map((e, i) => i === at ? { ...e, settings: next } : e) });
 }
@@ -136,19 +134,8 @@ type FoundAccess = NonNullable<LocalSettings['access']>;
 
 /** Saves onboarding answers and access on this machine. */
 export function saveLocalSetup(repo: string, answers: LocalSetupAnswers, access: FoundAccess, dir = boardDataDir()): void {
-  const { projectId, consent, structureSync = true, ...answered } = answers;
-  void consent;
+  const { projectId, structureSync = true, ...answered } = answers;
   updateSettings(repo, dir, (local) => ({ ...local, projectId, structureSync, overrides: { ...local.overrides, ...answered }, access }));
-}
-
-/** @deprecated Access alone authorizes operations. Kept for existing callers. */
-export function setConsent(repo: string, _consent: readonly RepositoryOperation[], dir = boardDataDir()): void {
-  updateSettings(repo, dir, (local) => local);
-}
-
-/** @deprecated Access alone authorizes operations. */
-export function changeConsent(repo: string, consent: readonly RepositoryOperation[], dir: string): void {
-  setConsent(repo, consent, dir);
 }
 
 /** Changes whether concepts and cross-repository links are saved to issues. */

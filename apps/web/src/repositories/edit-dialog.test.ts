@@ -13,7 +13,7 @@ const SETUP: RepositorySetup = {
   repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, labels: ['area: server'],
   domainDocs: { kind: 'private' }, skills: [], ...effectiveVocabulary(),
   access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
-  consent: ['push-branch'], structureSync: true,
+  structureSync: true,
   sources: { role: 'local', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default', vocabulary: 'default' },
 };
 

@@ -1,5 +1,5 @@
 import type { AzureBodyField } from './item-details.ts';
-import type { RepositoryOperation, RepositorySetup } from './model.ts';
+import type { RepositorySetup } from './model.ts';
 import type { VocabularyDiscovery } from './vocabulary.ts';
 
 // Browser-safe requests and results for the publication journal. Provider adapters execute only claimed operations.
@@ -225,16 +225,6 @@ export interface PublicationBoardState {
   attachments?: PublicationAttachment[];
   history?: PublicationPlan[];
   resolvedUrl?: { workId: string; revision: number; ticket: string; url: string; body: string; format: PublicationBodySnapshot['format'] };
-}
-
-/** The independent local consents needed for one concrete operation. */
-export function publicationConsents(operation: PublicationOperation, ticket: PublicationTicket): RepositoryOperation[] {
-  if (operation.kind === 'create') return ['publish-ticket',
-    ...Object.values(ticket.vocabulary).some((term) => term.labels.length) ? ['tag-ticket' as const] : [],
-    ...ticket.typeResolution.selected ? ['type-ticket' as const] : []];
-  if (operation.kind === 'pr-closing-reference') return ticket.destination.provider === 'azure' ? ['relate-ticket'] : [];
-  if (operation.kind === 'relationship') return ['relate-ticket'];
-  return operation.kind === 'append' || operation.kind === 'replace' ? ['edit-ticket'] : ['comment-ticket'];
 }
 
 /** GitHub child links modify the parent's sub-issues collection; other writes modify the target. */

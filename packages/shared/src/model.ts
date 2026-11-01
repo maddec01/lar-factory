@@ -908,7 +908,7 @@ export type SharedSetting = (typeof SHARED_SETTINGS)[number];
 /** Whether a value was set on this machine or uses the factory default. */
 export type SettingSource = 'local' | 'default';
 
-/** The repository writes the factory may need, each with its own credential access and local write consent. */
+/** The repository writes the factory may need, each with its own verified credential access. */
 export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket'] as const;
 
 export type RepositoryOperation = (typeof REPOSITORY_OPERATIONS)[number];
@@ -946,8 +946,6 @@ export interface RepositorySetup {
   vocabulary: EffectiveVocabulary;
   vocabularySources: VocabularySources;
   access: Record<RepositoryOperation, OperationAccess>;
-  /** The operations the user allows the factory to offer, less those the credentials refuse. */
-  consent: RepositoryOperation[];
   /** Where each setting's value comes from. */
   sources: Record<SharedSetting, SettingSource>;
   /** The other repositories the user connected it to, on this Mac only; the board's reads always fill it. */
@@ -989,7 +987,6 @@ export interface OnboardingChoices {
   structureSync?: boolean;
   itemSource?: RepositoryItemSource;
   role?: string;
-  consent?: RepositoryOperation[];
   domainDocs?: DomainDocLocation;
   skills?: string[];
   /** The other onboarded repositories ticked in the Connections step. */
@@ -1063,6 +1060,5 @@ export interface LocalSetupAnswers {
   itemSource: RepositoryItemSource;
   domainDocs: DomainDocLocation;
   skills: string[];
-  consent: RepositoryOperation[];
 }
 

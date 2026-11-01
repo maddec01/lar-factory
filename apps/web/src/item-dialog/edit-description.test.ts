@@ -57,7 +57,7 @@ const typeAtEnd = async (text: string) => {
 
 /** The board with every repository letting the factory edit its tickets, as its Edit dialog's Offer does. */
 const allowEdits = (board: BoardData): BoardData =>
-  ({ ...board, repos: board.repos.map((r) => ({ ...r, setup: { consent: ['edit-ticket'] } as unknown as RepositorySetup })) });
+  ({ ...board, repos: board.repos.map((r) => ({ ...r, setup: { access: { 'edit-ticket': 'allowed' } } as unknown as RepositorySetup })) });
 const editing = allowEdits(sample);
 
 /** An item of the sample re-pointed at an Azure DevOps repository, as a work item is. */
@@ -274,4 +274,15 @@ test('the expand button and Ctrl+Shift+E grow the item dialog and back, the edit
   await settle(() => editorArea()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true, bubbles: true })));
   expect(dialog()!.style.height, 'restored').toBe('');
   expect(description().querySelector('[data-description-editor]')!.className.split(' ')).not.toContain('flex-1');
+});
+
+test('Azure read-only setup hides Edit and explains the denial despite allowed edit access', async () => {
+  const [board, id] = azureBoard();
+  board.repos.find(repo => repo.repo === board.items[0]!.repo)!.setup!.azureReadOnly = true;
+  serve(board, { [id]: details('Read-only description.') });
+  await mountPage(board);
+  await openItem(id);
+  expect(text(description())).toContain('Read-only description.');
+  expect(editButton()).toBeUndefined();
+  expect(text(dialog())).toContain('read-only');
 });

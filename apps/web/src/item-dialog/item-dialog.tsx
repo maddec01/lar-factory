@@ -1,3 +1,4 @@
+import { useEditStore } from '../repositories/edit-store.ts';
 // The item dialog: every item, wherever it's listed, opens here over the page, as the design system's workspace-sized
 // Modal, whose body fades at its scrolled edges. Under its title it shows the item's repository, status and parent, with
 // the agent work figures beside the title. Its body has a progress bar with the slices as an overview, its hint, a meta area of
@@ -11,7 +12,7 @@
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { HINTS, blockedText, canResumeShaping, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
+import { writeAccessProblem, HINTS, blockedText, canResumeShaping, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -93,8 +94,9 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
   // Work with no ticket has no ticket text to show beside its record's.
   const ticket = !record || item.number > 0;
   const hint = item.status === 'Needs you' ? 'Answer in T3' : HINTS[item.status];
-  // Saving a description writes the ticket, which waits on this Mac's consent to edit the repository's tickets.
-  const editable = data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.consent.includes('edit-ticket') ?? false;
+  const setup = data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
+  const accessProblem = writeAccessProblem(item.repo, 'edit-ticket', setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
+  const editable = accessProblem === null;
   // The open editor in an expanded dialog takes the height the rest leaves.
   const fill = expanded && edit.editing;
   const rows = fill ? 'min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]' : aside ? '@min-[45rem]:grid-rows-[auto_1fr]' : '';
@@ -127,6 +129,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
               <span className="min-w-0 flex-1 font-medium text-(--warning-foreground)">{hint}</span>
             </div>
           )}
+          {ticket && accessProblem && <div role="status"><p>{accessProblem}</p><Button {...kind('other')} onClick={() => void useEditStore.getState().recheck(item.repo)}>Recheck access</Button></div>}
           {item.paused && <p data-paused className="m-0 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5 font-medium text-(--warning-foreground)">Paused: {item.paused}</p>}
           <NeedsYou item={item} data={data} />
           <ItemMeta item={item} read={read} now={now} />

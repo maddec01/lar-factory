@@ -1,5 +1,5 @@
 // Onboarding chooses a source and local settings, then checks access once.
-import { REPOSITORY_OPERATIONS, structureSyncOperations, sameRepo, shownRepo, type Detected, type DomainDocLocation, type OnboardingChoices,
+import { structureSyncOperations, sameRepo, shownRepo, type Detected, type DomainDocLocation, type OnboardingChoices,
   type RepoConfig, type RepositoryItemSource, type RepositoryOperation, type SetupDetection } from '@lar-factory/shared';
 
 export const STEP_TITLES = { project: 'Repository', work: 'Work and docs', access: 'Access and add' } as const;
@@ -10,7 +10,6 @@ export const stepsOf = (): StepId[] => ['project', 'work', 'access'];
 export interface Answers {
   itemSource: RepositoryItemSource | null;
   role: string;
-  consent: RepositoryOperation[];
   domainDocs: DomainDocLocation;
   skills: string[];
   structureSync: boolean;
@@ -36,7 +35,6 @@ export function connectionsOf(repo: string, _role: string, choices: OnboardingCh
 }
 function defaultsOf(detection: SetupDetection): Answers {
   return { itemSource: sourceOptions(detection)[0]?.value ?? null, role: '',
-    consent: REPOSITORY_OPERATIONS.filter((op) => detection.access[op] === 'allowed'),
     domainDocs: found(detection.domainDocs) ?? { kind: 'private' }, skills: [], structureSync: true };
 }
 export const answersOf = (detection: SetupDetection, choices: OnboardingChoices): Answers => ({ ...defaultsOf(detection), ...choices });

@@ -27,7 +27,7 @@ test('a repository with no factory files onboards, captures work and starts it w
   assert.deepEqual([detection.domainDocs, detection.projectSkills],
     [{ found: { kind: 'private' } }, { found: [] }]);
   const saved = await board.post({ repo, projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' },
-    structureSync: false, skills: [], consent: ['push-branch', 'open-pr'] }, board.url, '/api/onboarding/setup');
+    structureSync: false, skills: [] }, board.url, '/api/onboarding/setup');
   assert.equal(saved.status, 200);
 
   const created = await larWork(board.dataDir, 'create', '--title', 'Dark mode', '--repository', repo, '--kind', 'feature', '--status', 'Queued');

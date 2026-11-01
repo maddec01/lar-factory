@@ -23,6 +23,7 @@ export interface WorkItem {
   description?: string;
   descriptionFormat?: 'Markdown' | 'Html';
   reproSteps?: string;
+  reproStepsFormat?: 'Markdown' | 'Html';
   acceptanceCriteria?: string;
   systemInfo?: string;
   createdBy?: string;
@@ -60,7 +61,7 @@ export const STATES: Record<string, [string, string][]> = {
  * reading `items` (listed or not), with `requirement` its requirement backlog level's type and `areas` its area paths.
  * `pullRequests` are the PRs az repos pr show prints, and `tags` the project's tags, which a tag PATCH renames and a tag DELETE
  * removes, on the work items too. Azure documents no tag create, so neither does it. It records each call, each work item
- * patch and each tag renamed, a patch's System.Tags changes its work item, and `fail` throws for a call it matches.
+ * patch and each tag renamed, a patch's System.Tags, type or main text changes its work item, and `fail` throws for a call it matches.
  * Like az, it refuses a devops invoke at a preview's resource version, and one on wit/workitems' {id} route, which az rest PATCHes.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
@@ -89,7 +90,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
   const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
   const raw = (i: WorkItem, version?: string) => ({
-    id: i.id, rev: i.rev ?? 1, ...version?.startsWith('7.2-preview') && i.descriptionFormat && { multilineFieldsFormat: { 'System.Description': i.descriptionFormat } }, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
+    id: i.id, rev: i.rev ?? 1, ...version?.startsWith('7.2-preview') && (i.descriptionFormat || i.reproStepsFormat) && { multilineFieldsFormat: { ...i.descriptionFormat && { 'System.Description': i.descriptionFormat }, ...i.reproStepsFormat && { 'Microsoft.VSTS.TCM.ReproSteps': i.reproStepsFormat } } }, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
     fields: {
       'System.WorkItemType': i.type, 'System.State': i.state, 'System.AreaPath': i.area ?? TEAM_AREA, 'System.Title': i.title ?? `Item ${i.id}`, 'System.ChangedDate': '2026-10-21T08:00:00Z',
       ...i.reproSteps !== undefined && { 'Microsoft.VSTS.TCM.ReproSteps': i.reproSteps },
@@ -140,6 +141,13 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
       patches.push({ id, ops });
       const tagged = ops.find((o) => o.path === '/fields/System.Tags');
       if (tagged) Object.assign(byId.get(id)!, { tags: tagged.value, rev: (byId.get(id)!.rev ?? 1) + 1 });
+      const retyped = ops.find((o) => o.path === '/fields/System.WorkItemType');
+      if (retyped) {
+        const value = (path: string) => ops.find((o) => o.path === path)?.value as string | undefined;
+        const moved = { description: value('/fields/System.Description'), descriptionFormat: value('/multilineFieldsFormat/System.Description'),
+          reproSteps: value('/fields/Microsoft.VSTS.TCM.ReproSteps'), reproStepsFormat: value('/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps') };
+        Object.assign(byId.get(id)!, Object.fromEntries(Object.entries(moved).filter(([, v]) => v !== undefined)), { type: retyped.value, rev: (byId.get(id)!.rev ?? 1) + 1 });
+      }
       return JSON.stringify(raw(byId.get(id)!));
     }
     if (args[0] === 'devops' && args[1] === 'invoke') {

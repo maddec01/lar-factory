@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { normalizeItems } from '@lar-factory/shared';
+import { effectiveVocabulary, normalizeItems, type RepositorySetup, type VocabularyMapping } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { DEFAULT_RETENTION, openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
+import { changeKind } from '@lar-factory/work-records/change-kind';
 import { archivedItems, recordItems } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
@@ -206,4 +207,32 @@ test('concept counts completed decision facts while its Status remains Shaping, 
   assert.deepEqual(recovered.find(item=>item.id===restored)!.subIssues,{total:2,completed:0});
   assert.ok(recovered.every(item=>item.status==='List'&&item.completion?.complete===false));
   assert.deepEqual(recovered.find(item=>item.id===restored)!.map?.decisions,['Use the native issue title.']);
+});
+
+const SWAPS: [string, VocabularyMapping, string[]][] = [
+  ['a mapping', { bug: { type: null, labels: ['type: bug'] }, feature: { type: null, labels: ['type: feature'] } }, ['type: bug', 'docs']],
+  ['no mapping', {}, ['bug', 'docs']],
+];
+for (const [name, vocabulary, labels] of SWAPS) test(`a board read after a kind swap keeps the new kind, with ${name}`, async () => {
+  const records = await open();
+  const { workId, revision } = records.importTicket({ title: 'Swapped', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+  let onTicket: string[] = [...labels];
+  const setup = { repo: REPO, access: { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' }, vocabulary: effectiveVocabulary(vocabulary).vocabulary } as unknown as RepositorySetup;
+  const { error } = await changeKind(records, workId, revision, 'feature', { setup,
+    labels: { addToTicket: async (_, names) => { onTicket.push(...names); }, removeFromTicket: async (_, names) => { onTicket = onTicket.filter((label) => !names.includes(label)); } },
+    kinds: { read: async () => ({ labels: onTicket, type: null }), setType: async () => {}, boardTypes: async () => null } });
+  assert.equal(error, null);
+  const [item] = recordItems(records, tickets([12, 'List', REPO, onTicket]), [REPO]);
+  assert.equal(item!.kind, 'feature');
+  assert.deepEqual(item!.labels.filter((label) => label !== 'status-list'), Object.keys(vocabulary).length ? ['docs', 'type: feature'] : ['docs']);
+});
+
+test('a board read keeps the kind even when the swap could not write, as the ticket still says the old one', async () => {
+  const records = await open();
+  const { workId, revision } = records.importTicket({ title: 'Local', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+  const setup = { repo: REPO, access: { 'tag-ticket': 'refused' }, vocabulary: effectiveVocabulary({}).vocabulary } as unknown as RepositorySetup;
+  await changeKind(records, workId, revision, 'feature', { setup, labels: { addToTicket: async () => {}, removeFromTicket: async () => {} },
+    kinds: { read: async () => ({ labels: ['bug'], type: null }), setType: async () => {}, boardTypes: async () => null } });
+  const [item] = recordItems(records, tickets([12, 'List', REPO, ['bug']]), [REPO]);
+  assert.equal(item!.kind, 'feature');
 });

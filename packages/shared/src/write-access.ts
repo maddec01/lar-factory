@@ -13,5 +13,5 @@ export function writeAccessProblem(repo: string, operation: RepositoryOperation,
   if (access[operation] === 'allowed') return null;
   if (!onAzure(repo) && options.fineGrainedToken) return 'Fine-grained GitHub token permissions cannot be verified. Sign in with a classic token or gh OAuth login and recheck access.';
   if (!onAzure(repo) && operation === 'edit-ticket' && access['push-branch'] !== 'allowed') return "This login cannot edit other people's issues without verified push access. Recheck access in Settings.";
-  return `Access to ${operation} is not checked yet. Recheck access in Settings.`;
+  return `Access to ${operation} is not checked yet. ${!onAzure(repo) ? 'GitHub permissions require a classic token or gh OAuth login to verify. ' : ''}Recheck access in Settings.`;
 }

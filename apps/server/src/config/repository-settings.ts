@@ -9,11 +9,10 @@ import { isRepo, onTheBoard, type OnboardedRepository, type RepositoryConfig } f
 /** Changes local values or reads the signed-in account's access again. */
 export async function changeRepositorySettings(input: Record<string, unknown>, dir = boardDataDir()): Promise<{ setup: RepositorySetup } | Refused> {
   const { repo, change, key, value } = input;
-  if (!isRepo(repo) || !['override', 'recheck', 'consent', 'structure-sync'].includes(change as string)) {
+  if (!isRepo(repo) || !['override', 'recheck', 'structure-sync'].includes(change as string)) {
     return { status: 400, error: 'Send the repository and the change to its settings.' };
   }
   if (change === 'override' && !SHARED_SETTINGS.includes(key as SharedSetting)) return { status: 400, error: 'Choose a repository setting.' };
-  if (change === 'consent') return { status: 400, error: 'Write consent is obsolete. Recheck verified Access in Settings.' };
   const refused = notEditable(repo, dir);
   if (refused) return refused;
   try {

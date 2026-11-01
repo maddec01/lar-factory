@@ -120,7 +120,7 @@ test('the sample board keeps no onboarding', async (t) => {
 });
 
 /** Whether a gh call writes to a repository: a POST, PATCH, PUT or DELETE through the API, or a label, issue or PR change. */
-const ANSWERS = { structureSync: false, projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [], consent: ['push-branch', 'open-pr'] };
+const ANSWERS = { structureSync: false, projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [] };
 
 test('a repository with no factory files is detected and onboards with no write to it, its answers saved as local settings', async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
@@ -138,7 +138,7 @@ test('a repository with no factory files is detected and onboards with no write 
   const data = await until(board, (d) => d.repos.some((r) => r.repo === 'maddec01/lar-web'));
   assert.deepEqual(data.repos.find((r) => r.repo === 'maddec01/lar-web')?.role, 'Web client');
   const settings = JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'), 'utf8')).repositories[0].settings;
-  assert.deepEqual([settings.projectId, settings.consent, settings.access['push-branch']], ['lar-web', undefined, 'refused']);
+  assert.deepEqual([settings.projectId, settings.access['push-branch']], ['lar-web', 'refused']);
   assert.deepEqual((await board.calls()).filter(writesRepository), []);
 });
 
@@ -146,7 +146,7 @@ test('detection and saving refuse a body they cannot use', async (t) => {
   const board = await startBoard(t);
   const detected = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/detect');
   assert.deepEqual([detected.status, await detected.json()], [400, { error: 'Choose a repository and its T3 project before detecting its setup.' }]);
-  const saved = await board.post({ repo: 'maddec01/lar-web', ...ANSWERS, consent: ['merge'] }, board.url, '/api/onboarding/setup');
+  const saved = await board.post({ repo: 'maddec01/lar-web', ...ANSWERS, structureSync: 'invalid' }, board.url, '/api/onboarding/setup');
   assert.deepEqual([saved.status, await saved.json()],
     [400, { error: 'Send the repository, its T3 project, role, item source, domain-doc location, skills.' }]);
 });

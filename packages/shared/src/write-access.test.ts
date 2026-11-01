@@ -18,7 +18,13 @@ test('legacy consent loads without granting access and disappears on resave', as
   const dir = mkdtempSync(join(tmpdir(), 'legacy-access-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   writeListFile(dir, { repositories: [{ repo: 'org/repo', settings: { consent: ['publish-ticket'] } }] });
-  expect(readRepositorySetups(dir)[0]!.consent).toEqual([]);
+  expect(readRepositorySetups(dir)[0]).not.toHaveProperty('consent');
   setStructureSync('org/repo', true, dir);
   expect(readFileSync(join(dir, REPOSITORY_LIST_FILE), 'utf8')).not.toContain('consent');
+});
+
+test('unverified GitHub access explains supported credentials and editing restrictions', () => {
+  expect(writeAccessProblem('org/repo', 'publish-ticket', {})).toContain('classic token or gh OAuth');
+  expect(writeAccessProblem('org/repo', 'edit-ticket', {})).toContain("cannot edit other people's issues");
+  expect(writeAccessProblem('org/repo', 'edit-ticket', { 'edit-ticket': 'allowed' })).toBeNull();
 });

@@ -8,7 +8,7 @@ import { readRepositorySetups, setOverride } from '../config/repository-settings
 import { saveSetup, type SaveReads } from './save-setup.ts';
 
 const repo = 'team/app';
-const answers = { repo, projectId: 'app', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [], consent: [] };
+const answers = { repo, projectId: 'app', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [] };
 const allowed: SaveReads = { access: async () => Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, 'allowed'])) };
 async function folder(t: TestContext) {
   const dir = await mkdtemp(join(tmpdir(), 'local-setup-'));
@@ -45,9 +45,9 @@ test('failed access checks block sharing but allow local shaping when sharing is
   expect(readRepositorySetups(dir)[0]?.access['push-branch']).toBe('unverified');
 });
 
-test('invalid source, consent or sharing values change no local settings', async (t) => {
+test('invalid source or sharing values change no local settings', async (t) => {
   const dir = await folder(t);
-  for (const change of [{ structureSync: 'yes' }, { consent: ['merge'] }, { domainDocs: { kind: 'repository' } }, { itemSource: { kind: 'azure-board', team: 'Team' } }]) {
+  for (const change of [{ structureSync: 'yes' }, { domainDocs: { kind: 'repository' } }, { itemSource: { kind: 'azure-board', team: 'Team' } }]) {
     expect(await saveSetup({ ...answers, ...change }, dir, allowed)).toMatchObject({ status: 400 });
   }
   expect(readRepositoryList(dir)).toEqual([]);
@@ -68,7 +68,7 @@ test('a refused list read stops onboarding before saving anything', async (t) =>
 
 test('onboarding needs no consent payload and persists no consent list', async (t) => {
   const dir = await folder(t);
-  const { consent: _legacy, ...input } = answers;
+  const input = answers;
   expect(await saveSetup(input, dir, allowed)).toEqual({ onboarding: [] });
   expect(await readFile(join(dir, 'repository-settings.json'), 'utf8')).not.toContain('consent');
 });

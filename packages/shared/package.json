@@ -17,7 +17,8 @@
     "./test/sample-details.json": "./test/sample-details.json",
     "./test/raw-items": "./test/raw-items.ts",
     "./repository-settings": "./src/repository-settings.ts",
-    "./publication-settings": "./src/publication-settings.ts"
+    "./publication-settings": "./src/publication-settings.ts",
+    "./tracker-labels": "./src/tracker-labels.ts"
   },
   "scripts": {
     "test": "vp test run",

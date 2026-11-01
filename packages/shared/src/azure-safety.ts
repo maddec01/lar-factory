@@ -66,6 +66,11 @@ export function assertAzureCommandAllowed(args: readonly string[], env: Environm
   throw new Error(refusal);
 }
 
+/** Refuses a provider write in a read-only session, for a write that may turn out to need no az call. */
+export function assertAzureWriteAllowed(env: Environment = process.env): void {
+  if (readOnly(env)) throw new Error(refusal);
+}
+
 /** An agent can run git or az outside board transports, so read-only Azure sessions cannot launch one. */
 export function assertAzureThreadAllowed(repository: string, env: Environment = process.env): void {
   if (readOnly(env) && onAzure(repository)) throw new Error(`${refusal} Agent threads cannot start.`);

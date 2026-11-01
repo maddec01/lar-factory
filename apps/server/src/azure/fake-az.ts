@@ -58,8 +58,9 @@ export const STATES: Record<string, [string, string][]> = {
 /**
  * A fake az for one team whose current sprint holds `sprint`'s ids and whose requirement backlog lists `backlog`'s,
  * reading `items` (listed or not), with `requirement` its requirement backlog level's type and `areas` its area paths.
- * `pullRequests` are the PRs az repos pr show prints, and `tags` the project's tags, which a tag PATCH renames. It records
- * each call, each work item patch and each tag renamed, and `fail` throws for a call it matches.
+ * `pullRequests` are the PRs az repos pr show prints, and `tags` the project's tags, which a tag PATCH renames and a tag DELETE
+ * removes, on the work items too. Azure documents no tag create, so neither does it. It records each call, each work item
+ * patch and each tag renamed, a patch's System.Tags changes its work item, and `fail` throws for a call it matches.
  * Like az, it refuses a devops invoke at a preview's resource version, and one on wit/workitems' {id} route, which az rest PATCHes.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
@@ -137,6 +138,8 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         throw new Error('az rest failed: Bad Request({"message":"TF26071: This work item has been changed by someone else since you opened it. You will need to refresh it and discard your changes."})');
       }
       patches.push({ id, ops });
+      const tagged = ops.find((o) => o.path === '/fields/System.Tags');
+      if (tagged) Object.assign(byId.get(id)!, { tags: tagged.value, rev: (byId.get(id)!.rev ?? 1) + 1 });
       return JSON.stringify(raw(byId.get(id)!));
     }
     if (args[0] === 'devops' && args[1] === 'invoke') {
@@ -179,16 +182,25 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
           comments: page.map((c) => ({ id: c.id, text: c.text, createdDate: c.date, createdBy: { displayName: c.by }, ...withFormat && c.format && { format: c.format } })),
           ...from + top < newest.length && { continuationToken: String(from + top), nextPage: 'https://dev.azure.com/contoso/_apis/wit/workItems/1/comments?continuationToken=x' } });
       }
-      if (resource === 'wit/tags' && args.includes('--http-method')) {
+      if (resource === 'wit/tags' && ['PATCH', 'DELETE'].includes(flag(args, '--http-method'))) {
         const from = route(args, 'tagIdOrName')!;
-        const { name: to } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { name: string };
         const at = tags.findIndex((t) => t.toLowerCase() === from.toLowerCase());
         if (at < 0) throw new Error(`az devops invoke failed: TF400516: The tag ${from} does not exist.`);
+        const retag = (change: (tag: string) => string[]) => {
+          for (const item of items) if (item.tags) item.tags = item.tags.split(';').map((t) => t.trim()).flatMap((t) => t.toLowerCase() === from.toLowerCase() ? change(t) : [t]).join('; ');
+        };
+        if (flag(args, '--http-method') === 'DELETE') {
+          tags.splice(at, 1);
+          retag(() => []);
+          return '';
+        }
+        const { name: to } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { name: string };
         tagRenames.push({ from, to });
         tags[at] = to;
+        retag(() => [to]);
         return JSON.stringify({ id: `tag-${at}`, name: to });
       }
-      if (resource === 'wit/tags') return JSON.stringify({ count: tags.length, value: tags.map((name, at) => ({ id: `tag-${at}`, name, active: true })) });
+      if (resource === 'wit/tags' && (!args.includes('--http-method') || flag(args, '--http-method') === 'GET')) return JSON.stringify({ count: tags.length, value: tags.map((name, at) => ({ id: `tag-${at}`, name, active: true })) });
       if (resource === 'wit/workitemtypestates') {
         const states = STATES[route(args, 'type')!]!;
         return JSON.stringify({ count: states.length, value: states.map(([name, category]) => ({ name, color: '000000', category })) });

@@ -449,7 +449,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
         const type = field(raw, 'System.WorkItemType');
         const category = (await categories([type])).get(type)?.get(field(raw, 'System.State'));
         const { assignee } = azureWorkItem(raw);
-        return { state: category === 'Completed' || category === 'Removed' ? 'closed' : 'open', ...assignee && { assignee } };
+        return { abandonmentComplete: category === 'Removed', state: category === 'Completed' || category === 'Removed' ? 'closed' : 'open', ...assignee && { assignee } };
       } catch (err) { throw refusalOf(err); }
     },
   };

@@ -90,7 +90,7 @@ export function prLabel(pr: LinkedPr): string {
 
 export const UNREADABLE = 'Usage details are unavailable.';
 
-/** What Abandon asks: it sets the work aside on this Mac, and leaves a ticket for closeTicketPrompt to ask about. */
+/** Offers local abandonment with optional tracker closure. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
   return { question: `Abandon ${itemName(item)}?`, confirm: 'Abandon', done: `Set ${itemName(item)} aside on this Mac.`,
     detail: item.number ? 'Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.'
@@ -98,7 +98,7 @@ export function abandonPrompt(item: Item): { question: string; detail: string; c
   };
 }
 
-/** What the board asks after Abandon sets ticketed work aside, and how the provider keeps the closed ticket recoverable. */
+/** Confirms ticket closure for work set aside in Archive. */
 export function closeTicketPrompt(item: Item): { question: string; detail: string; confirm: string; keep: string; done: string } {
   const azure = onAzure(item.repo ?? '');
   return { question: `Close the ticket of ${itemName(item)} too?`, keep: 'Keep it open',

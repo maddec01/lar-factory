@@ -110,20 +110,20 @@ export function askAbandon(itemId: string): void {
   if (item && !pending(itemId)) useAbandonStore.getState().ask(item);
 }
 
-export async function abandonItem(itemId: string): Promise<void> {
+export async function abandonItem(itemId: string) {
   const item = itemOf(itemId);
   if (!ready(itemId, 'data-abandon') || !item) return;
-  // A failure is a toast only, and the dialog's footer goes back to its links.
+  // The confirmation retains failures until the user retries or cancels.
   const result = await runAction(itemId, 'abandon', { session: useBoardStore.getState().data.capture?.session, itemId }, (result) => {
     notify(result.error ? { verb: 'Failed', item, message: result.error } : { verb: 'Abandoned', item });
   });
   // An abandoned item leaves the item dialog, which closes and hands focus back itself.
   if (result.error) refocus([by('data-abandon', itemId)]);
-  // Its ticket stays open until the user confirms its close as a step of its own.
+  return result;
 
 }
 
-/** Closes the ticket of work Abandon just set aside, which has left the board. */
+/** Closes the ticket of work set aside in Archive. */
 export async function closeTicket(item: Item): Promise<void> {
   const result = await postAction('/api/close-ticket', { itemId: item.id });
   flushSync(() => {

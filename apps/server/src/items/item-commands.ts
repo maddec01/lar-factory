@@ -54,7 +54,7 @@ export interface ItemCommands {
   startBuild(itemId: string, model: unknown, drift?: unknown): Promise<Reply>;
   /**
    * Sets List or Queued work aside on this Mac, or work whose Needs you offers it, and leaves its ticket as it is.
-   * closeTicket closes that ticket after its own confirmation.
+   * Archive offers closeTicket separately. The combined action closes before setting work aside.
    */
   abandon(itemId: string): Reply;
   abandonAndClose(itemId: string): Promise<Reply>;
@@ -217,7 +217,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
   /** Why a command in flight on the item, or a Start this board run, blocks this action; null when nothing does. */
   function busyReason(itemId: string, action: Action): string | null {
     if (combined.has(itemId)) return 'Abandon and close ticket is running. Wait for it to finish.';
-    const started = starts.has(itemId) || !!board.snapshot().started?.[itemId] || recordedStart(itemId);
+    const started = buildStarts.has(itemId) || starts.has(itemId) || !!board.snapshot().started?.[itemId] || recordedStart(itemId);
     if (started && action === 'back to List') return 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
     if (started && action === 'abandon') return 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
     return null;
@@ -298,7 +298,7 @@ export function createItemCommands({ board, items, records, reread, archive, off
       const work = begin(item, choice);
       if (typeof work !== 'function') return work;
       // Keep a started or unconfirmed thread; only a confirmed stop or a failure reported by t3 allows retry.
-      pending = track(runs, itemId, work().then((result) => {
+      pending = track(runs, itemId, Promise.resolve().then(work).then((result) => {
         settled.add(pending!);
         if (result.thread) finishedStarts.set(pending!, result.thread.threadId);
         if (result.thread) board.update({ [record]: { ...board.snapshot()[record], [itemId]: result.thread } } satisfies Partial<BoardData>);
@@ -601,12 +601,17 @@ export function createItemCommands({ board, items, records, reread, archive, off
       return track(combined, itemId, Promise.resolve().then(async () => {
         try {
           const observation = await items.observeTicket(item.repo, item.number);
-          if (observation.state !== 'closed') {
+          if (observation.state !== 'closed' || observation.abandonmentComplete === false) {
+            if (observation.state !== 'open' && observation.state !== 'closed') return withBoard(502, { error: 'Could not establish the ticket state. Try again to reconcile before abandoning.' });
             const error = await items.abandon(item);
             if (error) return withBoard(502, { error });
           }
           try {
-            if (records) records.setAside(item.id, item.revision);
+            if (records) {
+              const current = records.read(item.id);
+              if (current.status !== item.status) throw new Error('The work changed status while its ticket closed. Check the updated work.');
+              records.setAside(item.id, current.revision);
+            }
           } catch (error) {
             reread();
             return withBoard(409, { error: `The ticket is closed, but the work remains on the board. Try again to finish abandonment. ${(error as Error).message}` });

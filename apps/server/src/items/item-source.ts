@@ -69,7 +69,7 @@ export const TICKET_MATCHES = 20;
 export const ticketNumberOf = (query: string): number | null => (/^#?\d+$/.test(query.trim()) ? Number(query.trim().replace('#', '')) : null);
 
 /** A ticket as its provider shows it now: open or closed with its assignees, or a confirmed not-found. */
-export type TicketObservation = Omit<Extract<NewObservation, { of: 'ticket' }>, 'of'>;
+export type TicketObservation = Omit<Extract<NewObservation, { of: 'ticket' }>, 'of'> & { abandonmentComplete?: boolean };
 
 export interface ItemSource {
   /** What a read reports for this source; absent for a source its repositories name, as the merged source then does. */

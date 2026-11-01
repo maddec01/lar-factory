@@ -473,10 +473,18 @@ test('thread handoffs carry an explicit isolated factory environment and absolut
   assert.ok(build.includes("export LAR_FACTORY_DATA_DIR='/tmp/O'\\''Brien $(literal)/data'"));
 });
 
+test('typed label names are refused with the tracker\'s reason', () => {
+  const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 'Failure', description: '', createIssue: true };
+  assert.deepEqual(validateDraft({ ...draft, options: { newLabels: ['needs-design'] } }, sample.repos).options, { newLabels: ['needs-design'] });
+  assert.throws(() => validateDraft({ ...draft, options: { newLabels: ['linked-work'] } }, sample.repos), /reserved for the factory/);
+  assert.throws(() => validateDraft({ ...draft, options: { newLabels: ['BUG'] } }, sample.repos), /reserved for the item's kind/);
+});
+
 test('ticket capture rejects malformed optional fields and multiline titles before a provider write', () => {
   const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 'Failure', description: '', createIssue: true };
   for (const changed of [
     { title: 'First\nSecond' }, { createIssue: 'yes' }, { options: [] }, { options: { labels: [''] } },
     { options: { milestone: '-1' } }, { options: { assignee: 'x\nfield=y' } }, { options: { areaPath: 'Other area' } },
+    { options: { newLabels: 'x' } }, { options: { newLabels: [7] } },
   ]) assert.throws(() => validateDraft({ ...draft, ...changed }, sample.repos));
 });

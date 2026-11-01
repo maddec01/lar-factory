@@ -1,5 +1,6 @@
 // Shared contract for Add item, which captures work or picks a ticket; no browser or Node dependencies.
 import type { Item, Kind, RepoConfig } from './model.ts';
+import { trackerCapabilities } from './tracker-capabilities.ts';
 
 export const ITEM_KINDS = ['bug', 'feature', 'improvement'] as const;
 
@@ -16,6 +17,8 @@ export interface ItemDraft {
 /** Optional provider fields. Missing fields use only the repository's kind mapping. */
 export interface TicketOptions {
   labels?: string[];
+  /** Names typed for this ticket, created when it submits. A name the tracker has by then is used as it is. */
+  newLabels?: string[];
   type?: string;
   assignee?: string;
   milestone?: string;
@@ -25,6 +28,8 @@ export interface TicketOptions {
 export interface TicketCreationOptions {
   provider: 'github' | 'azure';
   labels: string[];
+  /** Each label's colour, six hex digits, on a tracker whose labels have one. */
+  labelColors?: Record<string, string>;
   types: string[];
   assignees: string[];
   milestones: { value: string; name: string }[];
@@ -73,8 +78,13 @@ export function validateDraft(input: unknown, repos: RepoConfig[], kinds: readon
   if (value.options !== undefined) {
     if (!value.options || typeof value.options !== 'object' || Array.isArray(value.options)) throw new Error('Choose valid issue options.');
     const raw = value.options as Record<string, unknown>;
-    if (Object.keys(raw).some(key => !['labels', 'type', 'assignee', 'milestone', 'iteration'].includes(key))) throw new Error('Choose valid issue options.');
+    if (Object.keys(raw).some(key => !['labels', 'newLabels', 'type', 'assignee', 'milestone', 'iteration'].includes(key))) throw new Error('Choose valid issue options.');
     if (raw.labels !== undefined && (!Array.isArray(raw.labels) || raw.labels.length > 100 || raw.labels.some(label => typeof label !== 'string' || !label.trim() || label.length > 256))) throw new Error('Choose valid labels.');
+    if (raw.newLabels !== undefined) {
+      if (!Array.isArray(raw.newLabels) || raw.newLabels.length > 100 || raw.newLabels.some(label => typeof label !== 'string')) throw new Error('Choose valid labels.');
+      const problem = (raw.newLabels as string[]).map(trackerCapabilities(repo.repo).nameProblem).find(Boolean);
+      if (problem) throw new Error(problem);
+    }
     if (['type', 'assignee', 'milestone', 'iteration'].some(key => raw[key] !== undefined && (typeof raw[key] !== 'string' || (raw[key] as string).length > 512 || /[\r\n]/.test(raw[key] as string)))) throw new Error('Choose valid issue options.');
     if (raw.milestone && !/^[1-9]\d*$/.test(String(raw.milestone))) throw new Error('Choose a valid milestone.');
     options = raw as TicketOptions;

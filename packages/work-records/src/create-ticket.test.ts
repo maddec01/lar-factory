@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'vite-plus/test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { RepoConfig, TicketCreationOptions } from '@lar-factory/shared';
+import type { RepoConfig, TicketCreationOptions, TrackerLabels } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 import { captureWork, createRecordTicket, recordTicketPreview } from './create-ticket.ts';
 import type { StructureProvider, StructureTicket } from './tracker-sync.ts';
@@ -262,4 +262,113 @@ test.each([false, true])('retention purges capture prose and retains replay prot
   expect(() => records.completeCapture(REQUEST, { title: 'Replay', repository: REPO, kind: 'bug', ticket: `${REPO}#13` })).toThrow(/expired/i);
   expect(writes).toHaveLength(1);
   expect(records.list({}).map(record => record.workId)).toEqual(conversion ? [] : [local.workId]);
+});
+
+const NEW_LABEL_DRAFT = { repo: REPO, kind: 'bug', title: 'Fix export', description: 'Steps.', createIssue: true };
+/** The setup, with label management allowed, the label operations recorded, and each create answered by `create`. */
+async function withLabels(create: (name: string) => Promise<{ name: string }> = async (name) => ({ name })) {
+  const made = await setup();
+  made.repo.setup!.access['manage-labels'] = 'allowed';
+  const created: string[] = [];
+  const deps = { ...made.deps, labels: () => ({ create: async ({ name }: { name: string }) => { created.push(name); return create(name); } }) as unknown as TrackerLabels };
+  const capture = (labels: object, requestId = REQUEST) => captureWork({ requestId, draft: { ...NEW_LABEL_DRAFT, options: labels } }, deps);
+  return { ...made, deps, created, capture };
+}
+
+test('a new label is created when the ticket submits, and the ticket carries it', async () => {
+  const { capture, created, writes } = await withLabels();
+  expect((await capture({ labels: ['bug'], newLabels: ['needs-design'] })).status).toBe(200);
+  expect(created).toEqual(['needs-design']);
+  expect(writes[0]![5]).toEqual({ labels: ['bug', 'needs-design'], type: 'Bug' });
+});
+
+test('a failed label creation creates no ticket, shows the error and permits a new submission', async () => {
+  let fail = true;
+  const { capture, records, writes, created } = await withLabels(async (name) => {
+    if (fail) throw Error('HTTP 500: label service down');
+    return { name };
+  });
+  const before = records.list({}).length;
+  const refused = await capture({ newLabels: ['needs-design'] });
+  expect(refused.status).toBe(502);
+  expect(refused.body.uncertain).toBeUndefined();
+  expect(refused.body.error).toContain('needs-design');
+  expect(refused.body.error).toContain('HTTP 500: label service down');
+  expect(writes).toHaveLength(0);
+  expect(records.list({})).toHaveLength(before);
+  fail = false;
+  expect((await capture({ newLabels: ['needs-design'] }, SECOND)).status).toBe(200);
+  expect(created).toEqual(['needs-design', 'needs-design']);
+  expect(writes).toHaveLength(1);
+});
+
+test('a typed name the tracker already has is used as it is, not created again', async () => {
+  const { capture, created, writes, deps } = await withLabels();
+  deps.discoverOptions = async () => ({ ...options, labels: ['bug', 'Needs-Design'] });
+  expect((await capture({ labels: [], newLabels: ['needs-design'] })).status).toBe(200);
+  expect(created).toEqual([]);
+  expect(writes[0]![5]).toMatchObject({ labels: ['Needs-Design'] });
+});
+
+test.each(['manage-labels', 'tag-ticket'])('a new label without %s is refused before anything is written', async (operation) => {
+  const { capture, repo, created, writes } = await withLabels();
+  repo.setup!.access[operation as 'tag-ticket'] = 'refused';
+  const refused = await capture({ newLabels: ['needs-design'] });
+  expect(refused.status).toBe(403);
+  expect(refused.body.error).toContain(operation);
+  expect(created).toEqual([]);
+  expect(writes).toHaveLength(0);
+});
+
+test('a new label is not dropped when the tracker\'s labels could not be read: nothing is created', async () => {
+  const { capture, created, writes, deps } = await withLabels();
+  deps.discoverOptions = async () => { throw Error('No options'); };
+  const refused = await capture({ newLabels: ['needs-design'] });
+  expect(refused.status).toBe(502);
+  expect(refused.body.error).toContain('needs-design');
+  expect(created).toEqual([]);
+  expect(writes).toHaveLength(0);
+});
+
+test.each([['linked-work', /reserved/], ['bug', /reserved/], ['status-done', /reserved/], ['-flag', /hyphen/]])('a typed name %s is refused with its reason', async (name, reason) => {
+  const { capture, created, writes } = await withLabels();
+  const refused = await capture({ newLabels: [name] });
+  expect(refused.status).toBe(422);
+  expect(refused.body.error).toMatch(reason);
+  expect(created).toEqual([]);
+  expect(writes).toHaveLength(0);
+});
+
+test('local work with Create issue off gets no labels, even with new ones in its draft', async () => {
+  const { deps, created, writes } = await withLabels();
+  const result = await captureWork({ requestId: REQUEST, draft: { ...NEW_LABEL_DRAFT, createIssue: false, options: { labels: ['bug'], newLabels: ['needs-design'] } } }, deps);
+  expect(result.status).toBe(200);
+  expect(result.body.record?.ticket).toBeNull();
+  expect(created).toEqual([]);
+  expect(writes).toHaveLength(0);
+});
+
+test('on Azure a new tag has no create of its own: it goes on the work item, and a refusal creates no ticket', async () => {
+  const { records, repo, deps, created } = await withLabels();
+  const azure = 'example/Project/source';
+  repo.repo = azure;
+  repo.setup!.repo = azure;
+  repo.team = 'Team';
+  const writes: unknown[][] = [];
+  deps.provider.creationTarget = async () => ({ type: 'Bug', areaPath: 'Project\\Team' });
+  deps.provider.create = async (...args) => { writes.push(args); return { repository: azure, number: 21, body: '', version: '1' }; };
+  deps.discoverOptions = async () => ({ ...options, provider: 'azure', labels: ['bug'] });
+  const draft = { ...NEW_LABEL_DRAFT, repo: azure, options: { labels: ['bug'], newLabels: ['needs-design'] } };
+  expect((await captureWork({ requestId: REQUEST, draft }, deps)).status).toBe(200);
+  expect(created).toEqual([]);
+  expect(writes[0]![5]).toMatchObject({ labels: ['bug', 'needs-design'] });
+  deps.provider.create = async () => { throw Error('HTTP 403: not allowed to create tags'); };
+  const before = records.list({}).length;
+  const refused = await captureWork({ requestId: SECOND, draft }, deps);
+  expect(refused.status).toBe(502);
+  expect(refused.body.uncertain).toBeUndefined();
+  expect(refused.body.error).toContain('not allowed to create tags');
+  expect(records.list({})).toHaveLength(before);
+  const bad = await captureWork({ requestId: '33333333-3333-4333-8333-333333333333', draft: { ...draft, options: { newLabels: ['a;b'] } } }, deps);
+  expect(bad.body.error).toMatch(/semicolons/);
 });

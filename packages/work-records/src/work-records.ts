@@ -93,6 +93,8 @@ export interface FindingRef {
 export interface RecordedThread {
   /** T3's thread ID. */
   threadId: string;
+  /** When a caller confirmed deletion in T3, or null before confirmation. */
+  deletedAt?: string | null;
   /** What the thread does for the record, such as `shape` or `build`. */
   purpose: string;
   recordedAt: string;
@@ -171,6 +173,8 @@ export interface WorkRecord {
   parentId: string | null;
   /** Where its build stands, or null before it starts. */
   buildPhase: BuildPhase | null;
+  /** The actual launched branch, or null for builds launched before it was recorded. */
+  buildBranch?: string | null;
   /** The PR its build delivers through, `owner/name#number`, or null before one is recorded. */
   pullRequest: string | null;
   /** Whether it is set aside, which leaves its Status as it was. */
@@ -279,7 +283,15 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   setFindingDisposition(workId: string, revision: number, finding: FindingRef, disposition: FindingDisposition, reason?: string): WorkRecord;
   /** The build's review rounds, oldest first. */
   reviewRounds(workId: string): ReviewRound[];
-  /** Records a T3 thread that works on the record. A thread works on one record only. */
+  /** Persists confirmed deletion without inferring it from a failed read. */
+  confirmThreadDeleted(workId: string, revision: number, threadId: string): WorkRecord;
+  /** Records the branch used at launch. */
+  setBuildBranch(workId: string, revision: number, branch: string): WorkRecord;
+  /** Requires fresh approval while retaining the brief, history and ticket Spec. */
+  invalidateGate(workId: string, revision: number): WorkRecord;
+  /** Deletes only this build's owned slices and clears its phase atomically. */
+  resetBuild(workId: string, revision: number): WorkRecord;
+  /** Records a T3 thread that works on this record only. */
   addThread(workId: string, revision: number, threadId: string, purpose: string): WorkRecord;
   /** Its recorded threads, oldest first. */
   threads(workId: string): RecordedThread[];
@@ -328,6 +340,7 @@ interface Row {
   queue_order: number | null;
   ticket: string | null;
   parent_id: string | null;
+  build_branch: string | null;
   build_phase: BuildPhase | null;
   pull_request: string | null;
   set_aside_at: string | null;
@@ -350,6 +363,7 @@ const fromRow = (row: Row): WorkRecord => ({
   ticket: row.ticket,
   parentId: row.parent_id,
   buildPhase: row.build_phase,
+  buildBranch: row.build_branch,
   pullRequest: row.pull_request,
   setAside: row.set_aside_at !== null,
   fogGone: row.fog_gone_at !== null,
@@ -517,7 +531,7 @@ function workRecords(database: Database): WorkRecords {
   const bodyNames = db.prepare('SELECT body FROM bodies WHERE work_id = ?');
   const bodyText = db.prepare('SELECT markdown FROM bodies WHERE work_id = ? AND body = ?');
   const writeBodyRow = db.prepare(`INSERT INTO bodies (work_id, body, markdown, written, has_content, has_passing_gate)
-    VALUES (?, ?, ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND source IN ('gate', 'user')))
+    VALUES (?, ?, ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND source IN ('gate', 'user') AND invalidated = 0))
     ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written, has_content = excluded.has_content, has_passing_gate = excluded.has_passing_gate`);
   const writeBody = (workId: string, body: Body, markdown: string) => {
     const digest = body === 'brief' && markdown.trim() ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex') : '';
@@ -952,6 +966,40 @@ function workRecords(database: Database): WorkRecords {
         })),
       }));
     }),
+    confirmThreadDeleted: (workId, revision, threadId) => change(workId, revision, () => {
+      const result = db.prepare('UPDATE threads SET deleted_at = coalesce(deleted_at, ?) WHERE work_id = ? AND thread_id = ?').run(new Date().toISOString(), workId, checkThreadId(threadId));
+      if (!result.changes) throw invalid('The thread does not belong to this record.');
+      return {};
+    }),
+    setBuildBranch: (workId, revision, branch) => change(workId, revision, row => {
+      if (row.kind !== 'build') throw invalid('Only builds have a launched branch.');
+      db.prepare('UPDATE work_records SET build_branch = ? WHERE work_id = ?').run(checkFilled(branch, 'build branch'), workId);
+      return {};
+    }),
+    invalidateGate: (workId, revision) => change(workId, revision, () => {
+      db.prepare('UPDATE brief_gates SET invalidated = 1 WHERE work_id = ?').run(workId);
+      db.prepare("UPDATE bodies SET has_passing_gate = 0 WHERE work_id = ? AND body = 'brief'").run(workId);
+      return {};
+    }),
+    resetBuild: (workId, revision) => change(workId, revision, (row, touched) => {
+      if (row.kind !== 'build') throw invalid('Only builds own slices.');
+      const slices = childRows.all(workId) as unknown as Row[];
+      if (slices.some(slice => slice.kind !== 'slice')) throw invalid('The build owns a record that is not a slice.');
+      const owned = new Set(slices.map(slice => slice.work_id));
+      for (const slice of slices) {
+        for (const blocker of blockerRows.all(slice.work_id) as unknown as Row[]) {
+          if (!owned.has(blocker.work_id) && blocker.work_id !== workId) touched.push(blocker.work_id);
+        }
+        for (const holder of forgetDependencies(database, slice.work_id)) bump.run(new Date().toISOString(), holder);
+        for (const table of ['publication_attachments', 'publication_plans', 'review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests', 'observations', 'brief_gates']) {
+          db.prepare(`DELETE FROM ${table} WHERE work_id = ?`).run(slice.work_id);
+        }
+        db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?').run(slice.work_id, slice.work_id);
+        db.prepare("UPDATE capture_submissions SET draft='',created_ticket=NULL,failure='This submission expired.' WHERE work_id=? OR target_work_id=?").run(slice.work_id, slice.work_id);
+        db.prepare('DELETE FROM work_records WHERE work_id = ?').run(slice.work_id);
+      }
+      return { build_phase: null };
+    }),
     addThread: (workId, revision, threadId, purpose) => {
       const id = checkThreadId(threadId);
       const checked = checkPurpose(purpose);
@@ -960,7 +1008,7 @@ function workRecords(database: Database): WorkRecords {
     threads: (workId) => database.read(() => {
       find(workId);
       return threadRows.all(workId)
-        .map((row) => ({ threadId: String(row.thread_id), purpose: String(row.purpose), recordedAt: String(row.recorded_at) }));
+        .map((row) => ({ threadId: String(row.thread_id), purpose: String(row.purpose), recordedAt: String(row.recorded_at), deletedAt: row.deleted_at as string | null }));
     }),
     recordLaunchIntent: (workId, revision, purpose) => {
       const checked = checkPurpose(purpose);

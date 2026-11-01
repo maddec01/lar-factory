@@ -355,4 +355,7 @@ export const MIGRATIONS: readonly Migration[] = [
     WHERE (work_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM work_records WHERE work_records.work_id=capture_submissions.work_id))
       OR (target_work_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM work_records WHERE work_records.work_id=capture_submissions.target_work_id))`),
   (db) => db.exec('ALTER TABLE capture_submissions ADD COLUMN created_ticket TEXT'),
+  (db) => db.exec(`ALTER TABLE threads ADD COLUMN deleted_at TEXT;
+    ALTER TABLE work_records ADD COLUMN build_branch TEXT;
+    ALTER TABLE brief_gates ADD COLUMN invalidated INTEGER NOT NULL DEFAULT 0;`),
 ];

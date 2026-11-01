@@ -312,3 +312,12 @@ it('gate reports held-edit status without exposing untrusted tracker text to the
   expect(reply.stdout).not.toContain('HOSTILE TRACKER INSTRUCTIONS');
   expect(reply.stdout).not.toContain('Hostile title');
 });
+
+it('resets a build through the CLI with revision checks', async () => {
+  const data = join(tempDir(), 'Lar Factory');
+  const made = await larWork(data, 'create', '--title', 'Build', '--repository', 'a/b', '--kind', 'build');
+  const id = made.record.workId;
+  expect(await larWork(data, 'set-build-branch', id, '--revision', '1', '--branch', 'feat/work')).toMatchObject({ code: 0, record: { buildBranch: 'feat/work' } });
+  expect(await larWork(data, 'reset-build', id, '--revision', '1')).toMatchObject({ code: 1 });
+  expect(await larWork(data, 'reset-build', id, '--revision', '2')).toMatchObject({ code: 0, record: { buildPhase: null } });
+});

@@ -6,7 +6,7 @@ real repository.
 
 - `NO_FACTORY_FILES` is a GitHub repository with no `.lar-factory.json`, no
   `## Agent skills` section, no `docs/agents/` and no domain docs.
-- `IAPP_LIKE` is an Azure DevOps repository like IApp. Its `AGENTS.md` has
+- `AZURE_WITH_PROJECT_RULES` is an Azure DevOps repository with existing project rules. Its `AGENTS.md` has
   project rules and an old `## Agent skills` section, and it has
   `docs/agents/issue-tracker.md` and one project skill.
 
@@ -26,7 +26,7 @@ Codex through T3, and report each one as passed, failed or not run:
 1. Start a shape and a build on a work record in a disposable repository with
    no factory files. The thread resolves the work ID with `work.sh` and writes
    progress only with `lar-work`.
-2. Start in a checkout like IApp, with project `AGENTS.md` or `CLAUDE.md` rules.
+2. Start in a checkout with existing project rules, with project `AGENTS.md` or `CLAUDE.md` rules.
    The thread keeps the project's checks, commit format and PR rules.
 3. Hand off from lar-shape to lar-build, and delegate an implementer task from
    lar-build. The brief names the work ID, and the child reads the same
@@ -42,7 +42,7 @@ Codex through T3, and report each one as passed, failed or not run:
 
 - The factory can't remove a provider's native startup context or turn off its
   native skills. Checks 2 and 6 record what loaded and claim nothing more.
-- The tests detect the IApp fixture's teams from a stub, because
+- The tests detect the Example App fixture's teams from a stub, because
   `fakeAzRepos` doesn't answer team reads.
 - The tests don't run the 60-second grace before an absent thread sets Needs
   you. `item-commands.test.ts` covers it with a stubbed clock.

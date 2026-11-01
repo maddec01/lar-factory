@@ -18,8 +18,8 @@ const queueRows = () => $$<HTMLLIElement>('.queue ol > li');
 const startNext = () => $<HTMLButtonElement>('.queue header [data-start]')!;
 const bar = (root = '[data-line-filters]') => $(`${root} [data-item-filters]`)!;
 const open = (which: string, root?: string) => settle(() => bar(root).querySelector<HTMLButtonElement>(`[data-filter="${which}"]`)!.click());
-const choices = () => $$<HTMLLabelElement>('[data-filter-choice]').map((c) => text(c));
-const choose = (name: string) => settle(() => $$<HTMLLabelElement>('[data-filter-choice]').find((c) => text(c) === name)!.querySelector('input')!.click());
+const choices = () => $$<HTMLLabelElement>('[data-filter-choice], [data-label-choice]').map((c) => text(c));
+const choose = (name: string) => settle(() => $$<HTMLLabelElement>('[data-filter-choice], [data-label-choice]').find((c) => text(c) === name)!.querySelector('input')!.click());
 const chips = (root?: string) => [...bar(root).querySelectorAll('[data-filter-chip]')].map((c) => c.getAttribute('aria-label'));
 const removeChip = (name: string, root?: string) => settle(() => bar(root).querySelector<HTMLButtonElement>(`[aria-label="Remove ${name}"]`)!.click());
 const clear = (root?: string) => settle(() => bar(root).querySelector<HTMLButtonElement>('[data-filter-clear]')!.click());
@@ -148,6 +148,18 @@ test('the dropdown checklists change the board, add removable chips and save the
   expect(bar().querySelector('[data-filter-clear]')).toBeNull();
 });
 
+test('removing a chip or clearing moves focus to the Kind menu, which always stays', async () => {
+  const kindMenu = () => bar().querySelector<HTMLElement>('[data-filter="kind"]');
+  seed(BOARD_KEY, ['bug'], ['gone']);
+  await mountPage(withItems([]));
+  await removeChip('gone');
+  expect(document.activeElement).toBe(kindMenu());
+  (document.activeElement as HTMLElement).blur();
+  await clear();
+  expect(bar().querySelector('[data-filter-clear]')).toBeNull();
+  expect(document.activeElement).toBe(kindMenu());
+});
+
 test('a saved label no item carries still shows as a removable chip', async () => {
   seed(BOARD_KEY, [], ['gone']);
   await mountPage(withItems([item('Q1', { number: 1 })]));
@@ -193,7 +205,6 @@ test('the List counts follow the filters, and its Labels filter holds the chosen
   const rows = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').map((b) => b.dataset.item).sort();
   expect(rows(), 'matched without case across repositories').toEqual(['L1', 'L2']);
   await removeChip('docs', root);
-  await open('labels', root);
   await settle(() => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Repositories"] button').find((b) => b.textContent?.includes('lar-apple'))!.click());
   await open('labels', root);
   expect(choices(), 'a picked repository offers its own').toEqual(['Docs', 'infra']);

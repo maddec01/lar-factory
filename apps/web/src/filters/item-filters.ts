@@ -2,8 +2,9 @@
 // to the tracker and matches what a row shows, so a managed label or one mapped to the row's kind never matches.
 
 import { useState } from 'react';
-import { labelsOnRow } from '@lar-factory/shared';
+import { labelsOnRow, sameLabel } from '@lar-factory/shared';
 import type { Item, RepoConfig } from '@lar-factory/shared';
+import type { LabelChoice } from '../labels/label-picker.tsx';
 
 export const KIND_FILTERS = ['bug', 'feature', 'improvement', 'concept', 'no-kind'] as const;
 export type KindFilter = (typeof KIND_FILTERS)[number];
@@ -12,11 +13,6 @@ export interface ItemFilters {
   kinds: KindFilter[];
   /** Label names as first chosen; they match without case. */
   labels: string[];
-}
-
-export interface LabelChoice {
-  name: string;
-  color: string | undefined;
 }
 
 type FilterSurface = 'list' | 'board';
@@ -47,7 +43,6 @@ export function useItemFilters(surface: FilterSurface): [ItemFilters, (filters: 
 
 export const filtering = ({ kinds, labels }: ItemFilters): boolean => kinds.length + labels.length > 0;
 
-export const sameLabel = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
 /** Whether a row stays: it matches any chosen kind and any chosen label. An item with no kind badge counts as No kind. */
 export const rowFilter = ({ kinds, labels }: ItemFilters, repos: readonly RepoConfig[]) => (item: Item): boolean =>

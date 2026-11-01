@@ -21,9 +21,15 @@ const KIND_TERMS: Partial<Record<Kind, readonly VocabularyKey[]>> = {
   bug: ['bug'], feature: ['feature'], improvement: ['improvement'], concept: ['concept', 'concept-kind'], build: ['build'],
 };
 
+export const sameLabel = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+/** The labels the repository maps to `kind`, in lower case. */
+export const kindLabels = (kind: Kind, vocabulary?: EffectiveVocabulary): string[] =>
+  (KIND_TERMS[kind] ?? []).flatMap((key) => vocabulary?.[key].labels ?? []).map((label) => label.toLowerCase());
+
 /** The labels a row shows, in the ticket's order: none that are managed or that the repository maps to the item's kind. */
 export function shownLabels(item: Pick<Item, 'kind' | 'labels'>, vocabulary?: EffectiveVocabulary): string[] {
-  const mapped = new Set((KIND_TERMS[item.kind] ?? []).flatMap((key) => vocabulary?.[key].labels ?? []).map((label) => label.toLowerCase()));
+  const mapped = new Set(kindLabels(item.kind, vocabulary));
   return item.labels.slice(0, LABEL_LIMIT).filter((label) => !isManagedLabel(label) && !mapped.has(label.toLowerCase()));
 }
 

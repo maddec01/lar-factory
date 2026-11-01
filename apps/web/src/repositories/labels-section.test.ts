@@ -32,6 +32,7 @@ const boardWith = (change: Partial<RepositorySetup> = {}, items = sample.items):
 function serve(board: BoardData, labels: TrackerLabel[], fail: (body: Record<string, unknown>) => string | undefined = () => undefined) {
   const tracker = { labels, sent: [] as Record<string, unknown>[] };
   fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
+    if (url === '/api/repositories/settings') return new Response(JSON.stringify({ discovery: { provider: 'github', types: { state: 'available', choices: [] }, labels: { state: 'available', choices: tracker.labels.map((l) => l.name) } }, error: null }));
     if (url !== '/api/repositories/labels') return new Response(JSON.stringify(board));
     const body = JSON.parse(String(init?.body)) as Record<string, unknown> & { name: string; update: Partial<TrackerLabel> };
     tracker.sent.push(body);
@@ -248,4 +249,53 @@ test('saved settings holding labels still load', async () => {
   serve(board, []);
   await openEdit(board);
   expect(section()).not.toBeNull();
+});
+
+test('the delete confirmation says which mappings lose a mapped label, and only for a mapped one', async () => {
+  const board = boardWith({ ...effectiveVocabulary({ bug: { type: null, labels: ['docs'] }, feature: { type: null, labels: ['Docs'] } }) });
+  serve(board, [{ name: 'docs' }, { name: 'area-ui' }]);
+  await openEdit(board);
+  await settle(() => buttonIn(rowOf('docs')!, 'Delete docs')!.click());
+  expect(text(confirmDelete())).toContain('This also removes it from the Bug and Feature mappings.');
+  await settle(() => buttonIn(confirmDelete(), 'Cancel')!.click());
+  await settle(() => buttonIn(rowOf('area-ui')!, 'Delete area-ui')!.click());
+  expect(text(confirmDelete())).not.toContain('mapping');
+});
+
+test('renaming a mapped label says its mapping updates, once the name changes', async () => {
+  const board = boardWith({ ...effectiveVocabulary({ improvement: { type: null, labels: ['docs'] } }) });
+  serve(board, [{ name: 'docs' }]);
+  await openEdit(board);
+  await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
+  expect(text(rowOf('docs')!)).not.toContain('mapping');
+  await type(section().querySelector<HTMLInputElement>('[aria-label="Label name"]')!, 'guides');
+  expect(text(rowOf('docs')!)).toContain('This also updates the Improvement mapping.');
+});
+
+test("on a project-wide tracker rename and delete warn about the project's other repositories", async () => {
+  const board = boardWith({ repo: AZURE, itemSource: { kind: 'azure-board', team: 'Delivery' } });
+  serve(board, [{ name: 'docs' }]);
+  await openEdit(board);
+  await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
+  expect(text(rowOf('docs')!)).toContain("Kind mappings in the project's other onboarded repositories update too.");
+  await settle(() => buttonIn(rowOf('docs')!, 'Delete docs')!.click());
+  expect(text(confirmDelete())).toContain('whole project');
+  expect(text(confirmDelete())).toContain("Kind mappings in the project's other onboarded repositories update too.");
+});
+
+test('an open mapping reads the tracker again after a rename, so the new name is available', async () => {
+  const board = boardWith({ ...effectiveVocabulary({ bug: { type: null, labels: ['docs'] } }) });
+  serve(board, [{ name: 'docs' }], (body) => {
+    if (body.change === 'update') board.repos[0]!.setup!.vocabulary.bug.labels = ['guides'];
+    return undefined;
+  });
+  await openEdit(board);
+  await settle(() => buttonIn($('[data-edit-dialog]')!, 'Edit vocabulary')!.click());
+  await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
+  await type(section().querySelector<HTMLInputElement>('[aria-label="Label name"]')!, 'guides');
+  await settle(() => buttonIn(rowOf('docs')!, 'Save')!.click());
+  const bug = $('[data-vocabulary="bug"]')!;
+  expect(text(bug)).toContain('guides');
+  expect(text(bug)).not.toContain('docs');
+  expect(text(bug)).not.toContain('unavailable');
 });

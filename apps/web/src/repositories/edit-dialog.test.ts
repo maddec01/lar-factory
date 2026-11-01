@@ -203,6 +203,29 @@ test('vocabulary explains refused reads and Access while still allowing explicit
   expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: null, labels: [] } });
 });
 
+test('a mapped label gone from the tracker shows as unavailable and can be unticked and saved', async () => {
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed' }, ...effectiveVocabulary({ bug: { type: null, labels: ['renamed-away', 'bug'] } }) });
+  const sent = serve(board, (body) => body.change === 'discover-vocabulary' ? { body: { discovery } } : { body: { board, error: null } });
+  await openEdit(board);
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  expect(text(row)).toContain('renamed-away (unavailable)');
+  expect(text(row)).not.toContain('triage (unavailable)');
+  const stale = [...row.querySelectorAll('label')].find((label) => text(label).includes('renamed-away'))!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  await settle(() => stale.click());
+  expect(text(row)).not.toContain('renamed-away');
+  await settle(() => buttonIn(row, 'Save')!.click());
+  expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: null, labels: ['bug'] } });
+});
+
+test('a refused read does not call mapped labels unavailable', async () => {
+  const board = boardWith({ ...effectiveVocabulary({ bug: { type: null, labels: ['bug'] } }) });
+  serve(board, () => ({ body: { discovery: { ...discovery, labels: { state: 'refused', reason: 'Metadata read denied.' } } } }));
+  await openEdit(board);
+  await openVocabulary();
+  expect(text(vocabularyRow('bug'))).not.toContain('bug (unavailable)');
+});
+
 test('a typed managed name shows the reason and holds Save back', async () => {
   const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed' } });
   const sent = serve(board, () => ({ body: { discovery } }));

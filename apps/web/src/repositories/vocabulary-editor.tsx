@@ -14,8 +14,9 @@ export const KIND_NAMES = { bug: 'Bug', feature: 'Feature', improvement: 'Improv
 export type VocabularyKind = keyof typeof KIND_NAMES;
 type VocabularyAccess = Pick<RepositorySetup, 'repo' | 'access' | 'azureReadOnly'>;
 
-/** Discovery stays read-only; suggestions never become a mapping until the user chooses them. */
+/** Discovery stays read-only; suggestions never become a mapping until the user chooses them. A label change reads it again. */
 export function useVocabularyDiscovery(repo: string, onboarding = false) {
+  const labelChanges = useEditStore((s) => s.labelChanges);
   const [discovery, setDiscovery] = useState<VocabularyDiscovery | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, retry] = useState(0);
@@ -30,7 +31,7 @@ export function useVocabularyDiscovery(repo: string, onboarding = false) {
       else setDiscovery(result.discovery);
     });
     return () => { current = false; };
-  }, [repo, onboarding, attempt]);
+  }, [repo, onboarding, attempt, labelChanges]);
   return { discovery, error, retry: () => retry((n) => n + 1) };
 }
 
@@ -48,7 +49,7 @@ function vocabularyAccess(setup: VocabularyAccess) {
   return { labels: writeAccessProblem(setup.repo, 'tag-ticket', setup.access, options), newLabels: newLabelProblem(setup.repo, setup.access, options), types: writeAccessProblem(setup.repo, 'type-ticket', setup.access, options) };
 }
 
-/** An explicit none can always clear a stale or forbidden mapping. */
+/** An explicit none can always clear a stale or forbidden mapping, and unticking clears a label the tracker no longer has. */
 export function VocabularyFields({ name, setup, discovery, value, newLabels, disabled = false, onChange }: {
   name: VocabularyKind; setup: VocabularyAccess; discovery: VocabularyDiscovery; value: VocabularyTerm; newLabels: string[];
   disabled?: boolean; onChange: (value: VocabularyTerm, newLabels: string[]) => void;
@@ -62,6 +63,7 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
   const suggested = suggestVocabularyLabels(discovery.labels)[name]?.labels[0];
   const title = KIND_NAMES[name];
   const typedProblem = typedLabelsProblem(setup.repo, newLabels);
+  const gone = (label: string) => discovery.labels.state === 'available' && !labels.includes(label);
   return <fieldset disabled={disabled} className="m-0 grid min-w-0 gap-3 rounded-lg border p-3">
     <legend className="px-1 text-sm font-medium">{title}</legend>
     <label className="grid gap-1.5 text-sm">{discovery.provider === 'azure' ? 'Work item type' : 'Issue type'}
@@ -75,7 +77,7 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
     {typesProblem && <p id={`${id}-types`} className="m-0 text-xs text-base-700">{typesProblem}</p>}
     <div className="grid gap-2" role="group" aria-label={`${title} ${discovery.provider === 'azure' ? 'tags' : 'labels'}`} aria-describedby={labelsProblem ? `${id}-labels` : undefined}>
       <span className="text-sm">{discovery.provider === 'azure' ? 'Tags' : 'Labels'}</span>
-      {[...new Set([...labels, ...value.labels])].map((label) => <Checkbox key={label} label={label} checked={value.labels.includes(label)} disabled={!!labelsProblem || !labels.includes(label)}
+      {[...new Set([...labels, ...value.labels])].map((label) => <Checkbox key={label} label={gone(label) ? `${label} (unavailable)` : label} checked={value.labels.includes(label)} disabled={!!labelsProblem}
         onChange={() => onChange({ ...value, labels: value.labels.includes(label) ? value.labels.filter((v) => v !== label) : [...value.labels, label] }, newLabels)} />)}
       {!labels.length && !labelsProblem && <p className="m-0 text-xs text-base-700">No existing labels or tags.</p>}
       {labelsProblem && <p id={`${id}-labels`} className="m-0 text-xs text-base-700">{labelsProblem}</p>}

@@ -13,10 +13,19 @@ import { kind } from '../buttons/button-kinds.tsx';
 import { postAction } from '../items/card-actions.ts';
 import { tint } from '../items/item-parts.tsx';
 import { useEditStore, type LabelChange } from './edit-store.ts';
+import { KIND_NAMES, type VocabularyKind } from './vocabulary-editor.tsx';
 
 const SWATCHES = ['D73A4A', 'E99695', 'FBCA04', '0E8A16', 'C2E0C6', 'BFDADC', '1D76DB', '5319E7', 'D4C5F9', 'EDEDED'];
 
 const capitalized = (word: string) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+
+const OTHER_MAPPINGS = "Kind mappings in the project's other onboarded repositories update too.";
+
+/** The kind mappings holding `name` in this repository, as a sentence names them, or null when none does. */
+function mappingsOf(name: string, setup: RepositorySetup): string | null {
+  const kinds = (Object.keys(KIND_NAMES) as VocabularyKind[]).filter((key) => setup.vocabulary[key].labels.some((label) => label.toLowerCase() === name.toLowerCase())).map((key) => KIND_NAMES[key]);
+  return kinds.length ? `the ${new Intl.ListFormat('en').format(kinds)} mapping${kinds.length > 1 ? 's' : ''}` : null;
+}
 
 function ProblemText({ children }: { children: string | null }) {
   return children && <p className="m-0 text-xs text-(--error-foreground)" role="alert">{children}</p>;
@@ -48,8 +57,8 @@ function changeFrom(label: TrackerLabel, draft: Required<TrackerLabel>, capabili
   };
 }
 
-function LabelEditor({ label, capabilities, onSave, onDone }: {
-  label: TrackerLabel; capabilities: TrackerCapabilities; onSave: (change: LabelChange) => Promise<string | null>; onDone: () => void;
+function LabelEditor({ label, capabilities, mappings, onSave, onDone }: {
+  label: TrackerLabel; capabilities: TrackerCapabilities; mappings: string | null; onSave: (change: LabelChange) => Promise<string | null>; onDone: () => void;
 }) {
   const running = useEditStore((s) => s.running);
   const [draft, setDraft] = useState({ name: label.name, color: label.color ?? '', description: label.description ?? '' });
@@ -67,12 +76,13 @@ function LabelEditor({ label, capabilities, onSave, onDone }: {
   };
   return <form className="grid gap-3 border-t bg-base-200/40 p-3" onSubmit={(event) => void save(event)}>
     {capabilities.changeScope === 'project' && <Alert tone="warning" title="Renaming affects the whole project">
-      {capabilities.heading} belong to the project, not to this repository. Everything with this {capabilities.noun} follows the new name, in every repository of the project.
+      {capabilities.heading} belong to the project, not to this repository. Everything with this {capabilities.noun} follows the new name, in every repository of the project. {OTHER_MAPPINGS}
     </Alert>}
     <label className="grid gap-1.5 text-xs">{Noun} name
       <Input aria-label={`${Noun} name`} value={draft.name} disabled={running !== null} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
     </label>
     <ProblemText>{problem}</ProblemText>
+    {mappings && update.name !== undefined && <p className="m-0 text-xs text-base-700">This also updates {mappings}.</p>}
     {capabilities.color && <div className="grid gap-1.5 text-xs">Colour
       <span className="flex flex-wrap items-center gap-1.5">
         {SWATCHES.map((hex) => <button key={hex} type="button" aria-label={`Colour #${hex}`} aria-pressed={hex.toLowerCase() === draft.color.toLowerCase()} disabled={running !== null}
@@ -93,8 +103,8 @@ function LabelEditor({ label, capabilities, onSave, onDone }: {
   </form>;
 }
 
-function DeleteConfirm({ name, capabilities, onDelete, onClose }: {
-  name: string; capabilities: TrackerCapabilities; onDelete: () => Promise<string | null>; onClose: () => void;
+function DeleteConfirm({ name, capabilities, mappings, onDelete, onClose }: {
+  name: string; capabilities: TrackerCapabilities; mappings: string | null; onDelete: () => Promise<string | null>; onClose: () => void;
 }) {
   const running = useEditStore((s) => s.running);
   const [failure, setFailure] = useState<string | null>(null);
@@ -111,7 +121,9 @@ function DeleteConfirm({ name, capabilities, onDelete, onClose }: {
           <div className="grid gap-3">
             <Alert tone="danger" title={capabilities.deleteWarning}>
               <Text id="delete-label-detail" tone="muted">
-                {capabilities.changeScope === 'project' && `${capabilities.heading} belong to the project, so this reaches every repository in it. `}This can't be undone from the factory.
+                {mappings && `This also removes it from ${mappings}. `}
+                {capabilities.changeScope === 'project' && `${capabilities.heading} belong to the project, so this affects the whole project. ${OTHER_MAPPINGS} `}
+                This can't be undone from the factory.
               </Text>
             </Alert>
             <ProblemText>{failure}</ProblemText>
@@ -126,8 +138,8 @@ function DeleteConfirm({ name, capabilities, onDelete, onClose }: {
   );
 }
 
-function LabelRow({ label, capabilities, readOnly, editing, onEdit, onDelete, onSave }: {
-  label: TrackerLabel; capabilities: TrackerCapabilities; readOnly: string | null; editing: boolean;
+function LabelRow({ label, capabilities, mappings, readOnly, editing, onEdit, onDelete, onSave }: {
+  label: TrackerLabel; capabilities: TrackerCapabilities; mappings: string | null; readOnly: string | null; editing: boolean;
   onEdit: (editing: boolean) => void; onDelete: () => void; onSave: (change: LabelChange) => Promise<string | null>;
 }) {
   const running = useEditStore((s) => s.running);
@@ -150,7 +162,7 @@ function LabelRow({ label, capabilities, readOnly, editing, onEdit, onDelete, on
         <Button {...kind('control')} data-icon-only="" aria-label={`Delete ${label.name}`} title={readOnly ?? `Delete ${label.name}`} disabled={disabled} leftIcon={<Trash2 />} onClick={onDelete} />
       </span>}
     </div>
-    {editing && <LabelEditor label={label} capabilities={capabilities} onSave={onSave} onDone={() => onEdit(false)} />}
+    {editing && <LabelEditor label={label} capabilities={capabilities} mappings={mappings} onSave={onSave} onDone={() => onEdit(false)} />}
   </li>;
 }
 
@@ -202,11 +214,11 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
           <ProblemText>{problem ?? failure}</ProblemText>
           {labels.length
             ? <ul className="m-0 grid list-none overflow-hidden rounded-lg border p-0">
-              {labels.map((label) => <LabelRow key={label.name} label={label} capabilities={capabilities} readOnly={readOnly} editing={editing === label.name}
+              {labels.map((label) => <LabelRow key={label.name} label={label} capabilities={capabilities} mappings={mappingsOf(label.name, setup)} readOnly={readOnly} editing={editing === label.name}
                 onEdit={(open) => setEditing(open ? label.name : null)} onDelete={() => setDeleting(label.name)} onSave={change} />)}
             </ul>
             : <p className="m-0 text-xs text-base-700">No {heading.toLowerCase()} yet.</p>}
         </>}
-    {deleting && <DeleteConfirm name={deleting} capabilities={capabilities} onDelete={() => change({ change: 'delete', name: deleting })} onClose={() => setDeleting(null)} />}
+    {deleting && <DeleteConfirm name={deleting} capabilities={capabilities} mappings={mappingsOf(deleting, setup)} onDelete={() => change({ change: 'delete', name: deleting })} onClose={() => setDeleting(null)} />}
   </section>;
 }

@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vite-plus/test';
-import { $, mountPage, settle, text } from '../../test/support.ts';
+import { $, chooseOption, mountPage, openOptions, settle, text } from '../../test/support.ts';
 import type { OnboardingChoices } from '@lar-factory/shared';
 import { detection, dialog, empty, openOnboarding, posted, project, serve } from './onboarding-support.ts';
 
@@ -83,6 +83,20 @@ test('Azure onboarding displays the session write restriction with allowed Acces
   }
 });
 
+test('Azure onboarding picks its team in the design system Select, whose list opens above the dialog', async () => {
+  const repo = 'organization/project/repository';
+  await openOnboarding([project('app', { repo, provider: 'Azure DevOps' })], {
+    '/api/onboarding/detect': { detection: detection({ repo, provider: 'Azure DevOps', itemSources: { found: [{ kind: 'azure-board', team: 'Fiber' }, { kind: 'azure-board', team: 'Docs' }] } }) },
+  });
+  await pick('app');
+  const team = dialog()!.querySelector<HTMLElement>('[role="combobox"][aria-label="Team"]')!;
+  expect(await openOptions(team)).toEqual(['Fiber', 'Docs']);
+  expect(dialog()!.compareDocumentPosition($('[role="listbox"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  await chooseOption(team, 'Docs');
+  expect(text(team)).toBe('Docs');
+  expect(dialog()).not.toBeNull();
+});
+
 test('resuming onboarding keeps issue choices and turns legacy private docs off', async () => {
   const repo = 'team/app';
   const choices = { createIssuesFromAddItem: false, domainDocs: { kind: 'private' } } as unknown as OnboardingChoices;
@@ -131,7 +145,7 @@ test('unverified token writes never show Ready for concept sync or builds', asyn
 
 const vocabularyDiscovery = { provider: 'github', types: { state: 'unsupported', reason: 'No issue types here.' }, labels: { state: 'available', choices: ['bug'] } };
 const kindRow = (key: string) => dialog()!.querySelector<HTMLElement>(`[data-vocabulary="${key}"]`)!;
-const rowButton = (key: string, label: string) => [...kindRow(key).querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!;
+const rowButton = (key: string, label: string) => [...kindRow(key).querySelectorAll<HTMLButtonElement>('button:not([role="combobox"])')].find((b) => text(b) === label)!;
 
 async function vocabularyStep() {
   await openOnboarding([project('app', { repo: 'team/app' })], {

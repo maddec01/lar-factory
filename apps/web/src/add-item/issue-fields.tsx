@@ -2,13 +2,23 @@
 import { useEffect, useState } from 'react';
 import { effectiveIssueSettings, writeAccessProblem, type RepoConfig, type TicketCreationOptions, type TicketOptions } from '@lar-factory/shared';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
-import { NativeSelect } from '@lar-factory/ui/native-select';
+import { FormSelect } from '@lar-factory/ui/form-select';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { kind as buttonKind } from '../buttons/button-kinds.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
 import type { DraftValues } from './add-item-store.ts';
 
 const HINT = 'm-0 text-xs leading-snug text-(--muted-foreground)';
+
+/** An optional ticket field, for a form to read; a value no longer among its choices starts at None. */
+function OptionField({ name, label, choices, value: start = '' }: { name: string; label: string; choices: { value: string; name: string }[]; value?: string }) {
+  const [value, setValue] = useState(() => choices.some(choice => choice.value === start) ? start : '');
+  return choices.length > 0 && (
+    <label className="grid gap-1.5 text-xs" htmlFor={`item-${name}`}>{label}
+      <FormSelect id={`item-${name}`} name={name} none="None" value={value} onChange={setValue} choices={choices} />
+    </label>
+  );
+}
 
 export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: TicketOptions }) {
   const [read, setRead] = useState<TicketCreationOptions | null>(null);
@@ -30,14 +40,6 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
   const mapping = setup?.vocabulary[kind as 'bug' | 'feature' | 'improvement'];
   const labels = kept?.labels ?? mapping?.labels ?? [];
   const type = kept?.type ?? mapping?.type ?? '';
-  const select = (name: string, label: string, choices: { value: string; name: string }[], value = '') => choices.length > 0 && (
-    <label className="grid gap-1.5 text-xs" htmlFor={`item-${name}`}>{label}
-      <NativeSelect id={`item-${name}`} name={name} defaultValue={value}>
-        <option value="">None</option>
-        {choices.map(choice => <option key={choice.value} value={choice.value}>{choice.name}</option>)}
-      </NativeSelect>
-    </label>
-  );
   const names = (values: string[]) => values.map(value => ({ value, name: value }));
   return <div className="grid gap-3" key={kind}>
     {read.problems.length > 0 && <p role="status" className={HINT}>Some issue options could not be read. You can still submit the title and description.</p>}
@@ -45,10 +47,10 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
       <span className="text-xs">{read.provider === 'azure' ? 'Tags' : 'Labels'}</span>
       {read.labels.map(label => <Checkbox key={label} name="labels" value={label} label={label} defaultChecked={labels.includes(label)} />)}
     </div>}
-    {!writeAccessProblem(repo.repo, 'type-ticket', access, safety) && select('type', read.provider === 'azure' ? 'Work item type' : 'Issue type', names(read.types), read.types.includes(type) ? type : '')}
-    {select('assignee', 'Assignee', names(read.assignees), kept?.assignee)}
-    {read.provider === 'github' && select('milestone', 'Milestone', read.milestones, kept?.milestone)}
-    {read.provider === 'azure' && select('iteration', 'Iteration', names(read.iterations), kept?.iteration)}
+    {!writeAccessProblem(repo.repo, 'type-ticket', access, safety) && <OptionField name="type" label={read.provider === 'azure' ? 'Work item type' : 'Issue type'} choices={names(read.types)} value={type} />}
+    <OptionField name="assignee" label="Assignee" choices={names(read.assignees)} value={kept?.assignee} />
+    {read.provider === 'github' && <OptionField name="milestone" label="Milestone" choices={read.milestones} value={kept?.milestone} />}
+    {read.provider === 'azure' && <OptionField name="iteration" label="Iteration" choices={names(read.iterations)} value={kept?.iteration} />}
   </div>;
 }
 

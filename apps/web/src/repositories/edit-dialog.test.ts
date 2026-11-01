@@ -1,7 +1,7 @@
 // Repository Settings save local choices and show effective issue defaults with verified Access.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, chooseOption, fetchMock, mountPage, openOptions, sample, settle, text } from '../../test/support.ts';
 import { effectiveVocabulary, type BoardData, type RepositorySetup } from '@lar-factory/shared';
 
 const REPO = 'team/app';
@@ -35,7 +35,7 @@ function serve(board: BoardData, answer: (body: Record<string, unknown>) => { st
 const row = () => $(`.settings-row[data-row="repo-${REPO}"]`)!;
 const dialog = () => $('[data-edit-dialog]');
 const setting = (key: string) => $(`[data-edit-dialog] [data-setting="${key}"]`)!;
-const buttonIn = (el: Element, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label);
+const buttonIn = (el: Element, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button:not([role="combobox"])')].find((b) => text(b) === label);
 
 async function type(into: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(into, value);
@@ -150,9 +150,10 @@ test('legacy private domain docs display off and offer only on or off', async ()
   const board = boardWith({ domainDocs: { kind: 'private' } as unknown as RepositorySetup['domainDocs'] });
   serve(board);
   await openEdit(board);
-  const select = setting('domainDocs').querySelector('select')!;
-  expect(select.value).toBe('off');
-  expect([...select.options].map((option) => option.value)).toEqual(['off', 'repository']);
+  const select = setting('domainDocs').querySelector<HTMLElement>('[role="combobox"]')!;
+  expect(text(select)).toBe('Off');
+  expect(await openOptions(select)).toEqual(['Off', 'Write in build PRs']);
+  expect(dialog()!.compareDocumentPosition($('[role="listbox"]')!) & Node.DOCUMENT_POSITION_FOLLOWING, 'the list opens above the dialog').toBeTruthy();
 });
 
 const discovery = { provider: 'github', types: { state: 'available', choices: ['Task'] }, labels: { state: 'available', choices: ['bug', 'triage'] } };
@@ -174,15 +175,15 @@ test('vocabulary suggestions are drafts and new labels wait for Save; failures r
   const row = vocabularyRow('bug');
   expect(row.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false);
   await settle(() => buttonIn(row, 'Use suggested label: bug')!.click());
-  const select = row.querySelector('select')!;
-  await settle(() => { select.value = 'Task'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  const select = row.querySelector<HTMLElement>('[role="combobox"]')!;
+  await chooseOption(select, 'Task');
   await type(row.querySelector<HTMLInputElement>('input[type="text"]')!, 'needs review');
   expect(sent).toHaveLength(0);
   await settle(() => buttonIn(row, 'Save')!.click());
   expect(sent[0]).toEqual({ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: 'Task', labels: ['bug'] }, newLabels: ['needs review'] });
   expect(text(row)).toContain('Label creation refused.');
   expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('needs review');
-  expect(select.value).toBe('Task');
+  expect(text(select)).toBe('Task');
 });
 
 test('vocabulary explains refused reads and Access while still allowing explicit none', async () => {
@@ -212,12 +213,11 @@ test('a successful vocabulary save displays the provider result and clears the n
   await openEdit(board);
   await openVocabulary();
   await type(vocabularyRow('improvement').querySelector<HTMLInputElement>('input[type="text"]')!, 'triage');
-  const select = vocabularyRow('improvement').querySelector('select')!;
-  await settle(() => { select.value = 'Task'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await chooseOption(vocabularyRow('improvement').querySelector('[role="combobox"]')!, 'Task');
   await settle(() => buttonIn(vocabularyRow('improvement'), 'Save')!.click());
   const row = vocabularyRow('improvement');
   expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('');
-  expect(row.querySelector('select')!.value).toBe('Task');
+  expect(text(row.querySelector('[role="combobox"]'))).toBe('Task');
   expect([...row.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].filter((i) => i.checked)).toHaveLength(1);
   expect(text(row)).toContain('Saved.');
   expect(sent.filter((body) => body.change === 'vocabulary')).toHaveLength(1);
@@ -235,8 +235,7 @@ test('Azure vocabulary uses discovered work item types and tags for any reposito
   const row = vocabularyRow('bug');
   expect(text(row)).toContain('Work item type');
   expect(text(row)).toContain('Tags');
-  const select = row.querySelector('select')!;
-  await settle(() => { select.value = 'Defect'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await chooseOption(row.querySelector('[role="combobox"]')!, 'Defect');
   await settle(() => buttonIn(row, 'Use suggested label: bug')!.click());
   await settle(() => buttonIn(row, 'Save')!.click());
   expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo, change: 'vocabulary', key: 'bug', value: { type: 'Defect', labels: ['bug'] } });
@@ -253,7 +252,9 @@ test('Azure read-only vocabulary permits clearing mappings and blocks term selec
   expect(text(row)).toContain('read-only');
   expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.disabled).toBe(true);
   expect(row.querySelector<HTMLInputElement>('input[type="checkbox"]')!.disabled).toBe(true);
-  expect([...row.querySelectorAll('option')].map((o) => [o.value, o.disabled])).toEqual([['', false], ['Task', true]]);
+  await openOptions(row.querySelector('[role="combobox"]')!);
+  expect($$('[role="option"]').map((o) => [text(o), o.hasAttribute('data-disabled')])).toEqual([['None', false], ['Task', true]]);
+  await settle(() => $('[role="listbox"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await settle(() => buttonIn(row, 'None')!.click());
   expect(buttonIn(row, 'Save')!.disabled).toBe(false);
 });

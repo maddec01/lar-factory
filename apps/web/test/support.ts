@@ -126,6 +126,23 @@ export async function pressMenu(el: Element): Promise<void> {
   await settle(() => vi.advanceTimersByTime(0));
 }
 
+/** Opens a design-system Select by keyboard, as jsdom has no pointer capture for its press, and gives its option names. */
+export async function openOptions(trigger: Element): Promise<string[]> {
+  await settle(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })));
+  await settle(() => vi.advanceTimersByTime(50));
+  return $$('[role="option"]').map(text);
+}
+
+/** Opens a design-system Select and picks the option called `name`. */
+export async function chooseOption(trigger: Element, name: string): Promise<void> {
+  await openOptions(trigger);
+  await settle(() => $$('[role="option"]').find((option) => text(option) === name)!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+}
+
+/** The value a form reads for its field `name`. */
+export const formValue = (name: string) => $<HTMLInputElement>(`input[type="hidden"][name="${name}"]`)!.value;
+
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';

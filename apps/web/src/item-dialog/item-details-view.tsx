@@ -1,5 +1,5 @@
 // What the item dialog shows from an item's details: the description and comments in its main column, the people,
-// labels and their picker, dates, milestone or iteration and area in the meta area under its title, and the
+// kind control, labels and their picker, dates, milestone or iteration and area in the meta area under its title, and the
 // sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows its error in the
 // description's place; the board's own fields never wait. Once they load, Edit opens the description editor in the
 // description's place, with Save and Cancel under it; the extra sections, such as Acceptance Criteria, stay read-only.
@@ -7,17 +7,19 @@
 
 import { useState, type ReactNode } from 'react';
 import { CircleCheck, CircleDot, Lock, Pencil } from 'lucide-react';
-import { STRUCTURE_LABEL, kindLabels, onAzure, sameRepo, shortAgo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
-import type { IssueRef, Item, ItemComment, ItemDetails, TextFormat } from '@lar-factory/shared';
+import { STRUCTURE_LABEL, SWAP_KINDS, kindCanChange, kindLabels, onAzure, sameRepo, shortAgo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
+import type { IssueRef, Item, ItemComment, ItemDetails, SwapKind, TextFormat } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { FormSelect } from '@lar-factory/ui/form-select';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';
-import { AzureFields, AgentWork, AgentWorkNote, LabelChips, useShownLabels } from '../items/item-parts.tsx';
+import { AzureFields, AgentWork, AgentWorkNote, KIND_BADGES, LabelChips, useShownLabels } from '../items/item-parts.tsx';
 import { LabelPicker } from '../labels/label-picker.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import type { DescriptionEdit } from './use-description-edit.ts';
+import { useKindChangeStore } from './kind-change-store.ts';
 import { useLabelEdit } from './use-label-edit.ts';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
@@ -217,6 +219,35 @@ function ItemLabels({ item }: { item: Item }) {
   );
 }
 
+const KIND_CHOICES = SWAP_KINDS.map((value) => {
+  const { name, icon: Icon } = KIND_BADGES[value]!;
+  return { value, name, icon: <Icon aria-hidden="true" /> };
+});
+
+/**
+ * The control that changes an ordinary item's kind, and what the last change did: the line it answered with, or why it stopped,
+ * what it changed on the ticket before that, and Retry for the same change. Concepts, decisions and builds don't have it.
+ */
+function ItemKindControl({ item }: { item: Item }) {
+  const change = useKindChangeStore((state) => state.changes[item.id]);
+  const { start } = useKindChangeStore.getState();
+  if (!kindCanChange(item.kind)) return null;
+  return <>
+    <Fact label="Kind">
+      <span className="block w-44" data-item-kind-control>
+        <FormSelect aria-label="Kind" placeholder="No kind" value={item.kind === 'issue' ? '' : item.kind} choices={KIND_CHOICES} disabled={change?.saving} onChange={(kind) => void start(item.id, kind as SwapKind)} />
+      </span>
+    </Fact>
+    {change?.error
+      ? <div role="alert" data-kind-change-failed className="grid w-full justify-items-start gap-1 text-xs text-(--error-foreground)">
+        <p className="m-0">{change.error}</p>
+        <p className="m-0">{change.line ? `Changed on the ticket so far: ${change.line}` : 'Nothing changed on the ticket.'}</p>
+        <Button {...kind('other')} loading={change.saving} onClick={() => void start(item.id, change.kind)}>Retry</Button>
+      </div>
+      : change?.line && <p role="status" data-kind-change-line className="m-0 w-full text-xs text-(--muted-foreground)">{change.line}</p>}
+  </>;
+}
+
 /**
  * The meta area under the title: author, assignees, labels, milestone or iteration and area, dates, a pull request item's
  * checks, and the agent work figures, which only show here while the dialog is too narrow for the header to hold them, or why
@@ -229,6 +260,7 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
       {item.azure && <><Fact label="Azure type">{item.azure.type}</Fact><Fact label="Azure state">{item.azure.state}</Fact></>}
       <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
       <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
+      <ItemKindControl item={item} />
       <ItemLabels key={item.id} item={item} />
       {azure
         ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>

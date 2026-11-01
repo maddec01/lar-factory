@@ -87,6 +87,16 @@ const main = async () => {
     }
     throw new Error('Unexpected vocabulary write');
   }
+  // A vocabulary fixture's label renamed or deleted by name.
+  const labelWrite = options.vocabulary && args[0] === 'api' && ['PATCH', 'DELETE'].includes(args[2]) && /^repos\/[\w.-]+\/[\w.-]+\/labels\/([^/]+)$/.exec(args[3]);
+  if (labelWrite) {
+    const { labels } = options.vocabulary;
+    const at = labels.indexOf(decodeURIComponent(labelWrite[1]));
+    const name = args[2] === 'PATCH' ? JSON.parse(fs.readFileSync(0, 'utf8')).new_name : null;
+    labels.splice(at, 1, ...name ? [name] : []);
+    fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    return name ? output({ name }) : undefined;
+  }
   // Repository configuration reads are forbidden. Keep this sentinel to catch regressions.
   if (args[0] === 'api' && args.some((arg) => arg.includes('/contents/.lar-factory.json'))) {
     throw new Error('Factory configuration must come from local settings');

@@ -2,7 +2,8 @@
 
 [Work records](work-records.md) covers the commands below. A slice is a private
 record its build owns, on every provider. Slices are never published and have
-no Status; the board shows them inside their build's card.
+no Status; the board shows them inside their build's card. A build here can be a
+bug, feature, improvement or issue, as well as a record whose kind is build.
 
 Create each slice with `slice.sh`, which prints its work ID, and list the
 slices it waits on:

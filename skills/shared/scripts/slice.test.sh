@@ -78,6 +78,20 @@ else
     fail "a picked build ticket gets the slice, with each --blocked-by as a blocker edge: $status $output / $errors"
 fi
 
+for parent_kind in bug feature improvement issue; do
+    parent=$(make "$parent_kind")
+    run "$parent" "Implementation part" "$bin/body.md"
+    record=$(lar-work read "$output" 2>/dev/null || true)
+    if ((status == 0)) && [[ -z $errors ]] &&
+        jq -e --arg parent "$parent" '.kind == "slice" and .parentId == $parent and .ticket == null' <<<"$record" >/dev/null &&
+        [[ $(lar-work read "$parent" | jq -r .kind) == "$parent_kind" ]] &&
+        [[ $(lar-work body "$output" --body brief) == "$(cat "$bin/body.md")" ]] && no_provider; then
+        pass "a $parent_kind owns a private slice without changing kind"
+    else
+        fail "a $parent_kind owns a private slice: $status $output / $errors / $record"
+    fi
+done
+
 concept=$(make concept)
 run "$concept" "Which store" "$bin/body.md" --kind decision
 if ((status == 0)) && [[ $(lar-work read "$output" | jq -r '.kind + " " + .parentId') == "decision $concept" ]] &&
@@ -101,7 +115,7 @@ run "$build" "Store" "$bin/body.md" --kind decision
 refuses "a build takes no other kind" "a build owns only slices"
 
 run "$slice" "Deeper" "$bin/body.md"
-refuses "a slice owns no work" "only a build or a concept owns work"
+refuses "a slice owns no work" "only buildable work or a concept owns work"
 
 run "$build" "Sign in" "$bin/missing.md"
 refuses "a body file it can't read makes nothing" "can't read $bin/missing.md"

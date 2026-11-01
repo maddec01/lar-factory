@@ -138,7 +138,8 @@ it. It refuses Done, which completion decides, and a PR, which has no Status.
 
 ## Structure
 
-A concept owns decisions and builds, and a build owns slices. Create owned work
+A concept owns decisions and builds. Buildable work owns slices, including bugs,
+features, improvements and issues. Create owned work
 with
 `bash <this skill>/shared/scripts/slice.sh <parent> "<title>" <body-file> [--kind decision|build] [--blocked-by <work>]...`.
 It prints the new work ID; keep it. Under a concept, `--kind` names a decision

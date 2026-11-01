@@ -154,9 +154,6 @@ export interface LaunchIntentFilter {
 /** The kinds that never become a PR of their own, so hold no build phase or PR. */
 const UNBUILT_KINDS: readonly WorkKind[] = ['concept', 'decision', 'slice'];
 
-/** The kinds each kind may own as a structural parent. */
-const CHILD_KINDS: Partial<Record<WorkKind, readonly WorkKind[]>> = { concept: ['decision', 'build'], build: ['slice'] };
-
 export interface WorkRecord {
   /** The record's local identity, fixed for its life whether or not it has a ticket. */
   workId: string;
@@ -477,7 +474,8 @@ function checkDisposition(disposition: unknown, reason: unknown): [FindingDispos
 
 /** Throws unless a `parent` may own a `child`. */
 function checkOwns(parent: Row, child: { work_id: string; kind: WorkKind }): void {
-  const owns = CHILD_KINDS[parent.kind] ?? [];
+  const owns: readonly WorkKind[] = parent.kind === 'concept' ? ['decision', 'build']
+    : UNBUILT_KINDS.includes(parent.kind) ? [] : ['slice'];
   if (!owns.includes(child.kind)) {
     throw invalid(`A ${parent.kind} owns ${owns.length ? `only ${owns.join(' and ')} records` : 'no records'}, so ${parent.work_id} can't own the ${child.kind} ${child.work_id}.`);
   }

@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type TrackerLabel, type SetupDetection } from '@lar-factory/shared';
+import { isManagedLabel, kindLabels, pageWithData, sameRepo, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type LabelChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type TrackerLabel, type SetupDetection } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/editable-repository.ts';
 import type { Capture } from '../items/capture.ts';
@@ -38,6 +38,8 @@ export interface HttpDeps {
   recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
   /** Reads one item's details and older comments for the item dialog, and exports its record's markdown. */
   itemDetails: ItemDetailsReader;
+  /** Shows a label change the tracker took on the item's row, before the next read reports it. */
+  showLabelChange(item: Item, change: LabelChange): void;
   /**
    * Reads the source listing the item at `url` now, or once more after the running read; with no url, loads the
    * repositories' configs again and reads every source.
@@ -132,7 +134,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showLabelChange, readSoon, ready, projectChoices, keepOnboarding, createProject,
   detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
@@ -287,6 +289,25 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         const refused = await itemDetails.saveDescription(item, { body, ...bodyField !== undefined && { bodyField }, ...revision !== undefined && { revision: revision as number } });
         readSoon();
         return refused ? { status: refused.status, body: { error: refused.error } } : { status: 200, body: { error: null } };
+      },
+    },
+    '/api/item-labels': {
+      what: 'the label to change and its item', disabled: 'Changing labels is disabled in sample mode.',
+      async run({ itemId, label, action }) {
+        if (typeof itemId !== 'string' || !itemId || typeof label !== 'string' || !label || (action !== 'add' && action !== 'remove')) return { status: 400, body: { error: 'Name the item, the label and whether to add or remove it.' } };
+        const item = board.snapshot().items.find((i) => i.id === itemId);
+        if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+        const setup = board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
+        const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {});
+        if (problem) return { status: 403, body: { error: problem } };
+        if (isManagedLabel(label)) return { status: 422, body: { error: `The factory manages ${label}, so it can't be changed here.` } };
+        if (kindLabels(item.kind, setup?.vocabulary).includes(label.toLowerCase())) return { status: 422, body: { error: `${label} follows this item's kind, so it can't be changed here.` } };
+        const change: LabelChange = { label, action };
+        const refused = await itemDetails.changeLabels(item, change);
+        if (refused) return { status: refused.status, body: { error: refused.error } };
+        showLabelChange(item, change);
+        readSoon(item.url ?? undefined);
+        return { status: 200, body: withBoard({ error: null }) };
       },
     },
     '/api/item-export': {
@@ -455,6 +476,17 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     } catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
   }
 
+  /** Answers the labels the item dialog's picker offers, which it reads each time it opens. */
+  async function itemLabelsRequest(url: URL, res: ServerResponse): Promise<void> {
+    const itemId = url.searchParams.get('itemId');
+    if (!itemId) return json(res, 400, { error: 'Name the item whose labels to read.' });
+    const item = board.snapshot().items.find((i) => i.id === itemId);
+    if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+    const read = await itemDetails.labels(item);
+    if ('error' in read) json(res, read.status, { error: read.error });
+    else json(res, 200, read);
+  }
+
   /** Answers the next 10 older comments of one item, which the item dialog reads on "Load 10 more". */
   async function itemCommentsRequest(url: URL, res: ServerResponse): Promise<void> {
     const itemId = url.searchParams.get('itemId');
@@ -530,6 +562,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     if (path === '/api/onboarding/projects') return projectsRequest(res);
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
+    if (path === '/api/item-labels') return itemLabelsRequest(url, res);
     if (path === '/api/ticket-preview') {
       if (sample) return json(res, 403, { error: 'Creating issues is disabled in sample mode.' });
       const result = await capture.ticketPreview(url.searchParams.get('itemId') ?? '');

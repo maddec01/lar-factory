@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import type { Item } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { exportMarkdown } from '@lar-factory/work-records/export';
+import { trackerLabels } from '@lar-factory/shared/tracker-labels';
+import { fakeAz, type WorkItem } from '../azure/fake-az.ts';
 import { createItemDetails } from './item-details.ts';
 
 const opened: string[] = [];
@@ -45,6 +47,45 @@ test('work with no ticket has no details and saves no description', async () => 
   const { details, saveDescription } = createItemDetails(null, () => undefined);
   assert.equal((await details(workItem) as { body: string }).body, '');
   assert.deepEqual(await saveDescription(workItem, { body: 'x' }), { status: 409, error: 'This work has no ticket the board has read.' });
+});
+
+const taggedWork = (labels?: string) => {
+  const items: WorkItem[] = [{ id: 5, rev: 2, type: 'User Story', state: 'New', ...labels !== undefined && { tags: labels } }];
+  return { items, az: fakeAz({ items, tags: ['area-ui', 'bug', 'docs'] }) };
+};
+const onAzureFake = (az: ReturnType<typeof fakeAz>) => createItemDetails(null, (item) => item, { records: null, labelsOf: (repo) => trackerLabels(repo, { az: az.run, gh: async () => { throw new Error('gh is not for this repository'); } }) });
+
+test('on the fake Azure a tag goes on and off the work item, keeping the others', async () => {
+  const { items, az } = taggedWork('docs');
+  const { changeLabels } = onAzureFake(az);
+  assert.equal(await changeLabels(workItem, { label: 'area-ui', action: 'add' }), null);
+  assert.equal(items[0]!.tags, 'docs; area-ui');
+  assert.equal(await changeLabels(workItem, { label: 'docs', action: 'remove' }), null);
+  assert.equal(items[0]!.tags, 'area-ui');
+});
+
+test('on the fake Azure a failed tag write leaves the tags and says why, in the tracker\'s word', async () => {
+  const items: WorkItem[] = [{ id: 5, type: 'User Story', state: 'New', tags: 'docs' }];
+  const az = fakeAz({ items, fail: (args) => (args[0] === 'rest' ? new Error('az rest failed: TF237111: no permission') : undefined) });
+  assert.deepEqual(await onAzureFake(az).changeLabels(workItem, { label: 'area-ui', action: 'add' }), { status: 502, error: 'Could not change the tags on #5. az rest failed: TF237111: no permission' });
+  assert.equal(items[0]!.tags, 'docs');
+});
+
+test('the fake Azure\'s tags reach the picker without the managed ones', async () => {
+  const { az } = taggedWork();
+  assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'area-ui' }, { name: 'docs' }] });
+});
+
+test('a failed read of the tags says why', async () => {
+  const az = fakeAz({ items: [], fail: (args) => (args.includes('tags') ? new Error('az devops invoke failed: TF400813') : undefined) });
+  assert.deepEqual(await onAzureFake(az).labels(workItem), { status: 502, error: 'Could not read the tags. az devops invoke failed: TF400813' });
+});
+
+test('work with no ticket has no labels to read or change', async () => {
+  const { labels, changeLabels } = createItemDetails(null, () => undefined);
+  const refused = { status: 409, error: 'This work has no ticket the board has read.' };
+  assert.deepEqual(await labels(workItem), refused);
+  assert.deepEqual(await changeLabels(workItem, { label: 'docs', action: 'add' }), refused);
 });
 
 test("a build's details hold its brief, initial context, build phase and review rounds from its record", async () => {

@@ -45,6 +45,12 @@ export interface TrackerLabels {
   removeFromTicket(ticket: number, names: readonly string[]): Promise<void>;
 }
 
+/** One label to add to a ticket or remove from it. */
+export interface LabelChange {
+  label: string;
+  action: 'add' | 'remove';
+}
+
 const GITHUB: TrackerCapabilities = {
   noun: 'label', heading: 'Labels', color: true, description: true,
   deleteWarning: 'This removes it from every ticket.', changeScope: 'repository', syncLabel: STRUCTURE_LABEL, createUnavailable: null, nameProblem: customLabelProblem,

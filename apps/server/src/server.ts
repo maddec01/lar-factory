@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
@@ -422,6 +422,15 @@ function refreshLocalNow(recordsChanged: boolean): void {
   runLocal(() => startAfter.startUnblocked());
 }
 
+/** Changes the ticket as last read and shows it, since each refresh of the records goes back to that read. */
+function showLabelChange(item: Item, { label, action }: LabelChange): void {
+  const ticket = ticketOf(item);
+  const labels = ticket?.labels.filter((name) => !sameLabel(name, label)) ?? [];
+  recordedItems({ items: tickets.map((t) => (t === ticket ? { ...t, labels: action === 'add' ? [...labels, label] : labels } : t)), waiting: unread });
+  showRecords();
+  board.push();
+}
+
 /** Shows the work records as they are now with the last tickets read, and their T3 threads; stats only when `withStats`. */
 function showRecords(withStats = false): void {
   board.applyRead(recordedItems(), board.revision(), (shown) => withT3Reads(shown, withStats));
@@ -744,7 +753,7 @@ const { server, endStreams } = createBoardServer({
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
     if (read.availability !== 'available') throw new Error('T3 unavailable');
   },
-  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), readSoon, ready: () => firstGhCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), showLabelChange, readSoon, ready: () => firstGhCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   detectSetup: (input) => detectSetup(input), saveSetup: (input) => saveSetup(input),

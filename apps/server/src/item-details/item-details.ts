@@ -1,12 +1,14 @@
 // The item dialog's details for one item, its description's save and its markdown export. Sample mode serves the
 // details from a file beside the board's fixture and saves and exports nothing; otherwise the work record gives its own
-// text and progress, and the provider of its ticket reads and writes the ticket's.
+// text and progress, and the provider of its ticket reads and writes the ticket's. Its labels go through the tracker's
+// label operations, one name at a time, so no write replaces the ticket's whole set.
 
 import { readFileSync } from 'node:fs';
 import { userInfo, homedir } from 'node:os';
 import { join } from 'node:path';
-import { onAzure, readTicketSpec, stripTrackerStructure } from '@lar-factory/shared';
-import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails, RecordDetails } from '@lar-factory/shared';
+import { isManagedLabel, onAzure, readTicketSpec, stripTrackerStructure, trackerCapabilities } from '@lar-factory/shared';
+import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails, LabelChange, RecordDetails, TrackerLabel, TrackerLabels } from '@lar-factory/shared';
+import { trackerLabels } from '@lar-factory/shared/tracker-labels';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { activeSpecState, editSpec, refreshSpecs, resolveSpecEdit, syncSpecs, type SpecSyncOptions } from '@lar-factory/work-records/spec-sync';
 import { exportMarkdown } from '@lar-factory/work-records/export';
@@ -30,6 +32,10 @@ export interface ItemDetailsReader {
   details: ReadItemDetails;
   olderComments: ReadOlderComments;
   saveDescription: SaveDescription;
+  /** The labels the repository of the item's ticket offers, without the managed ones. */
+  labels(item: Item): Promise<{ labels: TrackerLabel[] } | Refused>;
+  /** Adds a label to the item's ticket or removes it; null when the tracker took it, else the refusal to show. */
+  changeLabels(item: Item, change: LabelChange): Promise<Refused | null>;
   exportMarkdown: ExportItem;
   specAction?(item: Item, generation: number, action: 'retry' | 'accept' | 'reject'): Promise<Refused | null>;
 }
@@ -40,6 +46,8 @@ export interface RecordsDeps {
   /** Where an export writes; the user's Downloads folder by default. */
   exportFolder?: string;
   specSync?: SpecSyncOptions;
+  /** The label operations of a repository; tests stand in for the tracker. */
+  labelsOf?: (repo: string) => TrackerLabels;
 }
 
 /** Comments per older page; GitHub and Azure DevOps both answer 10. */
@@ -65,6 +73,8 @@ function fromFile(file: string): ItemDetailsReader {
       return { comments: older.slice(from, from + PAGE), olderCursor: from + PAGE < older.length ? String(from + PAGE) : null };
     },
     saveDescription: async () => ({ status: 403, error: 'Saving descriptions is disabled in sample mode.' }),
+    labels: async () => ({ status: 403, error: 'Sample mode reads no labels.' }),
+    changeLabels: async () => ({ status: 403, error: 'Changing labels is disabled in sample mode.' }),
     exportMarkdown: async () => ({ status: 403, error: 'Exporting is disabled in sample mode.' }),
   };
 }
@@ -98,7 +108,7 @@ const NO_TICKET: Refused = { status: 409, error: 'This work has no ticket the bo
  * which reads and writes it by its node id. Work with no ticket has no details.
  */
 export function createItemDetails(sampleFile: string | null, ticketOf: (item: Item) => Item | undefined,
-  { records, exportFolder = join(homedir(), 'Downloads'), specSync }: RecordsDeps = { records: null }): ItemDetailsReader {
+  { records, exportFolder = join(homedir(), 'Downloads'), specSync, labelsOf = trackerLabels }: RecordsDeps = { records: null }): ItemDetailsReader {
   if (sampleFile) return fromFile(sampleFile);
   const azure = (item: Item) => Boolean(item.repo && onAzure(item.repo));
   return {
@@ -136,6 +146,21 @@ export function createItemDetails(sampleFile: string | null, ticketOf: (item: It
       if (!azure(item)) return saveGithubDescription(item, body);
       if (!bodyField || revision === undefined) return { status: 400, error: 'Send the field and revision the work item\'s details gave.' };
       return saveAzureDescription(item, { body, bodyField, revision });
+    },
+    async labels(work) {
+      const item = ticketOf(work);
+      if (!item) return NO_TICKET;
+      try { return { labels: (await labelsOf(item.repo).list()).filter(({ name }) => !isManagedLabel(name)) }; }
+      catch (error) { return { status: 502, error: `Could not read the ${trackerCapabilities(item.repo).noun}s. ${(error as Error).message}` }; }
+    },
+    async changeLabels(work, { label, action }) {
+      const item = ticketOf(work);
+      if (!item) return NO_TICKET;
+      const labels = labelsOf(item.repo);
+      try {
+        await (action === 'add' ? labels.addToTicket(item.number, [label]) : labels.removeFromTicket(item.number, [label]));
+        return null;
+      } catch (error) { return { status: 502, error: `Could not change the ${trackerCapabilities(item.repo).noun}s on #${item.number}. ${(error as Error).message}` }; }
     },
     async specAction(work, generation, action) {
       if (!records) return { status: 409, error: 'The board has no work records.' };

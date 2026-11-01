@@ -103,7 +103,7 @@ problem=$(jq -r --arg provider "$provider" '
             or ($provider == "azure" and (.itemSource.kind != "azure-board" or (.itemSource.team | type) != "string" or .itemSource.team == ""))) then "itemSource must name this provider and its Azure team when applicable"
         elif has("labels") and ((.labels | type) != "array" or any(.labels[]; type != "string")) then "labels must be an array of strings"
         elif has("skills") and ((.skills | type) != "array" or any(.skills[]; type != "string")) then "skills must be an array of strings"
-        elif has("domainDocs") and (.domainDocs | type != "object" or (.kind != "private" and (.kind != "repository" or (.glossary | type) != "string" or (.adrs | type) != "string"))) then "domainDocs must be private or name repository glossary and adrs paths"
+        elif has("domainDocs") and (.domainDocs | type != "object" or (.kind != "off" and .kind != "private" and (.kind != "repository" or (.glossary | type) != "string" or (.adrs | type) != "string"))) then "domainDocs must be off or name repository glossary and adrs paths"
         else empty end
     end' <<<"$local_settings")
 if [[ -n $problem ]]; then
@@ -115,6 +115,7 @@ jq --arg provider "$provider" '
     . as $local | (.overrides // {}) as $settings |
     ($local.structureSync != false) as $sync |
     {version: 1, role: "", itemSource: (if $provider == "azure" then null else {kind: "issues"} end),
-        labels: [], domainDocs: {kind: "private"}, skills: []}
+        labels: [], domainDocs: {kind: "off"}, skills: []}
     + ($settings | with_entries(select(.key | IN("role", "itemSource", "labels", "domainDocs", "skills", "vocabulary"))))
-    + {structureSync: $sync}' <<<"$local_settings"
+    + {structureSync: $sync}
+    | if .domainDocs.kind == "private" then .domainDocs = {kind: "off"} else . end' <<<"$local_settings"

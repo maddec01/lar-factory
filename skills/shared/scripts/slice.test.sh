@@ -28,6 +28,7 @@ FAKE
 done
 chmod +x "$bin/lar-work" "$bin/gh" "$bin/az" "$bin/curl"
 export PATH="$bin:$PATH" HOME="$bin/home" LAR_BOARD_PORT=4999
+export LAR_FACTORY_DATA_DIR="$HOME/Library/Application Support/Lar Factory"
 printf '## What to build\n\nThe sign-in form.\n' >"$bin/body.md"
 
 # make <kind> [ticket]: creates a record in maddec01/lar-factory and prints its work ID.

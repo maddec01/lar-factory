@@ -7,7 +7,7 @@ import { effectiveVocabulary, normalizeItems, type RepositorySetup, type Vocabul
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { DEFAULT_RETENTION, openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { changeKind } from '@lar-factory/work-records/change-kind';
-import { archivedItems, recordItems } from './record-items.ts';
+import { agreedKind, archivedItems, recordItems, ticketsByReference } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -235,4 +235,72 @@ test('a board read keeps the kind even when the swap could not write, as the tic
     kinds: { read: async () => ({ labels: ['bug'], type: null }), setType: async () => {}, boardTypes: async () => null } });
   const [item] = recordItems(records, tickets([12, 'List', REPO, ['bug']]), [REPO]);
   assert.equal(item!.kind, 'feature');
+});
+
+const setupWith = (vocabulary: VocabularyMapping = {}) => ({ repo: REPO, access: {}, vocabulary: effectiveVocabulary(vocabulary).vocabulary }) as unknown as RepositorySetup;
+const MAPPED: VocabularyMapping = { bug: { type: null, labels: ['type: bug'] }, feature: { type: null, labels: ['type: feature'] } };
+const importBug = (records: WorkRecords, kind: 'bug' | 'feature' | 'improvement' | 'concept' = 'bug') => records.importTicket({ title: 'T', repository: REPO, kind, ticket: `${REPO}#12` }).record;
+const readWith = (records: WorkRecords, labels: string[], vocabulary?: VocabularyMapping) => recordItems(records, tickets([12, 'List', REPO, labels]), [REPO], [], new Set(), [setupWith(vocabulary)])[0]!;
+
+test('a board read shows how the item\'s kind and its ticket\'s disagree, and an item that agrees has no disagreement', async () => {
+  const records = await open();
+  importBug(records);
+  assert.deepEqual(readWith(records, ['feature']).kindDisagreement, { ticketKind: 'feature', changed: 'item', kept: false, swap: { add: [], remove: ['feature'], type: null } });
+  assert.equal(readWith(records, ['bug']).kindDisagreement, undefined);
+  assert.equal(readWith(records, ['feature', 'type: bug'], MAPPED).kindDisagreement, undefined);
+});
+
+test('a GitHub issue\'s type and an Azure work item\'s type both count', async () => {
+  const records = await open();
+  importBug(records);
+  const [ticket] = tickets([12, 'List', REPO, []]);
+  const read = (more: Partial<typeof ticket & object>) => recordItems(records, [{ ...ticket!, ...more }], [REPO], [], new Set(), [setupWith()])[0]!.kindDisagreement?.ticketKind;
+  assert.equal(read({ issueType: 'Feature' }), 'feature');
+  assert.equal(read({ azure: { type: 'User Story', state: 'New' } as NonNullable<typeof ticket & object>['azure'] }), 'feature');
+});
+
+test('a read with no ticket, or a repository with no setup, shows no disagreement', async () => {
+  const records = await open();
+  importBug(records);
+  assert.equal(recordItems(records, [], [REPO], [], new Set(), [setupWith(MAPPED)])[0]!.kindDisagreement, undefined);
+  assert.equal(recordItems(records, tickets([12, 'List', REPO, ['feature']]), [REPO])[0]!.kindDisagreement, undefined);
+});
+
+test('concepts and local work never disagree', async () => {
+  const records = await open();
+  importBug(records, 'concept');
+  records.create({ title: 'Local', repository: REPO, kind: 'bug' });
+  const items = recordItems(records, tickets([12, 'List', REPO, ['bug']]), [REPO], [], new Set(), [setupWith(MAPPED)]);
+  assert.deepEqual(items.map((item) => item.kindDisagreement), [undefined, undefined]);
+});
+
+test('a kept answer shows as kept until the ticket\'s kind changes', async () => {
+  const records = await open();
+  const { workId, revision } = importBug(records);
+  records.recordKindAnswer(workId, revision, { answer: 'keep', ticketKind: 'feature' });
+  assert.equal(readWith(records, ['feature']).kindDisagreement?.kept, true);
+  assert.equal(readWith(records, ['improvement']).kindDisagreement?.kept, false);
+});
+
+for (const [name, vocabulary, labels] of SWAPS) test(`no disagreement shows on the board read after a swap, with ${name}`, async () => {
+  const records = await open();
+  const { workId, revision } = importBug(records);
+  let onTicket = [...labels];
+  const setup = { ...setupWith(vocabulary), access: { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } } as RepositorySetup;
+  assert.ok(readWith(records, ['feature'], vocabulary).kindDisagreement);
+  await changeKind(records, workId, revision, 'feature', { setup,
+    labels: { addToTicket: async (_, names) => { onTicket.push(...names); }, removeFromTicket: async (_, names) => { onTicket = onTicket.filter((label) => !names.includes(label)); } },
+    kinds: { read: async () => ({ labels: onTicket, type: null }), setType: async () => {}, boardTypes: async () => null } });
+  assert.equal(readWith(records, onTicket, vocabulary).kindDisagreement, undefined);
+});
+
+test('the kind a record and its ticket agree on comes from the last read and the mappings', async () => {
+  const records = await open();
+  const record = importBug(records);
+  const byTicket = (labels: string[]) => ticketsByReference(tickets([12, 'List', REPO, labels]));
+  const { vocabulary } = setupWith(MAPPED);
+  assert.equal(agreedKind(record, byTicket(['feature', 'type: bug']), vocabulary), 'bug');
+  assert.equal(agreedKind(record, byTicket(['feature']), vocabulary), null);
+  assert.equal(agreedKind(record, new Map(), vocabulary), null);
+  assert.equal(agreedKind(record, byTicket(['bug']), undefined), null);
 });

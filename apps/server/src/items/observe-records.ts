@@ -21,6 +21,8 @@ export interface ObserveReads {
   known?(repo: string, number: number): TicketObservation | undefined;
   /** Whether reads of `repo` wait for now, so a Dependency's ticket or PR there keeps its last observation. */
   waits?(repo: string): boolean;
+  /** The kind the record and its ticket agree on in the last read, or null when they don't. */
+  agreedKind?(record: WorkRecord): WorkRecord['kind'] | null;
 }
 
 /** How many records' provider reads run at once. */
@@ -97,6 +99,13 @@ async function observeDependency(records: WorkRecords, dependencyId: string, sub
   records.observeDependency(dependencyId, dependency.revision, { subject, kind, ...detail && { detail } });
 }
 
+/** Keeps the kind a record and its ticket last agreed on, which later tells a disagreement's notice which side changed. */
+function noteAgreement(records: WorkRecords, workId: string, reads: ObserveReads): void {
+  const record = records.read(workId);
+  const agreed = reads.agreedKind?.(record);
+  if (agreed && agreed !== record.agreedTicketKind) records.update(workId, record.revision, { agreedTicketKind: agreed });
+}
+
 /**
  * Observes every active record of `repos`, less the work IDs in `hidden`, which retention hides: its current PR until
  * the work finishes, then its ticket, PR first so a merge that closes the ticket finishes the work before the ticket's
@@ -129,6 +138,7 @@ export async function observeRecords(records: WorkRecords, repos: readonly strin
       if (ticket && !records.read(workId).setAside) {
         const number = numberOf(ticket);
         await observeOne(records, workId, 'ticket', async () => ({ of: 'ticket', ...reads.known?.(repository, number) ?? await reads.ticket(repository, number) })).finally(changed);
+        noteAgreement(records, workId, reads);
       }
       for (const { dependencyId, ticket: theirs, pullRequests } of records.dependencies(workId)) {
         for (const subject of [...theirs ? [theirs] : [], ...pullRequests]) {

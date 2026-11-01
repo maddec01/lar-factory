@@ -92,7 +92,9 @@ export interface ItemCommands {
    * answer's `line` says what changed, also after a failure, its `itemId` where the item is now, and `labelChanges` the
    * label writes the tracker took.
    */
-  changeKind(itemId: string, kind: unknown): Promise<Reply & { labelChanges: LabelChange[] }>;
+  changeKind(itemId: string, kind: unknown): Promise<Reply & { labelChanges: LabelChange[]; ticketType: string | null }>;
+  /** Answers a kind disagreement with no tracker write: keep both kinds, or give the item the kind `ticketKind`, the one the user saw. */
+  answerKind(itemId: string, answer: unknown, ticketKind: unknown): Reply;
 }
 
 export interface ItemCommandsDeps {
@@ -593,7 +595,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     backToList: (itemId) => move(itemId, BACK_TO_LIST),
 
     async changeKind(itemId, kind) {
-      const refused = (status: number, error: string) => ({ status, body: { error }, labelChanges: [] });
+      const refused = (status: number, error: string) => ({ status, body: { error }, labelChanges: [], ticketType: null });
       if (!SWAP_KINDS.includes(kind as SwapKind)) return refused(422, 'Choose Bug, Feature or Improvement.');
       const item = board.find(itemId);
       if (!item) return refused(404, GONE);
@@ -608,13 +610,31 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           reread();
         }
         const setup = board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
-        const { line, error, labelChanges } = await changeKind(records, workId, records.read(workId).revision, kind as SwapKind, { setup, ...kindTracker?.(item.repo) });
+        const { line, error, labelChanges, ticketType } = await changeKind(records, workId, records.read(workId).revision, kind as SwapKind, { setup, ...kindTracker?.(item.repo) });
         reread();
-        return { status: error ? 502 : 200, body: { error, line, itemId: workId }, labelChanges };
+        return { status: error ? 502 : 200, body: { error, line, itemId: workId }, labelChanges, ticketType };
       } catch (error) {
         reread();
         return refused(error instanceof WorkRecordError ? 409 : 502, (error as Error).message);
       }
+    },
+
+    answerKind(itemId, answer, ticketKind) {
+      const item = board.find(itemId);
+      if (!item) return withBoard(404, { error: GONE });
+      const disagreement = item.kindDisagreement;
+      if (!records || !disagreement || disagreement.ticketKind !== ticketKind) return withBoard(409, { error: "The kinds changed. Check the updated item." });
+      try {
+        const { revision } = records.read(itemId);
+        if (answer === 'keep') records.recordKindAnswer(itemId, revision, { answer: 'keep', ticketKind: disagreement.ticketKind });
+        else if (answer === 'update-item' && disagreement.ticketKind) records.update(itemId, revision, { kind: disagreement.ticketKind, agreedTicketKind: disagreement.ticketKind });
+        else return withBoard(422, { error: 'Choose keep or update-item.' });
+      } catch (error) {
+        reread();
+        return withBoard(error instanceof WorkRecordError ? 409 : 502, { error: (error as Error).message });
+      }
+      reread();
+      return withBoard(200, { error: null });
     },
 
     start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {

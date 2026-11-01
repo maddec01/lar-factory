@@ -40,6 +40,7 @@ export interface HttpDeps {
   itemDetails: ItemDetailsReader;
   /** Shows a label change the tracker took on the item's row, before the next read reports it. */
   showLabelChange(item: Item, change: LabelChange): void;
+  showTicketType(item: Item, type: string): void;
   /**
    * Reads the source listing the item at `url` now, or once more after the running read; with no url, loads the
    * repositories' configs again and reads every source.
@@ -134,7 +135,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showLabelChange, readSoon, ready, projectChoices, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectChoices, keepOnboarding, createProject,
   detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
@@ -314,13 +315,18 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       what: 'the kind and its item', disabled: 'Changing kinds is disabled in sample mode.',
       async run({ itemId, kind }) {
         if (typeof itemId !== 'string' || !itemId) return { status: 400, body: { error: 'Name the item and its new kind.' } };
-        const { status, body, labelChanges } = await commands.changeKind(itemId, kind);
+        const { status, body, labelChanges, ticketType } = await commands.changeKind(itemId, kind);
         const shown = board.snapshot().items.find((i) => i.id === ('itemId' in body ? body.itemId : itemId));
         if (shown) for (const change of labelChanges) showLabelChange(shown, change);
+        if (shown && ticketType) showTicketType(shown, ticketType);
         // A failure can have changed the ticket too, so the read runs either way. Local work has no ticket to read.
         if (shown?.url) readSoon(shown.url);
         return { status, body: withBoard(body) };
       },
+    },
+    '/api/item-kind-answer': {
+      what: 'the item and the answer', disabled: 'Answering is disabled in sample mode.',
+      run: forItem('Name the item and the answer.', (itemId, { answer, ticketKind }) => commands.answerKind(itemId, answer, ticketKind)),
     },
     '/api/item-export': {
       what: 'the item to export', disabled: 'Exporting is disabled in sample mode.',

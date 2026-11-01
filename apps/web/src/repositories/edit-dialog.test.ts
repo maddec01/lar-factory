@@ -1,13 +1,10 @@
-// Edit in Settings › Repositories: the dialog shows each of the repository's settings with where it comes from, saves
-// a local override or removes it so the shared default applies again, says why a Repository config can't be used while
-// the last usable setup stays, and rechecks access. A changed item source or domain-doc location names the work it
-// pauses on the repository's row, with Accept. Offer sets the operations the factory offers, within the access found.
+// Repository Settings save local choices and show effective issue defaults with verified Access.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
 import { effectiveVocabulary, type BoardData, type RepositorySetup } from '@lar-factory/shared';
 
-const REPO = 'maddec01/lar-server';
+const REPO = 'team/app';
 
 const SETUP: RepositorySetup = {
   repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, labels: ['area: server'],
@@ -17,9 +14,9 @@ const SETUP: RepositorySetup = {
   sources: { createIssuesFromAddItem: 'default', createIssuesFromRetro: 'default', writeRefinedSpec: 'default', role: 'local', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default', vocabulary: 'default' },
 };
 
-/** The sample board with `change` made to lar-server's setup. */
+/** The sample board with a generic repository's setup. */
 function boardWith(change: Partial<RepositorySetup> = {}, items = sample.items): BoardData {
-  return { ...sample, items, repos: [{ ...sample.repos[0]!, setup: { ...SETUP, ...change } }, sample.repos[1]!] };
+  return { ...sample, items, repos: [{ ...sample.repos[0]!, repo: change.repo ?? REPO, setup: { ...SETUP, ...change } }, sample.repos[1]!] };
 }
 
 /** Serves `board`, and `answer` for each settings change, whose bodies it returns. */
@@ -89,4 +86,71 @@ test('concept sync changes on this machine without a repository PR', async () =>
   const toggle = dialog()!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
   await settle(() => toggle.click());
   expect(sent).toEqual([{ repo: REPO, change: 'structure-sync', value: false }]);
+});
+
+test('issue defaults start on for existing repositories and persist each choice through Settings', async () => {
+  let board = boardWith({ access: { ...SETUP.access, 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' } });
+  const sent = serve(board, (body) => {
+    board = boardWith({ ...board.repos[0]!.setup!, [String(body.key)]: body.value });
+    return { body: { board } };
+  });
+  await openEdit(board);
+  for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
+    const input = setting(key).querySelector<HTMLInputElement>('input')!;
+    expect([input.checked, input.disabled]).toEqual([true, false]);
+    await settle(() => input.click());
+    expect(setting(key).querySelector<HTMLInputElement>('input')!.checked).toBe(false);
+  }
+  expect(sent).toEqual(['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec'].map((key) => ({ repo: REPO, change: 'override', key, value: false })));
+});
+
+test('issue defaults display independent access denials and recover saved choices after recheck', async () => {
+  const denied = boardWith();
+  const allowed = boardWith({ access: { ...SETUP.access, 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' }, createIssuesFromRetro: false });
+  serve(denied, () => ({ body: { board: allowed } }));
+  await openEdit(denied);
+  for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
+    const input = setting(key).querySelector<HTMLInputElement>('input')!;
+    expect([input.checked, input.disabled]).toEqual([false, true]);
+  }
+  expect(text(setting('createIssuesFromAddItem'))).toContain('not checked yet');
+  expect(text(setting('writeRefinedSpec'))).toContain('refused');
+  await settle(() => buttonIn(dialog()!.querySelector('[data-access]')!, 'Recheck access')!.click());
+  expect(setting('createIssuesFromAddItem').querySelector<HTMLInputElement>('input')!.checked).toBe(true);
+  expect(setting('createIssuesFromRetro').querySelector<HTMLInputElement>('input')!.checked).toBe(false);
+  expect(setting('writeRefinedSpec').querySelector<HTMLInputElement>('input')!.disabled).toBe(false);
+});
+
+test('Azure session read-only disables issue preferences with verified Access', async () => {
+  const repo = 'organization/project/repository';
+  const board = boardWith({ repo, azureReadOnly: true, access: { ...SETUP.access, 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' } });
+  serve(board);
+  await openRepositories(board);
+  await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Edit')!.click());
+  for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
+    const input = setting(key).querySelector<HTMLInputElement>('input')!;
+    expect([input.checked, input.disabled]).toEqual([false, true]);
+    expect(text(setting(key))).toContain('read-only');
+  }
+});
+
+test.each(['publish-ticket', 'edit-ticket'] as const)('only the controls needing %s are disabled when it is refused', async (operation) => {
+  const board = boardWith({ access: { ...SETUP.access, 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', [operation]: 'refused' } });
+  serve(board);
+  await openEdit(board);
+  for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
+    const input = setting(key).querySelector<HTMLInputElement>('input')!;
+    const denied = (key === 'writeRefinedSpec') === (operation === 'edit-ticket');
+    expect([input.checked, input.disabled]).toEqual([!denied, denied]);
+    if (denied) expect(input.getAttribute('aria-describedby')).toBe(setting(key).querySelector('p')!.id);
+  }
+});
+
+test('legacy private domain docs display off and offer only on or off', async () => {
+  const board = boardWith({ domainDocs: { kind: 'private' } as unknown as RepositorySetup['domainDocs'] });
+  serve(board);
+  await openEdit(board);
+  const select = setting('domainDocs').querySelector('select')!;
+  expect(select.value).toBe('off');
+  expect([...select.options].map((option) => option.value)).toEqual(['off', 'repository']);
 });

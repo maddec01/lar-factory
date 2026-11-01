@@ -31,13 +31,14 @@ const saveReads: SaveReads = {
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
 /** The body's answers, or null when one is missing or has the wrong shape. */
-function answersOf({ projectId, role, itemSource, domainDocs, skills, structureSync, vocabulary }: Record<string, unknown>): LocalSetupAnswers | null {
+function answersOf({ projectId, role, itemSource, domainDocs, skills, structureSync, vocabulary, createIssuesFromAddItem = true, createIssuesFromRetro = true, writeRefinedSpec = true }: Record<string, unknown>): LocalSetupAnswers | null {
+  if ([createIssuesFromAddItem, createIssuesFromRetro, writeRefinedSpec].some((value) => typeof value !== 'boolean')) return null;
   if (vocabulary !== undefined && !isVocabularyMapping(vocabulary)) return null;
   const docs = isRecord(domainDocs) && (domainDocs.kind === 'off'
     || domainDocs.kind === 'repository' && typeof domainDocs.glossary === 'string' && typeof domainDocs.adrs === 'string');
   if (structureSync !== undefined && typeof structureSync !== 'boolean') return null;
   if (typeof projectId !== 'string' || role !== undefined && typeof role !== 'string' || !isRecord(itemSource) || !docs || !strings(skills)) return null;
-  return { ...(vocabulary === undefined ? {} : { vocabulary }), projectId, structureSync: structureSync !== false, role: typeof role === 'string' ? role.trim() : '', itemSource, domainDocs, skills } as unknown as LocalSetupAnswers;
+  return { ...(vocabulary === undefined ? {} : { vocabulary }), projectId, structureSync: structureSync !== false, role: typeof role === 'string' ? role.trim() : '', itemSource, domainDocs, skills, createIssuesFromAddItem, createIssuesFromRetro, writeRefinedSpec } as unknown as LocalSetupAnswers;
 }
 
 const ANSWERS = 'Send the repository, its T3 project, role, item source, domain-doc location, skills.';

@@ -106,7 +106,7 @@ export async function detectAccess(repo: string, reads: DetectReads = detectRead
 
 type TreeFacts = Pick<SetupDetection, 'domainDocs' | 'projectSkills'>;
 
-/** The repository's glossary and ADRs when it has either, at the paths it has them, else private drafts. */
+/** The repository's glossary and ADRs when it has either, at the paths it has them, else off. */
 function domainDocsOf(files: readonly string[]): DomainDocLocation {
   const glossary = ['GLOSSARY.md', 'CONTEXT.md'].find((path) => files.includes(path));
   const adrs = files.some((path) => path.startsWith('docs/adr/'));
@@ -139,6 +139,7 @@ export async function detectSetup(input: Record<string, unknown>, reads: DetectR
   ]);
   return { detection: {
     repo, provider: azure ? 'Azure DevOps' : 'GitHub', checkout, itemSources,
+    ...azure && process.env.LAR_FACTORY_AZURE_READ_ONLY === '1' && { azureReadOnly: true },
     access: Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, access[op] ?? 'unverified'])) as SetupDetection['access'],
     ...facts,
   } };

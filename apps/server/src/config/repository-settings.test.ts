@@ -1,4 +1,4 @@
-import { test, expect, type TestContext } from 'vite-plus/test';
+import { test, expect, vi, type TestContext } from 'vite-plus/test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,6 +33,41 @@ test('local settings validate values and reset to factory defaults', async (t) =
   expect(await changeRepositorySettings({ repo: 'team/app', change: 'override', key: 'skills', value: 'all' }, dir)).toMatchObject({ status: 400 });
   expect(await changeRepositorySettings({ repo: 'else/app', change: 'override', key: 'role', value: 'X' }, dir)).toMatchObject({ status: 409 });
   expect(readRepositorySetups(dir)[0]?.role).toBe('');
+});
+
+test('Settings persists issue preferences independently and rejects invalid values', async (t) => {
+  const dir = await folder(t);
+  saveOnboarded('team/app', null, dir);
+  for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec'] as const) {
+    expect(readRepositorySetups(dir)[0]?.[key]).toBe(true);
+    expect(await changeRepositorySettings({ repo: 'team/app', change: 'override', key, value: false }, dir)).toMatchObject({ setup: { [key]: false } });
+    expect(readRepositorySetups(dir)[0]?.[key]).toBe(false);
+    expect(await changeRepositorySettings({ repo: 'team/app', change: 'override', key, value: 'on' }, dir)).toMatchObject({ status: 400 });
+  }
+  await changeRepositorySettings({ repo: 'team/app', change: 'override', key: 'createIssuesFromAddItem' }, dir);
+  expect(readRepositorySetups(dir)[0]).toMatchObject({ createIssuesFromAddItem: true, createIssuesFromRetro: false, writeRefinedSpec: false });
+});
+
+test('Azure read-only is exposed for this session without changing saved choices or GitHub', async (t) => {
+  const dir = await folder(t);
+  saveOnboarded('organization/project/repository', null, dir);
+  saveOnboarded('team/app', null, dir);
+  const before = await readFile(join(dir, 'repository-settings.json'), 'utf8');
+  vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '1');
+  t.onTestFinished(() => { vi.unstubAllEnvs(); });
+  expect(readRepositorySetups(dir)[0]).toMatchObject({ azureReadOnly: true, createIssuesFromAddItem: true });
+  expect(readRepositorySetups(dir)[1]?.azureReadOnly).not.toBe(true);
+  vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '0');
+  expect(readRepositorySetups(dir)[0]?.azureReadOnly).not.toBe(true);
+  expect(await readFile(join(dir, 'repository-settings.json'), 'utf8')).toBe(before);
+});
+
+test('legacy private domain docs read as off and save as on or off', async (t) => {
+  const dir = await folder(t);
+  await writeFile(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: [{ repo: 'team/app', settings: { overrides: { domainDocs: { kind: 'private' } } } }] }));
+  expect(readRepositorySetups(dir)[0]?.domainDocs).toEqual({ kind: 'off' });
+  await changeRepositorySettings({ repo: 'team/app', change: 'override', key: 'domainDocs', value: { kind: 'off' } }, dir);
+  expect(await readFile(join(dir, 'repository-settings.json'), 'utf8')).not.toContain('private');
 });
 
 test('changing docs applies directly and leaves no acceptance gate', async (t) => {

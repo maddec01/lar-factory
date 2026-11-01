@@ -84,6 +84,7 @@ function setupOf(repo: string, local: LocalSettings, connections: string[] = [])
   const domainDocs = savedDocs?.kind === 'repository' ? savedDocs : { kind: 'off' as const };
   return {
     repo, structureSync: local.structureSync ?? true, ...local.projectId !== undefined && { projectId: local.projectId },
+    ...onAzure(repo) && process.env.LAR_FACTORY_AZURE_READ_ONLY === '1' && { azureReadOnly: true },
     role: pick('role') ?? '', itemSource, labels: pick('labels') ?? [], domainDocs, skills: pick('skills') ?? [],
     createIssuesFromAddItem: pick('createIssuesFromAddItem') ?? true,
     createIssuesFromRetro: pick('createIssuesFromRetro') ?? true,

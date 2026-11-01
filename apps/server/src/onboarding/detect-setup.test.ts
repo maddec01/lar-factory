@@ -1,4 +1,4 @@
-import { test } from 'vite-plus/test';
+import { test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { SetupDetection } from '@lar-factory/shared';
 import type { Checkout } from '../t3/repository-project.ts';
@@ -25,6 +25,16 @@ const detect = async (files?: Record<string, string>, parts?: Partial<DetectRead
   const answer = await detectSetup({ repo: 'maddec01/lar-web', projectId: 'web', ...input }, reads(files, parts));
   return (answer as { detection: SetupDetection }).detection;
 };
+
+test('detection exposes the Azure session write restriction separately from verified Access', async (t) => {
+  vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '1');
+  t.onTestFinished(() => { vi.unstubAllEnvs(); });
+  const repo = 'organization/project/repository';
+  const result = await detect({}, { azureAccess: async () => ({ 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' }) }, { repo, projectId: 'app' });
+  assert.equal(result.azureReadOnly, true);
+  assert.equal(result.access['publish-ticket'], 'allowed');
+  assert.notEqual((await detect()).azureReadOnly, true);
+});
 
 test('detection reads doc and skill paths without reading factory configuration or instructions', async () => {
   const found = reads({ 'GLOSSARY.md': '', 'docs/adr/one.md': '', '.agents/skills/local/SKILL.md': '', 'AGENTS.md': '', '.lar-factory.json': '' });

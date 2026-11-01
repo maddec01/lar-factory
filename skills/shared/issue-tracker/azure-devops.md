@@ -35,13 +35,20 @@ az devops invoke --area wit --resource comments --organization "$org" \
 Queue, Status and shaping or build progress live only in local work records.
 [Tracker structure sync](publication.md) saves concept and multi-repository kind,
 map diagram, parts, Connections, Dependencies and issue grouping when the local
-option is ON. Only shaping results needed for that structure reach work items.
-Ordinary briefs, decisions, domain drafts and slices stay local. The source
-supplies List without a per-ticket import step. Do not write workflow labels,
-progress comments or Azure State.
+option is ON. That path saves only shaping results needed for structure.
+[Issue creation and Ticket Specs](work-records.md#issue-creation) use independent
+ON-by-default settings. The whole gated brief, including enabled Domain docs,
+becomes the main text with the earlier text kept as Original. Decisions, slices,
+queue and progress stay local. The source supplies List without a per-ticket
+import step. Keep workflow labels, progress comments and Azure State unchanged.
 
-Preserve teammates' raw HTML and Repro Steps. Respect the sync command's recorded
-outcomes, and reconcile uncertainty before retrying. The saved onboarding option
+Spec writes convert Markdown to HTML, preserve Original HTML and the managed
+structure block, and test the work-item revision. Bugs use Repro Steps for creates
+and Specs, leaving a separate Description intact. A visible Original heading
+supports sanitizers that strip comments or details. Member edits sync back to the
+record, with HTML conversion only after a real text edit. Preserve teammates'
+raw HTML outside managed structure when syncing structure. Respect the sync
+command's recorded outcomes and reconcile uncertainty before retrying. The saved onboarding option
 covers structural sync without repeated per-update approval prompts.
 
 Build PRs use the native work-item relationship through

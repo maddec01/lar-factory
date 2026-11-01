@@ -230,7 +230,7 @@ export function structureProvider(): StructureProvider {
         if(JSON.stringify(readTrackerStructure(fresh.body))!==JSON.stringify(readTrackerStructure(ticket.body)))throw Error('The issue structure changed while saving. The pending save will recheck it.');
         const metadata=readTrackerStructure(body);if(!metadata)throw Error('The structural update has no metadata.');
         await markStructural(ticket.repository,ticket.number);
-        // GitHub does not support conditional issue-body PATCH. Append metadata and never replace authored bytes.
+        // Structure uses comments to preserve authored bytes. replaceSpec separately writes gated text with Original.
         await github(`repos/${ticket.repository}/issues/${ticket.number}/comments`,'POST',{body:writeTrackerStructure('',metadata).trim()});
       } else {
         if (fresh.version !== ticket.version || fresh.body !== ticket.body) throw Error('The issue changed while saving its structure. The pending save will recheck it.');

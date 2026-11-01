@@ -10,8 +10,9 @@ build is a work record, named by the work ID in your `Build <work ID>` message.
 Read and change it with `lar-work` per
 `<lar-build>/shared/issue-tracker/work-records.md`, and set its Status with
 `bash <lar-build>/shared/scripts/status.sh <work ID> "<Status>"`. Factory
-progress stays in the record: write nothing to a ticket. Call tools by name:
-the ones named here. Call `orchestrator_capabilities` only when a model must
+progress stays in the record. Whole gated Specs and structural sync follow the
+saved settings per [work records](../shared/issue-tracker/work-records.md).
+Call the tools named here. Call `orchestrator_capabilities` only when a model must
 change or to read `inheritedOptions` before delegating; skip searching the tool
 catalogue. Read each file or skill a step names only when that step runs.
 
@@ -40,12 +41,17 @@ thread resuming after a handoff, and pass them in every subagent's brief.
 ## Build
 
 1. Set **In progress**, unless a handoff resumes past **Build**. Read the
-   record (`lar-work read`), its brief (`lar-work body <work ID> --body brief`),
+   ticket Spec through `lar-work gate <work ID>`, then its brief
+   (`lar-work body <work ID> --body brief`) and record (`lar-work read`),
    its initial context (`lar-work context`), the prototype or research branches
    the brief names, existing project instructions when present and `<lar-build>/project-rules.md`;
    follow existing worktree instructions if present. When no instructions exist,
    infer setup and checks from package scripts, manifests, CI and nearby code.
    Missing factory setup or agent instruction files never block a build.
+   Inspect the gate's Spec sync warnings. If the ticket read failed, report
+   that this build uses the last local copy. Held GitHub edits need the user's
+   Accept or Reject in details before use. Later tracker edits update the
+   record and leave the running build as it started.
 
    Then archive the build's idle shaping threads, on every start and every
    resume:
@@ -114,13 +120,14 @@ thread resuming after a handoff, and pass them in every subagent's brief.
    cites its origin names the record's ticket when it has one, otherwise the
    build PR, never a work ID or local path. Its prompt carries
    `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
-   When they are private, the PR writes no domain docs and this step does
-   nothing. A new term or ADR-worthy decision (all three conditions) settled
-   during the build is added the same way (by the fixer during review) without
-   stopping. Keep a list of each, headed **Domain docs added by the build**,
-   current through review fixes, for the reviewers and approver. With private
-   domain docs, keep drafts in the local record and leave this PR list empty.
-   Never copy private domain drafts into a PR or offer publication later.
+   With domain docs OFF, this step does nothing, creates no drafts and leaves
+   the brief's Domain docs as "none". A saved private value also means OFF.
+   With domain docs ON, add a new term or ADR-worthy decision settled during
+   the build the same way, using the fixer during review without stopping.
+   Each ADR must meet all three conditions in the domain-doc guide.
+   Keep a list of each, headed **Domain docs added by the build**,
+   current through review fixes, for the reviewers and approver. With domain
+   docs OFF, leave this list empty and offer no later publication.
 6. A subagent runs the full project check suite, once, on the build
    branch HEAD, and returns that commit's tree (`git rev-parse HEAD^{tree}`):
    the step 6 tree. Failures go to the fixer. All must pass. A fix for a

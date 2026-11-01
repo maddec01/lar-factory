@@ -32,7 +32,8 @@ The packaged Electron app starts and stops its own server.
 
 ## Repository settings
 
-Onboarding has three steps, repository, source/docs/sync, then access/add. It
+Onboarding selects the repository, source, domain docs, sync, issue defaults,
+optional vocabulary mappings and Access. It
 saves directly on this machine. It offers no setup PR, configuration file or
 guidance changes. The source supplies List without a per-ticket import step.
 Existing project conventions apply even when the repository has no agent docs.
@@ -45,13 +46,19 @@ holds role, issue source, labels, domain docs, selected project skills and
 vocabulary mappings. This retained field name has only built-in defaults beneath
 it. Cached shared values are ignored, and the server reads no repository config.
 
-`domainDocs.kind` is `off` for OFF or `repository` for ON. OFF keeps domain
-drafts local without later publish prompts. ON names the glossary and ADR paths
-that builds include in their PR. The tracker option is ON by default and uses
+`domainDocs.kind` is `off` for OFF or `repository` for ON. Legacy `private`
+reads as OFF. OFF means no drafts, Domain docs says "none", and builds write no
+glossary or ADR files or offer publication later. ON names the glossary and ADR
+paths; shaping drafts entries, enabled ticket Specs include them, and builds
+write them in their PR. The tracker option is ON by default and uses
 only `structureSync`, stored as `settings.structureSync`. Its scope is kind, map
 diagram, parts, Connections, Dependencies and issue grouping. It includes only
-shaping results needed to explain that structure. Queue, board Status, ordinary
-briefs, decisions, slices and per-item progress stay local.
+shaping results needed to explain that structure. Queue, board Status, decision
+records, slices and per-item progress stay local. Separate defaults create
+issues from Add item and retro captures and write whole gated briefs as ticket
+Specs. All three default to ON and verified Access controls their writes.
+See [issue creation and Specs](../../skills/shared/issue-tracker/work-records.md#issue-creation)
+for conversion, failures, Original preservation and tracker edit provenance.
 
 `bash skills/shared/scripts/repo-config.sh <repository>` from the workspace root
 prints effective local settings without a provider call. Its `--list` and
@@ -67,8 +74,10 @@ looks up no tools. T3 Code supplies the repository projects and starts threads.
 
 Before enabling structural sync, onboarding checks creation, comments and label
 capability on GitHub using the classic token's actual scopes and repository
-role. Unverified fine-grained tokens block the option with guidance to grant
-repository Issues read and write permission. Azure checks work-item creation,
+role. Unverified fine-grained tokens block writes with guidance to use a classic
+token or gh OAuth login and recheck Access. Repository, organization and project
+names and old consent lists grant no access. The session-wide Azure read-only
+setting bars Azure writes. Azure checks work-item creation,
 description editing and comments. These checks make no probe writes.
 
 The Electron app supplies `BOARD_APP_SECRET`. Writes require its
@@ -79,7 +88,9 @@ Source refresh and PR observations read providers; local progress does not write
 back to issues. Structural sync uses the saved local option and outbox. GitHub
 stores immutable managed projection, manifest and gzip chunk comments, with
 `linked-work` for discovery. It creates a missing label only when structure is
-first used, preserves existing labels and never patches authored issue bodies.
+first used and preserves existing labels and authored issue bodies. The separate
+Spec path replaces the main description with the whole gated brief and keeps
+prior text as Original.
 Azure uses batch reads, revision-tested numeric REST description patches and
 managed Markdown chunk comments. See [the structural protocol](../../skills/shared/issue-tracker/publication.md#storage-and-conflicts)
 for ETags, backwards comment pagination, canonical roots, detach cleanup and

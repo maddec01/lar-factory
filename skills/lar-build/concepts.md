@@ -30,7 +30,9 @@ parts they affect. The board reads their local completion separately.>
 - <need>, from <owner>, blocks <build title>
 ```
 
-The user's original text stays in the record's initial context.
+The user's original text stays in the record's initial context. Follow the local
+[domain-doc setting](shared/domain-docs.md#where-domain-docs-live). With it OFF,
+write "none" under Domain docs and in decision domain-drafts, without drafting entries.
 
 1. Grill the user ([Grilling with docs](grilling-with-docs.md) in [SKILL.md](grilling-with-docs.md))
    only on the destination and the out-of-scope list.
@@ -63,7 +65,8 @@ Work a decision record by the method its text names (**Grilling with docs** in
 in this order, so completion reads it as complete:
 
 1. Save the confirmed answer (`lar-work set-body <work ID> --revision N --body answer --file <file>`)
-   and the Domain docs drafts it settled, or "none" (`--body domain-drafts`).
+   and, with domain docs ON, the drafts it settled, or "none"
+   (`--body domain-drafts`). With domain docs OFF, save "none" and create no drafts.
 2. Turn fog that cleared into new decision records, as in step 2. When part of
    the destination is fully decided, make a build record for it
    (`slice.sh <concept work ID> "<title>" <brief file> --kind build`) with a

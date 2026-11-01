@@ -7,9 +7,9 @@ read and write records only through `lar-work` and the shared scripts.
 the `--revision` from your last read; when the record moved on, the change
 writes nothing, so read it again and redo the change.
 
-Factory progress stays on this machine. Work records are its source of truth,
-not a fully recoverable tracker cache. Tracker writes carry only the structure
-described below, never queue, Status or build progress.
+Work records are the source of truth for factory progress, including queue,
+Status and build progress. Tickets hold created issues, gated Specs and the
+separate structural projection. They are not a backup of local work records.
 
 ## Picking
 
@@ -17,8 +17,10 @@ A **work ID** names one record for its whole life. Work reaches the board throug
 The configured GitHub issues or Azure DevOps team source supplies that List;
 there is no per-ticket import step. A source-backed record keeps its ticket
 reference and initial text
-(`lar-work context <work ID>`). That text is where shaping starts. Refinement in
-the record is the authority, and a later ticket edit never changes it.
+(`lar-work context <work ID>`). That text is where shaping starts. A ticket
+already carrying Spec markers supplies its Original as initial context on a new
+machine, without restoring a local brief. Once this machine syncs a Spec, the
+ticket is the source of truth under [Ticket Specs](#ticket-specs).
 
 Resolve a thread's argument, a work ID or a ticket (`owner/repo#12`, its issue
 URL, or an Azure work item URL), with
@@ -28,6 +30,103 @@ resolve it again. A thread uses the existing local identity instead of creating
 a duplicate record.
 
 Name the work ID in every handoff, delegated-task brief and thread message.
+
+## Issue creation
+
+Onboarding and Settings offer Create issues from Add item, Create issues from
+retro captures and Write the refined spec to the issue. Each defaults to ON,
+including for existing repositories. Verified Access controls each write.
+Refused or unchecked Create issues disables the first two options and the Add
+item checkbox; refused or unchecked Edit issues disables the Spec option.
+`LAR_FACTORY_AZURE_READ_ONLY=1` bars Azure writes. Repository, organization and
+project names grant no permission. A stored consent list grants none either.
+Recheck access in Settings. Unverified fine-grained GitHub tokens need a classic
+token or gh OAuth login; editing other people's issues also needs push access.
+
+Add item starts its Create issue checkbox from the selected repository's default.
+The checkbox changes only that submission. With it on, GitHub offers labels,
+assignee and milestone, plus issue type for organization repositories. Azure
+offers work item type, tags, assignee and iteration, using the team's default
+area. Only title, repository and kind are required. All options start empty
+except the kind's mapped labels and type. Fields without write Access are hidden
+and their mapped values are omitted. Unreadable options leave title and description
+usable; Azure still needs a readable team backlog type or creation fails.
+
+Vocabulary mapping is optional in onboarding and Settings. It maps bug, feature
+and improvement to existing labels and type, suggests same-name labels and allows
+none. A typed label is created only when saved. Skipping this step creates no
+labels. Structure sync separately creates `linked-work`, as onboarding explains.
+
+A successful submission creates a ticket and a List record whose initial context
+is the submitted description. An unticked checkbox saves local work. Failure
+keeps the Add item draft open and adds nothing to List. An uncertain create blocks
+resubmission: its durable request ID and hidden ticket marker recover an existing
+result, including after a restart. Never retry with a new ID to bypass uncertainty.
+If Azure strips the marker, follow the error and check the board. When the ticket
+exists but saving its record failed, use the ticket named in the error with Find
+a ticket.
+
+A ticketless item's details offer Create issue beside Attach a ticket, regardless
+of the Add item default. It previews the stored title and outgoing text without
+text editing and keeps the work ID. Without a current passing brief, or with Spec
+writing off, it sends the description. Otherwise it sends the whole passing brief
+as Spec with the description as Original. Access still applies.
+`lar-work create-ticket <work ID> --revision N --request-id <UUID>` uses the same
+path with kind mappings. [Retro capture](../retro-capture.md) uses `--retro` and
+the separate retro default, keeping failed captures local for later conversion.
+`lar-work create` alone creates no ticket.
+
+Every card, row and item details shows its source, using the GitHub or Azure mark
+for tickets and a laptop for local work. Conversion updates that source.
+
+## Ticket Specs
+
+When a ticket-backed ordinary record passes its gate and Write the refined spec
+to the issue is ON, the whole brief becomes the ticket's main description, the
+Spec. The ticket's prior text remains in a collapsed Original section. This
+covers other people's tickets in onboarded repositories too. Concept maps,
+decisions, slices and Dependency tickets never use this write path. Structural
+sync has its own setting and protocol.
+
+From the first synced Spec, the ticket is the source of truth. The record keeps
+a copy for gate evidence and the builder. `lar-work gate <work ID>` rereads the
+ticket before returning its digest and sync status. Read the brief and revision
+after that refresh, before reviewing or gating the text. `record-gate` rereads
+again and rejects stale revisions or digests. A held GitHub edit needs Accept or
+Reject in item details before a later gate.
+
+A durable outbox survives closing the board. A failed Spec write keeps the item
+Ready and shows an error and retry in details. Report the failure without
+claiming the ticket was updated. The saved GitHub digest or Azure revision
+distinguishes the old ticket from a real edit, so an unchanged ticket cannot
+replace an unsent gated brief. When the ticket's main text also changes while a
+write is pending, the ticket wins. The record warns that it replaced the unsent
+Spec and keeps that text in gate history. Title-only changes keep the pending
+Spec. Gate history records tracker and conflict provenance.
+
+Board ticket reads import trusted Spec and title edits without changing Status.
+Azure converts HTML back to Markdown only for an actual text edit. GitHub edits
+by someone without verified repository write access, or with an unknown editor,
+stay held in details for the user's Accept or Reject. Azure member edits sync
+without this check. Never use held text as build instructions before acceptance.
+Saving the description in details approves that exact Spec, updates the local
+copy and queues its ticket write. Ready stays Ready.
+
+GitHub rereads the issue's own body immediately before writing. It has no
+conditional body edit, so a small race after that read remains. Azure tests the
+work-item revision and preserves its managed structure block and Original HTML.
+Azure Bugs use Repro Steps, leaving a separate Description intact. Azure writes
+HTML and includes a visible `Original (Lar Factory)` heading as a fallback when
+sanitizers remove comments or details. Fake-provider tests cover both markup
+forms; they do not prove a live deployment's sanitizer behavior.
+
+Start build rereads the ticket and starts from its text. If reading fails, it
+uses the record's last copy and reports the warning. Later edits update the
+record and leave an already running build as it started. Details show Spec as
+the main description and Original collapsed. A ticket without factory markers
+keeps its ordinary display; removing markers from an active Spec makes the whole
+description count as Spec. Before the first Spec, or with its setting OFF,
+ticket edits do not replace local briefs.
 
 ## Status
 
@@ -114,14 +213,16 @@ parts, Connections, Dependencies and issue grouping, with only the shaping
 results needed to explain them. Local changes enter the structural outbox
 automatically.
 `lar-work sync-structure <work ID>` requests a drain explicitly. Queue, Status,
-ordinary briefs, decisions, slices and per-item progress stay in local records.
+decision records, slices and per-item progress stay local. Whole gated briefs
+use [Ticket Specs](#ticket-specs), independently of structure sync.
 Shaping and starting a build remain independent choices.
 
 On a new machine, add the repository, then add its saved work from List to
 reconstruct the structure and cross-repository links. Restored items start in
-List. Ordinary briefs, decisions, slices and progress need the original local
-records; tracker sync cannot recover them. Conflicting structural versions stop
-sync with both copies retained. Follow the protocol's recovery rules rather
+List. Structural recovery restores no ordinary brief, decision record, slice or
+progress history. A ticket Spec preserves its text, but adding it on another
+machine restores no local brief or gate history. Conflicting structural versions
+stop sync with both copies retained. Follow the protocol's recovery rules rather
 than assuming a merge or conflict resolution UI exists.
 
 Opening a build's PR follows [PR delivery](publication-pr.md), including

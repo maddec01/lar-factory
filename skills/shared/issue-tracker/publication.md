@@ -20,10 +20,12 @@ Save only the information needed to understand which issues belong together:
 - Connections between repositories and Dependencies on other owners.
 - Shaping results necessary to explain that structure.
 
-Ordinary briefs, decision records, answers, domain drafts and slices stay local.
-Queue position, board Status, workflow stage, phase, per-item progress, completion
-styling and review state stay local too. A map projection must omit those fields
-even when the local map contains them. Tracker sync is not a backup of work records.
+Whole gated briefs use the separate [Ticket Spec path](work-records.md#ticket-specs),
+including Domain docs drafts when domain docs are ON. Structure sync omits ordinary
+briefs, decision records, answers and slices. Queue position, board Status,
+workflow stage, phase, per-item progress, completion styling and review state
+stay local. A map projection must omit those fields even when the local map
+contains them. Tracker sync is not a backup of work records.
 
 The saved onboarding choice covers these structural updates. Do not offer a
 second publication step or ask for permission again for each update. A refused
@@ -36,8 +38,10 @@ requests to change another team's work still require the user's authorization.
 Onboarding verifies GitHub issue creation, comments and labeling before it enables
 structural sync. Verification checks the logged-in classic token's actual scopes
 and the repository role together. An unverified fine-grained token blocks the
-option. Tell the user to grant repository Issues read and write permission and
-check access again; do not treat an unverified permission as authorization.
+option. Ask the user to sign in with a classic token or gh OAuth login and
+recheck access. Unchecked Access permits no write. Organization, project and
+repository names and old consent lists grant no permission. The session-wide
+Azure read-only setting bars Azure writes.
 
 Azure needs verified work-item creation, description editing and comments.
 The configured team's backlog determines the issue type and default area for new
@@ -52,7 +56,9 @@ breaks ties by durable identity, falling back to other parentless parts. Each
 issue's managed projection links to that root's committed manifest. Parts in
 other repositories carry explicit repository identities as well as issue URLs.
 
-GitHub never patches authored issue bodies. It appends immutable managed
+GitHub structure sync preserves authored issue bodies. The separate Ticket Spec
+writer deliberately replaces the main description while retaining Original.
+Structure sync appends immutable managed
 projection and manifest comments, and immutable gzip/base64 chunk comments.
 The `linked-work` label enables cheap discovery before reading comments. When
 structure is first used, the writer creates this label only if it is absent.

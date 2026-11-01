@@ -22,8 +22,10 @@ Every ordinary question batch runs these once, however many calls it takes:
 
 1. Set **Needs you**, then make the calls; each blocks.
 2. After the last call, keep the answers for the record: a decision's answer
-   body, or the brief's or map's **Confirmed** and Domain docs when you write
-   them. Never write them to a ticket.
+   body, or the brief's or map's **Confirmed** when you write them. Include
+   Domain docs drafts only when that setting is ON; otherwise write "none".
+   A whole gated brief reaches its ticket through the saved Spec setting, rather
+   than separate question-and-answer comments.
 3. Set the status back to the step's: Shaping while shaping, In progress or
    Review in a build.
 

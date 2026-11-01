@@ -2,11 +2,11 @@
 import { structureSyncOperations, sameRepo, shownRepo, type Detected, type DomainDocLocation, type OnboardingChoices,
   type RepoConfig, type RepositoryItemSource, type RepositoryOperation, type SetupDetection } from '@lar-factory/shared';
 
-export const STEP_TITLES = { project: 'Repository', work: 'Work and docs', vocabulary: 'Kind vocabulary', access: 'Access and add' } as const;
+export const STEP_TITLES = { project: 'Repository', work: 'Work and docs', access: 'Access and add' } as const;
 export type StepId = keyof typeof STEP_TITLES;
 export const isStep = (id: string): id is StepId => Object.hasOwn(STEP_TITLES, id);
 export const found = <T>(fact: Detected<T>): T | null => 'found' in fact ? fact.found : null;
-export const stepsOf = (): StepId[] => ['project', 'work', 'vocabulary', 'access'];
+export const stepsOf = (): StepId[] => ['project', 'work', 'access'];
 export interface Answers {
   itemSource: RepositoryItemSource | null;
   role: string;

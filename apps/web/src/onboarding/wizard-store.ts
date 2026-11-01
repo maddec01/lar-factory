@@ -68,13 +68,11 @@ export function stepReady(run: Run, projects: Projects, detection: Read<SetupDet
   const detected = detectedOf(detection);
   if (!detected || !('found' in detected.checkout)) return false;
   const answers = answersOf(detected, run.choices);
-  if (run.step === 'vocabulary' || run.step === 'access') {
-    const options = detected.azureReadOnly === undefined ? {} : { azureReadOnly: detected.azureReadOnly };
-    const terms = Object.values(run.choices.vocabulary ?? {});
-    if (terms.some((term) => term.type !== null) && writeAccessProblem(detected.repo, 'type-ticket', detected.access, options)) return false;
-    if (terms.some((term) => term.labels.length) && writeAccessProblem(detected.repo, 'tag-ticket', detected.access, options)) return false;
-    if (Object.values(run.choices.newLabels ?? {}).some((names) => names?.length) && newLabelProblem(detected.repo, detected.access, options)) return false;
-  }
+  const options = detected.azureReadOnly === undefined ? {} : { azureReadOnly: detected.azureReadOnly };
+  const terms = Object.values(run.choices.vocabulary ?? {});
+  if (terms.some((term) => term.type !== null) && writeAccessProblem(detected.repo, 'type-ticket', detected.access, options)) return false;
+  if (terms.some((term) => term.labels.length) && writeAccessProblem(detected.repo, 'tag-ticket', detected.access, options)) return false;
+  if (Object.values(run.choices.newLabels ?? {}).some((names) => names?.length) && newLabelProblem(detected.repo, detected.access, options)) return false;
   if (answerProblem(run.step, answers) || !answers.itemSource) return false;
   return run.step !== 'access' || !answers.structureSync || missingSyncAccess(detected).length === 0;
 }

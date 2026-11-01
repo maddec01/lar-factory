@@ -310,6 +310,8 @@ export interface Item {
   /** Why Abandon can't run on the item, which its greyed-out Abandon shows: an Azure work item whose type has no Removed state. Absent when it can. */
   abandonRefusal?: string;
   labels: string[];
+  /** Each label's colour on a tracker whose labels have one, by name, as CSS. Read with the labels, never stored on a record. */
+  labelColors?: Record<string, string>;
   azure?: AzureWorkItem;
   /** Azure backlog priority position, retained through partial reads and UI sorting. */
   sourceOrder?: number;

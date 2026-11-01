@@ -7,7 +7,8 @@ import { parseConceptMap } from './concept-map.ts';
 import { readTrackerStructure, trackerKind, trackerReference } from './tracker-structure.ts';
 
 interface RawLabelConn {
-  nodes: { name: string }[];
+  /** `color` is GitHub's six hex digits, with no `#`; the light reads leave it out. */
+  nodes: { name: string; color?: string }[];
 }
 
 export interface RawIssueRef {
@@ -170,6 +171,10 @@ function normalizeIssueRef(raw: RawIssueRef): IssueRef {
 
 const rawLabels = (raw: RawItem): string[] => raw.content?.labels?.nodes.map((l) => l.name) ?? [];
 
+/** The issue's labels' colours as CSS, by name; a colour that isn't six hex digits never reaches a style. */
+const rawLabelColors = (raw: RawItem): Record<string, string> => Object.fromEntries((raw.content?.labels?.nodes ?? [])
+  .flatMap((l) => (l.color && /^[0-9a-f]{6}$/i.test(l.color) ? [[l.name, `#${l.color}`]] : [])));
+
 /** An issue labelled `concept`, whose body holds its map. */
 export const isRawConcept = (raw: RawItem) => rawLabels(raw).includes('concept');
 
@@ -208,6 +213,7 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
   const closed = closing(c);
   const statuses = labelStatuses(rawLabels(raw));
+  const labelColors = rawLabelColors(raw);
   const item: Item = {
     id: c.id,
     revision: 0,
@@ -220,6 +226,7 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
     url: c.url,
     repo: c.repository.nameWithOwner,
     labels: rawLabels(raw),
+    ...Object.keys(labelColors).length > 0 && { labelColors },
     ...closed,
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
     parentId: null,

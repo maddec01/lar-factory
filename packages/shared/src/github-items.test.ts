@@ -254,3 +254,11 @@ test('a concept without parsed map content has no map, while a partial map keeps
   const partial = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: '## Fog\n- Where will it run?' });
   assert.deepEqual(normalizeItem(partial)?.map, { destination: '', decisions: [], fog: ['Where will it run?'] });
 });
+
+test("an issue's labels carry GitHub's colours, and a label without a valid colour has none", () => {
+  const raw = rawIssue('I_7', 7, '', [], { labels: { nodes: [{ name: 'area: web', color: 'BFDADC' }, { name: 'odd', color: 'red;' }, { name: 'plain' }] } });
+  const item = normalizeItem(raw)!;
+  assert.deepEqual(item.labels, ['area: web', 'odd', 'plain']);
+  assert.deepEqual(item.labelColors, { 'area: web': '#BFDADC' });
+  assert.equal('labelColors' in normalizeItem(rawIssue('I_8', 8, '', ['web']))!, false);
+});

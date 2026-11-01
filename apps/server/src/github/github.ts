@@ -4,7 +4,7 @@ import { structureProvider } from '@lar-factory/work-records/tracker-sync';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mapConcurrent, STRUCTURE_LABEL, DONE_WINDOW_MS, buildSubIssueSearches, readTrackerStructure, trackerKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey } from '@lar-factory/shared';
+import { LABEL_LIMIT, mapConcurrent, STRUCTURE_LABEL, DONE_WINDOW_MS, buildSubIssueSearches, readTrackerStructure, trackerKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey } from '@lar-factory/shared';
 import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
 import { AccessLost, NotFound, type TicketObservation } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
@@ -35,7 +35,7 @@ const CHECKS = `statusCheckRollup {
 /** The fields the board reads of a repository issue. */
 const ISSUE_FIELDS = `id number title url body issueType { name } state stateReason closedAt updatedAt
   repository { nameWithOwner }
-  labels(first: 20) { nodes { name } }
+  labels(first: ${LABEL_LIMIT}) { nodes { name color } }
   assignees(first: 20) { nodes { login } }
   parent { number title url state repository { nameWithOwner } }
   subIssuesSummary { total completed }
@@ -64,7 +64,7 @@ export const OPEN_ISSUES_QUERY = `query($owner: String!, $name: String!, $after:
 }`;
 
 /** What decides whether the board keeps a closed issue: its close, its labels, and its parent's id and labels. */
-const LIGHT_ISSUE_FIELDS = 'id closedAt stateReason labels(first: 20) { nodes { name } } parent { id labels(first: 20) { nodes { name } } }';
+const LIGHT_ISSUE_FIELDS = `id closedAt stateReason labels(first: ${LABEL_LIMIT}) { nodes { name } } parent { id labels(first: ${LABEL_LIMIT}) { nodes { name } } }`;
 
 /** How many close-date ranges a repository's closed issues are searched in at once, mostly a page each: more calls at once answer slower. */
 const CLOSED_RANGES = 10;

@@ -8,6 +8,7 @@
     ".": "./src/work-records.ts",
     "./export": "./src/export.ts",
     "./create-ticket": "./src/create-ticket.ts",
+    "./spec-sync": "./src/spec-sync.ts",
     "./tracker-sync": "./src/tracker-sync.ts"
   },
   "bin": {
@@ -18,10 +19,12 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@lar-factory/shared": "workspace:*"
+    "@lar-factory/shared": "workspace:*",
+    "turndown": "^7.2.4"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
+    "@types/turndown": "^5.0.6",
     "typescript": "^7.0.2",
     "vite-plus": "1.3.0"
   }

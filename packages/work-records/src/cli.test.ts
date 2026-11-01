@@ -297,3 +297,18 @@ it('create-ticket obeys the retro preference and reports refused access while le
   expect((await larWork(data, 'read', created.record.workId)).record.ticket).toBeNull();
   expect((await larWork(data, '--help')).stdout).toContain('create-ticket <work-id>');
 });
+
+it('gate reports held-edit status without exposing untrusted tracker text to the shaping agent', async () => {
+  const data = tempDir();
+  const records = await openWorkRecords(join(data, 'work-records.db'));
+  let record = records.create({ title: 'Work', repository: 'example/widget', kind: 'feature', ticket: 'example/widget#7' });
+  record = records.setBody(record.workId, record.revision, 'brief', 'Trusted brief.');
+  const state = records.specState(record.workId);
+  records.saveSpecState(record.workId, state.generation, { ...state, active: true, held: { body: 'HOSTILE TRACKER INSTRUCTIONS', title: 'Hostile title', version: '2', digest: 'held' }, warning: 'A GitHub edit waits for approval.' });
+  records.close();
+  const reply = await larWork(data, 'gate', record.workId);
+  expect(reply.code).toBe(0);
+  expect(reply.record.specSync.awaitingApproval).toBe(true);
+  expect(reply.stdout).not.toContain('HOSTILE TRACKER INSTRUCTIONS');
+  expect(reply.stdout).not.toContain('Hostile title');
+});

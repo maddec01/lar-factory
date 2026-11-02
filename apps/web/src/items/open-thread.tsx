@@ -1,6 +1,6 @@
 // Open thread: an Open, a link that opens an item's latest T3 thread in T3 Code, or a disabled button whose
-// title says why it can't: the item has no thread yet, T3's database can't be read, or T3 hasn't
-// written its environment id.
+// title says why it can't: the item has no thread yet, T3's database can't be read, T3 hasn't
+// written its environment id, or the thread is archived, whose link T3 opens as New thread.
 
 import { isLiveThread, threadLink } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
@@ -34,6 +34,7 @@ function latestThread(item: Item, data: BoardData, threadId?: string): { link: s
   const inherited = !threadId && !item.threads?.length ? conceptQuestionThread(item, data) : undefined;
   const latest = own ?? inherited;
   if (!latest) return { reason: 'No T3 thread has worked on this yet' };
+  if (latest.archived) return { reason: 'This thread is archived in T3 Code' };
   if (!data.t3EnvironmentId) return { reason: "T3 Code hasn't written its environment id" };
   return { link: threadLink(data.t3EnvironmentId, latest.id), conceptQuestion: !own && Boolean(inherited) };
 }
@@ -56,4 +57,25 @@ export function OpenThread({ item, data, label = 'Open thread', iconOnly = false
   return 'link' in thread
     ? <LinkButton kind="open" leftIcon={ICON.thread} data-open-thread={item.id} href={thread.link} title={iconOnly ? actionLabel : undefined} {...named}>{shown}</LinkButton>
     : <Button {...kind('open')} leftIcon={ICON.thread} className="disabled:pointer-events-auto" data-open-thread={item.id} disabled title={thread.reason} {...named}>{shown}</Button>;
+}
+
+/**
+ * The threads details lists beside Open thread: archived ones as text alone, since the only thing T3 offers for one is
+ * Unarchive, and earlier shaping threads with their links. A thread T3 or the board deleted isn't on the item.
+ */
+export function EarlierThreads({ item, data }: { item: Item; data: BoardData }) {
+  const earlier = Array.isArray(item.threads) ? item.threads.filter((thread, index) => thread.archived || (index > 0 && thread.purpose === 'shape')) : [];
+  if (!earlier.length) return null;
+  return (
+    <ul className="m-0 grid list-none gap-1 p-0 text-xs text-(--muted-foreground)" data-earlier-threads>
+      {earlier.map((thread) => (
+        <li key={thread.id} className="flex min-w-0 items-center gap-1.5" title={thread.title}>
+          {!thread.archived && data.t3EnvironmentId
+            ? <a href={threadLink(data.t3EnvironmentId, thread.id)} className="truncate underline">T3 · {thread.title}</a>
+            : <span className="truncate">T3 · {thread.title}</span>}{' '}
+          <span className="shrink-0">· {thread.archived ? 'archived' : 'shaping'}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }

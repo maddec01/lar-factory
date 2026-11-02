@@ -17,8 +17,8 @@ afterEach(() => {
 });
 
 describe('shaping thread cleanup setting', () => {
-  it('archives until the machine chooses otherwise', () => {
-    expect(readShapingThreadCleanup(tempDir())).toBe('archive');
+  it('settles until the machine chooses otherwise', () => {
+    expect(readShapingThreadCleanup(tempDir())).toBe('settle');
   });
 
   it.each<ShapingThreadCleanup>(['keep', 'settle', 'archive', 'delete'])('saves %s in the data folder and reads it back', (choice) => {

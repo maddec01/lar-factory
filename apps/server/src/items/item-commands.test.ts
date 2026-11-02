@@ -317,6 +317,26 @@ test('unknown lookup retains protection and warns without concurrent duplicate c
   assert.equal(board.snapshot().startCheckFailures?.[item.id], item.title);
 });
 
+test('a shaping thread the record holds as deleted raises no start check, with the CLI unavailable', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'deleted-shaping-'));
+  const records = await openWorkRecords(join(dir, 'records.db'));
+  try {
+    const { workId } = records.create({ title: 'Work', repository: WEB, kind: 'build', status: 'In progress' });
+    records.addThread(workId, records.read(workId).revision, 'shape', 'shape');
+    const { intent } = records.recordLaunchIntent(workId, records.read(workId).revision, 'build', undefined, 'delete');
+    records.resolveLaunchIntent(workId, records.read(workId).revision, intent.intentId, { threadId: 'build' });
+    records.markShapingThreadDeleted('shape');
+    let calls = 0;
+    const { commands, board } = commandsOn([], async () => { calls++; return 'unknown'; }, records);
+    const item = { ...board.snapshot().items[0]!, threads: [{ id: 'build', state: 'done' } as never] };
+    const revision = records.read(workId).revision;
+    await commands.reconcileStarts([item]);
+    assert.equal(calls, 0);
+    assert.equal(board.snapshot().startCheckFailures?.[workId], undefined);
+    assert.equal(records.read(workId).revision, revision);
+  } finally { records.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
 for (const build of [false, true]) for (const outcome of ['live', 'deleted', 'removed'] as const) {
   test(`${build ? 'build' : 'refining'} lookup retries at 30 seconds and clears warning when ${outcome}`, async () => {
     vi.useFakeTimers();

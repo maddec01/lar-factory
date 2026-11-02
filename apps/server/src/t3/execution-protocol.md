@@ -57,7 +57,9 @@ and 4122). `item-execution.ts` issues that read only when a caller asks about a 
 the active shells lack, and at most once in 30 seconds unless a thread leaves the
 active shells. A failed read keeps the last list for display. Thread start recovery and
 live worktree paths keep reading the subscribed shells alone. An item's archived
-threads sort after its other threads because archiving updates `updatedAt`. T3 opens
+threads sort after its other threads because archiving updates `updatedAt`. Settling
+updates it too, so a settled thread sorts by its latest run's time instead, which keeps
+Open thread on the build after the board settles a shaping thread. T3 opens
 New thread for an archived thread's `t3code://threads/...` link, so the board shows
 such a thread as archived and never links it.
 

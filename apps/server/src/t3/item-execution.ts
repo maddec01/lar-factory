@@ -21,10 +21,17 @@ function ancestorsOf(id: string, lineages: Map<unknown, Lineage>): Set<string> {
   return above;
 }
 
+const isSettled = (shell: Record<string, unknown>): boolean => !!shell.settledAt || shell.settledOverride === 'settled';
+
+/** What orders a thread among the item's. Settling moves `updatedAt`, so a settled thread goes by its last run, and with no run known behind every thread with a time. */
+const orderedBy = (shell: Record<string, unknown>): string =>
+  isSettled(shell) ? String(shell.latestRunCompletedAt ?? shell.latestRunStartedAt ?? shell.latestRunRequestedAt ?? '') : String(shell.updatedAt);
+
 /** Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out. */
 export function executionItemThreads(shells: Record<string, unknown>[]) {
   const byId = new Map<string, ItemThread>();
   const lineages = new Map<unknown, Lineage>();
+  const order = new Map<string, string>();
   for (const shell of shells) {
     if (typeof shell.id !== 'string' || shell.deletedAt) continue;
     if (typeof shell.updatedAt !== 'string' || !Number.isFinite(Date.parse(shell.updatedAt))) throw Error('Invalid execution timestamp');
@@ -33,6 +40,7 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
       : ['failed', 'interrupted', 'cancelled'].includes(String(shell.status)) ? 'stopped' : 'done';
     byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, ...(!shell.pendingRuntimeRequest && shell.status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && shell.status === 'queued' ? { queued: true as const } : {}), ...(shell.archivedAt ? { archived: true as const } : {}), updated: shell.updatedAt });
     lineages.set(shell.id, shell.lineage as Lineage);
+    order.set(shell.id, orderedBy(shell));
   }
   for (const thread of byId.values()) {
     if (thread.state !== 'running' && thread.state !== 'needs you' && !thread.queued) continue;
@@ -43,9 +51,9 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
       if (thread.currentRunning) ancestor.hasRunningChildren = true;
     }
   }
-  /** The recorded threads T3 shows, newest first and archived ones last, since archiving updates a thread; undefined for work with no recorded thread. */
+  /** The recorded threads T3 shows, newest first by `orderedBy` and archived ones last, since archiving updates a thread; undefined for work with no recorded thread. */
   return (threadIds: readonly string[]): ItemThread[] | undefined => threadIds.length
-    ? threadIds.flatMap((id) => byId.get(id) ?? []).sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || b.updated.localeCompare(a.updated)) : undefined;
+    ? threadIds.flatMap((id) => byId.get(id) ?? []).sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || order.get(b.id)!.localeCompare(order.get(a.id)!)) : undefined;
 }
 
 /** The last lookup the board read while T3 could be read, kept through an outage, and when it read it. */
@@ -250,7 +258,7 @@ export function threadCleanupState(threadId: string): ThreadCleanupState {
   }
   const shell = current.shownShells?.find(shell => shell.id === threadId);
   if (!shell || shell.deletedAt) return 'absent';
-  return { archived: !!shell.archivedAt, settled: !!shell.settledAt || shell.settledOverride === 'settled', live: mayBeLive(threadId, current.shownShells!) };
+  return { archived: !!shell.archivedAt, settled: isSettled(shell), live: mayBeLive(threadId, current.shownShells!) };
 }
 
 /** Complete current observations only; no database fallback for timing facts. */

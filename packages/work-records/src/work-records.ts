@@ -341,6 +341,8 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   pendingShapingThreadCleanups(): ShapingThreadCleanupRow[];
   /** Marks a row cleaned and clears its failure. Takes no revision, because a background retry must not fail an agent holding one. */
   markShapingThreadCleaned(threadId: string): void;
+  /** Marks a row cleaned and its thread deleted in one transaction. Takes no revision, like markShapingThreadCleaned. */
+  markShapingThreadDeleted(threadId: string): void;
   /** Saves or clears a row's failure. Takes no revision, like markShapingThreadCleaned. */
   saveShapingThreadFailure(threadId: string, failure: string | null): void;
   /** Saves a row's failure and gives it a new command ID, because T3 answers a command ID it rejected with that rejection forever. Takes no revision, like markShapingThreadCleaned. */
@@ -1151,6 +1153,11 @@ function workRecords(database: Database): WorkRecords {
       .map((row) => ({ threadId: String(row.thread_id), workId: String(row.work_id), action: row.action as ShapingThreadCleanup | null, commandId: String(row.command_id), failure: row.failure as string | null }))),
     markShapingThreadCleaned: (threadId) => database.write(() => {
       db.prepare('UPDATE shaping_thread_cleanups SET cleaned_at = ?, failure = NULL WHERE thread_id = ?').run(new Date().toISOString(), threadId);
+    }),
+    markShapingThreadDeleted: (threadId) => database.write(() => {
+      const now = new Date().toISOString();
+      db.prepare('UPDATE shaping_thread_cleanups SET cleaned_at = ?, failure = NULL WHERE thread_id = ?').run(now, threadId);
+      db.prepare('UPDATE threads SET deleted_at = coalesce(deleted_at, ?) WHERE thread_id = ?').run(now, threadId);
     }),
     saveShapingThreadFailure: (threadId, failure) => database.write(() => {
       db.prepare('UPDATE shaping_thread_cleanups SET failure = ? WHERE thread_id = ?').run(failure, threadId);

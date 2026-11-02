@@ -119,7 +119,13 @@ if (!fixture) {
 const retention = createRetention({ records, changed: () => reread() });
 /** This Mac's choice for an item's shaping threads after Start build. */
 const shapingThreadCleanup = createShapingThreadCleanup({ records, changed: () => reread() });
-const sweepShapingThreads = records && createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: lookupThread, send: sendThreadCommand });
+/** Work whose retained stats count a shaping thread the sweep deleted, until a fresh read replaces them. */
+const overcountedStats = new Set<string>();
+const sweepShapingThreads = records && createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: lookupThread, send: sendThreadCommand,
+  deleted: (workId) => {
+    overcountedStats.add(workId);
+    statsReadAt = -Infinity;
+  } });
 /** The tickets the item sources read last, which give the records their ticket context. */
 let tickets: Item[] = [];
 let ticketsByRef = new Map<string, Item>();
@@ -274,7 +280,7 @@ let transcriptsRead = false;
 function recordedThreadIds(items: readonly Item[]): string[] {
   if (!records) return [];
   const workIds = items.filter(item => item.recorded !== false).flatMap(item => [item.id, ...item.slices.flatMap(slice => slice.workId ?? [])]);
-  return [...new Set(workIds.flatMap(workId => records.threads(workId).map(thread => thread.threadId)))];
+  return [...new Set(workIds.flatMap(workId => records.threads(workId).filter(thread => !thread.deletedAt).map(thread => thread.threadId)))];
 }
 
 /**
@@ -286,9 +292,12 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   const now = Date.now();
   const needed = recordedThreadIds(items);
   const fresh = withStats && transcriptsRead && needed.length > 0;
-  const threadIds = (workId: string | undefined) => (workId && records ? records.threads(workId).map((t) => t.threadId) : []);
+  // A deleted thread never counts, even before T3's shells drop it, and an ID T3 can't show would make a read during an outage unavailable.
+  const threadIds = (workId: string | undefined) => (workId && records ? records.threads(workId).filter((t) => !t.deletedAt).map((t) => t.threadId) : []);
   const threads = (workId: string | undefined) => {
-    const observed = protocolItemThreads(threadIds(workId));
+    const ids = threadIds(workId);
+    // Work whose every thread was deleted still reads as an empty list, which its deleted-thread notice needs.
+    const observed = protocolItemThreads(ids.length || !workId || !records ? ids : records.threads(workId).map((t) => t.threadId));
     if (!Array.isArray(observed) || !workId || !records) return observed;
     const purposes = new Map(records.threads(workId).map(thread => [thread.threadId, thread.purpose]));
     return observed.map(thread => ({ ...thread, purpose: purposes.get(thread.id) }));
@@ -302,8 +311,11 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
   return items.map((item) => {
     if (item.recorded === false) return item;
-    const known = retainStats(previousStats.get(item.id), item.stats);
+    const overcounted = withStats && overcountedStats.has(item.id);
+    const known = overcounted ? undefined : retainStats(previousStats.get(item.id), item.stats);
     const live = fresh ? stats(threadIds(item.id)) : withStats && threadIds(item.id).length ? 'unavailable' : item.stats;
+    // An item the board just changed carries its old stats until a read reports the change.
+    if (overcounted && fresh && live !== 'unavailable' && !board.changing(item.id)) overcountedStats.delete(item.id);
     const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? (live === 'unavailable' ? live : retainStats(known, live)) : known, threads: threads(item.id) };
     shown.slices = item.slices.map((slice): typeof slice => {
       if (slice.progress === 'done' || slice.progress === 'blocked') return slice;

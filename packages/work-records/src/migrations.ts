@@ -362,4 +362,18 @@ export const MIGRATIONS: readonly Migration[] = [
   (db) => db.exec('ALTER TABLE launch_intents ADD COLUMN recovery TEXT'),
   (db) => db.exec(`ALTER TABLE work_records ADD COLUMN agreed_ticket_kind TEXT;
     ALTER TABLE work_records ADD COLUMN kind_answer TEXT`),
+  (db) => db.exec(`
+    -- The choice saved at Start build. Null is an earlier intent or one that isn't a Start build, which cleans up nothing.
+    ALTER TABLE launch_intents ADD COLUMN shaping_thread_cleanup TEXT;
+    -- A row means the board handled the thread once. Action is null when the setting couldn't be read.
+    CREATE TABLE shaping_thread_cleanups (
+      thread_id TEXT PRIMARY KEY,
+      work_id TEXT NOT NULL REFERENCES work_records (work_id),
+      action TEXT,
+      command_id TEXT NOT NULL,
+      failure TEXT,
+      cleaned_at TEXT
+    ) STRICT;
+    CREATE INDEX shaping_thread_cleanups_by_work_id ON shaping_thread_cleanups (work_id);
+  `),
 ];

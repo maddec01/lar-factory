@@ -934,3 +934,102 @@ it('commits staged recovery only after a confirmed launch across reopen', async 
   expect(reopened.children(build.workId)).toEqual([]);
   reopened.close();
 });
+
+describe('shaping thread cleanup rows', () => {
+  /** A build with shaping threads `shaped`, and a resolved build thread for `choice`. */
+  const started = async (choice: Parameters<WorkRecords['recordLaunchIntent']>[4], shaped = ['shape-1', 'shape-2']) => {
+    const records = await open();
+    const build = records.create({ title: 'Build', kind: 'build', repository: 'a/b' });
+    for (const thread of shaped) records.addThread(build.workId, records.read(build.workId).revision, thread, 'shape');
+    const startBuild = (thread: string, saved = choice) => {
+      const { intent } = records.recordLaunchIntent(build.workId, records.read(build.workId).revision, 'build', undefined, saved);
+      records.resolveLaunchIntent(build.workId, records.read(build.workId).revision, intent.intentId, { threadId: thread });
+    };
+    return { records, build, startBuild };
+  };
+  const pendingIds = (records: WorkRecords) => records.pendingShapingThreadCleanups().map(row => row.threadId);
+
+  it('holds one pending row per shaping thread once a build thread is recorded, with the saved action', async () => {
+    const { records, startBuild } = await started('archive');
+    expect(records.pendingShapingThreadCleanups()).toEqual([]);
+    startBuild('build-1');
+    const rows = records.pendingShapingThreadCleanups();
+    expect(rows.map(({ threadId, action, failure }) => ({ threadId, action, failure }))).toEqual([
+      { threadId: 'shape-1', action: 'archive', failure: null }, { threadId: 'shape-2', action: 'archive', failure: null }]);
+    expect(new Set(rows.map(row => row.commandId)).size).toBe(2);
+  });
+
+  it('adds nothing for an unresolved or failed intent, or one with no saved choice', async () => {
+    const { records, build } = await started('archive');
+    const uncertain = records.recordLaunchIntent(build.workId, records.read(build.workId).revision, 'build', undefined, 'archive').intent;
+    expect(uncertain.shapingThreadCleanup).toBe('archive');
+    expect(pendingIds(records)).toEqual([]);
+    records.resolveLaunchIntent(build.workId, records.read(build.workId).revision, uncertain.intentId, { failure: 'T3 started no thread.' });
+    expect(pendingIds(records)).toEqual([]);
+    const older = records.recordLaunchIntent(build.workId, records.read(build.workId).revision, 'build').intent;
+    records.resolveLaunchIntent(build.workId, records.read(build.workId).revision, older.intentId, { threadId: 'build-1' });
+    expect(older.shapingThreadCleanup).toBeUndefined();
+    expect(pendingIds(records)).toEqual([]);
+  });
+
+  it('records a Keep as already cleaned, so a later build under another setting leaves that thread alone', async () => {
+    const { records, build, startBuild } = await started('keep');
+    startBuild('build-1');
+    expect(pendingIds(records)).toEqual([]);
+    records.addThread(build.workId, records.read(build.workId).revision, 'shape-3', 'shape');
+    startBuild('build-2', 'archive');
+    expect(pendingIds(records)).toEqual(['shape-3']);
+  });
+
+  it('holds an unreadable setting as a row with no action', async () => {
+    const { records, startBuild } = await started('unreadable', ['shape-1']);
+    startBuild('build-1');
+    expect(records.pendingShapingThreadCleanups()).toMatchObject([{ threadId: 'shape-1', action: null }]);
+  });
+
+  it('touches only threads without a row, skips deleted threads and keeps a cleaned thread cleaned', async () => {
+    const { records, build, startBuild } = await started('archive');
+    records.confirmThreadDeleted(build.workId, records.read(build.workId).revision, 'shape-2');
+    startBuild('build-1');
+    const [first] = records.pendingShapingThreadCleanups();
+    expect(pendingIds(records)).toEqual(['shape-1']);
+    records.markShapingThreadCleaned('shape-1');
+    records.addThread(build.workId, records.read(build.workId).revision, 'shape-3', 'shape');
+    startBuild('build-2');
+    expect(pendingIds(records)).toEqual(['shape-3']);
+    expect(records.pendingShapingThreadCleanups()[0]!.commandId).not.toBe(first!.commandId);
+  });
+
+  it('saves and clears a failure with no change to the revision, and survives reopening', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = first.create({ title: 'Build', kind: 'build', repository: 'a/b' });
+    first.addThread(build.workId, 1, 'shape-1', 'shape');
+    const { intent } = first.recordLaunchIntent(build.workId, 2, 'build', undefined, 'archive');
+    first.resolveLaunchIntent(build.workId, 3, intent.intentId, { threadId: 'build-1' });
+    const revision = first.read(build.workId).revision;
+    const [row] = first.pendingShapingThreadCleanups();
+    first.saveShapingThreadFailure('shape-1', 'T3 refused it.');
+    expect(first.read(build.workId).revision).toBe(revision);
+    first.close();
+    const reopened = await open(path);
+    expect(reopened.pendingShapingThreadCleanups()).toEqual([{ ...row, failure: 'T3 refused it.' }]);
+    reopened.saveShapingThreadFailure('shape-1', null);
+    expect(reopened.pendingShapingThreadCleanups()[0]!.failure).toBeNull();
+    reopened.saveShapingThreadFailure('shape-1', 'Again.');
+    reopened.markShapingThreadCleaned('shape-1');
+    expect(reopened.pendingShapingThreadCleanups()).toEqual([]);
+    expect(reopened.read(build.workId).revision).toBe(revision);
+  });
+
+  it('lists rows of set-aside records, removes them with the record, and keeps them through resetBuild', async () => {
+    const { records, build, startBuild } = await started('archive', ['shape-1']);
+    startBuild('build-1');
+    records.resetBuild(build.workId, records.read(build.workId).revision);
+    expect(pendingIds(records)).toEqual(['shape-1']);
+    records.setAside(build.workId, records.read(build.workId).revision);
+    expect(pendingIds(records)).toEqual(['shape-1']);
+    records.deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }, new Date(Date.now() + 86_400_000));
+    expect(pendingIds(records)).toEqual([]);
+  });
+});

@@ -212,6 +212,18 @@ pnpm run build --unsigned
 The app, dmg and zip go into `apps/desktop/release/`. A signed release uses the
 maintainer's signing secrets and the Release workflow.
 
+### Required pull request checks
+
+The Main ruleset requires `Conventional commits` and `Tests` from GitHub Actions
+on pull requests to the default branch. `Tests` waits for typecheck and knip,
+shared and UI tests, both server shards, both web shards, script tests and macOS
+tests. Every dependency must succeed; a failed, cancelled or skipped dependency
+cannot produce a successful aggregate.
+
+The build flow waits for required checks before Verify or Ready to merge and
+uses its CI fixer when a required check fails. To inspect a pull request's
+required checks, run `gh pr checks <pr> --required`.
+
 ### Release secrets
 
 The Release workflow signs and notarizes the board app with the maintainer's Developer ID, and

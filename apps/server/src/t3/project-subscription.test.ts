@@ -75,6 +75,63 @@ it('retains observations across disconnect and requests a fresh snapshot', async
   expect(vi.getTimerCount()).toBe(0);
 });
 
+it('calls an execution reject callback once and sends nothing further after a failed exit', async () => {
+  vi.useFakeTimers();
+  class Socket extends EventTarget {
+    static OPEN = 1;
+    static instances: Socket[] = [];
+    readyState = 1;
+    sent: { _tag: string }[] = [];
+    constructor() { super(); Socket.instances.push(this); }
+    send(value: string) { this.sent.push(JSON.parse(value)); }
+    close() { this.readyState = 3; this.dispatchEvent(new Event('close')); }
+  }
+  vi.stubGlobal('WebSocket', Socket);
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ticket: 'fixture' })));
+  const reject = vi.fn();
+  const changed = vi.fn();
+  const stop = subscribeProjects(new URL('http://127.0.0.1:3773'), '', protocol(), changed, { tag: 'fixture.command', payload: {}, accept() {}, reject });
+  await vi.advanceTimersByTimeAsync(0);
+  const socket = Socket.instances[0]!;
+  socket.dispatchEvent(new Event('open'));
+  const sent = socket.sent.length;
+  const exit = { _tag: 'Exit', requestId: '1', exit: { _tag: 'Failure', cause: [] } };
+  socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify([exit, exit]) }));
+  expect(reject).toHaveBeenCalledTimes(1);
+  expect(reject).toHaveBeenCalledWith(exit.exit);
+  stop();
+  await vi.advanceTimersByTimeAsync(120_000);
+  expect(socket.sent).toHaveLength(sent);
+  expect(Socket.instances).toHaveLength(1);
+  expect(changed).not.toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('keeps reconnecting after a failed exit when the execution has no reject callback', async () => {
+  vi.useFakeTimers();
+  class Socket extends EventTarget {
+    static OPEN = 1;
+    static instances: Socket[] = [];
+    readyState = 1;
+    sent: { _tag: string }[] = [];
+    constructor() { super(); Socket.instances.push(this); }
+    send(value: string) { this.sent.push(JSON.parse(value)); }
+    close() { this.readyState = 3; this.dispatchEvent(new Event('close')); }
+  }
+  vi.stubGlobal('WebSocket', Socket);
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ticket: 'fixture' })));
+  const stop = subscribeProjects(new URL('http://127.0.0.1:3773'), '', protocol(), () => {}, { tag: 'fixture.launch', payload: {}, accept() {} });
+  await vi.advanceTimersByTimeAsync(0);
+  const first = Socket.instances[0]!;
+  first.dispatchEvent(new Event('open'));
+  first.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ _tag: 'Exit', requestId: '1', exit: { _tag: 'Failure', cause: [] } }) }));
+  await vi.advanceTimersByTimeAsync(1000);
+  const second = Socket.instances[1]!;
+  second.dispatchEvent(new Event('open'));
+  expect(second.sent.filter(frame => frame._tag === 'Request')).toHaveLength(1);
+  stop();
+});
+
 it('renews a healthy subscription before expiry and reports failed renewal', async () => {
   vi.useFakeTimers();
   class Socket extends EventTarget {

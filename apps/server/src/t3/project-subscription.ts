@@ -9,9 +9,9 @@ import { type BoardSession, type ProjectProtocol, type ProjectRead } from './pro
  * disconnect with retained observation, fresh-ticket reconnect to eight projects.
  * Renewal and rejection failures use fixtures. Consumer migration is #706.
  */
-export function subscribeProjects(origin: URL, _serverVersion: string, protocol: ProjectProtocol,
+export function subscribeProjects(origin: URL, _serverVersion: string, protocol: Pick<ProjectProtocol, 'subscriptionSession' | 'invalidateSession'>,
   onChange: (read: ProjectRead) => void,
-  execution?: { tag: string; payload: Record<string, unknown>; accept(value: unknown): void }): () => void {
+  execution?: { tag: string; payload: Record<string, unknown>; accept(value: unknown): void; reject?(exit: unknown): void }): () => void {
   if (origin.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname) || origin.username || origin.password) throw new Error('Expected local T3 server');
   let stopped = false;
   let socket: WebSocket | undefined;
@@ -22,6 +22,15 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
   let failures = 0;
   let ticketRequest: AbortController | undefined;
   const publish = (availability: ProjectRead['availability']) => onChange({ availability, ...(observation ? { observation } : {}) });
+  const close = () => {
+    stopped = true;
+    ticketRequest?.abort();
+    if (renewal) clearTimeout(renewal);
+    if (retry) clearTimeout(retry);
+    if (heartbeat) clearInterval(heartbeat);
+    socket?.close();
+    socket = undefined;
+  };
   const connect = async () => {
     if (stopped) return;
     let availability: ProjectRead['availability'] = 'unavailable';
@@ -36,7 +45,7 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
       current?.close();
       if (!stopped && !retry) {
         publish(availability);
-        retry = setTimeout(() => { retry = undefined; void connect(); }, Math.min(30_000, 1000 * 2 ** Math.min(failures++, 5)));
+        if (!stopped) retry = setTimeout(() => { retry = undefined; void connect(); }, Math.min(30_000, 1000 * 2 ** Math.min(failures++, 5)));
       }
     };
     try {
@@ -99,6 +108,7 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
               send({ _tag: 'Ack', requestId: '1' });
             } else if (frame._tag === 'Exit') {
               if (execution && isRecord(frame.exit) && frame.exit._tag === 'Success') execution.accept(frame.exit.value);
+              else if (execution?.reject) { close(); execution.reject(frame.exit); return; }
               else disconnected();
             }
           }
@@ -110,13 +120,7 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
   };
   void connect();
   return () => {
-    stopped = true;
-    ticketRequest?.abort();
-    if (renewal) clearTimeout(renewal);
-    if (retry) clearTimeout(retry);
-    if (heartbeat) clearInterval(heartbeat);
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ _tag: 'Interrupt', requestId: '1' }));
-    socket?.close();
-    socket = undefined;
+    close();
   };
 }

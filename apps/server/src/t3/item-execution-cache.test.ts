@@ -193,3 +193,35 @@ it('keeps failed detail reads unavailable and retries later demand without a req
     expect(fixture.read).toHaveBeenCalledTimes(2);
   } finally { now.mockRestore(); }
 });
+
+it('reads a thread cleanup state from the current snapshot only', async () => {
+  const { threadCleanupState } = await import('./item-execution.ts');
+  const updatedAt = '2026-10-31T12:00:00Z';
+  const show = (threads: object[], archivedThreads: object[] = []) => fixture.changed!({ availability: 'available', observation: { observedAt: updatedAt, snapshot: { threads, archivedThreads } } });
+  const idle = { id: 'one', updatedAt, status: 'idle' };
+  expect(threadCleanupState('one')).toBe('unavailable');
+  show([idle]);
+  expect(threadCleanupState('one')).toEqual({ archived: false, settled: false, live: false });
+  expect(threadCleanupState('never')).toBe('absent');
+  show([{ ...idle, deletedAt: updatedAt }]);
+  expect(threadCleanupState('one')).toBe('absent');
+  show([], [{ ...idle, archivedAt: updatedAt }]);
+  expect(threadCleanupState('one')).toEqual({ archived: true, settled: false, live: false });
+  show([{ ...idle, settledAt: updatedAt }]);
+  expect(threadCleanupState('one')).toMatchObject({ settled: true });
+  show([{ ...idle, settledOverride: 'settled' }]);
+  expect(threadCleanupState('one')).toMatchObject({ settled: true });
+  show([{ ...idle, settledOverride: 'active' }]);
+  expect(threadCleanupState('one')).toMatchObject({ settled: false });
+  for (const status of ['queued', 'preparing', 'starting', 'running', 'waiting']) {
+    show([{ ...idle, status }]);
+    expect(threadCleanupState('one')).toMatchObject({ live: true });
+  }
+  show([{ ...idle, pendingRuntimeRequest: { id: 'question' } }]);
+  expect(threadCleanupState('one')).toMatchObject({ live: true });
+  show([idle, { id: 'child', updatedAt, status: 'idle', lineage: { parentThreadId: 'one' } }, { id: 'grandchild', updatedAt, status: 'queued', lineage: { parentThreadId: 'child', rootThreadId: 'one' } }]);
+  expect(threadCleanupState('one')).toMatchObject({ live: true });
+  // A retained observation can't answer once T3 goes away.
+  fixture.changed!({ availability: 'unavailable' });
+  expect(threadCleanupState('one')).toBe('unavailable');
+});

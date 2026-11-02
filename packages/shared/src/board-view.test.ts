@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { abandonPrompt, boardSections, closeTicketPrompt, needsYouPrompt } from './board-view.ts';
+import { ABANDON_CLEANUP, abandonPrompt, boardSections, closesTicketOnAbandon, closeTicketPrompt, hasClosedPr, needsYouPrompt } from './board-view.ts';
 import type { BoardData, Item, NeedsYouCause, Status } from './model.ts';
 
 const ticketed = (repo: string) => ({ content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo, number: 7, title: 'Keep history' } as Item);
@@ -158,3 +158,24 @@ for (const kind of ['issue', 'concept'] as const) {
     });
   }
 }
+
+test("Abandon from a notice names Archive and leaves the ticket as it is, and offers the close only while the ticket is open", () => {
+  const notice = (ticketOpen: boolean) => waiting([{ type: 'pr-closed' }], { needsYou: { reason: 'Why.', offers: ['set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen } });
+  assert.equal(abandonPrompt(notice(false)).detail, 'This moves the item off the desk into Settings › Archive. Its ticket stays as it is. Any PR it has stays as it is.');
+  assert.equal(abandonPrompt(notice(true)).detail, 'This moves the item off the desk into Settings › Archive. Its ticket stays as it is. Any PR it has stays as it is. Abandon and close ticket closes the ticket first.');
+  assert.equal(abandonPrompt({ ...notice(true), number: 0 }).detail, 'This moves the item off the desk into Settings › Archive. It has no ticket. Any PR it has stays as it is.');
+  assert.deepEqual([closesTicketOnAbandon(notice(true)), closesTicketOnAbandon(notice(false)), closesTicketOnAbandon({ ...notice(true), abandonRefusal: 'No.' })], [true, false, false]);
+  assert.equal(closesTicketOnAbandon(ticketed('owner/repo')), true, 'List and Queued work has no notice to ask');
+  assert.equal(closesTicketOnAbandon(waiting([], { needsYou: { reason: 'Why.', offers: ['keep-working'], causes: [], ticketOpen: false } })), true, 'a notice that offers no Abandon changes nothing');
+});
+
+test('a closed PR is one a cause names or the ticket links', () => {
+  const pr = (state: 'open' | 'closed') => [{ number: 1, url: 'u', state }] as Item['linkedPrs'];
+  assert.equal(hasClosedPr(waiting([{ type: 'pr-closed' }])), true);
+  assert.equal(hasClosedPr(waiting([{ type: 'ticket-closed' }], { linkedPrs: pr('closed') })), true);
+  assert.equal(hasClosedPr(waiting([{ type: 'ticket-closed' }], { linkedPrs: pr('open') })), false);
+});
+
+test('Abandon says what stays when the board cannot inspect the branch or worktree', () => {
+  assert.equal(ABANDON_CLEANUP.uninspected('T3 is unavailable.'), "The board can't inspect this work's branch or worktree. T3 is unavailable. You can abandon without cleanup, and anything there stays.");
+});

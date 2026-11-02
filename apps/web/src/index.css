@@ -21,7 +21,10 @@
 @source "./filters";
 @source "./item-dialog";
 @source "./labels";
+@source "./items/abandon-dialog.tsx";
+@source "./items/cleanup-choices.tsx";
 @source "./items/item-parts.tsx";
+@source "./items/needs-you-dialog.tsx";
 @source "./items/open-thread.tsx";
 @source "./items/start-build.tsx";
 @source "./items/start-control.tsx";

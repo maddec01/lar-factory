@@ -4,15 +4,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { needsYouPrompt } from '@lar-factory/shared';
 import type { BoardData, Item, NeedsYouAction } from '@lar-factory/shared';
+import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
 import { useActionStore, useItemAction } from './action-store.ts';
-import { inspectRecovery, postAction, receive, resolveNeedsYou, startAgain } from './card-actions.ts';
+import { inspectRecovery, resolveNeedsYou, startAgain } from './card-actions.ts';
 import type { ActionResult, RecoveryInspection } from './card-actions.ts';
 import { writeState } from './item-actions.tsx';
 import { StartEntries } from './start-control.tsx';
+import { CleanupChoices, executeCleanup, inspectCleanup, offersCleanup, useCleanupChoices } from './cleanup-choices.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
 interface Props {
@@ -31,11 +33,9 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
   const [inspection, setInspection] = useState<RecoveryInspection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [cleanup, setCleanup] = useState<{ token: string; plans: CleanupPlan[] } | null>(null);
+  const cleanupChoices = useCleanupChoices();
   const [next, setNext] = useState<(() => Promise<ActionResult | undefined>) | null>(null);
-  const [local, setLocal] = useState(false);
-  const [remote, setRemote] = useState(false);
-  const [confirmLoss, setConfirmLoss] = useState(false);
+  const { cleanup } = cleanupChoices;
   const checking = inspects && !inspection && !error;
   const held = state.disabled || loading;
   const dismiss = () => { if (!loading) onClose(); };
@@ -54,7 +54,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
     void inspect();
   }, []);
 
-  async function finish(run: () => Promise<ActionResult | undefined>, selection?: { token: string; local: boolean; remote: boolean; confirmedLoss: boolean }) {
+  async function finish(run: () => Promise<ActionResult | undefined>, selection?: ReturnType<typeof cleanupChoices.selection>) {
     setLoading(true);
     setError(null);
     try {
@@ -62,8 +62,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
       if (!result) return;
       if (result.error || ('uncertain' in result && result.uncertain)) { setError(result.error); return; }
       if (selection) {
-        const cleaned = await postAction<{ errors: string[]; remainingBranches: string[] }>('/api/execute-owned-cleanup', { itemId: item.id, options: selection });
-        receive(cleaned);
+        const cleaned = await executeCleanup(item.id, selection);
         const message = [cleaned.error, ...cleaned.errors ?? [], cleaned.remainingBranches?.length ? `Branches remain for you to remove: ${cleaned.remainingBranches.join(', ')}` : null].filter(Boolean).join(' ') || undefined;
         useActionStore.getState().setCleanupResult(item.id, message);
       }
@@ -74,12 +73,11 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
     useActionStore.getState().setCleanupResult(item.id, undefined);
     setLoading(true);
     setError(null);
-    const result = await postAction<{ token: string; plans: CleanupPlan[] }>('/api/inspect-owned-cleanup', { itemId: item.id });
+    const result = await inspectCleanup(item.id);
     setLoading(false);
     if (result.error || !result.token || !result.plans) { setError(result.error ?? 'Cannot inspect cleanup.'); return; }
-    if (!result.plans.some(plan => plan.localAvailable || plan.remoteAvailable || plan.warning || plan.localBranches?.length || plan.worktreePaths?.length || plan.remoteBranch)) { await finish(run); return; }
-    setLocal(false); setRemote(false); setConfirmLoss(false);
-    setCleanup({ token: result.token, plans: result.plans });
+    if (!offersCleanup(result.plans)) { await finish(run); return; }
+    cleanupChoices.offer({ token: result.token, plans: result.plans });
     setNext(() => run);
   }
   const confirm = () => {
@@ -93,9 +91,8 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
 
   const choices = !inspection ? [] : inspection.pr === 'open' ? ['continue'] as const : inspection.branchExists ? ['continue', 'new'] as const : ['new'] as const;
   const actions = () => {
-    if (cleanup && next) return confirmButton(confirmLoss ? 'Confirm loss and proceed' : 'Proceed', () => {
-      if (local && cleanup.plans.some(plan => plan.dirtyFiles.length || plan.unpushedCommits.length) && !confirmLoss) { setConfirmLoss(true); return; }
-      void finish(next, { token: cleanup.token, local, remote, confirmedLoss: confirmLoss });
+    if (cleanup && next) return confirmButton(cleanupChoices.confirmLoss ? 'Confirm loss and proceed' : 'Proceed', () => {
+      if (!cleanupChoices.asksLoss()) void finish(next, cleanupChoices.selection());
     });
     if (inspects && !inspection) return error ? confirmButton('Try again', () => void inspect()) : null;
     if (inspection && (inspection.branchExists || inspection.pr !== 'none')) return choices.map(branchChoice =>
@@ -118,20 +115,14 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
             <Text id="needs-you-detail" tone="muted">{prompt.detail}</Text>
             {checking && <Text role="status">Checking the branch and PR...</Text>}
             {inspection && !cleanup && <>
-              {inspection.warning && <Text role="alert">PR state is unknown. A new branch or move could create a second PR. Deleting the remote branch could close an open PR.</Text>}
+              {inspection.warning && <Alert tone="warning">PR state is unknown. A new branch or move could create a second PR. Deleting the remote branch could close an open PR.</Alert>}
               {inspection.branchExists && <Text>{inspection.worktreePath ? 'Continue in the old worktree with its uncommitted changes.' : 'The old worktree is gone. Continuing creates a new worktree on the old branch.'}</Text>}
               {inspection.pr !== 'open' && <Text>A new branch starts from the base branch and plans the build again from its brief.</Text>}
               {inspection.pr === 'open' && <Text>A new thread continues on the open PR branch. Its commits and reviews stay, and the PR stays open.</Text>}
             </>}
             {moving && item.passingBrief && !cleanup && <Text>Keep the brief passing or reshape from its text?</Text>}
-            {cleanup && next && <>
-              {cleanup.plans.map(plan => plan.warning && <Text role="alert" key={plan.branch}>{plan.warning} A new branch or move could create a second PR. Deleting the remote branch could close an open PR.</Text>)}
-              {cleanup.plans.some(plan => plan.localAvailable) && <label><input type="checkbox" checked={local} onChange={event => { setLocal(event.target.checked); setConfirmLoss(false); }} /> Remove old local worktrees and branches</label>}
-              {cleanup.plans.some(plan => plan.remoteAvailable) && <label><input type="checkbox" checked={remote} onChange={event => setRemote(event.target.checked)} /> Delete pushed remote branch</label>}
-              <Text>Unticked branches and slice worktrees remain for you to remove.</Text>
-              {confirmLoss && <div><Text>Deleting local work will lose these files and commits:</Text><ul>{cleanup.plans.flatMap(plan => [...plan.dirtyFiles, ...plan.unpushedCommits].map(loss => <li key={`${plan.branch}:${loss}`}>{plan.branch}: {loss}</li>))}</ul></div>}
-            </>}
-            {error && <Text role="alert">{error}</Text>}
+            {cleanup && next && <CleanupChoices choices={cleanupChoices} />}
+            {error && <Alert tone="danger">{error}</Alert>}
           </div>
         </Modal.Body>
         <Modal.Footer>
@@ -141,16 +132,4 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
       </Modal.Content>
     </Modal>
   );
-}
-
-interface CleanupPlan {
-  branch: string;
-  localBranches?: string[];
-  worktreePaths?: string[];
-  remoteBranch?: string | null;
-  localAvailable: boolean;
-  remoteAvailable: boolean;
-  dirtyFiles: string[];
-  unpushedCommits: string[];
-  warning?: string;
 }

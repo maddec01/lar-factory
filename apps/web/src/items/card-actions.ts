@@ -2,7 +2,7 @@
 // keyboard focus in the dialog.
 
 import { flushSync } from 'react-dom';
-import { writeHeaders, remembersChoice } from '@lar-factory/shared';
+import { abandonsNotice, writeHeaders, remembersChoice } from '@lar-factory/shared';
 import type { BoardData, Item, NeedsYouAction, Status, ModelChoice, StartResult } from '@lar-factory/shared';
 import { useStartStore } from './start-store.ts';
 import { useAbandonStore } from './abandon-store.ts';
@@ -118,9 +118,11 @@ export function askAbandon(itemId: string): void {
 export async function abandonItem(itemId: string) {
   const item = itemOf(itemId);
   if (!ready(itemId, 'data-abandon') || !item) return;
-  // The confirmation retains failures until the user retries or cancels.
+  // The confirmation retains failures until the user retries or cancels. On a notice's work it has choices a toast
+  // would cover, so its failure raises none; List and Queued work keeps the toast.
   const result = await runAction(itemId, 'abandon', { session: useBoardStore.getState().data.capture?.session, itemId }, (result) => {
-    notify(result.error ? { verb: 'Failed', item, message: result.error } : { verb: 'Abandoned', item });
+    if (!result.error) notify({ verb: 'Abandoned', item });
+    else if (!abandonsNotice(item)) notify({ verb: 'Failed', item, message: result.error });
   });
   // An abandoned item leaves the item dialog, which closes and hands focus back itself.
   if (result.error) refocus([by('data-abandon', itemId)]);

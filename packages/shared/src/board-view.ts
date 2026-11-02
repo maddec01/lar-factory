@@ -98,13 +98,38 @@ export function prLabel(pr: LinkedPr): string {
 
 export const UNREADABLE = 'Usage details are unavailable.';
 
+/** Whether Abandon answers the item's notice, whatever its Status, rather than taking it off List or Queued. */
+export function abandonsNotice(item: Item): boolean {
+  return !!item.needsYou?.offers.includes('set-aside');
+}
+
+/** Whether Abandon's confirmation offers Abandon and close ticket: a notice's work needs its ticket open. */
+export function closesTicketOnAbandon(item: Item): boolean {
+  return !!item.number && !item.abandonRefusal && (!abandonsNotice(item) || item.needsYou!.ticketOpen);
+}
+
+/** Whether the work has a closed PR: one its notice names, or one its ticket links. */
+export function hasClosedPr(item: Item): boolean {
+  return !!item.needsYou?.causes.some((cause) => cause.type === 'pr-closed') || item.linkedPrs.some((pr) => pr.state === 'closed');
+}
+
 /** Offers local abandonment with optional tracker closure. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
   return { question: `Abandon ${itemName(item)}?`, confirm: 'Abandon', done: `Set ${itemName(item)} aside on this Mac.`,
-    detail: item.number ? 'Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.'
+    detail: abandonsNotice(item) ? ['This moves the item off the desk into Settings › Archive.', item.number ? 'Its ticket stays as it is.' : 'It has no ticket.', 'Any PR it has stays as it is.',
+      closesTicketOnAbandon(item) ? 'Abandon and close ticket closes the ticket first.' : ''].filter(Boolean).join(' ')
+      : item.number ? 'Abandon sets the work aside on this Mac and leaves its ticket open. Abandon and close ticket closes the ticket first.'
       : 'This sets the work aside on this Mac. It has no ticket, so nothing changes in its provider.',
   };
 }
+
+/** What a notice's confirmations say about cleanup. */
+export const ABANDON_CLEANUP = {
+  remoteWarning: 'Deleting the remote branch of a closed PR can stop it being reopened, including after a restore from Archive.',
+  failed: (item: Item) => `Cleanup didn't finish. The item stays on the desk with its notice${item.number ? ", and its ticket hasn't changed" : ''}.`,
+  nothing: 'The board has no branch or worktree it can remove for this work, so anything there stays.',
+  uninspected: (reason: string) => `The board can't inspect this work's branch or worktree. ${reason} You can abandon without cleanup, and anything there stays.`,
+};
 
 /** Confirms ticket closure for work set aside in Archive. */
 export function closeTicketPrompt(item: Item): { question: string; detail: string; confirm: string; keep: string; done: string } {

@@ -530,8 +530,201 @@ test('a failed Abandon retains its confirmation, inline error and focus', async 
   expect(inDialog('.action-error'), 'no inline error').toBeNull();
   await settle(() => vi.advanceTimersByTime(20));
   expect($('#abandon-dialog')?.getAttribute('role')).toBe('alertdialog');
-  expect(text($('#abandon-dialog [role="alert"]'))).toBe('Could not abandon #61.');
+  expect(text($('#abandon-dialog [data-slot="alert"]'))).toBe('Could not abandon #61.');
   expect($('#abandon-dialog')?.contains(document.activeElement)).toBe(true);
+});
+
+const abandonButtons = () => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button');
+const abandonPress = (name: string) => press(abandonButtons().find((b) => text(b) === name)!);
+const boxes = () => $$<HTMLLabelElement>('#abandon-dialog label');
+const tick = (name: string) => settle(() => boxes().find((box) => text(box).includes(name))!.querySelector('input')!.click());
+const closedPlan = { branch: 'build/old', localBranches: ['build/old'], worktreePaths: [], remoteBranch: 'build/old', localAvailable: true, remoteAvailable: true, dirtyFiles: [], unpushedCommits: [] };
+
+/** Presses Abandon on a Review item's notice: its confirmation is open, and its inspection is the post in flight. */
+async function abandonFromNotice(ticketOpen = false) {
+  const id = 'I_sample05';
+  const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
+    ? { ...i, status: 'Review', needsYou: { reason: 'Its PR closed.', offers: ['set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen } } : i) };
+  await mountPage(data);
+  holdPosts(data);
+  await openItem(id);
+  await press(button('abandon', id));
+  expect(posted()).toEqual([['/api/inspect-owned-cleanup', { itemId: id }]]);
+  return id;
+}
+
+test('Abandon on a notice asks with both cleanup boxes unticked and the remote warning, and Cancel changes nothing', async () => {
+  const id = await abandonFromNotice();
+  expect(text($('#abandon-dialog [role="status"]'))).toMatch(/^Checking/);
+  expect(abandonButtons()[1]!.disabled, 'Abandon waits for the answer').toBe(true);
+  await answer({ token: 't1', plans: [closedPlan] });
+  expect(text($('#abandon-detail'))).toBe('This moves the item off the desk into Settings › Archive. Its ticket stays as it is. Any PR it has stays as it is.');
+  expect(text($('#abandon-dialog')), 'the boxes ask about the branch and worktree').not.toContain('no branch or worktree it can remove');
+  expect(boxes().map((box) => text(box).trim()), 'each box names its branches').toEqual(['Remove old local worktrees and branches: build/old', 'Delete pushed remote branch: build/old']);
+  expect(boxes().map((box) => box.querySelector('input')!.checked)).toEqual([false, false]);
+  expect(text($('#abandon-dialog'))).toContain('Deleting the remote branch of a closed PR can stop it being reopened, including after a restore from Archive.');
+  expect(abandonButtons().map(text), 'a closed ticket has nothing to close').toEqual(['Cancel', 'Abandon']);
+  await abandonPress('Cancel');
+  expect(posted().map(([path]) => path)).toEqual(['/api/inspect-owned-cleanup']);
+  expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+  expect(button('abandon', id)).not.toBeNull();
+});
+
+const NOTHING_TO_REMOVE = 'The board has no branch or worktree it can remove for this work, so anything there stays.';
+
+for (const [name, plan] of [
+  ['an unpushed branch in a live worktree', { ...closedPlan, localBranches: [], remoteBranch: null, localAvailable: false, remoteAvailable: false }],
+  ['a pushed branch with an open PR', { ...closedPlan, localAvailable: false, remoteAvailable: false }],
+] as const) test(`Abandon on a notice with ${name} says the board can remove nothing, with no box to tick`, async () => {
+  await abandonFromNotice();
+  await answer({ token: 't1', plans: [plan] });
+  expect(boxes()).toEqual([]);
+  expect(text($('#abandon-dialog'))).toContain(NOTHING_TO_REMOVE);
+  expect(text($('#abandon-dialog'))).not.toContain('Unticked');
+});
+
+test('Abandon on a notice with no branch or worktree asks nothing about cleanup and sets the work aside', async () => {
+  const id = await abandonFromNotice(true);
+  await answer({ token: 't1', plans: [] });
+  expect(boxes()).toEqual([]);
+  expect(text($('#abandon-dialog'))).toContain(NOTHING_TO_REMOVE);
+  expect(abandonButtons().map(text)).toEqual(['Cancel', 'Abandon', 'Abandon and close ticket']);
+  await abandonPress('Abandon');
+  expect(posted().at(-1)).toEqual(['/api/abandon', { session: 's1', itemId: id }]);
+  expect(posted()).toHaveLength(2);
+});
+
+test('ticked cleanup with something to lose confirms the loss, runs first, then closes the ticket', async () => {
+  const id = await abandonFromNotice(true);
+  await answer({ token: 't1', plans: [{ ...closedPlan, dirtyFiles: ['/w: M a.ts'], unpushedCommits: ['build/old: abc Work'] }] });
+  await tick('Remove old');
+  await abandonPress('Abandon and close ticket');
+  expect(posted(), 'the first press only shows the loss').toHaveLength(1);
+  const loss = $('#abandon-dialog [data-cleanup-loss]')!;
+  expect(loss.getAttribute('role'), 'the list is announced').toBe('alert');
+  expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts, 'the list scrolls into view above the buttons').toContain(loss.parentElement);
+  expect(text(loss.querySelector('li > span'))).toBe('build/old');
+  expect($$('#abandon-dialog [data-cleanup-loss] ul ul li').map(text), 'each line drops the branch it sits under').toEqual(['/w: M a.ts', 'abc Work']);
+  await abandonPress('Confirm loss, abandon and close ticket');
+  expect(posted().at(-1)).toEqual(['/api/execute-owned-cleanup', { itemId: id, options: { token: 't1', local: true, remote: false, confirmedLoss: true } }]);
+  await answer({ errors: [], remainingBranches: ['build/old'] });
+  expect(posted().at(-1), 'unticked remaining branches are no failure').toEqual(['/api/abandon-and-close', { itemId: id }]);
+});
+
+test('when the board cannot inspect, the confirmation says what stays and still abandons without cleanup', async () => {
+  const id = await abandonFromNotice();
+  await answer({ error: 'T3 is unavailable.' }, 409);
+  expect(text($('#abandon-dialog [data-slot="alert"]'))).toBe("The board can't inspect this work's branch or worktree. T3 is unavailable. You can abandon without cleanup, and anything there stays.");
+  expect(boxes()).toEqual([]);
+  await abandonPress('Abandon without cleanup');
+  expect(posted().at(-1)).toEqual(['/api/abandon', { session: 's1', itemId: id }]);
+});
+
+test('a cleanup error keeps the item and ticket, and offers a fresh retry or the same Abandon without further cleanup', async () => {
+  const id = await abandonFromNotice(true);
+  await answer({ token: 't1', plans: [closedPlan] });
+  await tick('Delete pushed');
+  await abandonPress('Abandon and close ticket');
+  await answer({ errors: ['Could not delete remote branch build/old'], remainingBranches: ['build/old'] });
+  expect(posted().map(([path]) => path), 'the ticket stays alone').toEqual(['/api/inspect-owned-cleanup', '/api/execute-owned-cleanup']);
+  expect(text($('#abandon-dialog [data-slot="alert"]'))).toContain('Could not delete remote branch build/old');
+  expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+  expect(abandonButtons().map(text)).toEqual(['Cancel', 'Try cleanup again', 'Abandon and close ticket without further cleanup']);
+  expect(abandonButtons().at(-1)!.dataset.wrap, 'a long label wraps instead of clipping at 320 px').toBeDefined();
+  await abandonPress('Try cleanup again');
+  expect(posted().at(-1)).toEqual(['/api/inspect-owned-cleanup', { itemId: id }]);
+  await answer({ token: 't2', plans: [closedPlan] });
+  expect(boxes().map((box) => box.querySelector('input')!.checked), 'the retry keeps the ticks').toEqual([false, true]);
+  await abandonPress('Abandon');
+  expect(posted().at(-1)).toEqual(['/api/execute-owned-cleanup', { itemId: id, options: { token: 't2', local: false, remote: true, confirmedLoss: false } }]);
+  await answer({ error: 'Cleanup changed. Inspect and confirm again.' }, 409);
+  await abandonPress('Abandon without further cleanup');
+  expect(posted().at(-1)).toEqual(['/api/abandon', { session: 's1', itemId: id }]);
+  expect(posted().filter(([path]) => path === '/api/execute-owned-cleanup')).toHaveLength(2);
+});
+
+test('a failed Abandon after cleanup keeps the confirmation, and its retry does not clean up again', async () => {
+  const id = await abandonFromNotice();
+  await answer({ token: 't1', plans: [closedPlan] });
+  await tick('Remove old');
+  await abandonPress('Abandon');
+  await answer({ errors: [], remainingBranches: [] });
+  expect(posted().at(-1)?.[0]).toBe('/api/abandon');
+  await answer({ error: 'Could not abandon.' }, 409);
+  expect(text($('#abandon-dialog [data-slot="alert"]'))).toBe('Could not abandon.');
+  expect(toast(), 'the confirmation shows the failure, so no toast covers its buttons').toBeNull();
+  await abandonPress('Abandon');
+  expect(posted().at(-1)).toEqual(['/api/abandon', { session: 's1', itemId: id }]);
+  expect(posted().filter(([path]) => path === '/api/execute-owned-cleanup')).toHaveLength(1);
+});
+
+test('after cleanup, a failed Abandon does not say the work has no branch or worktree', async () => {
+  await abandonFromNotice();
+  await answer({ token: 't1', plans: [closedPlan] });
+  await tick('Remove old');
+  await abandonPress('Abandon');
+  await answer({ errors: [], remainingBranches: [] });
+  await answer({ error: 'Could not abandon.' }, 409);
+  expect(text($('#abandon-dialog'))).not.toContain(NOTHING_TO_REMOVE);
+});
+
+test('a cancelled loss prompt leaves no trace on the next Abandon', async () => {
+  const id = await abandonFromNotice();
+  await answer({ token: 't1', plans: [{ ...closedPlan, unpushedCommits: ['build/old: abc Work'] }] });
+  await tick('Remove old');
+  await tick('Delete pushed');
+  await abandonPress('Abandon');
+  expect(abandonButtons().map(text)).toEqual(['Cancel', 'Confirm loss and abandon']);
+  await abandonPress('Cancel');
+  await press(button('abandon', id));
+  await answer({ token: 't2', plans: [] });
+  expect(abandonButtons().map(text), 'no fresh offer keeps the loss').toEqual(['Cancel', 'Abandon']);
+  await abandonPress('Cancel');
+  await press(button('abandon', id));
+  await answer({ token: 't3', plans: [closedPlan] });
+  expect(boxes().map((box) => box.querySelector('input')!.checked), 'a fresh offer starts unticked').toEqual([false, false]);
+  expect(abandonButtons().map(text)).toEqual(['Cancel', 'Abandon']);
+});
+
+test('the closed-PR warning shows only beside a closed PR', async () => {
+  const id = 'I_sample05';
+  const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
+    ? { ...i, status: 'Review', linkedPrs: [], needsYou: { reason: 'Its ticket closed.', offers: ['set-aside'], causes: [{ type: 'ticket-closed' }], ticketOpen: false } } : i) };
+  await mountPage(data);
+  holdPosts(data);
+  await openItem(id);
+  await press(button('abandon', id));
+  await answer({ token: 't1', plans: [closedPlan] });
+  expect(text($('#abandon-dialog'))).toContain('Delete pushed remote branch');
+  expect(text($('#abandon-dialog'))).not.toContain('Deleting the remote branch of a closed PR');
+});
+
+test('a failed cleanup no longer offers to close a ticket the board has since read closed', async () => {
+  const id = await abandonFromNotice(true);
+  await answer({ token: 't1', plans: [closedPlan] });
+  await tick('Delete pushed');
+  await abandonPress('Abandon and close ticket');
+  await answer({ errors: ['Could not delete remote branch build/old'], remainingBranches: ['build/old'], board: { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
+    ? { ...i, status: 'Review', needsYou: { reason: 'Its PR closed.', offers: ['set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen: false } } : i) } });
+  expect(text($('#abandon-detail'))).not.toContain('close ticket');
+  expect(abandonButtons().map(text)).toEqual(['Cancel', 'Try cleanup again', 'Abandon without further cleanup']);
+  await abandonPress('Abandon without further cleanup');
+  expect(posted().at(-1)).toEqual(['/api/abandon', { session: 's1', itemId: id }]);
+});
+
+test('a failed cleanup on work with no ticket says nothing about a ticket', async () => {
+  const id = 'I_sample05';
+  const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
+    ? { ...i, number: 0, status: 'Review', needsYou: { reason: 'Its PR closed.', offers: ['set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen: false } } : i) };
+  await mountPage(data);
+  holdPosts(data);
+  await openItem(id);
+  await press(button('abandon', id));
+  await answer({ token: 't1', plans: [closedPlan] });
+  await tick('Delete pushed');
+  await abandonPress('Abandon');
+  await answer({ errors: ['Could not delete remote branch build/old'], remainingBranches: ['build/old'] });
+  expect(text($('#abandon-dialog [data-slot="alert"]'))).toBe("Cleanup didn't finish. The item stays on the desk with its notice. Could not delete remote branch build/old");
 });
 
 test('in sample mode the dialog’s actions are disabled', async () => {
@@ -578,7 +771,7 @@ test('work that needs you shows why, confirms each choice before posting it, off
   await confirmPress('Reopen PR');
   expect(posted()).toEqual([['/api/needs-you', { itemId: id, choice: 'reopen-pr' }]]);
   await answer({ error: "Couldn't reopen the PR." }, 502);
-  expect(text($('#needs-you-dialog [role="alert"]')), 'the failure stays in the confirmation').toBe("Couldn't reopen the PR.");
+  expect(text($('#needs-you-dialog [data-slot="alert"]')), 'the failure stays in the confirmation').toBe("Couldn't reopen the PR.");
   expect(inDialog('.action-error [role="alert"]')).toBeNull();
   expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
   await confirmPress('Try again');
@@ -789,7 +982,7 @@ test('shaping Start again confirms before posting and keeps the notice and the c
   await confirmPress('Start again');
   expect(posted()).toEqual([['/api/start-again', { itemId: id, options: {} }]]);
   await answer({ error: 'T3 is unavailable.' }, 502);
-  expect(text($('#needs-you-dialog [role="alert"]'))).toBe('T3 is unavailable.');
+  expect(text($('#needs-you-dialog [data-slot="alert"]'))).toBe('T3 is unavailable.');
   expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
 });
 
@@ -797,7 +990,7 @@ test('an uncertain start keeps the confirmation open with its message', async ()
   await recoveryItem(false);
   await confirmPress('Start again');
   await answer({ thread: null, error: 'T3 may have started it.', uncertain: true }, 502);
-  expect(text($('#needs-you-dialog [role="alert"]'))).toBe('T3 may have started it.');
+  expect(text($('#needs-you-dialog [data-slot="alert"]'))).toBe('T3 may have started it.');
   expect(confirmButtons().map(text)).toEqual(['Cancel', 'Try again']);
 });
 
@@ -839,12 +1032,12 @@ test('open PR recovery offers only continue and preserves the PR in its confirma
 test('inspection errors preserve the recovery notice and can be read again', async () => {
   const id = await recoveryItem();
   await answer({ error: 'Cannot inspect local worktrees' }, 502);
-  expect(text($('#needs-you-dialog [role="alert"]'))).toContain('Cannot inspect local worktrees');
+  expect(text($('#needs-you-dialog [data-slot="alert"]'))).toContain('Cannot inspect local worktrees');
   expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
   await confirmPress('Try again');
   expect(posted()).toEqual([['/api/inspect-recovery', { itemId: id }], ['/api/inspect-recovery', { itemId: id }]]);
   await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
-  expect($('#needs-you-dialog [role="alert"]')).toBeNull();
+  expect($('#needs-you-dialog [data-slot="alert"]')).toBeNull();
 });
 
 test('absent branch starts new once confirmed and receives the successful board', async () => {
@@ -876,5 +1069,5 @@ test('choosing a branch uses the model menu and sends recovery options', async (
   await answer({ token: 'empty', plans: [] });
   expect(posted().at(-1)).toEqual(['/api/start-again', { itemId: id, options: { branchChoice: 'new', confirmedOpenPr: false } }]);
   await answer({ error: 'Start refused' }, 409);
-  expect(text($('#needs-you-dialog [role="alert"]'))).toBe('Start refused');
+  expect(text($('#needs-you-dialog [data-slot="alert"]'))).toBe('Start refused');
 });

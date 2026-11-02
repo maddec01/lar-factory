@@ -21,5 +21,8 @@
 [data-kind][data-icon-only] { width: --spacing(7); padding: 0; }
 [data-kind][data-icon-only="large"] svg { width: --spacing(5); height: --spacing(5); }
 
+/* A button marked data-wrap, whose long label would clip on a narrow dialog: the label wraps and the button grows. */
+[data-kind][data-wrap] { height: auto; min-height: --spacing(7); padding-block: --spacing(1); white-space: normal; }
+
 /* The copied Modal's Close: 28 px square, like every icon-only button. */
 [data-slot="modal-close"] { width: --spacing(7); height: --spacing(7); }

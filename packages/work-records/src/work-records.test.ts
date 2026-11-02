@@ -559,6 +559,24 @@ describe('work-record facts the board sets', () => {
     expect(reopened.clearNeedsYou(build.workId, 4)).toMatchObject({ revision: 4 });
   });
 
+  it('keeps Needs you causes apart from the free text, across a reopen', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    expect(build.needsYouCauses).toEqual([]);
+    const moved = { type: 'assignee-changed', from: 'pedro', to: null } as const;
+    first.setNeedsYou(build.workId, 1, 'The implementer could not finish it.');
+    first.setNeedsYouCauses(build.workId, 2, [{ type: 'pr-closed' }, moved]);
+    first.close();
+
+    const reopened = await open(path);
+    expect(reopened.read(build.workId)).toMatchObject({ needsYou: 'The implementer could not finish it.', needsYouCauses: [{ type: 'pr-closed' }, moved], revision: 3 });
+    expect(reopened.setNeedsYouCauses(build.workId, 3, [{ type: 'pr-closed' }, moved]).revision, 'the same causes write nothing').toBe(3);
+    expect(reopened.clearNeedsYou(build.workId, 3)).toMatchObject({ needsYou: null, needsYouCauses: [{ type: 'pr-closed' }, moved], revision: 4 });
+    expect(reopened.setNeedsYou(build.workId, 4, 'Merge conflict').revision).toBe(5);
+    expect(reopened.setNeedsYouCauses(build.workId, 5, [], { clearReason: true })).toMatchObject({ needsYou: null, needsYouCauses: [], revision: 6 });
+  });
+
   it("snapshots a build's selected project skills once, so later selections leave it alone", async () => {
     const path = join(tempDir(), 'work-records.db');
     const first = await openWorkRecords(path);

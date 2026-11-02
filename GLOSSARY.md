@@ -4,6 +4,14 @@ The board tracks work saved on this machine and in a repository's issue tracker.
 
 ## Language
 
+**Your desk**:
+The board's row of items only the user can move next, including shaping work and concepts with an open question.
+_Avoid_: inbox, needs-you list.
+
+**Open question**:
+A request from a thread, such as a question or tool approval, that T3 holds until the user answers it. A question written in chat text is not one.
+_Avoid_: pending input.
+
 **Abandon**:
 Setting work aside on this machine. Closing its linked tracker ticket is a separate, optional action.
 _Avoid_: delete work.

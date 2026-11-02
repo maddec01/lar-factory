@@ -31,5 +31,5 @@ build:
    with the message
    `Build <work ID>. Read <installed lar-build>/agents/builder.md and follow it.`,
    where `<installed lar-build>` is this skill's absolute path, and records the
-   thread on the build. The build thread then archives the item's idle shaping
-   threads (the builder's **Build** step 1).
+   thread on the build. The board then applies the machine's Shaping thread
+   cleanup setting to the item's shaping threads.

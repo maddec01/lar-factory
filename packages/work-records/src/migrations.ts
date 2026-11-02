@@ -376,4 +376,5 @@ export const MIGRATIONS: readonly Migration[] = [
     ) STRICT;
     CREATE INDEX shaping_thread_cleanups_by_work_id ON shaping_thread_cleanups (work_id);
   `),
+  (db) => db.exec('ALTER TABLE work_records ADD COLUMN needs_you_causes TEXT'),
 ];

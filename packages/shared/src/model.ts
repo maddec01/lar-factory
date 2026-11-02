@@ -370,6 +370,14 @@ export interface Item {
 export const NEEDS_YOU_OFFERS = ['reopen-pr', 'replace-pr', 'set-aside', 'reopen-work', 'start-again', 'back-to-queue', 'back-to-list'] as const;
 export type NeedsYouOffer = (typeof NEEDS_YOU_OFFERS)[number];
 
+/** A change the board saw that makes work wait on the user. `assignee-changed` holds who its ticket moved from and to, null for no one. */
+export type NeedsYouCause =
+  | { type: 'pr-closed' }
+  | { type: 'ticket-closed' }
+  | { type: 'assignee-changed'; from: string | null; to: string | null }
+  | { type: 'ticket-missing' }
+  | { type: 'no-thread' };
+
 /** `running` during a turn, `needs you` at a request, `stopped` after an interrupted or failed turn, else `done`. */
 export type ThreadState = 'running' | 'needs you' | 'stopped' | 'done';
 

@@ -4,7 +4,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import type { StatementSync } from 'node:sqlite';
-import { readTicketSpec, stripTrackerStructure, STATUSES, type ShapingThreadCleanup, type Status } from '@lar-factory/shared';
+import { readTicketSpec, stripTrackerStructure, STATUSES, type NeedsYouCause, type ShapingThreadCleanup, type Status } from '@lar-factory/shared';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
@@ -199,8 +199,10 @@ export interface WorkRecord {
   setAside: boolean;
   /** Whether a concept's Fog is recorded gone; always false for other kinds. */
   fogGone: boolean;
-  /** Why it waits on the user, such as a closed unmerged PR; null when it doesn't. Its Status stays as it was. */
+  /** Why it waits on the user in free text, such as a merge conflict; null when it doesn't. Its Status stays as it was. */
   needsYou: string | null;
+  /** The changes the board saw that make it wait on the user, such as a closed unmerged PR. Its Status stays as it was. */
+  needsYouCauses: NeedsYouCause[];
   /** The project skills selected when its build started, or null before it starts. Later selections never change it. */
   skills: string[] | null;
   /** When its work was finished, as its delivery PR showed, or null while unfinished. A Status never implies it. */
@@ -281,6 +283,8 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   /** Records why the work waits on the user, replacing an earlier reason. */
   setNeedsYou(workId: string, revision: number, reason: string): WorkRecord;
   clearNeedsYou(workId: string, revision: number): WorkRecord;
+  /** Replaces the causes the work waits on the user for. `clearReason` also clears the free text in the same write. */
+  setNeedsYouCauses(workId: string, revision: number, causes: readonly NeedsYouCause[], options?: { clearReason?: boolean }): WorkRecord;
   /** Records the project skills selected as the build starts. A build snapshots its skills once. */
   snapshotSkills(workId: string, revision: number, skills: readonly string[]): WorkRecord;
   restore(workId: string, revision: number): WorkRecord;
@@ -394,6 +398,7 @@ interface Row {
   set_aside_at: string | null;
   fog_gone_at: string | null;
   needs_you: string | null;
+  needs_you_causes: string | null;
   skills: string | null;
   finished_at: string | null;
   agreed_ticket_kind: WorkKind | null;
@@ -418,6 +423,7 @@ const fromRow = (row: Row): WorkRecord => ({
   setAside: row.set_aside_at !== null,
   fogGone: row.fog_gone_at !== null,
   needsYou: row.needs_you,
+  needsYouCauses: row.needs_you_causes === null ? [] : JSON.parse(row.needs_you_causes) as NeedsYouCause[],
   skills: row.skills === null ? null : JSON.parse(row.skills) as string[],
   finishedAt: row.finished_at,
   agreedTicketKind: row.agreed_ticket_kind,
@@ -666,7 +672,7 @@ function workRecords(database: Database): WorkRecords {
   };
 
   const updateRow = db.prepare(`UPDATE work_records SET kind = ?, status = ?, queue_order = ?, ticket = ?, parent_id = ?, build_phase = ?,
-    pull_request = ?, set_aside_at = ?, fog_gone_at = ?, needs_you = ?, skills = ?, finished_at = ?, agreed_ticket_kind = ?, kind_answer = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
+    pull_request = ?, set_aside_at = ?, fog_gone_at = ?, needs_you = ?, needs_you_causes = ?, skills = ?, finished_at = ?, agreed_ticket_kind = ?, kind_answer = ?, revision = ?, updated_at = ? WHERE work_id = ? AND revision = ?`);
   /** Applies `change` to the record at `revision`, bumping it; throws when the record moved on. Records `apply`
    * returns in `touched` are bumped too, so a writer holding their old revision fails instead of overwriting. When
    * `apply` returns null the record already holds the change, so nothing is written or bumped. */
@@ -682,7 +688,7 @@ function workRecords(database: Database): WorkRecords {
       if (patch === null) return fromRow(row);
       const next = { ...row, ...patch, revision: row.revision + 1, updated_at: new Date().toISOString() };
       updateRow.run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.build_phase, next.pull_request, next.set_aside_at,
-        next.fog_gone_at, next.needs_you, next.skills, next.finished_at, next.agreed_ticket_kind, next.kind_answer, next.revision, next.updated_at, workId, expected);
+        next.fog_gone_at, next.needs_you, next.needs_you_causes, next.skills, next.finished_at, next.agreed_ticket_kind, next.kind_answer, next.revision, next.updated_at, workId, expected);
       for (const id of touched) bump.run(next.updated_at, id);
       return fromRow(find(workId));
     });
@@ -881,6 +887,11 @@ function workRecords(database: Database): WorkRecords {
       return change(workId, revision, (row) => (row.needs_you === why ? null : { needs_you: why }));
     },
     clearNeedsYou: (workId, revision) => change(workId, revision, (row) => (row.needs_you === null ? null : { needs_you: null })),
+    setNeedsYouCauses: (workId, revision, causes, { clearReason = false } = {}) => {
+      const saved = causes.length ? JSON.stringify(causes) : null;
+      return change(workId, revision, (row) => (row.needs_you_causes === saved && (!clearReason || row.needs_you === null) ? null
+        : { needs_you_causes: saved, ...clearReason && { needs_you: null } }));
+    },
     snapshotSkills: (workId, revision, skills) => {
       const snapshot = JSON.stringify(checkSkills(skills));
       return change(workId, revision, (row) => {
@@ -1145,7 +1156,7 @@ function workRecords(database: Database): WorkRecords {
           const recovery = JSON.parse(String(staged)) as { branch: string; reset: boolean };
           if (recovery.reset) resetOwnedBuild(workId, work, touched);
           db.prepare('UPDATE work_records SET build_branch = ? WHERE work_id = ?').run(recovery.branch, workId);
-          return { ...(recovery.reset ? { build_phase: null } : {}), needs_you: null };
+          return { ...(recovery.reset ? { build_phase: null } : {}), needs_you: null, needs_you_causes: null };
         }
         return {};
       });

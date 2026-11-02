@@ -226,6 +226,73 @@ test('a Ready item with a queued thread offers Open thread instead of Start buil
   expect(footerControls()).not.toContain('Start build ▾');
 });
 
+test('an archived thread shows as archived in details, with no link to it anywhere in the dialog', async () => {
+  await mountPage(withThreads('I_sample10', [{ ...thread('put-away', 'done'), title: 'Shape: accounts', archived: true }]));
+  await openItem('I_sample10');
+  expect(text(inDialog('[data-earlier-threads]')!)).toBe('T3 · Shape: accounts · archived');
+  expect(statusAction().getAttribute('href')).toBeNull();
+  expect(statusAction().getAttribute('title')).toBe('This thread is archived in T3 Code');
+  expect(dialog()!.querySelector('a[href*="put-away"]')).toBeNull();
+});
+
+test('beside an archived shaping thread, Open thread links the build thread', async () => {
+  await mountPage(withThreads('I_sample10', [thread('build', 'running'), { ...thread('put-away', 'done'), archived: true }]));
+  await openItem('I_sample10');
+  expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/build');
+  expect(text(inDialog('[data-earlier-threads]')!)).toBe('T3 · Thread put-away · archived');
+  expect(dialog()!.querySelector('a[href*="put-away"]')).toBeNull();
+});
+
+test('a long thread title truncates alone, keeping the row\'s archived mark in view', async () => {
+  await mountPage(withThreads('I_sample10', [{ ...thread('put-away', 'done'), archived: true }]));
+  await openItem('I_sample10');
+  const row = inDialog('[data-earlier-threads] li')!;
+  expect(row.querySelector('.truncate')!.textContent).toBe('T3 · Thread put-away');
+  expect(row.querySelector('.shrink-0')!.textContent).toBe('· archived');
+});
+
+test('a settled shaping thread keeps a row in details whose link opens it, while Open thread links the build', async () => {
+  const shaping = { ...thread('settled', 'done'), title: 'Shape: accounts', purpose: 'shape' };
+  await mountPage(withThreads('I_sample10', [{ ...thread('build', 'running'), purpose: 'build' }, shaping]));
+  await openItem('I_sample10');
+  expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/build');
+  const row = inDialog('[data-earlier-threads] li')!;
+  expect(text(row)).toBe('T3 · Shape: accounts · shaping');
+  expect(row.querySelector('a.truncate')!.getAttribute('href')).toBe('t3code://threads/sample-environment/settled');
+  expect(row.querySelector('.shrink-0')!.textContent).toBe('· shaping');
+});
+
+test('an earlier shaping thread lists beside an archived one, and only the archived one has no link', async () => {
+  await mountPage(withThreads('I_sample10', [
+    { ...thread('build', 'running'), purpose: 'build' },
+    { ...thread('settled', 'done'), purpose: 'shape' },
+    { ...thread('put-away', 'done'), purpose: 'shape', archived: true },
+  ]));
+  await openItem('I_sample10');
+  expect($$('[data-item-dialog] [data-earlier-threads] li').map(text)).toEqual(['T3 · Thread settled · shaping', 'T3 · Thread put-away · archived']);
+  expect(dialog()!.querySelector('a[href*="settled"]')).not.toBeNull();
+  expect(dialog()!.querySelector('a[href*="put-away"]')).toBeNull();
+});
+
+test('a shaping thread still the latest and an earlier build show no row', async () => {
+  await mountPage(withThreads('I_sample10', [{ ...thread('shaping', 'running'), purpose: 'shape' }, { ...thread('old-build', 'done'), purpose: 'build' }]));
+  await openItem('I_sample10');
+  expect(inDialog('[data-earlier-threads]')).toBeNull();
+});
+
+test('without T3\'s environment id, a settled shaping thread\'s row has no link', async () => {
+  await mountPage(withThreads('I_sample10', [thread('build', 'running'), { ...thread('settled', 'done'), purpose: 'shape' }], { ...sample, t3EnvironmentId: undefined }));
+  await openItem('I_sample10');
+  expect(text(inDialog('[data-earlier-threads] li')!)).toBe('T3 · Thread settled · shaping');
+  expect(dialog()!.querySelector('a[href*="settled"]')).toBeNull();
+});
+
+test('details list no earlier threads for an item without any', async () => {
+  await mountPage(withThreads('I_sample10', [thread('build', 'running')]));
+  await openItem('I_sample10');
+  expect(inDialog('[data-earlier-threads]')).toBeNull();
+});
+
 test('a Queued item whose threads are all done still offers Shape issue', async () => {
   await mountPage(withThreads('I_sample05', [thread('old', 'done')]));
   await openItem('I_sample05');

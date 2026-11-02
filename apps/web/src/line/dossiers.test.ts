@@ -317,6 +317,11 @@ test('the open body has no Check phase, progress rows or stage header; the Work 
   expect(dossier().querySelectorAll('[data-item]').length, "only the header's").toBe(1);
 });
 
+test("a part's archived thread reads as archived, not as its last state", async () => {
+  await mountPage(withItem('I_sample10', { threads: [{ ...thread('put-away', 'done'), archived: true }] }));
+  expect([...step('I_sample10').children].map(text)[2]).toContain('T3 · Thread put-away· archived');
+});
+
 test('each part shows what it asks next, then its stage track, status, figures and thread, and its slice bar', async () => {
   await mountPage(withItem('I_sample13', { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' },
     linkedPrs: [{ ...sample.items.flatMap((i) => i.linkedPrs)[0]!, number: 145, state: 'open', isDraft: false }] }));

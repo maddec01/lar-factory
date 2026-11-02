@@ -62,7 +62,7 @@ function ThreadLine({ part }: { part: Part }) {
     <span className="flex min-w-0 items-center gap-1.5" title={thread.title}>
       <StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />
       <span className="truncate">T3 · {thread.title}</span>
-      <span className="shrink-0">· {thread.state}{lastSeen(thread)}</span>
+      <span className="shrink-0">· {thread.archived ? 'archived' : thread.state}{lastSeen(thread)}</span>
     </span>
   );
 }

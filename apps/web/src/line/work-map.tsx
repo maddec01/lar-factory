@@ -99,7 +99,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
       <SourceIcon item={item} corner className="pointer-events-none" />
       <span className="pointer-events-none relative flex items-center gap-1.5 pr-5 text-[11px] text-(--muted-foreground)">
         <Icon className="size-3.5 shrink-0" />{part.kind}
-        <span className="ml-auto inline-flex items-center gap-1" title={thread ? `T3 thread: ${thread.title} (${thread.state})` : 'No T3 thread'}>
+        <span className="ml-auto inline-flex items-center gap-1" title={thread ? `T3 thread: ${thread.title} (${thread.archived ? 'archived' : thread.state})` : 'No T3 thread'}>
           {thread ? <><StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />thread</> : 'no thread'}
         </span>
       </span>

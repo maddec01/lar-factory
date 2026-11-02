@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { effectiveVocabulary, kindDisagreement, type RepositorySetup, type TicketKinds, type TrackerLabels } from '@lar-factory/shared';
-import { changeKind } from './change-kind.ts';
+import { changeKind, checkKind } from './change-kind.ts';
 import { openDatabase } from './database.ts';
 import { MIGRATIONS } from './migrations.ts';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
@@ -218,4 +218,16 @@ test('a record from before the migration has no agreed kind or answer, and keeps
   const records = await openWorkRecords(path);
   opened.push({ records, dir });
   expect(records.read('old-work')).toMatchObject({ kind: 'bug', agreedTicketKind: null, kindAnswer: null });
+});
+
+test('the check plans the swap as the change would: a type the backlog doesn\'t show needs no type access and has a note', async () => {
+  const records = await open();
+  const { workId } = records.importTicket({ title: 'T', repository: AZURE, kind: 'bug', ticket: `${AZURE}#12` }).record;
+  const tracker = fakeTracker({ labels: ['type: feature'], type: 'Feature' }, { board: ['Feature'] });
+  const check = await checkKind(records.read(workId), { setup: setupOf(AZURE, { 'tag-ticket': 'allowed' }), ...tracker });
+  expect(check).toMatchObject({
+    ticketKind: 'feature', accessProblem: null, note: ' The type stays Feature, because the team\'s backlog doesn\'t show Bug.',
+    swap: { add: ['type: bug'], remove: ['type: feature'], type: null },
+  });
+  expect(tracker.writes).toEqual([]);
 });

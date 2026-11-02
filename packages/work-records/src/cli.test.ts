@@ -108,6 +108,86 @@ process.stdout.write('{}');
     expect(bad.code).toBe(1);
   });
 
+  describe('kind-disagreement', () => {
+    /** A record of `kind` on ticket #12, and what the ticket's kind disagreement reads as. */
+    async function imported(data: string, kind: string) {
+      const made = (await larWork(data, 'import', '--title', 'T', '--repository', 'example/product', '--kind', kind, '--ticket', 'example/product#12')).record.record;
+      mapped(data);
+      return made;
+    }
+    const check = async (data: string, workId: string) => (await larWork(data, 'kind-disagreement', workId)).record.disagreement;
+
+    it('reports what an update would swap, writes nothing, and an update --kind changes what it reports', async () => {
+      const data = join(tempDir(), 'Lar Factory');
+      const writes = fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: { name: 'Feature' } });
+      const made = await imported(data, 'feature');
+      expect(await check(data, made.workId)).toBeNull();
+
+      await larWork(data, 'update', made.workId, '--revision', String(made.revision), '--kind', 'bug');
+      expect(await check(data, made.workId)).toEqual({
+        ticketKind: 'feature', changed: 'item', kept: false, note: '', accessProblem: null,
+        swap: { add: ['type: bug'], remove: ['type: feature'], type: { from: 'Feature', to: 'Bug' } },
+      });
+      expect(writes()).toEqual([]);
+    });
+
+    it('a kept answer is reported as kept, which is what clears the board', async () => {
+      const data = join(tempDir(), 'Lar Factory');
+      fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: null });
+      const made = await imported(data, 'bug');
+      await larWork(data, 'record-kind-answer', made.workId, '--revision', String(made.revision), '--answer', 'keep', '--ticket-kind', 'feature');
+      expect(await check(data, made.workId)).toMatchObject({ ticketKind: 'feature', kept: true });
+    });
+
+    it('a yes through change-kind leaves nothing to report', async () => {
+      const data = join(tempDir(), 'Lar Factory');
+      const dir = tempDir();
+      fakeIssue(dir, { labels: [{ name: 'type: feature' }], type: null });
+      const made = await imported(data, 'bug');
+      await larWork(data, 'change-kind', made.workId, '--revision', String(made.revision), '--kind', 'bug');
+      writeFileSync(join(dir, 'issue.json'), JSON.stringify({ number: 12, labels: [{ name: 'type: bug' }], type: { name: 'Bug' } }));
+      expect(await check(data, made.workId)).toBeNull();
+    });
+
+    it('a ticket with no kind counts only when the item\'s kind has something mapped to add', async () => {
+      const data = join(tempDir(), 'Lar Factory');
+      fakeIssue(tempDir(), { labels: [{ name: 'docs' }], type: null });
+      const made = await imported(data, 'bug');
+      expect(await check(data, made.workId)).toMatchObject({ ticketKind: null, swap: { add: ['type: bug'] } });
+
+      await larWork(data, 'update', made.workId, '--revision', String(made.revision), '--kind', 'improvement');
+      expect(await check(data, made.workId)).toBeNull();
+    });
+
+    it('says why this login can\'t make the swap', async () => {
+      const data = join(tempDir(), 'Lar Factory');
+      fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: null });
+      const made = await imported(data, 'bug');
+      writeFileSync(join(data, 'repository-settings.json'), readFileSync(join(data, 'repository-settings.json'), 'utf8').replace('"tag-ticket":"allowed"', '"tag-ticket":"refused"'));
+      expect((await check(data, made.workId)).accessProblem).toBe('Access to tag-ticket was refused. Recheck access in Settings.');
+    });
+
+    it('local work and a repository with no setup have nothing to report, as on the board', async () => {
+      const data = join(tempDir(), 'Lar Factory');
+      fakeIssue(tempDir(), { labels: [{ name: 'feature' }], type: null });
+      const local = (await larWork(data, 'create', '--title', 'T', '--repository', 'example/product', '--kind', 'bug')).record;
+      expect(await check(data, local.workId)).toBeNull();
+      const unlisted = (await larWork(data, 'import', '--title', 'T', '--repository', 'example/other', '--kind', 'bug', '--ticket', 'example/other#12')).record.record;
+      expect(await check(data, unlisted.workId)).toBeNull();
+    });
+
+    it('a failed ticket read fails with the reason', async () => {
+      const data = join(tempDir(), 'Lar Factory');
+      fakeIssue(tempDir(), { labels: [], type: null });
+      const other = (await larWork(data, 'import', '--title', 'T', '--repository', 'example/product', '--kind', 'bug', '--ticket', 'example/product#12')).record.record;
+      mapped(data);
+      vi.stubEnv('GH_PATH', join(tempDir(), 'no-such-gh'));
+      const failed = await larWork(data, 'kind-disagreement', other.workId);
+      expect(failed.code).toBe(1);
+      expect(failed.stderr).toMatch(/^lar-work: Could not read #12\./);
+    });
+  });
+
   it('creates, reads and updates a record in a data folder with no board running', async () => {
     const data = join(tempDir(), 'Lar Factory');
     const created = await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'feature');

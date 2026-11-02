@@ -6,13 +6,15 @@
 import { readFileSync } from 'node:fs';
 import { userInfo, homedir } from 'node:os';
 import { join } from 'node:path';
-import { onAzure, readTicketSpec, stripTrackerStructure, trackerCapabilities } from '@lar-factory/shared';
-import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails, LabelChange, RecordDetails, TrackerLabel, TrackerLabels } from '@lar-factory/shared';
+import { onAzure, readTicketSpec, sameRepo, stripTrackerStructure, trackerCapabilities } from '@lar-factory/shared';
+import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails, LabelChange, RecordDetails, RepositorySetup, SwapKind, TicketKinds, TrackerLabel, TrackerLabels } from '@lar-factory/shared';
 import { trackerLabels } from '@lar-factory/shared/tracker-labels';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { activeSpecState, editSpec, refreshSpecs, resolveSpecEdit, syncSpecs, type SpecSyncOptions } from '@lar-factory/work-records/spec-sync';
 import { exportMarkdown } from '@lar-factory/work-records/export';
+import { checkKind } from '@lar-factory/work-records/change-kind';
 import type { Refused } from '../config/editable-repository.ts';
+import { readRepositorySetups } from '../config/repository-settings.ts';
 import { readAzureItemDetails, readAzureOlderComments } from '../azure/azure-details.ts';
 import { saveAzureDescription } from '../azure/azure-writes.ts';
 import { readGithubItemDetails, readGithubOlderComments, saveGithubDescription } from '../github/github-details.ts';
@@ -48,6 +50,9 @@ export interface RecordsDeps {
   specSync?: SpecSyncOptions;
   /** The label operations of a repository; tests stand in for the tracker. */
   labelsOf?: (repo: string) => TrackerLabels;
+  /** A repository's local setup and its type reads, for what a kind update would write; tests stand in for them. */
+  setupOf?: (repo: string) => RepositorySetup | undefined;
+  kindsOf?: (repo: string) => TicketKinds;
 }
 
 /** Comments per older page; GitHub and Azure DevOps both answer 10. */
@@ -108,28 +113,41 @@ const NO_TICKET: Refused = { status: 409, error: 'This work has no ticket the bo
  * which reads and writes it by its node id. Work with no ticket has no details.
  */
 export function createItemDetails(sampleFile: string | null, ticketOf: (item: Item) => Item | undefined,
-  { records, exportFolder = join(homedir(), 'Downloads'), specSync, labelsOf = trackerLabels }: RecordsDeps = { records: null }): ItemDetailsReader {
+  { records, exportFolder = join(homedir(), 'Downloads'), specSync, labelsOf = trackerLabels, setupOf = (repo) => readRepositorySetups().find((setup) => sameRepo(setup.repo, repo)), kindsOf }: RecordsDeps = { records: null }): ItemDetailsReader {
   if (sampleFile) return fromFile(sampleFile);
   const azure = (item: Item) => Boolean(item.repo && onAzure(item.repo));
+  /** What an update of the ticket writes, from a fresh read and the team's backlog. A failed read leaves the board's own swap standing. */
+  const kindPlan = async (work: Item): Promise<ItemDetails['kindPlan']> => {
+    if (!records || work.kindDisagreement?.changed !== 'item') return undefined;
+    try {
+      const record = records.read(work.id);
+      const check = await checkKind(record, { setup: setupOf(work.repo), ...kindsOf && { kinds: kindsOf(work.repo) } });
+      return check ? { itemKind: record.kind as SwapKind, ticketKind: check.ticketKind, swap: check.swap, note: check.note } : undefined;
+    } catch { return undefined; }
+  };
+  const readDetails: ReadItemDetails = async (work) => {
+    let record = records ? recordDetails(records, work.id) : undefined;
+    if (record && records) {
+      await refreshSpecs(records, { ...specSync, workId: work.id });
+      record = recordDetails(records, work.id);
+    }
+    const item = ticketOf(work);
+    const read = !item ? NO_DETAILS : azure(item) ? await readAzureItemDetails(item) : await readGithubItemDetails(item);
+    const state = record && records ? activeSpecState(records, work.id, specSync) : null;
+    if (state) {
+      const details = 'error' in read ? NO_DETAILS : read;
+      const parsed = readTicketSpec(stripTrackerStructure(details.body));
+      return { ...details, body: record!.body, format: 'markdown', record,
+        spec: { generation: state.generation, pending: state.pending !== null, error: state.error, warning: state.warning,
+          original: parsed.original ?? state.original ?? (!state.active ? state.base?.body ?? details.body : null), originalFormat: azure(work) ? 'html' : 'markdown',
+          held: state.held ? { title: state.held.title, body: readTicketSpec(stripTrackerStructure(state.held.body)).spec } : null } };
+    }
+    return record && !('error' in read) ? { ...read, record } : read;
+  };
   return {
     async details(work) {
-      let record = records ? recordDetails(records, work.id) : undefined;
-      if (record && records) {
-        await refreshSpecs(records, { ...specSync, workId: work.id });
-        record = recordDetails(records, work.id);
-      }
-      const item = ticketOf(work);
-      const read = !item ? NO_DETAILS : azure(item) ? await readAzureItemDetails(item) : await readGithubItemDetails(item);
-      const state = record && records ? activeSpecState(records, work.id, specSync) : null;
-      if (state) {
-        const details = 'error' in read ? NO_DETAILS : read;
-        const parsed = readTicketSpec(stripTrackerStructure(details.body));
-        return { ...details, body: record!.body, format: 'markdown', record,
-          spec: { generation: state.generation, pending: state.pending !== null, error: state.error, warning: state.warning,
-            original: parsed.original ?? state.original ?? (!state.active ? state.base?.body ?? details.body : null), originalFormat: azure(work) ? 'html' : 'markdown',
-            held: state.held ? { title: state.held.title, body: readTicketSpec(stripTrackerStructure(state.held.body)).spec } : null } };
-      }
-      return record && !('error' in read) ? { ...read, record } : read;
+      const [read, plan] = await Promise.all([readDetails(work), kindPlan(work)]);
+      return plan && !('error' in read) ? { ...read, kindPlan: plan } : read;
     },
     async olderComments(work, before) {
       const item = ticketOf(work);

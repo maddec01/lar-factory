@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import type { Item, TrackerLabels } from '@lar-factory/shared';
+import { effectiveVocabulary, kindDisagreement } from '@lar-factory/shared';
+import type { Item, ItemDetails, RepositorySetup, TicketKinds, TrackerLabels } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { exportMarkdown } from '@lar-factory/work-records/export';
 import { trackerLabels } from '@lar-factory/shared/tracker-labels';
@@ -100,6 +101,23 @@ test('work with no ticket has no labels to read or change', async () => {
   const refused = { status: 409, error: 'This work has no ticket the board has read.' };
   assert.deepEqual(await labels(workItem), refused);
   assert.deepEqual(await changeLabels(workItem, { label: 'docs', action: 'add' }), refused);
+});
+
+test('details serve what a kind update writes, less a type the team\'s backlog doesn\'t show, and why', async () => {
+  const { records, exportFolder } = await recordsOn();
+  const repo = workItem.repo;
+  const { workId } = records.importTicket({ title: 'T', repository: repo, kind: 'bug', ticket: `${repo}#5` }).record;
+  const setup = { repo, access: { 'tag-ticket': 'allowed', 'type-ticket': 'refused' }, vocabulary: effectiveVocabulary({ bug: { type: 'Bug', labels: [] } }).vocabulary, itemSource: { kind: 'azure-board', team: 'Web' } } as unknown as RepositorySetup;
+  const kinds: TicketKinds = { read: async () => ({ labels: ['feature'], type: 'User Story' }), setType: async () => {}, boardTypes: async () => ['User Story'] };
+  const { swap } = kindDisagreement(records.read(workId), { labels: ['feature'], type: 'User Story' }, setup.vocabulary)!;
+  assert.deepEqual(swap.type, { from: 'User Story', to: 'Bug' });
+  const work = { ...boardItem(workId), repo, kindDisagreement: { ticketKind: 'feature', changed: 'item', kept: false, swap } } as Item;
+  const reader = createItemDetails(null, () => undefined, { records, exportFolder, setupOf: () => setup, kindsOf: () => kinds });
+  const read = await reader.details(work) as ItemDetails;
+  assert.deepEqual(read.kindPlan, { itemKind: 'bug', ticketKind: 'feature', swap: { add: [], remove: ['feature'], type: null }, note: " The type stays User Story, because the team's backlog doesn't show Bug." });
+  const failing = createItemDetails(null, () => undefined, { records, exportFolder, setupOf: () => setup, kindsOf: () => ({ ...kinds, read: async () => { throw new Error('refused'); } }) });
+  assert.equal((await failing.details(work) as ItemDetails).kindPlan, undefined);
+  assert.equal((await reader.details(boardItem(workId)) as ItemDetails).kindPlan, undefined, 'no disagreement, no read');
 });
 
 test("a build's details hold its brief, initial context, build phase and review rounds from its record", async () => {

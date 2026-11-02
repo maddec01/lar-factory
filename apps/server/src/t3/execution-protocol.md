@@ -103,3 +103,14 @@ consumer outside the adapter. Legacy SQL helpers remain for parity fixtures;
 `item-stats.ts` retains its optional `threadSessions` default for those fixtures.
 Production supplies protocol sessions explicitly. The residual production query
 is `CODEX_TURN_SELECTIONS` described above, not project or thread discovery.
+
+## Thread commands
+
+`sendThreadCommand` in `thread-commands.ts` sends `thread.settle`, `thread.archive`
+or `thread.delete` through the `orchestration.dispatchCommand` RPC, which answers
+`{ sequence }`. Source pointers at the reference commit are
+packages/contracts/src/orchestrationV2.ts:2894, 2915, 2920 and 3612. The `t3` CLI
+has no command for these. Each call issues one operate-scope session and revokes
+it afterwards. The call opens one connection and never reconnects. A failed `Exit`
+frame reports `rejected`. A timeout, a dropped connection, a malformed answer or a
+failed session issue reports `unconfirmed`. Retries keep the same `commandId`.

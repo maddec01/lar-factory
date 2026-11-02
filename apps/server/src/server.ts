@@ -27,6 +27,7 @@ import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
 import { createPrObserver } from './items/pr-observer.ts';
 import { createRetention } from './items/retention.ts';
+import { createShapingThreadCleanup } from './items/shaping-thread-cleanup.ts';
 import { agreedKind, archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
@@ -114,6 +115,8 @@ if (!fixture) {
 /** This Mac's retention setting, which hides finished and set-aside work in Archive and runs the timed delete Settings chose. */
 // A saved change shows at once; `reread` is defined below, before any request arrives.
 const retention = createRetention({ records, changed: () => reread() });
+/** This Mac's choice for an item's shaping threads after Start build. */
+const shapingThreadCleanup = createShapingThreadCleanup({ records, changed: () => reread() });
 /** The tickets the item sources read last, which give the records their ticket context. */
 let tickets: Item[] = [];
 let ticketsByRef = new Map<string, Item>();
@@ -133,7 +136,7 @@ function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tic
   if (!records) return [];
   const repos = items.repos().map((r) => r.repo);
   const hidden = retention.hidden();
-  board.update({ retention: retention.state() });
+  board.update({ retention: retention.state(), shapingThreadCleanup: shapingThreadCleanup.state() });
   const setups = board.snapshot().repos.flatMap((r) => r.setup ? [r.setup] : []);
   return recordItems(records, tickets, repos, unread, hidden, setups);
 }
@@ -764,7 +767,7 @@ const adding = createCapture({ board, items, records, reread, repos: () => board
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
-  board, commands, capture: adding, startAfter, retention, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  board, commands, capture: adding, startAfter, retention, shapingThreadCleanup, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   reauthorizeT3: async () => {
     const read = await reauthorizeRepositoryProjects();
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });

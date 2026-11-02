@@ -987,6 +987,23 @@ describe('shaping thread cleanup rows', () => {
     expect(records.pendingShapingThreadCleanups()).toMatchObject([{ threadId: 'shape-1', action: null }]);
   });
 
+  it('saves the first action on a row with no action and leaves one already saved, with no change to the revision', async () => {
+    const { records, build, startBuild } = await started('unreadable', ['shape-1']);
+    startBuild('build-1');
+    const revision = records.read(build.workId).revision;
+    records.saveShapingThreadAction('shape-1', 'archive');
+    records.saveShapingThreadAction('shape-1', 'delete');
+    expect(records.pendingShapingThreadCleanups()).toMatchObject([{ threadId: 'shape-1', action: 'archive' }]);
+    expect(records.read(build.workId).revision).toBe(revision);
+  });
+
+  it('saving Keep on a row with no action leaves nothing pending, like a Keep row from Start build', async () => {
+    const { records, startBuild } = await started('unreadable', ['shape-1']);
+    startBuild('build-1');
+    records.saveShapingThreadAction('shape-1', 'keep');
+    expect(records.pendingShapingThreadCleanups()).toEqual([]);
+  });
+
   it('touches only threads without a row, skips deleted threads and keeps a cleaned thread cleaned', async () => {
     const { records, build, startBuild } = await started('archive');
     records.confirmThreadDeleted(build.workId, records.read(build.workId).revision, 'shape-2');

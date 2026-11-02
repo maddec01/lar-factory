@@ -343,6 +343,8 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   markShapingThreadCleaned(threadId: string): void;
   /** Marks a row cleaned and its thread deleted in one transaction. Takes no revision, like markShapingThreadCleaned. */
   markShapingThreadDeleted(threadId: string): void;
+  /** Gives a row with no action the setting read later, and a row with an action keeps it. Keep starts cleaned, as at Start build. Takes no revision, like markShapingThreadCleaned. */
+  saveShapingThreadAction(threadId: string, action: ShapingThreadCleanup): void;
   /** Saves or clears a row's failure. Takes no revision, like markShapingThreadCleaned. */
   saveShapingThreadFailure(threadId: string, failure: string | null): void;
   /** Saves a row's failure and gives it a new command ID, because T3 answers a command ID it rejected with that rejection forever. Takes no revision, like markShapingThreadCleaned. */
@@ -1158,6 +1160,9 @@ function workRecords(database: Database): WorkRecords {
       const now = new Date().toISOString();
       db.prepare('UPDATE shaping_thread_cleanups SET cleaned_at = ?, failure = NULL WHERE thread_id = ?').run(now, threadId);
       db.prepare('UPDATE threads SET deleted_at = coalesce(deleted_at, ?) WHERE thread_id = ?').run(now, threadId);
+    }),
+    saveShapingThreadAction: (threadId, action) => database.write(() => {
+      db.prepare('UPDATE shaping_thread_cleanups SET action = ?, cleaned_at = ? WHERE thread_id = ? AND action IS NULL').run(action, action === 'keep' ? new Date().toISOString() : null, threadId);
     }),
     saveShapingThreadFailure: (threadId, failure) => database.write(() => {
       db.prepare('UPDATE shaping_thread_cleanups SET failure = ? WHERE thread_id = ?').run(failure, threadId);

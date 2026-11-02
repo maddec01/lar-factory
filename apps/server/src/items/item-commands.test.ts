@@ -235,7 +235,7 @@ async function closedPrBuild() {
   let record = records.setPullRequest(created.workId, created.revision, `${WEB}#40`);
   record = records.addThread(created.workId, record.revision, 'thread-0', 'build');
   record = records.observe(created.workId, record.revision, { of: 'pr', state: 'closed' });
-  records.setNeedsYou(created.workId, record.revision, 'Its PR closed without merging.');
+  records.setNeedsYouCauses(created.workId, record.revision, [{ type: 'pr-closed' }]);
   return { records, workId: created.workId, ...commandsOn([], undefined, records) };
 }
 
@@ -243,13 +243,13 @@ test('reopening a closed PR from Needs you reopens it in its provider and clears
   const { records, workId, commands, log } = await closedPrBuild();
   assert.equal((await commands.resolveNeedsYou(workId, 'reopen-pr')).status, 200);
   assert.deepEqual(log, [`reopen ${WEB}#40`]);
-  assert.deepEqual([records.read(workId).needsYou, records.read(workId).status], [null, 'Review']);
+  assert.deepEqual([records.read(workId).needsYouCauses, records.read(workId).status], [[], 'Review']);
 });
 
 test('a replacement build from Needs you readies the work, and Start build then starts a new thread on a new branch', async () => {
   const { records, workId, commands, branches } = await closedPrBuild();
   assert.equal((await commands.resolveNeedsYou(workId, 'replace-pr')).status, 200);
-  assert.deepEqual([records.read(workId).needsYou, records.read(workId).status], [null, 'Ready']);
+  assert.deepEqual([records.read(workId).needsYouCauses, records.read(workId).status], [[], 'Ready']);
   assert.equal((await commands.startBuild(workId, undefined)).status, 200);
   assert.equal(branches.length, 1, 'the closed PR\'s thread holds no start');
   assert.match(branches[0]!, /-retry-[a-f0-9]+$/);
@@ -265,17 +265,31 @@ test('Needs you refuses a choice it does not offer, and Clear clears any reason'
   const { records, workId, commands, log } = await closedPrBuild();
   assert.equal((await commands.resolveNeedsYou(workId, 'reopen-work')).status, 409);
   assert.equal((await commands.resolveNeedsYou(workId, 'clear')).status, 200);
-  assert.deepEqual([records.read(workId).needsYou, records.read(workId).status, log], [null, 'Review', []]);
+  assert.deepEqual([records.read(workId).needsYouCauses, records.read(workId).status, log], [[], 'Review', []]);
   assert.equal((await commands.resolveNeedsYou(workId, 'clear')).status, 409, 'work that no longer needs you has nothing to clear');
 });
 
-test('reopening Done work from Needs you moves it back to List', async () => {
+test('Start refuses while causes remain, and Clear removes causes and free text together', async () => {
   const records = await openRecords();
-  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Done', ticket: `${WEB}#7` }).record;
-  records.setNeedsYou(work.workId, records.observe(work.workId, work.revision, { of: 'ticket', state: 'open' }).revision, 'Its ticket reopened.');
-  const { commands } = commandsOn([], undefined, records);
-  assert.equal((await commands.resolveNeedsYou(work.workId, 'reopen-work')).status, 200);
-  assert.deepEqual([records.read(work.workId).needsYou, records.read(work.workId).status], [null, 'List']);
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  records.setNeedsYou(work.workId, work.revision, 'Merge conflict.');
+  records.setNeedsYouCauses(work.workId, records.read(work.workId).revision, [{ type: 'no-thread' }]);
+  const { commands, started } = recordedCommands(records);
+  const refused = await commands.start(work.workId, undefined);
+  assert.equal(refused.status, 409);
+  assert.match((refused.body as { error: string }).error, /^Needs you: The board asked T3 for a thread.* Merge conflict\.$/);
+  assert.deepEqual(started, []);
+  assert.equal((await commands.resolveNeedsYou(work.workId, 'clear')).status, 200);
+  assert.deepEqual([records.read(work.workId).needsYou, records.read(work.workId).needsYouCauses], [null, []]);
+  assert.equal((await commands.start(work.workId, undefined)).status, 200);
+});
+
+test('Start does not refuse saved old wording whose cause reads ended', async () => {
+  const records = await openRecords();
+  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued', ticket: `${WEB}#7` }).record;
+  const observed = records.observe(work.workId, work.revision, { of: 'ticket', state: 'open' });
+  records.setNeedsYou(work.workId, observed.revision, `Its ticket ${WEB}#7 closed in its provider. Set the work aside, or clear this to keep working.`);
+  assert.equal((await recordedCommands(records).commands.start(work.workId, undefined)).status, 200);
 });
 
 test('Start build reuses a live start, but a confirmed stopped build can start again once', async () => {
@@ -580,11 +594,11 @@ test('after a restart, an unresolved start T3 shows no thread for sets Needs you
     const refused = await commands.start(work.workId, undefined);
     assert.equal(refused.status, 409);
     assert.match((refused.body as { error: string }).error, /Needs you/);
-    assert.match(records.read(work.workId).needsYou ?? '', /no thread/);
+    assert.deepEqual(records.read(work.workId).needsYouCauses, [{ type: 'no-thread' }]);
     assert.deepEqual(started, []);
     assert.equal((await commands.start(work.workId, undefined)).status, 409, 'Start waits until the user clears Needs you');
     const record = records.read(work.workId);
-    records.clearNeedsYou(work.workId, record.revision);
+    records.setNeedsYouCauses(work.workId, record.revision, []);
     assert.equal((await commands.start(work.workId, undefined)).status, 200);
     assert.equal(started.length, 1);
   } finally { vi.useRealTimers(); }
@@ -731,7 +745,7 @@ test('an active Start prevents combined abandonment before provider access', asy
 });
 
  test('deleted-thread recovery refuses Clear without changing status', async () => {
-  const item = queued(91, { status: 'Review', threads: [], needsYou: { reason: 'Deleted', deletedThread: true, offers: ['back-to-list'] } });
+  const item = queued(91, { status: 'Review', threads: [], needsYou: { reason: 'Deleted', causes: [], ticketOpen: false, deletedThread: true, offers: ['back-to-list'] } });
   const records = await openRecords();
   const { commands, board } = commandsOn([], undefined, records);
   board.update({ items: [item] });
@@ -745,7 +759,7 @@ for (const briefChoice of ['keep', 'reshape'] as const) test(`deleted-thread mov
   records.recordGate(work.workId, records.read(work.workId).revision, { briefDigest: records.gate(work.workId).briefDigest!, approvedBy: 'test', evidence: 'Passed.' });
   const { commands, board } = recordedCommands(records);
   const item = board.find(work.workId)!;
-  board.update({ items: [{ ...item, threads: [], needsYou: { reason: 'Deleted', deletedThread: true, offers: ['back-to-list'] } }] });
+  board.update({ items: [{ ...item, threads: [], needsYou: { reason: 'Deleted', causes: [], ticketOpen: false, deletedThread: true, offers: ['back-to-list'] } }] });
   assert.equal((await commands.resolveNeedsYou(work.workId, 'back-to-list', 'invalid')).status, 422);
   assert.equal((await commands.resolveNeedsYou(work.workId, 'back-to-list')).status, 422);
   assert.equal(records.read(work.workId).status, 'Review');
@@ -773,7 +787,7 @@ test('Start again preserves launch intents and continues a deleted build on its 
   records.confirmThreadDeleted(work.workId, records.read(work.workId).revision, 'deleted-build');
   const { board, commands, bases, branches } = commandsOn([], undefined, records);
   const item = board.find(work.workId)!;
-  board.update({ items: [{ ...item, threads: [], needsYou: { reason: 'Deleted', deletedThread: true, offers: ['start-again'] } }] });
+  board.update({ items: [{ ...item, threads: [], needsYou: { reason: 'Deleted', causes: [], ticketOpen: false, deletedThread: true, offers: ['start-again'] } }] });
   assert.equal((await commands.startAgain(work.workId, undefined, {})).status, 409);
   assert.equal(records.launchIntents({ workId: work.workId }).length, 0);
   assert.equal((await commands.startAgain(work.workId, undefined, { branchChoice: 'continue' })).status, 200);

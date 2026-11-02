@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { effectiveVocabulary, normalizeItems, type RepositorySetup, type VocabularyMapping } from '@lar-factory/shared';
+import { effectiveVocabulary, normalizeItems, type NeedsYouCause, type NeedsYouOffer, type RepositorySetup, type Status, type VocabularyMapping } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { DEFAULT_RETENTION, openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { changeKind } from '@lar-factory/work-records/change-kind';
@@ -165,22 +165,161 @@ test("in a repository whose source hasn't read yet, only a record with a ticket 
   assert.deepEqual(recordItems(records, tickets([40, 'List']), [REPO], [REPO]).map((i) => i.title), ['Unread', 'Local']);
 });
 
-test('work that needs you shows the reason, with what its PR and ticket observations offer', async () => {
+/** A build on REPO with ticket #12 and PR #40, with `pr` and `ticket` as its last reads. */
+function observedBuild(records: WorkRecords, { pr, ticket, assignee, status = 'Review' }: { pr?: 'open' | 'closed'; ticket?: 'open' | 'closed' | 'not-found'; assignee?: string; status?: Status }) {
+  const made = records.importTicket({ title: 'Build', repository: REPO, kind: 'build', status, ticket: `${REPO}#12` }).record;
+  let record = records.setPullRequest(made.workId, made.revision, `${REPO}#40`);
+  if (pr) record = records.observe(made.workId, record.revision, { of: 'pr', state: pr });
+  if (ticket) record = records.observe(made.workId, record.revision, { of: 'ticket', state: ticket, ...assignee && { assignee } });
+  return record;
+}
+const noticeOf = (records: WorkRecords, workId: string) => recordItems(records, [], [REPO]).find((item) => item.id === workId)?.needsYou;
+
+const PR_CLOSED = `Its PR ${REPO}#40 closed without merging.`;
+const TICKET_CLOSED = `Its ticket ${REPO}#12 closed in its provider.`;
+const NO_THREAD_NOW = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code.";
+const MISSING = `Its ticket ${REPO}#12 wasn't found in its provider, so the board set the work aside. Restore it from Settings › Archive once the ticket is back.`;
+
+test('each cause decides the text and the exact offers of its notice', async () => {
+  const moved = { type: 'assignee-changed', from: 'pedro', to: null } as const;
+  const rows: [NeedsYouCause[], string, NeedsYouOffer[]][] = [
+    [[{ type: 'pr-closed' }], PR_CLOSED, ['reopen-pr', 'replace-pr', 'set-aside']],
+    [[{ type: 'ticket-closed' }, { type: 'pr-closed' }], `${PR_CLOSED} ${TICKET_CLOSED}`, ['reopen-pr', 'replace-pr', 'set-aside']],
+    [[{ type: 'ticket-closed' }], TICKET_CLOSED, ['keep-working', 'set-aside']],
+    [[moved], `Its ticket ${REPO}#12 moved from pedro to no one.`, ['keep-working', 'set-aside']],
+    [[{ type: 'no-thread' }], NO_THREAD_NOW, ['start-again', 'set-aside']],
+    [[{ type: 'ticket-missing' }], MISSING, ['mark-handled', 'set-aside']],
+  ];
+  for (const [causes, reason, offers] of rows) {
+    const records = await open();
+    const record = observedBuild(records, {});
+    records.setNeedsYouCauses(record.workId, record.revision, causes);
+    assert.deepEqual(noticeOf(records, record.workId)?.reason, reason);
+    assert.deepEqual(noticeOf(records, record.workId)?.offers, offers);
+  }
+});
+
+test('free text and causes show together, and the first matching row of causes decides the offers', async () => {
   const records = await open();
-  const build = records.create({ title: 'Build', repository: REPO, kind: 'build', status: 'Review' });
-  let record = records.setPullRequest(build.workId, build.revision, `${REPO}#40`);
-  record = records.observe(build.workId, record.revision, { of: 'pr', state: 'closed' });
-  records.setNeedsYou(build.workId, record.revision, 'Its PR closed without merging.');
-  const closed = records.importTicket({ title: 'Closed', repository: REPO, kind: 'bug', status: 'Queued', ticket: `${REPO}#12` }).record;
-  records.setNeedsYou(closed.workId, records.observe(closed.workId, closed.revision, { of: 'ticket', state: 'closed' }).revision, 'Its ticket closed.');
-  const reopened = records.importTicket({ title: 'Reopened', repository: REPO, kind: 'bug', status: 'Done', ticket: `${REPO}#13` }).record;
-  records.setNeedsYou(reopened.workId, records.observe(reopened.workId, reopened.revision, { of: 'ticket', state: 'open' }).revision, 'Its ticket reopened.');
+  const record = observedBuild(records, { ticket: 'closed' });
+  const written = records.setNeedsYou(record.workId, record.revision, 'Merge conflict.');
+  assert.deepEqual(noticeOf(records, record.workId), { reason: 'Merge conflict.', offers: ['mark-handled', 'set-aside'], causes: [], ticketOpen: false });
+  records.setNeedsYouCauses(record.workId, written.revision, [{ type: 'ticket-closed' }]);
+  assert.deepEqual(noticeOf(records, record.workId), { reason: `${TICKET_CLOSED} Merge conflict.`, offers: ['keep-working', 'set-aside'], causes: [{ type: 'ticket-closed' }], ticketOpen: false });
+});
+
+test('a notice says whether the ticket reads open', async () => {
+  const records = await open();
+  const record = observedBuild(records, { pr: 'closed', ticket: 'open' });
+  records.setNeedsYouCauses(record.workId, record.revision, [{ type: 'pr-closed' }]);
+  assert.deepEqual(noticeOf(records, record.workId), { reason: PR_CLOSED, offers: ['reopen-pr', 'replace-pr', 'set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen: true });
+});
+
+test('a stale closed PR adds nothing to an unrelated reason', async () => {
+  const records = await open();
+  const record = observedBuild(records, { pr: 'closed', ticket: 'closed' });
+  records.setNeedsYou(record.workId, record.revision, 'Its PR closed without merging.');
+  assert.deepEqual(noticeOf(records, record.workId), { reason: 'Its PR closed without merging.', offers: ['mark-handled', 'set-aside'], causes: [], ticketOpen: false });
+});
+
+test('no notice saved on Done work shows, whatever it holds', async () => {
+  const typed = await open();
+  const cause = observedBuild(typed, { ticket: 'open', status: 'Done' });
+  typed.setNeedsYouCauses(cause.workId, cause.revision, [{ type: 'ticket-closed' }]);
+  assert.equal(noticeOf(typed, cause.workId), undefined);
+  for (const saved of ['Merge conflict.', `Its ticket ${REPO}#12 reopened after the work was Done. Reopen the work, or clear this.`]) {
+    const records = await open();
+    const record = observedBuild(records, { ticket: 'open', status: 'Done' });
+    records.setNeedsYou(record.workId, record.revision, saved);
+    assert.equal(noticeOf(records, record.workId), undefined);
+  }
+});
+
+const OLD_PR = `Its PR ${REPO}#40 closed without merging. Reopen it, start a replacement build from the same brief, or set the work aside.`;
+const OLD_TICKET = `Its ticket ${REPO}#12 closed in its provider. Set the work aside, or clear this to keep working.`;
+
+test('saved old wording reads as causes and shows new wording, with no reason to clear anything', async () => {
+  const rows: [string, Parameters<typeof observedBuild>[1], string, NeedsYouCause[]][] = [
+    [OLD_PR, { pr: 'closed' }, PR_CLOSED, [{ type: 'pr-closed' }]],
+    [OLD_TICKET, { ticket: 'closed' }, TICKET_CLOSED, [{ type: 'ticket-closed' }]],
+    [`Its ticket ${REPO}#12 moved from pedro to no one. Check who owns the work, then clear this.`, { ticket: 'open', assignee: 'ana' },
+      `Its ticket ${REPO}#12 moved from pedro to no one.`, [{ type: 'assignee-changed', from: 'pedro', to: null }]],
+    [MISSING, { ticket: 'not-found' }, MISSING, [{ type: 'ticket-missing' }]],
+    ["The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code, then clear Needs you to start again.", {}, NO_THREAD_NOW, [{ type: 'no-thread' }]],
+  ];
+  for (const [saved, observed, reason, causes] of rows) {
+    const records = await open();
+    const record = observedBuild(records, observed);
+    records.setNeedsYou(record.workId, record.revision, saved);
+    assert.deepEqual([noticeOf(records, record.workId)?.reason, noticeOf(records, record.workId)?.causes], [reason, causes]);
+    assert.doesNotMatch(noticeOf(records, record.workId)!.reason, /clear/i);
+  }
+});
+
+test('saved old wording names a closure of the other kind whichever closed last', async () => {
+  for (const saved of [OLD_PR, OLD_TICKET]) {
+    const records = await open();
+    const record = observedBuild(records, { pr: 'closed', ticket: 'closed' });
+    records.setNeedsYou(record.workId, record.revision, saved);
+    assert.deepEqual([noticeOf(records, record.workId)?.reason, noticeOf(records, record.workId)?.offers],
+      [`${PR_CLOSED} ${TICKET_CLOSED}`, ['reopen-pr', 'replace-pr', 'set-aside']]);
+  }
+});
+
+test('a saved closed ticket on Ready work does not count the closed PR its replacement resolved', async () => {
+  const records = await open();
+  const record = observedBuild(records, { pr: 'closed', ticket: 'closed', status: 'Ready' });
+  records.setNeedsYou(record.workId, record.revision, OLD_TICKET);
+  assert.deepEqual([noticeOf(records, record.workId)?.reason, noticeOf(records, record.workId)?.offers], [TICKET_CLOSED, ['keep-working', 'set-aside']]);
+});
+
+test('saved assignee wording keeps names with spaces', async () => {
+  const records = await open();
+  const record = observedBuild(records, { ticket: 'open', assignee: 'Bo Ray' });
+  records.setNeedsYou(record.workId, record.revision, `Its ticket ${REPO}#12 moved from Ana Lee to Bo Ray. Check who owns the work, then clear this.`);
+  assert.deepEqual(noticeOf(records, record.workId)?.causes, [{ type: 'assignee-changed', from: 'Ana Lee', to: 'Bo Ray' }]);
+});
+
+test('a crafted reason reads as free text at once, whatever its length', async () => {
+  const crafted = (repeats: number) => `Its ticket a#1${' moved from x to'.repeat(repeats)} y. Check who owns the work, then clear this!`;
+  for (const reason of [crafted(2200), crafted(25)]) {
+    const records = await open();
+    const record = observedBuild(records, {});
+    records.setNeedsYou(record.workId, record.revision, reason);
+    const started = performance.now();
+    const notice = noticeOf(records, record.workId);
+    assert.ok(performance.now() - started < 1000, 'matching stays fast');
+    assert.deepEqual([notice?.reason, notice?.causes], [reason, []]);
+  }
+});
+
+test('a reason over the length limit stays free text even in an old wording', async () => {
+  const records = await open();
+  const record = observedBuild(records, { pr: 'closed' });
+  const long = `Its PR ${'x'.repeat(600)}#40 closed without merging. Reopen it, start a replacement build from the same brief, or set the work aside.`;
+  records.setNeedsYou(record.workId, record.revision, long);
+  assert.deepEqual(noticeOf(records, record.workId)?.causes, []);
+});
+
+test('a saved cause whose observation now reads ended no longer counts', async () => {
+  const rows: [string, Parameters<typeof observedBuild>[1]][] = [
+    [OLD_PR, { pr: 'open' }],
+    [OLD_TICKET, { ticket: 'open' }],
+    [`Its ticket ${REPO}#12 moved from pedro to ana. Check who owns the work, then clear this.`, { ticket: 'open', assignee: 'pedro' }],
+    [MISSING, { ticket: 'open' }],
+  ];
+  for (const [saved, observed] of rows) {
+    const records = await open();
+    const record = observedBuild(records, observed);
+    records.setNeedsYou(record.workId, record.revision, saved);
+    assert.equal(noticeOf(records, record.workId), undefined);
+  }
+});
+
+test('calm work has no notice', async () => {
+  const records = await open();
   const calm = records.create({ title: 'Calm', repository: REPO, kind: 'bug' });
-  const shown = new Map(recordItems(records, [], [REPO]).map((item) => [item.id, item.needsYou]));
-  assert.deepEqual(shown.get(build.workId), { reason: 'Its PR closed without merging.', offers: ['reopen-pr', 'replace-pr', 'set-aside'] });
-  assert.deepEqual(shown.get(closed.workId), { reason: 'Its ticket closed.', offers: ['set-aside'] });
-  assert.deepEqual(shown.get(reopened.workId), { reason: 'Its ticket reopened.', offers: ['reopen-work'] });
-  assert.equal(shown.get(calm.workId), undefined);
+  assert.equal(noticeOf(records, calm.workId), undefined);
 });
 
 test('concept counts completed decision facts while its Status remains Shaping, and recovered structure starts with no local completion', async () => {

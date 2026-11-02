@@ -31,6 +31,7 @@ import { protocolStartedThread } from '../t3/item-execution.ts';
 import { findStartedThread, lookupThread, startThread } from '../t3/t3.ts';
 import type { ItemSource } from './item-source.ts';
 import { importPickedTicket } from './import-ticket.ts';
+import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
 
 /** A command's answer: the HTTP status and the JSON body. */
 export interface Reply {
@@ -210,7 +211,6 @@ type StartRecord = keyof typeof PURPOSES;
 
 const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Check the repository's project in T3 Code; the board settles it once T3 shows it.";
 const LIVE_SHAPING = 'A shaping thread is still at work on this item. Wait for it to finish, then start the build.';
-const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code, then clear Needs you to start again.";
 
 export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkRecovery,
   checkoutOf = async projectId => {
@@ -402,7 +402,9 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       }
       if (found === 'absent' && Date.now() - Date.parse(intent.requestedAt) >= SHOW_GRACE_MS) {
         write(item.id, (revision) => records!.resolveLaunchIntent(item.id, revision, intent.intentId, { failure: NO_THREAD }));
-        write(item.id, (revision) => records!.setNeedsYou(item.id, revision, NO_THREAD));
+        const saved = savedNeedsYou(records!.read(item.id), records!.observations(item.id));
+        const causes = saved.causes.some((cause) => cause.type === 'no-thread') ? saved.causes : [...saved.causes, { type: 'no-thread' as const }];
+        write(item.id, (revision) => records!.setNeedsYouCauses(item.id, revision, causes, { clearReason: saved.oldWording }));
         return { thread: null, error: `Needs you: ${NO_THREAD}`, refused: true };
       }
       return { thread: null, error: MAY_HAVE_STARTED, uncertain: true };
@@ -441,8 +443,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const purpose = PURPOSES[record];
     const unresolved = records.launchIntents({ workId: item.id, unresolved: true }).find((intent) => intent.purpose === purpose);
     if (unresolved) return settle(item, unresolved, projectId);
-    const needsYou = records.read(item.id).needsYou;
-    if (needsYou && !recovery) return { thread: null, error: `Needs you: ${needsYou}`, refused: true };
+    const needsYou = needsYouNotice(records.read(item.id), records.observations(item.id));
+    if (needsYou && !recovery) return { thread: null, error: `Needs you: ${needsYou.reason}`, refused: true };
     // A build whose PR closed unmerged starts a replacement, so the thread that opened that PR holds no start.
     const held = recovery ? null : record === 'startedBuilds' && prClosed(item.id) ? null : heldThread(board.find(item.id) ?? item, purpose);
     const shown = board.snapshot()[record]?.[item.id];
@@ -455,7 +457,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const outcome = result.thread ? { threadId: result.thread.threadId } : !result.uncertain ? { failure: result.error ?? 'T3 started no thread.' } : null;
     // An outcome the record refuses leaves the intent unresolved, for a refresh to settle through T3.
     if (outcome) try { write(item.id, (revision) => records.resolveLaunchIntent(item.id, revision, intent.intentId, outcome)); } catch { /* settled later */ }
-    if (recovery && result.thread && records.read(item.id).needsYou) write(item.id, revision => records.clearNeedsYou(item.id, revision));
+    if (recovery && result.thread) write(item.id, revision => records.setNeedsYouCauses(item.id, revision, [], { clearReason: true }));
     return result;
   }
 
@@ -951,7 +953,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           const pullRequest = records.read(itemId).pullRequest!;
           await reopenPr(item.repo, Number(pullRequest.slice(pullRequest.lastIndexOf('#') + 1)));
         }
-        write(itemId, (revision) => records.clearNeedsYou(itemId, revision));
+        write(itemId, (revision) => records.setNeedsYouCauses(itemId, revision, [], { clearReason: true }));
         if (choice === 'replace-pr') write(itemId, (revision) => records.update(itemId, revision, { status: 'Ready' }));
         if (choice === 'reopen-work') write(itemId, (revision) => records.update(itemId, revision, { status: 'List' }));
       } catch (err) {

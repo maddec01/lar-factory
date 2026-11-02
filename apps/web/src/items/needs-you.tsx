@@ -15,7 +15,8 @@ import { kind } from '../buttons/button-kinds.tsx';
 
 const LABELS: Record<NeedsYouOffer, string> = {
   'start-again': 'Start again', 'back-to-queue': 'Back to Queue', 'back-to-list': 'Move to List',
-  'reopen-pr': 'Reopen PR', 'replace-pr': 'Start a replacement build', 'set-aside': 'Set aside', 'reopen-work': 'Reopen the work',
+  'reopen-pr': 'Reopen PR', 'replace-pr': 'Start a replacement build', 'keep-working': 'Keep working', 'mark-handled': 'Mark as handled',
+  'set-aside': 'Abandon', 'reopen-work': 'Reopen the work',
 };
 
 export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {

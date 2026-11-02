@@ -7,7 +7,7 @@ import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import type { ShapingThreadCleanup } from '@lar-factory/shared';
 import type { ThreadCleanupState } from '../t3/item-execution.ts';
 import type { ThreadCommand, ThreadCommandResult } from '../t3/thread-commands.ts';
-import { createShapingThreadCleanup, createShapingThreadSweep } from './shaping-thread-cleanup.ts';
+import { createShapingThreadCleanup, createShapingThreadSweep, shapingThreadCleanupProblems } from './shaping-thread-cleanup.ts';
 
 const dirs: string[] = [];
 const opened: WorkRecords[] = [];
@@ -357,6 +357,53 @@ test('a rejected command retries with a new command ID, since T3 answers a rejec
   assert.deepEqual(records().pendingShapingThreadCleanups(), []);
 });
 
+test('a thread T3 keeps rejecting waits twice as long each time, up to an hour, keeping its notice', async () => {
+  const { stub, records, sweep, workId } = await sweepOver();
+  stub.result = { outcome: 'rejected', reason: 'T3 refused it.' };
+  await sweep();
+  for (const wait of [30_000, 60_000, 120_000, 240_000, 480_000, 960_000, 1_920_000, 3_600_000, 3_600_000]) {
+    const sent = stub.sent.length;
+    stub.now += wait - 1;
+    await sweep();
+    assert.equal(stub.sent.length, sent, `no retry before ${wait} ms`);
+    stub.now += 1;
+    await sweep();
+    assert.equal(stub.sent.length, sent + 1, `a retry after ${wait} ms`);
+    assert.deepEqual([...shapingThreadCleanupProblems(records())].map(([id]) => id), [workId]);
+  }
+  assert.equal(new Set(stub.sent.map(command => command.commandId)).size, stub.sent.length);
+  stub.result = { outcome: 'accepted', sequence: 1 };
+  stub.now += 3_600_000;
+  await sweep();
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+  assert.deepEqual([...shapingThreadCleanupProblems(records())], []);
+});
+
+test('an unconfirmed retry between rejections waits a flat 30 seconds with its stable ID, and the next rejection keeps doubling', async () => {
+  const { stub, sweep } = await sweepOver();
+  stub.result = { outcome: 'rejected', reason: 'T3 refused it.' };
+  await sweep();
+  stub.now += 30_000;
+  await sweep();
+  stub.result = { outcome: 'unconfirmed', reason: 'No answer.' };
+  stub.now += 60_000;
+  await sweep();
+  const unconfirmed = stub.sent.at(-1)?.commandId;
+  stub.now += 30_000;
+  await sweep();
+  assert.equal(stub.sent.length, 4, 'an unconfirmed answer waits 30 seconds');
+  assert.equal(stub.sent.at(-1)?.commandId, unconfirmed);
+  stub.result = { outcome: 'rejected', reason: 'T3 refused it.' };
+  stub.now += 30_000;
+  await sweep();
+  stub.now += 119_999;
+  await sweep();
+  assert.equal(stub.sent.length, 5, 'no retry before the doubled wait');
+  stub.now += 1;
+  await sweep();
+  assert.equal(stub.sent.length, 6);
+});
+
 test('a send that throws is saved as a failure like any other', async () => {
   const { stub, records } = await sweepOver();
   const sweep = createShapingThreadSweep({ records: records(), stateOf: () => IDLE, lookup: async () => 'unknown', now: () => stub.now, deleted: () => {},
@@ -392,7 +439,59 @@ test('a set-aside record still retries, and deleting a record stops its retries'
   assert.equal(stub.sent.length, 2);
   assert.equal(records().read(workId).revision, revision, 'a background retry never bumps the revision');
   records().deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }, new Date(Date.now() + 86_400_000));
-  stub.now = 60_000;
+  stub.now = 90_000;
   await sweep();
   assert.equal(stub.sent.length, 2);
+});
+
+const FAILED = "The board couldn't clean up the shaping threads. T3 refused it. It keeps trying.";
+
+test('a failed command shows a problem that survives a restart and clears once a retry succeeds', async () => {
+  const { stub, records, sweep, reopen, workId } = await sweepOver();
+  assert.deepEqual([...shapingThreadCleanupProblems(records())], []);
+  stub.result = { outcome: 'rejected', reason: 'T3 refused it.' };
+  await sweep();
+  assert.deepEqual([...shapingThreadCleanupProblems(records())], [[workId, FAILED]]);
+  const restarted = await reopen();
+  assert.deepEqual([...shapingThreadCleanupProblems(records())], [[workId, FAILED]]);
+  stub.result = { outcome: 'accepted', sequence: 1 };
+  await restarted();
+  assert.deepEqual([...shapingThreadCleanupProblems(records())], []);
+});
+
+test('a reason with no full stop still reads as a sentence, and threads with one reason show it once', async () => {
+  const { stub, records, sweep, workId } = await sweepOver('archive', ['shape-1', 'shape-2']);
+  stub.result = { outcome: 'rejected', reason: 'T3 refused it' };
+  await sweep();
+  assert.deepEqual([...shapingThreadCleanupProblems(records())], [[workId, FAILED]]);
+});
+
+test('a thread held back or gone shows no problem, and a failure saved earlier stays while a thread is held back', async () => {
+  for (const state of [{ ...IDLE, live: true }, 'unavailable', 'absent'] as const) {
+    const { stub, records, sweep, workId } = await sweepOver();
+    stub.state = state;
+    await sweep();
+    assert.deepEqual([...shapingThreadCleanupProblems(records())], []);
+    if (state === 'absent') {
+      stub.lookup = 'deleted';
+      stub.now = 30_000;
+      await sweep();
+      assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+      continue;
+    }
+    records().saveShapingThreadFailure('shape-1', 'T3 refused it.');
+    await sweep();
+    assert.deepEqual([...shapingThreadCleanupProblems(records())], [[workId, FAILED]]);
+  }
+});
+
+test('an unreadable setting shows a problem naming it until a sweep can apply the setting, and Keep shows none', async () => {
+  const { cleanup, records, sweep, workId } = await sweepOver('unreadable');
+  await sweep();
+  assert.deepEqual([...shapingThreadCleanupProblems(records())], [[workId, "The board couldn't clean up the shaping threads. It can't read the shaping thread cleanup setting. It keeps trying."]]);
+  assert.equal(cleanup.save({ choice: 'archive' }).status, 200);
+  await sweep();
+  assert.deepEqual([...shapingThreadCleanupProblems(records())], []);
+  const kept = await sweepOver('keep');
+  assert.deepEqual([...shapingThreadCleanupProblems(kept.records())], []);
 });

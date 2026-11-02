@@ -5,7 +5,8 @@ import { useEditStore } from '../repositories/edit-store.ts';
 // people, labels, dates, milestone or iteration and area, its archived and earlier shaping threads, then its work record's brief, map or decision, and its ticket's
 // description and comments as ticket context; work with no ticket shows its record alone. The work it waits on,
 // sub-tickets and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the
-// comments. Work that needs you shows why above the meta area, with the board's choices for it. The board's fields show at
+// comments. Work that needs you shows why above the meta area, with the board's choices for it, beside any problem cleaning up
+// its shaping threads. The board's fields show at
 // once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
 // item, and the one action the item's status asks for, with Move to List and Abandon at its left. Its description has
 // Edit, and its header an expand control that grows it, the open editor taking the height. Closing it with unsaved edits
@@ -136,6 +137,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
           )}
           {ticket && accessProblem && <div role="status"><p>{accessProblem}</p><Button {...kind('other')} onClick={() => void useEditStore.getState().recheck(item.repo)}>Recheck access</Button></div>}
           {item.paused && <p data-paused className="m-0 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5 font-medium text-(--warning-foreground)">Paused: {item.paused}</p>}
+          {item.shapingCleanupProblem && <p data-shaping-cleanup-problem className="m-0 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5 font-medium text-(--warning-foreground)">{item.shapingCleanupProblem}</p>}
           <NeedsYou item={item} data={data} />
           <ItemMeta item={item} read={read} refresh={refresh} now={now} />
           <EarlierThreads item={item} data={data} />

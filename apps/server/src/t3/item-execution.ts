@@ -1,5 +1,5 @@
 import { executionStats } from './execution-stats.ts';
-import type { ItemThread, StartedThread } from '@lar-factory/shared';
+import { isLiveThread, type ItemThread, type StartedThread } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
 import { boardProjects } from './board-projects.ts';
 import { readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead } from './execution-protocol.ts';
@@ -165,6 +165,19 @@ export function protocolThreadById(threadId: string): ExecutionRead {
   if (shell) current?.demand?.([shell]);
   return { availability: shell && executionAvailable(shell) && read ? read.availability : 'unavailable',
     ...(read?.observation ? { observation: read.observation } : {}) };
+}
+
+/** A thread as cleanup needs it. Absence from a snapshot doesn't prove deletion; only `lookupThread` confirms it. */
+export type ThreadCleanupState = 'unavailable' | 'absent' | { archived: boolean; settled: boolean; live: boolean };
+
+/** One thread's cleanup state from the current shell snapshot only, never from the retained last observation. */
+export function threadCleanupState(threadId: string): ThreadCleanupState {
+  protocolItemThreads([]);
+  if (!current?.available) return 'unavailable';
+  const shell = current.shells?.find(shell => shell.id === threadId);
+  const thread = current.lookup?.([threadId])?.[0];
+  if (!shell || !thread) return 'absent';
+  return { archived: !!shell.archivedAt, settled: !!shell.settledAt || shell.settledOverride === 'settled', live: isLiveThread(thread) };
 }
 
 /** Complete current observations only; no database fallback for timing facts. */

@@ -20,6 +20,8 @@ export function protocolItemThreads(threadIds: readonly string[]) {
     });
   } catch { return threadIds.length ? 'unavailable' as const : undefined; }
 }
+/** Spawned boards never read a thread as cleanable, so no server run reaches T3's thread commands. */
+export function threadCleanupState(): 'unavailable' { return 'unavailable'; }
 /** Spawned boards find started threads through the fake t3 CLI alone. */
 export function protocolStartedThread(): never { throw Error("T3 execution unavailable"); }
 

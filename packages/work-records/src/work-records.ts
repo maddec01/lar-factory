@@ -4,7 +4,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import type { StatementSync } from 'node:sqlite';
-import { readTicketSpec, stripTrackerStructure, STATUSES, type Status } from '@lar-factory/shared';
+import { readTicketSpec, stripTrackerStructure, STATUSES, type ShapingThreadCleanup, type Status } from '@lar-factory/shared';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
@@ -101,6 +101,20 @@ export interface RecordedThread {
   recordedAt: string;
 }
 
+/** The shaping thread cleanup choice as Start build saves it, or that the setting couldn't be read. */
+export type SavedShapingThreadCleanup = ShapingThreadCleanup | 'unreadable';
+
+/** One shaping thread the board handles once after Start build. */
+export interface ShapingThreadCleanupRow {
+  threadId: string;
+  workId: string;
+  /** Null when the setting couldn't be read. */
+  action: ShapingThreadCleanup | null;
+  /** The T3 command ID, the same on every retry. */
+  commandId: string;
+  failure: string | null;
+}
+
 /** A start the board asked T3 for. This module only stores it and its outcome; it never launches or checks a thread. */
 export interface LaunchIntent {
   recovery?: { branch: string; reset: boolean; message?: string };
@@ -108,6 +122,8 @@ export interface LaunchIntent {
   workId: string;
   /** What the thread will do, as a recorded thread's purpose. */
   purpose: string;
+  /** The choice saved at Start build; missing on an earlier intent or one that isn't a Start build. */
+  shapingThreadCleanup?: SavedShapingThreadCleanup;
   requestedAt: string;
   /** `started` with T3's thread ID, `failed` with the reason, or null while unresolved. */
   outcome: 'started' | 'failed' | null;
@@ -315,11 +331,18 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   /** Its recorded threads, oldest first. */
   threads(workId: string): RecordedThread[];
   /** Records that the board is about to ask T3 for a thread, before it asks. */
-  recordLaunchIntent(workId: string, revision: number, purpose: string, recovery?: { branch: string; reset: boolean; message?: string }): { record: WorkRecord; intent: LaunchIntent };
+  recordLaunchIntent(workId: string, revision: number, purpose: string, recovery?: { branch: string; reset: boolean; message?: string }, shapingThreadCleanup?: SavedShapingThreadCleanup): { record: WorkRecord; intent: LaunchIntent };
   /** The matching intents in the order they were recorded. */
   launchIntents(filter: LaunchIntentFilter): LaunchIntent[];
-  /** Resolves an unresolved intent once: to T3's thread ID, which it records as the record's thread, or to a failure. */
+  /** Resolves an unresolved intent once: to T3's thread ID, which it records as the record's thread, or to a failure.
+   * A thread for an intent with a saved cleanup choice adds a row for each shaping thread on the record without one. */
   resolveLaunchIntent(workId: string, revision: number, intentId: string, outcome: { threadId: string } | { failure: string }): { record: WorkRecord; intent: LaunchIntent };
+  /** Every shaping thread still to clean up across all work, set-aside and hidden records too. */
+  pendingShapingThreadCleanups(): ShapingThreadCleanupRow[];
+  /** Marks a row cleaned and clears its failure. Takes no revision, because a background retry must not fail an agent holding one. */
+  markShapingThreadCleaned(threadId: string): void;
+  /** Saves or clears a row's failure. Takes no revision, like markShapingThreadCleaned. */
+  saveShapingThreadFailure(threadId: string, failure: string | null): void;
   /** Records that the work is finished. A merged observation of the delivery PR finishes the work too; a ticket closing
    * or a thread ending never does. A finish is final. */
   recordFinished(workId: string, revision: number): WorkRecord;
@@ -403,6 +426,7 @@ interface IntentRow {
   intent_id: string;
   work_id: string;
   purpose: string;
+  shaping_thread_cleanup: SavedShapingThreadCleanup | null;
   requested_at: string;
   thread_id: string | null;
   failure: string | null;
@@ -411,6 +435,7 @@ interface IntentRow {
 
 const fromIntentRow = (row: IntentRow): LaunchIntent => ({
   ...(row.recovery ? { recovery: JSON.parse(row.recovery) as NonNullable<LaunchIntent["recovery"]> } : {}),
+  ...(row.shaping_thread_cleanup ? { shapingThreadCleanup: row.shaping_thread_cleanup } : {}),
   intentId: row.intent_id,
   workId: row.work_id,
   purpose: row.purpose,
@@ -657,7 +682,7 @@ function workRecords(database: Database): WorkRecords {
     });
 
   const selectIntent = db.prepare('SELECT * FROM launch_intents WHERE intent_id = ?');
-  const insertIntent = db.prepare('INSERT INTO launch_intents (intent_id, work_id, purpose, requested_at) VALUES (?, ?, ?, ?)');
+  const insertIntent = db.prepare('INSERT INTO launch_intents (intent_id, work_id, purpose, requested_at, shaping_thread_cleanup) VALUES (?, ?, ?, ?, ?)');
   const resolveIntent = db.prepare('UPDATE launch_intents SET thread_id = ?, failure = ?, resolved_at = ? WHERE intent_id = ?');
   const threadHolder = db.prepare('SELECT work_id FROM threads WHERE thread_id = ?');
   const threadRows = db.prepare('SELECT * FROM threads WHERE work_id = ? ORDER BY rowid');
@@ -667,6 +692,18 @@ function workRecords(database: Database): WorkRecords {
     const holder = threadHolder.get(threadId);
     if (holder) throw invalid(`The thread ${threadId} is already recorded on the work record ${String(holder.work_id)}.`);
     addThreadRow.run(threadId, workId, purpose, new Date().toISOString());
+  };
+
+  const unhandledShapingThreads = db.prepare(`SELECT t.thread_id FROM threads t
+    LEFT JOIN shaping_thread_cleanups c ON c.thread_id = t.thread_id
+    WHERE t.work_id = ? AND t.purpose = 'shape' AND t.deleted_at IS NULL AND c.thread_id IS NULL ORDER BY t.rowid`);
+  const addCleanupRow = db.prepare('INSERT INTO shaping_thread_cleanups (thread_id, work_id, action, command_id, cleaned_at) VALUES (?, ?, ?, ?, ?)');
+  /** Keep needs no command, so its row starts cleaned and a later build under another setting leaves the thread alone. */
+  const addCleanupRows = (workId: string, choice: SavedShapingThreadCleanup) => {
+    const cleanedAt = choice === 'keep' ? new Date().toISOString() : null;
+    for (const { thread_id: threadId } of unhandledShapingThreads.all(workId)) {
+      addCleanupRow.run(String(threadId), workId, choice === 'unreadable' ? null : choice, randomUUID(), cleanedAt);
+    }
   };
 
   const retiredRows = db.prepare('SELECT * FROM work_records WHERE finished_at IS NOT NULL OR set_aside_at IS NOT NULL ORDER BY rowid');
@@ -716,7 +753,7 @@ function workRecords(database: Database): WorkRecords {
         if (!owned.has(blocker.work_id) && blocker.work_id !== workId) touched.push(blocker.work_id);
       }
       for (const holder of forgetDependencies(database, slice.work_id)) bump.run(new Date().toISOString(), holder);
-      for (const table of ['publication_attachments', 'publication_plans', 'review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests', 'observations', 'brief_gates']) {
+      for (const table of ['publication_attachments', 'publication_plans', 'review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'shaping_thread_cleanups', 'launch_intents', 'replaced_pull_requests', 'observations', 'brief_gates']) {
         db.prepare(`DELETE FROM ${table} WHERE work_id = ?`).run(slice.work_id);
       }
       db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?').run(slice.work_id, slice.work_id);
@@ -1072,11 +1109,11 @@ function workRecords(database: Database): WorkRecords {
       return threadRows.all(workId)
         .map((row) => ({ threadId: String(row.thread_id), purpose: String(row.purpose), recordedAt: String(row.recorded_at), deletedAt: row.deleted_at as string | null }));
     }),
-    recordLaunchIntent: (workId, revision, purpose, recovery) => {
+    recordLaunchIntent: (workId, revision, purpose, recovery, shapingThreadCleanup) => {
       const checked = checkPurpose(purpose);
       const intentId = randomUUID();
       const record = change(workId, revision, () => {
-        insertIntent.run(intentId, workId, checked, new Date().toISOString());
+        insertIntent.run(intentId, workId, checked, new Date().toISOString(), shapingThreadCleanup ?? null);
         if (recovery) db.prepare('UPDATE launch_intents SET recovery = ? WHERE intent_id = ?').run(JSON.stringify({ branch: checkFilled(recovery.branch, "recovery branch"), reset: recovery.reset === true, ...(recovery.message ? { message: recovery.message } : {}) }), intentId);
         return {};
       });
@@ -1095,6 +1132,7 @@ function workRecords(database: Database): WorkRecords {
         if (row?.work_id !== workId) throw new WorkRecordError('not-found', `The work record ${workId} has no launch intent "${intentId}".`);
         if (row.resolved_at) throw invalid(`The launch intent ${intentId} is already resolved.`);
         if (threadId) insertThread(workId, threadId, row.purpose);
+        if (threadId && row.shaping_thread_cleanup) addCleanupRows(workId, row.shaping_thread_cleanup);
         resolveIntent.run(threadId, failure, new Date().toISOString(), intentId);
         const staged = db.prepare('SELECT recovery FROM launch_intents WHERE intent_id = ?').get(intentId)?.recovery;
         if (threadId && staged) {
@@ -1107,6 +1145,14 @@ function workRecords(database: Database): WorkRecords {
       });
       return { record, intent: intent(intentId) };
     },
+    pendingShapingThreadCleanups: () => database.read(() => db.prepare('SELECT * FROM shaping_thread_cleanups WHERE cleaned_at IS NULL ORDER BY rowid').all()
+      .map((row) => ({ threadId: String(row.thread_id), workId: String(row.work_id), action: row.action as ShapingThreadCleanup | null, commandId: String(row.command_id), failure: row.failure as string | null }))),
+    markShapingThreadCleaned: (threadId) => database.write(() => {
+      db.prepare('UPDATE shaping_thread_cleanups SET cleaned_at = ?, failure = NULL WHERE thread_id = ?').run(new Date().toISOString(), threadId);
+    }),
+    saveShapingThreadFailure: (threadId, failure) => database.write(() => {
+      db.prepare('UPDATE shaping_thread_cleanups SET failure = ? WHERE thread_id = ?').run(failure, threadId);
+    }),
     recordFinished: (workId, revision) => change(workId, revision, (row) => {
       if (row.finished_at) throw invalid(`The work record ${workId} is already finished.`);
       return { finished_at: new Date().toISOString() };
@@ -1155,7 +1201,7 @@ function workRecords(database: Database): WorkRecords {
           for (const blocker of blockerRows.all(workId) as unknown as Row[]) if (!due.has(blocker.work_id)) touched.add(blocker.work_id);
         }
         // Children go before their parents, so clear the parents among the deleted records first.
-        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests', 'observations', 'brief_gates']
+        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'shaping_thread_cleanups', 'launch_intents', 'replaced_pull_requests', 'observations', 'brief_gates']
           .map((table) => db.prepare(`DELETE FROM ${table} WHERE work_id = ?`));
         const clearParent = db.prepare('UPDATE work_records SET parent_id = NULL WHERE work_id = ?');
         const deleteBlockers = db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?');

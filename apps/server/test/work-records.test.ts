@@ -88,3 +88,31 @@ test('Archive lists set-aside work with export and Restore, and a timed delete r
   const { board: after } = await confirmed.json() as { board: BoardData };
   assert.deepEqual([await archive(), after.retention?.deleteAfterDays, after.retention?.lastDelete?.deleted], [[], 0, [created.workId]]);
 });
+
+test("the shaping thread cleanup setting reads Archive on a fresh machine, survives a restart, and refuses an invalid choice", { timeout: 30_000 }, async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-board-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  const board = await startBoard(t, { recorded: false }, false, false, { HOME: home });
+  const fresh = await until(board, (d) => d.fetchedAt !== null);
+  assert.deepEqual(fresh.shapingThreadCleanup, { choice: 'archive' });
+
+  const refused = await board.postSession({ choice: 'shred' }, '/api/shaping-thread-cleanup');
+  assert.equal(refused.status, 400);
+  assert.deepEqual((await refused.json() as { board: BoardData }).board.shapingThreadCleanup, { choice: 'archive' });
+
+  const saved = await board.postSession({ choice: 'delete' }, '/api/shaping-thread-cleanup');
+  assert.equal(saved.status, 200);
+  assert.deepEqual((await saved.json() as { board: BoardData }).board.shapingThreadCleanup, { choice: 'delete' });
+
+  await board.stop();
+  const restarted = await startBoard(t, { recorded: false }, false, false, { HOME: home });
+  assert.deepEqual((await until(restarted, (d) => d.fetchedAt !== null)).shapingThreadCleanup, { choice: 'delete' });
+});
+
+test('in sample mode the shaping thread cleanup setting is absent and saving it is refused', async (t) => {
+  const sample = await startBoard(t, {}, true);
+  assert.equal('shapingThreadCleanup' in await sample.board(), false);
+  const refused = await sample.postSession({ choice: 'keep' }, '/api/shaping-thread-cleanup');
+  assert.equal(refused.status, 403);
+  assert.match((await refused.json() as { error: string }).error, /disabled in sample mode/);
+});

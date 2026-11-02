@@ -76,7 +76,7 @@ test('Settings opens from the title bar, in a browser too, as a modal over the b
   expect(section('General').getAttribute('aria-current')).toBe('page');
   expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
   expect(text(modal())).toContain('Board preferences.');
-  expect($$('.settings-group h3').map(text)).toEqual(['Dialogs', 'Refresh']);
+  expect($$('.settings-group h3').map(text)).toEqual(['Dialogs', 'Threads', 'Refresh']);
   expect($('.title-bar')!.closest('[hidden]'), 'the board stays under it').toBeNull();
   expect($('.desk')).not.toBeNull();
 });

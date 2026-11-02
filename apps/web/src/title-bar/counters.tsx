@@ -115,6 +115,8 @@ export function Counters() {
     .map((item) => ({ item, cost: costOf(item) }))
     .filter((x) => x.cost > 0)
     .sort((a, b) => b.cost - a.cost);
+  const incomplete = !data.firstRead.settled || !!data.itemSourceProblems?.length || !!data.error || !!data.localProblem ||
+    data.items.some(item => item.stats === 'unavailable' || (!item.stats && (item.threads === 'unavailable' || !!item.threads?.length)));
   const spend = costs.reduce((t, c) => t + c.cost, 0);
   const free = BUILD_LIMIT - building.length;
   const row = (i: Item, trailing?: ReactNode) => <Row key={i.id} item={i} data={data} now={now} trailing={trailing} />;
@@ -164,9 +166,10 @@ export function Counters() {
 
         <span aria-hidden="true" className="mx-1 hidden h-4 w-px shrink-0 bg-(--border) @min-[66rem]:block" />
 
-        <Counter label="spend" value={formatUsd(spend)} hideBelow="hidden @min-[66rem]:inline-flex" hint="Agent cost on open and recent items, an API estimate"
+        <Counter label="spend" value={incomplete ? 'Unavailable' : formatUsd(spend)} hideBelow="hidden @min-[66rem]:inline-flex" hint={incomplete ? 'Usage totals are incomplete or unavailable.' : 'Agent cost on open and recent items, an API estimate'}
           icon={<CircleDollarSign className="size-4 shrink-0" strokeWidth={2.25} />}>
-          <PopHead icon={<CircleDollarSign className="size-3.5 shrink-0 text-(--muted-foreground)" strokeWidth={2.25} />} title="Agent spend" sub={formatUsd(spend)} />
+          <PopHead icon={<CircleDollarSign className="size-3.5 shrink-0 text-(--muted-foreground)" strokeWidth={2.25} />} title="Agent spend" sub={incomplete ? 'Incomplete' : formatUsd(spend)} />
+          {incomplete && <PopFoot>Usage totals are incomplete or unavailable. Figures below cover available items.</PopFoot>}
           {costs.length
             ? <List items={costs.map((c) => c.item)} max={5}>{(i) => row(i, <span className="font-medium text-(--foreground)">{formatUsd(costOf(i))}</span>)}</List>
             : <Empty>No priced agent work yet.</Empty>}

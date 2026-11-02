@@ -1,15 +1,19 @@
 import type { Item } from '@lar-factory/shared';
 import type { WorkRecords } from '@lar-factory/work-records';
 
-/** Derive the notice after T3 observations, so a live item thread always holds it back. */
+/** Derive the notice after T3 observations, so a live item thread always holds it back. It names what the work already waits on, and a closed PR keeps its own notice. */
 export function deletedThreadNotice(records: WorkRecords, item: Item): Item['needsYou'] {
   const record = records.read(item.id);
   if (record.kind === 'slice' || !['Shaping', 'Needs you', 'In progress', 'Review'].includes(record.status)
     || !Array.isArray(item.threads) || item.threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)) return item.needsYou;
   const latest = records.threads(item.id).filter(t => t.purpose === 'shape' || t.purpose === 'build').at(-1);
   if (!latest?.deletedAt) return item.needsYou;
-  const pr = records.observations(item.id).find(o => o.of === 'pr')?.state;
-  if (pr === 'closed' && record.needsYou) return item.needsYou;
-  return { reason: 'The latest work thread was deleted.', deletedThread: true, deletedThreadPurpose: latest.purpose === 'build' ? 'build' : 'shape',
-    offers: pr === 'open' ? ['start-again'] : ['start-again', 'back-to-queue', 'back-to-list'] };
+  const causes = item.needsYou?.causes ?? [];
+  if (causes.some(c => c.type === 'pr-closed')) return item.needsYou;
+  const observations = records.observations(item.id);
+  const pr = observations.find(o => o.of === 'pr')?.state;
+  const ticketClosed = causes.some(c => c.type === 'ticket-closed');
+  return { reason: ['The latest work thread was deleted.', ...item.needsYou ? [item.needsYou.reason] : []].join(' '), deletedThread: true, deletedThreadPurpose: latest.purpose === 'build' ? 'build' : 'shape',
+    causes, ticketOpen: observations.find(o => o.of === 'ticket')?.state === 'open',
+    offers: [...pr === 'open' ? ['start-again'] as const : ['start-again', 'back-to-queue', 'back-to-list'] as const, ...ticketClosed ? ['set-aside'] as const : []] };
 }

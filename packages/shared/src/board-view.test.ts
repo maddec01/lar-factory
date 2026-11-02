@@ -44,7 +44,7 @@ for (const status of ['Verify', 'Ready to merge'] as const) {
   });
 
   test(`${status} stays on the desk when paused, archived or holding a Needs you reason`, () => {
-    for (const more of [{ paused: true }, { archived: true }, { needsYou: { reason: 'Stuck', offers: [] } }] as Partial<Item>[]) {
+    for (const more of [{ paused: true }, { archived: true }, { needsYou: { reason: 'Stuck', offers: [], causes: [], ticketOpen: true } }] as Partial<Item>[]) {
       assert.deepEqual(placed(delivered(status, { currentRunning: true }, more)), [1, 0]);
     }
   });

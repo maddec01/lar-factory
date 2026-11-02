@@ -358,8 +358,11 @@ export interface Item {
    * holds its starts; absent when no change affects it.
    */
   paused?: string;
-  /** Why its work record waits on the user, with what the board offers to do about it; absent when it doesn't wait. */
-  needsYou?: { reason: string; offers: NeedsYouOffer[]; deletedThread?: boolean; deletedThreadPurpose?: 'shape' | 'build' };
+  /**
+   * Why its work record waits on the user, with what the board offers to do about it; absent when it doesn't wait.
+   * `ticketOpen` says whether the last read showed its ticket open.
+   */
+  needsYou?: { reason: string; offers: NeedsYouOffer[]; causes: NeedsYouCause[]; ticketOpen: boolean; deletedThread?: boolean; deletedThreadPurpose?: 'shape' | 'build' };
   /** Why the board couldn't clean up its shaping threads yet, which it keeps trying; shown in item details only. */
   shapingCleanupProblem?: string;
   /** Set on work off the board in Archive: set aside, which Restore brings back, or finished and hidden by retention. */
@@ -367,7 +370,7 @@ export interface Item {
 }
 
 /** What the board offers for work that needs you, besides clearing the reason once the user has checked. */
-export const NEEDS_YOU_OFFERS = ['reopen-pr', 'replace-pr', 'set-aside', 'reopen-work', 'start-again', 'back-to-queue', 'back-to-list'] as const;
+export const NEEDS_YOU_OFFERS = ['reopen-pr', 'replace-pr', 'keep-working', 'mark-handled', 'set-aside', 'reopen-work', 'start-again', 'back-to-queue', 'back-to-list'] as const;
 export type NeedsYouOffer = (typeof NEEDS_YOU_OFFERS)[number];
 
 /** A change the board saw that makes work wait on the user. `assignee-changed` holds who its ticket moved from and to, null for no one. */

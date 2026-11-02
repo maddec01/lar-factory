@@ -3,10 +3,11 @@
 // PRs and provider fields. Spec sync can update title and brief; it never moves, restructures or blocks work.
 
 import { kindDisagreement, onAzure, parseConceptMap, refKey, sameRepo, ticketKindOf } from '@lar-factory/shared';
-import type { Blocker, DependencyHold, EffectiveVocabulary, IssueRef, Item, NeedsYouOffer, Slice, SliceProgress, SwapKind, TicketKindFacts } from '@lar-factory/shared';
+import type { Blocker, DependencyHold, EffectiveVocabulary, IssueRef, Item, Slice, SliceProgress, SwapKind, TicketKindFacts } from '@lar-factory/shared';
 import type { Dependency, WorkRecord, WorkRecords } from '@lar-factory/work-records';
 import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
+import { needsYouNotice } from './needs-you-causes.ts';
 
 type RecordSetup = { repo: string; structureSync?: boolean; writeRefinedSpec?: boolean; vocabulary?: EffectiveVocabulary };
 
@@ -40,22 +41,6 @@ function sliceProgress(record: WorkRecord): SliceProgress {
   if (isDone(record) || record.finishedAt) return 'done';
   if (record.needsYou) return 'blocked';
   return 'waiting';
-}
-
-/**
- * Why the record waits on the user, with what its observations offer: a PR closed unmerged offers reopening it, a
- * replacement build and setting the work aside; a ticket closed before the work was Done offers setting it aside; a
- * ticket open on Done work offers reopening the work. Undefined when it doesn't wait.
- */
-function needsYouOf(records: WorkRecords, record: WorkRecord): Item['needsYou'] {
-  if (!record.needsYou) return undefined;
-  const observed = (of: 'ticket' | 'pr') => records.observations(record.workId).find((o) => o.of === of)?.state;
-  const done = isDone(record);
-  const offers = new Set<NeedsYouOffer>();
-  if (observed('pr') === 'closed') for (const offer of ['reopen-pr', 'replace-pr', 'set-aside'] as const) offers.add(offer);
-  if (observed('ticket') === 'closed' && !done) offers.add('set-aside');
-  if (observed('ticket') === 'open' && done) offers.add('reopen-work');
-  return { reason: record.needsYou, offers: [...offers] };
 }
 
 /** The ticket items an item source read, by their lowercase reference, `owner/name#12`, in each repository that lists them. */
@@ -142,7 +127,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       slices,
     };
     if (map) item.map = map;
-    const needsYou = needsYouOf(records, record);
+    const needsYou = needsYouNotice(record, records.observations(record.workId));
     if (needsYou) item.needsYou = needsYou;
     return item;
   };

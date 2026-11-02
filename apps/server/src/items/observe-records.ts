@@ -1,14 +1,16 @@
 // The provider reads that keep each work record's observations: its current PR's state, then its ticket's state and
-// assignees. A change the record didn't make waits on the user through Needs you and never moves the Status, except a
-// merged PR, which finishes the work and makes it Done. A failed read keeps the last observation and changes nothing.
+// assignees. A change the record didn't make waits on the user through a Needs you cause and never moves the Status, except a
+// merged PR, which finishes the work and makes it Done. A read that shows the change ended removes its cause. A failed
+// read keeps the last observation and changes nothing.
 // A decision or concept finishes from its record alone, once lar-work completion says it is complete.
 // A record's Dependencies are read the same way, their tickets and PRs only, and what a read shows never marks one met
 // or clears its mark.
 
-import { sameRepo } from '@lar-factory/shared';
+import { sameRepo, type NeedsYouCause } from '@lar-factory/shared';
 import { WorkRecordError, type DependencyObservationKind, type NewObservation, type Observation, type Observed, type PullRequestState, type WorkRecord, type WorkRecords } from '@lar-factory/work-records';
 import { log } from '../log.ts';
 import { AccessLost, NotFound, type TicketObservation } from './item-source.ts';
+import { causesText, savedNeedsYou } from './needs-you-causes.ts';
 
 /**
  * The provider reads an observation takes, each throwing when the provider can't answer: NotFound when it says the PR
@@ -31,25 +33,32 @@ const OBSERVED_AT_ONCE = 6;
 /** The number in a reference, `owner/name#12`. */
 const numberOf = (reference: string) => Number(reference.slice(reference.lastIndexOf('#') + 1));
 
-/** Why the observation `next` waits on the user, given the record before it and the last one of its kind; null when nothing does. */
-function needsYouOf(record: WorkRecord, previous: Observation | undefined, next: NewObservation): string | null {
+/**
+ * What the observation `next` makes of `causes`, given the record before it and the last one of its kind: a read that
+ * shows a change raises its cause, and one that shows a cause ended removes it. A PR closing also raises a ticket last
+ * read closed, as its notice may have gone with Keep working. A ticket closing raises only itself, because a closed PR
+ * with no cause was resolved by a replacement build.
+ */
+function causesAfter(causes: readonly NeedsYouCause[], record: WorkRecord, previous: Observation | undefined, next: NewObservation, ticketClosed: boolean): NeedsYouCause[] {
   const was = previous?.state ?? null;
+  const without = (...types: NeedsYouCause['type'][]) => causes.filter((cause) => !types.includes(cause.type));
+  const raised = (cause: NeedsYouCause, kept: NeedsYouCause[]) => (kept.some((c) => c.type === cause.type) ? kept : [...kept, cause]);
   if (next.of === 'pr') {
-    return next.state === 'closed' && was !== 'closed'
-      ? `Its PR ${record.pullRequest} closed without merging. Reopen it, start a replacement build from the same brief, or set the work aside.` : null;
+    if (next.state !== 'closed') return without('pr-closed');
+    if (was === 'closed') return [...causes];
+    const withPr = raised({ type: 'pr-closed' }, [...causes]);
+    return ticketClosed ? raised({ type: 'ticket-closed' }, withPr) : withPr;
   }
-  const ticket = record.ticket!;
-  if (next.state === 'not-found') {
-    return `Its ticket ${ticket} wasn't found in its provider, so the board set the work aside. Restore it from Settings › Archive once the ticket is back.`;
-  }
+  if (next.state === 'not-found') return raised({ type: 'ticket-missing' }, [...causes]);
   const done = record.status === 'Done' || record.finishedAt !== null;
-  if (next.state === 'closed' && was !== 'closed' && !done) return `Its ticket ${ticket} closed in its provider. Set the work aside, or clear this to keep working.`;
-  if (next.state === 'open' && was === 'closed' && record.status === 'Done') return `Its ticket ${ticket} reopened after the work was Done. Reopen the work, or clear this.`;
+  let kept = without('ticket-missing', ...next.state === 'open' ? ['ticket-closed'] as const : []);
+  if (next.state === 'closed' && was !== 'closed' && !done) kept = raised({ type: 'ticket-closed' }, kept);
   const assignee = next.assignee ?? null;
-  if (was !== null && was !== 'not-found' && previous!.assignee !== assignee) {
-    return `Its ticket ${ticket} moved from ${previous!.assignee ?? 'no one'} to ${assignee ?? 'no one'}. Check who owns the work, then clear this.`;
-  }
-  return null;
+  const moved = kept.find((cause) => cause.type === 'assignee-changed');
+  if (was === null || was === 'not-found' || previous!.assignee === assignee || (done && !moved)) return kept;
+  const from = moved ? moved.from : previous!.assignee;
+  const others = kept.filter((cause) => cause !== moved);
+  return from === assignee ? others : [...others, { type: 'assignee-changed', from, to: assignee }];
 }
 
 /** Reads the record's `of` and records what it shows, with what the change means for the work. */
@@ -65,11 +74,16 @@ async function observeOne(records: WorkRecords, workId: string, of: Observed, re
   const before = records.read(workId);
   // A PR replaced during the read was not the one it read.
   if ((of === 'ticket' ? before.ticket : before.pullRequest) !== reference) return;
-  const reason = needsYouOf(before, previous, next);
+  // A slice is not on the board, so what a read shows on one stays free text.
+  const slice = before.kind === 'slice';
+  const observations = records.observations(workId);
+  const saved = slice ? { causes: [], oldWording: false } : savedNeedsYou(before, observations);
+  const causes = causesAfter(saved.causes, before, previous, next, observations.some((o) => o.of === 'ticket' && o.state === 'closed'));
   let record = records.observe(workId, before.revision, next);
   if (next.of === 'pr' && next.state === 'merged' && record.status !== 'Done') record = records.update(workId, record.revision, { status: 'Done' });
   if (next.of === 'ticket' && next.state === 'not-found') record = records.setAside(workId, record.revision);
-  if (reason) records.setNeedsYou(workId, record.revision, reason);
+  if (slice) { if (causes.length) records.setNeedsYou(workId, record.revision, causesText(before, causes).join(' ')); }
+  else records.setNeedsYouCauses(workId, record.revision, causes, { clearReason: saved.oldWording });
 }
 
 /** Apply a current PR read through the same completion and Needs you rules as the idle observer. */

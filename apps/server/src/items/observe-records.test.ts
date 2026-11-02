@@ -10,6 +10,7 @@ import { observePr } from '../config/pr-host.ts';
 import { observeIssue } from '../github/github.ts';
 import type { TicketObservation } from './item-source.ts';
 import { finishCompleted, observeRecords, type ObserveReads } from './observe-records.ts';
+import { recordItems } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -79,11 +80,11 @@ test('a PR closed unmerged sets Needs you once, leaving the Status as it was', a
   await observeRecords(records, [REPO], reads);
   const record = records.read(workId);
   assert.equal(record.status, 'Review');
-  assert.equal(record.needsYou, `Its PR ${REPO}#40 closed without merging. Reopen it, start a replacement build from the same brief, or set the work aside.`);
+  assert.deepEqual([record.needsYou, record.needsYouCauses], [null, [{ type: 'pr-closed' }]]);
   assert.deepEqual(asked, [`pr ${REPO}#40`], 'ticketless work reads only its PR');
-  records.clearNeedsYou(workId, record.revision);
+  records.setNeedsYouCauses(workId, record.revision, []);
   await observeRecords(records, [REPO], reads);
-  assert.equal(records.read(workId).needsYou, null, 'a PR that stays closed flags nothing again');
+  assert.deepEqual(records.read(workId).needsYouCauses, [], 'a PR that stays closed flags nothing again');
 });
 
 test('a ticket closing elsewhere sets Needs you without moving the Status', async () => {
@@ -96,20 +97,47 @@ test('a ticket closing elsewhere sets Needs you without moving the Status', asyn
   await observeRecords(records, [REPO], reads);
   const record = records.read(workId);
   assert.deepEqual([record.status, record.setAside], ['Queued', false]);
-  assert.equal(record.needsYou, `Its ticket ${REPO}#12 closed in its provider. Set the work aside, or clear this to keep working.`);
+  assert.deepEqual(record.needsYouCauses, [{ type: 'ticket-closed' }]);
 });
 
-test('a ticket reopened after the work was Done sets Needs you', async () => {
+test('a PR that closes after Keep working on a closed ticket names both causes', async () => {
   const records = await open();
-  const { workId } = records.importTicket({ title: 'Bug', repository: REPO, kind: 'bug', status: 'Done', ticket: `${REPO}#12` }).record;
-  const { reads, answers } = provider({ ticket: { state: 'closed' } });
+  const { workId } = build(records, 'Review');
+  const { reads, answers } = provider({ pr: 'open', ticket: { state: 'closed' } });
   await observeRecords(records, [REPO], reads);
-  assert.equal(records.read(workId).needsYou, null);
-  answers.ticket = { state: 'open' };
+  const kept = records.read(workId);
+  assert.deepEqual(kept.needsYouCauses, [{ type: 'ticket-closed' }]);
+  records.setNeedsYouCauses(workId, kept.revision, []);
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(records.read(workId).needsYouCauses, [], 'a ticket that stays closed flags nothing again');
+  answers.pr = 'closed';
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'pr-closed' }, { type: 'ticket-closed' }]);
+});
+
+test('a ticket that closes after a replacement build resolved the closed PR names only the ticket', async () => {
+  const records = await open();
+  const { workId } = build(records, 'Review');
+  const { reads, answers } = provider({ pr: 'closed', ticket: { state: 'open' } });
+  await observeRecords(records, [REPO], reads);
+  const closed = records.read(workId);
+  assert.deepEqual(closed.needsYouCauses, [{ type: 'pr-closed' }]);
+  records.setNeedsYouCauses(workId, closed.revision, [], { status: 'Ready' });
+  answers.ticket = { state: 'closed' };
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'ticket-closed' }]);
+});
+
+test('a ticket reopened or reassigned after merge adds nothing', async () => {
+  const records = await open();
+  const { workId } = build(records);
+  const { reads, answers } = provider({ pr: 'merged', ticket: { state: 'closed', assignee: 'pedro' } });
+  await observeRecords(records, [REPO], reads);
+  answers.ticket = { state: 'open', assignee: 'ana' };
   await observeRecords(records, [REPO], reads);
   const record = records.read(workId);
   assert.equal(record.status, 'Done');
-  assert.equal(record.needsYou, `Its ticket ${REPO}#12 reopened after the work was Done. Reopen the work, or clear this.`);
+  assert.deepEqual([record.needsYou, record.needsYouCauses], [null, []]);
 });
 
 test('a reassigned ticket sets Needs you without moving the Status', async () => {
@@ -121,7 +149,101 @@ test('a reassigned ticket sets Needs you without moving the Status', async () =>
   await observeRecords(records, [REPO], reads);
   const record = records.read(workId);
   assert.equal(record.status, 'In progress');
-  assert.equal(record.needsYou, `Its ticket ${REPO}#12 moved from pedro to ana. Check who owns the work, then clear this.`);
+  assert.deepEqual(record.needsYouCauses, [{ type: 'assignee-changed', from: 'pedro', to: 'ana' }]);
+});
+
+test('a closed PR and a closed ticket hold both causes in either closing order', async () => {
+  for (const [first, second] of [['pr', 'ticket'], ['ticket', 'pr']]) {
+    const records = await open();
+    const { workId } = build(records);
+    const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open' } });
+    await observeRecords(records, [REPO], reads);
+    for (const closing of [first, second]) {
+      if (closing === 'pr') answers.pr = 'closed';
+      else answers.ticket = { state: 'closed' };
+      await observeRecords(records, [REPO], reads);
+    }
+    assert.deepEqual(records.read(workId).needsYouCauses.map((c) => c.type).sort(), ['pr-closed', 'ticket-closed']);
+  }
+});
+
+test('a reopened PR, a reopened ticket and an assignee changed back each remove their cause, and the notice goes with the last', async () => {
+  const records = await open();
+  const { workId } = build(records);
+  const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open', assignee: 'pedro' } });
+  await observeRecords(records, [REPO], reads);
+  answers.pr = 'closed';
+  answers.ticket = { state: 'closed', assignee: 'ana' };
+  await observeRecords(records, [REPO], reads);
+  const causes = () => records.read(workId).needsYouCauses;
+  assert.deepEqual(causes(), [{ type: 'pr-closed' }, { type: 'ticket-closed' }, { type: 'assignee-changed', from: 'pedro', to: 'ana' }]);
+  answers.pr = 'open';
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(causes(), [{ type: 'ticket-closed' }, { type: 'assignee-changed', from: 'pedro', to: 'ana' }]);
+  answers.ticket = { state: 'open', assignee: 'ana' };
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(causes(), [{ type: 'assignee-changed', from: 'pedro', to: 'ana' }]);
+  answers.ticket = { state: 'open', assignee: 'bo' };
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(causes(), [{ type: 'assignee-changed', from: 'pedro', to: 'bo' }], 'a second move keeps who owned it first');
+  answers.ticket = { state: 'open', assignee: 'pedro' };
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(causes(), []);
+  assert.equal(recordItems(records, [], [REPO])[0]!.needsYou, undefined);
+});
+
+test('a missing ticket read as found removes its cause, and free text stays until someone clears it', async () => {
+  const records = await open();
+  const { workId } = records.importTicket({ title: 'Bug', repository: REPO, kind: 'bug', status: 'List', ticket: `${REPO}#12` }).record;
+  const { reads, answers } = provider({ ticket: { state: 'not-found' } });
+  await observeRecords(records, [REPO], reads);
+  let record = records.restore(workId, records.read(workId).revision);
+  records.setNeedsYou(workId, record.revision, 'Merge conflict.');
+  answers.ticket = { state: 'open' };
+  await observeRecords(records, [REPO], reads);
+  record = records.read(workId);
+  assert.deepEqual([record.needsYou, record.needsYouCauses], ['Merge conflict.', []]);
+});
+
+test('a failed read keeps every cause', async () => {
+  const records = await open();
+  const { workId } = build(records);
+  const { reads, answers } = provider({ pr: 'closed', ticket: { state: 'open' } });
+  await observeRecords(records, [REPO], reads);
+  answers.pr = new Error('HTTP 502');
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'pr-closed' }]);
+});
+
+test('a read turns saved old wording into causes and drops the old text', async () => {
+  const records = await open();
+  const made = build(records);
+  const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open' } });
+  await observeRecords(records, [REPO], reads);
+  answers.pr = 'closed';
+  answers.ticket = new Error('HTTP 502');
+  const { workId } = made;
+  const observed = records.observe(workId, records.read(workId).revision, { of: 'pr', state: 'closed' });
+  records.setNeedsYou(workId, observed.revision, `Its PR ${REPO}#40 closed without merging. Reopen it, start a replacement build from the same brief, or set the work aside.`);
+  await observeRecords(records, [REPO], reads);
+  answers.ticket = { state: 'closed' };
+  await observeRecords(records, [REPO], reads);
+  const record = records.read(workId);
+  assert.deepEqual([record.needsYou, record.needsYouCauses], [null, [{ type: 'pr-closed' }, { type: 'ticket-closed' }]]);
+  answers.pr = 'open';
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'ticket-closed' }]);
+});
+
+test('free text stays free text when the same read raises a cause, and a slice stays free text only', async () => {
+  const records = await open();
+  const { workId } = build(records);
+  const slice = records.importTicket({ title: 'Slice', repository: REPO, kind: 'slice', status: 'List', ticket: `${REPO}#99` }).record;
+  const { reads } = provider({ pr: 'closed', ticket: { state: 'closed' } });
+  records.setNeedsYou(workId, records.read(workId).revision, 'Merge conflict.');
+  await observeRecords(records, [REPO], reads);
+  assert.deepEqual([records.read(workId).needsYou, records.read(workId).needsYouCauses], ['Merge conflict.', [{ type: 'pr-closed' }, { type: 'ticket-closed' }]]);
+  assert.deepEqual([records.read(slice.workId).needsYou, records.read(slice.workId).needsYouCauses], [`Its ticket ${REPO}#99 closed in its provider.`, []]);
 });
 
 test('a confirmed not-found sets the work aside, and the record can be restored', async () => {
@@ -131,7 +253,7 @@ test('a confirmed not-found sets the work aside, and the record can be restored'
   const record = records.read(workId);
   assert.equal(record.setAside, true);
   assert.equal(record.status, 'List');
-  assert.match(record.needsYou!, /wasn't found in its provider, so the board set the work aside\. Restore it from Settings › Archive/);
+  assert.deepEqual(record.needsYouCauses, [{ type: 'ticket-missing' }]);
   assert.equal(records.restore(workId, record.revision).setAside, false);
 });
 

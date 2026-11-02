@@ -562,10 +562,10 @@ test('work that needs you shows why, posts each choice it offers and Clear, and 
   const id = 'I_sample05';
   const reason = 'Its PR closed without merging.';
   await mountPage({ ...sample, capture: { enabled: true, session: 'session-1' },
-    items: sample.items.map((i) => (i.id === id ? { ...i, status: 'Review', needsYou: { reason, offers: ['reopen-pr', 'replace-pr', 'set-aside'] } } : i)) });
+    items: sample.items.map((i) => (i.id === id ? { ...i, status: 'Review', needsYou: { reason, offers: ['reopen-pr', 'replace-pr', 'set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen: true } } : i)) });
   await openItem(id);
   expect(text(inDialog('[data-needs-you-reason] p'))).toBe(`Needs you: ${reason}`);
-  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Reopen PR', 'Start a replacement build', 'Set aside', 'Clear']);
+  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Reopen PR', 'Start a replacement build', 'Abandon', 'Clear']);
   await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[0]!);
   expect(posted()).toEqual([['/api/needs-you', { itemId: id, choice: 'reopen-pr' }]]);
   await answer({ error: "Couldn't reopen the PR." }, 502);
@@ -698,7 +698,7 @@ test('slice details follow live unknown and recovered progress while open', asyn
 test('deleted work thread offers the later recovery actions without Clear', async () => {
   const id = 'I_sample05';
   await mountPage({ ...sample, items: sample.items.map(i => i.id === id
-    ? { ...i, status: 'Review', needsYou: { reason: 'The latest work thread was deleted.', deletedThread: true,
+    ? { ...i, status: 'Review', needsYou: { reason: 'The latest work thread was deleted.', causes: [], ticketOpen: false, deletedThread: true,
       offers: ['start-again', 'back-to-queue', 'back-to-list'] } } : i) });
   await openItem(id);
   expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Start again', 'Back to Queue', 'Move to List']);
@@ -708,7 +708,7 @@ test('deleted work thread offers the later recovery actions without Clear', asyn
 test('moving deleted-thread work with a passing brief asks before sending the move', async () => {
   const id = 'I_sample05';
   await mountPage({ ...sample, items: sample.items.map(i => i.id === id
-    ? { ...i, status: 'Review', passingBrief: true, needsYou: { reason: 'Deleted', deletedThread: true,
+    ? { ...i, status: 'Review', passingBrief: true, needsYou: { reason: 'Deleted', causes: [], ticketOpen: false, deletedThread: true,
       offers: ['back-to-list'] } } : i) });
   await openItem(id);
   await press(button('needs-you', id));
@@ -720,7 +720,7 @@ async function recoveryItem(build = true) {
   const id = 'I_sample05';
   const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
     ? { ...i, status: 'Review', threads: [],
-      needsYou: { reason: 'Deleted work thread', deletedThread: true, deletedThreadPurpose: build ? 'build' : 'shape', offers: ['start-again', 'back-to-list'] } } : i) };
+      needsYou: { reason: 'Deleted work thread', causes: [], ticketOpen: false, deletedThread: true, deletedThreadPurpose: build ? 'build' : 'shape', offers: ['start-again', 'back-to-list'] } } : i) };
   await mountPage(data);
   holdPosts(data);
   await openItem(id);

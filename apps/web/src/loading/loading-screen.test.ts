@@ -82,17 +82,17 @@ test.each([
   expect(screen()).toBeNull();
 });
 
-test("the screen waits for the whole first read instead of revealing a second project loader", async () => {
+test('an empty successful source reveals the board while another source waits, after the logo and fade', async () => {
   await mountPage(unsettled(firstRead('items', ['lar-server', 'lar-apple'])));
-  await advance(DRAW_MS);
-  await push(unsettled({ ...firstRead('items', ['lar-server']), waiting: ['maddec01/lar-server'] }));
+  await push({ ...unsettled({ ...firstRead('items', ['lar-server']), ready: true, waiting: ['maddec01/lar-server'] }), items: [] });
+  await advance(DRAW_MS - 1);
   expect(leaving()).toBe(false);
-  expect(line()).toBe('Loading projects');
-  await advance(EXIT_MS);
-  expect(screen()).not.toBeNull();
-  await push(settled());
+  await advance(1);
   expect(leaving()).toBe(true);
   await advance(EXIT_MS);
+  expect(screen()).toBeNull();
+  expect(covered()).toBe(false);
+  await push(unsettled());
   expect(screen()).toBeNull();
 });
 
@@ -263,4 +263,20 @@ test('a development app without installation enabled never sends installation re
   await mountPage(settled(), '', '?loading=drawn');
   await advance(EXIT_MS);
   expect(bridge.boardReady).not.toHaveBeenCalled();
+});
+
+test('restart keeps rows before readiness and through failed settlement, then accepts successful empty sources', async () => {
+  await mountPage(settled());
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const before = useBoardStore.getState().data.items;
+  await push({ ...unsettled({ ...firstRead('items'), waiting: [] }), items: [], repos: [] });
+  expect(useBoardStore.getState().data.items).toEqual(before);
+  expect(useBoardStore.getState().data.repos).toEqual(sample.repos);
+  const failed = sample.repos.map(repo => ({ repo: repo.repo, problem: 'Source unavailable' }));
+  await push({ ...settled(), items: [], itemSourceProblems: failed });
+  expect(useBoardStore.getState().data.items).toEqual(before);
+  await push({ ...settled(), items: [], itemSourceProblems: failed.slice(1) });
+  expect(useBoardStore.getState().data.items).toEqual(before.filter(item => item.repo !== failed[0]!.repo));
+  await push({ ...settled(), items: [] });
+  expect(useBoardStore.getState().data.items).toEqual([]);
 });

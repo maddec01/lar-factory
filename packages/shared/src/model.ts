@@ -515,6 +515,8 @@ export interface FirstRead {
   waiting?: string[];
   /** Whether the read finished, failed, or gh blocked it. A settled first read stays settled until the server restarts. */
   settled: boolean;
+  /** Available local work or a successful source allows access before all sources settle. */
+  ready?: boolean;
 }
 
 /** The first read once it has settled, which is how sample mode starts. */
@@ -540,7 +542,7 @@ export interface BoardData {
   /** Error from the latest read if it failed; the items are then from fetchedAt. */
   error: string | null;
   items: Item[];
-  /** The first read's progress; the board page shows its loading screen until `settled`. */
+  /** The first read's progress; readiness allows access while remaining sources read. */
   firstRead: FirstRead;
   /** The model choices Start offers besides "T3 default"; empty when T3's settings or model list can't be read. */
   modelChoices: ModelGroup[];

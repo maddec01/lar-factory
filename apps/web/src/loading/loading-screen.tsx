@@ -1,5 +1,5 @@
 // The loading screen: the Lar Factory lockup over one line naming the first read's step. It covers the board from the
-// page's first paint until the whole first read has settled and the mark has drawn, then fades out once. Background
+// page's first paint until board content is available and the mark has drawn, then fades out once. Background
 // reads and server restarts keep the loaded board visible.
 
 import { useEffect, useLayoutEffect, useState } from 'react';

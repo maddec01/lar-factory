@@ -31,6 +31,7 @@ import * as T3Instances from "./skills/t3-instances.ts";
 import * as ExternalLink from "./window/external-link.ts";
 import * as MainWindowBounds from "./window/MainWindowBounds.ts";
 import * as IpcChannels from "./ipc-channels.ts";
+import { openBoardAddress } from "./board-server/board-address.ts";
 import * as LaunchSecret from "./board-server/launch-secret.ts";
 import * as RestartDialog from "./updates/restart-dialog.ts";
 import * as ShellEnvironment from "./shell-environment/ShellEnvironment.ts";
@@ -120,11 +121,11 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
 };
 
 /**
- * Opens the window at once on the starting page, and loads each ready server's page in it.
+ * Opens the window on the starting page, then loads the stable board address once.
  * Until the board first shows, the starting page names the launch step and says why its server isn't up yet,
  * without reloading, so its mark draws once. The board's page opens on the drawn mark.
  */
-const openBoardWindow = (secret: string) => {
+const openBoardWindow = (secret: string, address: Awaited<ReturnType<typeof openBoardAddress>>) => {
   let origin = "";
   let boardShown = false;
   // Bumped by each ready server and each stop, so a load that waits on the mark's draw is skipped once either comes.
@@ -146,20 +147,22 @@ const openBoardWindow = (secret: string) => {
   const events: BoardSupervisor.SupervisorEvents = {
     onReady: (url) =>
       Effect.suspend(() => {
+        address.connect(url);
+        origin = address.url.origin;
+        if (boardShown) return Effect.void;
         const mine = ++generation;
         // The board's page is held for the tool check, so the starting page stays up while it loads.
         tell(StartingPage.stepScript(StartingPage.STEPS.tools));
-        // The board's page opens on a finished mark, so the first one waits out the draw. A restart's reload
-        // replaces a board page, which drew long ago.
-        const wait = boardShown ? 0 : StartingPage.drawWait(startingShownAt, Date.now());
+        // The first board page waits until the starting mark has finished drawing.
+        const wait = StartingPage.drawWait(startingShownAt, Date.now());
         // Forked, so the supervisor watches the server's exit while the load waits.
         return Effect.sleep(Duration.millis(wait)).pipe(
           Effect.andThen(
             Effect.suspend(() => {
               if (mine !== generation) return Effect.void;
-              origin = url.origin;
+              origin = address.url.origin;
               boardShown = true;
-              return load(StartingPage.boardUrl(url));
+              return load(StartingPage.boardUrl(address.url));
             }),
           ),
           Effect.forkDetach,
@@ -171,6 +174,7 @@ const openBoardWindow = (secret: string) => {
         // The old server is gone: no page gets the secret until the next one is ready.
         generation += 1;
         origin = "";
+        address.disconnect();
         tell(StartingPage.errorScript(reason));
         return Effect.void;
       }),
@@ -181,6 +185,7 @@ const openBoardWindow = (secret: string) => {
   const forgetOrigin = Effect.sync(() => {
     generation += 1;
     origin = "";
+    address.disconnect();
   });
   const showStarting = load(StartingPage.url()).pipe(
     Effect.tap(() => Effect.sync(() => void (startingShownAt = Date.now()))),
@@ -301,7 +306,8 @@ const program = Effect.gen(function* () {
   yield* Effect.promise(() => Electron.app.whenReady());
   // One secret per launch, shared by the restarted servers and the page.
   const secret = LaunchSecret.make();
-  const board = openBoardWindow(secret);
+  const address = yield* Effect.acquireRelease(Effect.promise(openBoardAddress), (address) => Effect.sync(address.close));
+  const board = openBoardWindow(secret, address);
   // Opening the app again brings this window forward; the second copy has already quit.
   Electron.app.on("second-instance", () => {
     if (board.window.isMinimized()) board.window.restore();

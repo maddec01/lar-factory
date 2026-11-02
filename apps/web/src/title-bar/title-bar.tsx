@@ -122,7 +122,7 @@ function Refreshed({ data }: { data: BoardData }) {
   const landed = useLandedReads(fetchedAt);
   // A repository whose items haven't landed would show as empty, so the board says it still reads instead.
   const reading = data.firstRead.waiting ?? [];
-  const health: Health = reading.length ? 'waiting' : isStale(data, now) ? 'stale' : fetchedAt ? 'live' : 'waiting';
+  const health: Health = reading.length ? 'waiting' : (isStale(data, now) || data.itemSourceProblems?.length) ? 'stale' : fetchedAt ? 'live' : 'waiting';
   const ago = fetchedAt ? shortAgo(fetchedAt, now) : null;
   return (
     <Tooltip>

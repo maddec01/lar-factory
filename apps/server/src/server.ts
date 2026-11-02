@@ -158,7 +158,7 @@ const items = onboardedSources(async () => {
     repos: read.configs.map((config, index) => ({ ...repoView(config), setup: read.setups[index]! })),
     repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list),
   });
-  moveFirstRead({ step: 'items' });
+  moveFirstRead({ step: 'items', ...(read.configs.length === 0 ? { ready: true } : {}) });
   return read;
 });
 const choices = () => projectChoices(onboarded());
@@ -225,7 +225,7 @@ let warming = false;
  * them.
  */
 const settleFirstRead = () => {
-  moveFirstRead({ running: [], waiting: undefined, settled: true });
+  moveFirstRead({ running: [], waiting: undefined, ready: undefined, settled: true });
   if (warming || fixture) return;
   warming = true;
   void warmT3Stats(statsSources, recordedThreadIds(board.snapshot().items)).finally(() => {
@@ -442,6 +442,7 @@ function showTicketType(item: Item, type: string): void {
 /** Shows the work records as they are now with the last tickets read, and their T3 threads; stats only when `withStats`. */
 function showRecords(withStats = false): void {
   board.applyRead(recordedItems(), board.revision(), (shown) => withT3Reads(shown, withStats));
+  if (board.snapshot().items.length > 0) moveFirstRead({ ready: true });
 }
 
 /**
@@ -602,6 +603,11 @@ async function refresh(): Promise<void> {
     await checkQuota();
     const pace = readPace();
     await items.probe(pace);
+    if (!board.snapshot().firstRead.settled && board.snapshot().firstRead.waiting === undefined) {
+      unread = items.repos().map(repo => repo.repo);
+      moveFirstRead({ waiting: unread });
+      showRecords();
+    }
     if (!items.due(pace)) return;
     offerModelChoices();
     // The app installs after the board server starts, so each read picks up the latest install's state.
@@ -614,7 +620,9 @@ async function refresh(): Promise<void> {
       // whole read fetchedAt times.
       board.applyRead(recordedItems(partial), readRevision, withT3Reads, () => false);
       board.update({ itemSourceProblems: partial.problems ?? [] });
-      moveFirstRead({ waiting: partial.waiting });
+      const successful = items.repos().some(repo =>
+        !partial.waiting?.includes(repo.repo) && !partial.problems?.some(problem => problem.repo === repo.repo));
+      moveFirstRead({ waiting: partial.waiting, ...(successful || board.snapshot().items.length > 0 ? { ready: true } : {}) });
     };
     const snapshot = await items.read({ ...firstReadProgress, landed }, pace);
     const repos = items.repos();
@@ -629,7 +637,7 @@ async function refresh(): Promise<void> {
       specWorkIds = records.list({}).filter(record => record.ticket && refs.has(record.ticket.toLowerCase())).map(record => record.workId);
     }
     board.applyRead(recordedItems(snapshot), readRevision, withT3Reads, items.readAfresh);
-    moveFirstRead({ step: 'finishing', waiting: snapshot.waiting });
+    moveFirstRead({ step: 'finishing', waiting: snapshot.waiting, ready: true });
     board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? recordsProblem, itemSourceProblems: snapshot.problems ?? [],
       t3Availability: await t3Availability(), t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);

@@ -8,7 +8,7 @@ import { CopyableCommand } from './tool-notices.tsx';
 /** The warning names the repository as the title bar and the List modal do, among `repos`. */
 export function ItemSourceWarning({ repo, problem, fix, repos }: ItemSourceProblem & { repos: readonly RepoConfig[] }) {
   return (
-    <Warning dismissKey={`item-source:${repo.toLowerCase()}`} title={`${repoName(repo, repos)}'s items are off the board.`}>
+    <Warning dismissKey={`item-source:${repo.toLowerCase()}`} title={`${repoName(repo, repos)}'s items could not be refreshed.`}>
       {problem} {fix && <>Run <CopyableCommand command={fix} /> in a terminal. </>}The board reads it again on each refresh.
     </Warning>
   );

@@ -98,10 +98,22 @@ test("each repository's items show once its own read lands, while another reposi
   const early = await until(board, (d) => d.items.length > 0);
   assert.deepEqual(early.items.map((i) => [i.repo, i.number]), [[apple, 7]], "the repository's read still sleeps");
   assert.equal(early.firstRead.settled, false);
+  assert.equal(early.firstRead.ready, true);
   assert.deepEqual(early.firstRead.waiting, ['maddec01/lar-server', 'maddec01/lar-factory']);
   assert.equal(early.fetchedAt, null, 'the whole read has yet to land');
   assert.equal(early.error, null);
   const data = await settled(board);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number]).sort(), [[apple, 7], ['maddec01/lar-factory', 1]]);
   assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
+});
+
+test('a successful empty repository permits access while another source still reads', async (t) => {
+  const apple = 'maddec01/lar-apple';
+  const board = await startBoard(t, { items: [], readDelay: 1_500,
+    localSetups: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } }, repoIssues: { [apple]: [] } });
+  const early = await until(board, (d) => d.firstRead.ready === true);
+  assert.equal(early.firstRead.settled, false);
+  assert.deepEqual(early.items, []);
+  assert.deepEqual(early.firstRead.waiting, ['maddec01/lar-server', 'maddec01/lar-factory']);
+  assert.equal(early.fetchedAt, null);
 });

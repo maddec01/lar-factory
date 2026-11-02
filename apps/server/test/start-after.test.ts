@@ -142,6 +142,20 @@ test('a failed start disarms the part and shows its error on it, until it is arm
   assert.equal((await rearmed.json()).board.armedErrors[board.id(12)], undefined);
 });
 
+test('an armed build that reaches a live shaping thread disarms, shows the refusal and starts nothing', async (t) => {
+  const { board, env, open } = await blockedBuildBoard(t, { threads: { 'maddec01/lar-factory#12': ['shaping'] } });
+  writeFileSync(env.T3_STATE_DB + '.requests.json', '[]');
+  writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify([{ id: 'shaping', turns: [{ id: 'turn', startedAt: '2026-11-01T08:00:00Z' }] }]));
+  await until(board, (d) => { const { threads } = d.items.find((i) => i.id === board.id(12))!; return Array.isArray(threads) && threads[0]?.state === 'running'; });
+  assert.equal((await arm(board, board.id(12))).status, 200);
+  await settleDecisions(board, board.id(12), [open]);
+  const failed = await until(board, (d) => !!d.armedErrors?.[board.id(12)]);
+  assert.equal(failed.armedErrors![board.id(12)], 'A shaping thread is still at work on this item. Wait for it to finish, then start the build.');
+  assert.deepEqual(failed.armed, {});
+  assert.deepEqual(armedFile(env.HOME!), {});
+  assert.deepEqual(await board.t3Calls(), []);
+});
+
 test("a part whose repository has no T3 project can't be armed, as its start would fail", async (t) => {
   const server = rawIssue('I_30', 30, 'Ready', ['build'], {
     url: 'https://github.com/maddec01/lar-server/issues/30', repository: { nameWithOwner: 'maddec01/lar-server' },

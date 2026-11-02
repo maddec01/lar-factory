@@ -16,12 +16,12 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
     const state: ItemThread['state'] = shell.pendingRuntimeRequest ? 'needs you'
       : ['preparing', 'starting', 'running', 'waiting'].includes(String(shell.status)) ? 'running'
       : ['failed', 'interrupted', 'cancelled'].includes(String(shell.status)) ? 'stopped' : 'done';
-    byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, ...(!shell.pendingRuntimeRequest && shell.status === 'running' ? { currentRunning: true as const } : {}), updated: shell.updatedAt });
+    byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, ...(!shell.pendingRuntimeRequest && shell.status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && shell.status === 'queued' ? { queued: true as const } : {}), updated: shell.updatedAt });
     const lineage = shell.lineage as { parentThreadId?: string; rootThreadId?: string } | undefined;
     parents.set(shell.id, { parent: lineage?.parentThreadId, root: lineage?.rootThreadId });
   }
   for (const thread of byId.values()) {
-    if (thread.state !== 'running' && thread.state !== 'needs you') continue;
+    if (thread.state !== 'running' && thread.state !== 'needs you' && !thread.queued) continue;
     const seen = new Set([thread.id]);
     const root = parents.get(thread.id)?.root;
     if (root && root !== thread.id && byId.has(root)) { byId.get(root)!.hasLiveChildren = true; if (thread.currentRunning) byId.get(root)!.hasRunningChildren = true; }

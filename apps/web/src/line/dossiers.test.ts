@@ -3,7 +3,7 @@
 // view's concept block tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text } from '../../test/support.ts';
+import { $, $$, NOW, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -233,6 +233,33 @@ test('an open dossier has no About section; what keeps the work moving is in lab
   expect(dialogTitle(), "a fog question's #n opens its item").toBe(`#201 ${sample.items.find((i) => i.number === 201)!.title}`);
   expect([dossier(C180).querySelector('[data-attention]'), text(dossier(C180).querySelector('[data-attention-none]'))], 'no rows when nothing has entries')
     .toEqual([null, 'Nothing holds this up.']);
+});
+
+test('a part at Verify or Ready to merge counts as moving while its build thread runs, and back on your desk when it stops', async () => {
+  const build = { id: 'build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated: '2026-10-21T09:00:00.000Z' } as ItemThread;
+  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
+  const clear = withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, fresh));
+  await mountPage(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [build] }, clear));
+  expect(dossier().querySelector('[data-attention-row="verify"]')).toBeNull();
+  expect(text(next())).toBe('Moving#140 Owner accounts');
+  const part = text(step('I_sample13'));
+  expect([part.includes('Working'), part.includes('Ready to merge'), text(step('I_sample13').querySelector('[data-open-thread]'))]).toEqual([true, false, 'Open thread']);
+  await receive(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [{ ...build, id: 'shape', title: 'Shape', purpose: 'shape', state: 'done', currentRunning: undefined }, { ...build, state: 'done', currentRunning: undefined, hasRunningChildren: true }] }, clear));
+  expect(text(step('I_sample13')), 'it names the running build thread, not the newest one').toContain('T3 · Build· running');
+  await receive(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, clear));
+  expect(text(next())).toBe('To merge#140 Owner accounts');
+  expect(text(step('I_sample13'))).toContain('Ready to merge');
+});
+
+test('a decision part and a work map node name the running build thread and say Working', async () => {
+  const build = { id: 'build', title: 'Build', purpose: 'build', state: 'done', hasRunningChildren: true, updated: '2026-10-21T09:00:00.000Z' } as ItemThread;
+  const shape = { ...build, id: 'shape', title: 'Shape', purpose: 'shape', hasRunningChildren: undefined };
+  const data = withItem('I_sample10', { status: 'Verify', threads: [shape, build] }, { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() });
+  await mountPage(data);
+  expect(text(dossier().querySelector('[data-attention-row="decisions"]'))).toContain('· Working');
+  await press(button(dossier(), 'Work map'));
+  const node = text(dossier().querySelector('[data-map-part="I_sample10"]'));
+  expect([node.includes('Working· running'), node.includes('Verify')]).toEqual([true, false]);
 });
 
 test('parts in Verify or Ready to merge get their own row after Needs you, which with the chip counts only Needs you', async () => {

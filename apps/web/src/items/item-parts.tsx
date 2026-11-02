@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, buildActivity, isStale, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
+import { UNREADABLE, activityUnavailable, buildActivity, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -213,10 +213,18 @@ export function StructureSync({ item }: { item: Item }) {
   </>;
 }
 
+export const useActivityUnavailable = () => useBoardStore(({ data, now, clientError }) => activityUnavailable(data, now, clientError));
+
 export function useActivityFeedback(item: Item) {
-  const unavailable = useBoardStore(({ data, now, clientError }) => !!clientError || isStale(data, now) || !data.firstRead.settled);
-  return buildActivity(item, unavailable);
+  return buildActivity(item, useActivityUnavailable());
 }
+
+/** How the board names an item now: its recorded Status, or Working while it is at work again. */
+export function shownStatus(item: Item, unavailable: boolean): { working: boolean; word: string; glyph: Status } {
+  return workingAgain(item, unavailable) ? { working: true, word: 'Working', glyph: 'In progress' } : { working: false, word: item.status, glyph: item.status };
+}
+
+export const useShownStatus = (item: Item) => shownStatus(item, useActivityUnavailable());
 
 export function ActivityFeedback({ feedback, labelOnly = false }: { feedback: ReturnType<typeof buildActivity>; labelOnly?: boolean }) {
   if (labelOnly) return <span className="block h-4 whitespace-nowrap text-[11px] leading-4 text-(--muted-foreground)">{feedback.label}</span>;

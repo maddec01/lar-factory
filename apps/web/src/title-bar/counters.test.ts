@@ -2,7 +2,8 @@
 // the whole factory. Each opens a popover of the items behind its number; picking one opens the item dialog.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, moved, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, NOW, moved, mountPage, sample, settle, text } from '../../test/support.ts';
+import type { ItemThread } from '@lar-factory/shared';
 
 const completeSample = { ...sample, error: null, items: sample.items.map(item => ({ ...item, stats: item.stats && item.stats !== 'unavailable' ? item.stats : { agentMs: 0, tokens: 0, costUsd: 0 } })) };
 
@@ -43,6 +44,20 @@ test('the counts are the whole factory\'s with a repository scoped', async () =>
   expect(counters().map(text)).toEqual(before);
   await openCounter('need you');
   expect(rows()).toEqual(items);
+});
+
+test('need you leaves out a Verify item while its build thread runs, and counts it again when it stops', async () => {
+  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
+  const verify = (state: ItemThread['state'], currentRunning?: true) => ({ ...fresh, items: fresh.items.map((i) => (i.id === 'I_sample10' ? { ...i, status: 'Verify' as const,
+    threads: [{ id: 'build', title: 'Build', purpose: 'build', state, currentRunning, updated: '2026-10-21T09:00:00.000Z' } as ItemThread] } : i)) });
+  const count = () => Number(/need you: (\d+)/.exec(counter('need you').getAttribute('aria-label')!)![1]);
+  await mountPage(verify('done'));
+  const waiting = count();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(verify('running', true)));
+  expect(count()).toBe(waiting - 1);
+  await settle(() => useBoardStore.getState().receive(verify('done')));
+  expect(count()).toBe(waiting);
 });
 
 test('need you lists its items by status, each with its status glyph in its colour', async () => {

@@ -27,7 +27,7 @@ import { SettingsDialog } from './settings/settings.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
 
 function Content() {
-  const { data, now, loaded } = useBoardStore();
+  const { data, now, loaded, clientError } = useBoardStore();
   const scope = useScopeStore((state) => state.scope);
   const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
   return (
@@ -37,7 +37,7 @@ function Content() {
         {scope && !loaded && stillReading(data, scope)
           ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Loading projects…</p>
           : <>
-            <Desk items={boardSections({ ...data, items }, now).needsYou} />
+            <Desk items={boardSections({ ...data, items }, now, clientError).needsYou} />
             <Line items={items} />
           </>}
       </div>

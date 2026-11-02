@@ -2,7 +2,7 @@
 // in the order they run. Each part's kind comes from its local record, what it waits on from its blockers, and its
 // thread is its newest item thread.
 
-import { blockerRef, decisionType, openBlockers, refKey } from '@lar-factory/shared';
+import { blockerRef, currentBuildThread, decisionType, openBlockers, refKey } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'decision', 'build'] as const;
@@ -25,6 +25,12 @@ export interface DossierItems {
 
 /** A thread's state, drawn with the glyph of the status it reads as. */
 export const THREAD_GLYPH: Record<ThreadState, Status> = { running: 'In progress', 'needs you': 'Needs you', stopped: 'Needs you', done: 'Done' };
+
+/** The thread a part shows: its running build thread while it is at work again, otherwise its newest thread. */
+export function shownThread(part: Part, working: boolean): ItemThread | undefined {
+  const build = working ? currentBuildThread(part.item) : undefined;
+  return build ? { ...build, state: 'running' } : part.thread;
+}
 
 /** Past waiting: a thread has taken it on, whatever it waited for. */
 const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 'Done'];

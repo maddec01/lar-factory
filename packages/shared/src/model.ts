@@ -1128,10 +1128,35 @@ export interface LocalSetupAnswers {
 }
 
 
+export function openQuestionThread(item: Item) {
+  return Array.isArray(item.threads) ? item.threads.find((thread) => thread.state === 'needs you' && !thread.observedAt) : undefined;
+}
+
+/** The item's build thread as T3 shows it now, not a cached copy. */
+export function currentBuildThread(item: Item) {
+  return Array.isArray(item.threads) ? item.threads.find((thread) => thread.purpose === 'build' && !thread.observedAt) : undefined;
+}
+
+/** Whether the board can't trust what it knows of thread activity: the page's read failed, the data is stale or the first read hasn't settled. */
+export function activityUnavailable(data: BoardData, now: number, clientError?: string | null): boolean {
+  return !!clientError || isStale(data, now) || !data.firstRead.settled;
+}
+
+/**
+ * Whether an item at Verify or Ready to merge is at work again: its current build thread or a child of it runs, and
+ * nothing holds it for the user. It then counts as in flight, with its recorded Status unchanged.
+ */
+export function workingAgain(item: Item, unavailable = false): boolean {
+  if (item.status !== 'Verify' && item.status !== 'Ready to merge') return false;
+  if (unavailable || item.paused || item.archived || item.needsYou || openQuestionThread(item)) return false;
+  const current = currentBuildThread(item);
+  return !!(current?.currentRunning || current?.hasRunningChildren);
+}
+
 export function buildActivity(item: Item, stale = false): { label: string; running: boolean } {
+  if (workingAgain(item, stale)) return { label: 'Working', running: true };
   if (!['In progress', 'Review', 'Ready'].includes(item.status)) return { label: item.status, running: false };
-  const threads = Array.isArray(item.threads) ? item.threads.filter(t => t.purpose === 'build') : [];
-  const current = threads.find(t => !t.observedAt);
+  const current = currentBuildThread(item);
   if (stale || item.paused || item.archived || item.needsYou) return { label: 'Activity unavailable', running: false };
   if (item.buildRequested) return { label: 'Start requested', running: false };
   if (!current) return { label: 'Activity unavailable', running: false };

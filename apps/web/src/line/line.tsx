@@ -11,10 +11,10 @@ import { InFlight, flightRows } from './in-flight.tsx';
 import { Queue, queuedRows } from './queue.tsx';
 
 export function Line({ items }: { items: Item[] }) {
-  const { data, now } = useBoardStore();
+  const { data, now, clientError } = useBoardStore();
   const [filters, setFilters] = useItemFilters('board');
   const shows = rowFilter(filters, data.repos);
-  const rows = [...queuedRows(items, data.items), ...dossiersOf(items, data.items).map(({ parent }) => parent), ...flightRows(items, data, now)];
+  const rows = [...queuedRows(items, data.items), ...dossiersOf(items, data.items).map(({ parent }) => parent), ...flightRows(items, data, now, clientError)];
   return (
     <section className="line grid gap-3" aria-labelledby="line-h">
       <header data-line-filters className="grid gap-3">

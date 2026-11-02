@@ -24,7 +24,8 @@ export const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
 const THREAD_TEXT: Record<ThreadState, string> = {
   running: 'Thread running', 'needs you': 'Thread needs you', stopped: 'Run stopped', done: 'Run finished',
 };
-export function threadText(item: Item): string {
+export function threadText(item: Item, working: boolean): string {
+  if (working) return THREAD_TEXT.running;
   if (item.threads === 'unavailable') return 'Thread unavailable';
   const latest = item.threads?.[0];
   return latest ? `${THREAD_TEXT[latest.state]}${lastSeen(latest)}` : 'Not started';
@@ -41,12 +42,12 @@ export function OnYourDesk({ status }: { status: Status }) {
 export const statsOf = (item: Item): ItemStats | null => (item.stats && item.stats !== 'unavailable' ? item.stats : null);
 
 /** Active stages only; completed parts keep a check instead of a further workflow step. */
-export function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
+export function Track({ status, label = status, waiting }: { status: Status; label?: string; waiting?: boolean }) {
   const at = stageOf(status);
   if (status === 'Done') return <span className="flex h-5 items-center" title="Complete"><StatusGlyph status="Done" /></span>;
   if (at < 0) return null;
   return (
-    <ol className="m-0 grid list-none grid-cols-5 gap-px p-0" title={`${status}${waiting ? ', waiting' : ''}`}>
+    <ol className="m-0 grid list-none grid-cols-5 gap-px p-0" title={`${label}${waiting ? ', waiting' : ''}`}>
       {STAGES.map((st, n) => (
         <li key={st.name} className="relative flex h-5 items-center justify-center">
           <span className={`absolute inset-x-0 h-1.5 ${n === 0 ? 'rounded-l-full' : ''} ${n === STAGES.length - 1 ? 'rounded-r-full' : ''}`}

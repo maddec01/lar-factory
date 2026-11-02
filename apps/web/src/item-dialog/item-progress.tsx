@@ -5,7 +5,7 @@
 
 import { itemName } from '@lar-factory/shared';
 import type { Item, Slice, Status } from '@lar-factory/shared';
-import { ActivityFeedback, useActivityFeedback, SliceBar, SliceMark } from '../items/item-parts.tsx';
+import { ActivityFeedback, useActivityFeedback, useShownStatus, SliceBar, SliceMark } from '../items/item-parts.tsx';
 import { STATUS_COLOR } from '../items/status-glyph.tsx';
 import { WORKFLOW_STEPS } from '../items/workflow-steps.ts';
 import { SourceIcon } from '../items/source-icon.tsx';
@@ -26,6 +26,7 @@ function SliceChip({ slice }: { slice: Slice }) {
 
 export function ItemProgress({ item }: { item: Item }) {
   const feedback = useActivityFeedback(item);
+  const shown = useShownStatus(item);
   const at = WORKFLOW_STEPS.indexOf(item.status);
   const split = item.slices.length > 0 && SPLIT_STATUSES.includes(item.status);
   const done = item.slices.filter((s) => s.progress === 'done').length;
@@ -34,15 +35,16 @@ export function ItemProgress({ item }: { item: Item }) {
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-progress>
       {at >= 0 && <ol className="m-0 flex list-none items-end gap-[3px] p-0" data-steps>
         {WORKFLOW_STEPS.map((s, i) => {
-          const label = `Step ${i + 1} of ${WORKFLOW_STEPS.length}: ${s}`;
+          const name = i === at ? shown.word : s;
+          const label = `Step ${i + 1} of ${WORKFLOW_STEPS.length}: ${name}`;
           if (i !== at) {
             return <li key={s} title={s} aria-label={label} className="h-1.5 min-w-1.5 flex-1 rounded-full"
               style={{ background: i < at ? 'color-mix(in srgb, var(--foreground) 28%, transparent)' : 'var(--soft)' }} />;
           }
           return (
-            <li key={s} title={s} aria-label={label} aria-current="step" className="grid min-w-26 flex-[6] gap-1">
+            <li key={s} title={name} aria-label={label} aria-current="step" className="grid min-w-26 flex-[6] gap-1">
               <span className="flex items-baseline justify-between gap-2 text-xs leading-4">
-                <span className="truncate font-medium">{s}</span>
+                <span className="truncate font-medium">{name}</span>
                 <span className="shrink-0 text-(--muted-foreground) tabular-nums">{i + 1}/{WORKFLOW_STEPS.length}</span>
               </span>
               {split

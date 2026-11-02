@@ -9,18 +9,18 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { needsAnswer, openQuestionThread, blockerGroups, blockerRef, plural, prLabel, itemName, ref, repoKey, repoName } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, blockerGroups, blockerRef, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemTitle, SliceBar, StructureSync } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, SliceBar, StructureSync, shownStatus, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, threadsOf } from './dossier-parts.ts';
+import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, shownThread, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { PartStart, startable } from './part-start.tsx';
 import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
@@ -52,7 +52,7 @@ const waitsOn = (part: Part) => `waits on ${openWaits(part).map((b) => blockerRe
 
 /** A part's thread, its title and state; before it has one, what its start waits on. */
 function ThreadLine({ part }: { part: Part }) {
-  const { thread } = part;
+  const thread = shownThread(part, useShownStatus(part.item).working);
   if (!thread) {
     const { work, dependencies } = blockerGroups(part.item, openWaits(part));
     const waits = [...work ? [`${work.names} ${work.many ? 'are' : 'is'} done`] : [], ...dependencies ? [`you mark ${dependencies.names} met`] : []];
@@ -102,11 +102,12 @@ function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void })
 
 /** A part as a link to its item dialog: its status and its title, up to two lines. */
 function PartLink({ part }: { part: Part }) {
+  const { glyph } = useShownStatus(part.item);
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); open(part.item); }} title={`${itemName(part.item)}`}
       className="flex min-w-0 items-start gap-1.5 rounded text-left text-[13px] hover:underline">
       <SourceIcon item={part.item} />
-      <span className="mt-0.5 inline-flex"><StatusGlyph status={part.item.status} className="size-3.5" /></span>
+      <span className="mt-0.5 inline-flex"><StatusGlyph status={glyph} className="size-3.5" /></span>
       <span className="line-clamp-2"><ItemTitle item={part.item} /></span>
     </button>
   );
@@ -126,15 +127,16 @@ function Entry({ main, side }: { main: ReactNode; side?: ReactNode }) {
  *  Ready to merge, open decisions, blocked slices, parts waiting on others, parts ready to start, the map's
  *  Dependencies and its fog. */
 function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[]; data: BoardData; find: FindRef }) {
+  const unavailable = useActivityUnavailable();
   const ahead = parts.filter((p) => !isDone(p.item));
   const blocked = ahead.flatMap((part) => part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice })));
   const rows = [
     { key: 'you', label: 'Needs you', tone: 'text-(--warning-foreground)',
       entries: [...(needsAnswer(parent) ? [<Entry key={parent.id} main={<button onClick={() => open(parent)}>{itemName(parent)}</button>} side={<OpenThread item={parent} data={data} threadId={openQuestionThread(parent)?.id} label="Answer in T3" />} />] : []), ...ahead.filter((p) => needsAnswer(p.item)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={<OpenThread item={p.item} data={data} threadId={openQuestionThread(p.item)?.id} label="Answer in T3" />} />)] },
     { key: 'verify', label: 'To verify or merge', tone: 'text-(--warning-foreground)',
-      entries: ahead.filter((p) => p.item.status === 'Verify' || p.item.status === 'Ready to merge').map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={p.item.status} />) },
+      entries: ahead.filter((p) => (p.item.status === 'Verify' || p.item.status === 'Ready to merge') && !workingAgain(p.item, unavailable)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={p.item.status} />) },
     { key: 'decisions', label: 'Open decisions', tone: 'text-(--primary)',
-      entries: ahead.filter((p) => DECISION_KINDS.includes(p.kind)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={`${p.kind} · ${p.item.status}`} />) },
+      entries: ahead.filter((p) => DECISION_KINDS.includes(p.kind)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={`${p.kind} · ${shownStatus(p.item, unavailable).word}`} />) },
     { key: 'blocked', label: 'Blocked slices', tone: 'text-(--st-review)',
       entries: blocked.map(({ part, slice }, i) => (
         <Entry key={i}
@@ -176,7 +178,9 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
  *  works on it. A part that waits on another and has no Start says what it waits on instead. */
 function Action({ part, data }: { part: Part; data: BoardData }) {
   const { status } = part.item;
+  const { working } = useShownStatus(part.item);
   if (isDone(part.item)) return null;
+  if (working) return <span onClick={stop}><OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} /></span>;
   if (YOURS.includes(status)) return <OnYourDesk status={status} />;
   if (status === 'Ready' || status === 'Queued') return <span onClick={stop}><PartStart part={part} data={data} label="Start" /></span>;
   if (openWaits(part).length) return <span>{waitsOn(part)}</span>;
@@ -190,6 +194,7 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
   const { item } = part;
   const isPicked = usePicked(item);
   const waits = openWaits(part);
+  const shown = useShownStatus(item);
   const s = figuresOf(item, data);
   return (
     <li onClick={() => open(item)} data-part={item.id} className={`grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 hover:bg-(--accent) ${picked(isPicked)}`}>
@@ -199,8 +204,8 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
         <Action part={part} data={data} />
       </span>
       <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
-        <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} waiting={waits.length > 0} /></span>
-        <span>{isDone(item) ? 'Complete' : item.status}</span>
+        <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} label={shown.word} waiting={waits.length > 0} /></span>
+        <span>{isDone(item) ? 'Complete' : shown.word}</span>
         {s && <Figures s={s} />}
         <AzureFields azure={item.azure} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
@@ -239,18 +244,18 @@ interface Moving {
   ready: Part[]; active: Part[]; fog: string[];
 }
 
-function moving(parent: Item, parts: Part[]): Moving {
+function moving(parent: Item, parts: Part[], unavailable: boolean): Moving {
   const ahead = parts.filter((p) => !isDone(p.item));
   return {
     parts,
     done: Math.max(parent.subIssues.completed, parts.length - ahead.length),
     count: Math.max(parent.subIssues.total, parts.length),
     needsYou: ahead.filter((p) => needsAnswer(p.item)),
-    yours: ahead.filter((p) => YOURS.includes(p.item.status)),
+    yours: ahead.filter((p) => YOURS.includes(p.item.status) && !workingAgain(p.item, unavailable)),
     decisions: ahead.filter((p) => DECISION_KINDS.includes(p.kind)),
     blockedSlices: ahead.flatMap((part) => part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice }))),
     ready: ahead.filter(startable),
-    active: ahead.filter((p) => !needsAnswer(p.item) && ['Shaping', 'In progress', 'Review'].includes(p.item.status)),
+    active: ahead.filter((p) => !needsAnswer(p.item) && (['Shaping', 'In progress', 'Review'].includes(p.item.status) || workingAgain(p.item, unavailable))),
     fog: parent.map?.fog ?? [],
   };
 }
@@ -271,12 +276,16 @@ const repos = (m: Moving, data: BoardData) => [...new Set(m.parts.map((p) => rep
 function PartsBar({ m }: { m: Moving }) {
   const order = [...m.parts].sort((a, b) => Number(isDone(b.item)) - Number(isDone(a.item)) || stageOf(b.item.status) - stageOf(a.item.status));
   const unread = m.count - m.parts.length;
+  const unavailable = useActivityUnavailable();
   return (
     <ol className="m-0 flex min-w-0 list-none gap-[2px] p-0" title={`${m.done}/${m.count} parts done`} data-part-bar>
-      {order.map((p) => (
-        <li key={p.item.id} title={`${itemName(p.item)}: ${p.item.status}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${p.item.status === 'In progress' ? 'status-pulse' : ''}`}
-          style={{ background: isDone(p.item) ? 'var(--st-done)' : p.item.status === 'Queued' || p.item.status === 'List' ? 'var(--soft)' : STATUS_COLOR[p.item.status] }} />
-      ))}
+      {order.map((p) => {
+        const { word, glyph } = shownStatus(p.item, unavailable);
+        return (
+          <li key={p.item.id} title={`${itemName(p.item)}: ${word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${glyph === 'In progress' ? 'status-pulse' : ''}`}
+            style={{ background: isDone(p.item) ? 'var(--st-done)' : glyph === 'Queued' || glyph === 'List' ? 'var(--soft)' : STATUS_COLOR[glyph] }} />
+        );
+      })}
       {Array.from({ length: Math.max(0, unread) }, (_, n) => <li key={`u${n}`} className="h-1.5 min-w-[3px] flex-1 rounded-full border border-dashed border-(--input)" />)}
     </ol>
   );
@@ -349,7 +358,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
   };
   const isPicked = usePicked(parent);
   const find: FindRef = (repo = parent.repo ?? '', n) => data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
-  const m = moving(parent, parts);
+  const m = moving(parent, parts, useActivityUnavailable());
   const missing = m.count - parts.length;
   const threads = [parent, ...parts.map((p) => p.item)].flatMap(threadsOf);
 

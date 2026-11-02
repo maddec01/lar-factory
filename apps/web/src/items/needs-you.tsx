@@ -61,7 +61,7 @@ export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
   }
   async function recover() {
     setError(null);
-    if (item.needsYou?.deletedThreadPurpose !== 'build') {
+    if (item.needsYou?.startAgainPurpose !== 'build') {
       await startAgain(item.id, {});
       return;
     }

@@ -4,10 +4,11 @@ import { join } from 'node:path';
 import { afterEach, test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { effectiveVocabulary } from '@lar-factory/shared';
-import type { BoardData, Item, OperationAccess, ShapingThreadCleanup } from '@lar-factory/shared';
+import type { BoardData, Item, ItemThread, NeedsYouCause, OperationAccess, ShapingThreadCleanup, StartResult, Status } from '@lar-factory/shared';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
 import { createItemCommands } from './item-commands.ts';
+import { NO_THREAD } from './needs-you-causes.ts';
 import type { ItemSource } from './item-source.ts';
 import { archivedItems, recordItems } from './record-items.ts';
 import { observeRecords } from './observe-records.ts';
@@ -283,6 +284,89 @@ test('Start again on a no-thread notice stays out of Needs you, so only a starte
   assert.deepEqual(records.read(work.workId).needsYouCauses, [{ type: 'no-thread' }]);
 });
 
+/** Work whose last `purpose` start failed with no thread, waiting on the user. */
+async function noThreadWork(purpose: 'shape' | 'build', status: Status = purpose === 'build' ? 'Ready' : 'Queued') {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'build', status });
+  const { record, intent } = records.recordLaunchIntent(work.workId, work.revision, purpose);
+  const failed = records.resolveLaunchIntent(work.workId, record.revision, intent.intentId, { failure: NO_THREAD }).record;
+  records.setNeedsYouCauses(work.workId, failed.revision, [{ type: 'no-thread' }]);
+  return { records, workId: work.workId };
+}
+
+test('Start again on a no-thread notice keeps it when the start fails and removes it once a thread starts', async () => {
+  const { records, workId } = await noThreadWork('shape');
+  let answerWith: StartResult | null = { thread: null, error: 'T3 refused.' };
+  const { commands, board, started } = recordedCommands(records, { startAnswer: () => answerWith });
+  assert.equal(board.find(workId)!.needsYou!.startAgainPurpose, 'shape');
+  const failed = await commands.startAgain(workId, undefined, {});
+  assert.deepEqual([failed.status, (failed.body as { error: string }).error], [502, 'T3 refused.']);
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'no-thread' }]);
+  answerWith = null;
+  assert.equal((await commands.startAgain(workId, undefined, {})).status, 200);
+  assert.equal(started.length, 1);
+  assert.deepEqual(records.read(workId).needsYouCauses, []);
+  assert.deepEqual(records.threads(workId).map((t) => t.purpose), ['shape']);
+});
+
+test('Start again on a no-thread notice takes the build purpose from its failed start, not an older shaping thread', async () => {
+  const { records, workId } = await noThreadWork('build');
+  records.addThread(workId, records.read(workId).revision, 'older-shape', 'shape');
+  const { commands, board } = recordedCommands(records, { shown: (ids) => ids.map((id) => ({ id, title: 't', state: 'done' as const, updated: '2026-10-31T00:00:00Z' })) });
+  assert.equal(board.find(workId)!.needsYou!.startAgainPurpose, 'build');
+  assert.equal((await commands.inspectRecovery(workId)).status, 200);
+  assert.equal((await commands.startAgain(workId, undefined, {})).status, 409, 'its branch waits for a choice');
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'no-thread' }]);
+  assert.equal((await commands.startAgain(workId, undefined, { branchChoice: 'continue' })).status, 200);
+  assert.deepEqual(records.read(workId).needsYouCauses, []);
+  assert.deepEqual(records.threads(workId).map((t) => t.purpose), ['shape', 'build']);
+});
+
+test('Start again refuses while the board has not yet read a thread the record now holds', async () => {
+  const { records, workId } = await noThreadWork('build');
+  const { commands, board, started } = recordedCommands(records);
+  records.addThread(workId, records.read(workId).revision, 'just-recorded', 'build');
+  assert.equal(board.find(workId)?.threads, undefined, 'the board last read no threads');
+  assert.equal((await commands.inspectRecovery(workId)).status, 409);
+  assert.equal((await commands.startAgain(workId, undefined, {})).status, 409);
+  assert.deepEqual(started, []);
+});
+
+test('Start again refuses while the board shows an older stopped thread but has not yet read a newer one', async () => {
+  const { records, workId } = await noThreadWork('build');
+  records.addThread(workId, records.read(workId).revision, 'older-shape', 'shape');
+  const { commands, board, started, reread } = recordedCommands(records, { shown: (ids) => ids.map((id) => ({ id, title: 't', state: 'stopped' as const, updated: '2026-10-31T00:00:00Z' })) });
+  records.addThread(workId, records.read(workId).revision, 'just-recorded', 'build');
+  assert.deepEqual((board.find(workId)?.threads as ItemThread[]).map((t) => t.id), ['older-shape'], 'the board last read only the older thread');
+  assert.equal((await commands.inspectRecovery(workId)).status, 409);
+  assert.equal((await commands.startAgain(workId, undefined, {})).status, 409);
+  assert.deepEqual(started, []);
+  reread();
+  assert.equal((await commands.inspectRecovery(workId)).status, 200, 'the next read shows both stopped');
+});
+
+test('an uncertain Start again keeps the no-thread notice until T3 shows its thread', async () => {
+  const { records, workId } = await noThreadWork('shape');
+  const { commands } = recordedCommands(records, { startAnswer: () => ({ thread: null, error: 'It may have started.', uncertain: true }), recover: async () => ({ threadId: 'late', title: 'Work' }) });
+  const uncertain = await commands.startAgain(workId, undefined, {});
+  assert.deepEqual([uncertain.status, (uncertain.body as { uncertain?: boolean }).uncertain], [502, true]);
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'no-thread' }]);
+  assert.equal((await commands.startAgain(workId, undefined, {})).status, 200);
+  assert.deepEqual(records.read(workId).needsYouCauses, []);
+  assert.deepEqual(records.threads(workId).map((t) => t.threadId), ['late']);
+});
+
+test('Start again stays refused while T3 cannot be read, and on a notice that does not offer it', async () => {
+  const { records, workId } = await noThreadWork('shape');
+  const { commands, board } = recordedCommands(records);
+  board.update({ items: [{ ...board.find(workId)!, threads: 'unavailable' }] });
+  assert.equal((await commands.startAgain(workId, undefined, {})).status, 409);
+  const closed = await noThreadWork('shape');
+  closed.records.setNeedsYouCauses(closed.workId, closed.records.read(closed.workId).revision, [{ type: 'no-thread' }, { type: 'pr-closed' }]);
+  assert.equal((await recordedCommands(closed.records).commands.startAgain(closed.workId, undefined, {})).status, 409);
+  assert.deepEqual(closed.records.launchIntents({ workId: closed.workId, unresolved: true }), []);
+});
+
 test('Start refuses while causes and free text remain, and Mark as handled removes free text alone', async () => {
   const records = await openRecords();
   const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
@@ -535,7 +619,7 @@ test("Start build moves the build's concept record to In progress and writes no 
  */
 function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids.map((id) => ({ id, title: 't', state: 'running' as const, updated: '2026-10-31T00:00:00Z' })),
   recover = async (_project: string, _messages: readonly string[]): Promise<{ threadId: string; title: string } | 'absent' | 'unknown'> => 'absent', lookup = async (): Promise<'live' | 'deleted' | 'unknown'> => 'unknown',
-  skills = [] as string[], during = () => {}, beforeLaunch = () => {}, cleanupChoice = (): ShapingThreadCleanup => 'archive' }: { cleanupChoice?: () => ShapingThreadCleanup; shown?: (ids: string[]) => Item['threads']; recover?: (project: string, messages: readonly string[]) => Promise<{ threadId: string; title: string } | 'absent' | 'unknown'>;
+  skills = [] as string[], during = () => {}, beforeLaunch = () => {}, cleanupChoice = (): ShapingThreadCleanup => 'archive', startAnswer = () => null }: { cleanupChoice?: () => ShapingThreadCleanup; startAnswer?: () => StartResult | null; shown?: (ids: string[]) => Item['threads']; recover?: (project: string, messages: readonly string[]) => Promise<{ threadId: string; title: string } | 'absent' | 'unknown'>;
   lookup?: () => Promise<'live' | 'deleted' | 'unknown'>; skills?: string[]; during?: () => void; beforeLaunch?: (board: ReturnType<typeof createBoardState>) => void } = {}) {
   const board = createBoardState({ items: [], repos: [], modelChoices: [] } as unknown as BoardData);
   const reread = () => board.update({ items: recordItems(records, [], [WEB]).map((item) => {
@@ -549,6 +633,8 @@ function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids
     showThread: lookup, projectOf: async (repo) => { beforeLaunch(board); return { projectId: repo }; }, baseOf: async () => 'release', buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }), recoverThread: recover, skillsOf: () => skills, shapingThreadCleanupChoice: cleanupChoice,
     startThread: async (_project, message) => {
       during();
+      const answered = startAnswer();
+      if (answered) return answered;
       started.push(message);
       return { thread: { threadId: `thread-${started.length}`, title: 't' }, error: null };
     } });

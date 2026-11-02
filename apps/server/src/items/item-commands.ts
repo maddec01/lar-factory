@@ -399,6 +399,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       try { found = await recoverThread(projectId, intent.recovery?.message ? [intent.recovery.message] : messages, known); } catch { found = 'unknown'; }
       if (typeof found === 'object') {
         write(item.id, (revision) => records!.resolveLaunchIntent(item.id, revision, intent.intentId, { threadId: found.threadId }));
+        const saved = savedNeedsYou(records!.read(item.id), records!.observations(item.id));
+        if (saved.causes.some((cause) => cause.type === 'no-thread')) write(item.id, (revision) => records!.setNeedsYouCauses(item.id, revision, saved.causes.filter((cause) => cause.type !== 'no-thread'), { clearReason: saved.oldWording }));
         return { thread: found, error: null };
       }
       if (found === 'absent' && Date.now() - Date.parse(intent.requestedAt) >= SHOW_GRACE_MS) {
@@ -473,9 +475,18 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     write(item.id, (revision) => records!.setNeedsYouCauses(item.id, revision, left, { ...change, clearReason: change.clearReason || saved.oldWording }));
   }
 
+  /** Whether the item's notice is one Start again answers: a deleted thread, or a start T3 shows no thread for. */
+  const recovers = (item: Item) => !!item.needsYou?.deletedThread || !!item.needsYou?.causes.some((cause) => cause.type === 'no-thread');
+
+  /** Whether Start again starts a build: as its notice says, else as the last recorded thread did. */
+  const recoversBuild = (item: Item) => (item.needsYou?.startAgainPurpose ?? recordedThreads(item.id).at(-1)?.purpose) === 'build';
+
+  /** Only work with no recorded thread reads no threads, and the record may hold one the board hasn't read yet. Any other read that isn't a list may hide a live one, and so may a list without a recorded thread, as T3 leaves out only deleted threads. */
   function eligibleRecovery(item: Item): boolean {
-    return !!records && !!item.needsYou?.deletedThread && item.needsYou.offers.includes('start-again')
-      && Array.isArray(item.threads) && !item.threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren);
+    const { threads } = item;
+    return !!records && recovers(item) && item.needsYou!.offers.includes('start-again')
+      && (threads === undefined ? !recordedThreads(item.id).length : Array.isArray(threads) && !threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)
+        && recordedThreads(item.id).every(recorded => recorded.deletedAt || threads.some(t => t.id === recorded.threadId)));
   }
 
   async function cleanupSliceBranches(item: Item): Promise<string[]> {
@@ -502,7 +513,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const checkout = await checkoutOf(project.projectId);
     const snapshots = records.cleanupOwnership(item.id);
     const currentRecord = records.read(item.id);
-    if (item.needsYou?.deletedThread && recordedThreads(item.id).at(-1)?.purpose === 'build') {
+    if (recovers(item) && recoversBuild(item)) {
       snapshots.push({ branch: currentRecord.buildBranch || buildBranch(item), sliceIds: [], sliceBranches: await cleanupSliceBranches(item) });
     }
     const branches = [...new Set(snapshots.flatMap(snapshot => [snapshot.branch, ...snapshot.sliceBranches]).filter(Boolean))].filter(branch => !onlyBranch || branch === onlyBranch);
@@ -746,7 +757,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     async inspectRecovery(itemId) {
       const item = board.find(itemId);
       if (!item) return withBoard(404, { error: GONE });
-      if (!eligibleRecovery(item)) return withBoard(409, { error: 'This work has no eligible deleted thread.' });
+      if (!eligibleRecovery(item)) return withBoard(409, { error: 'This work offers no Start again.' });
       try {
         const inspection = await recoveryInspection(item);
         return withBoard(200, { inspection, choices: inspection.pr === 'open' ? ['continue'] : inspection.branchExists ? ['continue', 'new'] : ['new'] });
@@ -758,9 +769,9 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       const { branchChoice, confirmedOpenPr } = options as Record<string, unknown>;
       if (branchChoice !== undefined && branchChoice !== 'continue' && branchChoice !== 'new' || confirmedOpenPr !== undefined && typeof confirmedOpenPr !== 'boolean') return withBoard(422, { error: 'Invalid recovery options.' });
       const current = board.find(itemId);
-      const build = recordedThreads(itemId).at(-1)?.purpose === 'build';
+      const build = !!current && recoversBuild(current);
       return startOnce(build ? buildStarts : starts, build ? 'startedBuilds' : 'started', itemId, model, (item, choice) => {
-        if (!current || !eligibleRecovery(item)) return withBoard(409, { error: 'This work has no eligible deleted thread.' });
+        if (!current || !eligibleRecovery(item)) return withBoard(409, { error: 'This work offers no Start again.' });
         const blocked = blockedReply(item);
         if (blocked) return blocked;
         return async () => {

@@ -720,7 +720,7 @@ async function recoveryItem(build = true) {
   const id = 'I_sample05';
   const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
     ? { ...i, status: 'Review', threads: [],
-      needsYou: { reason: 'Deleted work thread', causes: [], ticketOpen: false, deletedThread: true, deletedThreadPurpose: build ? 'build' : 'shape', offers: ['start-again', 'back-to-list'] } } : i) };
+      needsYou: { reason: 'Deleted work thread', causes: [], ticketOpen: false, deletedThread: true, startAgainPurpose: build ? 'build' : 'shape', offers: ['start-again', 'back-to-list'] } } : i) };
   await mountPage(data);
   holdPosts(data);
   await openItem(id);

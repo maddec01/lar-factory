@@ -180,6 +180,17 @@ const TICKET_CLOSED = `Its ticket ${REPO}#12 closed in its provider.`;
 const NO_THREAD_NOW = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code.";
 const MISSING = `Its ticket ${REPO}#12 wasn't found in its provider, so the board set the work aside. Restore it from Settings › Archive once the ticket is back.`;
 
+test('a no-thread notice names the purpose of the start that failed, and other notices name none', async () => {
+  const records = await open();
+  const record = observedBuild(records, {});
+  const { record: asked, intent } = records.recordLaunchIntent(record.workId, record.revision, 'build');
+  const failed = records.resolveLaunchIntent(record.workId, asked.revision, intent.intentId, { failure: NO_THREAD_NOW }).record;
+  const waiting = records.setNeedsYouCauses(record.workId, failed.revision, [{ type: 'no-thread' }]);
+  assert.equal(noticeOf(records, record.workId)?.startAgainPurpose, 'build');
+  records.setNeedsYouCauses(record.workId, waiting.revision, [{ type: 'ticket-closed' }]);
+  assert.equal(noticeOf(records, record.workId)?.startAgainPurpose, undefined);
+});
+
 test('each cause decides the text and the exact offers of its notice', async () => {
   const moved = { type: 'assignee-changed', from: 'pedro', to: null } as const;
   const rows: [NeedsYouCause[], string, NeedsYouOffer[]][] = [

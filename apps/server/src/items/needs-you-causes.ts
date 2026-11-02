@@ -2,7 +2,7 @@
 // record saved before causes existed, the causes its old wording stands for.
 
 import type { Item, NeedsYouCause, NeedsYouOffer } from '@lar-factory/shared';
-import type { Observation, WorkRecord } from '@lar-factory/work-records';
+import type { LaunchIntent, Observation, WorkRecord } from '@lar-factory/work-records';
 
 export const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code.";
 
@@ -76,11 +76,15 @@ export function savedNeedsYou(record: WorkRecord, observations: readonly Observa
   return { causes, other: text, oldWording: false };
 }
 
-/** The notice of a record that waits on the user; undefined when it doesn't, as on Done work, whatever it saved. */
-export function needsYouNotice(record: WorkRecord, observations: readonly Observation[]): Item['needsYou'] {
+/**
+ * The notice of a record that waits on the user; undefined when it doesn't, as on Done work, whatever it saved.
+ * While it names no thread, Start again starts what the last failed of `launchIntents` asked for.
+ */
+export function needsYouNotice(record: WorkRecord, observations: readonly Observation[], launchIntents: () => readonly LaunchIntent[] = () => []): Item['needsYou'] {
   if (record.status === 'Done') return undefined;
   const { causes, other } = savedNeedsYou(record, observations);
   if (!causes.length && !other) return undefined;
+  const purpose = causes.some((cause) => cause.type === 'no-thread') ? launchIntents().filter((intent) => intent.outcome === 'failed').at(-1)?.purpose : undefined;
   return { reason: [...causesText(record, causes), ...other ? [other] : []].join(' '), offers: offersOf(causes), causes,
-    ticketOpen: observations.find((o) => o.of === 'ticket')?.state === 'open' };
+    ticketOpen: observations.find((o) => o.of === 'ticket')?.state === 'open', ...purpose && { startAgainPurpose: purpose === 'build' ? 'build' as const : 'shape' as const } };
 }

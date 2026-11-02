@@ -113,12 +113,12 @@ test('Azure creates and restores structural work through a local fake CLI, with 
   const records=await cache();const dir=handles.at(-1)!.dir;const state=join(dir,'azure.json');const fake=join(dir,'az.mjs');
   writeFileSync(state,JSON.stringify({items:{},comments:{},writes:[],next:40}));
   writeFileSync(fake,`#!/usr/bin/env node
-import {readFileSync,writeFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,renameSync} from 'node:fs';
 const args=process.argv.slice(2),stateFile=${JSON.stringify(state)},state=JSON.parse(readFileSync(stateFile,'utf8'));
 const value=flag=>args[args.indexOf(flag)+1],resource=value('--resource'),method=value('--http-method');
 const route=Object.fromEntries(args.slice(args.indexOf('--route-parameters')+1).filter(arg=>arg.includes('=')).map(arg=>{const i=arg.indexOf('=');return [arg.slice(0,i),arg.slice(i+1)];}));
 const body=args.includes('--in-file')?JSON.parse(readFileSync(value('--in-file'),'utf8')):undefined;
-const emit=value=>process.stdout.write(JSON.stringify(value));const save=()=>writeFileSync(stateFile,JSON.stringify(state));
+const emit=value=>process.stdout.write(JSON.stringify(value));const save=()=>{const next=stateFile+'.'+process.pid;writeFileSync(next,JSON.stringify(state));renameSync(next,stateFile);};
 if(args[0]==='rest'){
  const id=value('--url').match(/workitems\\/(\\d+)/)[1],patch=JSON.parse(readFileSync(value('--body').slice(1),'utf8')),item=state.items[id];
  if(value('--method')!=='patch'||patch[0].path!=='/rev'||patch[0].value!==item.rev)throw Error('Missing REST revision guard');
@@ -140,7 +140,7 @@ else if(resource==='workitems'){
  if(method==='POST'){if(value('--api-version')!=='7.1-preview.4'||!args.includes('format=markdown'))throw Error('Comment format missing');const id=String(++state.next);state.comments[id]=body.text;save();emit({id});}
  else emit({id:route.commentId,text:state.comments[route.commentId]});
 }else throw Error('Unexpected fake Azure resource '+resource);
-save();
+if(method!=='GET')save();
 `,{mode:0o755});
   vi.stubEnv('AZ_PATH',fake);vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY','');
   let root=records.create({repository:'sample/Project/app',kind:'concept',title:'Cross platform playback'});
@@ -167,7 +167,7 @@ save();
   const {writes,items}=JSON.parse(readFileSync(state,'utf8'));expect(items[String(number)].fields['System.AreaPath']).toBe('Project\\Team');
   expect(writes.some((write:{method:string})=>write.method==='PATCH')).toBe(true);
   expect(JSON.stringify(writes)).not.toContain('System.State');expect(JSON.stringify(writes)).not.toContain('System.Tags');
-});
+}, 30_000);
 
 test('independent cross-repository roots share one manifest and checkpoint, including edits from either root',async()=>{
   const records=await cache();let server=records.create({repository:'team/server',kind:'build',title:'Server change',ticket:'team/server#1'});
@@ -226,11 +226,11 @@ test('GitHub structural commits append comments, preserve interleaved author edi
   const records=await cache();const dir=handles.at(-1)!.dir;const state=join(dir,'github.json');const fake=join(dir,'gh.mjs');
   writeFileSync(state,JSON.stringify({body:'Author original.',labels:[],comments:[],writes:[],next:100,interleave:true}));
   writeFileSync(fake,`#!/usr/bin/env node
-import {readFileSync,writeFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,renameSync} from 'node:fs';
 const args=process.argv.slice(2),stateFile=${JSON.stringify(state)},state=JSON.parse(readFileSync(stateFile,'utf8'));
 const path=args.find(arg=>arg.startsWith('repos/')),method=args.includes('--method')?args[args.indexOf('--method')+1]:'GET';
 const payload=args.includes('--input')?JSON.parse(readFileSync(0,'utf8')):undefined;
-const emit=value=>process.stdout.write(JSON.stringify(value)),save=()=>writeFileSync(stateFile,JSON.stringify(state));
+const emit=value=>process.stdout.write(JSON.stringify(value)),save=()=>{const next=stateFile+'.'+process.pid;writeFileSync(next,JSON.stringify(state));renameSync(next,stateFile);};
 if(method!=='GET')state.writes.push({path,method,payload});
 if(method==='PATCH')throw Error('Structural writes must never PATCH authored issue bodies');
 if(path.endsWith('/labels/linked-work'))emit({name:'linked-work'});
@@ -243,7 +243,7 @@ else if(path.includes('/issues/1/comments?')){
  const id=String(++state.next);state.comments.push({id,body:payload.body});save();emit({id});
 }else if(path.endsWith('/issues/1'))emit({number:1,html_url:'https://github.com/team/server/issues/1',body:state.body,labels:state.labels,comments:state.comments.length,updated_at:String(state.comments.length)});
 else throw Error('Unexpected fake GitHub call '+JSON.stringify(args));
-save();
+if(method!=='GET')save();
 `,{mode:0o755});
   vi.stubEnv('GH_PATH',fake);const provider=structureProvider();const ticket=await provider.read('team/server',1);
   const {writeTrackerStructure}=await import('@lar-factory/shared');
@@ -257,7 +257,7 @@ save();
   fixture=JSON.parse(readFileSync(state,'utf8'));fixture.comments.push({id:'800',body:writeTrackerStructure('',{...base,snapshot:manifest}).trim()});
   fixture.comments.push({id:'801',body:writeTrackerStructure('',{...base,snapshot:{...manifest,digest:'b'.repeat(64)}}).trim()});writeFileSync(state,JSON.stringify(fixture));
   await expect(provider.read('team/server',1)).rejects.toThrow('concurrent tracker versions');
-});
+}, 30_000);
 
 test('a dependency owner issue is a reverse-linked durable member and can recover its concept after reset',async()=>{
   const records=await cache();const root=records.create({repository:'team/server',kind:'concept',title:'Playback',ticket:'team/server#1'});

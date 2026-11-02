@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'vite-plus/test';
@@ -10,14 +10,18 @@ const styles = fileURLToPath(new URL('../styles.css', import.meta.url));
 
 const load = async (css: string) => {
   const dir = await mkdtemp(join(tmpdir(), 'compiled-css-'));
-  await writeFile(join(dir, 'page.css'), css);
-  const plugin = compiledCss();
-  const context = { addWatchFile: () => {} };
-  const id = plugin.resolveId('./page.css?compiled', join(dir, 'page.ts'));
-  assert.ok(id !== undefined);
-  const code = await plugin.load.call(context, id);
-  assert.ok(code !== undefined);
-  return JSON.parse(code.replace(/^export default /, '').replace(/;$/, '')) as string;
+  try {
+    await writeFile(join(dir, 'page.css'), css);
+    const plugin = compiledCss();
+    const context = { addWatchFile: () => {} };
+    const id = plugin.resolveId('./page.css?compiled', join(dir, 'page.ts'));
+    assert.ok(id !== undefined);
+    const code = await plugin.load.call(context, id);
+    assert.ok(code !== undefined);
+    return JSON.parse(code.replace(/^export default /, '').replace(/;$/, '')) as string;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 };
 
 test('compiledCss turns a ?compiled CSS import into its CSS, with the tokens it imports', async () => {

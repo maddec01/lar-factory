@@ -12,13 +12,29 @@
    Doubt finding you can't fix.
 4. Read `lar-work gate <work ID>` after the final brief edit, then reread the
    brief and revision. If the refresh changed the reviewed text, review it
-   again. Record the passing gate with
-   `lar-work record-gate <work ID> --revision N --digest <briefDigest> --identity <approver> --evidence "<Doubt result and confirmed assumptions>"`.
-   Use the current revision and exact digest. The command rereads the ticket
-   again, so a stale revision or digest requires another read and review.
-   Eligible tickets queue the whole brief as Spec under the saved setting.
-   Gate evidence itself changes no Status. A failed write stays pending and
-   does not block Ready; report its error and the retry in item details.
+   again. Show the complete final brief and ask through
+   [Questions](shared/questions.md) whether it meets the user's expectations
+   and may be marked Ready. This checkpoint is required even with no remaining
+   assumptions or Doubt findings. Wait in Needs you for explicit approval of
+   this exact text. Silence is not approval. Feedback returns the item to
+   Shaping: revise, review and present the complete result again.
+
+   Retain the approved `briefDigest` and the explicit response for gate evidence.
+   Store this final approval only in gate evidence, never in the brief's
+   Confirmed section, as the question guide's exception requires. On resume,
+   reuse explicit approval of the unchanged digest from the thread or existing
+   gate evidence. A passing gate without that confirmation is insufficient.
+   Reshape requires a new final confirmation even when the text is unchanged.
+
+   After approval, refresh with `lar-work gate <work ID>` and reread the brief
+   and revision. A changed digest requires review and renewed confirmation.
+   Only for the unchanged approved digest, record the passing gate with
+   `lar-work record-gate <work ID> --revision N --digest <approved briefDigest> --identity <approver> --evidence "<explicit user approval of this digest, response reference, Doubt result and confirmed assumptions>"`.
+   The command rereads the ticket again. A stale revision or digest requires
+   another read; changed text requires review and renewed confirmation before
+   retrying. Eligible tickets queue the whole brief as Spec under the saved
+   setting. Gate evidence itself changes no Status. A failed write stays pending
+   and does not block Ready; report its error and the retry in item details.
 5. Set **Ready** on each build: this record if it's a build, and each build
    record made while shaping. Tell the user which builds are Ready and which
    work each waits on (`lar-work waiting-on`). This shaping thread is done.

@@ -1,12 +1,19 @@
 # 2. Size up
 
 
-Pick the route from the issue, code and existing project conventions. State what
-you understood, the repositories involved, open questions and the next shaping
-step in plain words. Continue within the user's request without asking them to
-approve the route. Ask only for missing decisions or an expansion of scope.
-Any issue can be shaped independently. Ready means refinement passed its gate;
-it commits the user to no build and starts no implementation.
+After reading the item and lightweight exploration, present the expected
+outcome, affected repositories, open questions or "none", and proposed next
+step in plain words. Ask the user to confirm or amend this understanding through
+[Questions](shared/questions.md). Wait for explicit confirmation before diagnosis,
+grilling, prototypes or brief drafting, even for a fully specified issue.
+Incorporate amendments and present the revised understanding for confirmation.
+Silence leaves the checkpoint pending in Needs you.
+
+On resume, reuse an explicit confirmation recorded in the thread or the brief's
+Confirmed section only when the proposed understanding is unchanged. Keep the
+confirmed understanding and the user's answer together for that comparison.
+Otherwise ask again. Ready commits the user to no build; Start build remains a
+separate user action.
 
 Record the kind (`bug`, `feature`, `improvement`, `concept`) with
 `lar-work update <work ID> --revision N --kind <kind>`, which stays local. Each

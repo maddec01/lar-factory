@@ -2,7 +2,7 @@
 
 Ask the user ordinary questions with the question UI (`AskUserQuestion`), so T3
 shows the thread as waiting for an unresolved decision: grilling rounds, the prototype pick,
-Gate assumptions, Doubt findings, Concepts,
+Size up confirmation, final brief approval, Gate assumptions, Doubt findings, Concepts,
 grill decisions, and the builder's stops. Retro picks and their
 clarifications use [chat](#retro-picks).
 If the tool is deferred, load it with `ToolSearch`; if it isn't available, ask
@@ -11,8 +11,9 @@ recommended answer. Separate questions with a horizontal rule. Word each so
 "yes" accepts the recommendation.
 
 Reuse answers and authorization already given. State routine shaping routes and
-implementation choices, then continue. Ask only for a missing decision, genuine
-conflict or expansion of scope. The saved sync choice needs no per-update prompt.
+implementation choices, then continue. The Size up and final brief checkpoints require explicit confirmation as
+lar-shape's Size up step and lar-shape's Gate step specify.
+Otherwise ask only for a missing decision, genuine conflict or expansion of scope. The saved sync choice needs no per-update prompt.
 
 Keep questions short. Use the issue title or ticket number only when context is
 needed. Local work IDs belong in commands and tool identifiers, never in the
@@ -20,12 +21,17 @@ question text shown to the user.
 
 Every ordinary question batch runs these once, however many calls it takes:
 
-1. Set **Needs you**, then make the calls; each blocks.
+1. Set **Needs you**, then make the calls. Wait for the answers before continuing,
+   including when the tool returns asynchronously. Silence never grants approval.
 2. After the last call, keep the answers for the record: a decision's answer
    body, or the brief's or map's **Confirmed** when you write them. Include
    Domain docs drafts only when that setting is ON; otherwise write "none".
    A whole gated brief reaches its ticket through the saved Spec setting, rather
    than separate question-and-answer comments.
+   Exception: final brief approval goes only in gate evidence bound to the
+   approved digest, per lar-shape's Gate step. Keep the response in the
+   thread until recording that gate; do not append it to Confirmed or otherwise
+   edit the approved brief to store the answer.
 3. Set the status back to the step's: Shaping while shaping, In progress or
    Review in a build.
 

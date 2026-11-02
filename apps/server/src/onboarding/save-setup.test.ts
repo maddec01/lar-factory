@@ -28,6 +28,15 @@ test('onboarding saves local settings, optional purpose and sharing on by defaul
   expect(readRepositorySetups(dir)[0]?.domainDocs).toEqual({ kind: 'off' });
 });
 
+test('onboarding with sync on and no mapping creates no labels', async (t) => {
+  const dir = await folder(t);
+  const created: string[] = [];
+  const reads: SaveReads = { ...allowed, createLabel: async (_repo, name) => { created.push(name); return name; } };
+  expect(await saveSetup({ ...answers, structureSync: true }, dir, reads)).toEqual({ onboarding: [] });
+  expect(readRepositorySetups(dir)[0]?.structureSync).toBe(true);
+  expect(created).toEqual([]);
+});
+
 test('onboarding persists each issue preference and defaults omitted preferences to on', async (t) => {
   const dir = await folder(t);
   await saveSetup(answers, dir, allowed);
@@ -109,6 +118,15 @@ test('onboarding refuses missing terms and unverified field access before persis
       { access: async () => ({}), vocabulary: vocabularyReads })).toMatchObject({ status: labels[0] === 'missing' ? 400 : 403 });
     expect(readRepositoryList(dir)).toEqual([]);
   }
+});
+
+test('onboarding refuses linked-work typed as a new label and saves nothing', async (t) => {
+  const dir = await folder(t);
+  const calls: string[] = [];
+  const reads: SaveReads = { ...allowed, vocabulary: { github: async (path) => path.includes('/labels') ? [] : { owner: { type: 'User' } }, azure: async () => ({ value: [] }) }, createLabel: async (_repo, name) => { calls.push(name); return name; } };
+  expect(await saveSetup({ ...answers, structureSync: false, newLabels: { bug: ['linked-work'] } }, dir, reads)).toEqual({ status: 409, error: "linked-work is reserved for the factory's saved links." });
+  expect(calls).toEqual([]);
+  expect(readRepositorySetups(dir)).toEqual([]);
 });
 
 test('explicit labels save with sharing off and failed creation saves no mapping', async (t) => {

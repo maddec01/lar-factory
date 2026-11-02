@@ -1,6 +1,7 @@
 import { expect, test } from 'vite-plus/test';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { BoardData } from '@lar-factory/shared';
 import { startBoard, writesRepository } from './server-support.ts';
 
 const repo = 'team/app';
@@ -34,6 +35,18 @@ test('Settings creates only explicitly saved labels and keeps its old mapping af
   expect(await readFile(join(board.dataDir, 'repository-settings.json'), 'utf8')).toBe(before);
 });
 
+test('renaming and deleting a mapped label changes the board row\'s mapping at once', async (t) => {
+  const board = await startBoard(t, { repositories: [repo], vocabulary: { ...choices, labels: ['bug', 'feature', 'triage'] } });
+  await board.post({ repo, change: 'vocabulary', key: 'improvement', value: { type: null, labels: ['triage', 'feature'] } }, board.url, '/api/repositories/settings');
+  const mapped = async (response: Response) => {
+    const { board: data } = await response.json() as { board: BoardData };
+    return data.repos.find((r) => r.repo === repo)?.setup?.vocabulary.improvement.labels;
+  };
+  const labels = (body: object) => board.post({ repo, ...body }, board.url, '/api/repositories/labels');
+  expect(await mapped(await labels({ change: 'update', name: 'triage', update: { name: 'sorting' } }))).toEqual(['sorting', 'feature']);
+  expect(await mapped(await labels({ change: 'delete', name: 'sorting' }))).toEqual(['feature']);
+});
+
 test('onboarding creates a typed label only on explicit save and refuses unverified Access', async (t) => {
   const board = await startBoard(t, { repositories: [], vocabulary: choices });
   const saved = await board.post({ ...answers, vocabulary: { bug: { type: null, labels: ['bug'] } }, newLabels: { bug: ['triage'] } }, board.url, '/api/onboarding/setup');
@@ -56,4 +69,21 @@ test('refused metadata reads expose their reason and still allow an explicit emp
   const forbidden = await board.post({ repo, change: 'vocabulary', key: 'feature', value: { type: 'Task', labels: [] } }, board.url, '/api/repositories/settings');
   expect(forbidden.status).toBe(400);
   expect((await board.calls()).filter(writesRepository)).toEqual([]);
+});
+
+test('Recheck finds label management for a saved setup that never had it, and onboarding saves it', async (t) => {
+  const board = await startBoard(t, { repositories: [repo], vocabulary: choices });
+  const file = join(board.dataDir, 'repository-settings.json');
+  const upgraded = JSON.parse(await readFile(file, 'utf8'));
+  delete upgraded.repositories[0].settings.access['manage-labels'];
+  await writeFile(file, JSON.stringify(upgraded));
+  const read = await board.post({ repo, change: 'discover-vocabulary' }, board.url, '/api/repositories/settings');
+  expect(await read.json()).toMatchObject({ setup: { access: { 'manage-labels': 'unverified' } } });
+  const rechecked = await board.post({ repo, change: 'recheck' }, board.url, '/api/repositories/settings');
+  expect(await rechecked.json()).toMatchObject({ setup: { access: { 'manage-labels': 'allowed' } } });
+
+  const fresh = await startBoard(t, { repositories: [], vocabulary: choices });
+  expect((await fresh.post(answers, fresh.url, '/api/onboarding/setup')).status).toBe(200);
+  const local = JSON.parse(await readFile(join(fresh.dataDir, 'repository-settings.json'), 'utf8'));
+  expect(local.repositories[0].settings.access['manage-labels']).toBe('allowed');
 });

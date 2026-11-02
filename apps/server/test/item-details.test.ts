@@ -7,7 +7,7 @@ import type { TestContext } from 'vite-plus/test';
 import { onboarded, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import type { ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
+import type { BoardData, ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
 
 const SAMPLE_DETAILS = JSON.parse(readFileSync(new URL(import.meta.resolve('@lar-factory/shared/test/sample-details.json')), 'utf8')) as Record<string, ItemDetails>;
 
@@ -163,6 +163,193 @@ test('sample mode saves no description', async (t) => {
   const board = await startBoard(t, {}, true);
   const response = await save(board, { itemId: 'I_sample13', body: 'x' });
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Saving descriptions is disabled in sample mode.' }]);
+});
+
+const labelWrite = (board: Board, body: object) => board.post(body, board.url, '/api/item-labels');
+const labelCalls = async (board: Board) => (await board.calls()).filter((args) => args[0] === 'api' && args[1] === '--method' && /\/issues\/12\/labels/.test(String(args[3])));
+
+/** A home with `tag-ticket` access `allowed` or refused on this repository. */
+function taggingHome(t: TestContext, allowed = true): Record<string, string> {
+  const home = mkdtempSync(join(tmpdir(), 'lar-board-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  const dir = join(home, 'Library/Application Support/Lar Factory');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory', settings: { access: { 'tag-ticket': allowed ? 'allowed' : 'refused' } } }] }));
+  return { HOME: home };
+}
+
+test('adding and removing a GitHub label each make one call, and the reply\'s row shows the change', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['docs'])] }, false, false, taggingHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const added = await labelWrite(board, { itemId: board.id(12), label: 'area-ui', action: 'add' });
+  const afterAdd = await added.json() as { error: string | null; board: BoardData };
+  assert.deepEqual([added.status, afterAdd.error, afterAdd.board.items[0]!.labels], [200, null, ['docs', 'status-list', 'area-ui']]);
+  const removed = await labelWrite(board, { itemId: board.id(12), label: 'docs', action: 'remove' });
+  const afterRemove = await removed.json() as { board: BoardData };
+  assert.deepEqual([removed.status, afterRemove.board.items[0]!.labels], [200, ['status-list', 'area-ui']]);
+  assert.deepEqual((await labelCalls(board)).map((args) => [args[2], args[3]]), [
+    ['POST', 'repos/maddec01/lar-factory/issues/12/labels'], ['DELETE', 'repos/maddec01/lar-factory/issues/12/labels/docs'],
+  ]);
+  // Records refresh from the tickets the board last read, so the change holds through them and the read after it.
+  await until(board, (d) => d.items[0]!.labels.join() === 'status-list,area-ui');
+});
+
+test('a failed label write answers the tracker\'s message and leaves the row as it was', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['docs'])], fail: 'ticket-labels' }, false, false, taggingHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const response = await labelWrite(board, { itemId: board.id(12), label: 'area-ui', action: 'add' });
+  assert.deepEqual([response.status, await response.json()], [502, { error: 'Could not change the labels on #12. gh failed: HTTP 403: Resource not accessible by integration' }]);
+  assert.deepEqual((await board.board() as BoardData).items[0]!.labels, ['docs', 'status-list']);
+});
+
+test('a label write refuses denied access and writes nothing', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, false, taggingHome(t, false));
+  await until(board, (d) => d.items.length === 1);
+  const response = await labelWrite(board, { itemId: board.id(12), label: 'area-ui', action: 'add' });
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Access to tag-ticket was refused. Recheck access in Settings.' }]);
+  assert.deepEqual(await labelCalls(board), []);
+});
+
+test('a label write refuses a managed label, an unknown item and a bad body', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, false, taggingHome(t));
+  await until(board, (d) => d.items.length === 1);
+  const managed = await labelWrite(board, { itemId: board.id(12), label: 'Linked-Work', action: 'add' });
+  assert.deepEqual([managed.status, await managed.json()], [422, { error: 'The factory manages Linked-Work, so it can\'t be changed here.' }]);
+  const unknown = await labelWrite(board, { itemId: 'I_nope', label: 'docs', action: 'add' });
+  assert.deepEqual([unknown.status, await unknown.json()], [404, { error: 'That item is not on the board.' }]);
+  for (const body of [{ label: 'docs', action: 'add' }, { itemId: board.id(12), action: 'add' }, { itemId: board.id(12), label: '', action: 'add' }, { itemId: board.id(12), label: 'docs', action: 'set' }]) {
+    const bad = await labelWrite(board, body);
+    assert.deepEqual([bad.status, await bad.json()], [400, { error: 'Name the item, the label and whether to add or remove it.' }], JSON.stringify(body));
+  }
+  assert.deepEqual(await labelCalls(board), []);
+});
+
+test('a label write refuses a label mapped to the item\'s kind, which follows the kind', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['bug'])], vocabulary: { labels: ['type: bug'], types: [] } }, false, false, taggingHome(t));
+  await onboarded(board);
+  const { kind } = (await until(board, (d) => d.items.length === 1)).items[0]!;
+  assert.equal(kind, 'bug');
+  const mapped = await board.post({ repo: 'maddec01/lar-factory', change: 'vocabulary', key: 'bug', value: { type: null, labels: ['type: bug'] } }, board.url, '/api/repositories/settings');
+  assert.equal(mapped.status, 200);
+  const response = await labelWrite(board, { itemId: board.id(12), label: 'Type: Bug', action: 'remove' });
+  assert.deepEqual([response.status, await response.json()], [422, { error: 'Type: Bug follows this item\'s kind, so it can\'t be changed here.' }]);
+  assert.deepEqual(await labelCalls(board), []);
+});
+
+test('the picker reads the tracker\'s labels without the managed ones, and a failed read says why', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], vocabulary: { labels: ['docs', 'bug', 'linked-work', 'status-x', 'area-ui'], types: [] } }, false, false, taggingHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const read = await fetch(`${board.url}/api/item-labels?itemId=${board.id(12)}`);
+  assert.deepEqual([read.status, await read.json()], [200, { labels: [{ name: 'docs' }, { name: 'area-ui' }] }]);
+  const missing = await fetch(`${board.url}/api/item-labels?itemId=I_nope`);
+  assert.deepEqual([missing.status, await missing.json()], [404, { error: 'That item is not on the board.' }]);
+  assert.equal((await fetch(`${board.url}/api/item-labels`)).status, 400);
+});
+
+test('a GitHub label may hold a separator, and the route refuses a managed name in any case', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['docs'])] }, false, false, taggingHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  assert.equal((await labelWrite(board, { itemId: board.id(12), label: 'area, web', action: 'add' })).status, 200);
+  assert.equal((await labelWrite(board, { itemId: board.id(12), label: 'LINKED-WORK', action: 'add' })).status, 422);
+  assert.equal((await labelWrite(board, { itemId: board.id(12), label: 'repo-web', action: 'add' })).status, 200);
+});
+
+test('sample mode changes no labels', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const response = await labelWrite(board, { itemId: 'I_sample13', label: 'docs', action: 'add' });
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Changing labels is disabled in sample mode.' }]);
+});
+
+/** A home where this repository maps Bug and Feature, with `access` to label and type its tickets. */
+function mappedHome(t: TestContext, access: object = { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' }): Record<string, string> {
+  const home = taggingHome(t);
+  writeFileSync(join(home.HOME!, 'Library/Application Support/Lar Factory/repository-settings.json'), JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory', settings: { access,
+    overrides: { vocabulary: { bug: { type: 'Bug', labels: ['type: bug'] }, feature: { type: 'Feature', labels: ['type: feature'] } } } } }] }));
+  return home;
+}
+const kindWrite = (board: Board, body: object) => board.post(body, board.url, '/api/item-kind');
+const kindItem = (board: BoardData, id: string) => board.items.find((i) => i.id === id)!;
+
+test('changing a kind swaps the ticket through the tracker, and the reply and later reads keep the new kind', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug', 'docs'])] }, false, false, mappedHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const id = board.id(12);
+  const reply = await kindWrite(board, { itemId: id, kind: 'feature' });
+  const body = await reply.json() as { error: string | null; line: string; itemId: string; board: BoardData };
+  assert.equal(reply.status, 200, body.error ?? '');
+  assert.equal(body.line, '#12: added label type: feature; removed label type: bug; type none to Feature.');
+  const shown = kindItem(body.board, body.itemId);
+  assert.equal(shown.kind, 'feature');
+  assert.deepEqual(shown.labels.filter((l) => l !== 'status-list').sort(), ['docs', 'type: feature']);
+  await until(board, (d) => d.items[0]!.labels.includes('type: feature') && d.items[0]!.kind === 'feature');
+  assert.ok((await board.calls()).some((args) => args[2] === 'PATCH' && args[3] === 'repos/maddec01/lar-factory/issues/12'));
+});
+
+test('Update ticket clears the disagreement in the reply, and later reads keep it clear', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug', 'docs'])] }, false, false, mappedHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const first = await (await kindWrite(board, { itemId: board.id(12), kind: 'feature' })).json() as { itemId: string; board: BoardData };
+  assert.equal(kindItem(first.board, first.itemId).kindDisagreement, undefined);
+  await until(board, (d) => d.items[0]!.labels.includes('type: feature'));
+  assert.equal(kindItem(await board.board() as BoardData, first.itemId).kindDisagreement, undefined);
+});
+
+test('without access the item keeps its new kind and the board shows the disagreement, until Keep answers it', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug'])] }, false, false, mappedHome(t, { 'tag-ticket': 'refused', 'type-ticket': 'allowed' }));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const changed = await (await kindWrite(board, { itemId: board.id(12), kind: 'feature' })).json() as { itemId: string; board: BoardData };
+  const { kindDisagreement } = kindItem(changed.board, changed.itemId);
+  assert.deepEqual(kindDisagreement, { ticketKind: 'bug', changed: 'item', kept: false, swap: { add: ['type: feature'], remove: ['type: bug'], type: { from: null, to: 'Feature' } } });
+  const kept = await board.post({ itemId: changed.itemId, answer: 'keep', ticketKind: 'bug' }, board.url, '/api/item-kind-answer');
+  assert.equal(kept.status, 200);
+  assert.equal(kindItem((await kept.json() as { board: BoardData }).board, changed.itemId).kindDisagreement?.kept, true);
+});
+
+test('a failed type write keeps the old kind and says what changed', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug'])], fail: 'ticket-type' }, false, false, mappedHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const before = kindItem(await board.board() as BoardData, board.id(12)).kind;
+  const failed = await kindWrite(board, { itemId: board.id(12), kind: 'feature' });
+  const body = await failed.json() as { error: string; line: string; itemId: string; board: BoardData };
+  assert.equal(failed.status, 502);
+  assert.match(body.error, /^Could not finish changing #12 to Feature\./);
+  assert.equal(body.line, '#12: added label type: feature; removed label type: bug.');
+  assert.equal(kindItem(body.board, body.itemId).kind, before);
+});
+
+test('without access only the item changes, and the reply says so', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List', undefined, ['type: bug'])] }, false, false, mappedHome(t, { 'tag-ticket': 'refused', 'type-ticket': 'allowed' }));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  const reply = await kindWrite(board, { itemId: board.id(12), kind: 'feature' });
+  const body = await reply.json() as { line: string; itemId: string; board: BoardData };
+  assert.equal(reply.status, 200);
+  assert.match(body.line, /^This item is now Feature\. Its ticket stays as it is: Access to tag-ticket was refused/);
+  assert.equal(kindItem(body.board, body.itemId).kind, 'feature');
+  assert.deepEqual(await labelCalls(board), []);
+});
+
+test('a kind change refuses a kind details doesn\'t offer and an item the board doesn\'t hold', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, false, mappedHome(t));
+  await onboarded(board);
+  await until(board, (d) => d.items.length === 1);
+  assert.equal((await kindWrite(board, { itemId: board.id(12), kind: 'concept' })).status, 422);
+  assert.equal((await kindWrite(board, { itemId: 'I_nope', kind: 'bug' })).status, 404);
+  assert.equal((await kindWrite(board, { kind: 'bug' })).status, 400);
+});
+
+test('sample mode changes no kinds', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const response = await kindWrite(board, { itemId: 'I_sample13', kind: 'bug' });
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Changing kinds is disabled in sample mode.' }]);
 });
 
 test('sample mode exports nothing', async (t) => {

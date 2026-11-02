@@ -9,8 +9,8 @@ const REFUSED = 'Submit from the board app.';
 /** Every write http.ts guards. */
 const GUARDED = ['/api/pr-readiness', '/api/items', '/api/pick-ticket', '/api/attach-ticket', '/api/queue', '/api/back-to-list', '/api/start',
   '/api/start-build', '/api/arm', '/api/disarm', '/api/abandon', '/api/close-ticket', '/api/restore', '/api/retention', '/api/needs-you',
-  '/api/item-description', '/api/item-export', '/api/onboarding/projects', '/api/onboarding/repositories', '/api/onboarding/detect',
-  '/api/onboarding/setup', '/api/repositories/settings', '/api/t3/reauthorize', '/api/recheck'];
+  '/api/item-description', '/api/item-labels', '/api/item-kind', '/api/item-kind-answer', '/api/item-export', '/api/onboarding/projects', '/api/onboarding/repositories', '/api/onboarding/detect',
+  '/api/onboarding/setup', '/api/repositories/settings', '/api/repositories/labels', '/api/t3/reauthorize', '/api/recheck'];
 
 const post = (board: Board, path: string, headers: Record<string, string> = {}) => fetch(`${board.url}${path}`, {
   method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json', ...headers }, body: '{}' });

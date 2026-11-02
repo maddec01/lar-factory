@@ -2,6 +2,8 @@
 // and people, which the board-wide read leaves out. The item's labels, parent, linked PRs, slices, blockers and update
 // time stay on the board's `Item`.
 
+import type { KindTicketSwap } from './kind-disagreement.ts';
+import type { SwapKind } from './managed-labels.ts';
 import type { IssueRef } from './model.ts';
 
 /** How a body or comment is written: GitHub's are markdown, an Azure DevOps field is markdown or HTML. */
@@ -60,6 +62,8 @@ export interface ItemDetails {
     originalFormat: TextFormat;
     held: { title: string; body: string } | null;
   };
+  /** What updating the ticket to the item's kind writes now, for a disagreement where the item changed, what it leaves alone and why, and the two kinds it was read for. */
+  kindPlan?: { itemKind: SwapKind; ticketKind: SwapKind | null; swap: KindTicketSwap; note: string };
   /** The ticket's description; empty when there is none. */
   body: string;
   format: TextFormat;

@@ -66,7 +66,8 @@ tags, assignee and iteration, using the team's default area. Only title,
 repository and kind are required. Kind mappings fill labels and type; the other
 fields start empty. Fields without write Access are hidden and omitted.
 Optional vocabulary mappings allow none, suggest existing same-name labels and
-create typed labels only when saved. Skipping that step creates no labels.
+create typed labels only when saved. Onboarding folds them into an optional
+section, and leaving it closed creates no labels.
 
 An unreadable options list still allows title and description; Azure requires a
 readable backlog type. A failed create keeps the draft open and adds nothing to

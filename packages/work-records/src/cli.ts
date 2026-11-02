@@ -7,9 +7,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
+import { changeKind, checkKind } from './change-kind.ts';
 import { createRecordTicket } from './create-ticket.ts';
-import { isRecord } from '@lar-factory/shared';
-import type { Status } from '@lar-factory/shared';
+import { isRecord, sameRepo } from '@lar-factory/shared';
+import type { Status, SwapKind } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
 import { syncStructures } from './tracker-sync.ts';
@@ -35,6 +36,10 @@ Reads
   context <work-id>                 Print the markdown the record began with.
   list [--repository R] [--status S] [--kind K]
                                     Print matching records, Queued ones in Queue order.
+  kind-disagreement <work-id>       Read the ticket and print {disagreement}, null when
+                                    the board would show none: ticketKind (null for none),
+                                    changed, kept, the swap change-kind would make, its
+                                    note, and accessProblem when this login can't make it.
 
 Changes
   Each change except create and import needs --revision, the revision you last
@@ -49,6 +54,21 @@ Changes
                                     none does. Repeating it never makes a second one
                                     and never changes the title or initial context.
   update <work-id> --revision N [--status S] [--kind K]
+                                    Changes the record alone. --kind writes nothing to
+                                    the ticket; change-kind does.
+  change-kind <work-id> --revision N --kind bug|feature|improvement
+                                    Give the record this kind and swap it on its ticket,
+                                    as item details does: it removes the other kinds'
+                                    mapped labels and the kind names, and adds the new
+                                    kind's mapped labels and type. Without access for a
+                                    write it needs, only the record changes. If a write
+                                    fails, the record keeps its kind and the error says
+                                    what changed; run it again to finish. Only change a
+                                    ticket when the user said yes.
+  record-kind-answer <work-id> --revision N --answer keep|update
+                     --ticket-kind bug|feature|improvement|none
+                                    Record the user's answer about the record's kind
+                                    and the ticket's. Changing the record's kind drops it.
   attach-ticket <work-id> --revision N --ticket T
   create-ticket <work-id> --revision N --request-id ID [--retro]
                                     Create and attach an issue, keeping the work ID.
@@ -289,7 +309,7 @@ Errors
 
 class UsageError extends Error {}
 
-const TAKES_WORK_ID = ['create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
+const TAKES_WORK_ID = ['kind-disagreement', 'change-kind', 'record-kind-answer', 'create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
   'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
   'review-rounds', 'observe', 'observe-failure', 'observations', 'confirm-thread-deleted', 'set-build-branch', 'invalidate-gate', 'reset-build', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
@@ -344,6 +364,8 @@ const OPTIONS = {
   'data-dir': { type: 'string' },
   'request-id': { type: 'string' },
   retro: { type: 'boolean' },
+  answer: { type: 'string' },
+  'ticket-kind': { type: 'string' },
   help: { type: 'boolean' },
 } as const;
 
@@ -407,6 +429,7 @@ async function run(records: WorkRecords, command: string, workId: string | undef
   const revision = () => Number(need(values, 'revision'));
   const status = values.status as Status | undefined;
   const kind = values.kind as WorkKind | undefined;
+  const setupOf = (repository: string) => readRepositorySetups(values['data-dir']).find((setup) => sameRepo(setup.repo, repository));
   const captured = () => ({
     title: need(values, 'title'), repository: need(values, 'repository'), kind: need(values, 'kind') as WorkKind, status,
     context: values.file === undefined ? undefined : readInput(values),
@@ -448,6 +471,20 @@ async function run(records: WorkRecords, command: string, workId: string | undef
       return records.list({ repository: values.repository, status, kind });
     case 'update':
       return records.update(workId!, revision(), { status, kind });
+    case 'kind-disagreement': {
+      const record = records.read(workId!);
+      return { disagreement: await checkKind(record, { setup: setupOf(record.repository) }) };
+    }
+    case 'change-kind': {
+      const record = records.read(workId!);
+      const result = await changeKind(records, workId!, revision(), need(values, 'kind') as SwapKind, { setup: setupOf(record.repository) });
+      if (result.error) throw new WorkRecordError('invalid', result.line ? `${result.error} Changed so far: ${result.line}` : result.error);
+      return { record: result.record, line: result.line };
+    }
+    case 'record-kind-answer': {
+      const ticketKind = need(values, 'ticket-kind');
+      return records.recordKindAnswer(workId!, revision(), { answer: need(values, 'answer') as 'keep' | 'update', ticketKind: ticketKind === 'none' ? null : ticketKind as WorkKind });
+    }
     case 'attach-ticket':
       return records.attachTicket(workId!, revision(), need(values, 'ticket'));
     case 'set-aside':

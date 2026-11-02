@@ -1,24 +1,25 @@
 // The repository editor keeps all settings on this machine.
 import type { ReactNode } from 'react';
-import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, type OperationAccess, type RepositoryOperation, type RepositorySetup } from '@lar-factory/shared';
+import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, trackerCapabilities, type OperationAccess, type RepositoryOperation, type RepositorySetup } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
-import { NativeSelect } from '@lar-factory/ui/native-select';
+import { FormSelect } from '@lar-factory/ui/form-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { canSave, shownDrafts, useEditStore, type Drafts, type DraftSetting } from './edit-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { EditVocabulary } from './vocabulary-editor.tsx';
 import { IssueDefaults } from './issue-defaults.tsx';
+import { LabelsSection } from './labels-section.tsx';
 
 const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: 'Refused', unverified: 'Not checked yet' };
 
-const OPERATIONS = (azure: boolean): Record<RepositoryOperation, string> => ({
+const OPERATIONS = (azure: boolean, labels: string): Record<RepositoryOperation, string> => ({
   'push-branch': 'Push branches', 'open-pr': 'Open PRs', 'edit-ticket': azure ? 'Edit work items' : 'Edit issues',
-  'publish-ticket': azure ? 'Create work items' : 'Create issues', 'tag-ticket': azure ? 'Set tags' : 'Set labels',
+  'publish-ticket': azure ? 'Create work items' : 'Create issues', 'tag-ticket': `Set ${labels}`, 'manage-labels': `Manage ${labels}`,
   'comment-ticket': 'Post comments', 'type-ticket': azure ? 'Set work item types' : 'Set issue types', 'relate-ticket': 'Set relationships',
 });
 
@@ -48,8 +49,8 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
   const { typed, running, type } = useEditStore();
   const drafts = shownDrafts(setup, typed);
   const azure = onAzure(repo);
-  const text = (field: keyof Drafts, label: string, placeholder?: string) => (
-    <Input aria-label={label} placeholder={placeholder} value={drafts[field]} disabled={running !== null} onChange={(e) => type(field, e.target.value)} />
+  const text = (field: keyof Drafts, label: string) => (
+    <Input aria-label={label} value={drafts[field]} disabled={running !== null} onChange={(e) => type(field, e.target.value)} />
   );
   return (
     <fieldset className="m-0 grid min-w-0 gap-5 border-0 p-0">
@@ -59,14 +60,10 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
       <Setting repo={repo} setup={setup} settingKey="itemSource" name="Work to read">
         {azure ? text('team', 'Team') : <p className="m-0 text-xs text-base-700">This repository's GitHub issues.</p>}
       </Setting>
-      <Setting repo={repo} setup={setup} settingKey="labels" name={azure ? 'Custom tags' : 'Custom labels'} hint="Separate them with commas.">
-        {text('labels', azure ? 'Custom tags' : 'Custom labels', 'area: server, area: web')}
-      </Setting>
+      <LabelsSection key={repo} repo={repo} setup={setup} />
       <Setting repo={repo} setup={setup} settingKey="domainDocs" name="Glossary and decisions" hint="Choose whether builds include domain docs in their PRs.">
-        <NativeSelect aria-label="Domain docs" value={drafts.domainDocs} disabled={running !== null} onChange={(e) => type('domainDocs', e.target.value)}>
-          <option value="off">Off</option>
-          <option value="repository">Write in build PRs</option>
-        </NativeSelect>
+        <FormSelect aria-label="Domain docs" value={drafts.domainDocs} disabled={running !== null} onChange={(value) => type('domainDocs', value)}
+          choices={[{ value: 'off', name: 'Off' }, { value: 'repository', name: 'Write in build PRs' }]} />
         {drafts.domainDocs === 'repository' && <span className="grid gap-2 sm:grid-cols-2">{text('glossary', 'Glossary path')}{text('adrs', 'ADR folder')}</span>}
       </Setting>
       <Setting repo={repo} setup={setup} settingKey="skills" name="Project skills" hint="Coding guidance for builds. Separate them with commas.">
@@ -78,7 +75,7 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
 
 function Access({ repo, setup }: { repo: string; setup: RepositorySetup }) {
   const { running, recheck } = useEditStore();
-  const names = OPERATIONS(onAzure(repo));
+  const names = OPERATIONS(onAzure(repo), trackerCapabilities(repo).heading.toLowerCase());
   return <details className="rounded-lg border p-3" data-access>
     <summary className="cursor-pointer text-sm font-medium">Access</summary>
     <ul className="m-0 mt-3 grid list-none gap-2 p-0 text-sm">

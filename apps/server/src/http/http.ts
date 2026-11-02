@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type SetupDetection } from '@lar-factory/shared';
+import { kindLabels, pageWithData, sameRepo, trackerCapabilities, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type LabelChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type TrackerLabel, type SetupDetection } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/editable-repository.ts';
 import type { Capture } from '../items/capture.ts';
@@ -38,6 +38,9 @@ export interface HttpDeps {
   recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
   /** Reads one item's details and older comments for the item dialog, and exports its record's markdown. */
   itemDetails: ItemDetailsReader;
+  /** Shows a label change the tracker took on the item's row, before the next read reports it. */
+  showLabelChange(item: Item, change: LabelChange): void;
+  showTicketType(item: Item, type: string): void;
   /**
    * Reads the source listing the item at `url` now, or once more after the running read; with no url, loads the
    * repositories' configs again and reads every source.
@@ -57,6 +60,7 @@ export interface HttpDeps {
   saveSetup(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
   /** Sets or removes a local override, accepts a changed setup or rechecks access for the body's repository, answering its setup, or why it can't. */
   changeRepositorySettings(input: Record<string, unknown>): Promise<{ setup: RepositorySetup } | Refused>;
+  changeRepositoryLabels(input: Record<string, unknown>): Promise<{ labels?: TrackerLabel[]; setups?: RepositorySetup[] } | Refused>;
 }
 
 export interface BoardServer {
@@ -131,8 +135,8 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  detectSetup, saveSetup, changeRepositorySettings }: HttpDeps): BoardServer {
+export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectChoices, keepOnboarding, createProject,
+  detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -288,6 +292,42 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         return refused ? { status: refused.status, body: { error: refused.error } } : { status: 200, body: { error: null } };
       },
     },
+    '/api/item-labels': {
+      what: 'the label to change and its item', disabled: 'Changing labels is disabled in sample mode.',
+      async run({ itemId, label, action }) {
+        if (typeof itemId !== 'string' || !itemId || typeof label !== 'string' || !label || (action !== 'add' && action !== 'remove')) return { status: 400, body: { error: 'Name the item, the label and whether to add or remove it.' } };
+        const item = board.snapshot().items.find((i) => i.id === itemId);
+        if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+        const setup = board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
+        const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {});
+        if (problem) return { status: 403, body: { error: problem } };
+        if (trackerCapabilities(item.repo).isManaged(label)) return { status: 422, body: { error: `The factory manages ${label}, so it can't be changed here.` } };
+        if (kindLabels(item.kind, setup?.vocabulary).includes(label.toLowerCase())) return { status: 422, body: { error: `${label} follows this item's kind, so it can't be changed here.` } };
+        const change: LabelChange = { label, action };
+        const refused = await itemDetails.changeLabels(item, change);
+        if (refused) return { status: refused.status, body: { error: refused.error } };
+        showLabelChange(item, change);
+        readSoon(item.url ?? undefined);
+        return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+    '/api/item-kind': {
+      what: 'the kind and its item', disabled: 'Changing kinds is disabled in sample mode.',
+      async run({ itemId, kind }) {
+        if (typeof itemId !== 'string' || !itemId) return { status: 400, body: { error: 'Name the item and its new kind.' } };
+        const { status, body, labelChanges, ticketType } = await commands.changeKind(itemId, kind);
+        const shown = board.snapshot().items.find((i) => i.id === ('itemId' in body ? body.itemId : itemId));
+        if (shown) for (const change of labelChanges) showLabelChange(shown, change);
+        if (shown && ticketType) showTicketType(shown, ticketType);
+        // A failure can have changed the ticket too, so the read runs either way. Local work has no ticket to read.
+        if (shown?.url) readSoon(shown.url);
+        return { status, body: withBoard(body) };
+      },
+    },
+    '/api/item-kind-answer': {
+      what: 'the item and the answer', disabled: 'Answering is disabled in sample mode.',
+      run: forItem('Name the item and the answer.', (itemId, { answer, ticketKind }) => commands.answerKind(itemId, answer, ticketKind)),
+    },
     '/api/item-export': {
       what: 'the item to export', disabled: 'Exporting is disabled in sample mode.',
       run: forItem('Name the item to export.', async (itemId) => {
@@ -351,6 +391,18 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         changeRow(input.repo as string, (r) => ({ ...r, setup: changed.setup }));
         readSoon();
         return { status: 200, body: withBoard({ ...changed, error: null }) };
+      },
+    },
+    // The tracker holds the labels, so a change shows on rows at the read it starts.
+    '/api/repositories/labels': {
+      what: 'the repository and the change to its labels', disabled: 'Sample mode reads and changes no labels.',
+      async run(input) {
+        const changed = await changeRepositoryLabels(input);
+        if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
+        if (input.change === 'list') return { status: 200, body: { ...changed, error: null } };
+        for (const setup of changed.setups ?? []) changeRow(setup.repo, (r) => ({ ...r, setup }));
+        readSoon();
+        return { status: 200, body: withBoard({ error: null }) };
       },
     },
     // Looks the tools up again for the notices' Recheck button and onboarding's detection.
@@ -443,6 +495,17 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     } catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
   }
 
+  /** Answers the labels the item dialog's picker offers, which it reads each time it opens. */
+  async function itemLabelsRequest(url: URL, res: ServerResponse): Promise<void> {
+    const itemId = url.searchParams.get('itemId');
+    if (!itemId) return json(res, 400, { error: 'Name the item whose labels to read.' });
+    const item = board.snapshot().items.find((i) => i.id === itemId);
+    if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+    const read = await itemDetails.labels(item);
+    if ('error' in read) json(res, read.status, { error: read.error });
+    else json(res, 200, read);
+  }
+
   /** Answers the next 10 older comments of one item, which the item dialog reads on "Load 10 more". */
   async function itemCommentsRequest(url: URL, res: ServerResponse): Promise<void> {
     const itemId = url.searchParams.get('itemId');
@@ -518,6 +581,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     if (path === '/api/onboarding/projects') return projectsRequest(res);
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
+    if (path === '/api/item-labels') return itemLabelsRequest(url, res);
     if (path === '/api/ticket-preview') {
       if (sample) return json(res, 403, { error: 'Creating issues is disabled in sample mode.' });
       const result = await capture.ticketPreview(url.searchParams.get('itemId') ?? '');

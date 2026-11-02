@@ -22,7 +22,11 @@ type Submission =
 export type AddItemPane = 'new' | 'pick';
 
 /** The form's values as last edited, which a closed dialog keeps for the next opening. */
-export interface DraftValues { repo: string; kind: string; title: string; description: string; createIssue?: boolean; options?: TicketOptions }
+export interface DraftValues {
+  repo: string; kind: string; title: string; description: string; createIssue?: boolean; options?: TicketOptions;
+  /** Create issue as this item changed it; absent while it follows the repository's default. */
+  createChoice?: boolean;
+}
 
 interface AddItemState {
   open: boolean;

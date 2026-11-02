@@ -1,7 +1,7 @@
 // The Add item dialog: the New work form and each phase of a submission, and the Pick a ticket pane.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
+import { $, $$, addStylesheet, chooseOption, fetchMock, formValue, mountPage, openOptions, push, sample, settle, text } from '../../test/support.ts';
 import { pastePlain, selectEnd, typeInto } from '../../test/editor.ts';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -26,17 +26,15 @@ async function open(data: BoardData = withFactory): Promise<void> {
   await settle(() => vi.advanceTimersByTime(50));
 }
 
-/** Sets a field's value the way typing or picking does, so React hears it. A pick in a select fires
- * `input`, then `change` in a later task, so a re-render between them shows. */
-async function enter(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): Promise<void> {
+/** Sets a field's value the way typing does, so React hears it. */
+async function enter(el: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
   const proto = Object.getPrototypeOf(el) as object;
   Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value);
   await settle(() => el.dispatchEvent(new Event('input', { bubbles: true })));
-  if (el instanceof HTMLSelectElement) await settle(() => el.dispatchEvent(new Event('change', { bubbles: true })));
 }
 
 async function fillDraft(): Promise<void> {
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await chooseOption(field('item-kind'), 'Bug');
   await enter(field('item-title'), 'Playback stalls');
   await typeInto(editorArea(), 'After a seek.');
 }
@@ -50,10 +48,11 @@ test('Add item opens a dialog with the configured repositories and kinds, and no
   expect(popup.getAttribute('role')).toBe('dialog');
   expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Add item');
   expect(document.activeElement, 'focus starts on the title').toBe(field('item-title'));
-  expect($$<HTMLOptionElement>('#item-repo option').map((o) => [o.value, o.textContent])).toEqual([
-    ['maddec01/lar-server', 'lar-server'], ['maddec01/lar-apple', 'lar-apple'], ['maddec01/lar-factory', 'lar-factory'],
-    ['maddec01/lar-empty', 'lar-empty']]);
-  expect($$<HTMLOptionElement>('#item-kind option').map((o) => o.value)).toEqual(['', 'bug', 'feature', 'improvement']);
+  expect(await openOptions(field('item-repo'))).toEqual(['lar-server', 'lar-apple', 'lar-factory', 'lar-empty']);
+  await chooseOption(field('item-repo'), 'lar-server');
+  expect(await openOptions(field('item-kind'))).toEqual(['Bug', 'Feature', 'Improvement']);
+  await settle(() => $('[role="listbox"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  field('item-title').focus();
   expect(field('item-title').getAttribute('aria-label')).toBe('Title');
   expect(field('item-title').required).toBe(true);
   expect(editorArea().getAttribute('aria-label')).toBe('Description');
@@ -70,14 +69,14 @@ test('the side panel heads Repository and Kind in small uppercase labels, beside
   const labels = [...panel.querySelectorAll<HTMLLabelElement>(':scope > div > label')];
   expect(labels.filter(l => l.htmlFor).map((l) => [l.htmlFor, l.textContent])).toEqual([['item-repo', 'Repository'], ['item-kind', 'Kind']]);
   expect(labels.filter(l => l.htmlFor).every((l) => l.classList.contains('uppercase'))).toBe(true);
-  expect(field('item-repo').tagName).toBe('SELECT');
-  expect(field('item-kind').tagName).toBe('SELECT');
+  expect(field('item-repo').getAttribute('role')).toBe('combobox');
+  expect(field('item-kind').getAttribute('role')).toBe('combobox');
   expect(panel.contains(field('item-title')) || panel.contains(editorArea()), 'the title and editor sit left of it').toBe(false);
 });
 
 test.each([['- a\nb', '- a\n- b'], ['1. a\nb', '1. a\n2. b'], ['# h', '# h']])('typing %j in the description creates the item with %j', async (typed, body) => {
   await open();
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await chooseOption(field('item-kind'), 'Bug');
   await enter(field('item-title'), 'Playback stalls');
   await typeInto(editorArea(), typed);
   respond({ item: null, error: null }, 500);
@@ -93,7 +92,7 @@ test('a description typed in Add item survives closing and reopening it', async 
   expect(dialog()).toBeNull();
   await settle(() => addButton().click());
   expect([...editorArea().querySelectorAll('ul > li')].map((li) => li.textContent)).toEqual(['a', 'b']);
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await chooseOption(field('item-kind'), 'Bug');
   await enter(field('item-title'), 'Playback stalls');
   respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
@@ -114,7 +113,7 @@ test('a description added to over several openings creates the item with all of 
   await reopen();
   await selectEnd(editorArea());
   await typeInto(editorArea(), 'z');
-  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await chooseOption(field('item-kind'), 'Bug');
   await enter(field('item-title'), 'Playback stalls');
   respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
@@ -154,12 +153,56 @@ test('a draft without a kind is not sent and says why', async () => {
   expect(result().textContent, 'editing clears the message').toBe('');
 });
 
+test('a missing kind moves focus to the Kind control once the title is filled', async () => {
+  await open();
+  await enter(field('item-title'), 'Playback stalls');
+  await settle(() => submit().click());
+  expect(document.activeElement).toBe(field('item-kind'));
+});
+
+test('the kind dropdown shows each kind with its icon, in the list and in the closed control', async () => {
+  await open();
+  expect(text(field('item-kind'))).toContain('Choose a kind');
+  await openOptions(field('item-kind'));
+  expect($$('[role="option"]').map((option) => [text(option), option.querySelectorAll('svg.lucide').length])).toEqual([['Bug', 1], ['Feature', 1], ['Improvement', 1]]);
+  await settle(() => $$('[role="option"]')[0]!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(text(field('item-kind'))).toBe('Bug');
+  expect(field('item-kind').querySelector('[aria-hidden="true"] svg.lucide-bug')).not.toBeNull();
+});
+
+test('picking in a Select clears the message and keeps the draft, and reopening shows the kept values', async () => {
+  await open();
+  await settle(() => submit().click());
+  expect(result().textContent).toBe('Choose bug, feature or improvement.');
+  await chooseOption(field('item-kind'), 'Feature');
+  expect(result().textContent).toBe('');
+  await chooseOption(field('item-repo'), 'lar-apple');
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  await settle(() => addButton().click());
+  expect([formValue('repo'), formValue('kind')]).toEqual(['maddec01/lar-apple', 'feature']);
+  expect([text(field('item-repo')), text(field('item-kind'))]).toEqual(['lar-apple', 'Feature']);
+});
+
+test('the list opens above the dialog, after it in the page, and Escape closes only the list', async () => {
+  await open();
+  await openOptions(field('item-kind'));
+  const list = $('[role="listbox"]')!;
+  expect(dialog()!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING, 'later in the page at the same z-index').toBeTruthy();
+  expect(dialog()!.contains(list)).toBe(false);
+  expect(list.className).toContain('z-50');
+  await settle(() => list.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect($('[role="listbox"]')).toBeNull();
+  expect(dialog()).not.toBeNull();
+});
+
 test('a repo picked while a message shows is the one posted', async () => {
   await open();
   await settle(() => submit().click());
   expect(result().textContent).toBe('Choose bug, feature or improvement.');
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-apple');
+  await chooseOption(field('item-repo'), 'lar-apple');
+  expect(formValue('repo')).toBe('maddec01/lar-apple');
   await fillDraft();
   respond({ item: null, error: null }, 500);
   await settle(() => submit().click());
@@ -233,7 +276,7 @@ test('sample mode disables adding and says so', async () => {
 
 test('the description names the repository picked', async () => {
   await open();
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
+  await chooseOption(field('item-repo'), 'lar-apple');
   expect(dialog()!.textContent).toContain('Record work in lar-apple and add it to List.');
 });
 
@@ -257,7 +300,7 @@ test('with no repository onboarded, adding is disabled and says where to add one
 test('opened before the repositories arrive, the dialog picks the first one once they do', async () => {
   await open({ ...withFactory, repos: [], fetchedAt: null });
   await push(withFactory);
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-server');
+  expect(formValue('repo')).toBe('maddec01/lar-server');
   expect(dialog()!.textContent).toContain('Record work in lar-server and add it to List.');
   expect(submit().disabled).toBe(false);
 });
@@ -295,7 +338,7 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
   expect(field('item-title').value).toBe('');
   expect(result().textContent).toBe('');
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(false);
-  expect(submit().textContent).toBe('Add to List');
+  expect(submit().textContent).toBe('Add item');
 });
 
 /** The fetch calls to `path`, each with its body, if it has one. */
@@ -316,7 +359,10 @@ test('Pick a ticket searches the repository picked and lists its open tickets, s
   expect([...$('#pick-ticket')!.classList], 'a long result list scrolls above the footer').toEqual(expect.arrayContaining(['min-h-0', 'overflow-y-auto']));
   expect(dialog()!.textContent).toContain('Find an open ticket in lar-server.');
   expect(text($('#pick-ticket'))).toContain('Find tickets outside your list, or open one you’ve already added.');
-  await enter(field<HTMLSelectElement>('pick-repo'), 'maddec01/lar-apple');
+  await openOptions(field('pick-repo'));
+  expect(dialog()!.compareDocumentPosition($('[role="listbox"]')!) & Node.DOCUMENT_POSITION_FOLLOWING, 'the list opens above the dialog').toBeTruthy();
+  await settle(() => $$('[role="option"]').find((option) => text(option) === 'lar-apple')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
   respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }, { number: 9, title: 'Seek is slow', url: 'u9', workId: 'work-9' }], error: null });
   await searchFor('seek');
   expect(calls('/api/tickets')).toEqual([['/api/tickets?repo=maddec01%2Flar-apple&q=seek', null]]);
@@ -388,7 +434,7 @@ test('Create issue starts from each repository default and an override applies o
   await open({ ...withFactory, repos });
   expect(field<HTMLInputElement>('item-create-issue').checked).toBe(true);
   expect(field<HTMLInputElement>('item-create-issue').disabled).toBe(false);
-  await enter(field<HTMLSelectElement>('item-repo'), repos[1]!.repo);
+  await chooseOption(field('item-repo'), 'lar-apple');
   expect(field<HTMLInputElement>('item-create-issue').checked).toBe(false);
   respond({ options: { provider: 'github', labels: ['forbidden'], types: ['Bug'], assignees: [], milestones: [], iterations: [], problems: [] } });
   await settle(() => field<HTMLInputElement>('item-create-issue').click());
@@ -418,6 +464,265 @@ test('a lost response keeps its request ID after the page reloads', async () => 
   expect(submit().disabled).toBe(true);
 });
 
+const picked = () => $$<HTMLInputElement>('#item-labels input[name="labels"]').map((input) => input.value);
+const typedLabels = () => $$<HTMLInputElement>('#item-labels input[name="newLabels"]').map((input) => input.value);
+const chips = () => $$('#item-labels [data-label-chip]').map(text);
+const choices = () => $$<HTMLLabelElement>('[data-label-choice]');
+const choice = (name: string) => choices().find((c) => text(c).startsWith(name))!;
+const search = () => $<HTMLInputElement>('[data-label-picker] input[aria-label]')!;
+const openPicker = () => settle(() => $<HTMLButtonElement>('#item-labels button')!.click());
+const toggle = (name: string) => settle(() => choice(name).querySelector('input')!.click());
+const createButton = () => $$<HTMLButtonElement>('[data-label-picker] button').find((b) => text(b).startsWith('Create'));
+
+/** A repository that reads `labels`, whose bug and feature map to labels and which has `access` besides ticket creation. */
+function labelledRepo(effectiveVocabulary: typeof import('@lar-factory/shared').effectiveVocabulary, labels: string[], { access = {}, repo = withFactory.repos[0]!.repo, createIssuesFromAddItem = true, bug = ['backend'], feature = ['triage'] }: { access?: object; repo?: string; createIssuesFromAddItem?: boolean; bug?: string[]; feature?: string[] } = {}) {
+  const config = { ...withFactory.repos[0]!, repo, setup: {
+    repo, createIssuesFromAddItem,
+    access: { 'publish-ticket': 'allowed', 'tag-ticket': 'allowed', 'manage-labels': 'allowed', ...access },
+    ...effectiveVocabulary({ bug: { type: null, labels: bug }, feature: { type: null, labels: feature } }),
+  } } as BoardData['repos'][number];
+  const data = { ...withFactory, repos: [config] };
+  const provider = repo.split('/').length === 3 ? 'azure' : 'github';
+  fetchMock.mockImplementation(async (url) => new Response(JSON.stringify(url.startsWith('/api/ticket-options')
+    ? { options: { provider, labels, labelColors: { docs: '0E8A16' }, types: [], assignees: [], milestones: [], iterations: [], problems: [] } }
+    : data)));
+  return data;
+}
+const labelSetup = async (labels: string[], options?: Parameters<typeof labelledRepo>[2]) => {
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  await open(labelledRepo(effectiveVocabulary, labels, options));
+};
+
+test('the footer has one Add item button with Create issue at its left, and the formatting hint sits under the description', async () => {
+  await labelSetup([]);
+  const footer = $('#add-item-form [data-slot="modal-footer"]') ?? submit().parentElement!;
+  expect(submit().textContent).toBe('Add item');
+  expect(footer.contains(field('item-create-issue'))).toBe(true);
+  expect(footer.textContent).not.toContain('Formats as you type');
+  expect(footer.textContent).not.toContain('Add to List');
+  const hint = $$('#add-item-form p').find((p) => text(p) === 'Formats as you type · saved as Markdown')!;
+  expect(editorArea().compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect($('aside[aria-label="Details"]')!.contains(hint)).toBe(false);
+});
+
+test('Azure uses the same footer wording, and its picker calls them tags', async () => {
+  await labelSetup(['docs'], { repo: 'org/project/repo' });
+  expect(submit().textContent).toBe('Add item');
+  expect(text($('label:has(#item-create-issue)'))).toBe('Create issue');
+  expect($('#item-labels')!.getAttribute('aria-label')).toBe('Tags');
+});
+
+test('ticking Create issue shows the ticket fields, and unticking hides them and says labels need a ticket', async () => {
+  await labelSetup(['docs']);
+  await settle(() => vi.advanceTimersByTime(50));
+  expect($('#item-labels')).not.toBeNull();
+  await settle(() => field<HTMLInputElement>('item-create-issue').click());
+  expect($('#item-labels')).toBeNull();
+  expect(text($('aside[aria-label="Details"]'))).toContain('Local work has its kind alone. Tick Create issue to add labels. Saved only on this machine.');
+  await settle(() => field<HTMLInputElement>('item-create-issue').click());
+  expect($('#item-labels')).not.toBeNull();
+});
+
+test('Create issue follows the repository until the user changes it, and the change survives closing the dialog', async () => {
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  const repos = [true, false].map((enabled, index) => ({ ...withFactory.repos[index]!, setup: {
+    repo: withFactory.repos[index]!.repo, createIssuesFromAddItem: enabled,
+    access: { 'publish-ticket': 'allowed' }, ...effectiveVocabulary(),
+  } })) as BoardData['repos'];
+  const data = { ...withFactory, repos };
+  fetchMock.mockImplementation(async (url) => new Response(JSON.stringify(url.startsWith('/api/ticket-options')
+    ? { options: { provider: 'github', labels: [], types: [], assignees: [], milestones: [], iterations: [], problems: [] } } : data)));
+  await open(data);
+  const box = () => field<HTMLInputElement>('item-create-issue');
+  expect(box().checked).toBe(true);
+  await chooseOption(field('item-repo'), 'lar-apple');
+  expect(box().checked, 'it follows the repository').toBe(false);
+  await chooseOption(field('item-repo'), 'lar-server');
+  expect(box().checked, 'and back').toBe(true);
+  await settle(() => box().click());
+  expect(box().checked).toBe(false);
+  await chooseOption(field('item-repo'), 'lar-apple');
+  await settle(() => box().click());
+  await chooseOption(field('item-repo'), 'lar-server');
+  expect(box().checked, 'the choice stays through repository changes').toBe(true);
+  await settle(() => box().click());
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  await settle(() => addButton().click());
+  expect(box().checked, 'and through closing the dialog').toBe(false);
+});
+
+test('without create access the checkbox is off and disabled with the reason, in the footer, and submits local work', async () => {
+  await labelSetup(['docs'], { access: { 'publish-ticket': 'refused' } });
+  const box = field<HTMLInputElement>('item-create-issue');
+  expect([box.checked, box.disabled]).toEqual([false, true]);
+  const reason = document.getElementById(box.getAttribute('aria-describedby')!)!;
+  expect(text(reason)).toContain('publish-ticket');
+  expect(submit().parentElement!.contains(reason)).toBe(true);
+  expect(text($('aside[aria-label="Details"]'))).not.toContain('Tick Create issue');
+  await fillDraft();
+  respond({ error: 'Denied' }, 403);
+  await settle(() => submit().click());
+  expect(posted().draft).toEqual({ repo: withFactory.repos[0]!.repo, kind: 'bug', title: 'Playback stalls', description: 'After a seek.', createIssue: false });
+});
+
+test('the picker starts from the kind\'s mapped labels, leaving out one the tracker no longer has, and never offers managed labels', async () => {
+  await labelSetup(['backend', 'docs', 'linked-work', 'bug', 'status-done', 'decision-1'], { bug: ['backend', 'renamed-away'] });
+  await chooseOption(field('item-kind'), 'Bug');
+  expect(picked()).toEqual(['backend']);
+  expect(chips()).toEqual(['backend']);
+  await openPicker();
+  expect(choices().map(text)).toEqual(['backend', 'docs']);
+  expect(choice('docs').querySelector<HTMLElement>('[data-label-dot]')!.style.background).toBe('rgb(14, 138, 22)');
+});
+
+test("on Azure the picker never offers a repo- tag, and refuses a typed name holding one or a separator", async () => {
+  await labelSetup(['repo-lar-api', 'docs'], { repo: 'contoso/Fabrikam%20Fiber/lar-api' });
+  await openPicker();
+  expect(choices().map(text)).toEqual(['docs']);
+  for (const [typed, reason] of [['repo-other', /reserved for the work item's repository/], ['foo; linked-work', /without commas or semicolons/]] as const) {
+    await settle(() => { const input = search(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, typed); input.dispatchEvent(new Event('input', { bubbles: true })); });
+    expect(createButton()).toBeUndefined();
+    expect(text($('[data-label-picker] [role="alert"]'))).toMatch(reason);
+  }
+});
+
+test('a managed label the kind maps to stays on the ticket, locked, without being offered', async () => {
+  await labelSetup(['bug', 'docs', 'linked-work'], { bug: ['bug'] });
+  await chooseOption(field('item-kind'), 'Bug');
+  await openPicker();
+  expect(picked()).toEqual(['bug']);
+  expect(choices().map(text)).toEqual(['docs', 'bug · set by kind']);
+  expect(choice('bug').querySelector('input')!.disabled).toBe(true);
+});
+
+test('changing kind swaps its mapped labels and keeps what the user picked', async () => {
+  await labelSetup(['backend', 'triage', 'docs']);
+  await chooseOption(field('item-kind'), 'Bug');
+  await openPicker();
+  await toggle('docs');
+  expect(picked()).toEqual(['backend', 'docs']);
+  await settle(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await chooseOption(field('item-kind'), 'Feature');
+  expect(picked()).toEqual(['docs', 'triage']);
+});
+
+test('a typed label is created on submit, is kept with the draft, and can be unticked', async () => {
+  await labelSetup(['backend', 'docs']);
+  await chooseOption(field('item-kind'), 'Bug');
+  await enter(field('item-title'), 'Playback stalls');
+  await openPicker();
+  expect(search().placeholder).toBe('Filter or type a new label');
+  await enter(search(), 'needs-design');
+  expect($$('[data-label-picker] p').some((p) => text(p) === 'No match.'), 'the create button says what to do').toBe(false);
+  await settle(() => createButton()!.click());
+  expect(search().value).toBe('');
+  expect(typedLabels()).toEqual(['needs-design']);
+  expect(picked()).toEqual(['backend']);
+  expect(chips()).toEqual(['backend', 'needs-designnew']);
+  expect(text($('[data-label-picker]'))).toContain('The new label is created when the ticket submits.');
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  await settle(() => addButton().click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(typedLabels(), 'a closed dialog keeps the typed label').toEqual(['needs-design']);
+  respond({ error: 'Could not create the label needs-design, so no ticket was created. HTTP 403' }, 502);
+  await settle(() => submit().click());
+  expect((posted().draft as { options: unknown }).options).toEqual({ labels: ['backend'], newLabels: ['needs-design'] });
+  expect(dialog(), 'a failed label creation keeps the draft open').not.toBeNull();
+  expect(text(result())).toContain('Could not create the label needs-design');
+  expect(field('item-title').value).toBe('Playback stalls');
+  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(false);
+  await openPicker();
+  await toggle('needs-design');
+  expect(typedLabels()).toEqual([]);
+  expect(choice('needs-design'), 'it stays a choice once unticked').toBeDefined();
+});
+
+test('a typed label the tracker has by the time the draft reopens becomes an ordinary pick', async () => {
+  await labelSetup(['docs']);
+  await openPicker();
+  await enter(search(), 'needs-design');
+  await settle(() => createButton()!.click());
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  labelledRepo(effectiveVocabulary, ['docs', 'needs-design']);
+  await settle(() => addButton().click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(typedLabels()).toEqual([]);
+  expect(picked()).toEqual(['needs-design']);
+  await openPicker();
+  expect(choices().map(text)).toEqual(['docs', 'needs-design']);
+});
+
+test('Enter on a typed name adds it and does not submit the form', async () => {
+  await labelSetup(['docs']);
+  await openPicker();
+  await enter(search(), 'needs-design');
+  const key = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+  await settle(() => search().dispatchEvent(key));
+  expect(key.defaultPrevented).toBe(true);
+  expect(typedLabels()).toEqual(['needs-design']);
+  expect(calls('/api/items')).toEqual([]);
+});
+
+test.each([['linked-work', /reserved for the factory/], ['bug', /reserved for the item's kind/], ['status-done', /reserved for board status/], ['-x', /hyphen/]])('typing %s is refused with its reason', async (name, reason) => {
+  await labelSetup(['docs']);
+  await openPicker();
+  await enter(search(), name);
+  expect(createButton()).toBeUndefined();
+  expect(text($('[data-label-picker] [role="alert"]'))).toMatch(reason);
+  const key = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+  await settle(() => search().dispatchEvent(key));
+  expect(typedLabels()).toEqual([]);
+});
+
+test('Azure refuses a tag name with a separator', async () => {
+  await labelSetup(['docs'], { repo: 'org/project/repo' });
+  await openPicker();
+  await enter(search(), 'a;b');
+  expect(createButton()).toBeUndefined();
+  expect(text($('[data-label-picker] [role="alert"]'))).toMatch(/semicolons/);
+});
+
+test('without label management access the picker still picks but says why it cannot create', async () => {
+  await labelSetup(['docs'], { access: { 'manage-labels': 'refused' } });
+  await openPicker();
+  expect(search().placeholder).toBe('Filter labels');
+  expect(text($('[data-label-picker]'))).not.toContain('created when the ticket submits');
+  await enter(search(), 'needs-design');
+  expect(createButton()).toBeUndefined();
+  expect(text($('[data-label-picker] [role="alert"]'))).toContain('manage-labels');
+  await enter(search(), '');
+  await toggle('docs');
+  expect(picked()).toEqual(['docs']);
+});
+
+test('a repository with no labels yet still offers typing one, with label management access', async () => {
+  await labelSetup([]);
+  await openPicker();
+  await enter(search(), 'first');
+  await settle(() => createButton()!.click());
+  expect(typedLabels()).toEqual(['first']);
+});
+
+test('a kind is still required, and local work with Create issue off sends no labels', async () => {
+  await labelSetup(['backend', 'docs']);
+  await enter(field('item-title'), 'Playback stalls');
+  await openPicker();
+  await enter(search(), 'needs-design');
+  await settle(() => createButton()!.click());
+  await settle(() => submit().click());
+  expect(text(result())).toContain('Choose bug, feature or improvement.');
+  expect(calls('/api/items')).toEqual([]);
+  await chooseOption(field('item-kind'), 'Bug');
+  await settle(() => field<HTMLInputElement>('item-create-issue').click());
+  respond({ error: 'Denied' }, 403);
+  await settle(() => submit().click());
+  expect(posted().draft).toEqual({ repo: withFactory.repos[0]!.repo, kind: 'bug', title: 'Playback stalls', description: '', createIssue: false });
+});
+
 test('provider fields start from only the kind mapping and submit the chosen options', async () => {
   const { effectiveVocabulary } = await import('@lar-factory/shared');
   const config = { ...withFactory.repos[0]!, setup: {
@@ -431,17 +736,43 @@ test('provider fields start from only the kind mapping and submit the chosen opt
     : data)));
   await open(data);
   await fillDraft();
-  expect(field<HTMLSelectElement>('item-type').value).toBe('Bug');
-  expect($<HTMLInputElement>('#item-labels input[value="backend"]')!.checked).toBe(true);
-  expect($<HTMLInputElement>('#item-labels input[value="triage"]')!.checked).toBe(false);
-  expect(field<HTMLSelectElement>('item-assignee').value).toBe('');
-  expect(field<HTMLSelectElement>('item-milestone').value).toBe('');
+  expect(formValue('type')).toBe('Bug');
+  expect(picked()).toEqual(['backend']);
+  expect(formValue('assignee')).toBe('');
+  expect(formValue('milestone')).toBe('');
   expect($('#item-iteration')).toBeNull();
-  await enter(field<HTMLSelectElement>('item-assignee'), 'writer');
-  await enter(field<HTMLSelectElement>('item-milestone'), '12');
+  await chooseOption(field('item-assignee'), 'writer');
+  await chooseOption(field('item-milestone'), 'Next');
   respond({ error: 'Denied' }, 403);
   await settle(() => submit().click());
   expect((posted().draft as Record<string, unknown>).options).toEqual({ labels: ['backend'], type: 'Bug', assignee: 'writer', milestone: '12' });
+});
+
+test('ticket options keep their picks in a kept draft, and changing repository reads the new one', async () => {
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  const repos = withFactory.repos.slice(0, 2).map((repo) => ({ ...repo, setup: {
+    repo: repo.repo, createIssuesFromAddItem: true,
+    access: { 'publish-ticket': 'allowed', 'tag-ticket': 'allowed', 'type-ticket': 'allowed' }, ...effectiveVocabulary(),
+  } })) as BoardData['repos'];
+  const data = { ...withFactory, repos };
+  const assignees = (repo: string) => repo.includes('apple') ? ['apple-dev'] : ['writer'];
+  fetchMock.mockImplementation(async url => new Response(JSON.stringify(url.startsWith('/api/ticket-options')
+    ? { options: { provider: 'github', labels: [], types: [], assignees: assignees(url), milestones: [], iterations: [], problems: [] } }
+    : data)));
+  await open(data);
+  await chooseOption(field('item-kind'), 'Bug');
+  await chooseOption(field('item-assignee'), 'writer');
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  await settle(() => addButton().click());
+  expect(formValue('assignee')).toBe('writer');
+  await chooseOption(field('item-repo'), 'lar-apple');
+  expect(formValue('assignee'), 'the other repository starts at None').toBe('');
+  await chooseOption(field('item-assignee'), 'apple-dev');
+  await enter(field('item-title'), 'Playback stalls');
+  respond({ error: 'Denied' }, 403);
+  await settle(() => submit().click());
+  expect(posted().draft).toMatchObject({ repo: 'maddec01/lar-apple', kind: 'bug', options: { assignee: 'apple-dev' } });
 });
 
 test('submitting before options load leaves their defaults to the server', async () => {
@@ -468,7 +799,7 @@ test('denied creation offers Recheck access without losing the current draft', a
   await settle(() => recheck!.click());
   expect(posted()).toMatchObject({ repo: withFactory.repos[0]!.repo, change: 'recheck' });
   expect(field<HTMLInputElement>('item-title').value).toBe('Playback stalls');
-  expect(field<HTMLSelectElement>('item-kind').value).toBe('bug');
+  expect(formValue('kind')).toBe('bug');
   expect(text(editorArea())).toBe('After a seek.');
   expect(dialog()).not.toBeNull();
 });

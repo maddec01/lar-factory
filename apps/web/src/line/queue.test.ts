@@ -4,7 +4,8 @@
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, moved, mountPage, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
-import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
+import { effectiveVocabulary } from '@lar-factory/shared';
+import type { BoardData, Item, KindDisagreement, ModelGroup } from '@lar-factory/shared';
 
 const MODEL_CHOICES: ModelGroup[] = [
   { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
@@ -43,18 +44,73 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(text(queue().querySelector('#queue-h'))).toBe('Queue 3');
   expect(rows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
   expect(text(row('I_sample05').querySelector('.queue-title'))).toBe(`#129 ${sample05.title}`);
-  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · improvement');
-  expect(text(row('I_sample21').querySelector('.queue-meta'))).toBe('lar-server · queued 24h ago · improvement');
+  expect(text(row('I_sample05').querySelector('.queue-age'))).toBe('lar-server · queued 2h ago');
+  expect(text(row('I_sample21').querySelector('.queue-age'))).toBe('lar-server · queued 24h ago');
 
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['I_sample06']);
 });
 
-test("a row shows the item's kind label and its repository's custom labels, colons and all, without case, and hides every other label", async () => {
-  const labelled = { ...sample05, labels: ['needs-triage', 'area: web', 'status-queued', 'Improvement', 'app: music', 'active', 'build', 'Area: Server', 'decision-grill'] };
+test('an unanswered kind disagreement shows a muted marker naming the ticket\'s kind, and an answered one none', async () => {
+  const disagreement: KindDisagreement = { ticketKind: 'bug', changed: 'item', kept: false, swap: { add: [], remove: [], type: null } };
+  const withKinds = (kindDisagreement: KindDisagreement) => ({ ...sample, items: sample.items.map((i) => (i.id === sample05.id ? { ...i, kindDisagreement } : i)) });
+  await mountPage(withKinds(disagreement));
+  const marker = () => row('I_sample05').querySelector<HTMLElement>('[data-kind-marker]');
+  expect(text(marker())).toBe('Bug');
+  expect(marker()!.title).toBe('The ticket says Bug. Open to choose.');
+  expect(marker()!.querySelector('svg')).not.toBeNull();
+  expect(marker()!.previousElementSibling!.matches('[data-kind-badge]')).toBe(true);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.setState({ data: withKinds({ ...disagreement, ticketKind: null }) }));
+  expect(text(marker())).toBe('No kind');
+  expect(marker()!.title).toBe('The ticket has no kind. Open to choose.');
+  await settle(() => useBoardStore.setState({ data: withKinds({ ...disagreement, kept: true }) }));
+  expect(marker()).toBeNull();
+});
+
+test('a row shows its coloured kind badge and label chips, colons and all, and hides managed labels', async () => {
+  const labelled = { ...sample05, labels: ['needs-triage', 'area: web', 'status-queued', 'Improvement', 'linked-work', 'build', 'Area: Server', 'decision-grill'], labelColors: { 'area: web': '#BFDADC' } };
   await mountPage({ ...sample, items: sample.items.map((i) => i.id === sample05.id ? labelled : i) });
-  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · area: web, Improvement, Area: Server');
+  const meta = row('I_sample05').querySelector('.queue-meta')!;
+  expect(text(meta.querySelector('[data-kind-badge]'))).toBe('Improvement');
+  expect(meta.querySelector('[data-kind-badge] svg')).not.toBeNull();
+  const chips = [...meta.querySelectorAll<HTMLElement>('[data-label-chip]')];
+  expect(chips.map(text)).toEqual(['needs-triage', 'area: web', 'Area: Server']);
+  expect(chips[1]!.style.backgroundColor, 'a GitHub label takes its colour').toContain('color-mix');
+  expect(chips[0]!.style.backgroundColor, 'a label with no colour keeps the neutral style').toBe('');
+});
+
+test("a label mapped to the item's kind hides on its row, and a label mapped to another kind shows", async () => {
+  const setup = { vocabulary: effectiveVocabulary({ bug: { type: null, labels: ['type: bug'] }, improvement: { type: null, labels: ['type: better'] } }).vocabulary } as NonNullable<BoardData['repos'][number]['setup']>;
+  const labelled = { ...sample05, labels: ['type: better', 'type: bug'] };
+  await mountPage({ ...sample, repos: sample.repos.map((r) => r.repo === sample05.repo ? { ...r, setup } : r), items: sample.items.map((i) => i.id === sample05.id ? labelled : i) });
+  expect([...row('I_sample05').querySelectorAll('[data-label-chip]')].map(text)).toEqual(['type: bug']);
+});
+
+test('a ticket with no recognised kind, a build and a decision have no kind badge on a row', async () => {
+  const noKind = { ...sample05, id: 'no-kind', kind: 'issue' as const, labels: ['web'] };
+  const build = { ...sample05, id: 'a-build', kind: 'build' as const, labels: ['build'] };
+  const decided = { ...sample05, id: 'a-decision', kind: 'decision' as const, labels: ['decision-grill'] };
+  await mountPage({ ...sample, items: [...sample.items, noKind, build, decided] });
+  for (const id of ['no-kind', 'a-build', 'a-decision']) expect(row(id).querySelector('[data-kind-badge]'), id).toBeNull();
+  expect(text(row('no-kind').querySelector('[data-label-chip]'))).toBe('web');
+});
+
+test('local work shows its kind and the laptop source icon, with no labels', async () => {
+  const local = { ...sample05, id: 'local', number: 0, url: null, labels: [] };
+  await mountPage({ ...sample, items: [...sample.items, local] });
+  expect(text(row('local').querySelector('[data-kind-badge]'))).toBe('Improvement');
+  expect(row('local').querySelector('[aria-label="Saved only on this machine."]')).not.toBeNull();
+  expect(row('local').querySelector('[data-label-chip]')).toBeNull();
+});
+
+test("an Azure DevOps item's tags use the neutral chip", async () => {
+  const azure = { ...sample05, repo: 'fabrikam/fiber/lar-factory', labels: ['web'] };
+  await mountPage({ ...sample, items: sample.items.map((i) => i.id === sample05.id ? azure : i) });
+  const chip = row('I_sample05').querySelector<HTMLElement>('[data-label-chip]')!;
+  expect(text(chip)).toBe('web');
+  expect(chip.style.backgroundColor).toBe('');
 });
 
 test("a dossier's parts are left out and show in the dossier; a Queued parent stays, and an item whose parent isn't on the board stays", async () => {

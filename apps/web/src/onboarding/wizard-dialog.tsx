@@ -18,7 +18,6 @@ import { useSettingsStore } from '../settings/settings-store.ts';
 const STEP_HELP: Record<StepId, string> = {
   project: 'Choose where agents will work.',
   work: 'Choose what to show and what builds may save.',
-  vocabulary: 'Optionally map kinds to labels and types.',
   access: 'Check the access the factory needs.',
 };
 

@@ -1,6 +1,6 @@
 // The title bar's List button and the List modal it opens, on the copied Modal's paned layout. The left pane picks
-// All repositories or a repository, each with how many of its items match the search;
-// the right pane shows the chosen group's items with the search, Add item, Scope board and the sort menu. It starts on
+// All repositories or a repository, each with how many of its items match the search and filters;
+// the right pane shows the chosen group's items with the search, Add item, Scope board, the sort menu and the filters. It starts on
 // the board's scope. An item opens the item dialog and Add item opens the Add item flow, each over the List modal, so
 // closing them comes back to the List as it was.
 
@@ -18,9 +18,11 @@ import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-syst
 import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemKind, StructureSync, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemKind, LabelChips, StructureSync, repoTone } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
+import { ItemFilterBar } from '../filters/item-filter-bar.tsx';
+import { filtering, rowFilter, useItemFilters } from '../filters/item-filters.ts';
 import { matchesSearch } from './list-search.ts';
 import { EXPANDED, ExpandButton, useExpand, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -64,11 +66,12 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
         <span className="block truncate text-[13px] font-medium leading-5 text-base-content">
           {item.number ? <span className="font-normal text-base-700">{ref(item)} </span> : null}{item.title}
         </span>
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 [&_[data-item-kind]>span]:h-4 [&_[data-item-kind]>span]:text-[10px]">
-          <span className="min-w-0 truncate text-[11px] leading-4 tabular-nums text-base-700">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span className="me-1 min-w-0 truncate text-[11px] leading-4 tabular-nums text-base-700">
             {showRepo && `${repoName(repoKey(item), repos)} · `}{shortAgo(item.updatedAt, now)}
           </span>
-          <ItemKind item={item} />
+          <ItemKind item={item} onRow />
+          <LabelChips item={item} />
           <StructureSync item={item} />
         </span>
         <AzureFields azure={item.azure} />
@@ -122,9 +125,12 @@ function ListModal({ onClose }: { onClose: () => void }) {
   const [sort, setSort] = useState<Sort | null>(null);
   const searchField = useRef<HTMLInputElement>(null);
   useFocusSearchWhenOpenerGoes(searchField);
+  const [filters, setFilters] = useItemFilters('list');
   const q = query.trim().toLowerCase();
+  const shows = rowFilter(filters, data.repos);
   // In boardSections' order, which counts items before the search so the rows stay put while typing.
-  const groups = boardSections(data, now).listGroups.map((group): ListGroup => ({ ...group, items: group.items.filter((i) => matchesSearch(i, q)) }));
+  const held = boardSections(data, now).listGroups;
+  const groups = held.map((group): ListGroup => ({ ...group, items: group.items.filter((i) => matchesSearch(i, q) && shows(i)) }));
   // A picked group that's gone shows All repositories.
   const picked = groups.find((group) => group.repo === pick);
   const active = picked?.repo ?? null;
@@ -163,10 +169,11 @@ function ListModal({ onClose }: { onClose: () => void }) {
             )}
             <SortMenu sort={effectiveSort} onSort={setSort} />
           </div>
+          <ItemFilterBar filters={filters} onChange={setFilters} rows={held.filter((group) => !picked || group.repo === picked.repo).flatMap((group) => group.items)} />
         </div>
         <Modal.Body>
           {items.map((item) => <ItemRow key={item.id} item={item} now={now} showRepo={!picked} onOpen={() => useItemDialogStore.getState().open(item.id)} />)}
-          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q ? 'Nothing here matches.' : reading ? 'Loading projects…' : 'Nothing in List.'}</p>}
+          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q || filtering(filters) ? 'Nothing here matches.' : reading ? 'Loading projects…' : 'Nothing in List.'}</p>}
         </Modal.Body>
       </Modal.Content>
     </Modal>

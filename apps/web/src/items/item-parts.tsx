@@ -1,12 +1,14 @@
-// The bits every view draws for an item: its numbered title, title link, status track and slice bar, and the item
-// dialog's repository tag, slices, pull requests, checks, and agent work. The tag is the design system's Badge; the
+// The bits every view draws for an item: its numbered title, title link, kind badge, label chips, status track and
+// slice bar, and the item dialog's repository tag, slices, pull requests, checks, and agent work. The tag is the design system's Badge; the
 // board's CSS adds the coloured dot.
 
-import { Check, GitPullRequest } from 'lucide-react';
-import { UNREADABLE, buildActivity, isStale, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
-import type { AzureWorkItem, Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
+import type { ReactNode } from 'react';
+import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
+import { UNREADABLE, buildActivity, isStale, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
+import type { AzureWorkItem, Checks, Item, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
+import { tint } from './label-tint.ts';
 import { PrReadiness } from './pr-readiness.tsx';
 import { STATUS_COLOR } from './status-glyph.tsx';
 import { WORKFLOW_STEPS } from './workflow-steps.ts';
@@ -152,16 +154,55 @@ export function AgentWorkNote({ item }: { item: Item }) {
   return s && s !== 'unavailable' ? null : <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : 'No T3 thread has worked on this yet.'}</p>;
 }
 
-/** Kind and relationships remain visible before an issue is queued. */
-export function ItemKind({ item }: { item: Item }) {
+export const KIND_BADGES: Partial<Record<Kind, { name: string; icon: LucideIcon; hue: number }>> = {
+  bug: { name: 'Bug', icon: Bug, hue: 25 },
+  feature: { name: 'Feature', icon: Sparkles, hue: 150 },
+  improvement: { name: 'Improvement', icon: TrendingUp, hue: 245 },
+  concept: { name: 'Concept', icon: Lightbulb, hue: 300 },
+};
+
+/** A kind in its colour with its icon, then `children`; builds, decisions and tickets with no recognised kind have none. */
+export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode }) {
+  const badge = KIND_BADGES[kind];
+  if (!badge) return null;
+  const { name, icon: Icon, hue } = badge;
+  return <Badge data-kind-badge hue={hue}><Icon aria-hidden="true" />{name}{children}</Badge>;
+}
+
+/** Beside a row's kind badge, in the row's muted text: what the ticket says instead, until someone answers. */
+export function KindMarker({ item }: { item: Pick<Item, 'kindDisagreement'> }) {
+  const { kindDisagreement: disagreement } = item;
+  if (!disagreement || disagreement.kept) return null;
+  const said = disagreement.ticketKind ? KIND_BADGES[disagreement.ticketKind]!.name : 'No kind';
+  const sentence = disagreement.ticketKind ? `The ticket says ${said}.` : 'The ticket has no kind.';
+  return <span data-kind-marker title={`${sentence} Open to choose.`} aria-label={sentence} className="inline-flex items-center gap-0.5 text-[11px] text-(--muted-foreground)"><ArrowLeftRight className="size-2.5" aria-hidden="true" />{said}</span>;
+}
+
+type LabelledItem = Pick<Item, 'kind' | 'labels' | 'labelColors' | 'repo'>;
+
+/** The labels of `item` that its row shows, under its repository's mappings. */
+export function useShownLabels(item: LabelledItem): string[] {
+  return labelsOnRow(item, useBoardStore((state) => state.data.repos));
+}
+
+/** The item's shown labels as chips, in the tracker's colours. */
+export function LabelChips({ item }: { item: LabelledItem }) {
+  return <>{useShownLabels(item).map((label) => (
+    <Badge key={label} data-label-chip className="max-w-full" style={tint(item.labelColors?.[label])}><span className="max-w-52 truncate" title={label}>{label}</span></Badge>
+  ))}</>;
+}
+
+/** Kind and relationships remain visible before an issue is queued. `onRow` leaves out the word for work with no kind badge. */
+export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean }) {
   const words: string[] = [];
-  if (item.kind) words.push(item.kind === 'bug' ? 'Bug' : item.kind === 'feature' ? 'Feature' : item.kind === 'improvement' ? 'Improvement' : item.kind === 'concept' ? 'Concept' : item.kind === 'decision' ? 'Decision' : 'Work');
+  if (!onRow && !KIND_BADGES[item.kind]) words.push(item.kind === 'decision' ? 'Decision' : 'Work');
   const parentKind = useBoardStore((state) => state.data.items.find((parent) => Boolean(item.parentId && parent.id === item.parentId || item.parent?.url && parent.url === item.parent.url))?.kind);
   const parentIsConcept = item.tracker?.parent?.kind === 'concept' || parentKind === 'concept';
   if (parentIsConcept) words.push('Part of a concept');
   else if (item.parent) words.push('Part of another issue');
   if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Cross-repository');
-  return words.length ? <span data-item-kind className="inline-flex flex-wrap gap-1">{words.map((word) => <Badge key={word}>{word}</Badge>)}</span> : null;
+  const badge = KIND_BADGES[item.kind];
+  return badge || words.length ? <span data-item-kind className="inline-flex flex-wrap gap-1"><KindBadge kind={item.kind} />{onRow && <KindMarker item={item} />}{words.map((word) => <Badge key={word}>{word}</Badge>)}</span> : null;
 }
 
 export function StructureSync({ item }: { item: Item }) {

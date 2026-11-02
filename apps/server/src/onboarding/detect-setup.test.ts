@@ -51,7 +51,7 @@ test('detection reads doc and skill paths without reading factory configuration 
 test("a login without push or triage access marks those operations Refused and leaves what it can't settle unverified", async () => {
   const detection = await detect({}, { github: async () => ({ push: false, triage: false, issues: true }) });
   assert.deepEqual(detection.access,
-    { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
+    { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'manage-labels': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
 });
 
 test("a repository with issues turned off has its issues Refused, and one the login can't read Refuses every fact it reads", async () => {
@@ -64,7 +64,7 @@ test("a repository with issues turned off has its issues Refused, and one the lo
   const refused = { refused: "Can't read maddec01/lar-web with gh: HTTP 404: Not Found" };
   assert.deepEqual([blocked.itemSources, blocked.domainDocs, blocked.projectSkills],
     [refused, refused, refused]);
-  assert.deepEqual(Object.values(blocked.access), ['unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified']);
+  assert.deepEqual(Object.values(blocked.access), ['unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified']);
 });
 
 test("an Azure DevOps repository detects its teams' boards and push access, with ticket access unverified", async () => {
@@ -73,7 +73,7 @@ test("an Azure DevOps repository detects its teams' boards and push access, with
   assert.deepEqual([detection.provider, detection.checkout, detection.itemSources], ['Azure DevOps', { found: '/Users/me/shop' },
     { found: [{ kind: 'azure-board', team: 'Retail Team' }, { kind: 'azure-board', team: 'Platform' }] }]);
   assert.deepEqual(detection.access,
-    { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
+    { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified', 'manage-labels': 'unverified', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
   const refused = await detect({}, { azurePush: async () => false, teams: async () => { throw new Error('TF400813: not authorized'); } }, { repo, projectId: 'shop' });
   assert.deepEqual([refused.access['push-branch'], refused.access['open-pr'], refused.itemSources],
     ['refused', 'unverified', { refused: "Can't read contoso/Retail/shop's teams with az: TF400813: not authorized" }]);
@@ -91,6 +91,13 @@ test("the checkout is Refused with its fix for another origin, a second checkout
 
 test('detection refuses a body without a repository and T3 project', async () => {
   assert.deepEqual(await detectSetup({ repo: 'nope' }, reads()), { status: 400, error: 'Choose a repository and its T3 project before detecting its setup.' });
+});
+
+test('a triage login can set labels but not manage them, and a write login can do both', async () => {
+  const triage = await detect({}, { github: async () => ({ push: false, triage: true, issues: true, tokenWrites: true }) });
+  assert.deepEqual([triage.access['tag-ticket'], triage.access['manage-labels']], ['allowed', 'refused']);
+  const write = await detect({}, { github: async () => ({ push: true, triage: true, issues: true, tokenWrites: true }) });
+  assert.deepEqual([write.access['tag-ticket'], write.access['manage-labels']], ['allowed', 'allowed']);
 });
 
 test('a push-capable user with an unverified token gets no positive write access', async () => {

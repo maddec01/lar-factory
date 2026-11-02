@@ -36,3 +36,15 @@ _Avoid_: restart, retry.
 **Reshape**:
 Sending an item with a passing brief back to shaping, keeping the text and requiring a new gate.
 _Avoid_: reset, reopen.
+
+**Kind**:
+What a piece of work is: Bug, Feature, Improvement or Concept. Builds, decisions and tickets with no recognised kind show as having no kind on rows.
+_Avoid_: category, type, label.
+
+**Label**:
+A tracker's own name for grouping tickets, called a tag on Azure DevOps.
+_Avoid_: custom label.
+
+**Managed label**:
+A label the factory reads as meaning, which it hides from rows and locks in settings.
+_Avoid_: required label, system label.

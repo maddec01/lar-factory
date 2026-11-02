@@ -104,7 +104,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
   const fill = expanded && edit.editing;
   const rows = fill ? 'min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]' : aside ? '@min-[45rem]:grid-rows-[auto_1fr]' : '';
   return (
-    <Modal.Content title={`${itemName(item)}`} presentation="workspace" data-item-dialog style={expanded ? EXPANDED : undefined}
+    <Modal.Content title={`${itemName(item)}`} presentation="workspace" data-item-dialog style={expanded ? EXPANDED : undefined} focusFirstField={false}
       headerActions={<>
         <AgentWork item={item} className="whitespace-nowrap text-xs text-base-700 @max-[40rem]:hidden" />
         <ExpandButton expanded={expanded} toggle={toggleExpanded} />
@@ -136,7 +136,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
           {ticket && accessProblem && <div role="status"><p>{accessProblem}</p><Button {...kind('other')} onClick={() => void useEditStore.getState().recheck(item.repo)}>Recheck access</Button></div>}
           {item.paused && <p data-paused className="m-0 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5 font-medium text-(--warning-foreground)">Paused: {item.paused}</p>}
           <NeedsYou item={item} data={data} />
-          <ItemMeta item={item} read={read} now={now} />
+          <ItemMeta item={item} read={read} refresh={refresh} now={now} />
           <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}>
             {record && <RecordText item={item} record={record} spec={read.state === 'loaded' && Boolean(read.details.spec)} className="@min-[45rem]:col-start-1" />}
             {ticket && <ItemDescription itemId={item.id} refresh={refresh} read={read} edit={edit} editable={editable} fill={fill} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}

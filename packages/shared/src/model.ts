@@ -1,6 +1,7 @@
 // The board's data model and the rules that place an item in the flow.
 // Shared by the server and the browser, so it imports nothing but types.
 
+import type { KindDisagreement } from './kind-disagreement.ts';
 import type { EffectiveVocabulary, VocabularyMapping, VocabularySources } from './vocabulary.ts';
 
 import type { SkillStatus } from './install-skills.ts';
@@ -20,8 +21,10 @@ export const STATUSES = [
 
 export type Status = (typeof STATUSES)[number];
 
+export const STATUS_LABEL_PREFIX = 'status-';
+
 /** A status kept on an issue as a label: `status-` and its name in lowercase, with hyphens for spaces. Done has no label. */
-export const statusLabel = (status: Exclude<Status, 'Done'>): string => `status-${status.toLowerCase().replaceAll(' ', '-')}`;
+export const statusLabel = (status: Exclude<Status, 'Done'>): string => `${STATUS_LABEL_PREFIX}${status.toLowerCase().replaceAll(' ', '-')}`;
 
 /** The statuses an issue's labels hold, in flow order. */
 export const labelStatuses = (labels: readonly string[]): Status[] => STATUSES.filter((s) => s !== 'Done' && labels.includes(statusLabel(s)));
@@ -308,6 +311,12 @@ export interface Item {
   /** Why Abandon can't run on the item, which its greyed-out Abandon shows: an Azure work item whose type has no Removed state. Absent when it can. */
   abandonRefusal?: string;
   labels: string[];
+  /** Each label's colour on a tracker whose labels have one, by name, as CSS. Read with the labels, never stored on a record. */
+  labelColors?: Record<string, string>;
+  /** Its GitHub issue's type, read with the labels; absent when it has none. An Azure work item's is its `azure.type`. */
+  issueType?: string;
+  /** How its kind and its ticket's disagree; absent when they don't, or an answer ended the question. */
+  kindDisagreement?: KindDisagreement;
   azure?: AzureWorkItem;
   /** Azure backlog priority position, retained through partial reads and UI sorting. */
   sourceOrder?: number;
@@ -446,7 +455,7 @@ export interface RepoConfig {
   items?: ItemSourceKind;
   /** The Azure DevOps team whose backlog and current sprint its item source is; absent for the other item sources. */
   team?: string;
-  /** Its custom labels, saved in local settings, which Add item offers and the queue shows. */
+  /** The labels a saved Custom labels setting holds. Settings no longer edit them, and the tracker holds the labels in use. */
   labels: string[];
   /** Settings saved on this machine. */
   setup?: RepositorySetup;
@@ -793,8 +802,11 @@ export const decodePart = (part: string): string => {
  */
 export const shownRepo = (repo: string): string => repo.split('/').map(decodePart).join('/');
 
+const REPO_TAG_PREFIX = 'repo-';
 /** The tag that records an Azure work item's repository: repo- and the repository's name as Azure shows it. */
-export const repoTag = (repo: string): string => `repo-${decodePart(repo.split('/').at(-1)!)}`;
+export const repoTag = (repo: string): string => `${REPO_TAG_PREFIX}${decodePart(repo.split('/').at(-1)!)}`;
+/** Whether the tag records a work item's repository; Azure keeps a tag's case, so the board ignores it. */
+export const isRepoTag = (tag: string): boolean => tag.trim().toLowerCase().startsWith(REPO_TAG_PREFIX);
 
 /**
  * A repository's shown name: the part after the last `/` of `owner/name` or `organization/project/repository`, or all
@@ -927,7 +939,7 @@ export type SharedSetting = (typeof SHARED_SETTINGS)[number];
 export type SettingSource = 'local' | 'default';
 
 /** The repository writes the factory may need, each with its own verified credential access. */
-export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket', 'comment-ticket', 'type-ticket', 'relate-ticket'] as const;
+export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket', 'edit-ticket', 'tag-ticket', 'manage-labels', 'comment-ticket', 'type-ticket', 'relate-ticket'] as const;
 
 export type RepositoryOperation = (typeof REPOSITORY_OPERATIONS)[number];
 

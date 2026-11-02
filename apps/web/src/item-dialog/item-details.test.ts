@@ -4,6 +4,7 @@
 
 import { expect, test } from 'vite-plus/test';
 import { $, $$, detailsReply, detailsRead, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
+import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
@@ -49,7 +50,7 @@ test('while the details load the dialog shows the board data and a loading state
   await mountPage();
   await openItem('I_sample13');
   expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
-  expect(inDialog('[data-labels]')!.textContent).toBe('build');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
   expect(inDialog('[aria-busy="true"]'), 'the loading state').not.toBeNull();
   expect(description()).toBeNull();
 
@@ -120,9 +121,28 @@ test('a failed read shows its error in the modal and the board data stays visibl
   await reply(held, 'I_sample13', new Response(JSON.stringify({ error: 'Item details are not available yet.' }), { status: 501 }));
   expect(text(inDialog('[role="alert"]'))).toBe('Could not load the details: Item details are not available yet.');
   expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
-  expect(inDialog('[data-labels]')!.textContent).toBe('build');
   expect(text(inDialog('[data-slices] p'))).toBe('Slices · 1/3 done');
   expect(inDialog('[aria-busy="true"]')).toBeNull();
+});
+
+test('details hide managed and mapped labels, and show linked-work only as a locked note', async () => {
+  const labelled = { ...sample.items.find((i) => i.id === 'I_sample13')!, kind: 'bug' as const, labels: ['bug', 'status-ready', 'linked-work', 'urgent', 'type: bug'], labelColors: { urgent: '#B60205' } };
+  const setup = { vocabulary: effectiveVocabulary({ bug: { type: null, labels: ['type: bug'] } }).vocabulary } as NonNullable<BoardData['repos'][number]['setup']>;
+  await mountPage({ ...sample, repos: sample.repos.map((r) => r.repo === labelled.repo ? { ...r, setup } : r), items: sample.items.map((i) => i.id === labelled.id ? labelled : i) });
+  await openItem('I_sample13');
+  const chips = [...$$<HTMLElement>('[data-item-dialog] [data-labels] [data-label-chip]')];
+  expect(chips.map(text)).toEqual(['urgent']);
+  expect(chips[0]!.style.backgroundColor).toContain('color-mix');
+  expect(text(inDialog('[data-labels] [data-locked-label]'))).toBe('linked-work');
+  expect(text(inDialog('[data-kind-badge]'))).toBe('Bug');
+});
+
+test('details name labels as the tracker does: tags on Azure DevOps, with no locked note when linked-work is absent', async () => {
+  const azure = { ...sample.items.find((i) => i.id === 'I_sample13')!, repo: 'fabrikam/fiber/lar-factory', labels: ['web'] };
+  await mountPage({ ...sample, items: sample.items.map((i) => i.id === azure.id ? azure : i) });
+  await openItem('I_sample13');
+  expect(text(inDialog('[data-meta]'))).toContain('Tagsweb');
+  expect(inDialog('[data-locked-label]')).toBeNull();
 });
 
 test('a read that cannot reach the board fails the same way', async () => {
@@ -138,7 +158,7 @@ test('one read per open: live board data updates the board fields and leaves the
   expect(reads()).toEqual(['I_sample13']);
   const before = text(description());
   await push({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, labels: ['build', 'urgent'], updatedAt: '2026-10-21T09:30:00Z' } : i)) });
-  expect(inDialog('[data-labels]')!.textContent).toBe('buildurgent');
+  expect(inDialog('[data-labels]')!.textContent).toBe('urgent');
   expect(text(description())).toBe(before);
   expect(reads()).toEqual(['I_sample13']);
 });

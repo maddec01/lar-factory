@@ -4,12 +4,13 @@ import { inspectCleanup, executeCleanup, type CleanupPlan } from './work-cleanup
 // Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
 // commands in flight are private here, so every rule about which command blocks which lives in this file.
 
+import { changeKind, type KindChangeDeps } from '@lar-factory/work-records/change-kind';
 import { refreshSpecs } from '@lar-factory/work-records/spec-sync';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
-import type { BoardData, DriftChoice, FactoryThreadContext, Item, ModelChoice, ModelGroup, OperationAccess, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
+import { SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, SkillCheckOutcome, StartedThread, StartResult, Status, SwapKind } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
@@ -86,6 +87,14 @@ export interface ItemCommands {
    * the Dependency's as the board showed it, so a change since then refuses the write.
    */
   markDependencyMet(itemId: string, dependencyId: unknown, revision: unknown, met: unknown): Reply;
+  /**
+   * Gives an ordinary item `kind`, through the same path as `lar-work change-kind`, making its record first if it has none. The
+   * answer's `line` says what changed, also after a failure, its `itemId` where the item is now, and `labelChanges` the
+   * label writes the tracker took.
+   */
+  changeKind(itemId: string, kind: unknown): Promise<Reply & { labelChanges: LabelChange[]; ticketType: string | null }>;
+  /** Answers a kind disagreement with no tracker write: keep both kinds, or give the item the kind `ticketKind`, the one the user saw. */
+  answerKind(itemId: string, answer: unknown, ticketKind: unknown): Reply;
 }
 
 export interface ItemCommandsDeps {
@@ -124,6 +133,8 @@ export interface ItemCommandsDeps {
   skillsOf?: (repo: string) => readonly string[];
   /** Reopens the repository's PR `number`; tests stand in for gh and az. */
   reopenPr?: (repo: string, number: number) => Promise<void>;
+  /** The tracker of a kind change; tests stand in for it. */
+  kindTracker?: (repo: string) => Pick<KindChangeDeps, 'labels' | 'kinds'>;
 }
 
 type Action = 'queue' | 'back to List' | 'start' | 'abandon';
@@ -203,7 +214,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const checkout = (await checkouts(process.env)).find(p => p.id === projectId);
     if (!checkout) throw new Error('Cannot find the repository checkout.');
     return checkout.folder;
-  }, board, items, records, reread, archive, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
+  }, board, items, records, reread, archive, offerModelChoices, checkSkills, kindTracker, projectOf = currentRepositoryProject,
   baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
   buildAccessOf = (repo) => readRepositorySetups().find(setup => sameRepo(setup.repo, repo))?.access ?? {},
   showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
@@ -582,6 +593,49 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       } catch (error) { return withBoard(502, {error:(error as Error).message}); }
     },
     backToList: (itemId) => move(itemId, BACK_TO_LIST),
+
+    async changeKind(itemId, kind) {
+      const refused = (status: number, error: string) => ({ status, body: { error }, labelChanges: [], ticketType: null });
+      if (!SWAP_KINDS.includes(kind as SwapKind)) return refused(422, 'Choose Bug, Feature or Improvement.');
+      const item = board.find(itemId);
+      if (!item) return refused(404, GONE);
+      if (!kindCanChange(item.kind)) return refused(422, 'Only an ordinary item can change kind here.');
+      if (!records) return refused(409, 'The board has no work records.');
+      try {
+        let workId = itemId;
+        if (item.recorded === false) {
+          const ticket = await items.readTicket(item.repo, item.number);
+          if (!ticket) return refused(404, 'This issue is no longer open.');
+          workId = (await importPickedTicket(records, item.repo, ticket)).record.workId;
+          reread();
+        }
+        const setup = board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
+        const { line, error, labelChanges, ticketType } = await changeKind(records, workId, records.read(workId).revision, kind as SwapKind, { setup, ...kindTracker?.(item.repo) });
+        reread();
+        return { status: error ? 502 : 200, body: { error, line, itemId: workId }, labelChanges, ticketType };
+      } catch (error) {
+        reread();
+        return refused(error instanceof WorkRecordError ? 409 : 502, (error as Error).message);
+      }
+    },
+
+    answerKind(itemId, answer, ticketKind) {
+      const item = board.find(itemId);
+      if (!item) return withBoard(404, { error: GONE });
+      const disagreement = item.kindDisagreement;
+      if (!records || !disagreement || disagreement.ticketKind !== ticketKind) return withBoard(409, { error: "The kinds changed. Check the updated item." });
+      try {
+        const { revision } = records.read(itemId);
+        if (answer === 'keep') records.recordKindAnswer(itemId, revision, { answer: 'keep', ticketKind: disagreement.ticketKind });
+        else if (answer === 'update-item' && disagreement.ticketKind) records.update(itemId, revision, { kind: disagreement.ticketKind, agreedTicketKind: disagreement.ticketKind });
+        else return withBoard(422, { error: 'Choose keep or update-item.' });
+      } catch (error) {
+        reread();
+        return withBoard(error instanceof WorkRecordError ? 409 : 502, { error: (error as Error).message });
+      }
+      reread();
+      return withBoard(200, { error: null });
+    },
 
     start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {
       if (item.status !== 'Queued' && !canResumeShaping(item)) return reply(409, { error: `Only Queued items or stopped shaping sessions can be started; this one is in ${item.status}.` });

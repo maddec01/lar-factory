@@ -2,11 +2,11 @@
 import { structureSyncOperations, sameRepo, shownRepo, type Detected, type DomainDocLocation, type OnboardingChoices,
   type RepoConfig, type RepositoryItemSource, type RepositoryOperation, type SetupDetection } from '@lar-factory/shared';
 
-export const STEP_TITLES = { project: 'Repository', work: 'Work and docs', vocabulary: 'Kind vocabulary', access: 'Access and add' } as const;
+export const STEP_TITLES = { project: 'Repository', work: 'Work and docs', access: 'Access and add' } as const;
 export type StepId = keyof typeof STEP_TITLES;
 export const isStep = (id: string): id is StepId => Object.hasOwn(STEP_TITLES, id);
 export const found = <T>(fact: Detected<T>): T | null => 'found' in fact ? fact.found : null;
-export const stepsOf = (): StepId[] => ['project', 'work', 'vocabulary', 'access'];
+export const stepsOf = (): StepId[] => ['project', 'work', 'access'];
 export interface Answers {
   itemSource: RepositoryItemSource | null;
   role: string;
@@ -52,5 +52,5 @@ export const missingSyncAccess = (detection: SetupDetection): RepositoryOperatio
 export function operationTitle(op: RepositoryOperation, detection: Pick<SetupDetection, 'provider'>): string {
   const issue = detection.provider === 'GitHub' ? 'issues' : 'work items';
   return ({ 'push-branch': 'Push branches', 'open-pr': 'Open pull requests', 'publish-ticket': `Create ${issue}`,
-    'edit-ticket': `Edit ${issue}`, 'comment-ticket': 'Post comments', 'tag-ticket': 'Set labels or tags', 'type-ticket': 'Set item types', 'relate-ticket': 'Link items' })[op];
+    'edit-ticket': `Edit ${issue}`, 'comment-ticket': 'Post comments', 'tag-ticket': 'Set labels or tags', 'manage-labels': 'Manage labels or tags', 'type-ticket': 'Set item types', 'relate-ticket': 'Link items' })[op];
 }

@@ -4,29 +4,22 @@
 // and each type's state categories decide what is Done (Completed) and what is hidden (Removed).
 // A repo-<name> tag says which of the repositories reading the source a work item is for; an untagged one is for each.
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { STATUSES, decodePart, readTrackerStructure, trackerKind, parseConceptMap, labelStatuses, repoTag, sameRepo, statusLabel } from '@lar-factory/shared';
+import { STATUSES, decodePart, readTrackerStructure, trackerKind, parseConceptMap, labelStatuses, isRepoTag, repoTag, sameRepo, statusLabel } from '@lar-factory/shared';
 import type { AzureWorkItem, Blocker, Item, LinkedPr } from '@lar-factory/shared';
 import { AccessLost, NotFound, ReadProblem, TICKET_MATCHES, ticketNumberOf, type ItemSource, type ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { assertAzureCommandAllowed } from '@lar-factory/shared/azure-safety';
+import { API_VERSION, DEVOPS_RESOURCE, withFile, workItemPatch } from '@lar-factory/shared/provider-command';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 import { linkedPr, prIds, type AzurePr } from './azure-prs.ts';
 import { azureWrites } from './azure-writes.ts';
 
+export { API_VERSION, withFile, workItemPatch };
+
 /** Runs az with these arguments and resolves with its output, or throws its error. */
 export type Az = (args: string[]) => Promise<string>;
 
-/**
- * The REST API version every `az devops invoke` call passes, as invoke's own default is 5.0. invoke reads it as a
- * number, so a preview call passes `7.2-preview` and az adds the server's resource version: `7.2-preview.1` fails as 7.2.1.
- */
-export const API_VERSION = '7.1';
-/** The Entra resource of Azure DevOps, which az rest gets its token for. */
-const DEVOPS_RESOURCE = '499b84ac-1321-427f-aa17-267ca6975798';
 /** The flags every az call ends with: the organization, no organization read from the checkout, and JSON output. */
 export const orgFlags = (organization: string): string[] => ['--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json'];
 /** The most ids one workitemsbatch call reads. */
@@ -88,14 +81,6 @@ export async function azureGet<T>(url: string, run: Az = az): Promise<T> {
   } catch (err) { throw problemOf(err); }
 }
 
-/**
- * The `az rest` arguments that PATCH the work item `id` in `project` of `organization` with the JSON patch in `file`.
- * az devops invoke can't: of wit/workitems' two routes, ${type} to create and {id}, it always takes the first.
- */
-export const workItemPatch = (organization: string, project: string, id: number, file: string, version = API_VERSION): string[] => ['rest', '--method', 'patch',
-  '--resource', DEVOPS_RESOURCE, '--url', `https://dev.azure.com/${organization}/${encodeURIComponent(project)}/_apis/wit/workitems/${id}?api-version=${version}`,
-  '--headers', 'Content-Type=application/json-patch+json', '--body', `@${file}`, '--output', 'json'];
-
 /** A logged-out az or a missing azure-devops extension as the ReadProblem that names its fix; any other error as it is. */
 export function problemOf(err: unknown): unknown {
   const text = err instanceof Error ? err.message : String(err);
@@ -113,18 +98,6 @@ export function refusalOf(err: unknown): unknown {
   if (/TF400813|not authorized|Unauthorized|Forbidden/i.test(text)) return new AccessLost(text);
   if (/TF401180/.test(text)) return new NotFound(text);
   return problemOf(err);
-}
-
-/** Runs `use` on a temporary file holding `body` as JSON, for az's --in-file, and removes the file after. */
-export async function withFile<T>(body: unknown, use: (file: string) => Promise<T>): Promise<T> {
-  const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
-  try {
-    const file = join(dir, 'body.json');
-    await writeFile(file, JSON.stringify(body));
-    return await use(file);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
 }
 
 export interface RawWorkItem {
@@ -152,8 +125,6 @@ export const linked = (raw: RawWorkItem, rel: string) => (raw.relations ?? []).f
 /** The work item's tags, from System.Tags's "a; b". */
 const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';').map((t) => t.trim()).filter(Boolean);
 const STATUS_TAGS = new Set(STATUSES.flatMap((s) => (s === 'Done' ? [] : [statusLabel(s)])));
-/** Whether the tag records a work item's repository; Azure keeps a tag's case, so the board ignores it. */
-const isRepoTag = (tag: string) => tag.toLowerCase().startsWith('repo-');
 
 /** Where a work item shows: for its tagged repository, untagged for each of the source's, or nowhere (null). */
 type Placement = Pick<Item, 'repo' | 'untaggedFor'> | null;

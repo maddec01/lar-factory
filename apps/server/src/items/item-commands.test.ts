@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
+import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item, OperationAccess } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
@@ -669,4 +670,81 @@ test('cleanup confirmations replace previous item tokens and expire', async () =
   const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 11 * 60_000);
   try { assert.equal((await commands.executeOwnedCleanup(record.workId, { token: second.token })).status, 409); }
   finally { clock.mockRestore(); }
+});
+
+test('changing the kind of an item with no record makes its record first, and a failed swap leaves it with the old kind', async () => {
+  const records = await openRecords();
+  const ticket = queued(9, { recorded: false, status: 'List', statuses: [], kind: 'bug', labels: ['bug'] });
+  const board = createBoardState({ items: [ticket], repos: [{ repo: WEB, setup: { access: { 'tag-ticket': 'allowed' }, vocabulary: effectiveVocabulary({}).vocabulary } }], modelChoices: [] } as unknown as BoardData);
+  const source = { readTicket: async () => ({ number: 9, title: 'Item 9', url: ticket.url!, text: '', kind: 'bug' }) } as unknown as ItemSource;
+  let fail = true;
+  const commands = createItemCommands({ factoryContext: null, board, items: source, records, reread: () => {}, archive: () => [], offerModelChoices: () => [],
+    kindTracker: () => ({
+      labels: { addToTicket: async () => {}, removeFromTicket: async () => { if (fail) throw new Error('az failed: TF26071'); } },
+      kinds: { read: async () => ({ labels: ['bug'], type: 'Bug' }), setType: async () => {}, boardTypes: async () => null },
+    }) });
+  const failed = await commands.changeKind(ticket.id, 'feature');
+  const { itemId } = failed.body as { itemId: string };
+  assert.equal(failed.status, 502);
+  assert.equal(records.read(itemId).kind, 'bug');
+  assert.equal(records.read(itemId).ticket, `${WEB}#9`);
+  fail = false;
+  board.update({ items: recordItems(records, [], [WEB]) });
+  const retried = await commands.changeKind(itemId, 'feature');
+  assert.equal(retried.status, 200);
+  assert.equal(records.read(itemId).kind, 'feature');
+  assert.deepEqual(retried.labelChanges, [{ label: 'bug', action: 'remove' }]);
+});
+
+test('an item that can\'t change kind makes no record', async () => {
+  const records = await openRecords();
+  const concept = queued(9, { recorded: false, status: 'List', kind: 'concept' });
+  const { commands, board } = commandsOn([], undefined, records);
+  board.update({ items: [concept] });
+  assert.equal((await commands.changeKind(concept.id, 'bug')).status, 422);
+  assert.deepEqual(records.list({}), []);
+});
+
+/** A board showing record `workId` with this disagreement. */
+const disagreeing = (records: WorkRecords, kindDisagreement: Item['kindDisagreement']) => {
+  const { commands, board } = commandsOn([], undefined, records);
+  const { workId } = records.importTicket({ title: 'T', repository: WEB, kind: 'feature', ticket: `${WEB}#9` }).record;
+  board.update({ items: [queued(9, { id: workId, kind: 'feature', kindDisagreement })] });
+  return { commands, workId };
+};
+const TICKET_MOVED: NonNullable<Item['kindDisagreement']> = { ticketKind: 'bug', changed: 'ticket', kept: false, swap: { add: [], remove: [], type: null } };
+
+test('keeping both kinds records the answer for the two kinds and changes neither', async () => {
+  const records = await openRecords();
+  const { commands, workId } = disagreeing(records, TICKET_MOVED);
+  assert.equal(commands.answerKind(workId, 'keep', 'bug').status, 200);
+  assert.deepEqual(records.read(workId).kindAnswer, { answer: 'keep', itemKind: 'feature', ticketKind: 'bug' });
+  assert.equal(records.read(workId).kind, 'feature');
+});
+
+test('updating the item takes the ticket\'s kind, with no tracker write, and agrees with it', async () => {
+  const records = await openRecords();
+  const { commands, workId } = disagreeing(records, TICKET_MOVED);
+  assert.equal(commands.answerKind(workId, 'update-item', 'bug').status, 200);
+  assert.deepEqual(records.read(workId), { ...records.read(workId), kind: 'bug', agreedTicketKind: 'bug', kindAnswer: null });
+});
+
+test('an answer for kinds the board no longer shows changes nothing', async () => {
+  const records = await openRecords();
+  const { commands, workId } = disagreeing(records, TICKET_MOVED);
+  const before = records.read(workId);
+  assert.equal(commands.answerKind(workId, 'keep', 'improvement').status, 409);
+  assert.equal(commands.answerKind('gone', 'keep', 'bug').status, 404);
+  assert.deepEqual(records.read(workId), before);
+});
+
+test('an update has no kind to take from a ticket with none, and other answers refuse', async () => {
+  const records = await openRecords();
+  const { commands, workId } = disagreeing(records, { ...TICKET_MOVED, ticketKind: null, changed: 'item' });
+  const before = records.read(workId);
+  assert.equal(commands.answerKind(workId, 'update-item', null).status, 422);
+  assert.equal(commands.answerKind(workId, 'maybe', null).status, 422);
+  assert.deepEqual(records.read(workId), before);
+  assert.equal(commands.answerKind(workId, 'keep', null).status, 200);
+  assert.deepEqual(records.read(workId).kindAnswer, { answer: 'keep', itemKind: 'feature', ticketKind: null });
 });

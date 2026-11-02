@@ -54,6 +54,30 @@ const main = async () => {
     process.exitCode = 1;
     return;
   }
+  // A ticket's labels, by the REST calls item details makes: later reads see the change, like GitHub.
+  const ticketLabels = args[0] === 'api' && args[1] === '--method' && /^repos\/([\w.-]+\/[\w.-]+)\/issues\/(\d+)\/labels(?:\/([^/]+))?$/.exec(args[3]);
+  if (ticketLabels) {
+    if (options.fail === 'ticket-labels') { process.stderr.write('HTTP 403: Resource not accessible by integration'); process.exitCode = 1; return; }
+    const content = (options.repoIssues?.[ticketLabels[1]] ?? []).find((c) => c?.number === Number(ticketLabels[2]));
+    if (content) {
+      const added = args[2] === 'POST' ? JSON.parse(fs.readFileSync(0, 'utf8')).labels : [];
+      const removed = ticketLabels[3] ? decodeURIComponent(ticketLabels[3]) : null;
+      content.labels.nodes = [...content.labels.nodes.filter((l) => l.name !== removed), ...added.map((name) => ({ name }))];
+      fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    }
+    return output([]);
+  }
+  // A ticket's labels and type as a kind change reads them, and its type as that change writes it.
+  const ticketRead = args[0] === 'api' && args[1] === '--method' && /^repos\/([\w.-]+\/[\w.-]+)\/issues\/(\d+)$/.exec(args[3]);
+  if (ticketRead && ['GET', 'PATCH'].includes(args[2])) {
+    const content = (options.repoIssues?.[ticketRead[1]] ?? []).find((c) => c?.number === Number(ticketRead[2]));
+    if (content && args[2] === 'PATCH') {
+      if (options.fail === 'ticket-type') { process.stderr.write('HTTP 403: Resource not accessible by integration'); process.exitCode = 1; return; }
+      content.issueType = { name: JSON.parse(fs.readFileSync(0, 'utf8')).type };
+      fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    }
+    return output({ number: Number(ticketRead[2]), labels: content?.labels.nodes ?? [], type: content?.issueType ?? null });
+  }
   // Vocabulary fixtures answer only metadata discovery and explicitly saved new labels.
   const vocabularyPath = args[0] === 'api' && args.find((arg) => /^repos\/[\w.-]+\/[\w.-]+(?:\/(?:labels\?per_page=100|labels|issue-types))?$/.test(arg));
   if (options.vocabulary && vocabularyPath && args.includes('--method')) {
@@ -67,12 +91,22 @@ const main = async () => {
     }
     if (method === 'POST' && vocabularyPath.endsWith('/labels')) {
       if (vocabulary.failCreate) { process.stderr.write('HTTP 403: Label creation refused'); process.exitCode = 1; return; }
-      const name = args.find((arg) => arg.startsWith('name=')).slice(5);
+      const { name } = JSON.parse(fs.readFileSync(0, 'utf8'));
       vocabulary.labels.push(name);
       fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
       return output({ name });
     }
     throw new Error('Unexpected vocabulary write');
+  }
+  // A vocabulary fixture's label renamed or deleted by name.
+  const labelWrite = options.vocabulary && args[0] === 'api' && ['PATCH', 'DELETE'].includes(args[2]) && /^repos\/[\w.-]+\/[\w.-]+\/labels\/([^/]+)$/.exec(args[3]);
+  if (labelWrite) {
+    const { labels } = options.vocabulary;
+    const at = labels.indexOf(decodeURIComponent(labelWrite[1]));
+    const name = args[2] === 'PATCH' ? JSON.parse(fs.readFileSync(0, 'utf8')).new_name : null;
+    labels.splice(at, 1, ...name ? [name] : []);
+    fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    return name ? output({ name }) : undefined;
   }
   // Repository configuration reads are forbidden. Keep this sentinel to catch regressions.
   if (args[0] === 'api' && args.some((arg) => arg.includes('/contents/.lar-factory.json'))) {

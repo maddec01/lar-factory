@@ -2,11 +2,13 @@
 // read the ticket. The record owns Status, kind, title, structure, blockers, Dependencies and slices; the ticket adds its URL, labels,
 // PRs and provider fields. Spec sync can update title and brief; it never moves, restructures or blocks work.
 
-import { onAzure, parseConceptMap, refKey, sameRepo } from '@lar-factory/shared';
-import type { Blocker, DependencyHold, IssueRef, Item, NeedsYouOffer, Slice, SliceProgress } from '@lar-factory/shared';
+import { kindDisagreement, onAzure, parseConceptMap, refKey, sameRepo, ticketKindOf } from '@lar-factory/shared';
+import type { Blocker, DependencyHold, EffectiveVocabulary, IssueRef, Item, NeedsYouOffer, Slice, SliceProgress, SwapKind, TicketKindFacts } from '@lar-factory/shared';
 import type { Dependency, WorkRecord, WorkRecords } from '@lar-factory/work-records';
 import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
+
+type RecordSetup = { repo: string; structureSync?: boolean; writeRefinedSpec?: boolean; vocabulary?: EffectiveVocabulary };
 
 /** The number in a ticket reference, `owner/name#12`. */
 const ticketNumber = (ticket: string | null): number => (ticket ? Number(ticket.slice(ticket.lastIndexOf('#') + 1)) : 0);
@@ -65,8 +67,18 @@ export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> 
   return byTicket;
 }
 
+/** What a read ticket says about its kind. */
+const kindFacts = (ticket: Item): TicketKindFacts => ({ labels: ticket.labels, type: ticket.issueType ?? ticket.azure?.type ?? null });
+
+/** The kind `record` and its ticket agree on in the last read, or null when they don't, or that read didn't show the ticket. */
+export function agreedKind(record: WorkRecord, byTicket: ReadonlyMap<string, Item>, vocabulary: EffectiveVocabulary | undefined): SwapKind | null {
+  const ticket = record.ticket ? byTicket.get(record.ticket.toLowerCase()) : undefined;
+  const said = ticket && vocabulary ? ticketKindOf(record.kind, kindFacts(ticket), vocabulary) : null;
+  return said === record.kind ? said : null;
+}
+
 /** Maps records and their local completion facts to board items, alongside their latest ticket context. */
-function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly {repo:string;structureSync?:boolean;writeRefinedSpec?:boolean}[] = []) {
+function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly RecordSetup[] = []) {
   const byTicket = ticketsByReference(tickets);
   const requested = new Set(records.launchIntents({ unresolved: true }).filter(intent => intent.purpose === 'build').map(intent => intent.workId));
   const completions = new Map<string, ReturnType<WorkRecords['completion']>>();
@@ -94,8 +106,11 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     const done = isDone(record);
     const sync = setups.find(setup=>sameRepo(setup.repo,record.repository))?.structureSync === false ? undefined : records.trackerState(record.workId);
     const spec = setups.find(setup => sameRepo(setup.repo, record.repository))?.writeRefinedSpec === false ? null : records.specState(record.workId);
+    const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
+    const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
     const item: Item = {
       content: 'ticket', labels: [], linkedPrs: [], ...ticket && { labels: ticket.labels, linkedPrs: ticket.linkedPrs },
+      ...ticket?.labelColors && { labelColors: ticket.labelColors },
       ...ticket?.azure && { azure: ticket.azure }, ...ticket?.sourceOrder !== undefined && { sourceOrder: ticket.sourceOrder },
       ...ticket?.abandonRefusal && { abandonRefusal: ticket.abandonRefusal }, ...ticket?.currentSprint && { currentSprint: ticket.currentSprint },
       id: record.workId,
@@ -105,6 +120,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       completion: completionOf(record),
       ...(ticket?.tracker && {tracker: ticket.tracker}),
       ...(sync && {sync}),
+      ...(disagreement && { kindDisagreement: disagreement }),
       ...(spec && (spec.pending !== null || spec.error || spec.warning) && { specSync: { pending: spec.pending !== null, error: spec.error, warning: spec.warning } }),
       revision: record.revision,
       passingBrief: records.gate(record.workId).current,
@@ -142,7 +158,7 @@ const listed = (record: WorkRecord, repos: readonly string[]) => record.kind !==
  * hasn't read yet, a record with a ticket waits until its ticket is read.
  */
 export function recordItems(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[] = [],
-  hidden: ReadonlySet<string> = new Set(), setups: readonly {repo:string;structureSync?:boolean;writeRefinedSpec?:boolean}[] = []): Item[] {
+  hidden: ReadonlySet<string> = new Set(), setups: readonly RecordSetup[] = []): Item[] {
   const { ticketOf, toItem } = itemMapper(records, tickets, setups);
   const waits = (record: WorkRecord) => record.ticket !== null && !ticketOf(record) && unread.some((repo) => sameRepo(repo, record.repository));
   const all = records.list({});

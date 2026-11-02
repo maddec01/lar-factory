@@ -1,6 +1,7 @@
 // Shared durable create path for Add item, local conversion and retro captures.
-import { readTicketSpec, formatTicketSpec, validateDraft, effectiveIssueSettings, writeAccessProblem, onAzure, type TicketCreationOptions, type ItemDraft, type RepoConfig, type VocabularyKey } from '@lar-factory/shared';
+import { readTicketSpec, formatTicketSpec, validateDraft, effectiveIssueSettings, writeAccessProblem, onAzure, sameLabel, trackerCapabilities, type TicketCreationOptions, type ItemDraft, type RepoConfig, type TrackerLabels, type VocabularyKey } from '@lar-factory/shared';
 import { discoverTicketOptions } from '@lar-factory/shared/publication-settings';
+import { trackerLabels } from '@lar-factory/shared/tracker-labels';
 import { WORK_KINDS, WorkRecordError, type WorkKind, type WorkRecords } from './work-records.ts';
 import { refreshSpecs, rememberCreatedSpec } from './spec-sync.ts';
 import { structureProvider, type StructureProvider } from './tracker-sync.ts';
@@ -17,9 +18,10 @@ export interface TicketCaptureDeps {
   repos(): RepoConfig[];
   provider?: StructureProvider;
   discoverOptions?: (repo: RepoConfig) => Promise<TicketCreationOptions>;
+  labels?: (repo: string) => TrackerLabels;
 }
 
-export async function captureWork(input: Record<string, unknown>, { records, repos, provider = structureProvider(), discoverOptions = discoverTicketOptions }: TicketCaptureDeps,
+export async function captureWork(input: Record<string, unknown>, { records, repos, provider = structureProvider(), discoverOptions = discoverTicketOptions, labels = trackerLabels }: TicketCaptureDeps,
   target?: { workId: string; revision: number }): Promise<CaptureReply> {
   const repoOf = (value: unknown) => repos().find(repo => repo.repo === value);
   if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) {
@@ -77,8 +79,17 @@ export async function captureWork(input: Record<string, unknown>, { records, rep
     const problem = writeAccessProblem(draft.repo, 'publish-ticket', access, { azureReadOnly: repo.setup?.azureReadOnly });
     if (problem) { records.failCapture(input.requestId, problem); return reply(403, { error: problem }); }
     const mapping = repo.setup?.vocabulary[draft.kind as VocabularyKey];
-    const options = { ...draft.options };
+    const { newLabels = [], ...options } = draft.options ?? {};
     const safety = { azureReadOnly: repo.setup?.azureReadOnly };
+    /** Why the typed names can't go on this ticket. They are never dropped quietly, as hidden fields are below. */
+    const newLabelRefusal = (setup: RepoConfig['setup']) => {
+      if (!newLabels.length) return null;
+      const safety = { azureReadOnly: setup?.azureReadOnly };
+      return writeAccessProblem(draft.repo, 'tag-ticket', setup?.access ?? {}, safety) ?? writeAccessProblem(draft.repo, 'manage-labels', setup?.access ?? {}, safety);
+    };
+    const refusal = newLabelRefusal(repo.setup);
+    if (refusal) { records.failCapture(input.requestId, refusal); return reply(403, { error: refusal }); }
+    const toCreate: string[] = [];
     const labelsAllowed = !writeAccessProblem(draft.repo, 'tag-ticket', access, safety);
     const typesAllowed = !writeAccessProblem(draft.repo, 'type-ticket', access, safety);
     options.labels = labelsAllowed ? options.labels ?? mapping?.labels ?? [] : [];
@@ -87,11 +98,21 @@ export async function captureWork(input: Record<string, unknown>, { records, rep
     try {
       const available = await discoverOptions(repo);
       options.labels = options.labels.filter(label => available.labels.includes(label));
+      for (const name of newLabels) {
+        const existing = available.labels.find(label => sameLabel(label, name));
+        if (existing) options.labels = [...new Set([...options.labels, existing])];
+        else if (!toCreate.some(label => sameLabel(label, name))) toCreate.push(name);
+      }
       if (!available.types.includes(options.type ?? '')) options.type = undefined;
       if (!available.assignees.includes(options.assignee ?? '')) delete options.assignee;
       if (!available.milestones.some(m => m.value === options.milestone)) delete options.milestone;
       if (!available.iterations.includes(options.iteration ?? '')) delete options.iteration;
-    } catch {
+    } catch (err) {
+      if (newLabels.length) {
+        const error = `Could not read the tracker's labels to add ${newLabels.join(', ')}. ${(err as Error).message}`;
+        records.failCapture(input.requestId, error);
+        return reply(502, { error });
+      }
       options.labels = [];
       options.type = undefined;
       delete options.assignee;
@@ -121,6 +142,18 @@ export async function captureWork(input: Record<string, unknown>, { records, rep
       if (problem) { records.failCapture(input.requestId, problem); return reply(403, { error: problem }); }
       if (writeAccessProblem(draft.repo, 'tag-ticket', latest?.access ?? {}, safety)) options.labels = [];
       if (writeAccessProblem(draft.repo, 'type-ticket', latest?.access ?? {}, safety)) options.type = backlogType;
+      const refusal = newLabelRefusal(latest);
+      if (refusal) { records.failCapture(input.requestId, refusal); return reply(403, { error: refusal }); }
+      const { createUnavailable, noun } = trackerCapabilities(draft.repo);
+      // A tracker with no create of its own makes the label from the ticket's write, which then fails or succeeds as one.
+      for (const name of toCreate) {
+        try { options.labels = [...options.labels ?? [], createUnavailable ? name : (await labels(draft.repo).create({ name })).name]; }
+        catch (err) {
+          const error = `Could not create the ${noun} ${name}, so no ticket was created. ${(err as Error).message}`;
+          records.failCapture(input.requestId, error);
+          return reply(502, { error });
+        }
+      }
       const ticket = await provider.create(draft.repo, draft.title, body, options.type, areaPath, options);
       createdTicket = ticket;
       number = ticket.number;

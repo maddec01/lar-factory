@@ -1,7 +1,7 @@
 // Repository Settings save local choices and show effective issue defaults with verified Access.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, chooseOption, fetchMock, mountPage, openOptions, sample, settle, text } from '../../test/support.ts';
 import { effectiveVocabulary, type BoardData, type RepositorySetup } from '@lar-factory/shared';
 
 const REPO = 'team/app';
@@ -9,7 +9,7 @@ const REPO = 'team/app';
 const SETUP: RepositorySetup = {
   repo: REPO, role: 'Backend API server', itemSource: { kind: 'issues' }, labels: ['area: server'],
   domainDocs: { kind: 'off' }, skills: [], ...effectiveVocabulary(),
-  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
+  access: { 'push-branch': 'allowed', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'refused', 'tag-ticket': 'refused', 'manage-labels': 'unverified', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
   structureSync: true,
   sources: { createIssuesFromAddItem: 'default', createIssuesFromRetro: 'default', writeRefinedSpec: 'default', role: 'local', itemSource: 'default', labels: 'local', domainDocs: 'default', skills: 'default', vocabulary: 'default' },
 };
@@ -35,7 +35,7 @@ function serve(board: BoardData, answer: (body: Record<string, unknown>) => { st
 const row = () => $(`.settings-row[data-row="repo-${REPO}"]`)!;
 const dialog = () => $('[data-edit-dialog]');
 const setting = (key: string) => $(`[data-edit-dialog] [data-setting="${key}"]`)!;
-const buttonIn = (el: Element, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label);
+const buttonIn = (el: Element, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button:not([role="combobox"])')].find((b) => text(b) === label);
 
 async function type(into: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(into, value);
@@ -66,11 +66,11 @@ test('settings edit local values and show no repository setup file controls', as
 test('save changes a local setting and keeps a refused edit visible', async () => {
   const sent = serve(boardWith(), () => ({ status: 403, body: { error: 'This setting needs access.' } }));
   await openEdit(boardWith());
-  await type(setting('labels').querySelector('input')!, 'area: server, area: api');
-  await settle(() => buttonIn(setting('labels'), 'Save')!.click());
-  expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'labels', value: ['area: server', 'area: api'] }]);
+  await type(setting('skills').querySelector('input')!, 'testing, typing');
+  await settle(() => buttonIn(setting('skills'), 'Save')!.click());
+  expect(sent).toEqual([{ repo: REPO, change: 'override', key: 'skills', value: ['testing', 'typing'] }]);
   expect(text(dialog())).toContain('This setting needs access.');
-  expect(setting('labels').querySelector<HTMLInputElement>('input')!.value).toBe('area: server, area: api');
+  expect(setting('skills').querySelector<HTMLInputElement>('input')!.value).toBe('testing, typing');
 });
 
 test('access is a single optional summary and recheck runs a real probe', async () => {
@@ -150,9 +150,10 @@ test('legacy private domain docs display off and offer only on or off', async ()
   const board = boardWith({ domainDocs: { kind: 'private' } as unknown as RepositorySetup['domainDocs'] });
   serve(board);
   await openEdit(board);
-  const select = setting('domainDocs').querySelector('select')!;
-  expect(select.value).toBe('off');
-  expect([...select.options].map((option) => option.value)).toEqual(['off', 'repository']);
+  const select = setting('domainDocs').querySelector<HTMLElement>('[role="combobox"]')!;
+  expect(text(select)).toBe('Off');
+  expect(await openOptions(select)).toEqual(['Off', 'Write in build PRs']);
+  expect(dialog()!.compareDocumentPosition($('[role="listbox"]')!) & Node.DOCUMENT_POSITION_FOLLOWING, 'the list opens above the dialog').toBeTruthy();
 });
 
 const discovery = { provider: 'github', types: { state: 'available', choices: ['Task'] }, labels: { state: 'available', choices: ['bug', 'triage'] } };
@@ -163,7 +164,7 @@ async function openVocabulary() {
 }
 
 test('vocabulary suggestions are drafts and new labels wait for Save; failures retain the draft', async () => {
-  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } });
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed', 'type-ticket': 'allowed' } });
   const sent = serve(board, (body) => body.change === 'discover-vocabulary'
     ? { body: { discovery } } : { status: 403, body: { error: 'Label creation refused.' } });
   await openEdit(board);
@@ -174,15 +175,15 @@ test('vocabulary suggestions are drafts and new labels wait for Save; failures r
   const row = vocabularyRow('bug');
   expect(row.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false);
   await settle(() => buttonIn(row, 'Use suggested label: bug')!.click());
-  const select = row.querySelector('select')!;
-  await settle(() => { select.value = 'Task'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  const select = row.querySelector<HTMLElement>('[role="combobox"]')!;
+  await chooseOption(select, 'Task');
   await type(row.querySelector<HTMLInputElement>('input[type="text"]')!, 'needs review');
   expect(sent).toHaveLength(0);
   await settle(() => buttonIn(row, 'Save')!.click());
   expect(sent[0]).toEqual({ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: 'Task', labels: ['bug'] }, newLabels: ['needs review'] });
   expect(text(row)).toContain('Label creation refused.');
   expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('needs review');
-  expect(select.value).toBe('Task');
+  expect(text(select)).toBe('Task');
 });
 
 test('vocabulary explains refused reads and Access while still allowing explicit none', async () => {
@@ -202,8 +203,46 @@ test('vocabulary explains refused reads and Access while still allowing explicit
   expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: null, labels: [] } });
 });
 
+test('a mapped label gone from the tracker shows as unavailable and can be unticked and saved', async () => {
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed' }, ...effectiveVocabulary({ bug: { type: null, labels: ['renamed-away', 'bug'] } }) });
+  const sent = serve(board, (body) => body.change === 'discover-vocabulary' ? { body: { discovery } } : { body: { board, error: null } });
+  await openEdit(board);
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  expect(text(row)).toContain('renamed-away (unavailable)');
+  expect(text(row)).not.toContain('triage (unavailable)');
+  const stale = [...row.querySelectorAll('label')].find((label) => text(label).includes('renamed-away'))!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  await settle(() => stale.click());
+  expect(text(row)).not.toContain('renamed-away');
+  await settle(() => buttonIn(row, 'Save')!.click());
+  expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: null, labels: ['bug'] } });
+});
+
+test('a refused read does not call mapped labels unavailable', async () => {
+  const board = boardWith({ ...effectiveVocabulary({ bug: { type: null, labels: ['bug'] } }) });
+  serve(board, () => ({ body: { discovery: { ...discovery, labels: { state: 'refused', reason: 'Metadata read denied.' } } } }));
+  await openEdit(board);
+  await openVocabulary();
+  expect(text(vocabularyRow('bug'))).not.toContain('bug (unavailable)');
+});
+
+test('a typed managed name shows the reason and holds Save back', async () => {
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed' } });
+  const sent = serve(board, () => ({ body: { discovery } }));
+  await openEdit(board);
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  await type(row.querySelector<HTMLInputElement>('input[type="text"]')!, 'linked-work');
+  expect(text(row)).toContain("linked-work is reserved for the factory's saved links.");
+  expect(buttonIn(row, 'Save')!.disabled).toBe(true);
+  await type(row.querySelector<HTMLInputElement>('input[type="text"]')!, 'triage');
+  expect(text(row)).not.toContain('reserved');
+  expect(buttonIn(row, 'Save')!.disabled).toBe(false);
+  expect(sent.some((body) => body.change === 'vocabulary')).toBe(false);
+});
+
 test('a successful vocabulary save displays the provider result and clears the new label draft', async () => {
-  let board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } });
+  let board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed', 'type-ticket': 'allowed' } });
   const sent = serve(board, (body) => {
     if (body.change === 'discover-vocabulary') return { body: { discovery } };
     board = boardWith({ ...board.repos[0]!.setup!, ...effectiveVocabulary({ improvement: { type: 'Task', labels: ['triage'] } }) });
@@ -212,15 +251,53 @@ test('a successful vocabulary save displays the provider result and clears the n
   await openEdit(board);
   await openVocabulary();
   await type(vocabularyRow('improvement').querySelector<HTMLInputElement>('input[type="text"]')!, 'triage');
-  const select = vocabularyRow('improvement').querySelector('select')!;
-  await settle(() => { select.value = 'Task'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  await chooseOption(vocabularyRow('improvement').querySelector('[role="combobox"]')!, 'Task');
   await settle(() => buttonIn(vocabularyRow('improvement'), 'Save')!.click());
   const row = vocabularyRow('improvement');
   expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('');
-  expect(row.querySelector('select')!.value).toBe('Task');
+  expect(text(row.querySelector('[role="combobox"]'))).toBe('Task');
   expect([...row.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].filter((i) => i.checked)).toHaveLength(1);
   expect(text(row)).toContain('Saved.');
   expect(sent.filter((body) => body.change === 'vocabulary')).toHaveLength(1);
+});
+
+test('Settings offers no linked-work as a kind mapping, on either tracker, and an old mapping to it can still be cleared', async () => {
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed' }, ...effectiveVocabulary({ feature: { type: null, labels: ['linked-work'] } }) });
+  serve(board, (body) => (body.change === 'discover-vocabulary'
+    ? { body: { discovery: { provider: 'github', types: { state: 'available', choices: [] }, labels: { state: 'available', choices: ['bug', 'docs', 'linked-work', 'status-done', 'repo-web'] } } } } : { body: {} }));
+  await openEdit(board);
+  await openVocabulary();
+  const offered = (key: string) => $$<HTMLLabelElement>(`[data-vocabulary="${key}"] [role="group"] label`).map(text);
+  expect(offered('bug')).toEqual(['bug', 'docs', 'repo-web']);
+  expect(offered('feature'), 'held by the mapping, and on the tracker, so not unavailable').toEqual(['bug', 'docs', 'repo-web', 'linked-work']);
+});
+
+test("an Azure kind mapping offers no repo- tag, and uses the tracker's words", async () => {
+  const repo = 'organization/project/repository';
+  const board = boardWith({ repo, itemSource: { kind: 'azure-board', team: 'Delivery' }, access: { ...SETUP.access, 'tag-ticket': 'allowed' } });
+  serve(board, (body) => (body.change === 'discover-vocabulary'
+    ? { body: { discovery: { provider: 'azure', types: { state: 'available', choices: [] }, labels: { state: 'available', choices: ['repo-repository', 'docs'] } } } } : { body: {} }));
+  await openRepositories(board);
+  await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Edit')!.click());
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  expect([...row.querySelectorAll('[role="group"] label')].map(text)).toEqual(['docs']);
+  expect(row.querySelector('[role="group"]')!.getAttribute('aria-label')).toBe('Bug tags');
+  expect(text(row)).toContain('New tag');
+  expect(row.querySelector('input[type="text"]')!.getAttribute('aria-label')).toBe('Bug new tag');
+  expect(text($('[aria-label="Kind vocabulary"] > p'))).toBe('Map bugs, features and improvements to existing tags and types. Suggestions are optional.');
+});
+
+test('reading an Azure kind mapping says it reads tags', async () => {
+  const repo = 'organization/project/repository';
+  const board = boardWith({ repo, itemSource: { kind: 'azure-board', team: 'Delivery' } });
+  serve(board);
+  const serving = fetchMock.getMockImplementation() as unknown as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation((async (url: string, init?: RequestInit) => (url === '/api/repositories/settings' ? new Promise<Response>(() => {}) : serving(url, init))) as typeof fetchMock);
+  await openRepositories(board);
+  await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Edit')!.click());
+  await openVocabulary();
+  expect(text($('[aria-label="Kind vocabulary"] [role="status"]'))).toBe('Reading existing tags and types…');
 });
 
 test('Azure vocabulary uses discovered work item types and tags for any repository', async () => {
@@ -235,11 +312,37 @@ test('Azure vocabulary uses discovered work item types and tags for any reposito
   const row = vocabularyRow('bug');
   expect(text(row)).toContain('Work item type');
   expect(text(row)).toContain('Tags');
-  const select = row.querySelector('select')!;
-  await settle(() => { select.value = 'Defect'; select.dispatchEvent(new Event('change', { bubbles: true })); });
-  await settle(() => buttonIn(row, 'Use suggested label: bug')!.click());
+  await chooseOption(row.querySelector('[role="combobox"]')!, 'Defect');
+  await settle(() => buttonIn(row, 'Use suggested tag: bug')!.click());
   await settle(() => buttonIn(row, 'Save')!.click());
   expect(sent.find((body) => body.change === 'vocabulary')).toEqual({ repo, change: 'vocabulary', key: 'bug', value: { type: 'Defect', labels: ['bug'] } });
+});
+
+test('an upgraded setup with label management not checked can map existing labels but not type a new one', async () => {
+  const board = boardWith({ access: { ...SETUP.access, 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } });
+  const sent = serve(board, (body) => body.change === 'discover-vocabulary' ? { body: { discovery } } : { body: { setup: board.repos[0]!.setup } });
+  await openEdit(board);
+  expect(text($('[data-operation="manage-labels"]')!)).toBe('Manage labelsNot checked yet');
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.disabled).toBe(true);
+  expect(text(row)).toContain('Access to manage-labels is not checked yet.');
+  await settle(() => buttonIn(row, 'Use suggested label: bug')!.click());
+  await settle(() => buttonIn(row, 'Save')!.click());
+  expect(sent.find((body) => body.change === 'vocabulary')).toMatchObject({ key: 'bug', value: { labels: ['bug'] } });
+});
+
+test('Azure lists tag management and disables a new tag with the reason it has no create', async () => {
+  const repo = 'organization/project/repository';
+  const board = boardWith({ repo, itemSource: { kind: 'azure-board', team: 'Delivery' }, access: { ...SETUP.access, 'tag-ticket': 'allowed', 'manage-labels': 'allowed' } });
+  serve(board, () => ({ body: { discovery: { ...discovery, provider: 'azure' } } }));
+  await openRepositories(board);
+  await settle(() => buttonIn($(`.settings-row[data-row="repo-${repo}"]`)!, 'Edit')!.click());
+  expect(text($('[data-operation="manage-labels"]')!)).toBe('Manage tagsAllowed');
+  await openVocabulary();
+  const row = vocabularyRow('bug');
+  expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.disabled).toBe(true);
+  expect(text(row)).toContain('Azure DevOps has no way to create a tag on its own.');
 });
 
 test('Azure read-only vocabulary permits clearing mappings and blocks term selection', async () => {
@@ -253,7 +356,9 @@ test('Azure read-only vocabulary permits clearing mappings and blocks term selec
   expect(text(row)).toContain('read-only');
   expect(row.querySelector<HTMLInputElement>('input[type="text"]')!.disabled).toBe(true);
   expect(row.querySelector<HTMLInputElement>('input[type="checkbox"]')!.disabled).toBe(true);
-  expect([...row.querySelectorAll('option')].map((o) => [o.value, o.disabled])).toEqual([['', false], ['Task', true]]);
+  await openOptions(row.querySelector('[role="combobox"]')!);
+  expect($$('[role="option"]').map((o) => [text(o), o.hasAttribute('data-disabled')])).toEqual([['None', false], ['Task', true]]);
+  await settle(() => $('[role="listbox"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await settle(() => buttonIn(row, 'None')!.click());
   expect(buttonIn(row, 'Save')!.disabled).toBe(false);
 });

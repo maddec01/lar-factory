@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
@@ -16,6 +16,7 @@ import { syncStructures } from '@lar-factory/work-records/tracker-sync';
 import { createBoardState } from './board/board-state.ts';
 import { readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { observePr } from './config/pr-host.ts';
+import { changeRepositoryLabels } from './config/repository-labels.ts';
 import { changeRepositorySettings, readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, observeIssue, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
@@ -26,7 +27,7 @@ import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
 import { createPrObserver } from './items/pr-observer.ts';
 import { createRetention } from './items/retention.ts';
-import { archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
+import { agreedKind, archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
@@ -421,6 +422,23 @@ function refreshLocalNow(recordsChanged: boolean): void {
   runLocal(() => startAfter.startUnblocked());
 }
 
+/** Changes the ticket as last read and shows it, since each refresh of the records goes back to that read. */
+function showLabelChange(item: Item, { label, action }: LabelChange): void {
+  const ticket = ticketOf(item);
+  const labels = ticket?.labels.filter((name) => !sameLabel(name, label)) ?? [];
+  recordedItems({ items: tickets.map((t) => (t === ticket ? { ...t, labels: action === 'add' ? [...labels, label] : labels } : t)), waiting: unread });
+  showRecords();
+  board.push();
+}
+
+/** Shows a type the tracker just took, the way showLabelChange shows a label, until the next read reports it. */
+function showTicketType(item: Item, type: string): void {
+  const ticket = ticketOf(item);
+  recordedItems({ items: tickets.map((t) => (t === ticket ? { ...t, ...t.azure ? { azure: { ...t.azure, type } } : { issueType: type } } : t)), waiting: unread });
+  showRecords();
+  board.push();
+}
+
 /** Shows the work records as they are now with the last tickets read, and their T3 threads; stats only when `withStats`. */
 function showRecords(withStats = false): void {
   board.applyRead(recordedItems(), board.revision(), (shown) => withT3Reads(shown, withStats));
@@ -695,6 +713,7 @@ async function observeProviders(): Promise<void> {
       pr: (repo, number) => observePr(repo, number),
       known: (repo, number) => knownTicket(repo, number),
       waits: (repo) => quotaLow && !onAzure(repo),
+      agreedKind: (record) => agreedKind(record, ticketsByRef, board.snapshot().repos.find((r) => sameRepo(r.repo, record.repository))?.setup?.vocabulary),
     }, retention.hidden(), showRecords);
     // After the PR reads, so a concept whose last build merged finishes in the same pass.
     finishCompleted(records, repos);
@@ -743,11 +762,12 @@ const { server, endStreams } = createBoardServer({
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
     if (read.availability !== 'available') throw new Error('T3 unavailable');
   },
-  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), readSoon, ready: () => firstGhCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), showLabelChange, showTicketType, readSoon, ready: () => firstGhCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   detectSetup: (input) => detectSetup(input), saveSetup: (input) => saveSetup(input),
   changeRepositorySettings: (input) => changeRepositorySettings(input),
+  changeRepositoryLabels: (input) => changeRepositoryLabels(input),
 });
 
 /** Logs why the board can't start and exits. */

@@ -2,6 +2,8 @@
 import { providerCommand as commandOutput } from './provider-command.ts';
 import { decodePart, isRecord, onAzure, sameRepo, type RepositorySetup } from './index.ts';
 import { isRepo, readRepositorySetups } from './repository-settings.ts';
+import { typedLabelsProblem } from './tracker-capabilities.ts';
+import { trackerLabels } from './tracker-labels.ts';
 import { publicationSettingsSnapshot, type VocabularyCapability, type VocabularyDiscovery } from './vocabulary.ts';
 
 /** Authenticated GETs. GitHub list reads include every page; Azure reads return its JSON envelope. */
@@ -36,7 +38,7 @@ function failure(err: unknown): VocabularyCapability {
 }
 
 /** A valid empty response is available with zero choices. A malformed response is a refused read. */
-async function choices(read: () => Promise<unknown>): Promise<VocabularyCapability> {
+async function choices(read: () => Promise<unknown>, keep?: (rows: Record<string, unknown>[]) => void): Promise<VocabularyCapability> {
   try {
     const raw = await read();
     const list = Array.isArray(raw) ? raw.flatMap((page) => isRecord(page) && Array.isArray(page.value) ? page.value : page)
@@ -44,6 +46,7 @@ async function choices(read: () => Promise<unknown>): Promise<VocabularyCapabili
     if (!Array.isArray(list) || list.some((item) => !isRecord(item) || typeof item.name !== 'string' || !item.name.trim())) {
       throw new Error('The provider returned an unreadable list of terms.');
     }
+    keep?.(list as Record<string, unknown>[]);
     return { state: 'available', choices: [...new Set(list.filter((item) => item.isDisabled !== true).map((item) => item.name as string))] };
   } catch (err) { return failure(err); }
 }
@@ -65,8 +68,11 @@ export async function discoverVocabulary(repo: string, reads: VocabularyReads = 
       return choices(() => reads.github(`repos/${repo}/issue-types`));
     } catch (err) { return failure(err); }
   };
-  const [foundTypes, labels] = await Promise.all([types(), choices(() => reads.github(`repos/${repo}/labels?per_page=100`))]);
-  return { provider: 'github', types: foundTypes, labels };
+  const labelColors: Record<string, string> = {};
+  const [foundTypes, labels] = await Promise.all([types(), choices(() => reads.github(`repos/${repo}/labels?per_page=100`), (rows) => {
+    for (const { name, color } of rows) if (typeof color === 'string') labelColors[name as string] = color;
+  })]);
+  return { provider: 'github', types: foundTypes, labels, ...Object.keys(labelColors).length > 0 && { labelColors } };
 }
 
 export interface PublicationSettings {
@@ -87,15 +93,19 @@ export async function readPublicationSettings(repo: string, options: { dir?: str
 
 export { readRepositorySetups, setOverride, setVocabularyOverride, validateRepositorySettings } from './repository-settings.ts';
 
-/** Creates only names explicitly submitted with Save, after access and Azure safety checks. */
+/** Creates only names explicitly submitted with Save that the tracker lacks, after access and Azure safety checks. */
 export async function saveVocabularyLabels(repo: string, names: unknown, discovery: VocabularyDiscovery, access: Partial<RepositorySetup['access']>, create = createVocabularyLabel): Promise<string[]> {
   if (!Array.isArray(names) || names.some((name) => typeof name !== 'string' || !name.trim() || name.length > 100)) throw new Error('Enter nonempty new label names of at most 100 characters.');
   if (!names.length) return [];
-  const { writeAccessProblem } = await import('./write-access.ts');
-  const problem = writeAccessProblem(repo, 'tag-ticket', access);
-  if (problem) throw new Error(problem);
+  const refused = typedLabelsProblem(repo, names as string[]);
+  if (refused) throw new Error(refused);
   if (discovery.labels.state !== 'available') throw new Error('Recheck label access before creating labels.');
   const choices = [...discovery.labels.choices];
+  if ((names as string[]).some((name) => !choices.some((choice) => choice.toLowerCase() === name.trim().toLowerCase()))) {
+    const { newLabelProblem } = await import('./write-access.ts');
+    const problem = newLabelProblem(repo, access);
+    if (problem) throw new Error(problem);
+  }
   const resolved: string[] = [];
   for (const raw of names as string[]) {
     const name = raw.trim();
@@ -107,13 +117,7 @@ export async function saveVocabularyLabels(repo: string, names: unknown, discove
   return [...new Set(resolved)];
 }
 
-async function createVocabularyLabel(repo: string, name: string): Promise<string> {
-  if (onAzure(repo)) {
-    const [organization, project] = repo.split('/');
-    await jsonCommand('az', ['devops', 'invoke', '--area', 'wit', '--resource', 'tags', '--route-parameters', `project=${decodePart(project!)}`, `tagId=${name}`, '--http-method', 'PUT', '--api-version', '7.1', '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json']);
-  } else await jsonCommand('gh', ['api', '--method', 'POST', `repos/${repo}/labels`, '-f', `name=${name}`, '-f', 'color=ededed']);
-  return name;
-}
+const createVocabularyLabel = async (repo: string, name: string): Promise<string> => (await trackerLabels(repo).create({ name })).name;
 
 interface TicketOptionReads extends VocabularyReads {
   azureOptions(repo: string, team: string, field: 'assignees' | 'iterations'): Promise<unknown>;
@@ -156,6 +160,6 @@ export async function discoverTicketOptions(config: import('./model.ts').RepoCon
     }),
     azure ? list(() => reads.azureOptions(repo, team, 'iterations'), row => text(row.path)) : Promise.resolve([]),
   ]);
-  return { provider: vocabulary.provider, labels: vocabulary.labels.state === 'available' ? vocabulary.labels.choices : [],
+  return { provider: vocabulary.provider, labels: vocabulary.labels.state === 'available' ? vocabulary.labels.choices : [], ...vocabulary.labelColors && { labelColors: vocabulary.labelColors },
     types: vocabulary.types.state === 'available' ? vocabulary.types.choices : [], assignees, milestones, iterations, problems };
 }

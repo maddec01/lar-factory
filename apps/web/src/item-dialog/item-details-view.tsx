@@ -1,21 +1,27 @@
 // What the item dialog shows from an item's details: the description and comments in its main column, the people,
-// labels, dates, milestone or iteration and area in the meta area under its title, and the
+// kind control, labels and their picker, dates, milestone or iteration and area in the meta area under its title, and the
 // sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows its error in the
 // description's place; the board's own fields never wait. Once they load, Edit opens the description editor in the
 // description's place, with Save and Cancel under it; the extra sections, such as Acceptance Criteria, stay read-only.
 // Beside a work record's own text, the description and comments are the ticket's context and say so.
 
-import { useState, type ReactNode } from 'react';
-import { CircleCheck, CircleDot, Pencil } from 'lucide-react';
-import { onAzure, shortAgo } from '@lar-factory/shared';
-import type { IssueRef, Item, ItemComment, ItemDetails, TextFormat } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { CircleCheck, CircleDot, Lock, Pencil } from 'lucide-react';
+import { STRUCTURE_LABEL, SWAP_KINDS, kindCanChange, kindLabels, kindSwapAccessProblem, onAzure, sameRepo, shortAgo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
+import type { IssueRef, Item, ItemComment, ItemDetails, KindTicketSwap, SwapKind, TextFormat } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { FormSelect } from '@lar-factory/ui/form-select';
+import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';
-import { AzureFields, AgentWork, AgentWorkNote } from '../items/item-parts.tsx';
+import { AzureFields, AgentWork, AgentWorkNote, KIND_BADGES, LabelChips, useShownLabels } from '../items/item-parts.tsx';
+import { LabelPicker } from '../labels/label-picker.tsx';
+import { useBoardStore } from '../board/board-store.ts';
 import type { DescriptionEdit } from './use-description-edit.ts';
+import { useKindChangeStore } from './kind-change-store.ts';
+import { OPEN_ITEM_DIALOG } from './item-dialog-store.ts';
+import { useLabelEdit } from './use-label-edit.ts';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
 import type { DetailsEntry } from './details-cache.ts';
@@ -168,21 +174,170 @@ function FromDetails({ read, label, show }: { read: ItemDetailsRead; label: stri
   return shown ? <Fact label={label}>{shown}</Fact> : null;
 }
 
+const LABEL_ERROR = 'm-0 text-xs text-(--error-foreground)';
+
+/**
+ * The tracker's labels on the item, without those its row hides, and the picker that adds and removes them; linked-work
+ * shows only as a note, for the factory owns it. Without access the control is disabled with the reason. Local work has no labels.
+ */
+function ItemLabels({ item }: { item: Item }) {
+  const shown = useShownLabels(item);
+  const setup = useBoardStore((state) => state.data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup);
+  const edit = useLabelEdit(item);
+  const [open, setOpen] = useState(false);
+  const { heading, noun } = trackerCapabilities(item.repo);
+  if (!item.number) return <p data-local-labels className="m-0 text-xs text-(--muted-foreground)">Local work has no ticket, so it has a kind alone. Create a ticket to add {noun}s.</p>;
+  const linked = item.labels.some((l) => l.toLowerCase() === STRUCTURE_LABEL);
+  const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
+  const openChange = (next: boolean) => {
+    setOpen(next);
+    if (next) void edit.read();
+  };
+  return (
+    <Fact label={heading}>
+      <span className="flex flex-wrap items-center gap-1">
+        {(shown.length > 0 || linked) && <span className="contents" data-labels>
+          <LabelChips item={item} />
+          {linked && <span data-locked-label title="The factory manages this for saved links, so it can't be edited." className="inline-flex items-center gap-1 text-xs text-(--muted-foreground)"><Lock className="size-3 shrink-0" aria-hidden="true" />{STRUCTURE_LABEL}</span>}
+        </span>}
+        <Popover open={open} onOpenChange={openChange}>
+          <Popover.Trigger asChild>
+            <button type="button" data-edit-labels disabled={problem !== null} title={problem ?? undefined} aria-label={`Edit ${heading.toLowerCase()}`}
+              className="grid size-5 place-items-center rounded text-(--muted-foreground) hover:bg-(--accent) disabled:opacity-50 disabled:hover:bg-transparent"><Pencil className="size-3" /></button>
+          </Popover.Trigger>
+          <Popover.Content side="bottom" align="start">
+            <div className="grid w-72 gap-2">
+              {edit.choices
+                ? <LabelPicker heading={heading} choices={edit.choices} picked={item.labels} locked={kindLabels(item.kind, setup?.vocabulary)} busy={edit.saving} onToggle={(name) => void edit.toggle(name)} />
+                : !edit.error && <p role="status" className="m-0 text-xs text-(--muted-foreground)">Reading {noun}s…</p>}
+              {edit.error && <p role="alert" className={LABEL_ERROR}>{edit.error}</p>}
+            </div>
+          </Popover.Content>
+        </Popover>
+        {edit.error && !open && <span role="alert" className={LABEL_ERROR}>{edit.error}</span>}
+      </span>
+    </Fact>
+  );
+}
+
+const KIND_CHOICES = SWAP_KINDS.map((value) => {
+  const { name, icon: Icon } = KIND_BADGES[value]!;
+  return { value, name, icon: <Icon aria-hidden="true" /> };
+});
+
+/**
+ * The control that changes an ordinary item's kind, and what the last change did: the line it answered with, or why it stopped,
+ * what it changed on the ticket before that, and Retry for the same change. Concepts, decisions and builds don't have it.
+ * A write disables this control and takes away the button that answered, which drops focus to the page or the dialog, so it comes
+ * back here when the write ends. A control the user has moved to since keeps it.
+ */
+function ItemKindControl({ item }: { item: Item }) {
+  const change = useKindChangeStore((state) => state.changes[item.id]);
+  const saving = useKindChangeStore((state) => Boolean(state.changes[item.id]?.saving || state.answers[item.id]?.saving));
+  const control = useRef<HTMLButtonElement>(null);
+  const wasSaving = useRef(false);
+  useEffect(() => {
+    if (wasSaving.current && !saving && (document.activeElement === document.body || document.activeElement?.matches(OPEN_ITEM_DIALOG))) control.current?.focus();
+    wasSaving.current = saving;
+  }, [saving]);
+  const { start } = useKindChangeStore.getState();
+  if (!kindCanChange(item.kind)) return null;
+  return <>
+    <Fact label="Kind">
+      <span className="block w-44" data-item-kind-control>
+        <FormSelect ref={control} writesOnPick aria-label="Kind" placeholder="No kind" value={item.kind === 'issue' ? '' : item.kind} choices={KIND_CHOICES} disabled={change?.saving} onChange={(kind) => void start(item.id, kind as SwapKind)} />
+      </span>
+    </Fact>
+    {change?.error
+      ? <div role="alert" data-kind-change-failed className="grid w-full justify-items-start gap-1 text-xs text-(--error-foreground)">
+        <p className="m-0">{change.error}</p>
+        <p className="m-0">{change.line ? `Changed on the ticket so far: ${change.line}` : 'Nothing changed on the ticket.'}</p>
+        <Button {...kind('other')} loading={change.saving} onClick={() => void start(item.id, change.kind)}>Retry</Button>
+      </div>
+      : change?.line && <p role="status" data-kind-change-line className="m-0 w-full text-xs text-(--muted-foreground)">{change.line}</p>}
+  </>;
+}
+
+const kindName = (value: SwapKind) => KIND_BADGES[value]!.name;
+const NOTICE_HINT = 'm-0 text-xs text-(--muted-foreground)';
+
+/** What an update changes on the ticket, in the tracker's own words, and `note`, what it leaves alone and why. */
+function swapLine(item: Item, { add, remove, type }: KindTicketSwap, note: string): string {
+  const { noun } = trackerCapabilities(item.repo);
+  const parts = [...add.length || remove.length ? [`${noun} ${remove.join(', ') || 'none'} → ${add.join(', ') || 'none'}`] : [], ...type ? [`type ${type.from ?? 'none'} → ${type.to}`] : []];
+  if (parts.length) return `Update changes #${item.number}: ${parts.join(', ')}.${note}`;
+  return note ? `Update writes nothing to #${item.number}.${note}` : `Update writes nothing to #${item.number}, as ${kindName(item.kind as SwapKind)} has no mapped ${noun} or type.`;
+}
+
+/**
+ * How the item's kind and its ticket's disagree and the two answers, worded from whichever side moved. A kept answer holds until
+ * either kind changes and leaves a line whose Change shows the choice again here, with the answer standing until a new one replaces it.
+ * What an update writes comes from the details, which know the team's backlog, and only while their plan is for the kinds on show. Otherwise
+ * they are read again once for these kinds, and Update waits. The board's own read can't say, so it stands in only if that finds no plan.
+ */
+function KindNotice({ item, read, refresh }: { item: Item; read: ItemDetailsRead; refresh: () => Promise<boolean> }) {
+  const disagreement = item.kindDisagreement;
+  const saving = useKindChangeStore((state) => state.changes[item.id]?.saving);
+  const answering = useKindChangeStore((state) => state.answers[item.id]);
+  const setup = useBoardStore((state) => state.data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup);
+  const [reopened, setReopened] = useState(false);
+  const [readFor, setReadFor] = useState<string | null>(null);
+  const kinds = `${item.kind} ${disagreement?.ticketKind}`;
+  const held = read.state === 'loaded' ? read.details.kindPlan : undefined;
+  const plan = held?.itemKind === item.kind && held.ticketKind === disagreement?.ticketKind ? held : undefined;
+  const planStale = disagreement?.changed === 'item' && (!disagreement.kept || reopened) && read.state === 'loaded' && !plan && readFor !== kinds;
+  useEffect(() => {
+    if (!planStale) return;
+    let current = true;
+    detailsCache.drop(item.id);
+    void refresh().then(() => { if (current) setReadFor(kinds); });
+    return () => { current = false; };
+  }, [planStale, kinds, item.id, refresh]);
+  if (!disagreement) return null;
+  const { ticketKind, changed, kept } = disagreement;
+  const { swap, note } = plan ?? { swap: disagreement.swap, note: '' };
+  const { start, answer } = useKindChangeStore.getState();
+  if (kept && !reopened) {
+    return <p data-kind-kept className={`${NOTICE_HINT} w-full`}>{ticketKind ? `Ticket says ${kindName(ticketKind)}. Kept as is.` : 'Ticket has no kind. Left as is.'}{' '}
+      <button type="button" className="underline underline-offset-2 hover:text-(--foreground)" onClick={() => setReopened(true)}>Change</button></p>;
+  }
+  const mine = kindName(item.kind as SwapKind);
+  const said = ticketKind && kindName(ticketKind);
+  const keep = () => { setReopened(false); void answer(item.id, 'keep', ticketKind); };
+  const busy = saving || answering?.saving;
+  const ticketMoved = changed === 'ticket' && said !== null;
+  const checking = !ticketMoved && (read.state === 'loading' || planStale);
+  const shaped = `Shaping decided this is ${mine === 'Improvement' ? 'an' : 'a'} ${mine}.`;
+  const problem = ticketMoved ? null : kindSwapAccessProblem(item.repo, swap, setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
+  return (
+    <div data-kind-notice className="grid w-full gap-2 rounded-lg border border-(--border) p-3">
+      <p className="m-0 text-sm">{ticketMoved ? `The ticket now says ${said}. This item still says ${mine}.` : `${shaped} ${said ? `The ticket still says ${said}.` : 'The ticket has no kind.'}`}</p>
+      <span className="flex flex-wrap gap-2">
+        {ticketMoved
+          ? <Button {...kind('other')} disabled={busy} onClick={() => void answer(item.id, 'update-item', ticketKind)}>Update item to {said}</Button>
+          : <Button {...kind('other')} disabled={busy || checking || problem !== null} onClick={() => void start(item.id, item.kind as SwapKind)}>{said ? `Update ticket to ${mine}` : `Add ${mine} to ticket`}</Button>}
+        <Button {...kind('other')} disabled={busy} onClick={keep}>{ticketMoved ? `Keep item as ${mine}` : said ? `Keep ticket as ${said}` : 'Leave ticket as is'}</Button>
+      </span>
+      <p data-kind-notice-hint className={NOTICE_HINT}>{ticketMoved ? 'Changes this item only. Nothing is written to the ticket.' : checking ? 'Checking what the update changes…' : problem ?? swapLine(item, swap, note)}</p>
+      {answering?.error && <p role="alert" className={LABEL_ERROR}>{answering.error}</p>}
+    </div>
+  );
+}
+
 /**
  * The meta area under the title: author, assignees, labels, milestone or iteration and area, dates, a pull request item's
  * checks, and the agent work figures, which only show here while the dialog is too narrow for the header to hold them, or why
  * there are none. They wrap onto as many lines as the width needs. Labels, update time and checks come from the board.
  */
-export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRead; now: number }) {
+export function ItemMeta({ item, read, refresh, now }: { item: Item; read: ItemDetailsRead; refresh: () => Promise<boolean>; now: number }) {
   const azure = Boolean(item.repo && onAzure(item.repo));
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2" data-meta>
       {item.azure && <><Fact label="Azure type">{item.azure.type}</Fact><Fact label="Azure state">{item.azure.state}</Fact></>}
       <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
       <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
-      {item.labels.length > 0 && (
-        <Fact label="Labels"><span className="flex flex-wrap gap-1" data-labels>{item.labels.map((l) => <Badge key={l} className="h-auto max-w-full whitespace-normal py-px text-start wrap-anywhere">{l}</Badge>)}</span></Fact>
-      )}
+      <ItemKindControl item={item} />
+      <ItemLabels key={item.id} item={item} />
       {azure
         ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>
         : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}
@@ -190,6 +345,7 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
       <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
       <AgentWorkNote item={item} />
       <AgentWork item={item} className="@min-[40rem]:hidden" />
+      <KindNotice key={`${item.id} notice`} item={item} read={read} refresh={refresh} />
     </div>
   );
 }

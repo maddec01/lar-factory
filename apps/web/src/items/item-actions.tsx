@@ -1,4 +1,4 @@
-// The item dialog's buttons that move an item: Queue on a List item, Back to List on a Queued one and Abandon on
+// The item dialog's buttons that move an item: Queue on a List item, Move to List on a Queued one and Abandon on
 // both, each with its pending label.
 
 import { useId, useRef } from 'react';
@@ -29,8 +29,8 @@ export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
 export function BackToListButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);
   const moving = action?.phase === 'pending' && action.kind === 'back-to-list';
-  return <Button {...kind('other')} className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Back to List'} ${itemName(item)}`}
-    {...writeState(data, action)} onClick={() => void backToList(item.id)}>{moving ? 'Moving to List…' : 'Back to List'}</Button>;
+  return <Button {...kind('other')} className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Move to List'} ${itemName(item)}`}
+    {...writeState(data, action)} onClick={() => void backToList(item.id)}>{moving ? 'Moving to List…' : 'Move to List'}</Button>;
 }
 
 /** Abandon, a link in the footer; greyed out, with a line saying why, on an item whose provider can't abandon it. */

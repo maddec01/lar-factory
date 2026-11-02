@@ -28,7 +28,7 @@ function startedThread(item: Item, data: BoardData, start: StartState | undefine
   return (kind === 'refine' ? data.started : data.startedBuilds)?.[item.id] ?? (start?.phase === 'started' ? start.thread : undefined);
 }
 
-/** Whether Start is in flight, uncertain or done, which takes Back to List and Abandon away. */
+/** Whether Start is in flight, uncertain or done, which takes Move to List and Abandon away. */
 export function useStartHolds(item: Item, data: BoardData): boolean {
   const start = useStart(item.id);
   return Boolean(startedThread(item, data, start, 'refine')) || start?.phase === 'uncertain' || start?.phase === 'pending';

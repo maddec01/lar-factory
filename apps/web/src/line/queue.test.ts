@@ -294,7 +294,7 @@ test('in sample mode Shape issue still opens its menu, which starts nothing', as
   expect(posted()).toEqual([]);
 });
 
-test('Back to List from the dialog takes the item off the Queue', async () => {
+test('Move to List from the dialog takes the item off the Queue', async () => {
   holdPosts();
   await mountPage();
   await settle(() => row('I_sample05').click());

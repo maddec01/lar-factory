@@ -24,7 +24,7 @@ export type Notice =
   | { verb: 'Abandoned'; item: Item }
   /** The ticket of work Abandon set aside closed. */
   | { verb: 'Closed'; item: Item }
-  /** A Queued card's Back to List (`to`), Abandon, or the ticket close after it (`ticket`) failed. */
+  /** A Queued card's Move to List (`to`), Abandon, or the ticket close after it (`ticket`) failed. */
   | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; message: string }
   | { verb: 'Started'; item: Item; thread: StartedThread; kind: StartKind };
 

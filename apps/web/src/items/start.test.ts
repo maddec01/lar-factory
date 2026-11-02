@@ -14,7 +14,7 @@ const CHOICE_KEY = 'lar-board:model-choice';
 
 const start = (id = 'I_sample05') => $<HTMLButtonElement>(`[data-item-dialog] [data-start="${id}"]`)!;
 const card = () => $('[data-item-dialog]')!;
-/** The dialog's Back to List and Abandon. */
+/** The dialog's Move to List and Abandon. */
 const footer = () => card().querySelector('[data-back-to-list], [data-abandon]');
 const menu = () => $('[role="menu"]');
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
@@ -140,7 +140,7 @@ test('picking an entry starts the item with that model, shows the thread, and re
   expect(menu()).toBeNull();
   expect([text(start()), start().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
   expect(document.activeElement, 'focus is back on Start').toBe(start());
-  expect(footer(), 'no Back to List or Abandon while Start is pending').toBeNull();
+  expect(footer(), 'no Move to List or Abandon while Start is pending').toBeNull();
   await pressMenu(start());
   expect(menu(), 'no menu while a start is in flight').toBeNull();
 
@@ -170,7 +170,7 @@ test('a renamed thread still gets a short outcome in the toast', async () => {
   expect(localStorage.getItem(CHOICE_KEY), '"T3 default" stores as null').toBe('null');
 });
 
-test('a failed Start shows in the dialog, keeps Back to List and the last choice, and offers Retry start', async () => {
+test('a failed Start shows in the dialog, keeps Move to List and the last choice, and offers Retry start', async () => {
   localStorage.setItem(CHOICE_KEY, JSON.stringify({ instanceId: 'codex', model: 'gpt-5.5' }));
   await mountItem(withChoices);
   await open();
@@ -178,7 +178,7 @@ test('a failed Start shows in the dialog, keeps Back to List and the last choice
   await answer({ thread: null, error: 'T3 is down.' }, 502);
   expect(text(start())).toBe('Retry start ▾');
   expect(text(card().querySelector('p.start [role="alert"]'))).toBe('T3 is down.');
-  expect(footer(), 'a failed Start brings Back to List and Abandon back').not.toBeNull();
+  expect(footer(), 'a failed Start brings Move to List and Abandon back').not.toBeNull();
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!), 'a failure keeps the previous choice').toEqual({ instanceId: 'codex', model: 'gpt-5.5' });
   const close = card().querySelector<HTMLButtonElement>('p.start button.dismiss')!;
   expect(close.getAttribute('aria-label')).toBe('Dismiss error for #129');
@@ -189,7 +189,7 @@ test('a failed Start shows in the dialog, keeps Back to List and the last choice
   expect(document.activeElement).toBe(card().querySelector('[data-back-to-list]'));
 });
 
-test('a Start that may have run hides Start, Back to List and Abandon; closing its message leaves a tag', async () => {
+test('a Start that may have run hides Start, Move to List and Abandon; closing its message leaves a tag', async () => {
   await mountItem(withChoices);
   await open();
   await press(entries()[1]!);

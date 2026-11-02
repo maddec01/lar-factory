@@ -14,7 +14,7 @@ import type { ActionResult, RecoveryInspection } from './card-actions.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
 const LABELS: Record<NeedsYouOffer, string> = {
-  'start-again': 'Start again', 'back-to-queue': 'Back to Queue', 'back-to-list': 'Back to List',
+  'start-again': 'Start again', 'back-to-queue': 'Back to Queue', 'back-to-list': 'Move to List',
   'reopen-pr': 'Reopen PR', 'replace-pr': 'Start a replacement build', 'set-aside': 'Set aside', 'reopen-work': 'Reopen the work',
 };
 

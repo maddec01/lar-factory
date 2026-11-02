@@ -23,6 +23,7 @@ interface Editing {
 
 export interface DescriptionEdit {
   editing: boolean;
+  draft: string | null;
   /** Whether the draft differs from the description it opened on. */
   dirty: boolean;
   saving: boolean;
@@ -42,10 +43,11 @@ export function useDescriptionEdit(itemId: string, read: ItemDetailsRead, refres
   const update = useCallback((patch: Partial<Editing>) => setState((shown) => shown && { ...shown, ...patch }), []);
   // Stable, as the editor reads its baseline once per callback it is given.
   const change = useCallback((draft: string) => update({ draft }), [update]);
-  const setBaseline = useCallback((baseline: string) => update({ baseline }), [update]);
+  const setBaseline = useCallback((baseline: string) => setState((shown) => shown && { ...shown, baseline: shown.baseline ?? baseline }), []);
   const dirty = state?.draft != null && state.draft !== state.baseline;
   return {
     editing: state !== null,
+    draft: state?.draft ?? null,
     dirty,
     saving: state?.saving ?? false,
     error: state?.error ?? null,

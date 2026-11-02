@@ -9,12 +9,15 @@ parent, children and blockers. Before accepting an existing passing brief,
 run `lar-work gate <work ID>` to refresh its ticket Spec, inspect the sync
 warnings and held edits, then reread the brief and revision. A Reshape
 item keeps its brief text and gate history but has no current passing gate.
-Send it through Gate again before marking it Ready. Follow
+Send it through Gate again with new final confirmation before marking it Ready. Follow
 [Gate](gate.md) when the text changed or an edit needs approval. Then route:
 
 - A decision: [Decisions](concepts.md#decisions).
 - A record with a current passing brief, also when resuming a shaping
-  handoff: set **Ready** if it isn't and stop; report its readiness without starting a build.
+  handoff: accept it only when gate evidence records explicit user approval of
+  the current digest. If that evidence is missing, follow [Gate](gate.md),
+  including final confirmation. Otherwise set **Ready** if it isn't and stop;
+  report its readiness without starting a build.
 - Anything else: set Shaping. An **Explore subagent** reads existing project instructions when present,
   neighboring code conventions, its glossary and relevant ADRs ([where domain docs live](shared/domain-docs.md#where-domain-docs-live)),
   and the code this work touches, and returns ≤300 words in

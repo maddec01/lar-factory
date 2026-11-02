@@ -12,14 +12,14 @@ import { earlierShapePrompt, shapePrompt, larWork, startBoard, until, writesRepo
 import { projectsDb } from './stats-db.ts';
 
 /** A home and T3 database that outlive each board started on them, as this Mac's do across a restart. */
-function machine(t: TestContext) {
+function machine(t: TestContext, title = 'Issue 12') {
   const home = mkdtempSync(join(tmpdir(), 'lar-restart-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
   checkouts(home, { 'lar-factory': 'git@github.com:maddec01/lar-factory.git' });
   const env = { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/lar/lar-factory` }]) };
   /** Starts a board on this machine with the fake gh and t3 as `options` say, and `extra` in its environment; `recorded` imports issue 12 once, as onboarding did. */
   return (options: object = {}, recorded = false, extra: Record<string, string> = {}) =>
-    startBoard(t, { items: [boardIssue(12, 'Queued')], recorded, ...options }, false, false, { ...env, ...extra });
+    startBoard(t, { items: [{ ...boardIssue(12, 'Queued'), content: { ...boardIssue(12, 'Queued').content!, title } }], recorded, ...options }, false, false, { ...env, ...extra });
 }
 
 const start = (board: Board, workId: string) => board.postSession({ itemId: workId }, '/api/start');
@@ -105,28 +105,33 @@ test('a failed start stays a failure after a restart, so Start there asks T3 aga
 });
 
 test('a start left unresolved before threads took their phase in their name recovers its thread, and no second one starts', { timeout: 30_000 }, async (t) => {
-  const boardOn = machine(t);
+  const title = 'A long issue title '.repeat(6).trim();
+  const boardOn = machine(t, title);
   const before = await boardOn({ t3: { fail: 'garbage' } }, true);
   const workId = before.id(12);
   await until(before, (d) => d.items.some((i) => i.id === workId));
-  const message = earlierShapePrompt(before,'#12 Issue 12',workId);
+  const message = earlierShapePrompt(before,`#12 ${title}`,workId);
   assert.equal((await (await start(before, workId)).json()).uncertain, true);
   await before.stop();
 
   const after = await boardOn({ t3: { recover: 'late', firstMessage: message } });
   await until(after, (d) => d.items.some((i) => i.id === workId));
   const settled = await start(after, workId);
-  assert.deepEqual([settled.status, (await settled.json()).thread?.threadId], [200, 'thread-1']);
+  const recovered = (await settled.json()).thread;
+  assert.deepEqual([settled.status, recovered?.threadId], [200, 'thread-1']);
+  assert.ok(recovered.title.endsWith('…'));
+  assert.ok(recovered.title.length <= 80);
   assert.equal(await starts(after), 0);
   assert.deepEqual(await intents(after, workId), [{ threadId: 'thread-1', failure: false, resolved: true }]);
 });
 
 test('an uncertain start stays unresolved across a restart: T3 is read before anything, and no second thread starts', { timeout: 30_000 }, async (t) => {
-  const boardOn = machine(t);
+  const title = 'A long issue title '.repeat(6).trim();
+  const boardOn = machine(t, title);
   const before = await boardOn({ t3: { fail: 'garbage' } }, true);
   const workId = before.id(12);
   await until(before, (d) => d.items.some((i) => i.id === workId));
-  const message = shapePrompt(before,'#12 Issue 12',workId);
+  const message = shapePrompt(before,`#12 ${title}`,workId);
   assert.equal((await (await start(before, workId)).json()).uncertain, true);
   await before.stop();
 
@@ -141,7 +146,10 @@ test('an uncertain start stays unresolved across a restart: T3 is read before an
   const after = await boardOn({ t3: { recover: 'late', firstMessage: message } });
   await until(after, (d) => d.items.some((i) => i.id === workId));
   const settled = await start(after, workId);
-  assert.deepEqual([settled.status, (await settled.json()).thread?.threadId], [200, 'thread-1']);
+  const recovered = (await settled.json()).thread;
+  assert.deepEqual([settled.status, recovered?.threadId], [200, 'thread-1']);
+  assert.ok(recovered.title.endsWith('…'));
+  assert.ok(recovered.title.length <= 80);
   assert.equal(await starts(after), 0);
   assert.deepEqual(await intents(after, workId), [{ threadId: 'thread-1', failure: false, resolved: true }]);
   assert.equal((await after.board() as BoardData).items.find((i) => i.id === workId)?.status, 'Queued', 'settling a start moves no Status');

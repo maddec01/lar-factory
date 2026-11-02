@@ -524,3 +524,15 @@ test('an in flight row shows its coloured kind badge and label chips, and a buil
   expect(chips[0]!.style.backgroundColor).toContain('color-mix');
   expect(meta('I_sample13').querySelector('[data-kind-badge]')).toBeNull();
 });
+
+test('in flight marks stay on the title first line while meta keeps its baseline', async () => {
+  await mountPage();
+  for (const flight of rows()) {
+    const title = flight.querySelector<HTMLElement>('[data-title]')!;
+    expect(title.classList.contains('leading-5')).toBe(true);
+    expect(title.classList.contains('self-baseline')).toBe(true);
+    expect(title.parentElement!.classList.contains('items-start')).toBe(true);
+    expect(title.previousElementSibling!.classList.contains('top-1')).toBe(false);
+    expect(flight.querySelector('[data-line="1"]')!.classList.contains('self-start')).toBe(true);
+  }
+});

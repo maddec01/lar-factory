@@ -62,8 +62,8 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
         {/* Line 1 spans line 2's first four columns; the side action takes the repositories column across both lines.
             Below 1024 px, where a dossier drops that column, line 1 spans three and the action sits above the figures. */}
         <span className={`grid ${LINE2_A1} items-center gap-x-4 gap-y-1`} data-line2>
-          <span className="col-span-3 flex min-w-0 lg:col-span-4 flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-0.5" data-line="1">
-            <span className="flex min-w-0 items-baseline gap-1.5"><span className="relative top-1 shrink-0"><SourceIcon item={item} /></span><span className="min-w-0 wrap-anywhere text-[13px] font-medium" title={item.title} data-title><ItemTitle item={item} /></span></span>
+          <span className="col-span-3 flex min-w-0 lg:col-span-4 flex-wrap items-baseline gap-x-2 gap-y-0.5 self-start pt-0.5" data-line="1">
+            <span className="flex min-w-0 items-start gap-1.5"><span className="shrink-0"><SourceIcon item={item} /></span><span className="min-w-0 wrap-anywhere text-[13px] font-medium leading-5 self-baseline" title={item.title} data-title><ItemTitle item={item} /></span></span>
             <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-(--muted-foreground)" data-meta>
               <span>{item.status} · {threadText(item)} · {repo}</span>
               {item.linkedPrs[0] && <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(item.linkedPrs[0])}</span>}

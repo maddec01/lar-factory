@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vite-plus/test';
 import { executionItemThreads, protocolThreadById } from './item-execution.ts';
 
 describe('recorded thread lookup', () => {
-  const shell = { id: 'root', title: 'Build', updatedAt: '2026-10-31T12:00:00Z', archivedAt: '2026-10-31T12:00:00Z', status: 'idle' };
+  const shell = { id: 'root', title: 'Build', updatedAt: '2026-10-31T12:00:00Z', status: 'idle' };
   it('shows the recorded threads, archived ones too, whatever their first message names', () => {
-    const lookup = executionItemThreads([shell, { ...shell, id: 'other' }]);
+    const lookup = executionItemThreads([shell, { ...shell, id: 'other' }, { ...shell, id: 'put-away', archivedAt: shell.updatedAt }]);
     expect(lookup(['root'])).toEqual([{ id: 'root', title: 'Build', state: 'done', updated: shell.updatedAt }]);
+    expect(lookup(['put-away'])).toEqual([{ id: 'put-away', title: 'Build', state: 'done', archived: true, updated: shell.updatedAt }]);
   });
   it('leaves out a recorded thread T3 no longer has, and has nothing to show for work with no recorded thread', () => {
     const lookup = executionItemThreads([{ ...shell, id: 'gone', deletedAt: shell.updatedAt }]);

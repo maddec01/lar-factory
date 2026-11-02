@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vite-plus/test';
-import { readExecution, readThreadFamily, subscribeExecution, subscribeExecutionShell, executionCapabilities } from './execution-protocol.ts';
+import { readArchivedShells, readExecution, readThreadFamily, subscribeExecution, subscribeExecutionShell, executionCapabilities } from './execution-protocol.ts';
 import { ProjectProtocol } from './project-protocol.ts';
 const protocol = new ProjectProtocol({ read: async () => undefined, write: async () => {} },
   { issue: async () => { throw Error(); }, revoke: async () => {} }, async () => new Response(), 'unknown');
@@ -7,6 +7,7 @@ it('reports failed authentication without waiting for lookup or family timeout',
   const origin = new URL('http://127.0.0.1:3773');
   expect(await readExecution(origin, 'unknown', protocol, 'thread')).toEqual({ availability: 'renewal-required', observation: undefined });
   expect(await readThreadFamily(origin, 'unknown', protocol, 'thread')).toEqual({ availability: 'renewal-required' });
+  expect(await readArchivedShells(origin, 'unknown', protocol)).toEqual({ availability: 'renewal-required' });
 });
 it('refuses external origins before obtaining a session', () => {
   expect(() => subscribeExecution(new URL('http://example.com'), 'unknown', protocol, 'thread', () => {})).toThrow('Expected local T3 server');

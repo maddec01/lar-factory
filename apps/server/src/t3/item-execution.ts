@@ -1,46 +1,62 @@
 import { executionStats } from './execution-stats.ts';
-import { isLiveThread, type ItemThread, type StartedThread } from '@lar-factory/shared';
+import type { ItemThread, StartedThread } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
 import { boardProjects } from './board-projects.ts';
-import { readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead } from './execution-protocol.ts';
+import { readArchivedShells, readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead, type ThreadFamilyRead } from './execution-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 import { titledFrom } from './t3.ts';
+
+type Lineage = { parentThreadId?: string; rootThreadId?: string } | undefined;
+
+/** The threads above `id`, through its parents and its root, since T3's shells can leave out a thread between them. */
+function ancestorsOf(id: string, lineages: Map<unknown, Lineage>): Set<string> {
+  const above = new Set<string>();
+  let parent = lineages.get(id)?.parentThreadId;
+  while (parent && parent !== id && !above.has(parent)) {
+    above.add(parent);
+    parent = lineages.get(parent)?.parentThreadId;
+  }
+  const root = lineages.get(id)?.rootThreadId;
+  if (root && root !== id) above.add(root);
+  return above;
+}
 
 /** Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out. */
 export function executionItemThreads(shells: Record<string, unknown>[]) {
   const byId = new Map<string, ItemThread>();
-  const parents = new Map<string, { parent?: string; root?: string }>();
+  const lineages = new Map<unknown, Lineage>();
   for (const shell of shells) {
     if (typeof shell.id !== 'string' || shell.deletedAt) continue;
     if (typeof shell.updatedAt !== 'string' || !Number.isFinite(Date.parse(shell.updatedAt))) throw Error('Invalid execution timestamp');
     const state: ItemThread['state'] = shell.pendingRuntimeRequest ? 'needs you'
       : ['preparing', 'starting', 'running', 'waiting'].includes(String(shell.status)) ? 'running'
       : ['failed', 'interrupted', 'cancelled'].includes(String(shell.status)) ? 'stopped' : 'done';
-    byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, ...(!shell.pendingRuntimeRequest && shell.status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && shell.status === 'queued' ? { queued: true as const } : {}), updated: shell.updatedAt });
-    const lineage = shell.lineage as { parentThreadId?: string; rootThreadId?: string } | undefined;
-    parents.set(shell.id, { parent: lineage?.parentThreadId, root: lineage?.rootThreadId });
+    byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, ...(!shell.pendingRuntimeRequest && shell.status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && shell.status === 'queued' ? { queued: true as const } : {}), ...(shell.archivedAt ? { archived: true as const } : {}), updated: shell.updatedAt });
+    lineages.set(shell.id, shell.lineage as Lineage);
   }
   for (const thread of byId.values()) {
     if (thread.state !== 'running' && thread.state !== 'needs you' && !thread.queued) continue;
-    const seen = new Set([thread.id]);
-    const root = parents.get(thread.id)?.root;
-    if (root && root !== thread.id && byId.has(root)) { byId.get(root)!.hasLiveChildren = true; if (thread.currentRunning) byId.get(root)!.hasRunningChildren = true; }
-    let parent = parents.get(thread.id)?.parent;
-    while (parent && !seen.has(parent)) {
-      seen.add(parent);
-      if (byId.has(parent)) { byId.get(parent)!.hasLiveChildren = true; if (thread.currentRunning) byId.get(parent)!.hasRunningChildren = true; }
-      parent = parents.get(parent)?.parent;
+    for (const id of ancestorsOf(thread.id, lineages)) {
+      const ancestor = byId.get(id);
+      if (!ancestor) continue;
+      ancestor.hasLiveChildren = true;
+      if (thread.currentRunning) ancestor.hasRunningChildren = true;
     }
   }
-  /** The recorded threads T3 shows, newest first; undefined for work with no recorded thread. */
+  /** The recorded threads T3 shows, newest first and archived ones last, since archiving updates a thread; undefined for work with no recorded thread. */
   return (threadIds: readonly string[]): ItemThread[] | undefined => threadIds.length
-    ? threadIds.flatMap((id) => byId.get(id) ?? []).sort((a, b) => b.updated.localeCompare(a.updated)) : undefined;
+    ? threadIds.flatMap((id) => byId.get(id) ?? []).sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || b.updated.localeCompare(a.updated)) : undefined;
 }
 
 /** The last lookup the board read while T3 could be read, kept through an outage, and when it read it. */
 let lastSeen: { lookup: ReturnType<typeof executionItemThreads>; observedAt: string } | undefined;
 
-let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
+/** The archived list T3 last answered, kept through a failed read. */
+let lastArchived: Record<string, unknown>[] = [];
+/** How long one read of the archived list answers. Refresh runs about every 2 seconds. Any recorded thread missing from the active shells asks for the list, so with one the board reads it every 30 seconds for the server's life. */
+const ARCHIVED_READ_MS = 30_000;
+
+let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; demandArchived?(): void; archivedCurrent?(): boolean; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; shownShells?: Record<string, unknown>[]; shellIds?: Set<unknown>; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
 /**
  * The recorded threads as T3 shows them now. While T3 can't be read, each thread's last observation with when the board
  * saw it, or 'unavailable' once one was never seen. Failures never become empty success.
@@ -97,6 +113,37 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
         }
         drain();
       };
+      let archivedReading = false;
+      let archivedReadAt = -Infinity;
+      let archivedFresh = false;
+      let archivedEpoch = 0;
+      const forgetArchived = () => { archivedEpoch++; archivedFresh = false; archivedReadAt = -Infinity; };
+      /** The shells a thread lookup shows: the subscribed ones, which win, then the archived list. */
+      const showShells = () => {
+        state.shownShells = [...state.shells!, ...lastArchived.filter(shell => !state.shellIds!.has(shell.id))];
+        state.lookup = executionItemThreads(state.shownShells);
+        lastSeen = { lookup: state.lookup, observedAt: state.observedAt! };
+      };
+      state.archivedCurrent = () => archivedFresh && Date.now() - archivedReadAt < ARCHIVED_READ_MS;
+      state.demandArchived = () => {
+        if (!state.available || archivedReading || Date.now() - archivedReadAt < ARCHIVED_READ_MS) return;
+        archivedReading = true;
+        archivedReadAt = Date.now();
+        const startedEpoch = archivedEpoch;
+        void readArchivedShells(origin, version, protocol).catch((): ThreadFamilyRead => ({ availability: 'unavailable' })).then(read => {
+          if (current !== state) return;
+          const threads = read.availability === 'available' ? read.observation?.threads : undefined;
+          try {
+            if (!threads) throw Error('T3 archived threads unavailable');
+            executionItemThreads(threads);
+          } catch { archivedFresh = false; return; }
+          lastArchived = threads;
+          showShells();
+          // A thread that left the active shells during the read may be missing from its answer.
+          if (startedEpoch === archivedEpoch) archivedFresh = true;
+          else archivedReadAt = -Infinity;
+        }).finally(() => { archivedReading = false; });
+      };
       state.reads = entries;
       state.fingerprints = fingerprints;
       state.stop = subscribeExecutionShell(origin, version, protocol, read => {
@@ -105,6 +152,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
           fingerprints.clear();
           queued.clear();
           retryAt.clear();
+          forgetArchived();
         }
         state.shell = read;
         state.available = false;
@@ -112,10 +160,12 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
           // Shell events already contain status and runtime requests. History reads must not delay those facts.
           try {
             const shells = [...read.observation.snapshot.threads as Record<string, unknown>[], ...read.observation.snapshot.archivedThreads as Record<string, unknown>[]];
-            state.lookup = executionItemThreads(shells);
+            const ids = new Set(shells.map(shell => shell.id));
+            if ([...state.shellIds ?? []].some(id => !ids.has(id))) forgetArchived();
             state.shells = shells;
+            state.shellIds = ids;
             state.observedAt = read.observation.observedAt;
-            lastSeen = { lookup: state.lookup, observedAt: state.observedAt };
+            showShells();
             state.available = true;
           } catch { state.available = false; }
         }
@@ -123,7 +173,10 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
     } catch { state.available = false; }
   }
   if (!threadIds.length) return undefined;
-  if (current.available) return current.lookup?.(threadIds);
+  if (current.available) {
+    if (threadIds.some(id => !current!.shellIds?.has(id))) current.demandArchived?.();
+    return current.lookup?.(threadIds);
+  }
   const seen = lastSeen?.lookup(threadIds);
   if (!lastSeen || seen?.length !== threadIds.length) return 'unavailable';
   const { observedAt } = lastSeen;
@@ -161,7 +214,7 @@ function executionAvailable(shell: Record<string, unknown>): boolean {
 export function protocolThreadById(threadId: string): ExecutionRead {
   protocolItemThreads([]);
   const read = current?.reads?.get(threadId);
-  const shell = current?.shells?.find(shell => shell.id === threadId);
+  const shell = current?.shownShells?.find(shell => shell.id === threadId);
   if (shell) current?.demand?.([shell]);
   return { availability: shell && executionAvailable(shell) && read ? read.availability : 'unavailable',
     ...(read?.observation ? { observation: read.observation } : {}) };
@@ -170,14 +223,34 @@ export function protocolThreadById(threadId: string): ExecutionRead {
 /** A thread as cleanup needs it. Absence from a snapshot doesn't prove deletion; only `lookupThread` confirms it. */
 export type ThreadCleanupState = 'unavailable' | 'absent' | { archived: boolean; settled: boolean; live: boolean };
 
-/** One thread's cleanup state from the current shell snapshot only, never from the retained last observation. */
+/** T3's shell statuses with no run at work or held up (`OrchestrationV2ShellThreadStatus` at the reference commit). Cleanup treats any other status, or none, as live, since deleting a thread cancels its runs. */
+const IDLE_STATUSES = new Set(['idle', 'completed', 'interrupted', 'failed', 'cancelled', 'rolled_back']);
+
+/** Work a shell's `status`, the latest unheld run, can hide (`isLiveSubagentShell` at the reference commit). A field another T3 release leaves out or sends in another form says nothing. */
+const hasHiddenWork = ({ activityRunStatus, pendingBackgroundTasks }: Record<string, unknown>): boolean =>
+  typeof activityRunStatus === 'string' || (Array.isArray(pendingBackgroundTasks) && pendingBackgroundTasks.length > 0);
+
+/** Whether the thread or a descendant T3 still has might be at work. */
+function mayBeLive(threadId: string, shells: Record<string, unknown>[]): boolean {
+  const lineages = new Map(shells.map(shell => [shell.id, shell.lineage as Lineage]));
+  return shells.some(shell => !shell.deletedAt && (!!shell.pendingRuntimeRequest || !IDLE_STATUSES.has(String(shell.status)) || hasHiddenWork(shell))
+    && (shell.id === threadId || ancestorsOf(String(shell.id), lineages).has(threadId)));
+}
+
+/**
+ * One thread's cleanup state from the current shell snapshot and, for a thread it lacks, a current read of the archived
+ * list, never from a retained last observation. Without such a read the thread may be archived, so it is unavailable.
+ */
 export function threadCleanupState(threadId: string): ThreadCleanupState {
   protocolItemThreads([]);
   if (!current?.available) return 'unavailable';
-  const shell = current.shells?.find(shell => shell.id === threadId);
-  const thread = current.lookup?.([threadId])?.[0];
-  if (!shell || !thread) return 'absent';
-  return { archived: !!shell.archivedAt, settled: !!shell.settledAt || shell.settledOverride === 'settled', live: isLiveThread(thread) };
+  if (!current.shellIds?.has(threadId) && !current.archivedCurrent?.()) {
+    current.demandArchived?.();
+    return 'unavailable';
+  }
+  const shell = current.shownShells?.find(shell => shell.id === threadId);
+  if (!shell || shell.deletedAt) return 'absent';
+  return { archived: !!shell.archivedAt, settled: !!shell.settledAt || shell.settledOverride === 'settled', live: mayBeLive(threadId, current.shownShells!) };
 }
 
 /** Complete current observations only; no database fallback for timing facts. */
@@ -185,7 +258,7 @@ export function protocolStatsInputs(threadIds?: readonly string[]) {
   if (threadIds?.length === 0) return executionStats([]);
   protocolItemThreads([]);
   if (!current?.available || !current.reads) throw Error('T3 execution unavailable');
-  const shells = (current.shells ?? []).filter(shell => !shell.deletedAt);
+  const shells = (current.shownShells ?? []).filter(shell => !shell.deletedAt);
   const wanted = threadIds ? new Set(threadIds) : undefined;
   if (wanted) {
     let added = true;

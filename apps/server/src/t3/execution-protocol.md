@@ -4,7 +4,8 @@ Server callers use `readExecution` for bounded thread-ID lookup and
 `subscribeExecution` for retained timestamped thread projections. Both reuse
 `ProjectProtocol.subscriptionSession` and the project Effect RPC ticket transport.
 `readThreadFamily` reads active family shells. `subscribeExecutionShell` reads
-projects, active threads and archived threads. Consumers must check availability
+projects and active threads, and `readArchivedShells` reads archived threads.
+Consumers must check availability
 before treating a retained observation as current. Neither failure nor an empty
 family establishes deletion. Only `t3 thread show` confirms a deletion.
 
@@ -47,6 +48,26 @@ same completed observation. While T3 can't be read, each recorded thread shows
 its last observation with that observation's time, or unavailable once one was
 never seen. A recorded thread missing from a completed snapshot is left out
 until the T3 CLI confirms it deleted. Stats use the same completed protocol observation.
+
+T3's `orchestration.subscribeShell` always sends `archivedThreads: []`
+(`buildActiveShellSnapshot` in apps/server/src/orchestration-v2/ShellStream.ts), and
+archiving a thread sends `thread.removed` for the active list. `readArchivedShells`
+calls `orchestration.getArchivedShellSnapshot` (packages/contracts/src/orchestrationV2.ts:3572
+and 4122). `item-execution.ts` issues that read only when a caller asks about a thread
+the active shells lack, and at most once in 30 seconds unless a thread leaves the
+active shells. A failed read keeps the last list for display. Thread start recovery and
+live worktree paths keep reading the subscribed shells alone. An item's archived
+threads sort after its other threads because archiving updates `updatedAt`. T3 opens
+New thread for an archived thread's `t3code://threads/...` link, so the board shows
+such a thread as archived and never links it.
+
+Archived read proof, 2026-11-02, T3 0.1.7-nightly.20261102.4066, port 3773: three calls
+on one connection returned 51 threads, 8 projects and about 120 KB in 54, 14 and 14 ms,
+with `archivedAt` set on the archived test thread. The list here is small beside the
+3,000 or more active threads, but a read opens a connection and parses the whole list.
+The board skips it only while every recorded thread is in the active shells. Any
+recorded thread missing from them, such as an archived thread, starts a read every 30
+seconds for the server's life.
 
 
 Stats coverage (#709): `execution-stats.ts` maps providerTurns to turn intervals,
@@ -119,7 +140,9 @@ rejection (`Orchestrator.ts`, `OrchestratorCommandPreviouslyRejectedError`), so 
 after `rejected` uses a new one.
 
 `threadCleanupState` in `item-execution.ts` answers from the current shell snapshot
-and never from the retained observation, so the shaping thread sweep reads a thread
-just before it sends a command. Spawned test boards replace `item-execution.ts`
+and, for a thread that snapshot lacks, from an archived read still within its 30
+seconds. It never answers from a retained observation, so the shaping thread sweep
+reads a thread just before it sends a command. Without a current archived read it
+answers unavailable, never absent. Spawned test boards replace `item-execution.ts`
 with `test/execution-observations.ts`, whose answer is always unavailable, so no
 server run reaches these commands.

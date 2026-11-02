@@ -17,7 +17,7 @@ test('confirmed latest deletion survives reopening, but live work and a newer th
     records.close();
     records = await openWorkRecords(join(dir, 'records.db'));
     const item = { ...recordItems(records, [], ['owner/repo'])[0]!, threads: [] };
-    expect(deletedThreadNotice(records, item)).toMatchObject({ deletedThread: true, deletedThreadPurpose: 'shape', offers: ['start-again', 'back-to-queue', 'back-to-list'] });
+    expect(deletedThreadNotice(records, item)).toMatchObject({ deletedThread: true, startAgainPurpose: 'shape', offers: ['start-again', 'back-to-queue', 'back-to-list'] });
     expect(deletedThreadNotice(records, { ...item, threads: 'unavailable' })).toBeUndefined();
     expect(deletedThreadNotice(records, { ...item, threads: [{ id: 'live', state: 'running' } as never] })).toBeUndefined();
     records.addThread(record.workId, record.revision, 'new', 'shape');
@@ -58,7 +58,7 @@ test('a thread deleted on a closed ticket names both causes and adds Abandon to 
   const dir = mkdtempSync(join(tmpdir(), 'deleted-notice-'));
   const { records, notice } = await deletedBuild(dir, 'records.db', null, [{ type: 'ticket-closed' }]);
   try {
-    expect(notice).toEqual({ reason: 'The latest work thread was deleted. Its ticket owner/repo#1 closed in its provider.', deletedThread: true, deletedThreadPurpose: 'build',
+    expect(notice).toEqual({ reason: 'The latest work thread was deleted. Its ticket owner/repo#1 closed in its provider.', deletedThread: true, startAgainPurpose: 'build',
       causes: [{ type: 'ticket-closed' }], ticketOpen: false, offers: ['start-again', 'back-to-queue', 'back-to-list', 'set-aside'] });
   } finally { records.close(); rmSync(dir, { recursive: true, force: true }); }
 });

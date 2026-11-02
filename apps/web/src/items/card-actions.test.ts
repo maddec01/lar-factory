@@ -239,7 +239,7 @@ test.each([false, true])('deleted-thread move inspects cleanup and cleans only a
   const item = data.items[0]!;
   item.status = 'In progress';
   item.passingBrief = false;
-  item.needsYou = { reason: 'Thread deleted', causes: [], ticketOpen: false, deletedThread: true, deletedThreadPurpose: 'build', offers: ['back-to-list'] };
+  item.needsYou = { reason: 'Thread deleted', causes: [], ticketOpen: false, deletedThread: true, startAgainPurpose: 'build', offers: ['back-to-list'] };
   await mountPage(data);
   await openItem(item.id);
   holdPosts();

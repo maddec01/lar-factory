@@ -360,9 +360,9 @@ export interface Item {
   paused?: string;
   /**
    * Why its work record waits on the user, with what the board offers to do about it; absent when it doesn't wait.
-   * `ticketOpen` says whether the last read showed its ticket open.
+   * `ticketOpen` says whether the last read showed its ticket open. `startAgainPurpose` is what Start again starts.
    */
-  needsYou?: { reason: string; offers: NeedsYouOffer[]; causes: NeedsYouCause[]; ticketOpen: boolean; deletedThread?: boolean; deletedThreadPurpose?: 'shape' | 'build' };
+  needsYou?: { reason: string; offers: NeedsYouOffer[]; causes: NeedsYouCause[]; ticketOpen: boolean; deletedThread?: boolean; startAgainPurpose?: 'shape' | 'build' };
   /** Why the board couldn't clean up its shaping threads yet, which it keeps trying; shown in item details only. */
   shapingCleanupProblem?: string;
   /** Set on work off the board in Archive: set aside, which Restore brings back, or finished and hidden by retention. */

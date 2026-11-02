@@ -127,7 +127,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       slices,
     };
     if (map) item.map = map;
-    const needsYou = needsYouNotice(record, records.observations(record.workId));
+    const needsYou = needsYouNotice(record, records.observations(record.workId), () => records.launchIntents({ workId: record.workId }));
     if (needsYou) item.needsYou = needsYou;
     return item;
   };

@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
-import { createShapingThreadCleanup } from './shaping-thread-cleanup.ts';
+import type { ShapingThreadCleanup } from '@lar-factory/shared';
+import type { ThreadCleanupState } from '../t3/item-execution.ts';
+import type { ThreadCommand, ThreadCommandResult } from '../t3/thread-commands.ts';
+import { createShapingThreadCleanup, createShapingThreadSweep } from './shaping-thread-cleanup.ts';
 
 const dirs: string[] = [];
 const opened: WorkRecords[] = [];
@@ -51,4 +54,208 @@ test("an unreadable setting shows why, and a valid choice replaces the file", as
 test('a board with no work records refuses the choice', () => {
   const cleanup = createShapingThreadCleanup({ records: null, dir: 'unused' });
   assert.equal(cleanup.save({ choice: 'keep' }).status, 409);
+});
+
+const IDLE = { archived: false, settled: false, live: false };
+
+/** Records with shaping threads `shaped` whose Start build saved `choice`, and a sweep over stubs: nothing reaches T3. */
+async function sweepOver(choice: ShapingThreadCleanup = 'archive', shaped = ['shape-1']) {
+  const { dir, cleanup } = await setUp();
+  const path = join(dir, 'sweep.db');
+  let records = await openWorkRecords(path);
+  opened.push(records);
+  const work = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
+  for (const thread of shaped) records.addThread(work.workId, records.read(work.workId).revision, thread, 'shape');
+  const { intent } = records.recordLaunchIntent(work.workId, records.read(work.workId).revision, 'build', undefined, choice);
+  records.resolveLaunchIntent(work.workId, records.read(work.workId).revision, intent.intentId, { threadId: 'build-1' });
+  const stub = {
+    state: IDLE as ThreadCleanupState,
+    lookup: 'unknown' as 'live' | 'deleted' | 'unknown',
+    result: { outcome: 'accepted', sequence: 1 } as ThreadCommandResult,
+    lookups: 0, reads: 0, now: 0,
+    sent: [] as ThreadCommand[],
+  };
+  const sweepOn = (on: WorkRecords) => createShapingThreadSweep({ records: on, now: () => stub.now,
+    stateOf: () => { stub.reads += 1; return stub.state; },
+    lookup: async () => { stub.lookups += 1; return stub.lookup; },
+    send: async (command) => { stub.sent.push(command); return stub.result; } });
+  return { cleanup, stub, workId: work.workId, records: () => records, sweep: sweepOn(records),
+    reopen: async () => { opened.splice(opened.indexOf(records), 1); records.close(); records = await openWorkRecords(path); opened.push(records); return sweepOn(records); } };
+}
+
+test('archives each shaping thread once, with the recorded thread ID and its stable command ID', async () => {
+  const { stub, records, sweep } = await sweepOver('archive', ['shape-1', 'shape-2']);
+  const commandIds = records().pendingShapingThreadCleanups().map(row => row.commandId);
+  await sweep();
+  assert.deepEqual(stub.sent, [
+    { type: 'thread.archive', commandId: commandIds[0], threadId: 'shape-1' },
+    { type: 'thread.archive', commandId: commandIds[1], threadId: 'shape-2' }]);
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+  await sweep();
+  assert.equal(stub.sent.length, 2);
+});
+
+test('Keep sends nothing and reads nothing', async () => {
+  const { stub, sweep } = await sweepOver('keep');
+  await sweep();
+  assert.deepEqual([stub.sent, stub.reads], [[], 0]);
+});
+
+test('settle and delete rows stay pending with no command, for now', async () => {
+  for (const choice of ['settle', 'delete'] as const) {
+    const { stub, records, sweep } = await sweepOver(choice);
+    await sweep();
+    assert.deepEqual(stub.sent, []);
+    assert.equal(records().pendingShapingThreadCleanups().length, 1);
+  }
+});
+
+test('a later change to the setting leaves a pending row with its saved action', async () => {
+  const { cleanup, stub, records, sweep } = await sweepOver('archive');
+  assert.equal(cleanup.save({ choice: 'keep' }).status, 200);
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.action, 'archive');
+  await sweep();
+  assert.equal(stub.sent[0]?.type, 'thread.archive');
+});
+
+test('T3 being unreadable saves no failure and tries again on the next pass', async () => {
+  const { stub, records, sweep } = await sweepOver();
+  stub.state = 'unavailable';
+  await sweep();
+  assert.deepEqual(stub.sent, []);
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.failure, null);
+  stub.state = IDLE;
+  await sweep();
+  assert.equal(stub.sent.length, 1);
+});
+
+test('a live thread gets no command and no failure, and is archived on a later pass once idle', async () => {
+  const { stub, records, sweep } = await sweepOver();
+  stub.state = { ...IDLE, live: true };
+  await sweep();
+  assert.deepEqual(stub.sent, []);
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.failure, null);
+  stub.state = IDLE;
+  await sweep();
+  assert.equal(stub.sent.length, 1);
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+});
+
+test('a thread still live counts as live even once archived', async () => {
+  const { stub, records, sweep } = await sweepOver();
+  stub.state = { ...IDLE, archived: true, live: true };
+  await sweep();
+  assert.equal(records().pendingShapingThreadCleanups().length, 1);
+});
+
+test('an archived thread counts as cleaned with no command, and clears an earlier failure', async () => {
+  const { stub, records, sweep } = await sweepOver();
+  records().saveShapingThreadFailure('shape-1', 'Earlier failure.');
+  stub.state = { ...IDLE, archived: true };
+  await sweep();
+  assert.deepEqual(stub.sent, []);
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+});
+
+test('only a confirmed deletion cleans an absent thread, and an unconfirmed answer waits 30 seconds', async () => {
+  const { stub, records, sweep } = await sweepOver();
+  stub.state = 'absent';
+  await sweep();
+  assert.equal(stub.lookups, 1);
+  assert.equal(records().pendingShapingThreadCleanups().length, 1);
+  stub.now = 29_999;
+  await sweep();
+  assert.equal(stub.lookups, 1);
+  stub.now = 30_000;
+  stub.lookup = 'deleted';
+  await sweep();
+  assert.equal(stub.lookups, 2);
+  assert.deepEqual(stub.sent, []);
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+});
+
+test('a thread absent while the CLI still shows it stays pending with no command', async () => {
+  const { stub, records, sweep } = await sweepOver();
+  stub.state = 'absent';
+  stub.lookup = 'live';
+  await sweep();
+  assert.deepEqual(stub.sent, []);
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.failure, null);
+});
+
+test('an unconfirmed command keeps its failure, retries after 30 seconds with the same command ID, and survives a restart', async () => {
+  const { stub, records, sweep, reopen } = await sweepOver();
+  const [{ commandId } = { commandId: '' }] = records().pendingShapingThreadCleanups();
+  stub.result = { outcome: 'unconfirmed', reason: 'No answer.' };
+  await sweep();
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.failure, 'No answer.');
+  stub.now += 29_999;
+  await sweep();
+  assert.equal(stub.sent.length, 1, 'no retry before 30 seconds');
+  stub.now += 1;
+  await sweep();
+  stub.result = { outcome: 'accepted', sequence: 2 };
+  const restarted = await reopen();
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.failure, 'No answer.');
+  await restarted();
+  assert.deepEqual(stub.sent.map(command => command.commandId), [commandId, commandId, commandId]);
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+});
+
+test('a rejected command retries with a new command ID, since T3 answers a rejected ID with the same rejection', async () => {
+  const { stub, records, sweep, reopen } = await sweepOver();
+  const [{ commandId: first } = { commandId: '' }] = records().pendingShapingThreadCleanups();
+  stub.result = { outcome: 'rejected', reason: 'T3 refused it.' };
+  await sweep();
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.failure, 'T3 refused it.');
+  const [{ commandId: second } = { commandId: '' }] = records().pendingShapingThreadCleanups();
+  assert.notEqual(second, first);
+  stub.now += 30_000;
+  stub.result = { outcome: 'unconfirmed', reason: 'No answer.' };
+  await sweep();
+  stub.result = { outcome: 'accepted', sequence: 2 };
+  stub.now += 30_000;
+  await (await reopen())();
+  assert.deepEqual(stub.sent.map(command => command.commandId), [first, second, second]);
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+});
+
+test('a send that throws is saved as a failure like any other', async () => {
+  const { stub, records } = await sweepOver();
+  const sweep = createShapingThreadSweep({ records: records(), stateOf: () => IDLE, lookup: async () => 'unknown', now: () => stub.now,
+    send: async () => { throw new Error('Socket closed.'); } });
+  await sweep();
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.failure, 'Socket closed.');
+});
+
+test('allows one sweep at a time', async () => {
+  const { stub, records } = await sweepOver();
+  let answer = (_: ThreadCommandResult) => {};
+  const sends: ThreadCommand[] = [];
+  const sweep = createShapingThreadSweep({ records: records(), stateOf: () => IDLE, lookup: async () => 'unknown', now: () => stub.now,
+    send: (command) => { sends.push(command); return new Promise(resolve => { answer = resolve; }); } });
+  const first = sweep();
+  await sweep();
+  assert.equal(sends.length, 1);
+  answer({ outcome: 'accepted', sequence: 1 });
+  await first;
+  await sweep();
+  assert.equal(sends.length, 1);
+});
+
+test('a set-aside record still retries, and deleting a record stops its retries', async () => {
+  const { stub, records, sweep, workId } = await sweepOver();
+  records().setAside(workId, records().read(workId).revision);
+  stub.result = { outcome: 'rejected', reason: 'Refused.' };
+  await sweep();
+  assert.equal(stub.sent.length, 1);
+  const revision = records().read(workId).revision;
+  stub.now = 30_000;
+  await sweep();
+  assert.equal(stub.sent.length, 2);
+  assert.equal(records().read(workId).revision, revision, 'a background retry never bumps the revision');
+  records().deleteExpired({ hideAfterDays: 0, deleteAfterDays: 0 }, new Date(Date.now() + 86_400_000));
+  stub.now = 60_000;
+  await sweep();
+  assert.equal(stub.sent.length, 2);
 });

@@ -1000,6 +1000,20 @@ describe('shaping thread cleanup rows', () => {
     expect(records.pendingShapingThreadCleanups()[0]!.commandId).not.toBe(first!.commandId);
   });
 
+  it('gives a rejected row its failure and a new command ID in one step, with no change to the revision', async () => {
+    const { records, build, startBuild } = await started('archive', ['shape-1']);
+    startBuild('build-1');
+    const revision = records.read(build.workId).revision;
+    const [row] = records.pendingShapingThreadCleanups();
+    records.saveShapingThreadRejection('shape-1', 'T3 refused it.');
+    const [rejected] = records.pendingShapingThreadCleanups();
+    expect(rejected).toMatchObject({ threadId: 'shape-1', failure: 'T3 refused it.' });
+    expect(rejected!.commandId).not.toBe(row!.commandId);
+    records.saveShapingThreadFailure('shape-1', 'No answer.');
+    expect(records.pendingShapingThreadCleanups()[0]).toEqual({ ...rejected, failure: 'No answer.' });
+    expect(records.read(build.workId).revision).toBe(revision);
+  });
+
   it('saves and clears a failure with no change to the revision, and survives reopening', async () => {
     const path = join(tempDir(), 'work-records.db');
     const first = await openWorkRecords(path);

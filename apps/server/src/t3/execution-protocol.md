@@ -113,4 +113,13 @@ packages/contracts/src/orchestrationV2.ts:2894, 2915, 2920 and 3612. The `t3` CL
 has no command for these. Each call issues one operate-scope session and revokes
 it afterwards. The call opens one connection and never reconnects. A failed `Exit`
 frame reports `rejected`. A timeout, a dropped connection, a malformed answer or a
-failed session issue reports `unconfirmed`. Retries keep the same `commandId`.
+failed session issue reports `unconfirmed`. A retry after `unconfirmed` keeps the same
+`commandId`. T3 stores a receipt for a rejection and answers that ID with the same
+rejection (`Orchestrator.ts`, `OrchestratorCommandPreviouslyRejectedError`), so a retry
+after `rejected` uses a new one.
+
+`threadCleanupState` in `item-execution.ts` answers from the current shell snapshot
+and never from the retained observation, so the shaping thread sweep reads a thread
+just before it sends a command. Spawned test boards replace `item-execution.ts`
+with `test/execution-observations.ts`, whose answer is always unavailable, so no
+server run reaches these commands.

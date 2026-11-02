@@ -137,8 +137,8 @@ export async function closeTicket(item: Item): Promise<void> {
   });
 }
 
-/** Acts on work that needs you as `choice` says, then clears its reason; a failure stays in the dialog. */
-export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOffer, 'set-aside'> | 'clear', briefChoice?: 'keep' | 'reshape'): Promise<ActionResult | undefined> {
+/** Acts on work that needs you as `choice` says; a failure stays in the dialog. */
+export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOffer, 'set-aside'>, briefChoice?: 'keep' | 'reshape'): Promise<ActionResult | undefined> {
   if (!ready(itemId, 'data-needs-you')) return;
   return runAction(itemId, 'needs-you', { itemId, choice, briefChoice }, (result) => result.error ?? undefined);
 }

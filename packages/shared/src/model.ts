@@ -369,8 +369,8 @@ export interface Item {
   archived?: { setAside: boolean; hidden: boolean; ticketOpen: boolean };
 }
 
-/** What the board offers for work that needs you, besides clearing the reason once the user has checked. */
-export const NEEDS_YOU_OFFERS = ['reopen-pr', 'replace-pr', 'keep-working', 'mark-handled', 'set-aside', 'reopen-work', 'start-again', 'back-to-queue', 'back-to-list'] as const;
+/** What the board offers for work that needs you. */
+export const NEEDS_YOU_OFFERS = ['reopen-pr', 'replace-pr', 'keep-working', 'mark-handled', 'set-aside', 'start-again', 'back-to-queue', 'back-to-list'] as const;
 export type NeedsYouOffer = (typeof NEEDS_YOU_OFFERS)[number];
 
 /** A change the board saw that makes work wait on the user. `assignee-changed` holds who its ticket moved from and to, null for no one. */

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 // Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
-// offers for it, then Clear for after the user checked, such as T3 after an uncertain start. Set aside is Abandon.
+// offers for it. Set aside is Abandon.
 
 import { itemName } from '@lar-factory/shared';
 import type { BoardData, Item, NeedsYouOffer } from '@lar-factory/shared';
@@ -16,7 +16,7 @@ import { kind } from '../buttons/button-kinds.tsx';
 const LABELS: Record<NeedsYouOffer, string> = {
   'start-again': 'Start again', 'back-to-queue': 'Back to Queue', 'back-to-list': 'Move to List',
   'reopen-pr': 'Reopen PR', 'replace-pr': 'Start a replacement build', 'keep-working': 'Keep working', 'mark-handled': 'Mark as handled',
-  'set-aside': 'Abandon', 'reopen-work': 'Reopen the work',
+  'set-aside': 'Abandon',
 };
 
 export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
@@ -86,8 +86,6 @@ export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
             {...offer === 'set-aside' ? { 'data-abandon': item.id, onClick: () => askAbandon(item.id) }
               : { 'data-needs-you': item.id, onClick: () => { if (offer === 'start-again') { void recover(); return; } if (item.needsYou?.deletedThread && item.passingBrief && (offer === 'back-to-queue' || offer === 'back-to-list')) setMove(offer); else if (item.needsYou?.deletedThread && (offer === 'back-to-queue' || offer === 'back-to-list')) void moveBack(offer); else void resolveNeedsYou(item.id, offer); } }}>{LABELS[offer]}</Button>
         ))}
-        {!item.needsYou.deletedThread && <Button {...kind('other')} {...state} data-needs-you={item.id} aria-label={`Clear Needs you on ${itemName(item)}`}
-          onClick={() => void resolveNeedsYou(item.id, 'clear')}>Clear</Button>}
       </span>
       {loading && <p role="status">Checking the branch and PR...</p>}
       {error && <p role="alert">{error}</p>}

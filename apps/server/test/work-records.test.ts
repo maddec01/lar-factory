@@ -89,16 +89,16 @@ test('Archive lists set-aside work with export and Restore, and a timed delete r
   assert.deepEqual([await archive(), after.retention?.deleteAfterDays, after.retention?.lastDelete?.deleted], [[], 0, [created.workId]]);
 });
 
-test("the shaping thread cleanup setting reads Archive on a fresh machine, survives a restart, and refuses an invalid choice", { timeout: 30_000 }, async (t) => {
+test("the shaping thread cleanup setting reads Settle on a fresh machine, survives a restart, and refuses an invalid choice", { timeout: 30_000 }, async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'lar-board-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
   const board = await startBoard(t, { recorded: false }, false, false, { HOME: home });
   const fresh = await until(board, (d) => d.fetchedAt !== null);
-  assert.deepEqual(fresh.shapingThreadCleanup, { choice: 'archive' });
+  assert.deepEqual(fresh.shapingThreadCleanup, { choice: 'settle' });
 
   const refused = await board.postSession({ choice: 'shred' }, '/api/shaping-thread-cleanup');
   assert.equal(refused.status, 400);
-  assert.deepEqual((await refused.json() as { board: BoardData }).board.shapingThreadCleanup, { choice: 'archive' });
+  assert.deepEqual((await refused.json() as { board: BoardData }).board.shapingThreadCleanup, { choice: 'settle' });
 
   const saved = await board.postSession({ choice: 'delete' }, '/api/shaping-thread-cleanup');
   assert.equal(saved.status, 200);

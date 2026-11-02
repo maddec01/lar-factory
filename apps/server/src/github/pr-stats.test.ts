@@ -177,3 +177,8 @@ test('a merged item reads its most recently merged PR\'s block, and an open link
     'whatever order GitHub lists them in');
   assert.equal(mergedStats(item([pr(1, 'merged', newer, '2026-10-20T00:00:00Z'), pr(2, 'open', 'Body')])), null, 'an open PR: live stats');
 });
+
+test('with its retained stats dropped, a merged PR keeps its frozen block over a lower fresh read', () => {
+  const lower = { agentMs: 60_000, wallMs: 60_000, tokens: 10, costUsd: 1 };
+  assert.deepEqual(mergedStats(item([pr(1, 'merged', block)], null), lower), { ...stats, frozen: true });
+});

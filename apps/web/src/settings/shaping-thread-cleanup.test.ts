@@ -32,7 +32,7 @@ test('General has the row in its own group, with the four choices and what each 
   expect(radios().map((r) => r.value)).toEqual(['keep', 'settle', 'archive', 'delete']);
   expect(picked()).toEqual(['archive']);
   const description = text(row());
-  for (const said of ['Keep changes nothing', 'Settle', 'Archive', "Delete can't be undone from the board", "item's stats no longer count"]) expect(description).toContain(said);
+  for (const said of ['Keep changes nothing', 'Item details still links to a settled thread', "An archived thread has no link on the board and reopens from T3's Settings, Archived", "Delete can't be undone from the board", "item's stats no longer count"]) expect(description).toContain(said);
 });
 
 test('Picking a choice saves it and shows the board the server answers with', async () => {

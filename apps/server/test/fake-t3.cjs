@@ -28,6 +28,11 @@ const main = async () => {
     db.close();
     return;
   }
+  if (args[1] === 'show' && options.deletedThreads?.includes(args[2])) {
+    process.stderr.write(`Thread ${args[2]} is no longer available.`);
+    process.exitCode = 1;
+    return;
+  }
   if (args[1] === 'list' && options.recover) {
     process.stdout.write(JSON.stringify([{ threadId: 'thread-1', title: titleFromMessage(options.firstMessage ?? 'Shaping #12 Issue 12') }]));
     return;

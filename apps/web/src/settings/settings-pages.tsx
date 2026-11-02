@@ -247,7 +247,7 @@ export function pages(input: PagesInput): Page[] {
       ] },
       { title: 'Threads', rows: [{
         id: 'shaping-thread-cleanup', title: 'Shaping threads after Start build',
-        description: "What the board does to an item's shaping threads when its build starts. Keep changes nothing. Settle settles them in T3, and Archive archives them there. Item details still links to a settled or archived thread. Delete removes them from T3. Delete can't be undone from the board, and the item's stats no longer count that thread.",
+        description: "What the board does to an item's shaping threads when its build starts. Keep changes nothing. Settle settles them in T3, and Archive archives them there. Item details still links to a settled thread. An archived thread has no link on the board and reopens from T3's Settings, Archived. Delete removes them from T3. Delete can't be undone from the board, and the item's stats no longer count that thread.",
         control: custom(() => null), below: <ShapingThreadCleanupSetting state={data.shapingThreadCleanup} />,
       }] },
       { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },

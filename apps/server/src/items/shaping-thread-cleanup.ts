@@ -2,7 +2,7 @@
 // build, as Settings shows and saves it, and the sweep that does it.
 
 import type { ShapingThreadCleanup, ShapingThreadCleanupState } from '@lar-factory/shared';
-import { readShapingThreadCleanup, writeShapingThreadCleanup, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
+import { readShapingThreadCleanup, writeShapingThreadCleanup, WorkRecordError, type ShapingThreadCleanupRow, type WorkRecords } from '@lar-factory/work-records';
 import type { ThreadCleanupState } from '../t3/item-execution.ts';
 import type { lookupThread } from '../t3/t3.ts';
 import type { ThreadCommand, ThreadCommandResult } from '../t3/thread-commands.ts';
@@ -52,34 +52,41 @@ export interface ShapingThreadSweepDeps {
   lookup: typeof lookupThread;
   /** Issues a T3 session, so it runs only for a command the sweep will send. */
   send(command: ThreadCommand): Promise<ThreadCommandResult>;
+  /** Told once a deletion is recorded, so the work's stats stop counting that thread. */
+  deleted(workId: string): void;
   now?: () => number;
 }
+
+/** The choices that send T3 a command. */
+type ThreadAction = Exclude<ShapingThreadCleanup, 'keep'>;
 
 /** How long a thread waits after a failure or an unconfirmed answer before the sweep tries it again. */
 const RETRY_MS = 30_000;
 
 /** A function that takes each pending shaping thread one step on, one sweep at a time. It never interrupts a live thread. */
-export function createShapingThreadSweep({ records, stateOf, lookup, send, now = Date.now }: ShapingThreadSweepDeps): () => Promise<void> {
+export function createShapingThreadSweep({ records, stateOf, lookup, send, deleted, now = Date.now }: ShapingThreadSweepDeps): () => Promise<void> {
   const retryAt = new Map<string, number>();
   let sweeping = false;
   const later = (threadId: string) => retryAt.set(threadId, now() + RETRY_MS);
-  const cleaned = (threadId: string) => {
-    retryAt.delete(threadId);
-    records.markShapingThreadCleaned(threadId);
-  };
-  async function step({ threadId, commandId }: { threadId: string; commandId: string }): Promise<void> {
-    // Read just before sending: T3 refuses to archive an archived thread, and its deletion cancels active runs.
+  async function step({ threadId, workId, commandId }: ShapingThreadCleanupRow, action: ThreadAction): Promise<void> {
+    const cleaned = () => {
+      retryAt.delete(threadId);
+      if (action !== 'delete') return records.markShapingThreadCleaned(threadId);
+      records.markShapingThreadDeleted(threadId);
+      deleted(workId);
+    };
+    // Read just before sending: T3 refuses to archive an archived thread or settle one, and its deletion cancels active runs.
     const state = stateOf(threadId);
     if (state === 'unavailable') return;
     if (state === 'absent') {
-      if (await lookup(threadId) === 'deleted') cleaned(threadId);
+      if (await lookup(threadId) === 'deleted') cleaned();
       else later(threadId);
       return;
     }
     if (state.live) return;
-    if (state.archived) return cleaned(threadId);
-    const result = await send({ type: 'thread.archive', commandId, threadId });
-    if (result.outcome === 'accepted') return cleaned(threadId);
+    if (action !== 'delete' && (state.archived || action === 'settle' && state.settled)) return cleaned();
+    const result = await send({ type: `thread.${action}`, commandId, threadId });
+    if (result.outcome === 'accepted') return cleaned();
     later(threadId);
     if (result.outcome === 'rejected') records.saveShapingThreadRejection(threadId, result.reason);
     else records.saveShapingThreadFailure(threadId, result.reason);
@@ -89,9 +96,10 @@ export function createShapingThreadSweep({ records, stateOf, lookup, send, now =
     sweeping = true;
     try {
       for (const row of records.pendingShapingThreadCleanups()) {
-        // Settle and delete come next, and a row with no action waits for the notice about an unreadable setting.
-        if (row.action !== 'archive' || now() < (retryAt.get(row.threadId) ?? -Infinity)) continue;
-        try { await step(row); }
+        const { action } = row;
+        // A row with no action waits for the notice about an unreadable setting, and Keep's rows start cleaned.
+        if (!action || action === 'keep' || now() < (retryAt.get(row.threadId) ?? -Infinity)) continue;
+        try { await step(row, action); }
         catch (err) {
           later(row.threadId);
           records.saveShapingThreadFailure(row.threadId, (err as Error).message);

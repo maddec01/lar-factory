@@ -7,8 +7,8 @@ import { SHAPING_THREAD_CLEANUPS, type ShapingThreadCleanup } from '@lar-factory
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { WorkRecordError } from './database.ts';
 
-/** Archive the shaping threads, which item details still links to. */
-const DEFAULT_SHAPING_THREAD_CLEANUP: ShapingThreadCleanup = 'archive';
+/** Settle the shaping threads, which item details still links to. */
+const DEFAULT_SHAPING_THREAD_CLEANUP: ShapingThreadCleanup = 'settle';
 
 const shapingThreadCleanupPath = (dir: string): string => join(dir, 'shaping-thread-cleanup.json');
 

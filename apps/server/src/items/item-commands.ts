@@ -577,7 +577,9 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
         if (previous?.pending || (previous && Date.now() < previous.retryAt)) return;
         checks.set(threadId, { pending: true, retryAt: Infinity });
         let answer: Awaited<ReturnType<typeof lookupThread>>;
-        try { answer = await showThread(threadId); } catch { answer = 'unknown'; }
+        // A deletion the record holds needs no lookup, which could only raise a warning while the CLI is unavailable.
+        try { answer = recordedThreads(id).some(thread => thread.threadId === threadId && thread.deletedAt) ? 'deleted' : await showThread(threadId); }
+        catch { answer = 'unknown'; }
         checks.set(threadId, { pending: false, retryAt: answer === 'unknown' ? Date.now() + 30_000 : Infinity });
         if (!board.find(id)) return;
         const failures = { ...board.snapshot().startCheckFailures };

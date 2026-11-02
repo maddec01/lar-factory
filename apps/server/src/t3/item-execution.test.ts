@@ -8,6 +8,28 @@ describe('recorded thread lookup', () => {
     expect(lookup(['root'])).toEqual([{ id: 'root', title: 'Build', state: 'done', updated: shell.updatedAt }]);
     expect(lookup(['put-away'])).toEqual([{ id: 'put-away', title: 'Build', state: 'done', archived: true, updated: shell.updatedAt }]);
   });
+  it('keeps showing a settled thread, which has a link as any other', () => {
+    const lookup = executionItemThreads([{ ...shell, settledAt: shell.updatedAt, settledOverride: 'settled' }]);
+    expect(lookup(['root'])).toEqual([{ id: 'root', title: 'Build', state: 'done', updated: shell.updatedAt }]);
+  });
+  describe('order, since settling moves updatedAt', () => {
+    const order = (shells: object[]) => executionItemThreads(shells as Record<string, unknown>[])(['shaping', 'build'])?.map(thread => thread.id);
+    const build = { ...shell, id: 'build', updatedAt: '2026-11-02T20:37:30Z', latestRunCompletedAt: '2026-11-02T20:37:30Z' };
+    const shaping = { ...shell, id: 'shaping', updatedAt: '2026-11-02T20:38:51Z', latestRunCompletedAt: '2026-11-02T20:37:13Z' };
+    it('keeps a just-settled shaping thread behind the build it preceded', () => {
+      expect(order([build, { ...shaping, settledAt: shaping.updatedAt, settledOverride: 'settled' }])).toEqual(['build', 'shaping']);
+    });
+    it('keeps a settled thread with no known run behind an unsettled one', () => {
+      expect(order([build, { ...shaping, settledOverride: 'settled', latestRunCompletedAt: null }])).toEqual(['build', 'shaping']);
+    });
+    it('keeps a build T3 settled on its own ahead of an older unsettled shaping thread', () => {
+      const autoSettled = { ...build, updatedAt: '2026-11-05T00:00:00Z', settledAt: '2026-11-05T00:00:00Z' };
+      expect(order([autoSettled, { ...shaping, updatedAt: '2026-11-02T20:37:13Z' }])).toEqual(['build', 'shaping']);
+    });
+    it('still shows an unsettled thread by its latest update', () => {
+      expect(order([build, shaping])).toEqual(['shaping', 'build']);
+    });
+  });
   it('leaves out a recorded thread T3 no longer has, and has nothing to show for work with no recorded thread', () => {
     const lookup = executionItemThreads([{ ...shell, id: 'gone', deletedAt: shell.updatedAt }]);
     expect(lookup(['root', 'gone'])).toEqual([]);

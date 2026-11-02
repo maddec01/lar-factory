@@ -1036,6 +1036,19 @@ describe('shaping thread cleanup rows', () => {
     expect(reopened.read(build.workId).revision).toBe(revision);
   });
 
+  it('marks a deleted thread in one step with no change to the revision, and a later build leaves it alone', async () => {
+    const { records, build, startBuild } = await started('delete', ['shape-1']);
+    startBuild('build-1');
+    const revision = records.read(build.workId).revision;
+    records.saveShapingThreadFailure('shape-1', 'No answer.');
+    records.markShapingThreadDeleted('shape-1');
+    expect(pendingIds(records)).toEqual([]);
+    expect(records.read(build.workId).revision).toBe(revision);
+    expect(records.threads(build.workId).map(thread => [thread.threadId, !!thread.deletedAt])).toEqual([['shape-1', true], ['build-1', false]]);
+    startBuild('build-2');
+    expect(pendingIds(records)).toEqual([]);
+  });
+
   it('lists rows of set-aside records, removes them with the record, and keeps them through resetBuild', async () => {
     const { records, build, startBuild } = await started('archive', ['shape-1']);
     startBuild('build-1');

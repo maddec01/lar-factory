@@ -3,7 +3,7 @@ import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
+import { openWorkRecords, workRecordsPath, writeShapingThreadCleanup } from '@lar-factory/work-records';
 import { changeRecords, testFactoryContext, NOT_LANDED, readsRepositoryConfig, recordBlockers, SAMPLE_MODELS, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -198,6 +198,30 @@ for (const [name, threads] of [
     assert.equal((await startBuild(board, board.id(12))).status, 200);
   });
 }
+
+test('once Delete records a shaping thread as deleted, a fresh stats read replaces the retained figures with no restart', async (t) => {
+  const minutes = (id: string, count: number) => ({ id, turns: [{ id: `${id}-turn`, startedAt: '2026-11-01T08:00:00Z', completedAt: new Date(Date.parse('2026-11-01T08:00:00Z') + count * 60_000).toISOString(), status: 'completed' }] });
+  const env = startableEnv(t);
+  writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify([minutes(SHAPING, 60)]));
+  writeFileSync(env.T3_STATE_DB + '.requests.json', '[]');
+  const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { threads: { 'maddec01/lar-factory#12': [SHAPING] }, t3: { deletedThreads: [SHAPING] } }, { ...env, FAKE_THREAD_CLEANUP: '1' });
+  const agentMs = (data: BoardData) => { const { stats } = data.items[0]!; return typeof stats === 'object' ? stats.agentMs : undefined; };
+  await until(board, (d) => agentMs(d) === 60 * 60_000);
+  writeShapingThreadCleanup('delete', board.dataDir);
+  assert.equal((await startBuild(board, board.id(12))).status, 200);
+  await until(board, (d) => agentMs(d) === 60 * 60_000);
+  writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify([minutes('thread-1', 10)]));
+  const data = await until(board, (d) => agentMs(d) === 10 * 60_000);
+  const [item] = data.items;
+  assert.deepEqual((item!.threads as { id: string }[]).map((thread) => thread.id), ['thread-1'], 'details has no link for the deleted thread and keeps the build thread');
+  assert.equal(item!.needsYou, undefined, 'no Start again notice');
+  assert.deepEqual(data.startCheckFailures ?? {}, {});
+  const records = await openWorkRecords(workRecordsPath(board.dataDir));
+  try {
+    assert.ok(records.threads(board.id(12)).find((thread) => thread.threadId === SHAPING)?.deletedAt);
+    assert.deepEqual(records.pendingShapingThreadCleanups(), []);
+  } finally { records.close(); }
+});
 
 test('a running thread with another purpose is not refused as a shaping thread', async (t) => {
   const env = startableEnv(t);

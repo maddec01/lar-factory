@@ -20,8 +20,12 @@ export function protocolItemThreads(threadIds: readonly string[]) {
     });
   } catch { return threadIds.length ? 'unavailable' as const : undefined; }
 }
-/** Spawned boards never read a thread as cleanable, so no server run reaches T3's thread commands. */
-export function threadCleanupState(): 'unavailable' { return 'unavailable'; }
+/** Spawned boards never read a thread as cleanable, so no server run reaches T3's thread commands. With FAKE_THREAD_CLEANUP, one gone from the fixture reads as absent. */
+export function threadCleanupState(threadId: string): 'unavailable' | 'absent' {
+  if (process.env.FAKE_THREAD_CLEANUP !== '1') return 'unavailable';
+  const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
+  return threads.some(thread => thread.id === threadId) ? 'unavailable' : 'absent';
+}
 /** Spawned boards find started threads through the fake t3 CLI alone. */
 export function protocolStartedThread(): never { throw Error("T3 execution unavailable"); }
 

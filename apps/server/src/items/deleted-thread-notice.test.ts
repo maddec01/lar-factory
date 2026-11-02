@@ -23,3 +23,17 @@ test('confirmed latest deletion survives reopening, but live work and a newer th
     expect(deletedThreadNotice(records, item)).toBeUndefined();
   } finally { records.close(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a shaping thread cleanup deleted after the build thread was recorded raises no notice', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'deleted-notice-'));
+  const records = await openWorkRecords(join(dir, 'records.db'));
+  try {
+    const { workId } = records.create({ title: 'Work', repository: 'owner/repo', kind: 'build', status: 'In progress' });
+    records.addThread(workId, records.read(workId).revision, 'shape', 'shape');
+    const { intent } = records.recordLaunchIntent(workId, records.read(workId).revision, 'build', undefined, 'delete');
+    records.resolveLaunchIntent(workId, records.read(workId).revision, intent.intentId, { threadId: 'build' });
+    records.markShapingThreadDeleted('shape');
+    const item = { ...recordItems(records, [], ['owner/repo'])[0]!, threads: [] };
+    expect(deletedThreadNotice(records, item)).toBeUndefined();
+  } finally { records.close(); rmSync(dir, { recursive: true, force: true }); }
+});

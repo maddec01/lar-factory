@@ -1,7 +1,7 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
 // Abandon and the ticket close after it ask.
 
-import { STATUSES, inRepo, isRecentlyDone, onAzure, itemName, repoKey, repoName, sameRepo } from './model.ts';
+import { STATUSES, activityUnavailable, inRepo, isRecentlyDone, onAzure, itemName, openQuestionThread, repoKey, repoName, sameRepo, workingAgain } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
 import { slug } from './format.ts';
 
@@ -47,17 +47,15 @@ export function noneOnboarded(data: BoardData): boolean {
   return !data.repos.length && !data.onboarding?.length && !data.repositoryConfigProblems?.length && !data.error && data.fetchedAt !== null;
 }
 
-export function openQuestionThread(item: Item) {
-  return Array.isArray(item.threads) ? item.threads.find((thread) => thread.state === 'needs you' && !thread.observedAt) : undefined;
-}
-
 /** Whether this item's own question or status asks for an answer. */
 export function needsAnswer(item: Item): boolean {
   return item.status === 'Needs you' || Boolean(openQuestionThread(item) &&
     (item.kind === 'concept' ? !['List', 'Queued', 'Done'].includes(item.status) : item.status === 'Shaping'));
 }
 
-export function boardSections(data: BoardData, now: number): BoardSections {
+/** `clientError` is the page's own failed read; the placement of Verify and Ready to merge items depends on it. */
+export function boardSections(data: BoardData, now: number, clientError?: string | null): BoardSections {
+  const unavailable = activityUnavailable(data, now, clientError);
   const items = [...data.items].sort(byFlowOrder);
   const inStatus = (...s: Status[]) => items.filter((i) => s.includes(i.status));
   const list = inStatus('List');
@@ -68,8 +66,8 @@ export function boardSections(data: BoardData, now: number): BoardSections {
     .sort((a, b) => b.items.length - a.items.length);
   const notConcept = (i: Item) => i.kind !== 'concept';
   return {
-    needsYou: items.filter((item) => needsAnswer(item) || (notConcept(item) && ['Ready', 'Verify', 'Ready to merge'].includes(item.status))),
-    inFlight: inStatus('Shaping', 'Ready', 'In progress', 'Review').filter(notConcept),
+    needsYou: items.filter((item) => needsAnswer(item) || (notConcept(item) && ['Ready', 'Verify', 'Ready to merge'].includes(item.status) && !workingAgain(item, unavailable))),
+    inFlight: items.filter((item) => notConcept(item) && (['Shaping', 'Ready', 'In progress', 'Review'].includes(item.status) || workingAgain(item, unavailable))),
     concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),
     list,

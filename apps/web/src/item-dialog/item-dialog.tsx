@@ -13,7 +13,7 @@ import { useEditStore } from '../repositories/edit-store.ts';
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { needsAnswer, openQuestionThread, writeAccessProblem, HINTS, blockedText, canResumeShaping, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
+import { currentBuildThread, needsAnswer, openQuestionThread, writeAccessProblem, HINTS, blockedText, canResumeShaping, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -26,7 +26,7 @@ import { EarlierThreads, OpenThread, hasLiveThread } from '../items/open-thread.
 import { NeedsYou } from '../items/needs-you.tsx';
 import { Dependencies, dependenciesOf } from '../items/dependencies.tsx';
 import { PrLink } from '../items/pr-link.tsx';
-import { AgentWork, ItemKind, PrList, RepoTag, StructureSync } from '../items/item-parts.tsx';
+import { AgentWork, ItemKind, PrList, RepoTag, StructureSync, useShownStatus } from '../items/item-parts.tsx';
 import { LinkButton } from '../items/link-button.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
@@ -46,6 +46,8 @@ import { RecordText } from './record-text.tsx';
 
 /** The one thing the item's status asks of you. */
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {
+  const { working } = useShownStatus(item);
+  if (working) return <OpenThread item={item} data={data} threadId={currentBuildThread(item)?.id} />;
   if (needsAnswer(item)) return <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />;
   switch (item.status) {
     case 'List': return <QueueButton item={item} data={data} />;
@@ -98,7 +100,8 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
   const record = read.state === 'loaded' ? read.details.record : undefined;
   // Work with no ticket has no ticket text to show beside its record's.
   const ticket = !record || item.number > 0;
-  const hint = needsAnswer(item) ? 'Answer in T3' : HINTS[item.status];
+  const shown = useShownStatus(item);
+  const hint = needsAnswer(item) ? 'Answer in T3' : shown.working ? undefined : HINTS[item.status];
   const setup = data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
   const accessProblem = writeAccessProblem(item.repo, 'edit-ticket', setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
   const editable = accessProblem === null;
@@ -115,7 +118,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <SourceIcon item={item} />
           <RepoTag repo={repoKey(item)} repos={data.repos} />
-          <StatusGlyph status={item.status} /> <span className="font-medium text-base-content">{item.status}</span>
+          <StatusGlyph status={shown.glyph} /> <span className="font-medium text-base-content">{shown.word}</span>
           <span className="min-w-0 truncate @max-[30rem]:hidden">· updated {shortAgo(item.updatedAt, now)}</span>
           {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)" title={blockedText(item) ?? undefined}>blocked by {openBlockers(item).length}<span className="sr-only">. {blockedText(item)}</span></span>}
         </div>

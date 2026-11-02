@@ -2,8 +2,8 @@
 // dossier's two lines and line 2 columns, with its agent figures, a build's slices, and its side action. Ports the old
 // Board view's in-flight cards and slice popover tests to the card.
 
-import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text, toast } from '../../test/support.ts';
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test';
+import { $, $$, NOW, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text, toast } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread, KindDisagreement, RawItem, Slice } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -537,4 +537,47 @@ test('in flight marks stay on the title first line while meta keeps its baseline
     expect(title.previousElementSibling!.classList.contains('top-1')).toBe(false);
     expect(flight.querySelector('[data-line="1"]')!.classList.contains('self-start')).toBe(true);
   }
+});
+
+describe.each(['Verify', 'Ready to merge'] as const)('%s with its build thread running', (status) => {
+  const threads = (build: ItemThread['state'], more: Partial<ItemThread> = {}): ItemThread[] => [thread('other', 'done'), { ...thread('build', build), purpose: 'build', ...more }];
+  const at = (t: ItemThread[], change: Partial<Item> = {}): BoardData => withItem('I_sample13', { status, blockers: [], threads: t, ...change }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() });
+  const running = threads('running', { currentRunning: true });
+  const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
+  const desk = () => $('.desk-card[data-item="I_sample13"]');
+
+  test('its row sits in flight as Working, with Open thread on the build thread, and leaves the desk', async () => {
+    await mountPage(at(running));
+    expect(desk()).toBeNull();
+    expect(text(meta('I_sample13'))).toMatch(/^Working · /);
+    const open = side('I_sample13').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+    expect([text(open), open.getAttribute('href')]).toEqual(['Open thread', 't3code://threads/sample-environment/build']);
+  });
+
+  test('its row says Working with slices too, and with a running child', async () => {
+    await mountPage(at(threads('done', { hasRunningChildren: true }), { slices: [{ number: 1, title: 'One', progress: 'done' }] as Slice[] }));
+    expect(desk()).toBeNull();
+    expect(text(meta('I_sample13'))).toMatch(/^Working · Thread running · /);
+  });
+
+  test('it returns to the desk with its Status when the thread stops, with no write', async () => {
+    await mountPage(at(running));
+    await receive(at(threads('done')));
+    expect(text(desk())).toContain(status);
+    expect(text(desk()!.querySelector('.desk-actions'))).toContain('Open PR');
+    expect($('[data-in-flight] [data-item="I_sample13"]')).toBeNull();
+    expect(posted()).toEqual([]);
+  });
+
+  test('it stays on the desk with an open question, even while a child runs', async () => {
+    await mountPage(at(threads('needs you', { hasRunningChildren: true })));
+    expect(text(desk())).toContain(status);
+  });
+
+  test('it returns to the desk at its Status while the page cannot read the board', async () => {
+    await mountPage(at(running));
+    expect(desk()).toBeNull();
+    await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().fail('HTTP 502'));
+    expect(text(desk())).toContain(status);
+  });
 });

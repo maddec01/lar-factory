@@ -7,12 +7,12 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight, GitPullRequest } from 'lucide-react';
-import { boardSections, blockedText, itemName, openBlockers, prLabel, repoKey, repoName } from '@lar-factory/shared';
+import { boardSections, blockedText, currentBuildThread, itemName, openBlockers, prLabel, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ActivityFeedback, useActivityFeedback, AzureFields, ItemTitle, KindBadge, KindMarker, LabelChips, SliceBar, SliceList } from '../items/item-parts.tsx';
+import { ActivityFeedback, useActivityFeedback, useShownStatus, AzureFields, ItemTitle, KindBadge, KindMarker, LabelChips, SliceBar, SliceList } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartBuild } from '../items/start-build.tsx';
@@ -31,6 +31,8 @@ function Act({ children }: { children: ReactNode }) {
 
 /** The one thing a status asks next, or where to act on an item that waits on you. */
 function Side({ item, data }: { item: Item; data: BoardData }) {
+  const { working } = useShownStatus(item);
+  if (working) return <Act><OpenThread item={item} data={data} threadId={currentBuildThread(item)?.id} /></Act>;
   if (YOURS.includes(item.status)) return <OnYourDesk status={item.status} />;
   switch (item.status) {
     case 'Ready': return <Act><StartBuild item={item} data={data} /></Act>;
@@ -49,6 +51,7 @@ const sliceNote = (item: Item) => {
 /** One item; the whole row opens it in the item dialog, and a build's slice count unfolds its slices under it. */
 function FlightRow({ item, data }: { item: Item; data: BoardData }) {
   const feedback = useActivityFeedback(item);
+  const shown = useShownStatus(item);
   const done = item.slices.filter((s) => s.progress === 'done').length;
   const note = sliceNote(item);
   const blocked = openBlockers(item).length;
@@ -58,14 +61,14 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
   return (
     <div className="border-b border-(--border) last:border-b-0" data-flight={item.id}>
       <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id} className={`${HEAD_A1} cursor-pointer hover:bg-(--accent) ${picked(isPicked)}`}>
-        <span className="grid size-6 place-items-center" data-glyph><StatusGlyph status={item.status} /></span>
+        <span className="grid size-6 place-items-center" data-glyph><StatusGlyph status={shown.glyph} /></span>
         {/* Line 1 spans line 2's first four columns; the side action takes the repositories column across both lines.
             Below 1024 px, where a dossier drops that column, line 1 spans three and the action sits above the figures. */}
         <span className={`grid ${LINE2_A1} items-center gap-x-4 gap-y-1`} data-line2>
           <span className="col-span-3 flex min-w-0 lg:col-span-4 flex-wrap items-baseline gap-x-2 gap-y-0.5 self-start pt-0.5" data-line="1">
             <span className="flex min-w-0 items-start gap-1.5"><span className="shrink-0"><SourceIcon item={item} /></span><span className="min-w-0 wrap-anywhere text-[13px] font-medium leading-5 self-baseline" title={item.title} data-title><ItemTitle item={item} /></span></span>
             <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-(--muted-foreground)" data-meta>
-              <span>{item.status} · {threadText(item)} · {repo}</span>
+              <span>{shown.word} · {threadText(item, shown.working)} · {repo}</span>
               {item.linkedPrs[0] && <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(item.linkedPrs[0])}</span>}
               <KindBadge kind={item.kind} />
               <KindMarker item={item} />
@@ -95,16 +98,16 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
 }
 
 /** The items with a row here, furthest along first, whatever a filter hides: none a dossier or Your desk shows. */
-export function flightRows(items: Item[], data: BoardData, now: number): Item[] {
+export function flightRows(items: Item[], data: BoardData, now: number, clientError: string | null): Item[] {
   const shown = inDossiers(dossiersOf(items, data.items));
-  const deskIds = new Set(boardSections({ ...data, items }, now).needsYou.map((item) => item.id));
+  const deskIds = new Set(boardSections({ ...data, items }, now, clientError).needsYou.map((item) => item.id));
   return items.filter((i) => stageOf(i.status) >= 0 && i.status !== 'Done' && !shown.has(i.id) && !deskIds.has(i.id)).sort((a, b) => stageOf(b.status) - stageOf(a.status));
 }
 
 /** `items` are the line's items in the main area's scope, `shows` says which rows the filters leave. */
 export function InFlight({ items, shows }: { items: Item[]; shows: (item: Item) => boolean }) {
-  const { data, now } = useBoardStore();
-  const all = flightRows(items, data, now);
+  const { data, now, clientError } = useBoardStore();
+  const all = flightRows(items, data, now, clientError);
   const rows = all.filter(shows);
   return (
     <div className="overflow-hidden rounded-xl border border-(--border) bg-(--card)" data-in-flight>

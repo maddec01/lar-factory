@@ -7,11 +7,11 @@ import { BookOpen, FlaskConical, Hammer, ListChecks, Lightbulb, MessagesSquare, 
 import { ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemTitle, SliceBar } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, SliceBar, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partWaves, upstreamOf, waitText } from './dossier-parts.ts';
+import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partWaves, shownThread, upstreamOf, waitText } from './dossier-parts.ts';
 import type { Part, PartKind } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
 
@@ -78,11 +78,13 @@ function useWidth() {
 }
 
 function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now: number; width: number }) {
-  const { item, thread } = part;
+  const { item } = part;
   const isPicked = useItemDialogStore((state) => state.itemId === item.id);
   const Icon = KIND_ICON[part.kind];
   const open = openWaits(part);
   const complete = isDone(item);
+  const shown = useShownStatus(item);
+  const thread = shownThread(part, shown.working);
   const tone = complete ? 'border-(--border) bg-(--muted)'
     : item.status === 'Needs you' ? 'border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] shadow-[inset_3px_0_0_var(--warning)]'
     : open.length ? 'border-dashed border-(--input)' : 'border-(--border)';
@@ -107,7 +109,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
       <AzureFields azure={item.azure} />
       {item.slices.length > 0 && <span className="pointer-events-none relative"><SliceBar item={item} /></span>}
       <span className="pointer-events-none relative mt-auto flex items-center gap-1.5 text-xs">
-        <StatusGlyph status={complete ? 'Done' : item.status} className="size-3" />{complete ? 'Complete' : item.status}
+        <StatusGlyph status={complete ? 'Done' : shown.glyph} className="size-3" />{complete ? 'Complete' : shown.word}
         {thread && <span className="truncate text-(--muted-foreground)">· {thread.state}</span>}
       </span>
       {action && <span className="relative flex min-h-6 min-w-0 items-center">{action}</span>}

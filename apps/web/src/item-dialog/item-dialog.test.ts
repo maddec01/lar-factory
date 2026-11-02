@@ -3,7 +3,7 @@
 // requests in a sidebar, and its footer carries GitHub and the action the item's status asks for.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, NOW, answer, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
 import type { Blocker, BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
@@ -213,6 +213,24 @@ test('Open thread and Answer in T3 link to the latest thread in T3 Code, in the 
   await openItem('I_sample12');
   const answerLink = statusAction() as HTMLAnchorElement;
   expect([text(answerLink), answerLink.getAttribute('href')]).toEqual(['Answer in T3', 't3code://threads/sample-environment/sample-thread-202']);
+});
+
+test.each(['Verify', 'Ready to merge'] as const)('%s with its build thread running offers Open thread on that thread, says Working and keeps its stage', async (status) => {
+  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
+  const change = (threads: Item['threads']) => ({ ...fresh, items: fresh.items.map((i) => (i.id === 'I_sample10' ? { ...i, status, threads } : i)) });
+  await mountPage(change([thread('other', 'done'), { ...thread('build', 'running'), purpose: 'build', currentRunning: true }]));
+  await openItem('I_sample10');
+  const open = statusAction() as HTMLAnchorElement;
+  expect([text(open), open.getAttribute('href')]).toEqual(['Open thread', 't3code://threads/sample-environment/build']);
+  expect(text(inDialog('[data-item-summary]'))).toContain('Working');
+  expect(text(inDialog('[data-item-summary]'))).not.toContain(status);
+  expect(text(inDialog('[data-steps] [aria-current="step"]'))).toContain('Working');
+  expect(inDialog('[data-steps] [aria-current="step"]')!.getAttribute('aria-label')).toMatch(status === 'Verify' ? /^Step 7 of 8: Working/ : /^Step 8 of 8: Working/);
+
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(change([{ ...thread('build', 'done'), purpose: 'build' }])));
+  expect(text(statusAction())).toBe(status === 'Verify' ? 'Verify build' : 'Merge PR');
+  expect(text(inDialog('[data-item-summary]'))).toContain(status);
 });
 
 test.each([

@@ -16,7 +16,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
-import { ItemTitle, repoTone } from '../items/item-parts.tsx';
+import { ItemTitle, repoTone, useShownStatus } from '../items/item-parts.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 
@@ -65,12 +65,13 @@ function Empty({ children }: { children: ReactNode }) {
 
 /** One item: its status glyph, its number and title, then its repository's dot and age (or a trailing figure). Picking it opens the item dialog. */
 function Row({ item, data, now, trailing }: { item: Item; data: BoardData; now: number; trailing?: ReactNode }) {
+  const shown = useShownStatus(item);
   return (
     <li>
       <Popover.Close asChild aria-label={`${itemName(item)}`}>
         <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
           className="flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left text-[13px] text-base-content outline-none hover:bg-base-200 focus-visible:bg-base-200">
-          <StatusGlyph status={item.status} />
+          <StatusGlyph status={shown.glyph} />
           <SourceIcon item={item} />
           <span className="min-w-0 flex-1 truncate"><ItemTitle item={item} /></span>
           <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums">
@@ -108,8 +109,8 @@ function Slots({ used, limit }: { used: number; limit: number }) {
 }
 
 export function Counters() {
-  const { data, now } = useBoardStore();
-  const s = boardSections(data, now);
+  const { data, now, clientError } = useBoardStore();
+  const s = boardSections(data, now, clientError);
   const building = buildsInSlots(data.items);
   const costs = data.items
     .map((item) => ({ item, cost: costOf(item) }))

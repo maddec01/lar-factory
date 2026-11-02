@@ -18,3 +18,21 @@ it('shows pending relaunch after stopped or finished build threads', () => {
     expect(buildActivity({ status: 'In progress', buildRequested: true, threads: [{ purpose: 'build', state }] } as Item)).toEqual({ label: 'Start requested', running: false });
   }
 });
+
+for (const status of ['Verify', 'Ready to merge'] as const) {
+  const running = { status, buildPhase: 'retro', threads: [{ id: 'build', purpose: 'build', state: 'running', currentRunning: true }] } as unknown as Item;
+
+  it(`says Working at ${status} while the build thread or a child runs, whatever the phase`, () => {
+    expect(buildActivity(running)).toEqual({ label: 'Working', running: true });
+    expect(buildActivity({ ...running, threads: [{ purpose: 'build', state: 'done', hasRunningChildren: true }] } as Item)).toEqual({ label: 'Working', running: true });
+  });
+
+  it(`says ${status} when the thread is idle, asks a question, is held or can't be read`, () => {
+    const recorded = { label: status, running: false };
+    expect(buildActivity({ ...running, threads: [{ purpose: 'build', state: 'done' }] } as Item)).toEqual(recorded);
+    expect(buildActivity({ ...running, threads: [{ purpose: 'build', state: 'needs you' }] } as Item)).toEqual(recorded);
+    expect(buildActivity({ ...running, threads: [{ purpose: 'build', state: 'needs you', hasRunningChildren: true }] } as Item)).toEqual(recorded);
+    expect(buildActivity({ ...running, needsYou: { reason: 'Stuck', offers: [] } } as unknown as Item)).toEqual(recorded);
+    expect(buildActivity(running, true)).toEqual(recorded);
+  });
+}

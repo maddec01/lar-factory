@@ -121,9 +121,23 @@ function noteAgreement(records: WorkRecords, workId: string, reads: ObserveReads
 }
 
 /**
- * Observes every active record of `repos`, less the work IDs in `hidden`, which retention hides: its current PR until
- * the work finishes, then its ticket, PR first so a merge that closes the ticket finishes the work before the ticket's
- * close is seen, then its Dependencies' tickets and PRs, each once a pass, OBSERVED_AT_ONCE records at a time. `changed` publishes each observation's writes before another
+ * Observes one record's current PR until the work finishes, then its ticket, PR first so a merge that closes the ticket
+ * finishes the work before the ticket's close is seen. `changed` publishes each observation's writes.
+ */
+export async function observeWork(records: WorkRecords, { workId, repository, ticket, pullRequest, finishedAt }: WorkRecord, reads: ObserveReads, changed: () => void = () => {}): Promise<void> {
+  if (pullRequest && !finishedAt) {
+    await observeOne(records, workId, 'pr', async () => ({ of: 'pr', state: await reads.pr(repository, numberOf(pullRequest)) })).finally(changed);
+  }
+  if (ticket && !records.read(workId).setAside) {
+    const number = numberOf(ticket);
+    await observeOne(records, workId, 'ticket', async () => ({ of: 'ticket', ...reads.known?.(repository, number) ?? await reads.ticket(repository, number) })).finally(changed);
+    noteAgreement(records, workId, reads);
+  }
+}
+
+/**
+ * Observes every active record of `repos`, less the work IDs in `hidden`, which retention hides: the record itself,
+ * then its Dependencies' tickets and PRs, each once a pass, OBSERVED_AT_ONCE records at a time. `changed` publishes each observation's writes before another
  * provider read can hold up the pass. A record a thread changes meanwhile is read again next time.
  */
 export async function observeRecords(records: WorkRecords, repos: readonly string[], reads: ObserveReads, hidden: ReadonlySet<string> = new Set(),
@@ -144,16 +158,10 @@ export async function observeRecords(records: WorkRecords, repos: readonly strin
   const observeNext = async (): Promise<void> => {
     for (; next < active.length;) await observeActive(active[next++]!);
   };
-  const observeActive = async ({ workId, repository, ticket, pullRequest, finishedAt }: WorkRecord): Promise<void> => {
+  const observeActive = async (record: WorkRecord): Promise<void> => {
+    const { workId } = record;
     try {
-      if (pullRequest && !finishedAt) {
-        await observeOne(records, workId, 'pr', async () => ({ of: 'pr', state: await reads.pr(repository, numberOf(pullRequest)) })).finally(changed);
-      }
-      if (ticket && !records.read(workId).setAside) {
-        const number = numberOf(ticket);
-        await observeOne(records, workId, 'ticket', async () => ({ of: 'ticket', ...reads.known?.(repository, number) ?? await reads.ticket(repository, number) })).finally(changed);
-        noteAgreement(records, workId, reads);
-      }
+      await observeWork(records, record, reads, changed);
       for (const { dependencyId, ticket: theirs, pullRequests } of records.dependencies(workId)) {
         for (const subject of [...theirs ? [theirs] : [], ...pullRequests]) {
           const repo = subject.slice(0, subject.lastIndexOf('#'));

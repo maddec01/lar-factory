@@ -12,14 +12,15 @@ import { randomUUID } from 'node:crypto';
 import { readTicketSpec, stripTrackerStructure, SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isLiveThread, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, PickedTicket, ShapingThreadCleanup, SkillCheckOutcome, StartedThread, StartResult, Status, SwapKind } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { readShapingThreadCleanup, WorkRecordError, type LaunchIntent, type SavedShapingThreadCleanup, type WorkRecords } from '@lar-factory/work-records';
+import { readShapingThreadCleanup, WorkRecordError, type LaunchIntent, type PullRequestState, type SavedShapingThreadCleanup, type WorkRecord, type WorkRecords } from '@lar-factory/work-records';
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
 import type { BoardState } from '../board/board-state.ts';
-import { prHost, prUrl } from '../config/pr-host.ts';
+import { observePr, prHost, prUrl } from '../config/pr-host.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
 import { readRepositorySetups } from '../config/repository-settings.ts';
 import { installHome } from '../skills/bundled-skills.ts';
 import { readJsonRecord } from '../json-file.ts';
+import { log } from '../log.ts';
 import { serverRuntimePath } from '../t3/t3-settings.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
@@ -32,6 +33,7 @@ import { findStartedThread, lookupThread, startThread } from '../t3/t3.ts';
 import type { ItemSource } from './item-source.ts';
 import { importPickedTicket } from './import-ticket.ts';
 import { needsYouNotice, NO_THREAD, savedNeedsYou } from './needs-you-causes.ts';
+import { observeWork } from './observe-records.ts';
 
 /** A command's answer: the HTTP status and the JSON body. */
 export interface Reply {
@@ -75,8 +77,12 @@ export interface ItemCommands {
    * that succeeded answers a second press without closing again.
    */
   closeTicket(itemId: string): Promise<Reply>;
-  /** Brings set-aside work in Archive back to the board in the Status it had, unless retention hides it as finished. */
-  restore(itemId: string): Reply;
+  /**
+   * Brings set-aside work in Archive back to the board in the Status it had, unless retention hides it as finished, then
+   * reads its PR and ticket through the observer's rules, as no observer reads set-aside work. A failed read keeps the
+   * notice as last saved for the next observer pass, and the restore still succeeds.
+   */
+  restore(itemId: string): Promise<Reply>;
   /**
    * Acts on work that needs you as `choice`, one of its notice's offers, says, then removes every cause the notice names
    * and refuses anything else. Reopening the PR reopens it in its provider, a replacement build moves the work to Ready
@@ -137,6 +143,8 @@ export interface ItemCommandsDeps {
   skillsOf?: (repo: string) => readonly string[];
   /** Reopens the repository's PR `number`; tests stand in for gh and az. */
   reopenPr?: (repo: string, number: number) => Promise<void>;
+  /** Reads the repository's PR `number` as it is now; tests stand in for gh and az. */
+  readPr?: (repo: string, number: number) => Promise<PullRequestState>;
   /** The tracker of a kind change; tests stand in for it. */
   kindTracker?: (repo: string) => Pick<KindChangeDeps, 'labels' | 'kinds'>;
 }
@@ -222,7 +230,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
   baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
   buildAccessOf = (repo) => readRepositorySetups().find(setup => sameRepo(setup.repo, repo))?.access ?? {},
   showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, shapingThreadCleanupChoice = readShapingThreadCleanup, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
-  reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)) }: ItemCommandsDeps): ItemCommands {
+  reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)), readPr = (repo, number) => observePr(repo, number) }: ItemCommandsDeps): ItemCommands {
   const retryBuilds = new Set<string>();
   /** Thread lookups by thread ID: one in flight, or when the next may run. */
   const checks = new Map<string, { pending: boolean; retryAt: number }>();
@@ -941,13 +949,16 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       return withBoard(error ? 502 : 200, { error });
     },
 
-    restore(itemId) {
+    async restore(itemId) {
       if (!records) return withBoard(409, { error: 'The board has no work records to change.' });
       if (!archive().some((shown) => shown.id === itemId && shown.archived?.setAside)) {
         return withBoard(409, { error: "That work isn't set aside in Archive, so there is nothing to restore." });
       }
-      try { write(itemId, (revision) => records.restore(itemId, revision)); }
+      let restored: WorkRecord;
+      try { restored = write(itemId, (revision) => records.restore(itemId, revision)); }
       catch (err) { return withBoard(409, { error: (err as Error).message }); }
+      try { await observeWork(records, restored, { ticket: (repo, number) => items.observeTicket(repo, number), pr: readPr }, reread); }
+      catch (err) { log(`can't recheck ${itemId} after its restore: ${(err as Error).message}`); }
       return withBoard(200, { error: null });
     },
 

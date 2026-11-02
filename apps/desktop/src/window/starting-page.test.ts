@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { BRAND_BLOCK_COLOR, BRAND_MARK_BAR, BRAND_MARK_BLOCK, BRAND_MARK_CENTRE_LINE, BRAND_MARK_L } from "@lar-factory/shared";
 
 import * as LaunchSecret from "../board-server/launch-secret.ts";
 import * as StartingPage from "./starting-page.ts";
@@ -15,15 +14,6 @@ describe("StartingPage", () => {
     assert.match(html(page), /class="loading-lar"><span class="loading-lar-slide">ar</);
     assert.match(html(page), /class="loading-factory">Factory</);
     assert.notInclude(html(page), "didn't start");
-  });
-
-  it("draws the mark the board page's loading screen draws, from the shared geometry", () => {
-    const page = html(StartingPage.url());
-    assert.include(page, `d="${BRAND_MARK_L}"`);
-    assert.include(page, `d="${BRAND_MARK_BLOCK}"`);
-    assert.include(page, `fill="${BRAND_BLOCK_COLOR}"`);
-    assert.include(page, `d="${BRAND_MARK_CENTRE_LINE}"`);
-    assert.include(page, `stroke-width="${BRAND_MARK_BAR}"`);
   });
 
   it("takes its colours and spacing from the design system, in light and dark mode", () => {

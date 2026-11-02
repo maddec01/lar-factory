@@ -297,8 +297,8 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   return items.map((item) => {
     if (item.recorded === false) return item;
     const known = retainStats(previousStats.get(item.id), item.stats);
-    const live = fresh ? stats(threadIds(item.id)) : item.stats;
-    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item.id) };
+    const live = fresh ? stats(threadIds(item.id)) : withStats && threadIds(item.id).length ? 'unavailable' : item.stats;
+    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? (live === 'unavailable' ? live : retainStats(known, live)) : known, threads: threads(item.id) };
     shown.slices = item.slices.map((slice): typeof slice => {
       if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
       const ids = slice.workId && records ? records.threads(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];

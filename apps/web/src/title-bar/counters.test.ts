@@ -4,6 +4,8 @@
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, moved, mountPage, sample, settle, text } from '../../test/support.ts';
 
+const completeSample = { ...sample, error: null, items: sample.items.map(item => ({ ...item, stats: item.stats && item.stats !== 'unavailable' ? item.stats : { agentMs: 0, tokens: 0, costUsd: 0 } })) };
+
 const counters = () => $$<HTMLButtonElement>('.counters button[aria-haspopup]');
 const counter = (label: string) => counters().find((b) => b.getAttribute('aria-label')!.startsWith(`${label}: `))!;
 const popup = () => $('[data-state="open"] .counter-popup');
@@ -18,7 +20,7 @@ async function openCounter(label: string): Promise<HTMLElement> {
 }
 
 test('the counters show need you, building over the limit of 2, queued, shipped this week and spend, each by its number and named by its label', async () => {
-  await mountPage();
+  await mountPage(completeSample);
   expect(counters().map(text)).toEqual(['8', '3/2', '3', '4', '$190.25']);
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
     'need you: 8 items only you can move',
@@ -104,7 +106,7 @@ test('each row is named by its item\'s number and title, not by the popover\'s c
 });
 
 test('spend lists the five priciest items with their cost, out of every priced item', async () => {
-  await mountPage();
+  await mountPage(completeSample);
   const pop = await openCounter('spend');
   expect(head(pop)).toBe('Agent spend$190.25');
   expect(rows()).toEqual([
@@ -119,14 +121,14 @@ test('spend lists the five priciest items with their cost, out of every priced i
 });
 
 test('the spend tooltip says the figure is an API estimate', async () => {
-  await mountPage();
+  await mountPage(completeSample);
   await settle(() => counter('spend').focus());
   await settle(() => vi.advanceTimersByTime(1000));
   expect(text($('[role="tooltip"]'))).toBe('Agent cost on open and recent items, an API estimate');
 });
 
 test('with nothing on the board each popover says so', async () => {
-  await mountPage({ ...sample, items: [] });
+  await mountPage({ ...completeSample, items: [] });
   expect(counters().map(text)).toEqual(['0', '0/2', '0', '0', '$0.00']);
   const empty: [string, string][] = [];
   for (const label of ['need you', 'building', 'queued', 'shipped', 'spend']) {
@@ -150,4 +152,24 @@ test('picking a row closes the popover and opens that item\'s dialog', async () 
   await settle(() => popup()!.querySelector<HTMLButtonElement>('li button')!.click());
   expect(popup()).toBeNull();
   expect(text($('[data-item-dialog] [data-slot="modal-header"] h2'))).toBe('#150 Relay for streaming away from home');
+});
+
+test('spend does not present partial histories as a complete total', async () => {
+  const data = structuredClone(sample);
+  data.items[0]!.stats = 'unavailable';
+  await mountPage(data);
+  expect(text(counter('spend'))).toBe('Unavailable');
+  const pop = await openCounter('spend');
+  expect(head(pop)).toBe('Agent spendIncomplete');
+  expect(text(pop)).toContain('Usage totals are incomplete or unavailable.');
+});
+
+test.each(['pending', 'failed'] as const)('spend remains incomplete when an empty source succeeds and another is %s', async (state) => {
+  const data = structuredClone(completeSample);
+  data.items = [];
+  if (state === 'pending') data.firstRead = { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] };
+  else data.itemSourceProblems = [{ repo: 'owner/failed', problem: 'Read failed' }];
+  await mountPage(data);
+  expect(text(counter('spend'))).toBe('Unavailable');
+  expect(head(await openCounter('spend'))).toBe('Agent spendIncomplete');
 });

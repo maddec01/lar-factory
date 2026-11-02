@@ -440,7 +440,9 @@ test.each(['Shaping', 'In progress', 'Review'] as const)('line activity follows 
   const { useBoardStore } = await import('../board/board-store.ts');
   for (const [state, expected] of [['running', 'Thread running'], ['stopped', 'Run stopped'], ['done', 'Run finished'], ['needs you', 'Thread needs you']] as const) {
     await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: [thread('t1', state)] })));
-    expect(activity()).toBe(expected);
+    if (status === 'Shaping' && state === 'needs you') {
+      expect($(`.desk-card[data-item="${id}"]`)).not.toBeNull();
+    } else expect(activity()).toBe(expected);
   }
   await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: 'unavailable' })));
   expect(activity()).toBe('Thread unavailable');

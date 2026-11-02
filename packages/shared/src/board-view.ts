@@ -27,7 +27,7 @@ export interface ListGroup {
 }
 
 export interface BoardSections {
-  /** The desk: Ready, Needs you, Verify and Ready to merge, concepts left out. */
+  /** The desk: Items awaiting action, including current shaping and concept questions. */
   needsYou: Item[];
   inFlight: Item[];
   concepts: Item[];
@@ -47,6 +47,16 @@ export function noneOnboarded(data: BoardData): boolean {
   return !data.repos.length && !data.onboarding?.length && !data.repositoryConfigProblems?.length && !data.error && data.fetchedAt !== null;
 }
 
+export function openQuestionThread(item: Item) {
+  return Array.isArray(item.threads) ? item.threads.find((thread) => thread.state === 'needs you' && !thread.observedAt) : undefined;
+}
+
+/** Whether this item's own question or status asks for an answer. */
+export function needsAnswer(item: Item): boolean {
+  return item.status === 'Needs you' || Boolean(openQuestionThread(item) &&
+    (item.kind === 'concept' ? !['List', 'Queued', 'Done'].includes(item.status) : item.status === 'Shaping'));
+}
+
 export function boardSections(data: BoardData, now: number): BoardSections {
   const items = [...data.items].sort(byFlowOrder);
   const inStatus = (...s: Status[]) => items.filter((i) => s.includes(i.status));
@@ -58,7 +68,7 @@ export function boardSections(data: BoardData, now: number): BoardSections {
     .sort((a, b) => b.items.length - a.items.length);
   const notConcept = (i: Item) => i.kind !== 'concept';
   return {
-    needsYou: inStatus('Ready', 'Needs you', 'Verify', 'Ready to merge').filter(notConcept),
+    needsYou: items.filter((item) => needsAnswer(item) || (notConcept(item) && ['Ready', 'Verify', 'Ready to merge'].includes(item.status))),
     inFlight: inStatus('Shaping', 'Ready', 'In progress', 'Review').filter(notConcept),
     concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),

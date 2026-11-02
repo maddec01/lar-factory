@@ -12,7 +12,7 @@ import { useEditStore } from '../repositories/edit-store.ts';
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { writeAccessProblem, HINTS, blockedText, canResumeShaping, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, writeAccessProblem, HINTS, blockedText, canResumeShaping, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -45,6 +45,7 @@ import { RecordText } from './record-text.tsx';
 
 /** The one thing the item's status asks of you. */
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {
+  if (needsAnswer(item)) return <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />;
   switch (item.status) {
     case 'List': return <QueueButton item={item} data={data} />;
     case 'Queued':
@@ -96,7 +97,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
   const record = read.state === 'loaded' ? read.details.record : undefined;
   // Work with no ticket has no ticket text to show beside its record's.
   const ticket = !record || item.number > 0;
-  const hint = item.status === 'Needs you' ? 'Answer in T3' : HINTS[item.status];
+  const hint = needsAnswer(item) ? 'Answer in T3' : HINTS[item.status];
   const setup = data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
   const accessProblem = writeAccessProblem(item.repo, 'edit-ticket', setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
   const editable = accessProblem === null;

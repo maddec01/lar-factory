@@ -1,10 +1,10 @@
-// Your desk: the items only you can move, Ready, Needs you, Verify and Ready to merge, as cards in one row that scrolls
+// Your desk: the items awaiting your action, including shaping and concept questions, as cards in one row that scrolls
 // sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the same five
 // rows at the same heights, so they line up across cards: status, repository and age; the title; the next step; the
 // step track; and the actions, the card's action on the left and Open thread as an icon in the right corner. Only a
 // Ready card's start message or Start after error, under its actions, makes one card taller than the rest.
 
-import { HINTS, itemPr, openBlockerRefs, itemName, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, HINTS, itemPr, openBlockerRefs, itemName, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -38,6 +38,7 @@ const MERGE_COLOR: Record<MergeState, string> = { 'can merge': 'var(--st-done)',
  * status's hint. The checks leave out a zero count other than passed.
  */
 function NextStep({ item, data }: { item: Item; data: BoardData }) {
+  if (needsAnswer(item)) return <span className="truncate">Answer in T3</span>;
   const pipeline = readsPr(item) ? itemPr(item)?.pipeline : undefined;
   if (pipeline) {
     const { checks, mergeState } = pipeline;
@@ -56,14 +57,14 @@ function NextStep({ item, data }: { item: Item; data: BoardData }) {
 
 /** One row: the card's action on the left, and Open thread as a square icon in the right corner unless it is the action. */
 function Actions({ item, data }: { item: Item; data: BoardData }) {
-  const action = startsBuild(item) ? <StartBuild item={item} data={data} />
+  const action = needsAnswer(item) ? <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" /> : startsBuild(item) ? <StartBuild item={item} data={data} />
     : readsPr(item) ? <PrLink item={item} label="Open PR" />
     : null;
   return (
     // A click beside the buttons opens the item dialog, as anywhere else on the card.
     <KeepClicks className="desk-actions flex h-7 min-w-0 items-center justify-start gap-2" passEmpty>
       {action ?? <OpenThread item={item} data={data} />}
-      {action && <span className="ml-auto flex"><OpenThread item={item} data={data} iconOnly /></span>}
+      {action && !needsAnswer(item) && <span className="ml-auto flex"><OpenThread item={item} data={data} iconOnly /></span>}
     </KeepClicks>
   );
 }

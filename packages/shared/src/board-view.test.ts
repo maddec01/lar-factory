@@ -31,3 +31,27 @@ for (const [repo, detail, confirm, done] of [
     assert.deepEqual(closeTicketPrompt(ticketed(repo!)), { question: 'Close the ticket of #7 Keep history too?', detail, confirm, keep: 'Keep it open', done });
   });
 }
+
+test('a current shaping question enters the desk and leaves when answered', () => {
+  const item = { ...ticketed('owner/repo'), status: 'Shaping', threads: [{ id: 'question', state: 'needs you' }] } as Item;
+  const data = { items: [item], repos: [] } as unknown as BoardData;
+  assert.deepEqual(boardSections(data, Date.now()).needsYou, [item]);
+  item.threads = [{ id: 'question', state: 'running' }] as Item['threads'];
+  assert.deepEqual(boardSections(data, Date.now()).needsYou, []);
+});
+
+for (const kind of ['issue', 'concept'] as const) {
+  for (const status of ['List', 'Queued', 'Shaping', 'Ready', 'In progress', 'Review', 'Needs you', 'Verify', 'Ready to merge', 'Done'] as const) {
+    test(kind + ' desk boundary in ' + status, () => {
+      const item = { ...ticketed('owner/repo'), kind, status, threads: [{ id: 'q', state: 'needs you' }] } as Item;
+      const data = { items: [item], repos: [] } as unknown as BoardData;
+      const expected = kind === 'concept' ? !['List', 'Queued', 'Done'].includes(status) : ['Shaping', 'Ready', 'Needs you', 'Verify', 'Ready to merge'].includes(status);
+      assert.equal(boardSections(data, Date.now()).needsYou.length, Number(expected));
+      item.threads = 'unavailable';
+      const ordinary = kind === 'concept' ? status === 'Needs you' : ['Ready', 'Needs you', 'Verify', 'Ready to merge'].includes(status);
+      assert.equal(boardSections(data, Date.now()).needsYou.length, Number(ordinary));
+      item.threads = [{ id: 'q', state: 'needs you', observedAt: '2026-11-02' }] as Item['threads'];
+      assert.equal(boardSections(data, Date.now()).needsYou.length, Number(ordinary));
+    });
+  }
+}

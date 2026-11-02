@@ -77,9 +77,9 @@ const NO_THREAD = 'No T3 thread has worked on this yet';
 const NO_PROJECT = 'T3 Code has no project for maddec01/lar-server';
 
 test.each<[string, BoardData, string, string, string[]]>([
-  ['Needs you with no thread', sample, 'I_sample11', 'Answer in T3', [`Open thread (disabled: ${NO_THREAD})`]],
-  ['Needs you', sample, 'I_sample12', 'Answer in T3', ['Open thread']],
-  ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', 'Answer in T3', ['Open thread']],
+  ['Needs you with no thread', sample, 'I_sample11', 'Answer in T3', [`Answer in T3 (disabled: ${NO_THREAD})`]],
+  ['Needs you', sample, 'I_sample12', 'Answer in T3', ['Answer in T3']],
+  ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', 'Answer in T3', ['Answer in T3']],
   ['Ready with a thread at work on it', withItem('I_sample13', { threads: liveThread }), 'I_sample13', 'A thread is at work on it', ['Open thread']],
   ['Ready held by open blockers', withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 9, repo: 'maddec01/lar-apple', state: 'open' }, { number: 7, repo: 'maddec01/lar-server', state: 'closed' }] }),
     'I_sample13', 'Waits on #202, lar-apple#9', ['Start after lar-apple#9 ▾', '[Open thread]']],
@@ -168,6 +168,7 @@ test('a decision with no thread answers in its concept thread without inheriting
   const child = useBoardStore.getState().data.items.find((item) => item.id === 'I_sample12')!;
   expect(child.threads).toEqual([]);
   expect(child.stats).toBeUndefined();
+  expect(card('I_sample09')).not.toBeNull();
   await settle(() => card('I_sample12').click());
   expect(text(dialog()!.querySelector('[data-open-thread]'))).toBe('Answer in concept thread');
 });
@@ -176,7 +177,7 @@ test('a decision keeps its own thread even when its concept has a waiting thread
   await mountPage(questionBoard({ threads: [{ id: 'own-decision', title: 'Decision', state: 'stopped', updated: '2026-10-21T09:00:00.000Z' }] }));
   const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
   expect(action.href).toBe('t3code://threads/sample-environment/own-decision');
-  expect(text(action)).toBe('Open thread');
+  expect(text(action)).toBe('Answer in T3');
 });
 
 test.each([
@@ -202,4 +203,19 @@ test('a ready item appears once on the desk while its concept family remains ava
   const expand = $<HTMLButtonElement>('[data-dossier="I_sample09"] button[aria-expanded]')!;
   if (expand.getAttribute('aria-expanded') === 'false') await settle(() => expand.click());
   expect($('[data-dossier="I_sample09"] [data-map-part="I_sample13"], [data-dossier="I_sample09"] [data-part="I_sample13"]')).not.toBeNull();
+});
+
+test('shaping questions target the older question and leave the desk on a board update', async () => {
+  const data = withItem('I_sample12', { status: 'Shaping', threads: [
+    { id: 'newer', title: 'Newer', state: 'done', updated: '2026-11-02' },
+    { id: 'question', title: 'Question', state: 'needs you', updated: '2026-11-01' },
+  ] });
+  await mountPage(data);
+  expect(nextLine('I_sample12')).toBe('Answer in T3');
+  expect(card('I_sample12').querySelector('a')?.getAttribute('href')).toBe('t3code://threads/sample-environment/question');
+  await settle(() => card('I_sample12').click());
+  expect(dialog()!.querySelector('[data-open-thread]')?.getAttribute('href')).toBe('t3code://threads/sample-environment/question');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...data, items: data.items.map(item => item.id === 'I_sample12' ? { ...item, threads: [] } : item) }));
+  expect(card('I_sample12')).toBeNull();
 });

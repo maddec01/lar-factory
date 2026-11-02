@@ -9,8 +9,8 @@ import { refreshSpecs } from '@lar-factory/work-records/spec-sync';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
-import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, SkillCheckOutcome, StartedThread, StartResult, Status, SwapKind } from '@lar-factory/shared';
+import { readTicketSpec, stripTrackerStructure, SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, PickedTicket, SkillCheckOutcome, StartedThread, StartResult, Status, SwapKind } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
@@ -67,7 +67,7 @@ export interface ItemCommands {
    * Sets List or Queued work aside on this Mac, or work whose Needs you offers it, and leaves its ticket as it is.
    * Archive offers closeTicket separately. The combined action closes before setting work aside.
    */
-  abandon(itemId: string): Reply;
+  abandon(itemId: string): Promise<Reply>;
   abandonAndClose(itemId: string): Promise<Reply>;
   /**
    * Closes the open ticket of set-aside work in Archive: as not planned on GitHub, to Removed on Azure DevOps. A close
@@ -235,7 +235,22 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
   // Only settled starts can be retried; requests arriving during a retry share its pending result.
   const finishedStarts = new WeakMap<Promise<Start>, string>();
   const settled = new WeakSet<Promise<Start>>();
+  /** Saves only this ticket, retaining its text while a closed-ticket persistence failure is retried. */
+  async function abandonmentRecord(item: Item) {
+    let ticket = abandonmentTickets.get(item.id);
+    if (!ticket) {
+      ticket = await items.readTicket(item.repo, item.number!) ?? undefined;
+      if (!ticket) throw new Error('Could not read the ticket before abandonment. Try again.');
+      abandonmentTickets.set(item.id, ticket);
+    }
+    const context = stripTrackerStructure(ticket.text).replace(/<!-- lar-factory:create [^\n]*? -->/g, '').trimEnd();
+    const parsed = readTicketSpec(context);
+    return records!.importTicket({ title: ticket.title, repository: item.repo, kind: ticket.kind,
+      ticket: `${item.repo}#${ticket.number}`, context: parsed.marked ? parsed.original ?? '' : context }).record;
+  }
   /** Ticket closes by item id: one in flight, so a second press waits for it, or one that succeeded, kept. */
+  const abandonmentTickets = new Map<string, PickedTicket>();
+  const abandoning = new Map<string, Promise<Reply>>();
   const combined = new Map<string, Promise<Reply>>();
   const closing = new Map<string, Promise<string | null>>();
 
@@ -244,6 +259,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
 
   /** Why a command in flight on the item, or a Start this board run, blocks this action; null when nothing does. */
   function busyReason(itemId: string, action: Action): string | null {
+    if (abandoning.has(itemId)) return 'Abandon is running. Wait for it to finish.';
     if (combined.has(itemId)) return 'Abandon and close ticket is running. Wait for it to finish.';
     if (['List', 'Queued'].includes(board.find(itemId)?.status ?? '') && recordedThreads(itemId).length > 0 && !!recordedThreads(itemId).at(-1)?.deletedAt && !records?.launchIntents({ workId: itemId, unresolved: true }).length) return null;
     const started = buildStarts.has(itemId) || starts.has(itemId) || !!board.snapshot().started?.[itemId] || recordedStart(itemId);
@@ -797,7 +813,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       };
     }),
 
-    abandon(itemId) {
+    async abandon(itemId) {
       const item = board.find(itemId);
       // A second press after Abandon finished has nothing left to do.
       if (!item && board.removed(itemId)) return withBoard(200, { error: null });
@@ -805,18 +821,25 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       // Needs you offers setting work aside whatever its Status and threads, as after its PR closed unmerged.
       const offered = item.needsYou?.offers.includes('set-aside');
       if (!canAbandon(item) && !offered) return reply(409, { error: `Only List and Queued items can be abandoned; this one is in ${item.status}.` });
-      const busy = combined.has(itemId) ? "Abandon and close ticket is running." : offered ? null : busyReason(itemId, 'abandon');
+      const busy = combined.has(itemId) || abandoning.has(itemId) ? "Abandon is running. Wait for it to finish." : offered ? null : busyReason(itemId, 'abandon');
       if (busy) return withBoard(409, { error: busy });
-      if (records) {
-        try { records.setAside(item.id, item.revision); }
-        catch (err) {
-          reread();
-          return withBoard(409, { error: (err as Error).message });
+      return track(abandoning, itemId, Promise.resolve().then(async () => {
+        if (records) {
+          try {
+            const current = item.recorded === false ? await abandonmentRecord(item) : null;
+            if (current && current.status !== item.status) throw new Error('The work changed status while its ticket was read. Check the updated work.');
+            records.setAside(current?.workId ?? item.id, current?.revision ?? item.revision);
+          }
+          catch (err) {
+            reread();
+            return withBoard(409, { error: (err as Error).message });
+          }
         }
-      }
-      board.remove(itemId);
-      reread();
-      return withBoard(200, { error: null });
+        abandonmentTickets.delete(itemId);
+        board.remove(itemId);
+        reread();
+        return withBoard(200, { error: null });
+      }));
     },
 
     abandonAndClose(itemId) {
@@ -830,6 +853,11 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       if ((!canAbandon(item) && !offered) || busy || !item.number || item.abandonRefusal) return Promise.resolve(withBoard(409, { error: busy ?? item.abandonRefusal ?? 'This work cannot be abandoned with ticket closure.' }));
       return track(combined, itemId, Promise.resolve().then(async () => {
         try {
+          if (records && item.recorded === false && !abandonmentTickets.has(item.id)) {
+            const ticket = await items.readTicket(item.repo, item.number);
+            if (!ticket) return withBoard(502, { error: 'Could not read the ticket before abandonment. Try again.' });
+            abandonmentTickets.set(item.id, ticket);
+          }
           const observation = await items.observeTicket(item.repo, item.number);
           if (observation.state !== 'closed' || observation.abandonmentComplete === false) {
             if (observation.state !== 'open' && observation.state !== 'closed') return withBoard(502, { error: 'Could not establish the ticket state. Try again to reconcile before abandoning.' });
@@ -838,14 +866,15 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           }
           try {
             if (records) {
-              const current = records.read(item.id);
+              const current = item.recorded === false ? await abandonmentRecord(item) : records.read(item.id);
               if (current.status !== item.status) throw new Error('The work changed status while its ticket closed. Check the updated work.');
-              records.setAside(item.id, current.revision);
+              records.setAside(current.workId, current.revision);
             }
           } catch (error) {
             reread();
             return withBoard(409, { error: `The ticket is closed, but the work remains on the board. Try again to finish abandonment. ${(error as Error).message}` });
           }
+          abandonmentTickets.delete(itemId);
           board.remove(itemId);
           reread();
           return withBoard(200, { error: null });

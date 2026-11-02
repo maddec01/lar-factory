@@ -50,7 +50,6 @@ test('while the details load the dialog shows the board data and a loading state
   await mountPage();
   await openItem('I_sample13');
   expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
-  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
   expect(inDialog('[aria-busy="true"]'), 'the loading state').not.toBeNull();
   expect(description()).toBeNull();
 

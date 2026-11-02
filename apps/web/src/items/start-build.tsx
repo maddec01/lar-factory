@@ -1,5 +1,5 @@
 // Start build on a Ready item, on the line and in the item dialog: today's Start with its model menu, posting to
-// /api/start-build. Open thread takes its place while the item has a running or needs-you thread, and Start after
+// /api/start-build. Open thread takes its place while the item has a running, queued or needs-you thread, and Start after
 // while an issue it's blocked by is open. It's disabled, its title saying why, while its repository is still
 // onboarding or T3 has no project for its repository.
 

@@ -380,13 +380,19 @@ export interface ItemThread {
   updated: string;
   /** Set while T3 can't be read: when the board last saw this state. */
   observedAt?: string;
-  /** A running or waiting descendant still belongs to this thread's work. */
+  /** A running, waiting or queued descendant still belongs to this thread's work. */
   hasLiveChildren?: true;
   currentRunning?: true;
+  /** T3 has queued this thread's next turn. Its state stays `done`. */
+  queued?: true;
   hasRunningChildren?: true;
   /** The work record's thread role, when recorded by the factory. */
   purpose?: string;
 }
+
+/** Whether the thread or a descendant is at work, waits on the user or has a queued turn. */
+export const isLiveThread = (thread: ItemThread): boolean =>
+  thread.state === 'running' || thread.state === 'needs you' || !!thread.queued || !!thread.hasLiveChildren;
 
 /** Resume only an interrupted shaping session whose current thread family is known to have stopped. */
 export function canResumeShaping(item: Item): boolean {

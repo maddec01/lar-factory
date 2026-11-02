@@ -2,8 +2,9 @@ import {buildMessage,type Item} from '@lar-factory/shared';
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
 import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
-import { testFactoryContext, NOT_LANDED, readsRepositoryConfig, recordBlockers, SAMPLE_MODELS, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { changeRecords, testFactoryContext, NOT_LANDED, readsRepositoryConfig, recordBlockers, SAMPLE_MODELS, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, DriftChoice, RawItem, SkillCheckOutcome } from '@lar-factory/shared';
@@ -144,6 +145,68 @@ test('Start build is refused while a blocker is incomplete, naming it, and runs 
   assert.equal((await refused.json()).error, 'Blocked by Decision 5 until it completes; use Start after to start it then.');
   assert.deepEqual([...await writes(board), ...await board.t3Calls()], []);
   await settleDecisions(board, board.id(12), blockers);
+  assert.equal((await startBuild(board, board.id(12))).status, 200);
+});
+
+const LIVE_SHAPING = 'A shaping thread is still at work on this item. Wait for it to finish, then start the build.';
+const SHAPING = 'shaping';
+const turn = (status?: string) => ({ id: 'turn', startedAt: '2026-11-01T08:00:00Z', ...status && { status, completedAt: '2026-11-01T08:01:00Z' } });
+const idleShaping = { id: SHAPING, turns: [turn('completed')] };
+const child = (status?: string) => ({ id: 'child', rootThreadId: SHAPING, turns: [turn(status)] });
+
+/** A board with Ready #12 and its shaping thread recorded, T3 showing `threads` and `requests`, if any; waits for the first read. */
+async function shapingBoard(t: TestContext, threads?: object[], requests: object[] = []) {
+  const env = startableEnv(t);
+  if (threads) {
+    writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify(threads));
+    writeFileSync(env.T3_STATE_DB + '.requests.json', JSON.stringify(requests));
+  }
+  const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { threads: { 'maddec01/lar-factory#12': [SHAPING] } }, env);
+  await until(board, (d) => d.items[0]!.threads !== undefined);
+  return board;
+}
+
+for (const [name, threads, requests] of [
+  ['is running', [{ id: SHAPING, turns: [turn()] }]],
+  ['is waiting', [{ id: SHAPING, turns: [turn('waiting')] }]],
+  ['needs the user', [{ id: SHAPING, turns: [turn()] }], [{ turnId: 'turn', createdAt: '2026-11-01T08:01:00Z' }]],
+  ['is queued', [{ id: SHAPING, turns: [turn('queued')] }]],
+  ['has a running child', [idleShaping, child()]],
+  ['has a queued child', [idleShaping, child('queued')]],
+] as [string, object[], object[]?][]) {
+  test(`Start build is refused while a shaping thread ${name}, writing no record and launching nothing`, async (t) => {
+    const board = await shapingBoard(t, threads, requests);
+    const records = await openWorkRecords(workRecordsPath(board.dataDir));
+    const before = (() => { try { return records.read(board.id(12)); } finally { records.close(); } })();
+    const refused = await startBuild(board, board.id(12));
+    assert.equal(refused.status, 409);
+    assert.equal((await refused.json()).error, LIVE_SHAPING);
+    const again = await openWorkRecords(workRecordsPath(board.dataDir));
+    try { assert.deepEqual(again.read(board.id(12)), before); } finally { again.close(); }
+    assert.deepEqual(await board.t3Calls(), []);
+  });
+}
+
+for (const [name, threads] of [
+  ['idle', [idleShaping]],
+  ['stopped', [{ id: SHAPING, turns: [turn('interrupted')] }]],
+  ['unreadable, T3 being down', undefined],
+  ['last seen running, T3 being down', [{ id: SHAPING, turns: [turn()], retainedAt: '2026-11-01T08:02:00Z' }]],
+] as [string, object[] | undefined][]) {
+  test(`Start build runs while the shaping thread is ${name}`, async (t) => {
+    const board = await shapingBoard(t, threads);
+    assert.equal((await startBuild(board, board.id(12))).status, 200);
+  });
+}
+
+test('a running thread with another purpose is not refused as a shaping thread', async (t) => {
+  const env = startableEnv(t);
+  writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify([{ id: 'earlier-build', turns: [turn()] }]));
+  writeFileSync(env.T3_STATE_DB + '.requests.json', '[]');
+  const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, env);
+  await changeRecords(board, (records) => {
+    records.addThread(board.id(12), records.read(board.id(12)).revision, 'earlier-build', 'build');
+  }, board.id(12), (item) => Array.isArray(item.threads) && item.threads[0]?.state === 'running');
   assert.equal((await startBuild(board, board.id(12))).status, 200);
 });
 

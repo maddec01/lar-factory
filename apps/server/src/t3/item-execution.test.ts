@@ -18,6 +18,19 @@ describe('recorded thread lookup', () => {
     expect(executionItemThreads([parent, child])(['root'])?.[0]).toMatchObject({ hasRunningChildren: true, hasLiveChildren: true });
     expect(executionItemThreads([parent, { ...child, status: 'waiting' }])(['root'])?.[0]).not.toHaveProperty('hasRunningChildren');
   });
+  it('marks a queued thread, still done, and holds its ancestors as live', () => {
+    const parent = { ...shell, status: 'idle' };
+    const child = { ...shell, id: 'child', status: 'idle', lineage: { parentThreadId: 'root', rootThreadId: 'root' } };
+    const grandchild = { ...shell, id: 'grandchild', status: 'queued', lineage: { parentThreadId: 'child', rootThreadId: 'root' } };
+    expect(executionItemThreads([{ ...shell, status: 'queued' }])(['root'])).toEqual([
+      { id: 'root', title: 'Build', state: 'done', queued: true, updated: shell.updatedAt },
+    ]);
+    expect(executionItemThreads([parent, child, grandchild])(['root', 'child'])).toMatchObject([
+      { id: 'root', state: 'done', hasLiveChildren: true }, { id: 'child', hasLiveChildren: true },
+    ]);
+    expect(executionItemThreads([parent, child, grandchild])(['root'])?.[0]).not.toHaveProperty('hasRunningChildren');
+    expect(executionItemThreads([parent])(['root'])?.[0]).not.toHaveProperty('queued');
+  });
   it('shows a subagent thread only when it is recorded', () => {
     const child = { ...shell, id: 'child', lineage: { relationshipToParent: 'subagent' } };
     expect(executionItemThreads([child])(['child'])).toHaveLength(1);

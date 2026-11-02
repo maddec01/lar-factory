@@ -9,7 +9,7 @@ import { refreshSpecs } from '@lar-factory/work-records/spec-sync';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { readTicketSpec, stripTrackerStructure, SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
+import { readTicketSpec, stripTrackerStructure, SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isLiveThread, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, PickedTicket, SkillCheckOutcome, StartedThread, StartResult, Status, SwapKind } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
@@ -207,6 +207,7 @@ const PURPOSES = { started: 'shape', startedBuilds: 'build' } as const;
 type StartRecord = keyof typeof PURPOSES;
 
 const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Check the repository's project in T3 Code; the board settles it once T3 shows it.";
+const LIVE_SHAPING = 'A shaping thread is still at work on this item. Wait for it to finish, then start the build.';
 const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code, then clear Needs you to start again.";
 
 export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkRecovery,
@@ -782,6 +783,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       if (busy) return withBoard(409, { error: busy });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
+      // While T3 can't be read the launch reports any problem, so a retained observation refuses nothing.
+      if (Array.isArray(item.threads) && item.threads.some((t) => t.purpose === PURPOSES.started && !t.observedAt && isLiveThread(t))) return withBoard(409, { error: LIVE_SHAPING });
       const previous = board.snapshot().startedBuilds?.[itemId];
       const retry = retryBuilds.has(itemId) || previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped')
         || recordedThreads(itemId).some((t) => t.purpose === PURPOSES.startedBuilds) || prClosed(itemId);

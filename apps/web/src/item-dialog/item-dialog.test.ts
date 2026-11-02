@@ -219,6 +219,13 @@ test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread
   expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/live');
 });
 
+test('a Ready item with a queued thread offers Open thread instead of Start build', async () => {
+  await mountPage(withThreads('I_sample13', [{ ...thread('queued', 'done'), queued: true }]));
+  await openItem('I_sample13');
+  expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/queued');
+  expect(footerControls()).not.toContain('Start build ▾');
+});
+
 test('a Queued item whose threads are all done still offers Shape issue', async () => {
   await mountPage(withThreads('I_sample05', [thread('old', 'done')]));
   await openItem('I_sample05');

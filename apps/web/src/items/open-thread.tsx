@@ -2,7 +2,7 @@
 // title says why it can't: the item has no thread yet, T3's database can't be read, or T3 hasn't
 // written its environment id.
 
-import { threadLink } from '@lar-factory/shared';
+import { isLiveThread, threadLink } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
@@ -38,9 +38,9 @@ function latestThread(item: Item, data: BoardData, threadId?: string): { link: s
   return { link: threadLink(data.t3EnvironmentId, latest.id), conceptQuestion: !own && Boolean(inherited) };
 }
 
-/** Whether a thread on the item is running or waits on you, so starting another would make a second one. */
+/** Whether a thread on the item is running, queued or waits on you, so starting another would make a second one. */
 export const hasLiveThread = (item: Item): boolean =>
-  Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren);
+  Array.isArray(item.threads) && item.threads.some(isLiveThread);
 
 /**
  * Opens the latest thread, or the phase's recorded `threadId`, in T3 Code: the board app hands the link to T3, a browser asks to open it. `iconOnly` draws

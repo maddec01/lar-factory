@@ -557,7 +557,7 @@ test('closing the dialog clears the store, and Escape closes it', async () => {
   expect(dialog()).toBeNull();
 });
 
-test('work that needs you shows why, posts each choice it offers and Clear, and sets the work aside through Abandon', async () => {
+test('work that needs you shows why, posts each choice it offers, offers no Clear, and sets the work aside through Abandon', async () => {
   holdPosts();
   const id = 'I_sample05';
   const reason = 'Its PR closed without merging.';
@@ -565,13 +565,13 @@ test('work that needs you shows why, posts each choice it offers and Clear, and 
     items: sample.items.map((i) => (i.id === id ? { ...i, status: 'Review', needsYou: { reason, offers: ['reopen-pr', 'replace-pr', 'set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen: true } } : i)) });
   await openItem(id);
   expect(text(inDialog('[data-needs-you-reason] p'))).toBe(`Needs you: ${reason}`);
-  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Reopen PR', 'Start a replacement build', 'Abandon', 'Clear']);
+  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Reopen PR', 'Start a replacement build', 'Abandon']);
   await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[0]!);
   expect(posted()).toEqual([['/api/needs-you', { itemId: id, choice: 'reopen-pr' }]]);
   await answer({ error: "Couldn't reopen the PR." }, 502);
   expect(text(inDialog('.action-error [role="alert"]'))).toBe("Couldn't reopen the PR.");
-  await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[3]!);
-  expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: id, choice: 'clear' }]);
+  await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[1]!);
+  expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: id, choice: 'replace-pr' }]);
   await answer({ error: null });
   await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[2]!);
   expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #129 /);

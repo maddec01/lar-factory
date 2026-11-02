@@ -577,6 +577,15 @@ describe('work-record facts the board sets', () => {
     expect(reopened.setNeedsYouCauses(build.workId, 5, [], { clearReason: true })).toMatchObject({ needsYou: null, needsYouCauses: [], revision: 6 });
   });
 
+  it('moves work and removes its Needs you causes in one write, or does neither', async () => {
+    const records = await open(join(tempDir(), 'work-records.db'));
+    const build = lar(records, 'build');
+    records.setNeedsYouCauses(build.workId, 1, [{ type: 'pr-closed' }]);
+    expect(() => records.setNeedsYouCauses(build.workId, 2, [], { status: 'Nowhere' as never })).toThrow(/Status/);
+    expect(records.read(build.workId)).toMatchObject({ status: build.status, needsYouCauses: [{ type: 'pr-closed' }], revision: 2 });
+    expect(records.setNeedsYouCauses(build.workId, 2, [], { status: 'Ready' })).toMatchObject({ status: 'Ready', needsYouCauses: [], revision: 3 });
+  });
+
   it("snapshots a build's selected project skills once, so later selections leave it alone", async () => {
     const path = join(tempDir(), 'work-records.db');
     const first = await openWorkRecords(path);

@@ -218,6 +218,22 @@ test('local retry failure preserves the explanation after tracker closure', asyn
   expect(text($('#abandon-dialog [role="alert"]'))).toContain('ticket is closed');
 });
 
+test.each([
+  [[{ type: 'ticket-closed' }], 'Keep working', 'keep-working'],
+  [[{ type: 'assignee-changed', from: 'pedro', to: 'sam' }], 'Keep working', 'keep-working'],
+  [[], 'Mark as handled', 'mark-handled'],
+] as const)('a notice with causes %j posts %s and offers no way to close it otherwise', async (causes, label, choice) => {
+  const data = structuredClone(sample);
+  const item = data.items[0]!;
+  item.needsYou = { reason: 'Why it waits.', causes: [...causes], ticketOpen: false, offers: [choice, 'set-aside'] };
+  await mountPage(data);
+  await openItem(item.id);
+  holdPosts();
+  expect($$('[data-needs-you-reason] button').map(text)).toEqual([label, 'Abandon']);
+  await press(button('needs-you', item.id));
+  expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: item.id, choice }]);
+});
+
 test.each([false, true])('deleted-thread move inspects cleanup and cleans only after success %s', async success => {
   const data = structuredClone(sample);
   const item = data.items[0]!;

@@ -5,7 +5,7 @@ import { afterEach, test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item, OperationAccess, ShapingThreadCleanup } from '@lar-factory/shared';
-import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
+import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
 import { createItemCommands } from './item-commands.ts';
 import type { ItemSource } from './item-source.ts';
@@ -66,7 +66,7 @@ for (const operation of ['push-branch', 'open-pr'] as const) for (const state of
  * Commands on a board holding `items`, whose source records each abandon it gets. Given `records`, the board shows their items and Archive with `tickets` as the source read them, and reads them
  * again after each write.
  */
-function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = [], access: Partial<Record<'push-branch' | 'open-pr', OperationAccess>> = { 'push-branch': 'allowed', 'open-pr': 'allowed' }) {
+function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = [], access: Partial<Record<'push-branch' | 'open-pr', OperationAccess>> = { 'push-branch': 'allowed', 'open-pr': 'allowed' }, whileReopening: () => void = () => {}) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
   const reread = () => {
     if (records) board.update({ items: recordItems(records, tickets, [WEB]) });
@@ -85,7 +85,7 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
   } as unknown as ItemSource;
   const commands = createItemCommands({ factoryContext:null, checkoutOf: async () => '/repo',
     inspectWorkRecovery: async () => ({ branch: 'old', branchExists: true, worktreePath: null, pr: 'none' }), board, items: source, records: records ?? null, reread, archive, offerModelChoices: () => [],
-    showThread, reopenPr: async (repo, number) => { log.push(`reopen ${repo}#${number}`); }, projectOf: async (repo) => ({ projectId: repo }), baseOf: async () => 'release', buildAccessOf: () => access,
+    showThread, reopenPr: async (repo, number) => { whileReopening(); log.push(`reopen ${repo}#${number}`); }, projectOf: async (repo) => ({ projectId: repo }), baseOf: async () => 'release', buildAccessOf: () => access,
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
       bases.push(worktree && 'base' in worktree ? worktree.base : undefined);
@@ -229,14 +229,18 @@ test("a ticket close refuses work whose abandonRefusal says why, and work whose 
 });
 
 /** A Review build on WEB whose PR #40 is observed closed unmerged, with its build thread, waiting on the user. */
-async function closedPrBuild() {
+async function closedPrBuild({ whileReopening, ticket = false, stored = (opened: WorkRecords) => opened }: { whileReopening?: (records: WorkRecords, workId: string) => void; ticket?: boolean; stored?: (records: WorkRecords) => WorkRecords } = {}) {
   const records = await openRecords();
   const created = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Review' });
   let record = records.setPullRequest(created.workId, created.revision, `${WEB}#40`);
   record = records.addThread(created.workId, record.revision, 'thread-0', 'build');
   record = records.observe(created.workId, record.revision, { of: 'pr', state: 'closed' });
-  records.setNeedsYouCauses(created.workId, record.revision, [{ type: 'pr-closed' }]);
-  return { records, workId: created.workId, ...commandsOn([], undefined, records) };
+  if (ticket) {
+    record = records.attachTicket(created.workId, record.revision, `${WEB}#7`);
+    record = records.observe(created.workId, record.revision, { of: 'ticket', state: 'closed' });
+  }
+  records.setNeedsYouCauses(created.workId, record.revision, [{ type: 'pr-closed' }, ...ticket ? [{ type: 'ticket-closed' } as const] : []]);
+  return { records, workId: created.workId, ...commandsOn([], undefined, stored(records), [], undefined, () => whileReopening?.(records, created.workId)) };
 }
 
 test('reopening a closed PR from Needs you reopens it in its provider and clears the reason', async () => {
@@ -261,15 +265,25 @@ test('setting work aside from Needs you works in any Status, though a thread wor
   assert.equal(records.read(workId).setAside, true);
 });
 
-test('Needs you refuses a choice it does not offer, and Clear clears any reason', async () => {
+test('Needs you refuses Clear, a removed choice and any choice its notice does not offer, and changes nothing', async () => {
   const { records, workId, commands, log } = await closedPrBuild();
-  assert.equal((await commands.resolveNeedsYou(workId, 'reopen-work')).status, 409);
-  assert.equal((await commands.resolveNeedsYou(workId, 'clear')).status, 200);
-  assert.deepEqual([records.read(workId).needsYouCauses, records.read(workId).status, log], [[], 'Review', []]);
-  assert.equal((await commands.resolveNeedsYou(workId, 'clear')).status, 409, 'work that no longer needs you has nothing to clear');
+  const before = records.read(workId);
+  for (const choice of ['clear', 'reopen-work', 'keep-working', 'mark-handled', 'set-aside', 'start-again', 'back-to-list', undefined]) {
+    assert.equal((await commands.resolveNeedsYou(workId, choice)).status, 409, String(choice));
+  }
+  assert.deepEqual([records.read(workId), log], [before, []]);
 });
 
-test('Start refuses while causes remain, and Clear removes causes and free text together', async () => {
+test('Start again on a no-thread notice stays out of Needs you, so only a started thread removes it', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  records.setNeedsYouCauses(work.workId, work.revision, [{ type: 'no-thread' }]);
+  const { commands } = recordedCommands(records);
+  assert.equal((await commands.resolveNeedsYou(work.workId, 'start-again')).status, 409);
+  assert.deepEqual(records.read(work.workId).needsYouCauses, [{ type: 'no-thread' }]);
+});
+
+test('Start refuses while causes and free text remain, and Mark as handled removes free text alone', async () => {
   const records = await openRecords();
   const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
   records.setNeedsYou(work.workId, work.revision, 'Merge conflict.');
@@ -279,9 +293,104 @@ test('Start refuses while causes remain, and Clear removes causes and free text 
   assert.equal(refused.status, 409);
   assert.match((refused.body as { error: string }).error, /^Needs you: The board asked T3 for a thread.* Merge conflict\.$/);
   assert.deepEqual(started, []);
-  assert.equal((await commands.resolveNeedsYou(work.workId, 'clear')).status, 200);
-  assert.deepEqual([records.read(work.workId).needsYou, records.read(work.workId).needsYouCauses], [null, []]);
-  assert.equal((await commands.start(work.workId, undefined)).status, 200);
+  assert.equal((await commands.resolveNeedsYou(work.workId, 'mark-handled')).status, 409, 'the cause offers Start again');
+  records.setNeedsYouCauses(work.workId, records.read(work.workId).revision, []);
+  const before = records.read(work.workId);
+  const handling = recordedCommands(records).commands;
+  assert.equal((await handling.resolveNeedsYou(work.workId, 'mark-handled')).status, 200);
+  const after = records.read(work.workId);
+  assert.deepEqual({ ...after, revision: 0, updatedAt: '' }, { ...before, needsYou: null, revision: 0, updatedAt: '' });
+  assert.equal((await handling.resolveNeedsYou(work.workId, 'mark-handled')).status, 409, 'work that no longer needs you has nothing to handle');
+  assert.equal((await handling.start(work.workId, undefined)).status, 200);
+});
+
+/** An In progress feature on ticket WEB#7, read open and assigned to pedro, then read as `change`, with its observer and commands. */
+async function observedTicketWork(change: { state: 'open' | 'closed'; assignee?: string }) {
+  const records = await openRecords();
+  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'feature', status: 'In progress', ticket: `${WEB}#7` }).record;
+  records.observe(work.workId, work.revision, { of: 'ticket', state: 'open', assignee: 'pedro' });
+  const { commands, log, reread, board } = commandsOn([], undefined, records);
+  const read = (next: { state: 'open' | 'closed'; assignee?: string }) => observeRecords(records, [WEB], { ticket: async () => next, pr: async () => 'open' }, new Set(), reread);
+  await read(change);
+  reread();
+  return { records, workId: work.workId, commands, log, read, board };
+}
+
+test('Keep working on a closed ticket removes the notice, keeps the Status and the closed read, and the same read raises nothing', async () => {
+  const { records, workId, commands, log, read, board } = await observedTicketWork({ state: 'closed', assignee: 'pedro' });
+  assert.deepEqual(board.find(workId)?.needsYou?.offers, ['keep-working', 'set-aside']);
+  assert.equal((await commands.resolveNeedsYou(workId, 'keep-working')).status, 200);
+  assert.equal(board.find(workId)?.needsYou, undefined);
+  assert.deepEqual([records.read(workId).status, records.read(workId).ticket, log], ['In progress', `${WEB}#7`, []]);
+  assert.equal(records.observations(workId).find((o) => o.of === 'ticket')?.state, 'closed');
+  await read({ state: 'closed', assignee: 'pedro' });
+  assert.deepEqual(records.read(workId).needsYouCauses, []);
+});
+
+test('Keep working on an assignee change removes the notice, and a later move to a new assignee raises a new one', async () => {
+  const { records, workId, commands, read } = await observedTicketWork({ state: 'open', assignee: 'sam' });
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'assignee-changed', from: 'pedro', to: 'sam' }]);
+  assert.equal((await commands.resolveNeedsYou(workId, 'keep-working')).status, 200);
+  assert.equal(records.read(workId).status, 'In progress');
+  await read({ state: 'open', assignee: 'sam' });
+  assert.deepEqual(records.read(workId).needsYouCauses, []);
+  await read({ state: 'open', assignee: 'alex' });
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'assignee-changed', from: 'sam', to: 'alex' }]);
+});
+
+test('Keep working removes a saved old wording with its cause and leaves other free text as a notice of its own', async () => {
+  const { records, workId } = await observedTicketWork({ state: 'closed' });
+  records.setNeedsYouCauses(workId, records.read(workId).revision, []);
+  records.setNeedsYou(workId, records.read(workId).revision, `Its ticket ${WEB}#7 closed in its provider. Set the work aside, or clear this to keep working.`);
+  assert.equal((await commandsOn([], undefined, records).commands.resolveNeedsYou(workId, 'keep-working')).status, 200);
+  assert.deepEqual([records.read(workId).needsYou, records.read(workId).needsYouCauses], [null, []]);
+
+  records.setNeedsYou(workId, records.read(workId).revision, 'Merge conflict.');
+  records.setNeedsYouCauses(workId, records.read(workId).revision, [{ type: 'ticket-closed' }]);
+  const mixed = commandsOn([], undefined, records);
+  assert.equal((await mixed.commands.resolveNeedsYou(workId, 'keep-working')).status, 200);
+  assert.deepEqual([records.read(workId).needsYou, records.read(workId).needsYouCauses], ['Merge conflict.', []]);
+  assert.deepEqual(mixed.board.find(workId)?.needsYou?.offers, ['mark-handled', 'set-aside']);
+});
+
+test('Reopen PR on a notice that also names a closed ticket removes both causes, and the ticket stays closed', async () => {
+  const { records, workId, commands, log } = await closedPrBuild({ ticket: true });
+  assert.equal((await commands.resolveNeedsYou(workId, 'reopen-pr')).status, 200);
+  assert.deepEqual(log, [`reopen ${WEB}#40`]);
+  assert.deepEqual(records.read(workId).needsYouCauses, []);
+  assert.equal(records.observations(workId).find((o) => o.of === 'ticket')?.state, 'closed');
+});
+
+test('a cause raised while the PR reopens stays, since the notice the user confirmed did not name it', async () => {
+  const { records, workId, commands } = await closedPrBuild({ whileReopening: (opened, id) => {
+    opened.setNeedsYouCauses(id, opened.read(id).revision, [{ type: 'pr-closed' }, { type: 'ticket-closed' }]);
+  } });
+  assert.equal((await commands.resolveNeedsYou(workId, 'reopen-pr')).status, 200);
+  assert.deepEqual(records.read(workId).needsYouCauses, [{ type: 'ticket-closed' }]);
+});
+
+test('a failed PR reopen leaves the notice and the record unchanged', async () => {
+  const { records, workId, commands } = await closedPrBuild({ whileReopening: () => { throw new Error('The provider refused.'); } });
+  const before = records.read(workId);
+  const failed = await commands.resolveNeedsYou(workId, 'reopen-pr');
+  assert.equal(failed.status, 502);
+  assert.equal((failed.body as { error: string }).error, 'The provider refused.');
+  assert.deepEqual(records.read(workId), before);
+});
+
+test('a failed write in a replacement leaves the Status and the notice as they were', async () => {
+  const { records, workId, commands, board } = await closedPrBuild({ stored: (opened) => ({ ...opened, setNeedsYouCauses: () => { throw new WorkRecordError('invalid', 'The record refused.'); } }) });
+  const before = records.read(workId);
+  assert.equal((await commands.resolveNeedsYou(workId, 'replace-pr')).status, 409);
+  assert.deepEqual(records.read(workId), before);
+  assert.deepEqual(board.find(workId)?.needsYou?.causes, [{ type: 'pr-closed' }]);
+});
+
+test('a replacement moves the work to Ready and its closed PR raises nothing afterwards', async () => {
+  const { records, workId, commands, reread } = await closedPrBuild();
+  assert.equal((await commands.resolveNeedsYou(workId, 'replace-pr')).status, 200);
+  await observeRecords(records, [WEB], { ticket: async () => ({ state: 'open' }), pr: async () => 'closed' }, new Set(), reread);
+  assert.deepEqual([records.read(workId).needsYouCauses, records.read(workId).needsYou, records.read(workId).status], [[], null, 'Ready']);
 });
 
 test('Start does not refuse saved old wording whose cause reads ended', async () => {
@@ -596,7 +705,7 @@ test('after a restart, an unresolved start T3 shows no thread for sets Needs you
     assert.match((refused.body as { error: string }).error, /Needs you/);
     assert.deepEqual(records.read(work.workId).needsYouCauses, [{ type: 'no-thread' }]);
     assert.deepEqual(started, []);
-    assert.equal((await commands.start(work.workId, undefined)).status, 409, 'Start waits until the user clears Needs you');
+    assert.equal((await commands.start(work.workId, undefined)).status, 409, 'Start waits while the notice stands');
     const record = records.read(work.workId);
     records.setNeedsYouCauses(work.workId, record.revision, []);
     assert.equal((await commands.start(work.workId, undefined)).status, 200);
@@ -750,6 +859,16 @@ test('an active Start prevents combined abandonment before provider access', asy
   const { commands, board } = commandsOn([], undefined, records);
   board.update({ items: [item] });
   assert.equal((await commands.resolveNeedsYou(item.id, 'clear')).status, 409);
+});
+
+test('a deleted-thread move removes the causes its notice names', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Recover work', repository: WEB, kind: 'feature', status: 'In progress' });
+  records.setNeedsYouCauses(work.workId, work.revision, [{ type: 'ticket-closed' }]);
+  const { commands, board } = recordedCommands(records);
+  board.update({ items: [{ ...board.find(work.workId)!, threads: [], needsYou: { reason: 'Deleted', causes: [{ type: 'ticket-closed' }], ticketOpen: false, deletedThread: true, offers: ['back-to-list', 'set-aside'] } }] });
+  assert.equal((await commands.resolveNeedsYou(work.workId, 'back-to-list')).status, 200);
+  assert.deepEqual([records.read(work.workId).status, records.read(work.workId).needsYouCauses], ['List', []]);
 });
 
 for (const briefChoice of ['keep', 'reshape'] as const) test(`deleted-thread move requires a brief choice and can ${briefChoice}`, async () => {

@@ -283,8 +283,8 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   /** Records why the work waits on the user, replacing an earlier reason. */
   setNeedsYou(workId: string, revision: number, reason: string): WorkRecord;
   clearNeedsYou(workId: string, revision: number): WorkRecord;
-  /** Replaces the causes the work waits on the user for. `clearReason` also clears the free text in the same write. */
-  setNeedsYouCauses(workId: string, revision: number, causes: readonly NeedsYouCause[], options?: { clearReason?: boolean }): WorkRecord;
+  /** Replaces the causes the work waits on the user for. `clearReason` also clears the free text, and `status` moves the work, in the same write. */
+  setNeedsYouCauses(workId: string, revision: number, causes: readonly NeedsYouCause[], options?: { clearReason?: boolean; status?: Status }): WorkRecord;
   /** Records the project skills selected as the build starts. A build snapshots its skills once. */
   snapshotSkills(workId: string, revision: number, skills: readonly string[]): WorkRecord;
   restore(workId: string, revision: number): WorkRecord;
@@ -887,10 +887,12 @@ function workRecords(database: Database): WorkRecords {
       return change(workId, revision, (row) => (row.needs_you === why ? null : { needs_you: why }));
     },
     clearNeedsYou: (workId, revision) => change(workId, revision, (row) => (row.needs_you === null ? null : { needs_you: null })),
-    setNeedsYouCauses: (workId, revision, causes, { clearReason = false } = {}) => {
+    setNeedsYouCauses: (workId, revision, causes, { clearReason = false, status } = {}) => {
       const saved = causes.length ? JSON.stringify(causes) : null;
-      return change(workId, revision, (row) => (row.needs_you_causes === saved && (!clearReason || row.needs_you === null) ? null
-        : { needs_you_causes: saved, ...clearReason && { needs_you: null } }));
+      const moved = status === undefined ? undefined : checkStatus(status);
+      return change(workId, revision, (row) => (row.needs_you_causes === saved && (!clearReason || row.needs_you === null) && (!moved || moved === row.status) ? null
+        : { needs_you_causes: saved, ...clearReason && { needs_you: null },
+          ...moved && moved !== row.status && { status: moved, queue_order: queueOrder(row.repository, moved) } }));
     },
     snapshotSkills: (workId, revision, skills) => {
       const snapshot = JSON.stringify(checkSkills(skills));

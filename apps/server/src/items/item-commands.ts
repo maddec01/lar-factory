@@ -78,9 +78,10 @@ export interface ItemCommands {
   /** Brings set-aside work in Archive back to the board in the Status it had, unless retention hides it as finished. */
   restore(itemId: string): Reply;
   /**
-   * Acts on work that needs you as `choice` says, then clears its reason: `clear` alone, or one of its offers. Reopening
-   * the PR reopens it in its provider, a replacement build moves the work to Ready for Start build, and reopening the
-   * work moves it to List. Setting it aside is Abandon.
+   * Acts on work that needs you as `choice`, one of its notice's offers, says, then removes every cause the notice names
+   * and refuses anything else. Reopening the PR reopens it in its provider, a replacement build moves the work to Ready
+   * for Start build, Keep working changes nothing else and Mark as handled also removes the free text. Setting it aside
+   * is Abandon, and Start again is its own command.
    */
   resolveNeedsYou(itemId: string, choice: unknown, briefChoice?: unknown): Promise<Reply>;
   /**
@@ -459,6 +460,17 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     if (outcome) try { write(item.id, (revision) => records.resolveLaunchIntent(item.id, revision, intent.intentId, outcome)); } catch { /* settled later */ }
     if (recovery && result.thread) write(item.id, revision => records.setNeedsYouCauses(item.id, revision, [], { clearReason: true }));
     return result;
+  }
+
+  /**
+   * Removes the causes the notice names, and a saved old wording of them, in one write with `change`. A cause raised
+   * since then stays, because the user hasn't seen it.
+   */
+  function removeCauses(item: Item, change: { status?: Status; clearReason?: boolean }): void {
+    const seen = item.needsYou!.causes.map((cause) => JSON.stringify(cause));
+    const saved = savedNeedsYou(records!.read(item.id), records!.observations(item.id));
+    const left = saved.causes.filter((cause) => !seen.includes(JSON.stringify(cause)));
+    write(item.id, (revision) => records!.setNeedsYouCauses(item.id, revision, left, { ...change, clearReason: change.clearReason || saved.oldWording }));
   }
 
   function eligibleRecovery(item: Item): boolean {
@@ -940,22 +952,20 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           const cleanupBranches = item.kind === 'build' ? await cleanupSliceBranches(item) : [];
           if (item.kind === 'build') write(itemId, revision => records.captureCleanup(itemId, revision, inspection.branch, cleanupBranches));
           if (item.kind === 'build') write(itemId, revision => records.resetBuild(itemId, revision));
-          write(itemId, revision => records.update(itemId, revision, { status: choice === 'back-to-queue' ? 'Queued' : 'List' }));
+          removeCauses(item, { status: choice === 'back-to-queue' ? 'Queued' : 'List' });
           starts.delete(itemId);
           buildStarts.delete(itemId);
         } catch (error) { return withBoard(409, { error: (error as Error).message }); }
         return withBoard(200, { error: null });
       }
-      const offered = choice === 'clear' || (choice !== 'set-aside' && item.needsYou.offers.some((offer) => offer === choice));
+      const offered = choice !== 'set-aside' && choice !== 'start-again' && item.needsYou.offers.some((offer) => offer === choice);
       if (!offered) return withBoard(409, { error: 'Pick one of the choices the board offers for this work.' });
       try {
         if (choice === 'reopen-pr') {
           const pullRequest = records.read(itemId).pullRequest!;
           await reopenPr(item.repo, Number(pullRequest.slice(pullRequest.lastIndexOf('#') + 1)));
         }
-        write(itemId, (revision) => records.setNeedsYouCauses(itemId, revision, [], { clearReason: true }));
-        if (choice === 'replace-pr') write(itemId, (revision) => records.update(itemId, revision, { status: 'Ready' }));
-        if (choice === 'reopen-work') write(itemId, (revision) => records.update(itemId, revision, { status: 'List' }));
+        removeCauses(item, { ...choice === 'replace-pr' && { status: 'Ready' }, clearReason: choice === 'mark-handled' });
       } catch (err) {
         reread();
         return withBoard(err instanceof WorkRecordError ? 409 : 502, { error: (err as Error).message });

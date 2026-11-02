@@ -61,6 +61,7 @@ const IDLE = { archived: false, settled: false, live: false };
 /** Records with shaping threads `shaped` whose Start build saved `choice`, and a sweep over stubs: nothing reaches T3. */
 async function sweepOver(choice: ShapingThreadCleanup | 'unreadable' = 'archive', shaped = ['shape-1']) {
   const { dir, cleanup } = await setUp();
+  if (choice === 'unreadable') writeFileSync(join(dir, 'shaping-thread-cleanup.json'), 'not json');
   const path = join(dir, 'sweep.db');
   let records = await openWorkRecords(path);
   opened.push(records);
@@ -76,7 +77,7 @@ async function sweepOver(choice: ShapingThreadCleanup | 'unreadable' = 'archive'
     sent: [] as ThreadCommand[],
     deleted: [] as string[],
   };
-  const sweepOn = (on: WorkRecords) => createShapingThreadSweep({ records: on, now: () => stub.now, deleted: workId => stub.deleted.push(workId),
+  const sweepOn = (on: WorkRecords) => createShapingThreadSweep({ records: on, dir, now: () => stub.now, deleted: workId => stub.deleted.push(workId),
     stateOf: () => { stub.reads += 1; return stub.state; },
     lookup: async () => { stub.lookups += 1; return stub.lookup; },
     send: async (command) => { stub.sent.push(command); return stub.result; } });
@@ -216,11 +217,34 @@ test('a replacement build leaves cleaned threads alone', async () => {
   }
 });
 
-test('a row with no action waits for the notice about an unreadable setting', async () => {
+test('an unreadable setting sends nothing and reads no thread until a sweep can read it', async () => {
   const { stub, records, sweep } = await sweepOver('unreadable');
   await sweep();
   assert.deepEqual([stub.sent, stub.reads], [[], 0]);
   assert.equal(records().pendingShapingThreadCleanups().length, 1);
+});
+
+test('the first value a sweep reads becomes the saved action and is applied, and a later Settings change leaves it', async () => {
+  const { cleanup, stub, records, sweep } = await sweepOver('unreadable');
+  await sweep();
+  stub.state = { ...IDLE, live: true };
+  assert.equal(cleanup.save({ choice: 'archive' }).status, 200);
+  await sweep();
+  assert.equal(records().pendingShapingThreadCleanups()[0]?.action, 'archive');
+  assert.equal(cleanup.save({ choice: 'delete' }).status, 200);
+  stub.state = IDLE;
+  await sweep();
+  assert.deepEqual(stub.sent.map(command => command.type), ['thread.archive']);
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
+});
+
+test('Keep read after an unreadable setting sends nothing and cleans the row', async () => {
+  const { cleanup, stub, records, sweep } = await sweepOver('unreadable');
+  await sweep();
+  assert.equal(cleanup.save({ choice: 'keep' }).status, 200);
+  await sweep();
+  assert.deepEqual([stub.sent, stub.reads], [[], 0]);
+  assert.deepEqual(records().pendingShapingThreadCleanups(), []);
 });
 
 test('a later change to the setting leaves a pending row with its saved action', async () => {

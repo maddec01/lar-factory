@@ -46,6 +46,8 @@ export function createShapingThreadCleanup({ records, dir, changed = () => {} }:
 
 export interface ShapingThreadSweepDeps {
   records: WorkRecords;
+  /** The board's data folder, where the setting lives; tests give their own. */
+  dir?: string;
   /** One thread's state in T3's current snapshot. */
   stateOf(threadId: string): ThreadCleanupState;
   /** Confirms a deletion, which a thread's absence from a snapshot doesn't prove. */
@@ -64,10 +66,18 @@ type ThreadAction = Exclude<ShapingThreadCleanup, 'keep'>;
 const RETRY_MS = 30_000;
 
 /** A function that takes each pending shaping thread one step on, one sweep at a time. It never interrupts a live thread. */
-export function createShapingThreadSweep({ records, stateOf, lookup, send, deleted, now = Date.now }: ShapingThreadSweepDeps): () => Promise<void> {
+export function createShapingThreadSweep({ records, dir, stateOf, lookup, send, deleted, now = Date.now }: ShapingThreadSweepDeps): () => Promise<void> {
   const retryAt = new Map<string, number>();
   let sweeping = false;
   const later = (threadId: string) => retryAt.set(threadId, now() + RETRY_MS);
+  /** The setting's first readable value becomes the row's action; until then the row waits, with its notice. */
+  function savedSetting(threadId: string): ShapingThreadCleanup | null {
+    let choice: ShapingThreadCleanup;
+    try { choice = readShapingThreadCleanup(dir); }
+    catch { return null; }
+    records.saveShapingThreadAction(threadId, choice);
+    return choice;
+  }
   async function step({ threadId, workId, commandId }: ShapingThreadCleanupRow, action: ThreadAction): Promise<void> {
     const cleaned = () => {
       retryAt.delete(threadId);
@@ -96,8 +106,8 @@ export function createShapingThreadSweep({ records, stateOf, lookup, send, delet
     sweeping = true;
     try {
       for (const row of records.pendingShapingThreadCleanups()) {
-        const { action } = row;
-        // A row with no action waits for the notice about an unreadable setting, and Keep's rows start cleaned.
+        const action = row.action ?? savedSetting(row.threadId);
+        // Keep's rows start cleaned.
         if (!action || action === 'keep' || now() < (retryAt.get(row.threadId) ?? -Infinity)) continue;
         try { await step(row, action); }
         catch (err) {

@@ -1,6 +1,6 @@
 import { isRecord } from '@lar-factory/shared';
 import { ShellRecovery } from './shell-recovery.ts';
-import { type ProjectProtocol, type ProjectRead } from './project-protocol.ts';
+import { type BoardSession, type ProjectProtocol, type ProjectRead } from './project-protocol.ts';
 
 /** T3 97e35bcf23e4dcf34c2dcffadd37c08db0e01e52:
  * apps/server/src/ws.ts:1158-1200,3277-3337; packages/client-runtime/src/rpc/protocol.ts.
@@ -26,8 +26,10 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
     if (stopped) return;
     let availability: ProjectRead['availability'] = 'unavailable';
     let current: WebSocket | undefined;
-    const disconnected = () => {
+    let session: BoardSession | undefined;
+    const disconnected = (invalidate = false) => {
       if (current && socket !== current) return;
+      if (invalidate && !stopped && session) protocol.invalidateSession(session);
       socket = undefined;
       if (heartbeat) clearInterval(heartbeat);
       if (renewal) clearTimeout(renewal);
@@ -40,7 +42,7 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
     try {
       let token: string;
       try {
-        const session = await protocol.subscriptionSession();
+        session = await protocol.subscriptionSession();
         token = session.token;
         renewal = setTimeout(() => {
           if (stopped) return;
@@ -77,7 +79,7 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
         send({ _tag: 'Ping' });
       });
       heartbeat = setInterval(() => {
-        if (Date.now() - lastPong > 15_000) disconnected();
+        if (Date.now() - lastPong > 15_000) disconnected(true);
         else if (ws.readyState === WebSocket.OPEN) send({ _tag: 'Ping' });
       }, 5000);
       ws.addEventListener('message', event => {
@@ -102,9 +104,9 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
           }
         } catch { availability = 'malformed'; disconnected(); }
       });
-      ws.addEventListener('close', disconnected);
-      ws.addEventListener('error', disconnected);
-    } catch { disconnected(); }
+      ws.addEventListener('close', () => disconnected(true));
+      ws.addEventListener('error', () => disconnected(true));
+    } catch { disconnected(true); }
   };
   void connect();
   return () => {

@@ -20,6 +20,9 @@ export interface ProjectRead { availability: ProjectAvailability; observation?: 
 export class ProjectProtocol {
   private observation?: ProjectObservation;
   private snapshotTime = -Infinity;
+  private session?: BoardSession;
+  private generation = 0;
+  private forceRenewal = false;
   private pending?: Promise<BoardSession>;
   private readonly vault: SessionVault;
   private readonly authority: SessionAuthority;
@@ -34,38 +37,64 @@ export class ProjectProtocol {
     this.now = now;
   }
 
-  /** Reissue through the local control plane, then retire the previous session. */
-  async reauthorize(): Promise<void> { await this.renew(); }
-
-  private renew(): Promise<BoardSession> {
-    if (this.pending) return this.pending;
-    this.pending = (async () => {
-      const previous = await this.vault.read();
-      const session = await this.authority.issue();
-      if (!session.token || !session.sessionId || !(Date.parse(session.expiresAt) > this.now() + 60_000)) throw new Error('Invalid session');
-      try { await this.vault.write(session); }
-      catch { await this.authority.revoke(session.sessionId); throw new Error('Credential storage failed'); }
-      if (previous) await this.authority.revoke(previous.sessionId);
-      return session;
-    })().finally(() => { this.pending = undefined; });
-    return this.pending;
+  /** Ignore late failures from consumers of an already replaced session. */
+  invalidateSession(session: BoardSession): void {
+    if (this.session !== session) return;
+    this.session = undefined;
+    this.generation++;
+    this.forceRenewal = true;
   }
 
-  async subscriptionSession(): Promise<BoardSession> {
-    const stored = await this.vault.read();
-    return stored && Date.parse(stored.expiresAt) > this.now() + 60_000 ? stored : this.renew();
+  async reauthorize(): Promise<void> {
+    this.session = undefined;
+    this.generation++;
+    this.forceRenewal = true;
+    try { await this.pending; } catch { /* A failed acquisition can be retried. */ }
+    await this.subscriptionSession();
+  }
+
+  subscriptionSession(): Promise<BoardSession> {
+    if (this.pending) return this.pending;
+    if (this.session && Date.parse(this.session.expiresAt) > this.now() + 60_000) return Promise.resolve(this.session);
+    const generation = this.generation;
+    const acquisition = (async () => {
+      const previous = this.session ?? await this.vault.read();
+      if (generation !== this.generation) throw new Error('Session invalidated');
+      if (!this.forceRenewal && previous?.token && previous.sessionId && Date.parse(previous.expiresAt) > this.now() + 60_000) {
+        this.session = previous;
+        return previous;
+      }
+      this.session = undefined;
+      this.forceRenewal = true;
+      const session = await this.authority.issue();
+      if (!session.token || !session.sessionId || !(Date.parse(session.expiresAt) > this.now() + 60_000)) throw new Error('Invalid session');
+      try {
+        if (generation !== this.generation) throw new Error('Session invalidated');
+        await this.vault.write(session);
+        if (generation !== this.generation) throw new Error('Session invalidated');
+        if (previous) await this.authority.revoke(previous.sessionId);
+        if (generation !== this.generation) throw new Error('Session invalidated');
+      } catch {
+        await this.authority.revoke(session.sessionId);
+        throw new Error('Session renewal failed');
+      }
+      this.session = session;
+      this.forceRenewal = false;
+      return session;
+    })().finally(() => { if (this.pending === acquisition) this.pending = undefined; });
+    this.pending = acquisition;
+    return acquisition;
   }
 
   async readProjects(): Promise<ProjectRead> {
     const result = (availability: ProjectAvailability): ProjectRead => ({ availability, ...(this.observation ? { observation: this.observation } : {}) });
     let session: BoardSession;
     try {
-      const stored = await this.vault.read();
-      session = stored && Date.parse(stored.expiresAt) > this.now() + 60_000 ? stored : await this.renew();
+      session = await this.subscriptionSession();
     } catch { return result('renewal-required'); }
     try {
       const response = await this.request(session.token);
-      if (response.status === 401 || response.status === 403) return result('renewal-required');
+      if (response.status === 401 || response.status === 403) { this.invalidateSession(session); return result('renewal-required'); }
       if (!response.ok) return result('unavailable');
       let body: unknown;
       try { body = await response.json(); } catch { return result('malformed'); }
@@ -80,6 +109,6 @@ export class ProjectProtocol {
       this.snapshotTime = snapshotTime;
       this.observation = { projects, observedAt: new Date(this.now()).toISOString() };
       return result('available');
-    } catch { return result('unavailable'); }
+    } catch { this.invalidateSession(session); return result('unavailable'); }
   }
 }

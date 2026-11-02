@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { abandonPrompt, boardSections, closeTicketPrompt } from './board-view.ts';
-import type { BoardData, Item, Status } from './model.ts';
+import { abandonPrompt, boardSections, closeTicketPrompt, needsYouPrompt } from './board-view.ts';
+import type { BoardData, Item, NeedsYouCause, Status } from './model.ts';
 
 const ticketed = (repo: string) => ({ content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo, number: 7, title: 'Keep history' } as Item);
 
@@ -74,6 +74,66 @@ for (const [repo, detail, confirm, done] of [
     assert.deepEqual(closeTicketPrompt(ticketed(repo!)), { question: 'Close the ticket of #7 Keep history too?', detail, confirm, keep: 'Keep it open', done });
   });
 }
+
+const waiting = (causes: NeedsYouCause[], change: Partial<Item> = {}) => ({ ...ticketed('owner/repo'), status: 'Review', needsYou: { reason: 'Why.', offers: [], causes, ticketOpen: false }, ...change } as Item);
+const GOES = 'This notice goes away.';
+const STAYS = 'The notice stays with only its other note, which you can then mark as handled.';
+
+test('Keep working says the item stays on the desk at its Status and what happens to its ticket', () => {
+  assert.deepEqual(needsYouPrompt(waiting([{ type: 'ticket-closed' }]), 'keep-working'), { question: 'Keep working on #7 Keep history?',
+    detail: `The item stays on the desk at Review. Its ticket stays closed. Its PR, branch and worktree don't change. ${GOES}` });
+  assert.equal(needsYouPrompt(waiting([{ type: 'assignee-changed', from: 'pedro', to: null }], { status: 'In progress' }), 'keep-working').detail,
+    `The item stays on the desk at In progress. Its ticket stays with no one. Its PR, branch and worktree don't change. ${GOES}`);
+});
+
+test('Mark as handled changes nothing except removing the notice', () => {
+  assert.deepEqual(needsYouPrompt(waiting([]), 'mark-handled'), { question: 'Mark #7 Keep history as handled?', detail: 'This changes nothing except removing the notice.' });
+  assert.equal(needsYouPrompt(waiting([{ type: 'ticket-missing' }]), 'mark-handled').detail, 'This changes nothing except removing the notice. Its ticket stays missing from its provider.');
+});
+
+test('Reopen PR and a replacement build name the destination, and a closed ticket stays closed', () => {
+  assert.deepEqual(needsYouPrompt(waiting([{ type: 'pr-closed' }, { type: 'ticket-closed' }]), 'reopen-pr'), { question: 'Reopen the PR of #7 Keep history?',
+    detail: `This reopens its PR in its provider. The item stays at Review, and its branch and worktree don't change. Its ticket stays closed. ${GOES}` });
+  assert.deepEqual(needsYouPrompt(waiting([{ type: 'pr-closed' }]), 'replace-pr'), { question: 'Start a replacement build for #7 Keep history?',
+    detail: `This moves the item to Ready, where Start build starts a new thread on a new branch from the same brief. Its closed PR stays closed, and its old branch and worktree stay. Its ticket doesn't change. ${GOES}` });
+});
+
+test('a choice names the other note only when the notice has one, and then says the notice stays for it', () => {
+  const noted = waiting([{ type: 'ticket-closed' }]);
+  noted.needsYou!.hasOtherNote = true;
+  for (const action of ['keep-working', 'reopen-pr', 'replace-pr', 'back-to-queue', 'back-to-list'] as const) {
+    assert.ok(needsYouPrompt(noted, action).detail.endsWith(STAYS), action);
+    assert.ok(needsYouPrompt(waiting([{ type: 'ticket-closed' }]), action).detail.endsWith(GOES), action);
+  }
+  assert.equal(needsYouPrompt(noted, 'mark-handled').detail, 'This changes nothing except removing the notice. Its ticket stays closed.');
+});
+
+test('a choice that starts nothing says so beside a no-thread cause', () => {
+  assert.equal(needsYouPrompt(waiting([{ type: 'pr-closed' }, { type: 'no-thread' }]), 'reopen-pr').detail,
+    `This reopens its PR in its provider. The item stays at Review, and its branch and worktree don't change. Its ticket doesn't change. No thread starts, so T3 still shows none for this work. ${GOES}`);
+});
+
+test('Start again says what it starts, and that the notice goes only once a thread does', () => {
+  const after = 'Once T3 shows the thread, the notice goes away. If the start fails, the notice stays.';
+  assert.deepEqual(needsYouPrompt(waiting([{ type: 'no-thread' }]), 'start-again'), { question: 'Start #7 Keep history again?',
+    detail: `This starts a new shaping thread in T3. The item stays at Review. Its ticket doesn't change. Its PR, branch and worktree don't change. ${after}` });
+  const build = waiting([{ type: 'no-thread' }]);
+  build.needsYou!.startAgainPurpose = 'build';
+  assert.equal(needsYouPrompt(build, 'start-again').detail,
+    `This starts a new build thread in T3. The item stays at Review. Its ticket doesn't change. The board checks its PR, branch and worktree, then says what happens to them. ${after}`);
+});
+
+test('Back to Queue and Move to List name the destination, and a build says it resets', () => {
+  assert.deepEqual(needsYouPrompt(waiting([]), 'back-to-queue'), { question: 'Move #7 Keep history back to Queue?',
+    detail: `This moves the item to Queued. Its ticket and PR don't change. Its old branches and worktrees stay unless you choose to remove them next. ${GOES}` });
+  assert.deepEqual(needsYouPrompt(waiting([{ type: 'ticket-closed' }], { kind: 'build' }), 'back-to-list'), { question: 'Move #7 Keep history to List?',
+    detail: `This moves the item to List. Its slices and build progress reset. Its ticket stays closed. Its PR doesn't change. Its old branches and worktrees stay unless you choose to remove them next. ${GOES}` });
+});
+
+test('work with no ticket says so', () => {
+  assert.match(needsYouPrompt(waiting([], { number: 0 }), 'keep-working').detail, /It has no ticket\./);
+  assert.match(needsYouPrompt(waiting([], { number: 0 }), 'back-to-list').detail, /It has no ticket\. Its PR doesn't change\./);
+});
 
 test('a current shaping question enters the desk and leaves when answered', () => {
   const item = { ...ticketed('owner/repo'), status: 'Shaping', threads: [{ id: 'question', state: 'needs you' }] } as Item;

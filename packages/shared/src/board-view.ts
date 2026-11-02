@@ -1,8 +1,8 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
-// Abandon and the ticket close after it ask.
+// Abandon, the ticket close after it and a Needs you choice ask.
 
 import { STATUSES, activityUnavailable, inRepo, isRecentlyDone, onAzure, itemName, openQuestionThread, repoKey, repoName, sameRepo, workingAgain } from './model.ts';
-import type { BoardData, Item, LinkedPr, Status } from './model.ts';
+import type { BoardData, Item, LinkedPr, NeedsYouOffer, Status } from './model.ts';
 import { slug } from './format.ts';
 
 export function byFlowOrder(a: Item, b: Item): number {
@@ -115,4 +115,53 @@ export function closeTicketPrompt(item: Item): { question: string; detail: strin
       : 'This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.',
     done: azure ? `Moved ${itemName(item)} to Removed.` : `Closed ${itemName(item)} as "not planned".`,
   };
+}
+
+/** The Needs you choices the board confirms with `needsYouPrompt`; Abandon asks with its own. */
+export type NeedsYouAction = Exclude<NeedsYouOffer, 'set-aside'>;
+
+/** What the notice's causes say stays true of the ticket. */
+function ticketCauses(item: Item): string[] {
+  return (item.needsYou?.causes ?? []).flatMap((cause) => {
+    if (cause.type === 'ticket-closed') return ['Its ticket stays closed.'];
+    if (cause.type === 'assignee-changed') return [`Its ticket stays with ${cause.to ?? 'no one'}.`];
+    if (cause.type === 'ticket-missing') return ['Its ticket stays missing from its provider.'];
+    return [];
+  });
+}
+
+/**
+ * What a Needs you choice asks before it happens: where the item goes and what it does to its ticket, PR, branch and
+ * worktree. Only Mark as handled and a started thread remove free text, so the others say the notice stays for it.
+ */
+export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: string; detail: string } {
+  const name = itemName(item);
+  const told = ticketCauses(item);
+  const ticket = told.length ? told.join(' ') : item.number ? "Its ticket doesn't change." : 'It has no ticket.';
+  const noThread = item.needsYou?.causes.some((cause) => cause.type === 'no-thread') ? 'No thread starts, so T3 still shows none for this work.' : '';
+  const outcome = item.needsYou?.hasOtherNote ? 'The notice stays with only its other note, which you can then mark as handled.' : 'This notice goes away.';
+  const sentences = (...parts: string[]) => parts.filter(Boolean).join(' ');
+  switch (action) {
+    case 'reopen-pr': return { question: `Reopen the PR of ${name}?`,
+      detail: sentences(`This reopens its PR in its provider. The item stays at ${item.status}, and its branch and worktree don't change.`, ticket, noThread, outcome) };
+    case 'replace-pr': return { question: `Start a replacement build for ${name}?`,
+      detail: sentences('This moves the item to Ready, where Start build starts a new thread on a new branch from the same brief. Its closed PR stays closed, and its old branch and worktree stay.', ticket, noThread, outcome) };
+    case 'keep-working': return { question: `Keep working on ${name}?`,
+      detail: sentences(`The item stays on the desk at ${item.status}.`, ticket, "Its PR, branch and worktree don't change.", noThread, outcome) };
+    case 'mark-handled': return { question: `Mark ${name} as handled?`, detail: sentences('This changes nothing except removing the notice.', ...told) };
+    case 'start-again': {
+      const build = item.needsYou?.startAgainPurpose === 'build';
+      return { question: `Start ${name} again?`,
+        detail: sentences(`This starts a new ${build ? 'build' : 'shaping'} thread in T3. The item stays at ${item.status}.`, ticket,
+          build ? 'The board checks its PR, branch and worktree, then says what happens to them.' : "Its PR, branch and worktree don't change.",
+          'Once T3 shows the thread, the notice goes away. If the start fails, the notice stays.') };
+    }
+    case 'back-to-queue': case 'back-to-list': {
+      const queue = action === 'back-to-queue';
+      return { question: queue ? `Move ${name} back to Queue?` : `Move ${name} to List?`,
+        detail: sentences(`This moves the item to ${queue ? 'Queued' : 'List'}.`, item.kind === 'build' ? 'Its slices and build progress reset.' : '',
+          told.length || !item.number ? `${ticket} Its PR doesn't change.` : "Its ticket and PR don't change.",
+          'Its old branches and worktrees stay unless you choose to remove them next.', noThread, outcome) };
+    }
+  }
 }

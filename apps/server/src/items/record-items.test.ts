@@ -214,9 +214,9 @@ test('free text and causes show together, and the first matching row of causes d
   const records = await open();
   const record = observedBuild(records, { ticket: 'closed' });
   const written = records.setNeedsYou(record.workId, record.revision, 'Merge conflict.');
-  assert.deepEqual(noticeOf(records, record.workId), { reason: 'Merge conflict.', offers: ['mark-handled', 'set-aside'], causes: [], ticketOpen: false });
+  assert.deepEqual(noticeOf(records, record.workId), { reason: 'Merge conflict.', offers: ['mark-handled', 'set-aside'], causes: [], ticketOpen: false, hasOtherNote: true });
   records.setNeedsYouCauses(record.workId, written.revision, [{ type: 'ticket-closed' }]);
-  assert.deepEqual(noticeOf(records, record.workId), { reason: `${TICKET_CLOSED} Merge conflict.`, offers: ['keep-working', 'set-aside'], causes: [{ type: 'ticket-closed' }], ticketOpen: false });
+  assert.deepEqual(noticeOf(records, record.workId), { reason: `${TICKET_CLOSED} Merge conflict.`, offers: ['keep-working', 'set-aside'], causes: [{ type: 'ticket-closed' }], ticketOpen: false, hasOtherNote: true });
 });
 
 test('a notice says whether the ticket reads open', async () => {
@@ -230,7 +230,7 @@ test('a stale closed PR adds nothing to an unrelated reason', async () => {
   const records = await open();
   const record = observedBuild(records, { pr: 'closed', ticket: 'closed' });
   records.setNeedsYou(record.workId, record.revision, 'Its PR closed without merging.');
-  assert.deepEqual(noticeOf(records, record.workId), { reason: 'Its PR closed without merging.', offers: ['mark-handled', 'set-aside'], causes: [], ticketOpen: false });
+  assert.deepEqual(noticeOf(records, record.workId), { reason: 'Its PR closed without merging.', offers: ['mark-handled', 'set-aside'], causes: [], ticketOpen: false, hasOtherNote: true });
 });
 
 test('no notice saved on Done work shows, whatever it holds', async () => {

@@ -86,5 +86,5 @@ export function needsYouNotice(record: WorkRecord, observations: readonly Observ
   if (!causes.length && !other) return undefined;
   const purpose = causes.some((cause) => cause.type === 'no-thread') ? launchIntents().filter((intent) => intent.outcome === 'failed').at(-1)?.purpose : undefined;
   return { reason: [...causesText(record, causes), ...other ? [other] : []].join(' '), offers: offersOf(causes), causes,
-    ticketOpen: observations.find((o) => o.of === 'ticket')?.state === 'open', ...purpose && { startAgainPurpose: purpose === 'build' ? 'build' as const : 'shape' as const } };
+    ticketOpen: observations.find((o) => o.of === 'ticket')?.state === 'open', ...purpose && { startAgainPurpose: purpose === 'build' ? 'build' as const : 'shape' as const }, ...other && { hasOtherNote: true } };
 }

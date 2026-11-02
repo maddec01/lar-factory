@@ -222,7 +222,7 @@ test.each([
   [[{ type: 'ticket-closed' }], 'Keep working', 'keep-working'],
   [[{ type: 'assignee-changed', from: 'pedro', to: 'sam' }], 'Keep working', 'keep-working'],
   [[], 'Mark as handled', 'mark-handled'],
-] as const)('a notice with causes %j posts %s and offers no way to close it otherwise', async (causes, label, choice) => {
+] as const)('a notice with causes %j posts %s only once confirmed and offers no way to close it otherwise', async (causes, label, choice) => {
   const data = structuredClone(sample);
   const item = data.items[0]!;
   item.needsYou = { reason: 'Why it waits.', causes: [...causes], ticketOpen: false, offers: [choice, 'set-aside'] };
@@ -231,6 +231,8 @@ test.each([
   holdPosts();
   expect($$('[data-needs-you-reason] button').map(text)).toEqual([label, 'Abandon']);
   await press(button('needs-you', item.id));
+  expect(posted()).toEqual([]);
+  await press($$<HTMLButtonElement>('#needs-you-dialog [data-slot="modal-footer"] button').find(el => text(el) === label)!);
   expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: item.id, choice }]);
 });
 
@@ -244,20 +246,23 @@ test.each([false, true])('deleted-thread move inspects cleanup and cleans only a
   await openItem(item.id);
   holdPosts();
   await press(button('needs-you', item.id));
+  expect(posted()).toEqual([]);
+  await press($$<HTMLButtonElement>('#needs-you-dialog [data-slot="modal-footer"] button').find(el => text(el) === 'Move to List')!);
   expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
   await answer({ token: 'saved', plans: [{ branch: 'slice/old', localAvailable: true, remoteAvailable: true, dirtyFiles: ['draft.txt'], unpushedCommits: [] }] });
-  const inputs = $$<HTMLInputElement>('[data-needs-you-reason] input');
+  const inputs = $$<HTMLInputElement>('#needs-you-dialog input');
   expect(inputs.map(input => input.checked)).toEqual([false, false]);
   if (success) await press(inputs[0]!);
-  await press($$<HTMLButtonElement>('[data-needs-you-reason] button').find(el => text(el) === 'Proceed')!);
+  await press($$<HTMLButtonElement>('#needs-you-dialog button').find(el => text(el) === 'Proceed')!);
   if (success) {
     expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
-    expect(text($('[data-needs-you-reason]'))).toContain('draft.txt');
-    await press($$<HTMLButtonElement>('[data-needs-you-reason] button').find(el => text(el) === 'Confirm loss and proceed')!);
+    expect(text($('#needs-you-dialog'))).toContain('draft.txt');
+    await press($$<HTMLButtonElement>('#needs-you-dialog button').find(el => text(el) === 'Confirm loss and proceed')!);
   }
   expect(posted().at(-1)?.[0]).toBe('/api/needs-you');
   await answer(success ? { error: null, board: data } : { error: 'Move refused' }, success ? 200 : 409);
   expect(posted().some(call => call[0] === '/api/execute-owned-cleanup')).toBe(success);
+  if (!success) expect(text($('#needs-you-dialog [role="alert"]'))).toBe('Move refused');
   if (success) {
     expect(posted().at(-1)?.[1]).toEqual({ itemId: item.id, options: { token: 'saved', local: true, remote: false, confirmedLoss: true } });
     await answer({ errors: ['Remote refused'], remainingBranches: ['slice/old'] });

@@ -99,3 +99,23 @@ it('renews a healthy subscription before expiry and reports failed renewal', asy
   stop();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it('shares one vault read across subscriptions and renews once after rejected tickets', async () => {
+  vi.useFakeTimers();
+  const read = vi.fn(async () => session);
+  const issue = vi.fn(async () => ({ ...session, sessionId: 'replacement' }));
+  const shared = new ProjectProtocol({ read, write: async () => {} },
+    { issue, revoke: async () => {} }, async () => new Response(), '');
+  let rejected = false;
+  vi.stubGlobal('fetch', vi.fn(async () => rejected ? new Promise<Response>(() => {}) : new Response('', { status: 401 })));
+  const stops = Array.from({ length: 12 }, () =>
+    subscribeProjects(new URL('http://127.0.0.1:3773'), '', shared, () => {}));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(issue).not.toHaveBeenCalled();
+  rejected = true;
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(issue).toHaveBeenCalledTimes(1);
+  stops.forEach(stop => stop());
+  expect(vi.getTimerCount()).toBe(0);
+});

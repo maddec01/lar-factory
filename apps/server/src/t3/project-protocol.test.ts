@@ -72,3 +72,72 @@ it('retains the last observation when the projects endpoint disappears', async (
   missing = true;
   expect(await adapter.readProjects()).toEqual({ availability: 'unavailable', observation: first.observation });
 });
+
+it('shares acquisition across subscriptions and normal requests', async () => {
+  let reads = 0;
+  const adapter = new ProjectProtocol({
+    read: async () => { reads++; return { token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }; },
+    write: async () => {},
+  }, { issue: async () => { throw Error(); }, revoke: async () => {} },
+  async () => Response.json({ projects: [], updatedAt: '2026-01-01' }), '');
+  await Promise.all([adapter.subscriptionSession(), adapter.subscriptionSession(), adapter.readProjects()]);
+  await adapter.subscriptionSession();
+  expect(reads).toBe(1);
+});
+
+it('recovers after storage failure and ignores rejection of an older session', async () => {
+  let locked = true;
+  let issued = 0;
+  const adapter = new ProjectProtocol({
+    read: async () => undefined,
+    write: async () => { if (locked) throw Error(); },
+  }, {
+    issue: async () => ({ token: 'fixture', sessionId: String(++issued), expiresAt: '2099-01-01' }),
+    revoke: async () => {},
+  }, async () => { throw Error(); }, '');
+  await expect(adapter.subscriptionSession()).rejects.toThrow();
+  locked = false;
+  const first = await adapter.subscriptionSession();
+  adapter.invalidateSession(first);
+  const second = await adapter.subscriptionSession();
+  adapter.invalidateSession(first);
+  expect(await adapter.subscriptionSession()).toBe(second);
+  expect(issued).toBe(3);
+});
+
+it('reauthorization prevents a late vault read from restoring credentials', async () => {
+  let release!: (session: BoardSession) => void;
+  let reads = 0;
+  const stored = { token: 'fixture', sessionId: 'old', expiresAt: '2099-01-01' };
+  const adapter = new ProjectProtocol({
+    read: async () => ++reads === 1 ? new Promise<BoardSession>(resolve => { release = resolve; }) : stored,
+    write: async () => {},
+  }, {
+    issue: async () => ({ ...stored, sessionId: 'new' }),
+    revoke: async () => {},
+  }, async () => { throw Error(); }, '');
+  const pending = adapter.subscriptionSession();
+  const rejected = expect(pending).rejects.toThrow('Session invalidated');
+  const renewal = adapter.reauthorize();
+  release(stored);
+  await rejected;
+  await renewal;
+  expect((await adapter.subscriptionSession()).sessionId).toBe('new');
+});
+
+it('renews an expired cached session once for concurrent consumers', async () => {
+  let now = 0;
+  let issues = 0;
+  const adapter = new ProjectProtocol({
+    read: async () => ({ token: 'fixture', sessionId: 'old', expiresAt: new Date(120_000).toISOString() }),
+    write: async () => {},
+  }, {
+    issue: async () => { issues++; return { token: 'fixture', sessionId: 'new', expiresAt: '2099-01-01' }; },
+    revoke: async () => {},
+  }, async () => { throw Error(); }, '', () => now);
+  await adapter.subscriptionSession();
+  now = 61_000;
+  const sessions = await Promise.all([adapter.subscriptionSession(), adapter.subscriptionSession()]);
+  expect(sessions.map(session => session.sessionId)).toEqual(['new', 'new']);
+  expect(issues).toBe(1);
+});

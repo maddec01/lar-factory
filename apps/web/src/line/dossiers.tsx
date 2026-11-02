@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { blockerGroups, blockerRef, plural, prLabel, itemName, ref, repoKey, repoName } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, blockerGroups, blockerRef, plural, prLabel, itemName, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -130,7 +130,7 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
   const blocked = ahead.flatMap((part) => part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice })));
   const rows = [
     { key: 'you', label: 'Needs you', tone: 'text-(--warning-foreground)',
-      entries: ahead.filter((p) => p.item.status === 'Needs you').map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={<OpenThread item={p.item} data={data} />} />) },
+      entries: [...(needsAnswer(parent) ? [<Entry key={parent.id} main={<button onClick={() => open(parent)}>{itemName(parent)}</button>} side={<OpenThread item={parent} data={data} threadId={openQuestionThread(parent)?.id} label="Answer in T3" />} />] : []), ...ahead.filter((p) => needsAnswer(p.item)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={<OpenThread item={p.item} data={data} threadId={openQuestionThread(p.item)?.id} label="Answer in T3" />} />)] },
     { key: 'verify', label: 'To verify or merge', tone: 'text-(--warning-foreground)',
       entries: ahead.filter((p) => p.item.status === 'Verify' || p.item.status === 'Ready to merge').map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={p.item.status} />) },
     { key: 'decisions', label: 'Open decisions', tone: 'text-(--primary)',
@@ -142,7 +142,7 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
           side={<>slice of <button type="button" onClick={() => open(part.item)} title={part.item.title} className="rounded px-0.5 font-medium tabular-nums text-(--primary) hover:bg-(--accent)">{ref(part.item)}</button> · waits on a re-slice</>} />
       )) },
     { key: 'waiting', label: 'Waiting', tone: 'text-(--muted-foreground)',
-      entries: ahead.filter((p) => openWaits(p).length && p.item.status !== 'Needs you').map((p) => (
+      entries: ahead.filter((p) => openWaits(p).length && !needsAnswer(p.item)).map((p) => (
         <Entry key={p.item.id} main={<PartLink part={p} />} side={waitsOn(p)} />
       )) },
     { key: 'ready', label: 'Ready to start', tone: 'text-(--st-now)',
@@ -245,12 +245,12 @@ function moving(parent: Item, parts: Part[]): Moving {
     parts,
     done: Math.max(parent.subIssues.completed, parts.length - ahead.length),
     count: Math.max(parent.subIssues.total, parts.length),
-    needsYou: ahead.filter((p) => p.item.status === 'Needs you'),
+    needsYou: ahead.filter((p) => needsAnswer(p.item)),
     yours: ahead.filter((p) => YOURS.includes(p.item.status)),
     decisions: ahead.filter((p) => DECISION_KINDS.includes(p.kind)),
     blockedSlices: ahead.flatMap((part) => part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice }))),
     ready: ahead.filter(startable),
-    active: ahead.filter((p) => ['Shaping', 'In progress', 'Review'].includes(p.item.status)),
+    active: ahead.filter((p) => !needsAnswer(p.item) && ['Shaping', 'In progress', 'Review'].includes(p.item.status)),
     fog: parent.map?.fog ?? [],
   };
 }
@@ -283,7 +283,8 @@ function PartsBar({ m }: { m: Moving }) {
 }
 
 /** The one thing to say next: what waits on you (a part in Needs you first), else what can start, else what's moving. */
-function nextOf(m: Moving): { tone: 'you' | 'start' | 'moving' | 'none'; part?: Part; text: string } {
+function nextOf(m: Moving, parent: Item): { tone: 'you' | 'start' | 'moving' | 'none'; part?: Part; text: string } {
+  if (needsAnswer(parent)) return { tone: 'you', text: itemName(parent) };
   const yours = m.needsYou[0] ?? m.yours[0];
   if (yours) return { tone: 'you', part: yours, text: `${itemName(yours.item)}` };
   if (m.ready[0]) return { tone: 'start', part: m.ready[0], text: `${itemName(m.ready[0].item)}` };
@@ -321,8 +322,8 @@ function Counts({ m }: { m: Moving }) {
 }
 
 /** Next, as a sentence with its Start. */
-function Next({ m, data }: { m: Moving; data: BoardData }) {
-  const n = nextOf(m);
+function Next({ m, data, parent }: { m: Moving; data: BoardData; parent: Item }) {
+  const n = nextOf(m, parent);
   // A part on your desk is named as its attention row names it: Needs you, or to verify or merge.
   const yours = n.part?.item.status === 'Verify' ? 'To verify' : n.part?.item.status === 'Ready to merge' ? 'To merge' : 'Needs you';
   const word = { you: yours, start: 'Next', moving: 'Moving', none: '' }[n.tone];
@@ -377,7 +378,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
         <span className={`col-start-2 grid ${LINE2_A1} items-center gap-x-4`} data-line="2">
           <span data-col="bar"><PartsBar m={m} /></span>
           <span className="text-[11px] tabular-nums text-(--muted-foreground)">{m.done}/{m.count} parts</span>
-          <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} /></span>
+          <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
           <span data-col="figures" className="grid min-w-0"><Figures s={figuresOf(parent, data, true)} /></span>
           <span data-col="repos" className="hidden truncate text-right text-[11px] text-(--muted-foreground) lg:block" title={repos(m, data)}>{repos(m, data)}</span>
         </span>

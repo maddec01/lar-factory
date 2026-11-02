@@ -277,7 +277,7 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
 });
 
 test('the Ready to start row and the header agree on what can start: a Queued decision can, a part with a live thread cannot', async () => {
-  const data = withItem('I_sample12', { status: 'Shaping' }, withDecision());
+  const data = withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, withDecision());
   await mountPage(data);
   const ready = () => dossier().querySelector('[data-attention-row="ready"]');
   expect([text(ready()!.firstElementChild), text(startIn(next()))]).toEqual(['Ready to start 1', 'Start ▾']);
@@ -370,7 +370,7 @@ test('a blocked build shows only Start after, a Start, in place of Start build',
 
 test('once its blockers complete, Start build sends the build, and the header offers it too', async () => {
   holdPosts(unblocked());
-  await mountPage(withItem('I_sample12', { status: 'Shaping' }, unblocked()));
+  await mountPage(withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()));
   expect(text(startIn(next()))).toBe('Start ▾');
   await pressMenu(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
@@ -545,4 +545,19 @@ test('unlabelled local decision parts show the decision lane and completed answe
   expect(text(doneNode)).toContain('decision');expect(text(doneNode)).toContain('Complete');expect(text(doneNode)).not.toContain('Shaping');expect(text(doneNode)).not.toContain('build');
   expect(text(pendingNode)).toContain('decision');expect(text(pendingNode)).toContain('Shaping');
   expect(complete.status).toBe('Shaping');expect(pending.status).toBe('Shaping');
+});
+
+test('a concept question takes priority over its parts and appears in Attention', async () => {
+  await mountPage(withItem(C200, { status: 'In progress', threads: [thread('own-question', 'needs you')] }));
+  expect(text(next())).toContain(c200.title);
+  expect(text(next())).toContain('Needs you');
+  expect(text(dossier())).not.toContain('Nothing holds this up');
+  expect(dossier().querySelector('a[href="t3code://threads/sample-environment/own-question"]')).not.toBeNull();
+});
+
+test('a shaping part with a question leads moving parts in the dossier', async () => {
+  await mountPage(withItem('I_sample12', { status: 'Shaping', threads: [thread('part-question', 'needs you')] }));
+  expect(text(next())).toContain('Needs you');
+  expect(chips()).toContain('1 need you');
+  expect(dossier().querySelector('a[href="t3code://threads/sample-environment/part-question"]')).not.toBeNull();
 });

@@ -3,6 +3,7 @@ import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { openWorkRecords, workRecordsPath, writeShapingThreadCleanup } from '@lar-factory/work-records';
 import { changeRecords, testFactoryContext, NOT_LANDED, readsRepositoryConfig, recordBlockers, SAMPLE_MODELS, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
@@ -221,6 +222,39 @@ test('once Delete records a shaping thread as deleted, a fresh stats read replac
     assert.ok(records.threads(board.id(12)).find((thread) => thread.threadId === SHAPING)?.deletedAt);
     assert.deepEqual(records.pendingShapingThreadCleanups(), []);
   } finally { records.close(); }
+});
+
+const cleanupProblem = (data: BoardData) => data.items[0]?.shapingCleanupProblem;
+/** Starts #12's build and returns its status then, which a cleanup problem never changes. */
+async function startedStatus(board: Board): Promise<string> {
+  const response = await startBuild(board, board.id(12));
+  assert.equal(response.status, 200);
+  return (await response.json() as { board: BoardData }).board.items[0]!.status;
+}
+
+test('a corrupt cleanup setting at Start build starts the build and shows a problem until a sweep applies the fixed setting', async (t) => {
+  const board = await shapingBoard(t, [idleShaping]);
+  writeFileSync(join(board.dataDir, 'shaping-thread-cleanup.json'), '{');
+  const status = await startedStatus(board);
+  const shown = await until(board, (d) => cleanupProblem(d) !== undefined);
+  assert.equal(cleanupProblem(shown), "The board couldn't clean up the shaping threads. It can't read the shaping thread cleanup setting. It keeps trying.");
+  assert.equal(shown.items[0]!.status, status);
+  assert.equal(shown.items[0]!.needsYou, undefined);
+  writeShapingThreadCleanup('keep', board.dataDir);
+  await until(board, (d) => cleanupProblem(d) === undefined);
+  const records = await openWorkRecords(workRecordsPath(board.dataDir));
+  try { assert.deepEqual(records.pendingShapingThreadCleanups(), []); } finally { records.close(); }
+});
+
+test('a saved cleanup failure leaves the build running, shows a problem and clears once the thread is cleaned', async (t) => {
+  const board = await shapingBoard(t, [idleShaping]);
+  const status = await startedStatus(board);
+  const item = board.id(12);
+  const data = await changeRecords(board, (records) => records.saveShapingThreadFailure(SHAPING, 'T3 refused it.'), item, (shown) => shown.shapingCleanupProblem !== undefined);
+  assert.equal(cleanupProblem(data), "The board couldn't clean up the shaping threads. T3 refused it. It keeps trying.");
+  assert.equal(data.items[0]!.status, status);
+  assert.equal(data.items[0]!.needsYou, undefined);
+  await changeRecords(board, (records) => records.markShapingThreadCleaned(SHAPING), item, (shown) => shown.shapingCleanupProblem === undefined);
 });
 
 test('a running thread with another purpose is not refused as a shaping thread', async (t) => {

@@ -27,7 +27,7 @@ import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
 import { createPrObserver } from './items/pr-observer.ts';
 import { createRetention } from './items/retention.ts';
-import { createShapingThreadCleanup, createShapingThreadSweep } from './items/shaping-thread-cleanup.ts';
+import { createShapingThreadCleanup, createShapingThreadSweep, shapingThreadCleanupProblems } from './items/shaping-thread-cleanup.ts';
 import { agreedKind, archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
@@ -309,6 +309,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     if (priced !== null) pricingUnavailable(!priced);
   }
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
+  const cleanupProblems = records && shapingThreadCleanupProblems(records);
   return items.map((item) => {
     if (item.recorded === false) return item;
     const overcounted = withStats && overcountedStats.has(item.id);
@@ -334,6 +335,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     if (records) {
       const notice = deletedThreadNotice(records, shown);
       if (notice) shown.needsYou = notice;
+      shown.shapingCleanupProblem = cleanupProblems?.get(item.id);
     }
     return shown;
   });

@@ -42,6 +42,24 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
 /** The progress bar's active step segments. */
 const steps = () => $$('[data-item-dialog] [data-progress] [data-steps] > li');
 
+test('a cleanup problem shows in the dialog with no button, and never on the card', async () => {
+  const problem = "The board couldn't clean up the shaping threads. T3 refused it. It keeps trying.";
+  const carrying = { ...sample, items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, shapingCleanupProblem: problem } : i)) };
+  await mountPage(carrying);
+  expect($$('main *').some((el) => text(el).includes(problem))).toBe(false);
+  await openItem('I_sample13');
+  const notice = inDialog('[data-shaping-cleanup-problem]')!;
+  expect(text(notice)).toBe(problem);
+  expect(notice.querySelector('button')).toBeNull();
+  expect(inDialog('[data-needs-you-reason]')).toBeNull();
+});
+
+test('an item with no cleanup problem shows no notice', async () => {
+  await mountPage();
+  await openItem('I_sample13');
+  expect(inDialog('[data-shaping-cleanup-problem]')).toBeNull();
+});
+
 test('the progress bar names the current step on its segment and every step in a title and an accessible label', async () => {
   await mountPage();
   await openItem('I_sample13');

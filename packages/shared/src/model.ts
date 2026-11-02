@@ -360,6 +360,8 @@ export interface Item {
   paused?: string;
   /** Why its work record waits on the user, with what the board offers to do about it; absent when it doesn't wait. */
   needsYou?: { reason: string; offers: NeedsYouOffer[]; deletedThread?: boolean; deletedThreadPurpose?: 'shape' | 'build' };
+  /** Why the board couldn't clean up its shaping threads yet, which it keeps trying; shown in item details only. */
+  shapingCleanupProblem?: string;
   /** Set on work off the board in Archive: set aside, which Restore brings back, or finished and hidden by retention. */
   archived?: { setAside: boolean; hidden: boolean; ticketOpen: boolean };
 }

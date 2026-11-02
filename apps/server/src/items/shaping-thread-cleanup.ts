@@ -44,6 +44,19 @@ export function createShapingThreadCleanup({ records, dir, changed = () => {} }:
   };
 }
 
+/** A row with no action, from a setting Start build couldn't read, gives this reason. */
+const UNREADABLE_SETTING = "It can't read the shaping thread cleanup setting.";
+
+/** What details says, by work ID, about work whose pending rows have a failure or no action. A thread only held back adds nothing. */
+export function shapingThreadCleanupProblems(records: WorkRecords): Map<string, string> {
+  const reasons = new Map<string, Set<string>>();
+  for (const { workId, action, failure } of records.pendingShapingThreadCleanups()) {
+    const reason = action ? failure : UNREADABLE_SETTING;
+    if (reason) reasons.set(workId, (reasons.get(workId) ?? new Set()).add(/[.!?]$/.test(reason) ? reason : `${reason}.`));
+  }
+  return new Map([...reasons].map(([workId, why]) => [workId, `The board couldn't clean up the shaping threads. ${[...why].join(' ')} It keeps trying.`]));
+}
+
 export interface ShapingThreadSweepDeps {
   records: WorkRecords;
   /** The board's data folder, where the setting lives; tests give their own. */
@@ -64,12 +77,15 @@ type ThreadAction = Exclude<ShapingThreadCleanup, 'keep'>;
 
 /** How long a thread waits after a failure or an unconfirmed answer before the sweep tries it again. */
 const RETRY_MS = 30_000;
+/** The longest a thread waits after a rejection. T3 keeps a receipt for each rejected command ID and never prunes them, so each rejection doubles the wait, starting from `RETRY_MS`. */
+const MAX_REJECTED_RETRY_MS = 3_600_000;
 
 /** A function that takes each pending shaping thread one step on, one sweep at a time. It never interrupts a live thread. */
 export function createShapingThreadSweep({ records, dir, stateOf, lookup, send, deleted, now = Date.now }: ShapingThreadSweepDeps): () => Promise<void> {
   const retryAt = new Map<string, number>();
+  const rejectedRetryMs = new Map<string, number>();
   let sweeping = false;
-  const later = (threadId: string) => retryAt.set(threadId, now() + RETRY_MS);
+  const later = (threadId: string, wait = RETRY_MS) => retryAt.set(threadId, now() + wait);
   /** The setting's first readable value becomes the row's action; until then the row waits, with its notice. */
   function savedSetting(threadId: string): ShapingThreadCleanup | null {
     let choice: ShapingThreadCleanup;
@@ -81,6 +97,7 @@ export function createShapingThreadSweep({ records, dir, stateOf, lookup, send, 
   async function step({ threadId, workId, commandId }: ShapingThreadCleanupRow, action: ThreadAction): Promise<void> {
     const cleaned = () => {
       retryAt.delete(threadId);
+      rejectedRetryMs.delete(threadId);
       if (action !== 'delete') return records.markShapingThreadCleaned(threadId);
       records.markShapingThreadDeleted(threadId);
       deleted(workId);
@@ -97,9 +114,15 @@ export function createShapingThreadSweep({ records, dir, stateOf, lookup, send, 
     if (action !== 'delete' && (state.archived || action === 'settle' && state.settled)) return cleaned();
     const result = await send({ type: `thread.${action}`, commandId, threadId });
     if (result.outcome === 'accepted') return cleaned();
-    later(threadId);
-    if (result.outcome === 'rejected') records.saveShapingThreadRejection(threadId, result.reason);
-    else records.saveShapingThreadFailure(threadId, result.reason);
+    if (result.outcome === 'rejected') {
+      const wait = rejectedRetryMs.get(threadId) ?? RETRY_MS;
+      rejectedRetryMs.set(threadId, Math.min(wait * 2, MAX_REJECTED_RETRY_MS));
+      later(threadId, wait);
+      records.saveShapingThreadRejection(threadId, result.reason);
+    } else {
+      later(threadId);
+      records.saveShapingThreadFailure(threadId, result.reason);
+    }
   }
   return async () => {
     if (sweeping) return;

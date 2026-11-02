@@ -94,15 +94,18 @@ Build step 1 and plan from the brief.
    changed files, then go to step 5. Any other build starts a **planner**
    subagent with `planner.md`, the build's work ID and the repo path; it
    returns the slice list.
-3. **Implement.** In parallel, start an **implementer** child task for each
+3. **Implement.** Follow **Launch reporting and recovery** in
+   `<lar-build>/shared/issue-tracker/slices.md`: reconcile before launch or
+   resume, confirm phase `implement` before launching, and confirm each child's
+   association before yielding. Handle failed writes there without redelegating.
+
+   In parallel, start an **implementer** child task for each
    ready slice (the ready-slices command in **Slices**) not already running,
    while no planner runs, per **Implementer** in
    `<lar-build>/shared/orchestration.md`, and track it by its `taskId`. Give it
    `implementer.md`, the slice's work ID, its brief
    (`lar-work body <slice> --body brief`), the build branch and the full slice
-   branch name, and record its child thread on the slice as an active slice
-   (**Slices** in `<lar-build>/shared/issue-tracker/slices.md`). Derive the
-   name from the slice work ID's first 8 characters `<id>` and a slug of the
+   branch name. Derive the name from the slice work ID's first 8 characters `<id>` and a slug of the
    slice title. The first attempt uses `slice/<id>-<slug>`. When
    `git branch --list 'slice/<id>-*'` finds a branch, a restart (after a
    handoff, a re-slice or a retry) uses `slice/<id>-<slug>-<k>`, where `k`

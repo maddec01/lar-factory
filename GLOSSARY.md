@@ -12,9 +12,17 @@ _Avoid_: inbox, needs-you list.
 A request from a thread, such as a question or tool approval, that T3 holds until the user answers it. A question written in chat text is not one.
 _Avoid_: pending input.
 
+**Needs you notice**:
+The reason work waits on the user, shown with the actions that resolve it.
+_Avoid_: notification, alert.
+
 **Abandon**:
 Setting work aside on this machine. Closing its linked tracker ticket is a separate, optional action.
 _Avoid_: delete work.
+
+**Archive**:
+The list in Settings of work that has left the board, including work set aside by Abandon.
+_Avoid_: trash, deleted items.
 
 **Spec**:
 The refined brief as it appears as a ticket's main description after shaping.

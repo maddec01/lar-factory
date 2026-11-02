@@ -77,6 +77,7 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
   const branches: (string | undefined)[] = [];
   const bases: (string | undefined)[] = [];
   const source = {
+    readTicket: async (_repo: string, number: number) => ({number, title: `Item ${number}`, text: 'Description', kind: 'issue'}),
     abandon: async (item: Item) => {
       log.push(`abandon ${item.number}`);
       return null;
@@ -93,6 +94,70 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
     } });
   return { board, commands, log, branches, bases, archive, reread };
 }
+
+test('unpicked ticket abandonment saves a local record and offers Archive restore', async () => {
+  const records = await openRecords();
+  const ticket = queued(7);
+  const { commands, board, archive } = commandsOn([], undefined, records, [ticket]);
+  const reply = await commands.abandon(ticket.id);
+  assert.equal(reply.status, 200);
+  assert.equal(board.snapshot().items.length, 0);
+  assert.equal(archive().length, 1);
+  assert.notEqual(archive()[0]!.id, ticket.id);
+  const restarted = await openWorkRecords(join(opened.at(-1)!.dir, 'work-records.db'));
+  try {
+    assert.equal(recordItems(restarted, [ticket], [WEB]).length, 0);
+    assert.equal(archivedItems(restarted, [ticket], [WEB], new Set()).length, 1);
+  } finally { restarted.close(); }
+  assert.equal(commands.restore(archive()[0]!.id).status, 200);
+  assert.equal(board.snapshot().items.length, 1);
+});
+
+for (const failure of ['none', 'import', 'close', 'read']) test(`unpicked combined abandonment handles ${failure} failure without duplicate closure or records`, async () => {
+  const records = await openRecords();
+  const ticket = queued(7);
+  const board = createBoardState({ items: [], repos: [], modelChoices: [] } as unknown as BoardData);
+  const reread = () => board.update({ items: recordItems(records, [ticket], [WEB]) });
+  reread();
+  let closed = false;
+  let closes = 0;
+  let fail = true;
+  const source = {
+    readTicket: async () => {
+      if (failure === 'read' && fail) throw new Error('Read failed');
+      return { number: 7, title: 'Target', text: 'Target description\n<!-- lar-factory:structure\n{}\n-->', kind: 'issue', tracker: { snapshot: 'must not restore' } };
+    },
+    observeTicket: async () => ({ state: closed ? 'closed' : 'open' }),
+    abandon: async (item: Item) => {
+      assert.equal(item.id, ticket.id);
+      if (failure === 'close' && fail) return 'Close failed';
+      closes++; closed = true; return null;
+    },
+  } as unknown as ItemSource;
+  const commands = createItemCommands({ factoryContext: null, board, records, reread,
+    archive: () => archivedItems(records, [ticket], [WEB], new Set()), offerModelChoices: () => [], items: source });
+  const imported = records.importTicket.bind(records);
+  const spy = vi.spyOn(records, 'importTicket').mockImplementation(input => {
+    if (failure === 'import' && fail) throw new Error('Disk unavailable');
+    return imported(input);
+  });
+  try {
+    const first = await commands.abandonAndClose(ticket.id);
+    assert.equal(first.status, failure === 'none' ? 200 : failure === 'import' ? 409 : 502);
+    if (failure !== 'none') {
+      assert.equal(records.list({}).length, 0);
+      assert.ok(board.find(ticket.id));
+      fail = false;
+      assert.equal((await commands.abandonAndClose(ticket.id)).status, 200);
+    }
+    assert.equal(closes, 1);
+    assert.equal(records.list({}).length, 1);
+    assert.equal(records.list({})[0]!.setAside, true);
+    assert.equal(records.list({})[0]!.parentId, null);
+    assert.equal(recordItems(records, [ticket], [WEB]).length, 0);
+    assert.equal(commands.restore(records.list({})[0]!.workId).status, 200);
+  } finally { spy.mockRestore(); }
+});
 
 for (const failed of [false, true]) test(`Abandon uses the current record after a provider ${failed ? 'failure' : 'observation'} while another ticket still reads`, async () => {
   const records = await openRecords();
@@ -112,7 +177,7 @@ for (const failed of [false, true]) test(`Abandon uses the current record after 
   try {
     // Let the first observation finish while the second stays held, without a timer or a provider refresh.
     await new Promise(setImmediate);
-    const response = commands.abandon(work.workId);
+    const response = await commands.abandon(work.workId);
     assert.equal(response.status, 200, JSON.stringify(response.body));
     assert.equal(records.read(work.workId).setAside, true);
   } finally {
@@ -126,7 +191,7 @@ test('Abandon sets the work aside on this Mac and leaves its ticket alone, which
   const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
   const { board, commands, log } = commandsOn([], undefined, records, [queued(7)]);
   assert.deepEqual((await commands.closeTicket(work.workId)).status, 409, 'work Abandon never set aside has no ticket to close');
-  assert.equal(commands.abandon(work.workId).status, 200);
+  assert.equal((await commands.abandon(work.workId)).status, 200);
   assert.equal(records.read(work.workId).setAside, true);
   assert.equal(board.find(work.workId), undefined);
   assert.deepEqual(log, [], 'Abandon writes nothing to the provider');
@@ -155,8 +220,8 @@ test("a ticket close refuses work whose abandonRefusal says why, and work whose 
   const refused = records.importTicket({ title: 'Refused', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#7` }).record;
   const closed = records.importTicket({ title: 'Closed', repository: WEB, kind: 'bug', status: 'Queued', ticket: `${WEB}#8` }).record;
   const { commands, log } = commandsOn([], undefined, records, [queued(7, { abandonRefusal: refusal }), queued(8, { state: 'closed' })]);
-  assert.equal(commands.abandon(refused.workId).status, 200);
-  assert.equal(commands.abandon(closed.workId).status, 200);
+  assert.equal((await commands.abandon(refused.workId)).status, 200);
+  assert.equal((await commands.abandon(closed.workId)).status, 200);
   const answers = await Promise.all([commands.closeTicket(refused.workId), commands.closeTicket(closed.workId)]);
   assert.deepEqual(answers.map((a) => [a.status, (a.body as { error: string }).error]), [[409, refusal],
     [409, "The board doesn't see that work's ticket open, so it closes nothing. Check it in its provider."]]);
@@ -192,7 +257,7 @@ test('a replacement build from Needs you readies the work, and Start build then 
 
 test('setting work aside from Needs you works in any Status, though a thread worked on it', async () => {
   const { records, workId, commands } = await closedPrBuild();
-  assert.equal(commands.abandon(workId).status, 200);
+  assert.equal((await commands.abandon(workId)).status, 200);
   assert.equal(records.read(workId).setAside, true);
 });
 
@@ -555,7 +620,7 @@ test('combined requests share a transition and exclude Start while the provider 
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(transitions, 1);
   assert.equal((await commands.start(queued(7).id, undefined)).status, 409);
-  assert.equal(commands.abandon(queued(7).id).status, 409);
+  assert.equal((await commands.abandon(queued(7).id)).status, 409);
   finish(null);
   assert.equal((await first).status, 200);
   assert.equal((await duplicate).status, 200);
@@ -676,7 +741,8 @@ test('changing the kind of an item with no record makes its record first, and a 
   const records = await openRecords();
   const ticket = queued(9, { recorded: false, status: 'List', statuses: [], kind: 'bug', labels: ['bug'] });
   const board = createBoardState({ items: [ticket], repos: [{ repo: WEB, setup: { access: { 'tag-ticket': 'allowed' }, vocabulary: effectiveVocabulary({}).vocabulary } }], modelChoices: [] } as unknown as BoardData);
-  const source = { readTicket: async () => ({ number: 9, title: 'Item 9', url: ticket.url!, text: '', kind: 'bug' }) } as unknown as ItemSource;
+  const source = {
+    readTicket: async () => ({ number: 9, title: 'Item 9', url: ticket.url!, text: '', kind: 'bug' }) } as unknown as ItemSource;
   let fail = true;
   const commands = createItemCommands({ factoryContext: null, board, items: source, records, reread: () => {}, archive: () => [], offerModelChoices: () => [],
     kindTracker: () => ({

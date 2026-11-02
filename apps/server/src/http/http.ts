@@ -246,7 +246,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     },
     '/api/restore': {
       what: 'the set-aside item to restore', disabled: 'Restoring is disabled in sample mode.',
-      run: forItem('Name the item to restore.', async (itemId) => commands.restore(itemId)),
+      run: forItem('Name the item to restore.', (itemId) => commands.restore(itemId)),
     },
     '/api/retention': {
       what: 'the retention setting', disabled: 'Retention is disabled in sample mode.',

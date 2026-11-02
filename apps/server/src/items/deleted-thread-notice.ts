@@ -14,6 +14,6 @@ export function deletedThreadNotice(records: WorkRecords, item: Item): Item['nee
   const pr = observations.find(o => o.of === 'pr')?.state;
   const ticketClosed = causes.some(c => c.type === 'ticket-closed');
   return { reason: ['The latest work thread was deleted.', ...item.needsYou ? [item.needsYou.reason] : []].join(' '), deletedThread: true, startAgainPurpose: item.needsYou?.startAgainPurpose ?? (latest.purpose === 'build' ? 'build' : 'shape'),
-    causes, ticketOpen: observations.find(o => o.of === 'ticket')?.state === 'open',
+    causes, ticketOpen: observations.find(o => o.of === 'ticket')?.state === 'open', ...item.needsYou?.hasOtherNote && { hasOtherNote: true },
     offers: [...pr === 'open' ? ['start-again'] as const : ['start-again', 'back-to-queue', 'back-to-list'] as const, ...ticketClosed ? ['set-aside'] as const : []] };
 }

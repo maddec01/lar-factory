@@ -17,6 +17,10 @@ const press = async (el: HTMLElement) => {
   el.focus();
   await settle(() => el.click());
 };
+/** The confirmation a Needs you choice opens. */
+const confirmation = () => $('#needs-you-dialog');
+const confirmButtons = () => $$<HTMLButtonElement>('#needs-you-dialog [data-slot="modal-footer"] button');
+const confirmPress = (name: string) => press(confirmButtons().find((b) => text(b) === name)!);
 const without = (id: string): BoardData => ({ ...sample, items: sample.items.filter((i) => i.id !== id) });
 
 /** Opens the item dialog on `itemId` through its store, as every list on the page does. */
@@ -557,24 +561,59 @@ test('closing the dialog clears the store, and Escape closes it', async () => {
   expect(dialog()).toBeNull();
 });
 
-test('work that needs you shows why, posts each choice it offers, offers no Clear, and sets the work aside through Abandon', async () => {
+test('work that needs you shows why, confirms each choice before posting it, offers no Clear, and sets the work aside through Abandon', async () => {
   holdPosts();
   const id = 'I_sample05';
   const reason = 'Its PR closed without merging.';
   await mountPage({ ...sample, capture: { enabled: true, session: 'session-1' },
-    items: sample.items.map((i) => (i.id === id ? { ...i, status: 'Review', needsYou: { reason, offers: ['reopen-pr', 'replace-pr', 'set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen: true } } : i)) });
+    items: sample.items.map((i) => (i.id === id ? { ...i, status: 'Review', needsYou: { reason, offers: ['reopen-pr', 'replace-pr', 'set-aside'], causes: [{ type: 'pr-closed' }, { type: 'ticket-closed' }], ticketOpen: false } } : i)) });
   await openItem(id);
   expect(text(inDialog('[data-needs-you-reason] p'))).toBe(`Needs you: ${reason}`);
   expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Reopen PR', 'Start a replacement build', 'Abandon']);
   await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[0]!);
+  expect(posted(), 'pressing a choice writes nothing').toEqual([]);
+  expect(confirmation()!.getAttribute('role')).toBe('alertdialog');
+  expect(text($('#needs-you-detail'))).toContain('Its ticket stays closed.');
+  expect(confirmButtons().map(text)).toEqual(['Cancel', 'Reopen PR']);
+  await confirmPress('Reopen PR');
   expect(posted()).toEqual([['/api/needs-you', { itemId: id, choice: 'reopen-pr' }]]);
   await answer({ error: "Couldn't reopen the PR." }, 502);
-  expect(text(inDialog('.action-error [role="alert"]'))).toBe("Couldn't reopen the PR.");
+  expect(text($('#needs-you-dialog [role="alert"]')), 'the failure stays in the confirmation').toBe("Couldn't reopen the PR.");
+  expect(inDialog('.action-error [role="alert"]')).toBeNull();
+  expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+  await confirmPress('Try again');
+  expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: id, choice: 'reopen-pr' }]);
+  expect(posted()).toHaveLength(2);
+  await answer({ error: null });
+  expect(confirmation()).toBeNull();
   await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[1]!);
+  expect(text($('#needs-you-dialog h2'))).toMatch(/^Start a replacement build for #129 /);
+  await confirmPress('Start a replacement build');
   expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: id, choice: 'replace-pr' }]);
   await answer({ error: null });
   await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[2]!);
   expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #129 /);
+});
+
+test('Cancel and Escape leave the notice and post nothing, and the choice takes focus back', async () => {
+  holdPosts();
+  const id = 'I_sample05';
+  await mountPage({ ...sample, capture: { enabled: true, session: 'session-1' },
+    items: sample.items.map((i) => (i.id === id ? { ...i, status: 'Review', needsYou: { reason: 'Why.', offers: ['keep-working', 'set-aside'], causes: [{ type: 'ticket-closed' }], ticketOpen: false } } : i)) });
+  await openItem(id);
+  await press(button('needs-you', id));
+  await confirmPress('Cancel');
+  await settle(() => vi.advanceTimersByTime(100));
+  expect(confirmation()).toBeNull();
+  expect(document.activeElement).toBe(button('needs-you', id));
+  await press(button('needs-you', id));
+  await settle(() => vi.advanceTimersByTime(100));
+  await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await settle(() => vi.advanceTimersByTime(100));
+  expect(confirmation(), 'Escape cancels').toBeNull();
+  expect(dialog(), 'and leaves the item dialog open').not.toBeNull();
+  expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+  expect(posted()).toEqual([]);
 });
 
 /** A Dependency on the server team blocking a build, its ticket read an hour before NOW as `kind`. */
@@ -712,15 +751,31 @@ test('moving deleted-thread work with a passing brief asks before sending the mo
       offers: ['back-to-list'] } } : i) });
   await openItem(id);
   await press(button('needs-you', id));
-  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Move to List', 'Keep passing', 'Reshape']);
+  expect(confirmButtons().map(text)).toEqual(['Cancel', 'Keep passing', 'Reshape']);
+  expect(text(confirmation())).toContain('This moves the item to List.');
   expect(posted()).toEqual([]);
 });
 
-async function recoveryItem(build = true) {
+test('Back to Queue asks first and sends the move only once confirmed', async () => {
+  const id = 'I_sample05';
+  const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
+    ? { ...i, status: 'Review', passingBrief: false, needsYou: { reason: 'Deleted', causes: [], ticketOpen: false, deletedThread: true, offers: ['back-to-queue'] } } : i) };
+  await mountPage(data);
+  holdPosts(data);
+  await openItem(id);
+  await press(button('needs-you', id));
+  expect(posted()).toEqual([]);
+  await confirmPress('Back to Queue');
+  expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
+  await answer({ token: 'empty', plans: [] });
+  expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: id, choice: 'back-to-queue' }]);
+});
+
+async function recoveryItem(build = true, needsYou: Partial<NonNullable<Item['needsYou']>> = { reason: 'Deleted work thread', causes: [], deletedThread: true }) {
   const id = 'I_sample05';
   const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' }, items: sample.items.map(i => i.id === id
     ? { ...i, status: 'Review', threads: [],
-      needsYou: { reason: 'Deleted work thread', causes: [], ticketOpen: false, deletedThread: true, startAgainPurpose: build ? 'build' : 'shape', offers: ['start-again', 'back-to-list'] } } : i) };
+      needsYou: { reason: '', causes: [], ticketOpen: false, startAgainPurpose: build ? 'build' : 'shape', offers: ['start-again', 'back-to-list'], ...needsYou } } : i) };
   await mountPage(data);
   holdPosts(data);
   await openItem(id);
@@ -728,40 +783,75 @@ async function recoveryItem(build = true) {
   return id;
 }
 
-test('shaping Start again posts immediately and keeps the notice on failure', async () => {
+test('shaping Start again confirms before posting and keeps the notice and the confirmation on failure', async () => {
   const id = await recoveryItem(false);
+  expect(posted()).toEqual([]);
+  await confirmPress('Start again');
   expect(posted()).toEqual([['/api/start-again', { itemId: id, options: {} }]]);
   await answer({ error: 'T3 is unavailable.' }, 502);
-  expect(text(dialog())).toContain('T3 is unavailable.');
+  expect(text($('#needs-you-dialog [role="alert"]'))).toBe('T3 is unavailable.');
   expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+});
+
+test('an uncertain start keeps the confirmation open with its message', async () => {
+  await recoveryItem(false);
+  await confirmPress('Start again');
+  await answer({ thread: null, error: 'T3 may have started it.', uncertain: true }, 502);
+  expect(text($('#needs-you-dialog [role="alert"]'))).toBe('T3 may have started it.');
+  expect(confirmButtons().map(text)).toEqual(['Cancel', 'Try again']);
+});
+
+test('a no-thread notice starts again through its confirmation, and a started thread removes the notice', async () => {
+  const id = await recoveryItem(false, { reason: 'T3 shows no thread.', causes: [{ type: 'no-thread' }], offers: ['start-again', 'set-aside'] });
+  expect(text($('#needs-you-detail'))).toContain('This starts a new shaping thread in T3.');
+  expect(posted()).toEqual([]);
+  await confirmPress('Start again');
+  expect(posted()).toEqual([['/api/start-again', { itemId: id, options: {} }]]);
+  await answer({ error: 'T3 refused.' }, 502);
+  expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+  await confirmPress('Try again');
+  await answer({ thread: { threadId: 't', title: 't' }, error: null, board: { ...sample, items: sample.items.map(i => i.id === id ? { ...i, needsYou: undefined } : i) } });
+  expect(confirmation()).toBeNull();
+  expect(inDialog('[data-needs-you-reason]')).toBeNull();
+});
+
+test('a no-thread build inspects its branch on opening, and only reads', async () => {
+  const id = await recoveryItem(true, { reason: 'T3 shows no thread.', causes: [{ type: 'no-thread' }], offers: ['start-again', 'set-aside'] });
+  expect(posted()).toEqual([['/api/inspect-recovery', { itemId: id }]]);
 });
 
 test('build recovery inspects before offering branches and explains a missing worktree', async () => {
   const id = await recoveryItem();
   expect(posted()).toEqual([['/api/inspect-recovery', { itemId: id }]]);
+  expect(text(confirmation())).toContain('Checking the branch and PR...');
   await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
-  expect(text(dialog())).toContain('The old worktree is gone.');
-  expect($$('[data-needs-you-reason] button').map(text)).toContain('Continue on old branch');
-  expect($$('[data-needs-you-reason] button').map(text)).toContain('Start on new branch');
+  expect(text(confirmation())).toContain('The old worktree is gone.');
+  expect(confirmButtons().map(text)).toEqual(['Cancel', 'Continue on old branch', 'Start on new branch']);
 });
 
 test('open PR recovery offers only continue and preserves the PR in its confirmation', async () => {
   await recoveryItem();
   await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: '/old', pr: 'open' } });
-  expect(text(dialog())).toContain('Its commits and reviews stay, and the PR stays open.');
-  expect($$('[data-needs-you-reason] button').map(text)).not.toContain('Start on new branch');
+  expect(text(confirmation())).toContain('Its commits and reviews stay, and the PR stays open.');
+  expect(confirmButtons().map(text)).toEqual(['Cancel', 'Continue on old branch']);
 });
 
-test('inspection errors preserve the recovery notice', async () => {
-  await recoveryItem();
+test('inspection errors preserve the recovery notice and can be read again', async () => {
+  const id = await recoveryItem();
   await answer({ error: 'Cannot inspect local worktrees' }, 502);
-  expect(text(inDialog('[role="alert"]'))).toContain('Cannot inspect local worktrees');
+  expect(text($('#needs-you-dialog [role="alert"]'))).toContain('Cannot inspect local worktrees');
   expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
+  await confirmPress('Try again');
+  expect(posted()).toEqual([['/api/inspect-recovery', { itemId: id }], ['/api/inspect-recovery', { itemId: id }]]);
+  await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
+  expect($('#needs-you-dialog [role="alert"]')).toBeNull();
 });
 
-test('absent branch starts new directly and receives the successful board', async () => {
+test('absent branch starts new once confirmed and receives the successful board', async () => {
   const id = await recoveryItem();
   await answer({ inspection: { branch: 'build/old', branchExists: false, worktreePath: null, pr: 'none' } });
+  expect(posted(), 'nothing starts until the confirmation').toHaveLength(1);
+  await confirmPress('Start again');
   expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
   await answer({ token: 'empty', plans: [] });
   expect(posted().at(-1)).toEqual(['/api/start-again', { itemId: id, options: { branchChoice: 'new' } }]);
@@ -772,19 +862,19 @@ test('absent branch starts new directly and receives the successful board', asyn
 test('unknown PR state warns before choosing a new branch', async () => {
   await recoveryItem();
   await answer({ inspection: { branch: 'build/old', branchExists: false, worktreePath: null, pr: 'unknown', warning: 'Observation failed' } });
-  expect(text(dialog())).toContain('A new branch or move could create a second PR.');
+  expect(text(confirmation())).toContain('A new branch or move could create a second PR.');
   expect(posted()).toHaveLength(1);
-  expect($$('[data-needs-you-reason] button').map(text)).not.toContain('Continue on old branch');
+  expect(confirmButtons().map(text)).not.toContain('Continue on old branch');
 });
 
 test('choosing a branch uses the model menu and sends recovery options', async () => {
   const id = await recoveryItem();
   await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
-  await pressMenu($$<HTMLButtonElement>('[data-needs-you-reason] button').find(b => text(b) === 'Start on new branch')!);
+  await pressMenu(confirmButtons().find(b => text(b) === 'Start on new branch')!);
   await press($<HTMLElement>('[data-start-pick]')!);
   expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
   await answer({ token: 'empty', plans: [] });
   expect(posted().at(-1)).toEqual(['/api/start-again', { itemId: id, options: { branchChoice: 'new', confirmedOpenPr: false } }]);
   await answer({ error: 'Start refused' }, 409);
-  expect(text(dialog())).toContain('Start refused');
+  expect(text($('#needs-you-dialog [role="alert"]'))).toBe('Start refused');
 });

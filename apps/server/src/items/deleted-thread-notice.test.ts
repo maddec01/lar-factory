@@ -63,6 +63,22 @@ test('a thread deleted on a closed ticket names both causes and adds Abandon to 
   } finally { records.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a thread deleted on work with free text keeps saying the notice has another note', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'deleted-note-'));
+  const records = await openWorkRecords(join(dir, 'work-records.db'));
+  try {
+    let record = records.create({ title: 'Noted', repository: 'owner/repo', kind: 'build', status: 'In progress' });
+    record = records.addThread(record.workId, record.revision, 'gone', 'build');
+    record = records.confirmThreadDeleted(record.workId, record.revision, 'gone');
+    records.setNeedsYou(record.workId, record.revision, 'Merge conflict.');
+    const item = recordItems(records, [], ['owner/repo'])[0]!;
+    expect(deletedThreadNotice(records, { ...item, threads: [] })).toMatchObject({ deletedThread: true, hasOtherNote: true });
+  } finally {
+    records.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a thread deleted with an open PR offers Start again, plus Abandon on a closed ticket', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'deleted-notice-'));
   const open = await deletedBuild(dir, 'open.db', 'open', []);

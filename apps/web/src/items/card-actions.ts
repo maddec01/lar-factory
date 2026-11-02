@@ -3,7 +3,7 @@
 
 import { flushSync } from 'react-dom';
 import { writeHeaders, remembersChoice } from '@lar-factory/shared';
-import type { BoardData, Item, NeedsYouOffer, Status, ModelChoice, StartResult } from '@lar-factory/shared';
+import type { BoardData, Item, NeedsYouAction, Status, ModelChoice, StartResult } from '@lar-factory/shared';
 import { useStartStore } from './start-store.ts';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
@@ -137,10 +137,10 @@ export async function closeTicket(item: Item): Promise<void> {
   });
 }
 
-/** Acts on work that needs you as `choice` says; a failure stays in the dialog. */
-export async function resolveNeedsYou(itemId: string, choice: Exclude<NeedsYouOffer, 'set-aside'>, briefChoice?: 'keep' | 'reshape'): Promise<ActionResult | undefined> {
+/** Acts on work that needs you as `choice` says; its confirmation shows a failure, so the item keeps none. */
+export async function resolveNeedsYou(itemId: string, choice: NeedsYouAction, briefChoice?: 'keep' | 'reshape'): Promise<ActionResult | undefined> {
   if (!ready(itemId, 'data-needs-you')) return;
-  return runAction(itemId, 'needs-you', { itemId, choice, briefChoice }, (result) => result.error ?? undefined);
+  return runAction(itemId, 'needs-you', { itemId, choice, briefChoice }, () => undefined);
 }
 
 /** Marks the Dependency holding the item met, or clears the mark; a failure stays in the dialog. */
@@ -169,7 +169,7 @@ export async function startAgain(itemId: string, options: { branchChoice?: 'cont
   flushSync(() => {
     receive(result);
     if (remembersChoice(result)) useStartStore.getState().remember(model);
-    actions.set(itemId, result.error ? { phase: 'error', kind: 'needs-you', message: result.error } : undefined);
+    actions.set(itemId, undefined);
   });
   return result;
 }

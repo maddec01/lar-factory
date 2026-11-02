@@ -46,21 +46,31 @@ export interface ThreadFamilyRead {
   observation?: { threads: Record<string, unknown>[]; snapshotSequence: number; observedAt: string };
 }
 
-/** Source contract orchestrationV2.ts:3650. Includes active family members. */
-export function readThreadFamily(origin: URL, version: string, protocol: ProjectProtocol,
-  threadId: string): Promise<ThreadFamilyRead> {
-  if (!threadId.trim()) throw new Error('Thread ID required');
+/** One bounded request answering `{ snapshotSequence, threads }`. Failure retains no invented empty result. */
+function readThreadShells(origin: URL, version: string, protocol: ProjectProtocol, tag: string, payload: Record<string, unknown>): Promise<ThreadFamilyRead> {
   return new Promise(resolve => {
     const finish = (read: ThreadFamilyRead) => { queueMicrotask(() => { clearTimeout(timer); stop(); resolve(read); }); };
     const timer = setTimeout(() => finish({ availability: 'unavailable' }), 15_000);
     const stop = subscribeProjects(origin, version, protocol, read => finish({ availability: read.availability }), {
-      tag: 'orchestration.getThreadFamily', payload: { threadId },
+      tag, payload,
       accept(value) {
-        if (!isRecord(value) || !Number.isSafeInteger(value.snapshotSequence) || (value.snapshotSequence as number) < 0 || !Array.isArray(value.threads) || !value.threads.every(isRecord)) throw new Error('Invalid thread family');
+        if (!isRecord(value) || !Number.isSafeInteger(value.snapshotSequence) || (value.snapshotSequence as number) < 0 || !Array.isArray(value.threads) || !value.threads.every(isRecord)) throw new Error(`Invalid ${tag} answer`);
         finish({ availability: 'available', observation: { threads: value.threads, snapshotSequence: value.snapshotSequence as number, observedAt: new Date().toISOString() } });
       },
     });
   });
+}
+
+/** Source contract orchestrationV2.ts:3650. Includes active family members. */
+export function readThreadFamily(origin: URL, version: string, protocol: ProjectProtocol,
+  threadId: string): Promise<ThreadFamilyRead> {
+  if (!threadId.trim()) throw new Error('Thread ID required');
+  return readThreadShells(origin, version, protocol, 'orchestration.getThreadFamily', { threadId });
+}
+
+/** Source contract orchestrationV2.ts:3572 and 4122. The shell subscription always sends `archivedThreads: []`, so only this reads them. */
+export function readArchivedShells(origin: URL, version: string, protocol: ProjectProtocol): Promise<ThreadFamilyRead> {
+  return readThreadShells(origin, version, protocol, 'orchestration.getArchivedShellSnapshot', {});
 }
 
 /** Exact pinned contract, not a claim about arbitrary T3 releases.

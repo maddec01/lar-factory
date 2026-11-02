@@ -385,6 +385,8 @@ export interface ItemThread {
   currentRunning?: true;
   /** T3 has queued this thread's next turn. Its state stays `done`. */
   queued?: true;
+  /** T3 archived this thread. T3 opens New thread for an archived thread's link, so the board never links it. */
+  archived?: true;
   hasRunningChildren?: true;
   /** The work record's thread role, when recorded by the factory. */
   purpose?: string;

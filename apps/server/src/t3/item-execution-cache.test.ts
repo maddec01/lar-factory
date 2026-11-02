@@ -1,16 +1,20 @@
-import { afterEach, expect, it, vi } from 'vite-plus/test';
-import type { ExecutionRead, ShellRead } from './execution-protocol.ts';
+import type { WorkRecords } from '@lar-factory/work-records';
+import { afterEach, beforeEach, expect, it, vi } from 'vite-plus/test';
+import type { ExecutionRead, ShellRead, ThreadFamilyRead } from './execution-protocol.ts';
 
 const fixture = vi.hoisted(() => ({ changed: undefined as ((read: ShellRead) => void) | undefined,
-  read: vi.fn<(id: string) => Promise<ExecutionRead>>() }));
+  read: vi.fn<(id: string) => Promise<ExecutionRead>>(), archived: vi.fn<() => Promise<ThreadFamilyRead>>() }));
 vi.mock('../json-file.ts', () => ({ readJsonRecord: () => ({ origin: 'http://localhost:3773', serverVersion: 'fixture', pid: 1 }) }));
 vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture', t3Running: () => true }));
 vi.mock('./board-projects.ts', () => ({ boardProjects: () => ({}) }));
 vi.mock('./execution-protocol.ts', () => ({
   subscribeExecutionShell: (_origin: unknown, _version: unknown, _protocol: unknown, changed: typeof fixture.changed) => { fixture.changed = changed; return () => {}; },
   readExecution: (_origin: unknown, _version: unknown, _protocol: unknown, id: string) => fixture.read(id),
+  readArchivedShells: () => fixture.archived(),
 }));
-afterEach(() => { vi.resetModules(); fixture.read.mockReset(); });
+const archivedRead = (threads: object[]): ThreadFamilyRead => ({ availability: 'available', observation: { threads: threads as Record<string, unknown>[], snapshotSequence: 1, observedAt: '2026-10-31T12:00:00Z' } });
+beforeEach(() => { fixture.archived.mockResolvedValue(archivedRead([])); });
+afterEach(() => { vi.useRealTimers(); vi.resetModules(); fixture.read.mockReset(); fixture.archived.mockReset(); });
 it('loads history once, refreshes changed threads and keeps timestamped last observations through an outage', async () => {
   const { protocolItemThreads, protocolThreadById } = await import('./item-execution.ts');
   const observedAt = '2026-10-31T12:00:00Z';
@@ -202,9 +206,11 @@ it('reads a thread cleanup state from the current snapshot only', async () => {
   expect(threadCleanupState('one')).toBe('unavailable');
   show([idle]);
   expect(threadCleanupState('one')).toEqual({ archived: false, settled: false, live: false });
-  expect(threadCleanupState('never')).toBe('absent');
+  threadCleanupState('never');
+  await vi.waitFor(() => expect(threadCleanupState('never')).toBe('absent'));
   show([{ ...idle, deletedAt: updatedAt }]);
-  expect(threadCleanupState('one')).toBe('absent');
+  threadCleanupState('one');
+  await vi.waitFor(() => expect(threadCleanupState('one')).toBe('absent'));
   show([], [{ ...idle, archivedAt: updatedAt }]);
   expect(threadCleanupState('one')).toEqual({ archived: true, settled: false, live: false });
   show([{ ...idle, settledAt: updatedAt }]);
@@ -224,4 +230,169 @@ it('reads a thread cleanup state from the current snapshot only', async () => {
   // A retained observation can't answer once T3 goes away.
   fixture.changed!({ availability: 'unavailable' });
   expect(threadCleanupState('one')).toBe('unavailable');
+});
+
+it('counts a thread idle for cleanup only under the statuses T3 lists as idle, itself and each descendant', async () => {
+  const { threadCleanupState } = await import('./item-execution.ts');
+  const updatedAt = '2026-10-31T12:00:00Z';
+  const show = (threads: object[]) => fixture.changed!({ availability: 'available', observation: { observedAt: updatedAt, snapshot: { threads, archivedThreads: [] } } });
+  const one = (status?: string) => ({ id: 'one', updatedAt, status });
+  threadCleanupState('one');
+  for (const status of ['idle', 'completed', 'interrupted', 'failed', 'cancelled', 'rolled_back']) {
+    show([one(status)]);
+    expect(threadCleanupState('one')).toMatchObject({ live: false });
+  }
+  for (const status of ['blocked', 'a-status-from-a-later-t3', undefined]) {
+    show([one(status)]);
+    expect(threadCleanupState('one')).toMatchObject({ live: true });
+    const child = { id: 'child', updatedAt, status: 'idle', lineage: { parentThreadId: 'one' } };
+    const grandchild = { id: 'grandchild', updatedAt, status, lineage: { parentThreadId: 'child' } };
+    show([one('idle'), child, grandchild]);
+    expect(threadCleanupState('one')).toMatchObject({ live: true });
+    show([one('idle'), { id: 'rooted', updatedAt, status, lineage: { rootThreadId: 'one' } }]);
+    expect(threadCleanupState('one')).toMatchObject({ live: true });
+    show([one('idle'), { id: 'other', updatedAt, status }]);
+    expect(threadCleanupState('one')).toMatchObject({ live: false });
+  }
+  show([one('idle'), { id: 'gone', updatedAt, status: 'running', deletedAt: updatedAt, lineage: { parentThreadId: 'one' } }]);
+  expect(threadCleanupState('one')).toMatchObject({ live: false });
+});
+
+it('counts work a finished status can hide as live for cleanup, itself and each descendant', async () => {
+  const { threadCleanupState } = await import('./item-execution.ts');
+  const updatedAt = '2026-10-31T12:00:00Z';
+  const show = (threads: object[]) => fixture.changed!({ availability: 'available', observation: { observedAt: updatedAt, snapshot: { threads, archivedThreads: [] } } });
+  const one = { id: 'one', updatedAt, status: 'completed' };
+  const child = { id: 'child', updatedAt, status: 'completed', lineage: { parentThreadId: 'one' } };
+  threadCleanupState('one');
+  for (const work of [{ activityRunStatus: 'running' }, { activityRunStatus: 'waiting' }, { pendingBackgroundTasks: [{ kind: 'shell' }] }]) {
+    show([{ ...one, ...work }]);
+    expect(threadCleanupState('one')).toMatchObject({ live: true });
+    show([one, { ...child, ...work }]);
+    expect(threadCleanupState('one')).toMatchObject({ live: true });
+    show([one, { id: 'other', updatedAt, status: 'completed', ...work }]);
+    expect(threadCleanupState('one')).toMatchObject({ live: false });
+  }
+  // Another T3 release may leave these out or send something else, which says nothing.
+  for (const noSignal of [{}, { activityRunStatus: null, pendingBackgroundTasks: [] }, { activityRunStatus: 7, pendingBackgroundTasks: { kind: 'shell' } }]) {
+    show([{ ...one, ...noSignal }]);
+    expect(threadCleanupState('one')).toMatchObject({ live: false });
+  }
+});
+
+it('sends no cleanup command to a thread with an unknown status', async () => {
+  const { threadCleanupState } = await import('./item-execution.ts');
+  const { createShapingThreadSweep } = await import('../items/shaping-thread-cleanup.ts');
+  threadCleanupState('one');
+  fixture.changed!({ availability: 'available', observation: { observedAt: '2026-10-31T12:00:00Z', snapshot: { threads: [{ id: 'one', updatedAt: '2026-10-31T12:00:00Z', status: 'a-status-from-a-later-t3' }], archivedThreads: [] } } });
+  const send = vi.fn();
+  const records = { pendingShapingThreadCleanups: () => [{ threadId: 'one', workId: 'work', action: 'delete', commandId: 'command', failure: null }] } as unknown as WorkRecords;
+  await createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: vi.fn(), send, deleted: vi.fn() })();
+  expect(send).not.toHaveBeenCalled();
+});
+
+const observedAt = '2026-10-31T12:00:00Z';
+const shell = (id: string, more: object = {}) => ({ id, title: id, updatedAt: observedAt, status: 'completed', ...more });
+const showActive = (threads: object[]) => fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads, archivedThreads: [] } } });
+
+it('reads the archived list only for a thread the active shells lack, and at most once in 30 seconds', async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') });
+  const { protocolItemThreads } = await import('./item-execution.ts');
+  protocolItemThreads([]);
+  showActive([shell('active')]);
+  expect(protocolItemThreads(['active'])).toMatchObject([{ id: 'active' }]);
+  expect(fixture.archived).not.toHaveBeenCalled();
+  fixture.archived.mockResolvedValue(archivedRead([shell('put-away', { archivedAt: observedAt })]));
+  protocolItemThreads(['put-away']);
+  await vi.waitFor(() => expect(protocolItemThreads(['put-away'])).toMatchObject([{ id: 'put-away', archived: true }]));
+  protocolItemThreads(['put-away']);
+  expect(fixture.archived).toHaveBeenCalledTimes(1);
+  vi.setSystemTime(Date.now() + 30_000);
+  protocolItemThreads(['put-away']);
+  expect(fixture.archived).toHaveBeenCalledTimes(2);
+});
+
+it('sorts an archived thread after the unarchived ones, however recently T3 updated it', async () => {
+  const { protocolItemThreads } = await import('./item-execution.ts');
+  protocolItemThreads([]);
+  showActive([shell('build')]);
+  fixture.archived.mockResolvedValue(archivedRead([shell('shaping', { archivedAt: observedAt, updatedAt: '2026-11-01T00:00:00Z' })]));
+  protocolItemThreads(['build', 'shaping']);
+  await vi.waitFor(() => expect(protocolItemThreads(['build', 'shaping'])).toHaveLength(2));
+  expect((protocolItemThreads(['build', 'shaping']) as { id: string }[]).map(thread => thread.id)).toEqual(['build', 'shaping']);
+});
+
+it('keeps an archived thread for display when a later read fails, and answers unavailable for cleanup', async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') });
+  const { protocolItemThreads, threadCleanupState } = await import('./item-execution.ts');
+  protocolItemThreads([]);
+  showActive([]);
+  fixture.archived.mockResolvedValue(archivedRead([shell('put-away', { archivedAt: observedAt })]));
+  threadCleanupState('put-away');
+  await vi.waitFor(() => expect(threadCleanupState('put-away')).toEqual({ archived: true, settled: false, live: false }));
+  fixture.archived.mockClear();
+  fixture.archived.mockResolvedValue({ availability: 'unavailable' });
+  vi.setSystemTime(Date.now() + 30_000);
+  expect(threadCleanupState('put-away')).toBe('unavailable');
+  await vi.waitFor(() => expect(fixture.archived).toHaveBeenCalledTimes(1));
+  await Promise.resolve();
+  expect(threadCleanupState('put-away')).toBe('unavailable');
+  expect(threadCleanupState('never-seen')).toBe('unavailable');
+  expect(protocolItemThreads(['put-away'])).toMatchObject([{ id: 'put-away', archived: true }]);
+});
+
+it('treats an archived list with an invalid shell as a failed read', async () => {
+  const { protocolItemThreads, threadCleanupState } = await import('./item-execution.ts');
+  protocolItemThreads([]);
+  showActive([shell('active')]);
+  fixture.archived.mockResolvedValue(archivedRead([{ id: 'broken', updatedAt: 'never' }]));
+  threadCleanupState('broken');
+  await vi.waitFor(() => expect(fixture.archived).toHaveBeenCalledTimes(1));
+  await new Promise(resolve => setTimeout(resolve));
+  expect(threadCleanupState('broken')).toBe('unavailable');
+  expect(protocolItemThreads(['active'])).toMatchObject([{ id: 'active' }]);
+});
+
+it('rereads the archived list after a thread leaves the active shells, and a read begun before that answers nothing for cleanup', async () => {
+  const { protocolItemThreads, threadCleanupState } = await import('./item-execution.ts');
+  protocolItemThreads([]);
+  showActive([shell('one'), shell('other')]);
+  threadCleanupState('never');
+  await vi.waitFor(() => expect(threadCleanupState('never')).toBe('absent'));
+  let answer!: (read: ThreadFamilyRead) => void;
+  fixture.archived.mockClear();
+  fixture.archived.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+  showActive([shell('other')]);
+  expect(threadCleanupState('one')).toBe('unavailable');
+  expect(fixture.archived).toHaveBeenCalledTimes(1);
+  showActive([]);
+  fixture.archived.mockResolvedValue(archivedRead([shell('one', { archivedAt: observedAt })]));
+  answer(archivedRead([]));
+  await new Promise(resolve => setTimeout(resolve));
+  expect(threadCleanupState('one')).toBe('unavailable');
+  await vi.waitFor(() => expect(threadCleanupState('one')).toEqual({ archived: true, settled: false, live: false }));
+});
+
+it('answers from the active shell once a thread is unarchived, whatever the archived list last said', async () => {
+  const { protocolItemThreads, threadCleanupState } = await import('./item-execution.ts');
+  protocolItemThreads([]);
+  showActive([]);
+  fixture.archived.mockResolvedValue(archivedRead([shell('back', { archivedAt: observedAt })]));
+  threadCleanupState('back');
+  await vi.waitFor(() => expect(threadCleanupState('back')).toMatchObject({ archived: true }));
+  showActive([shell('back')]);
+  expect(threadCleanupState('back')).toEqual({ archived: false, settled: false, live: false });
+  expect(protocolItemThreads(['back'])).toEqual([expect.not.objectContaining({ archived: true })]);
+});
+
+it('never finds a started thread in the archived list', async () => {
+  const { protocolItemThreads, protocolStartedThread } = await import('./item-execution.ts');
+  protocolItemThreads([]);
+  showActive([]);
+  const message = 'Build w1.';
+  fixture.archived.mockResolvedValue(archivedRead([shell('old', { projectId: 'p', title: message, archivedAt: observedAt })]));
+  protocolItemThreads(['old']);
+  await vi.waitFor(() => expect(protocolItemThreads(['old'])).toHaveLength(1));
+  expect(protocolStartedThread('p', [message], [])).toBeNull();
+  expect(fixture.read).not.toHaveBeenCalled();
 });

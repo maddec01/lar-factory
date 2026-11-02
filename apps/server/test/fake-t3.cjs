@@ -9,6 +9,10 @@ if (args[0] === '--version') {
 }
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8')).t3 ?? {};
 fs.appendFileSync(process.env.FAKE_GH_STATE + '.t3calls', JSON.stringify(args) + '\n');
+const titleFromMessage = (message) => {
+  const line = message.trim().split('\n')[0].trim();
+  return line.length > 80 ? line.slice(0, 79).trimEnd() + '…' : line;
+};
 const main = async () => {
   if (options.delay) await new Promise((r) => setTimeout(r, options.delay));
   // Adding a project: T3 lists the folder as project `added`, or refuses with `addFails` as its message.
@@ -25,7 +29,7 @@ const main = async () => {
     return;
   }
   if (args[1] === 'list' && options.recover) {
-    process.stdout.write(JSON.stringify([{ threadId: 'thread-1', title: (options.firstMessage ?? 'Shaping #12 Issue 12').split('\n')[0] }]));
+    process.stdout.write(JSON.stringify([{ threadId: 'thread-1', title: titleFromMessage(options.firstMessage ?? 'Shaping #12 Issue 12') }]));
     return;
   }
   if (args[1] === 'show' && options.recover) {
@@ -49,7 +53,7 @@ const main = async () => {
   else {
     // Each start opens a new thread, numbered from thread-1.
     const starts = fs.readFileSync(process.env.FAKE_GH_STATE + '.t3calls', 'utf8').trim().split('\n').filter((line) => JSON.parse(line)[1] === 'start').length;
-    process.stdout.write(JSON.stringify({ threadId: `thread-${starts}`, runId: 'run-1', title: options.untitled ? undefined : args[3].split('\n')[0] }));
+    process.stdout.write(JSON.stringify({ threadId: `thread-${starts}`, runId: 'run-1', title: options.untitled ? undefined : titleFromMessage(args[3]) }));
   }
 };
 main();

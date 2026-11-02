@@ -261,25 +261,41 @@ function ItemKindControl({ item }: { item: Item }) {
 const kindName = (value: SwapKind) => KIND_BADGES[value]!.name;
 const NOTICE_HINT = 'm-0 text-xs text-(--muted-foreground)';
 
-/** What an update changes on the ticket, in the tracker's own words. */
-function swapLine(item: Item, { add, remove, type }: KindTicketSwap): string {
+/** What an update changes on the ticket, in the tracker's own words, and `note`, what it leaves alone and why. */
+function swapLine(item: Item, { add, remove, type }: KindTicketSwap, note: string): string {
   const { noun } = trackerCapabilities(item.repo);
   const parts = [...add.length || remove.length ? [`${noun} ${remove.join(', ') || 'none'} → ${add.join(', ') || 'none'}`] : [], ...type ? [`type ${type.from ?? 'none'} → ${type.to}`] : []];
-  return parts.length ? `Update changes #${item.number}: ${parts.join(', ')}.` : `Update writes nothing to #${item.number}, as ${kindName(item.kind as SwapKind)} has no mapped ${noun} or type.`;
+  if (parts.length) return `Update changes #${item.number}: ${parts.join(', ')}.${note}`;
+  return note ? `Update writes nothing to #${item.number}.${note}` : `Update writes nothing to #${item.number}, as ${kindName(item.kind as SwapKind)} has no mapped ${noun} or type.`;
 }
 
 /**
  * How the item's kind and its ticket's disagree and the two answers, worded from whichever side moved. A kept answer holds until
  * either kind changes and leaves a line whose Change shows the choice again here, with the answer standing until a new one replaces it.
+ * What an update writes comes from the details, which know the team's backlog, and only while their plan is for the kinds on show. Otherwise
+ * they are read again once for these kinds, and Update waits. The board's own read can't say, so it stands in only if that finds no plan.
  */
-function KindNotice({ item }: { item: Item }) {
+function KindNotice({ item, read, refresh }: { item: Item; read: ItemDetailsRead; refresh: () => Promise<boolean> }) {
   const disagreement = item.kindDisagreement;
   const saving = useKindChangeStore((state) => state.changes[item.id]?.saving);
   const answering = useKindChangeStore((state) => state.answers[item.id]);
   const setup = useBoardStore((state) => state.data.repos.find((r) => sameRepo(r.repo, item.repo))?.setup);
   const [reopened, setReopened] = useState(false);
+  const [readFor, setReadFor] = useState<string | null>(null);
+  const kinds = `${item.kind} ${disagreement?.ticketKind}`;
+  const held = read.state === 'loaded' ? read.details.kindPlan : undefined;
+  const plan = held?.itemKind === item.kind && held.ticketKind === disagreement?.ticketKind ? held : undefined;
+  const planStale = disagreement?.changed === 'item' && (!disagreement.kept || reopened) && read.state === 'loaded' && !plan && readFor !== kinds;
+  useEffect(() => {
+    if (!planStale) return;
+    let current = true;
+    detailsCache.drop(item.id);
+    void refresh().then(() => { if (current) setReadFor(kinds); });
+    return () => { current = false; };
+  }, [planStale, kinds, item.id, refresh]);
   if (!disagreement) return null;
-  const { ticketKind, changed, kept, swap } = disagreement;
+  const { ticketKind, changed, kept } = disagreement;
+  const { swap, note } = plan ?? { swap: disagreement.swap, note: '' };
   const { start, answer } = useKindChangeStore.getState();
   if (kept && !reopened) {
     return <p data-kind-kept className={`${NOTICE_HINT} w-full`}>{ticketKind ? `Ticket says ${kindName(ticketKind)}. Kept as is.` : 'Ticket has no kind. Left as is.'}{' '}
@@ -290,6 +306,7 @@ function KindNotice({ item }: { item: Item }) {
   const keep = () => { setReopened(false); void answer(item.id, 'keep', ticketKind); };
   const busy = saving || answering?.saving;
   const ticketMoved = changed === 'ticket' && said !== null;
+  const checking = !ticketMoved && (read.state === 'loading' || planStale);
   const shaped = `Shaping decided this is ${mine === 'Improvement' ? 'an' : 'a'} ${mine}.`;
   const problem = ticketMoved ? null : kindSwapAccessProblem(item.repo, swap, setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
   return (
@@ -298,10 +315,10 @@ function KindNotice({ item }: { item: Item }) {
       <span className="flex flex-wrap gap-2">
         {ticketMoved
           ? <Button {...kind('other')} disabled={busy} onClick={() => void answer(item.id, 'update-item', ticketKind)}>Update item to {said}</Button>
-          : <Button {...kind('other')} disabled={busy || problem !== null} onClick={() => void start(item.id, item.kind as SwapKind)}>{said ? `Update ticket to ${mine}` : `Add ${mine} to ticket`}</Button>}
+          : <Button {...kind('other')} disabled={busy || checking || problem !== null} onClick={() => void start(item.id, item.kind as SwapKind)}>{said ? `Update ticket to ${mine}` : `Add ${mine} to ticket`}</Button>}
         <Button {...kind('other')} disabled={busy} onClick={keep}>{ticketMoved ? `Keep item as ${mine}` : said ? `Keep ticket as ${said}` : 'Leave ticket as is'}</Button>
       </span>
-      <p data-kind-notice-hint className={NOTICE_HINT}>{ticketMoved ? 'Changes this item only. Nothing is written to the ticket.' : problem ?? swapLine(item, swap)}</p>
+      <p data-kind-notice-hint className={NOTICE_HINT}>{ticketMoved ? 'Changes this item only. Nothing is written to the ticket.' : checking ? 'Checking what the update changes…' : problem ?? swapLine(item, swap, note)}</p>
       {answering?.error && <p role="alert" className={LABEL_ERROR}>{answering.error}</p>}
     </div>
   );
@@ -312,7 +329,7 @@ function KindNotice({ item }: { item: Item }) {
  * checks, and the agent work figures, which only show here while the dialog is too narrow for the header to hold them, or why
  * there are none. They wrap onto as many lines as the width needs. Labels, update time and checks come from the board.
  */
-export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRead; now: number }) {
+export function ItemMeta({ item, read, refresh, now }: { item: Item; read: ItemDetailsRead; refresh: () => Promise<boolean>; now: number }) {
   const azure = Boolean(item.repo && onAzure(item.repo));
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2" data-meta>
@@ -328,7 +345,7 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
       <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
       <AgentWorkNote item={item} />
       <AgentWork item={item} className="@min-[40rem]:hidden" />
-      <KindNotice key={`${item.id} notice`} item={item} />
+      <KindNotice key={`${item.id} notice`} item={item} read={read} refresh={refresh} />
     </div>
   );
 }

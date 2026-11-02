@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
-import { changeKind } from './change-kind.ts';
+import { changeKind, checkKind } from './change-kind.ts';
 import { createRecordTicket } from './create-ticket.ts';
 import { isRecord, sameRepo } from '@lar-factory/shared';
 import type { Status, SwapKind } from '@lar-factory/shared';
@@ -36,6 +36,10 @@ Reads
   context <work-id>                 Print the markdown the record began with.
   list [--repository R] [--status S] [--kind K]
                                     Print matching records, Queued ones in Queue order.
+  kind-disagreement <work-id>       Read the ticket and print {disagreement}, null when
+                                    the board would show none: ticketKind (null for none),
+                                    changed, kept, the swap change-kind would make, its
+                                    note, and accessProblem when this login can't make it.
 
 Changes
   Each change except create and import needs --revision, the revision you last
@@ -305,7 +309,7 @@ Errors
 
 class UsageError extends Error {}
 
-const TAKES_WORK_ID = ['change-kind', 'record-kind-answer', 'create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
+const TAKES_WORK_ID = ['kind-disagreement', 'change-kind', 'record-kind-answer', 'create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
   'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
   'review-rounds', 'observe', 'observe-failure', 'observations', 'confirm-thread-deleted', 'set-build-branch', 'invalidate-gate', 'reset-build', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
@@ -425,6 +429,7 @@ async function run(records: WorkRecords, command: string, workId: string | undef
   const revision = () => Number(need(values, 'revision'));
   const status = values.status as Status | undefined;
   const kind = values.kind as WorkKind | undefined;
+  const setupOf = (repository: string) => readRepositorySetups(values['data-dir']).find((setup) => sameRepo(setup.repo, repository));
   const captured = () => ({
     title: need(values, 'title'), repository: need(values, 'repository'), kind: need(values, 'kind') as WorkKind, status,
     context: values.file === undefined ? undefined : readInput(values),
@@ -466,10 +471,13 @@ async function run(records: WorkRecords, command: string, workId: string | undef
       return records.list({ repository: values.repository, status, kind });
     case 'update':
       return records.update(workId!, revision(), { status, kind });
+    case 'kind-disagreement': {
+      const record = records.read(workId!);
+      return { disagreement: await checkKind(record, { setup: setupOf(record.repository) }) };
+    }
     case 'change-kind': {
       const record = records.read(workId!);
-      const result = await changeKind(records, workId!, revision(), need(values, 'kind') as SwapKind,
-        { setup: readRepositorySetups(values['data-dir']).find((setup) => sameRepo(setup.repo, record.repository)) });
+      const result = await changeKind(records, workId!, revision(), need(values, 'kind') as SwapKind, { setup: setupOf(record.repository) });
       if (result.error) throw new WorkRecordError('invalid', result.line ? `${result.error} Changed so far: ${result.line}` : result.error);
       return { record: result.record, line: result.line };
     }

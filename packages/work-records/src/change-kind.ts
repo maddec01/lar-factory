@@ -2,7 +2,7 @@
 // removes one name, from a fresh read, so running the same change again after a failure finishes it. The record takes the
 // new kind only after the ticket has. Without access for a write it needs, only the record changes.
 import { SWAP_KINDS, kindCanChange, kindDisagreement, kindSwapAccessProblem, kindTicketSwap, sameLabel, trackerCapabilities } from '@lar-factory/shared';
-import type { Kind, LabelChange, RepositorySetup, SwapKind, TicketKinds, TrackerLabels } from '@lar-factory/shared';
+import type { Kind, KindDisagreement, KindTicketSwap, LabelChange, RepositorySetup, SwapKind, TicketKindFacts, TicketKinds, TrackerLabels } from '@lar-factory/shared';
 import { ticketKinds, trackerLabels } from '@lar-factory/shared/tracker-labels';
 import { WorkRecordError, type WorkRecord, type WorkRecords } from './work-records.ts';
 
@@ -26,7 +26,47 @@ export interface KindChangeResult {
   ticketType: string | null;
 }
 
+/** A disagreement as the shared path would act on it, for lar-work to report before anyone answers. */
+export interface KindCheck extends KindDisagreement {
+  /** What the swap leaves alone and why, in the words the change's line uses. */
+  note: string;
+  /** Why this login can't make the swap, or null when it can. */
+  accessProblem: string | null;
+}
+
 const KIND_NAMES: Record<SwapKind, string> = { bug: 'Bug', feature: 'Feature', improvement: 'Improvement' };
+
+const ticketNumber = (ticket: string) => Number(ticket.slice(ticket.lastIndexOf('#') + 1));
+
+/** What giving `ticket` the kind changes on it, less a type the team's backlog doesn't show, which `note` explains. */
+async function plannedSwap(ticket: TicketKindFacts, kind: SwapKind, setup: RepositorySetup | undefined, boardTypes: TicketKinds['boardTypes']): Promise<{ swap: KindTicketSwap; note: string }> {
+  const swap = kindTicketSwap(ticket, kind, setup?.vocabulary);
+  if (!swap.type) return { swap, note: '' };
+  const { to } = swap.type;
+  const shown = await boardTypes(setup?.itemSource?.kind === 'azure-board' ? setup.itemSource.team : undefined);
+  return shown && !shown.some((type) => sameLabel(type, to))
+    ? { swap: { ...swap, type: null }, note: ` The type stays ${ticket.type}, because the team's backlog doesn't show ${to}.` }
+    : { swap, note: '' };
+}
+
+const swapProblem = (repo: string, swap: KindTicketSwap, setup: RepositorySetup | undefined) =>
+  kindSwapAccessProblem(repo, swap, setup?.access ?? {}, setup?.azureReadOnly === undefined ? {} : { azureReadOnly: setup.azureReadOnly });
+
+/** The record's disagreement with a fresh read of its ticket, or null when the board would show none. It writes nothing. */
+export async function checkKind(record: WorkRecord, { setup, kinds }: Pick<KindChangeDeps, 'setup' | 'kinds'>): Promise<KindCheck | null> {
+  if (!record.ticket || !setup?.vocabulary) return null;
+  const number = ticketNumber(record.ticket);
+  const { read, boardTypes } = kinds ?? ticketKinds(record.repository);
+  try {
+    const ticket = await read(number);
+    const disagreement = kindDisagreement(record, ticket, setup.vocabulary);
+    if (!disagreement) return null;
+    const { swap, note } = await plannedSwap(ticket, record.kind as SwapKind, setup, boardTypes);
+    return { ...disagreement, swap, note, accessProblem: swapProblem(record.repository, swap, setup) };
+  } catch (error) {
+    throw new WorkRecordError('invalid', `Could not read #${number}. ${(error as Error).message}`);
+  }
+}
 
 export async function changeKind(records: WorkRecords, workId: string, revision: number, kind: SwapKind, { setup, ...tracker }: KindChangeDeps): Promise<KindChangeResult> {
   if (!SWAP_KINDS.includes(kind)) throw new WorkRecordError('invalid', 'Choose Bug, Feature or Improvement.');
@@ -39,28 +79,17 @@ export async function changeKind(records: WorkRecords, workId: string, revision:
   if (!record.ticket) return itemOnly('Local work has no ticket to change.');
 
   const repo = record.repository;
-  const number = Number(record.ticket.slice(record.ticket.lastIndexOf('#') + 1));
+  const number = ticketNumber(record.ticket);
   const { noun } = trackerCapabilities(repo);
   const { addToTicket, removeFromTicket } = tracker.labels ?? trackerLabels(repo);
   const { read, setType, boardTypes } = tracker.kinds ?? ticketKinds(repo);
-  const access = setup?.access ?? {};
-  const safety = setup?.azureReadOnly === undefined ? {} : { azureReadOnly: setup.azureReadOnly };
   const done: string[] = [];
   const labelChanges: LabelChange[] = [];
   const line = (note = '') => `${done.length ? `#${number}: ${done.join('; ')}.` : ''}${note}`;
   try {
     const ticket = await read(number);
-    const swap = kindTicketSwap(ticket, kind, setup?.vocabulary);
-    let note = '';
-    if (swap.type) {
-      const { to } = swap.type;
-      const shown = await boardTypes(setup?.itemSource?.kind === 'azure-board' ? setup.itemSource.team : undefined);
-      if (shown && !shown.some((type) => sameLabel(type, to))) {
-        note = ` The type stays ${ticket.type}, because the team's backlog doesn't show ${to}.`;
-        swap.type = null;
-      }
-    }
-    const problem = kindSwapAccessProblem(repo, swap, access, safety);
+    const { swap, note } = await plannedSwap(ticket, kind, setup, boardTypes);
+    const problem = swapProblem(repo, swap, setup);
     if (problem) return itemOnly(`Its ticket stays as it is: ${problem}`);
 
     for (const label of swap.add) {

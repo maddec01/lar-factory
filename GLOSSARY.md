@@ -41,6 +41,10 @@ _Avoid_: missing thread, lost thread.
 Opening a new thread for work whose thread was deleted, keeping the work ID.
 _Avoid_: restart, retry.
 
+**Shaping thread cleanup**:
+What the board does to an item's shaping threads after its build thread is recorded, as the machine's setting chooses.
+_Avoid_: thread archive, settling threads.
+
 **Reshape**:
 Sending an item with a passing brief back to shaping, keeping the text and requiring a new gate.
 _Avoid_: reset, reopen.

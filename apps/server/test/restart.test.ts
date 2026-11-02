@@ -19,7 +19,7 @@ function machine(t: TestContext, title = 'Issue 12') {
   const env = { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/lar/lar-factory` }]) };
   /** Starts a board on this machine with the fake gh and t3 as `options` say, and `extra` in its environment; `recorded` imports issue 12 once, as onboarding did. */
   return (options: object = {}, recorded = false, extra: Record<string, string> = {}) =>
-    startBoard(t, { items: [{ ...boardIssue(12, 'Queued'), content: { ...boardIssue(12, 'Queued').content!, title } }], recorded, ...options }, false, false, { ...env, ...extra });
+    startBoard(t, { items: [{ ...boardIssue(12, 'Queued'), content: { ...boardIssue(12, 'Queued').content!, title } }], recorded, ...options }, false, true, { ...env, FAST_LOCAL_REFRESH_ONLY: '1', ...extra });
 }
 
 const start = (board: Board, workId: string) => board.postSession({ itemId: workId }, '/api/start');
@@ -47,7 +47,7 @@ test('a database upgraded by another process keeps the board alive with its cach
   assert.equal((await fetch(`${board.url}/healthz`)).status, 200);
   assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
   // Two more local ticks must neither crash the process nor repeat the sanitized diagnostic.
-  await new Promise(resolve => setTimeout(resolve, 4200));
+  await new Promise(resolve => setTimeout(resolve, 250));
   assert.equal((await fetch(`${board.url}/api/board`)).status, 200);
   assert.equal(board.logs().split('local work paused: schema-too-new').length - 1, 1);
   assert.doesNotMatch(board.logs(), /WorkRecordError:|schema version \d+, which is newer/);
@@ -86,12 +86,9 @@ test('a successful start holds its thread after a restart, so Start there asks T
 
 test('a failed start stays a failure after a restart, so Start there asks T3 again', async (t) => {
   const boardOn = machine(t);
-  const before = await boardOn({}, true);
-  const workId = before.id(12);
-  await until(before, (d) => d.items.some((i) => i.id === workId));
-  await before.stop();
   // No t3 at all is a certain failure: nothing ran, so no thread can exist.
-  const missing = await boardOn({}, false, { T3_PATH: '/nonexistent/t3' });
+  const missing = await boardOn({}, true, { T3_PATH: '/nonexistent/t3' });
+  const workId = missing.id(12);
   await until(missing, (d) => d.items.some((i) => i.id === workId));
   const failed = await start(missing, workId);
   assert.equal(failed.status, 502);

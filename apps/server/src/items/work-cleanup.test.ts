@@ -1,6 +1,6 @@
 import { expect, it } from 'vite-plus/test';
 import type { Item } from '@lar-factory/shared';
-import { executeCleanup, inspectCleanup } from './work-cleanup.ts';
+import { executeCleanup, inspectCleanup, inspectCleanups } from './work-cleanup.ts';
 
 it('limits ownership to the saved build and its slices and protects live and default branches', async () => {
   const plan = await inspectCleanup({ repository: 'a/b', checkout: '/project', item: {} as Item,
@@ -124,4 +124,33 @@ it('removes only a verified sibling worktree of the same repository', async () =
     expect(plan.worktreePaths).toHaveLength(1);
     expect(await executeCleanup({ plan, expectedPlan: plan, checkout, repository: 'a/b', local: true, remote: false, confirmedLoss: false })).toEqual({ errors: [], remainingBranches: [] });
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+it('inspects branches a few at a time, in plan order, reading the branch and worktree lists once', async () => {
+  const calls: string[] = [];
+  let inFlight = 0;
+  let most = 0;
+  const branches = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  const plans = await inspectCleanups(branches, { repository: 'a/b', checkout: '/project', item: {} as Item, sliceIds: [], sliceBranches: [], defaultBranch: 'main', liveWorktreePaths: [], writable: true,
+    provider: {
+      // Earlier branches answer later, so a plan that followed the answers would come back reversed.
+      branchExists: async (_repo, branch) => {
+        most = Math.max(most, ++inFlight);
+        await new Promise(resolve => setTimeout(resolve, (branches.length - branches.indexOf(branch)) * 2));
+        inFlight--;
+        return false;
+      },
+      openPrByHead: async () => null,
+    },
+    git: async (_tool, args) => {
+      calls.push(args.includes('worktree') ? 'worktree' : args.includes('--format=%(refname:short)') ? 'refs' : 'other');
+      return { code: 0, stderr: '', detail: '', stdout: args.includes('--format=%(refname:short)') ? branches.join('\n') : '' };
+    },
+  });
+  expect(plans.map(plan => plan.branch)).toEqual(branches);
+  expect(plans.map(plan => plan.localBranches)).toEqual(branches.map(branch => [branch]));
+  expect(calls.filter(call => call === 'refs')).toHaveLength(1);
+  expect(calls.filter(call => call === 'worktree')).toHaveLength(1);
+  expect(most).toBeGreaterThan(1);
+  expect(most).toBeLessThanOrEqual(4);
 });

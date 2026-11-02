@@ -1,4 +1,4 @@
-import { inspectCleanup, executeCleanup, type CleanupPlan } from './work-cleanup.ts';
+import { inspectCleanups, executeCleanup, type CleanupPlan } from './work-cleanup.ts';
 // The commands the board's buttons send: queue, back to List, start, start build, abandon, close an
 // abandoned item's ticket, restore set-aside work and act on Needs you.
 // Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
@@ -508,25 +508,27 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
   const cleaning = new Set<string>();
   async function ownedCleanup(item: Item, onlyBranch?: string) {
     if (!records) throw new Error('Work records are unavailable.');
+    const snapshots = records.cleanupOwnership(item.id);
+    const saved = new Set(snapshots.flatMap(snapshot => [snapshot.branch, ...snapshot.sliceBranches]));
+    // A build's notice plans its branches in memory, so inspecting and Cancel write nothing. Only a saved branch or a
+    // recorded build thread shows the board made them: a name derived from the ticket could be anyone's branch.
+    const noticed = item.kind === 'build' && item.needsYou || recovers(item) && recoversBuild(item);
+    const savedBranch = noticed ? records.read(item.id).buildBranch : null;
+    const planned = noticed && (savedBranch || recordedThreads(item.id).some(thread => thread.purpose === PURPOSES.startedBuilds))
+      ? { branch: savedBranch || buildBranch(item), sliceBranches: await cleanupSliceBranches(item) } : null;
+    if (planned) snapshots.push({ ...planned, sliceIds: [] });
+    const branches = [...new Set(snapshots.flatMap(snapshot => [snapshot.branch, ...snapshot.sliceBranches]).filter(Boolean))].filter(branch => !onlyBranch || branch === onlyBranch);
+    if (!branches.length) return { checkout: '', plans: [] as CleanupPlan[], unsaved: null };
+    const unsaved = planned && [planned.branch, ...planned.sliceBranches].some(branch => !saved.has(branch)) ? planned : null;
     const project = await projectOf(item.repo);
     if (project.error !== undefined) throw new Error(project.error);
     const checkout = await checkoutOf(project.projectId);
-    const snapshots = records.cleanupOwnership(item.id);
-    const currentRecord = records.read(item.id);
-    if (recovers(item) && recoversBuild(item)) {
-      snapshots.push({ branch: currentRecord.buildBranch || buildBranch(item), sliceIds: [], sliceBranches: await cleanupSliceBranches(item) });
-    }
-    const branches = [...new Set(snapshots.flatMap(snapshot => [snapshot.branch, ...snapshot.sliceBranches]).filter(Boolean))].filter(branch => !onlyBranch || branch === onlyBranch);
-    if (!branches.length) return { checkout, plans: [] as CleanupPlan[] };
     const livePaths = liveWorktreePaths();
     if (!livePaths) throw new Error('Cannot verify live T3 worktree bindings. Try again when T3 is available.');
     const writable = !writeAccessProblem(item.repo, 'push-branch', buildAccessOf(item.repo)) && process.env.LAR_FACTORY_AZURE_READ_ONLY !== '1';
-    const plans = [];
     const defaultBranch = await baseOf(item.repo);
-    for (const branch of branches) {
-      plans.push(await inspectCleanup({ repository: item.repo, checkout, item, branch, sliceIds: [], sliceBranches: [], liveWorktreePaths: livePaths, defaultBranch, writable }));
-    }
-    return { checkout, plans };
+    const plans = await inspectCleanups(branches, { repository: item.repo, checkout, item, sliceIds: [], sliceBranches: [], liveWorktreePaths: livePaths, defaultBranch, writable });
+    return { checkout, plans, unsaved };
   }
 
   async function recoveryInspection(item: Item) {
@@ -734,11 +736,13 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       if (!item) return withBoard(404, { error: GONE });
       cleaning.add(itemId);
       try {
-        const { checkout, plans } = await ownedCleanup(item);
+        const { checkout, plans, unsaved } = await ownedCleanup(item);
         if (JSON.stringify(plans) !== JSON.stringify(saved.plans)) throw new Error('Cleanup changed. Inspect and confirm again.');
         if (options.local && plans.some(plan => plan.dirtyFiles.length || plan.unpushedCommits.length) && options.confirmedLoss !== true) throw new Error('Confirm loss of dirty files and unpushed commits.');
         if (options.remote && plans.some(plan => plan.remoteBranch && !plan.remoteAvailable)) throw new Error('Remote cleanup is unavailable.');
         cleanupTokens.delete(options.token);
+        // captureCleanup lists a branch before its slices, as the plan does, so the plans stay comparable after it.
+        if (unsaved && item.kind === 'build' && (options.local || options.remote)) write(itemId, revision => records!.captureCleanup(itemId, revision, unsaved.branch, unsaved.sliceBranches));
         const errors: string[] = [];
         const remainingBranches: string[] = [];
         for (const plan of plans) {
@@ -888,8 +892,9 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       if (!item && (board.removed(itemId) || archive().some(i => i.id === itemId && i.archived?.setAside))) return Promise.resolve(withBoard(200, { error: null }));
       if (!item) return Promise.resolve(withBoard(404, { error: GONE }));
       const offered = item.needsYou?.offers.includes('set-aside');
-      const busy = busyReason(itemId, 'abandon');
+      const busy = abandoning.has(itemId) ? 'Abandon is running. Wait for it to finish.' : offered ? null : busyReason(itemId, 'abandon');
       if ((!canAbandon(item) && !offered) || busy || !item.number || item.abandonRefusal) return Promise.resolve(withBoard(409, { error: busy ?? item.abandonRefusal ?? 'This work cannot be abandoned with ticket closure.' }));
+      if (offered && !item.needsYou!.ticketOpen) return Promise.resolve(withBoard(409, { error: "The board doesn't see this work's ticket open, so it closes nothing. Press Abandon to set the work aside." }));
       return track(combined, itemId, Promise.resolve().then(async () => {
         try {
           if (records && item.recorded === false && !abandonmentTickets.has(item.id)) {

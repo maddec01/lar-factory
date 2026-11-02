@@ -9,8 +9,26 @@ Any issue can be shaped independently. Ready means refinement passed its gate;
 it commits the user to no build and starts no implementation.
 
 Record the kind (`bug`, `feature`, `improvement`, `concept`) with
-`lar-work update <work ID> --revision N --kind <kind>`. Anything the user adds
-or corrects is another open question. Then:
+`lar-work update <work ID> --revision N --kind <kind>`, which stays local. Each
+time you record it, run `lar-work kind-disagreement <work ID>` and settle its
+`disagreement`. The ticket changes only on the user's yes.
+
+- Null, or `kept` is true: nothing to ask.
+- `accessProblem` is set: tell the user why the ticket can't change and continue.
+  Item details keeps the notice.
+- Otherwise ask per the [question guide](shared/questions.md) whether to update
+  the ticket, naming both kinds (`ticketKind` null means the ticket has no kind),
+  the labels and type in `swap`, and `note`. Offer "Update ticket to <kind>" and
+  "Keep ticket as <ticketKind>", or "Leave ticket as is". Then, with a fresh
+  revision from `lar-work read`, record the answer:
+  - Yes: `lar-work change-kind <work ID> --revision N --kind <kind>`, and tell the
+    user its `line`. When it fails, tell the user what its error says changed. The
+    same command finishes the change.
+  - No: `lar-work record-kind-answer <work ID> --revision N --answer keep --ticket-kind <ticketKind or none>`.
+
+When the read fails, tell the user the ticket went unchecked and continue.
+
+Anything the user adds or corrects is another open question. Then:
 
 - **Bug**: first a **Diagnose subagent** with [diagnosing-bugs](diagnose-bug.md) returns the
   cause, the evidence and a failing test to write; its open questions join the

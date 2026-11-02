@@ -10,9 +10,9 @@ import { join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { readTicketSpec, stripTrackerStructure, SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isLiveThread, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
-import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, PickedTicket, SkillCheckOutcome, StartedThread, StartResult, Status, SwapKind } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, PickedTicket, ShapingThreadCleanup, SkillCheckOutcome, StartedThread, StartResult, Status, SwapKind } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
+import { readShapingThreadCleanup, WorkRecordError, type LaunchIntent, type SavedShapingThreadCleanup, type WorkRecords } from '@lar-factory/work-records';
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
 import type { BoardState } from '../board/board-state.ts';
 import { prHost, prUrl } from '../config/pr-host.ts';
@@ -129,6 +129,8 @@ export interface ItemCommandsDeps {
   showThread?: typeof lookupThread;
   /** Finds the thread an unresolved start opened, through T3's protocol and then its CLI; tests stand in for both. */
   recoverThread?: (projectId: string, messages: readonly string[], known: readonly string[]) => Promise<StartedThread | 'absent' | 'unknown'>;
+  /** This machine's shaping thread cleanup choice, which throws when unreadable; tests stand in for the local setting. */
+  shapingThreadCleanupChoice?: () => ShapingThreadCleanup;
   /** The project skills selected for the repository as builds start now; tests stand in for the local settings. */
   skillsOf?: (repo: string) => readonly string[];
   /** Reopens the repository's PR `number`; tests stand in for gh and az. */
@@ -218,7 +220,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
   }, board, items, records, reread, archive, offerModelChoices, checkSkills, kindTracker, projectOf = currentRepositoryProject,
   baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
   buildAccessOf = (repo) => readRepositorySetups().find(setup => sameRepo(setup.repo, repo))?.access ?? {},
-  showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
+  showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, shapingThreadCleanupChoice = readShapingThreadCleanup, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
   reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)) }: ItemCommandsDeps): ItemCommands {
   const retryBuilds = new Set<string>();
   /** Thread lookups by thread ID: one in flight, or when the next may run. */
@@ -423,6 +425,12 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     return null;
   }
 
+  /** The choice a Start build saves. An unreadable setting never stops the build. */
+  function savedShapingThreadCleanup(): SavedShapingThreadCleanup {
+    try { return shapingThreadCleanupChoice(); }
+    catch { return 'unreadable'; }
+  }
+
   /**
    * Starts the item's thread for `record` through `ask`, guarded by its work record: a held or unresolved start answers
    * for it, Needs you and a paused setup refuse it, and a launch intent is on the record before `ask` runs. Without records, `ask` alone.
@@ -440,7 +448,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const shown = board.snapshot()[record]?.[item.id];
     if (held) return { thread: shown?.threadId === held.threadId ? shown : held, error: null };
     prepare();
-    const { intent } = write(item.id, (revision) => records.recordLaunchIntent(item.id, revision, purpose, stagedRecovery));
+    const cleanup = record === 'startedBuilds' ? savedShapingThreadCleanup() : undefined;
+    const { intent } = write(item.id, (revision) => records.recordLaunchIntent(item.id, revision, purpose, stagedRecovery, cleanup));
     asking.add(intent.intentId);
     const result = await ask().finally(() => asking.delete(intent.intentId));
     const outcome = result.thread ? { threadId: result.thread.threadId } : !result.uncertain ? { failure: result.error ?? 'T3 started no thread.' } : null;

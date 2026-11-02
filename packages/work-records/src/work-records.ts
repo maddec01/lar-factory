@@ -110,7 +110,7 @@ export interface ShapingThreadCleanupRow {
   workId: string;
   /** Null when the setting couldn't be read. */
   action: ShapingThreadCleanup | null;
-  /** The T3 command ID, the same on every retry. */
+  /** The T3 command ID. A retry reuses it until T3 rejects it. */
   commandId: string;
   failure: string | null;
 }
@@ -343,6 +343,8 @@ export interface WorkRecords extends TrackerCache, PublicationRecords, Dependenc
   markShapingThreadCleaned(threadId: string): void;
   /** Saves or clears a row's failure. Takes no revision, like markShapingThreadCleaned. */
   saveShapingThreadFailure(threadId: string, failure: string | null): void;
+  /** Saves a row's failure and gives it a new command ID, because T3 answers a command ID it rejected with that rejection forever. Takes no revision, like markShapingThreadCleaned. */
+  saveShapingThreadRejection(threadId: string, failure: string): void;
   /** Records that the work is finished. A merged observation of the delivery PR finishes the work too; a ticket closing
    * or a thread ending never does. A finish is final. */
   recordFinished(workId: string, revision: number): WorkRecord;
@@ -1152,6 +1154,9 @@ function workRecords(database: Database): WorkRecords {
     }),
     saveShapingThreadFailure: (threadId, failure) => database.write(() => {
       db.prepare('UPDATE shaping_thread_cleanups SET failure = ? WHERE thread_id = ?').run(failure, threadId);
+    }),
+    saveShapingThreadRejection: (threadId, failure) => database.write(() => {
+      db.prepare('UPDATE shaping_thread_cleanups SET failure = ?, command_id = ? WHERE thread_id = ?').run(failure, randomUUID(), threadId);
     }),
     recordFinished: (workId, revision) => change(workId, revision, (row) => {
       if (row.finished_at) throw invalid(`The work record ${workId} is already finished.`);

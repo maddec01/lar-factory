@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { effectiveVocabulary } from '@lar-factory/shared';
-import type { BoardData, Item, OperationAccess } from '@lar-factory/shared';
+import type { BoardData, Item, OperationAccess, ShapingThreadCleanup } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
 import { createItemCommands } from './item-commands.ts';
@@ -392,7 +392,7 @@ test("Start build moves the build's concept record to In progress and writes no 
  */
 function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids.map((id) => ({ id, title: 't', state: 'running' as const, updated: '2026-10-31T00:00:00Z' })),
   recover = async (_project: string, _messages: readonly string[]): Promise<{ threadId: string; title: string } | 'absent' | 'unknown'> => 'absent', lookup = async (): Promise<'live' | 'deleted' | 'unknown'> => 'unknown',
-  skills = [] as string[], during = () => {}, beforeLaunch = () => {} }: { shown?: (ids: string[]) => Item['threads']; recover?: (project: string, messages: readonly string[]) => Promise<{ threadId: string; title: string } | 'absent' | 'unknown'>;
+  skills = [] as string[], during = () => {}, beforeLaunch = () => {}, cleanupChoice = (): ShapingThreadCleanup => 'archive' }: { cleanupChoice?: () => ShapingThreadCleanup; shown?: (ids: string[]) => Item['threads']; recover?: (project: string, messages: readonly string[]) => Promise<{ threadId: string; title: string } | 'absent' | 'unknown'>;
   lookup?: () => Promise<'live' | 'deleted' | 'unknown'>; skills?: string[]; during?: () => void; beforeLaunch?: (board: ReturnType<typeof createBoardState>) => void } = {}) {
   const board = createBoardState({ items: [], repos: [], modelChoices: [] } as unknown as BoardData);
   const reread = () => board.update({ items: recordItems(records, [], [WEB]).map((item) => {
@@ -403,7 +403,7 @@ function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids
   const started: string[] = [];
   const commands = createItemCommands({ factoryContext:null, checkoutOf: async () => '/repo',
     inspectWorkRecovery: async () => ({ branch: 'old', branchExists: true, worktreePath: null, pr: 'none' }), board, items: {} as ItemSource, records, reread, archive: () => [], offerModelChoices: () => [],
-    showThread: lookup, projectOf: async (repo) => { beforeLaunch(board); return { projectId: repo }; }, baseOf: async () => 'release', buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }), recoverThread: recover, skillsOf: () => skills,
+    showThread: lookup, projectOf: async (repo) => { beforeLaunch(board); return { projectId: repo }; }, baseOf: async () => 'release', buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }), recoverThread: recover, skillsOf: () => skills, shapingThreadCleanupChoice: cleanupChoice,
     startThread: async (_project, message) => {
       during();
       started.push(message);
@@ -455,6 +455,71 @@ test('an unresolved start looks for its thread under both the new message and th
   const [current, earlier] = asked.pop()!;
   assert.match(current!, new RegExp(`^Build Build it\\nBuild ${build.workId}\\. Read .*/agents/builder\\.md and follow it\\.$`));
   assert.equal(earlier, current!.split('\n').slice(1).join('\n'));
+});
+
+const idle = (ids: string[]) => ids.map((id) => ({ id, title: 't', state: 'done' as const, updated: '2026-10-31T00:00:00Z' }));
+
+/** A record ready to build, with one shaping thread that has stopped. */
+async function shapedBuild() {
+  const records = await openRecords();
+  const made = records.create({ title: 'Build it', repository: WEB, kind: 'feature', status: 'Ready' });
+  records.addThread(made.workId, made.revision, 'shape-1', 'shape');
+  return { records, workId: made.workId };
+}
+
+test('Start build saves the setting, and its shaping threads wait for cleanup once the build thread is recorded', async () => {
+  const { records, workId } = await shapedBuild();
+  let intents = -1;
+  let pendingDuring = -1;
+  const { commands } = recordedCommands(records, { shown: idle, during: () => {
+    intents = records.launchIntents({ workId, unresolved: true }).filter(intent => intent.shapingThreadCleanup === 'archive').length;
+    pendingDuring = records.pendingShapingThreadCleanups().length;
+  } });
+  assert.equal((await commands.startBuild(workId, undefined)).status, 200);
+  assert.deepEqual([intents, pendingDuring], [1, 0]);
+  assert.deepEqual(records.pendingShapingThreadCleanups().map(({ threadId, action }) => [threadId, action]), [['shape-1', 'archive']]);
+});
+
+test('Start saves no choice on a shaping intent', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  await recordedCommands(records).commands.start(work.workId, undefined);
+  assert.equal(records.launchIntents({ workId: work.workId })[0]?.shapingThreadCleanup, undefined);
+});
+
+test('an unreadable setting never stops the build, and Keep leaves nothing pending', async () => {
+  const unreadable = await shapedBuild();
+  const { commands } = recordedCommands(unreadable.records, { shown: idle, cleanupChoice: () => { throw new Error('Unreadable.'); } });
+  assert.equal((await commands.startBuild(unreadable.workId, undefined)).status, 200);
+  assert.equal(unreadable.records.launchIntents({ workId: unreadable.workId })[0]?.shapingThreadCleanup, 'unreadable');
+  assert.deepEqual(unreadable.records.pendingShapingThreadCleanups().map(row => row.action), [null]);
+
+  const keep = await shapedBuild();
+  const kept = recordedCommands(keep.records, { shown: idle, cleanupChoice: () => 'keep' });
+  assert.equal((await kept.commands.startBuild(keep.workId, undefined)).status, 200);
+  assert.deepEqual(keep.records.pendingShapingThreadCleanups(), []);
+});
+
+test('a launch settled by a later refresh cleans up with the choice saved at Start build, and an uncertain one changes nothing', async () => {
+  const { records, workId } = await shapedBuild();
+  records.recordLaunchIntent(workId, records.read(workId).revision, 'build', undefined, 'archive');
+  let answer: { threadId: string; title: string } | 'unknown' = 'unknown';
+  const { commands, board } = recordedCommands(records, { shown: idle, recover: async () => answer, cleanupChoice: () => 'keep' });
+  await commands.reconcileStarts(board.snapshot().items);
+  assert.deepEqual(records.pendingShapingThreadCleanups(), []);
+  answer = { threadId: 'build-late', title: 'Build it' };
+  await commands.startBuild(workId, undefined);
+  assert.deepEqual(records.threads(workId).map(t => t.threadId), ['shape-1', 'build-late']);
+  assert.deepEqual(records.pendingShapingThreadCleanups().map(({ threadId, action }) => [threadId, action]), [['shape-1', 'archive']]);
+});
+
+test('an intent from before this shipped sends nothing, even once resolved', async () => {
+  const { records, workId } = await shapedBuild();
+  records.recordLaunchIntent(workId, records.read(workId).revision, 'build');
+  const { commands } = recordedCommands(records, { shown: idle, recover: async () => ({ threadId: 'build-late', title: 'Build it' }) });
+  await commands.startBuild(workId, undefined);
+  assert.deepEqual(records.threads(workId).map(t => t.threadId), ['shape-1', 'build-late']);
+  assert.deepEqual(records.pendingShapingThreadCleanups(), []);
 });
 
 test('Start names its thread with the title the record holds at launch', async () => {

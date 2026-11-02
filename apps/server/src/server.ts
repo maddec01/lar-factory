@@ -27,7 +27,7 @@ import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
 import { createPrObserver } from './items/pr-observer.ts';
 import { createRetention } from './items/retention.ts';
-import { createShapingThreadCleanup } from './items/shaping-thread-cleanup.ts';
+import { createShapingThreadCleanup, createShapingThreadSweep } from './items/shaping-thread-cleanup.ts';
 import { agreedKind, archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
@@ -46,8 +46,10 @@ import { createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectHints } from './t3/repository-project.ts';
-import { protocolItemThreads } from './t3/item-execution.ts';
+import { protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
 import { loadT3Reads, warmT3Stats } from './t3/t3-reads.ts';
+import { lookupThread } from './t3/t3.ts';
+import { sendThreadCommand } from './t3/thread-commands.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
 import { TOOL_NAMES, checkTools, lookUpTools, missingTool, probeGh, tools } from './tools/tools.ts';
 
@@ -117,6 +119,7 @@ if (!fixture) {
 const retention = createRetention({ records, changed: () => reread() });
 /** This Mac's choice for an item's shaping threads after Start build. */
 const shapingThreadCleanup = createShapingThreadCleanup({ records, changed: () => reread() });
+const sweepShapingThreads = records && createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: lookupThread, send: sendThreadCommand });
 /** The tickets the item sources read last, which give the records their ticket context. */
 let tickets: Item[] = [];
 let ticketsByRef = new Map<string, Item>();
@@ -418,6 +421,7 @@ function refreshLocalNow(recordsChanged: boolean): void {
   const finished = after.some((item) => running(before.find((b) => b.id === item.id) ?? item) && !running(item));
   if (finished) board.update({ items: after = withT3Reads(after) });
   runLocal(() => commands.reconcileStarts(after));
+  runLocal(() => sweepShapingThreads?.());
   if (!recordsChanged && JSON.stringify(after) === JSON.stringify(before)) return;
   board.push();
   void syncPrStats(after);

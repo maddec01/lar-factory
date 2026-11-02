@@ -62,24 +62,6 @@ Build step 1 and plan from the brief.
    that this build uses the last local copy. Held GitHub edits need the user's
    Accept or Reject in details before use. Later tracker edits update the
    record and leave the running build as it started.
-
-   Then archive the build's idle shaping threads, on every start and every
-   resume:
-
-   - Load `t3_thread_read` and `t3_thread_organize`, with `ToolSearch` if they
-     are deferred. The candidates are the threads `lar-work threads <work ID>`
-     lists, leaving out this build thread and every thread whose purpose is
-     `build` or `implement`. The parent concept's, decisions' and other
-     builds' threads sit on their own records, so they never match.
-   - Read each candidate's T3 status with `t3_thread_read`. Archive with
-     `t3_thread_organize` each one whose status is `idle`, `completed`,
-     `interrupted`, `failed` or `cancelled`. A thread with any other status,
-     unknown ones included, stays as it is: no archive, interrupt or message.
-     Skip threads already archived, and threads T3 no longer has.
-   - Post one line in chat naming the threads archived and any left
-     unarchived (the tools were missing or an archive failed), and none when
-     there were neither. Finding nothing to archive is the normal result once
-     the shaping threads are gone. This step never stops a build.
 2. **Plan.** On a resume, a handoff that says `Small build` skips **Plan**:
    if the handoff says the change isn't done, finish it as below and go to
    step 5; otherwise go to the step the handoff names. A build that already

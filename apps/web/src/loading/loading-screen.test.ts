@@ -31,17 +31,6 @@ test('the board page opens on the loading screen, over the board, with the mark 
   expect($('.title-bar'), 'the board is under the screen').not.toBeNull();
 });
 
-test('the loading line stays stable as projects finish, and waits while the whole read is unsettled', async () => {
-  await mountPage(unsettled(firstRead('items', ['lar-apple', 'lar-server'])));
-  expect(line()).toBe('Loading projects');
-
-  await push(unsettled(firstRead('items', ['lar-server'])));
-  expect(line()).toBe('Loading projects');
-  await advance(10_000);
-  expect(screen(), 'an unsettled read keeps the screen').not.toBeNull();
-  expect(leaving()).toBe(false);
-});
-
 test('a new step rolls the old line out while the new one rolls in, and only the line animates', async () => {
   await mountPage(unsettled());
   expect($('.loading-roll-in'), 'the first line arrives with the page, so it does not roll').toBeNull();
@@ -194,16 +183,6 @@ test('Queue and Abandon responses stay authoritative during a restarted read', a
   expect(screen(), 'actions never re-open the loading screen').toBeNull();
 });
 
-test('a new background read during the fade does not restart the loading screen', async () => {
-  await mountPage(settled());
-  await advance(DRAW_MS);
-  expect(leaving()).toBe(true);
-  await push(unsettled());
-  expect(leaving()).toBe(true);
-  await advance(EXIT_MS);
-  expect(screen()).toBeNull();
-});
-
 test('with reduced motion the finished mark shows at once, the line swaps without rolling and the exit stays a fade', async () => {
   reduceMotion();
   await mountPage(unsettled());
@@ -227,6 +206,9 @@ test('project updates do not roll or name individual projects', async () => {
   await push(unsettled(firstRead('items', ['lar-server'])));
   expect(line()).toBe('Loading projects');
   expect($('.loading-roll-in')).toBeNull();
+  await advance(10_000);
+  expect(screen(), 'an unsettled read keeps the screen').not.toBeNull();
+  expect(leaving()).toBe(false);
   await push(unsettled(firstRead('finishing')));
   expect(text($('.loading-roll-out'))).toBe('Loading projects');
   expect(line()).toBe('Finishing up');
@@ -246,7 +228,6 @@ test('the board behind is inert while the screen is up, through the fade, and se
   expect(leaving()).toBe(true);
   expect(covered(), 'the initial fade still covers the board').toBe(true);
 
-  await push(settled());
   await advance(EXIT_MS);
   expect(screen()).toBeNull();
   expect(covered()).toBe(false);

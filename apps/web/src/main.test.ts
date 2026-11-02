@@ -13,6 +13,7 @@ test('the first paint shows the board data the server put in the page, with no f
   expect(text($('.list-button')), 'the List counts its 4 items').toBe('List4');
   expect(fetchMock).not.toHaveBeenCalled();
   expect($('#board-data')).not.toBeNull();
+  expect($('[data-warning="client-error"]')).toBeNull();
 });
 
 test('the tab shows "Lar Factory" and the logo as its icon', async () => {
@@ -35,11 +36,6 @@ test('an entered title round-trips through the inline board data without closing
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   await settle(() => $<HTMLButtonElement>('.list-button')!.click());
   expect(document.body.textContent).toContain(title);
-});
-
-test('fresh data shows no warning', async () => {
-  await mountPage(fresh);
-  expect($('[data-warning="client-error"]')).toBeNull();
 });
 
 test('stale data and a failed read show no warning, the title bar carries them', async () => {

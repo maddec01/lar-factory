@@ -92,6 +92,12 @@ else
   fail "a fresh worktree gets installed: $output / $(cat "$calls")"
 fi
 
+if [[ $output == *"warning: core.hooksPath"* && $output == *"$repo/.githooks"* ]]; then
+  pass "missing hooksPath warns and installation continues"
+else
+  fail "missing hooksPath warns and installation continues: $output"
+fi
+
 before=$(state "$repo")
 : >"$calls"
 if output=$(bash "$setup" "$repo" 2>&1) && [[ $(state "$repo") == "$before" ]]; then
@@ -231,6 +237,59 @@ if output=$(FAKE_PNPM_FAIL=1 git -C "$repo" worktree add -q ../y -b test2 2>&1) 
   pass "a failed setup warns and still creates the worktree"
 else
   fail "a failed setup warns and still creates the worktree: $output"
+fi
+
+# Effective values are compared literally, even when another spelling resolves.
+repo=$(make_workspace_repo)
+for value in '' /wrong .githooks "$repo/.githooks"; do
+  git -C "$repo" config core.hooksPath "$value"
+  : >"$calls"
+  stderr="$bin/stderr"
+  if bash "$setup" "$repo" >"$bin/stdout" 2>"$stderr" && [[ -s $calls ]] &&
+    { [[ "$value" == "$repo/.githooks" && ! -s $stderr ]] ||
+      [[ "$value" != "$repo/.githooks" && $(cat "$stderr") == *"warning: core.hooksPath"* ]]; }; then
+    pass "effective hooksPath '$value' has the expected warning"
+  else
+    fail "effective hooksPath '$value': $(cat "$stderr")"
+  fi
+done
+
+# The repair command works from elsewhere, including shell metacharacters.
+repo=$(make_repo)
+spaced="$(dirname "$repo")/repo space ' quote"
+mv "$repo" "$spaced"
+repo="$spaced"
+mkdir "$repo/board/node_modules"
+if bash "$setup" "$repo" >"$bin/stdout" 2>"$bin/stderr" &&
+  [[ $(cat "$bin/stderr") == *"warning: core.hooksPath"* ]] &&
+  (cd / && bash -c "$(tail -n 1 "$bin/stderr")") &&
+  [[ $(git -C "$repo" config core.hooksPath) == "$repo/.githooks" ]]; then
+  pass "warning precedes npm skip and its repair command handles spaces and quotes"
+else
+  fail "repair command: $(cat "$bin/stderr")"
+fi
+
+# Global configuration counts, and linked worktrees use the main checkout.
+git -C "$repo" config --unset core.hooksPath
+printf '[core]\n hooksPath = "%s/.githooks"\n' "$repo" >"$bin/gitconfig"
+git -C "$repo" worktree add -qb linked "$(dirname "$repo")/linked space"
+if GIT_CONFIG_GLOBAL="$bin/gitconfig" bash "$setup" "$(dirname "$repo")/linked space" >"$bin/stdout" 2>"$bin/stderr" &&
+  [[ ! -s "$bin/stderr" ]]; then
+  pass "linked worktree accepts effective global main checkout hooks"
+else
+  fail "linked worktree: $(cat "$bin/stderr")"
+fi
+ln -s "$repo" "$(dirname "$repo")/alias"
+git -C "$repo" config core.hooksPath "$(dirname "$repo")/alias/.githooks"
+if bash "$setup" "$repo" >"$bin/stdout" 2>"$bin/stderr" && [[ -s "$bin/stderr" ]]; then
+  pass "symlink alias warns"
+else
+  fail "symlink alias should warn"
+fi
+if FAKE_PNPM_FAIL=1 bash "$setup" "$(dirname "$repo")/linked space" >"$bin/stdout" 2>"$bin/stderr"; then
+  fail "warning must preserve installation failure"
+else
+  pass "warning preserves installation failure"
 fi
 
 ((failures == 0)) || { printf '%d failed\n' "$failures"; exit 1; }

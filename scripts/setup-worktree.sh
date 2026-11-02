@@ -10,6 +10,15 @@ set -euo pipefail
 
 worktree=$(git -C "${1:-${T3CODE_WORKTREE_PATH:-.}}" rev-parse --show-toplevel)
 
+# Linked worktrees share the main checkout's hooks.
+common_dir=$(git -C "$worktree" rev-parse --path-format=absolute --git-common-dir)
+expected_hooks="$(dirname "$common_dir")/.githooks"
+actual_hooks=$(git -C "$worktree" config --get core.hooksPath || true)
+if [[ "$actual_hooks" != "$expected_hooks" ]]; then
+  printf 'setup-worktree: warning: core.hooksPath should be %s. Set it with:\n' "$expected_hooks" >&2
+  printf 'git -C %q config core.hooksPath %q\n' "$worktree" "$expected_hooks" >&2
+fi
+
 # Installs the package or workspace in $1, then fetches Electron's binary for the
 # package in $2, which defaults to $1.
 install() {

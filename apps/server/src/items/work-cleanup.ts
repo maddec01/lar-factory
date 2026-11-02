@@ -20,25 +20,59 @@ export interface CleanupPlan {
   remoteHead?: string | null;
 }
 
-/** Inspect only refs owned by this build, without changing Git or the provider. */
-export async function inspectCleanup(input: {
+/** How many branches one cleanup inspects at once. */
+const INSPECTED_AT_ONCE = 4;
+
+interface CheckoutLists { refs: string[]; trees: { path?: string; branch?: string }[] }
+
+type CleanupInput = {
   repository: string; checkout: string; item: Item; branch?: string | null;
   sliceBranches?: string[]; sliceIds: string[]; liveWorktreePaths: string[]; defaultBranch: string;
   writable: boolean; provider?: Pick<ReturnType<typeof prHost>, 'branchExists' | 'openPrByHead'>;
   git?: typeof runTool;
-}): Promise<CleanupPlan> {
+};
+
+async function readGit(git: typeof runTool, cwd: string, args: string[]): Promise<string> {
+  const result = await git('git', ['-C', cwd, ...args], { timeout: 10_000 });
+  if (result.code !== 0) throw new Error('Cannot inspect cleanup Git state');
+  return result.stdout;
+}
+
+async function readCheckoutLists(git: typeof runTool, checkout: string): Promise<CheckoutLists> {
+  const [refs, trees] = await Promise.all([
+    readGit(git, checkout, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']),
+    readGit(git, checkout, ['worktree', 'list', '--porcelain']),
+  ]);
+  return {
+    refs: refs.trim().split('\n').filter(Boolean),
+    trees: trees.split('\n\n').map(block => ({
+      path: block.split('\n').find(line => line.startsWith('worktree '))?.slice(9),
+      branch: block.split('\n').find(line => line.startsWith('branch refs/heads/'))?.slice(18),
+    })),
+  };
+}
+
+/** Inspects each of `branches`, INSPECTED_AT_ONCE at a time, from one read of the checkout's lists: one plan each, in their order. */
+export async function inspectCleanups(branches: readonly string[], input: Omit<CleanupInput, 'branch'>): Promise<CleanupPlan[]> {
+  const lists = await readCheckoutLists(input.git ?? runTool, input.checkout);
+  const plans: CleanupPlan[] = new Array(branches.length);
+  let next = 0;
+  const inspectNext = async () => {
+    for (; next < branches.length;) {
+      const index = next++;
+      plans[index] = await inspectCleanup({ ...input, branch: branches[index] }, lists);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(INSPECTED_AT_ONCE, branches.length) }, inspectNext));
+  return plans;
+}
+
+/** Inspect only refs owned by this build, without changing Git or the provider. */
+export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists): Promise<CleanupPlan> {
   const branch = input.branch || buildBranch(input.item);
   const git = input.git ?? runTool;
-  const read = async (cwd: string, args: string[]) => {
-    const result = await git('git', ['-C', cwd, ...args], { timeout: 10_000 });
-    if (result.code !== 0) throw new Error('Cannot inspect cleanup Git state');
-    return result.stdout;
-  };
-  const refs = (await read(input.checkout, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'])).trim().split('\n').filter(Boolean);
-  const trees = (await read(input.checkout, ['worktree', 'list', '--porcelain'])).split('\n\n').map(block => ({
-    path: block.split('\n').find(line => line.startsWith('worktree '))?.slice(9),
-    branch: block.split('\n').find(line => line.startsWith('branch refs/heads/'))?.slice(18),
-  }));
+  const read = (cwd: string, args: string[]) => readGit(git, cwd, args);
+  const { refs, trees } = lists ?? await readCheckoutLists(git, input.checkout);
   const owned = refs.filter(ref => ref === branch || (input.sliceBranches ? input.sliceBranches.includes(ref) : input.sliceIds.some(id => ref.startsWith(`slice/${id.slice(0, 8)}-`))));
   const localBranches = owned.filter(ref => ref !== input.defaultBranch && !trees.some(tree => tree.branch === ref && tree.path && input.liveWorktreePaths.includes(tree.path)));
   const worktreePaths = trees.filter(tree => tree.branch && localBranches.includes(tree.branch) && tree.path).map(tree => tree.path!);

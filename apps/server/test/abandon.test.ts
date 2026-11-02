@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { onboarded, startableEnv, startBoard, until } from './server-support.ts';
+import { changeRecords, onboarded, startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import type { BoardData } from '@lar-factory/shared';
@@ -113,6 +113,32 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
   const response = await board.postSession({ itemId: board.id(12) }, '/api/abandon-and-close');
   assert.equal(response.status, 502);
   assert.ok(has(await board.board(), board.id(12)));
+});
+
+test('a local build whose ticket and unmerged PR closed explains both, offers no Clear, stays on Cancel and goes to Archive on Abandon', async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'In progress')], builds: [{ number: 12, repository: { nameWithOwner: 'maddec01/lar-factory' } }] }, false, true);
+  const id = board.id(12);
+  const data = await changeRecords(board, (records) => {
+    let record = records.setPullRequest(id, records.read(id).revision, 'maddec01/lar-factory#40');
+    record = records.addThread(id, record.revision, 'build-thread', 'build');
+    record = records.observe(id, record.revision, { of: 'pr', state: 'closed' });
+    record = records.observe(id, record.revision, { of: 'ticket', state: 'closed' });
+    records.setNeedsYouCauses(id, record.revision, [{ type: 'pr-closed' }, { type: 'ticket-closed' }]);
+  }, id, (item) => !!item.needsYou);
+  const notice = data.items.find((i) => i.id === id)!.needsYou!;
+  assert.match(notice.reason, /PR maddec01\/lar-factory#40 closed without merging/);
+  assert.match(notice.reason, /ticket .*closed in its provider/);
+  assert.ok(notice.offers.includes('set-aside'));
+  assert.ok(!(notice.offers as string[]).includes('clear'));
+  // Opening the confirmation only inspects, and Cancel sends nothing more.
+  await board.postSession({ itemId: id }, '/api/inspect-owned-cleanup');
+  const cancelled = (await board.board() as BoardData).items.find((i) => i.id === id);
+  assert.deepEqual(cancelled?.needsYou, notice);
+  assert.equal((await abandon(board, id)).status, 200);
+  assert.ok(!has(await board.board() as BoardData, id));
+  const { items } = await (await fetch(`${board.url}/api/archive`)).json() as { items: { id: string }[] };
+  assert.ok(items.some((item) => item.id === id));
+  assert.deepEqual(await writes(board), []);
 });
 
 test('combined success can be retried after the item leaves the board without closing twice', async (t) => {

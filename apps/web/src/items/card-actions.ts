@@ -1,4 +1,4 @@
-// Queue, Back to List, Keep, Abandon and the ticket close after it, Needs you's choices and a Dependency's met mark, from the item dialog: each posts to the board server, shows the result, and keeps
+// Queue, Move to List, Keep, Abandon and the ticket close after it, Needs you's choices and a Dependency's met mark, from the item dialog: each posts to the board server, shows the result, and keeps
 // keyboard focus in the dialog.
 
 import { flushSync } from 'react-dom';
@@ -85,14 +85,18 @@ async function runAction(itemId: string, kind: ItemAction['kind'], body: object,
 
 export async function queueItem(itemId: string): Promise<void> {
   if (!ready(itemId, 'data-queue')) return;
+  const origin = useItemDialogStore.getState();
   const result = await runAction(itemId, 'queue', { itemId }, (result) => {
     const currentId = result.itemId ?? itemId;
     const item = itemOf(currentId);
     if (result.error || !item) return result.error ?? 'The item left the board.';
-    if (useItemDialogStore.getState().itemId === itemId && currentId !== itemId) useItemDialogStore.getState().open(currentId);
+    const dialog = useItemDialogStore.getState();
+    if (dialog.session !== origin.session || dialog.itemId !== itemId) return;
+    if (currentId !== itemId) useItemDialogStore.setState({ itemId: currentId });
+    if (origin.fromList) dialog.dismiss?.();
   });
   // The item stays on show, Queued, so focus goes to its Start.
-  if (!result.error) refocus([by('data-start', result.itemId ?? itemId), by('data-back-to-list', result.itemId ?? itemId)]);
+  if (!result.error && !origin.fromList && useItemDialogStore.getState().session === origin.session && useItemDialogStore.getState().itemId !== null) refocus([by('data-start', result.itemId ?? itemId), by('data-back-to-list', result.itemId ?? itemId)]);
 }
 
 export async function backToList(itemId: string): Promise<void> {

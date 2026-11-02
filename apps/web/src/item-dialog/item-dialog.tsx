@@ -7,7 +7,7 @@ import { useEditStore } from '../repositories/edit-store.ts';
 // sub-tickets and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the
 // comments. Work that needs you shows why above the meta area, with the board's choices for it. The board's fields show at
 // once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
-// item, and the one action the item's status asks for, with Back to List and Abandon at its left. Its description has
+// item, and the one action the item's status asks for, with Move to List and Abandon at its left. Its description has
 // Edit, and its header an expand control that grows it, the open editor taking the height. Closing it with unsaved edits
 // asks "Discard changes?" first.
 
@@ -61,7 +61,7 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
   }
 }
 
-/** Back to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. */
+/** Move to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. */
 function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   const startHolds = useStartHolds(item, data);
   if (item.status === 'List') return <AbandonButton item={item} data={data} />;
@@ -188,6 +188,15 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
   const edit = useDescriptionEdit(item.id, read, refresh);
   const [asking, setAsking] = useState(false);
   const [expanded, toggleExpanded] = useExpand(asking);
+  useEffect(() => {
+    useItemDialogStore.setState({ dismiss: () => {
+      if (!edit.saving) {
+        if (edit.dirty) setAsking(true);
+        else close();
+      }
+    } });
+    return () => { useItemDialogStore.setState({ dismiss: null }); };
+  }, [edit.saving, edit.dirty, close]);
   return <>
     <Modal onClose={() => (edit.dirty ? setAsking(true) : close())} loading={edit.saving}>
       <ItemDialogContent item={item} data={data} now={now} read={read} edit={edit} refresh={refresh} expanded={expanded} toggleExpanded={toggleExpanded} />
@@ -198,12 +207,12 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
 
 export function ItemDialog() {
   const { data, now } = useBoardStore();
-  const { itemId, close } = useItemDialogStore();
+  const { itemId, session, close } = useItemDialogStore();
   const item = data.items.find((i) => i.id === itemId);
   // An item that left the board closes the dialog for good, so a later read that brings it back doesn't reopen it.
   useEffect(() => {
     if (itemId && !item) close();
   }, [itemId, item, close]);
   if (!item) return null;
-  return <ItemModal key={item.id} item={item} data={data} now={now} close={close} />;
+  return <ItemModal key={session} item={item} data={data} now={now} close={close} />;
 }

@@ -226,7 +226,7 @@ test('closing a focused toast prefers its target in the open item dialog over th
   dialog.setAttribute('data-state', 'open');
   const target = document.createElement('button');
   target.setAttribute('data-back-to-list', 'I_sample05');
-  target.textContent = 'Back to List';
+  target.textContent = 'Move to List';
   dialog.append(target);
   document.body.append(dialog);
   const { showToast } = await import('./toasts.tsx');

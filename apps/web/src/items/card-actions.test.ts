@@ -1,4 +1,4 @@
-// Queue, Back to List and Abandon from the item dialog: each posts to its endpoint, shows its own pending state,
+// Queue, Move to List and Abandon from the item dialog: each posts to its endpoint, shows its own pending state,
 // then the result as a toast or an error, and keeps focus in the dialog.
 // Ported from the card action cases of test/render.test.ts.
 
@@ -43,7 +43,7 @@ test("a server that can't be reached is a Queue error too", async () => {
   expect(toast(), 'no toast').toBeNull();
 });
 
-test('Back to List shows only its own pending state', async () => {
+test('Move to List shows only its own pending state', async () => {
   holdPosts();
   await mountPage();
   await openItem('I_sample05');
@@ -54,7 +54,7 @@ test('Back to List shows only its own pending state', async () => {
   expect(text(button('start', 'I_sample05')), 'Start is not relabelled').toBe('Shape issue ▾');
 });
 
-test('a failed Back to List shows as a toast naming the item, which stays until closed and hands focus back', async () => {
+test('a failed Move to List shows as a toast naming the item, which stays until closed and hands focus back', async () => {
   holdPosts();
   await mountPage();
   await openItem('I_sample05');
@@ -65,7 +65,7 @@ test('a failed Back to List shows as a toast naming the item, which stays until 
   expect(text(toast())).toMatch(/^Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
   expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
   expect($('[data-item-dialog] .action-error'), 'the dialog shows no inline error').toBeNull();
-  expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Back to List');
+  expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Move to List');
   await settle(() => vi.advanceTimersByTime(60_000));
   expect(toast(), 'a failure stays').not.toBeNull();
   const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;
@@ -139,7 +139,7 @@ test('confirming Abandon holds Queue without relabelling it, and announces the c
   expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
 });
 
-test('in sample mode Back to List is disabled too', async () => {
+test('in sample mode Move to List is disabled too', async () => {
   await mountPage({ ...sample, capture: { enabled: false } as BoardData['capture'] });
   await openItem('I_sample05');
   for (const b of [button('back-to-list', 'I_sample05'), button('abandon', 'I_sample05')]) {
@@ -248,4 +248,41 @@ test.each([false, true])('deleted-thread move inspects cleanup and cleans only a
     expect(text($('[data-needs-you-reason]'))).toContain('Remote refused');
     expect(text($('[data-needs-you-reason]'))).toContain('slice/old');
   }
+});
+
+test('Queue from List closes details and returns focus to the surviving List search', async () => {
+  holdPosts();
+  await mountPage();
+  await press($<HTMLButtonElement>('.title-bar .list-button')!);
+  await press($<HTMLButtonElement>('[data-list-modal] [data-item="I_sample01"]')!);
+  await press(button('queue', 'I_sample01'));
+  await press(button('queue', 'I_sample01'));
+  expect(posted()).toHaveLength(1);
+  await answer({ error: null, board: moved('I_sample01', 'Queued') });
+  await settle(() => vi.advanceTimersByTime(100));
+  expect($('[data-item-dialog]')).toBeNull();
+  expect($('[data-list-modal]')).not.toBeNull();
+  expect(document.activeElement).toBe($('[data-list-modal] input[type="search"]'));
+});
+
+test.each(['replace', 'reopen', 'other', 'closed', 'failure'])('List Queue handles %s without dismissing a later session', async (outcome) => {
+  holdPosts();
+  await mountPage();
+  await press($<HTMLButtonElement>('.title-bar .list-button')!);
+  await press($<HTMLButtonElement>('[data-list-modal] [data-item="I_sample01"]')!);
+  await press(button('queue', 'I_sample01'));
+  const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+  if (outcome === 'reopen') {
+    await settle(() => useItemDialogStore.getState().close());
+    await openItem('I_sample01');
+  }
+  if (outcome === 'other') await openItem('I_sample05');
+  if (outcome === 'closed') await settle(() => useItemDialogStore.getState().close());
+  const board = moved('I_sample01', 'Queued');
+  if (outcome === 'replace') board.items = board.items.map(item => item.id === 'I_sample01' ? { ...item, id: 'I_imported' } : item);
+  await answer(outcome === 'failure' ? { error: 'Queue refused' } : { error: null, board, ...(outcome === 'replace' && { itemId: 'I_imported' }) });
+  expect(useItemDialogStore.getState().itemId).toBe(
+    outcome === 'replace' || outcome === 'closed' ? null : outcome === 'other' ? 'I_sample05' : 'I_sample01',
+  );
+  if (outcome === 'failure') expect(text($('[data-item-dialog] .action-error'))).toContain('Queue refused');
 });

@@ -129,7 +129,7 @@ const footerControls = () => [...footer().querySelectorAll<HTMLElement>('button,
 
 test.each([
   ['List', 'I_sample01', ['Abandon', 'GitHub', 'Queue']],
-  ['Queued', 'I_sample05', ['Back to List', 'Abandon', 'GitHub', 'Shape issue ▾']],
+  ['Queued', 'I_sample05', ['Move to List', 'Abandon', 'GitHub', 'Shape issue ▾']],
     ['Shaping', 'I_sample07', ['GitHub', 'Open thread']],
   ['Needs you', 'I_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
   ['blocked Ready', 'I_sample13', ['GitHub', 'Start after #202 ▾']],
@@ -176,7 +176,7 @@ test('a Queued item blocked by an open issue has only Start after in the footer'
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample05'
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) });
   await openItem('I_sample05');
-  expect(footerControls()).toEqual(['Back to List', 'Abandon', 'GitHub', 'Start after #202 ▾']);
+  expect(footerControls()).toEqual(['Move to List', 'Abandon', 'GitHub', 'Start after #202 ▾']);
 });
 
 /** The sample with `itemId`'s threads replaced. */
@@ -209,10 +209,10 @@ test.each([
 test("a Queued item has Shape issue disabled in the footer until onboarding's PR merges while its repository is still onboarding", async () => {
   await mountPage({ ...sample, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
   await openItem('I_sample05');
-  expect(footerControls()).toEqual(['Back to List', 'Abandon', 'GitHub', "Shape issue (disabled: Waits for onboarding to finish)"]);
+  expect(footerControls()).toEqual(['Move to List', 'Abandon', 'GitHub', "Shape issue (disabled: Waits for onboarding to finish)"]);
 });
 
-test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Shape issue, and neither Back to List nor Abandon', async (state) => {
+test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Shape issue, and neither Move to List nor Abandon', async (state) => {
   await mountPage(withThreads('I_sample05', [thread('live', state)]));
   await openItem('I_sample05');
   expect(footerControls()).toEqual(['GitHub', 'Open thread']);
@@ -354,7 +354,7 @@ test.each([['running'], ['needs you']] as const)('a Ready item with a %s thread 
   expect(footerControls()).toEqual(['GitHub', 'Open thread']);
 });
 
-test('Back to List in the dialog shows the item in List, says so, and moves focus to Queue', async () => {
+test('Move to List in the dialog shows the item in List, says so, and moves focus to Queue', async () => {
   holdPosts();
   await mountPage();
   await openItem('I_sample05');
@@ -366,7 +366,7 @@ test('Back to List in the dialog shows the item in List, says so, and moves focu
   expect(document.activeElement).toBe(button('queue', 'I_sample05'));
 });
 
-test('a failed Back to List is a toast, and focus goes back to Back to List', async () => {
+test('a failed Move to List is a toast, and focus goes back to Move to List', async () => {
   holdPosts();
   await mountPage();
   await openItem('I_sample05');
@@ -591,7 +591,7 @@ test('deleted work thread offers the later recovery actions without Clear', asyn
     ? { ...i, status: 'Review', needsYou: { reason: 'The latest work thread was deleted.', deletedThread: true,
       offers: ['start-again', 'back-to-queue', 'back-to-list'] } } : i) });
   await openItem(id);
-  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Start again', 'Back to Queue', 'Back to List']);
+  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Start again', 'Back to Queue', 'Move to List']);
   expect($$<HTMLButtonElement>('[data-needs-you-reason] button').map(button => button.disabled)).toEqual([false, false, false]);
 });
 
@@ -602,7 +602,7 @@ test('moving deleted-thread work with a passing brief asks before sending the mo
       offers: ['back-to-list'] } } : i) });
   await openItem(id);
   await press(button('needs-you', id));
-  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Back to List', 'Keep passing', 'Reshape']);
+  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Move to List', 'Keep passing', 'Reshape']);
   expect(posted()).toEqual([]);
 });
 

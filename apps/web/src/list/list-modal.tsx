@@ -107,7 +107,7 @@ function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElem
     wasOpen.current = itemOpen;
     if (!closed) return;
     // The copied Modal returns focus on the next task when the element that had it is still on the page.
-    const timer = setTimeout(() => { if (document.activeElement === document.body) searchField.current?.focus(); });
+    const timer = setTimeout(() => { if (document.activeElement === document.body || document.activeElement === searchField.current?.closest('[data-list-modal]')) searchField.current?.focus({ preventScroll: true }); });
     return () => clearTimeout(timer);
   }, [itemOpen, searchField]);
 }
@@ -172,7 +172,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
           <ItemFilterBar filters={filters} onChange={setFilters} rows={held.filter((group) => !picked || group.repo === picked.repo).flatMap((group) => group.items)} />
         </div>
         <Modal.Body>
-          {items.map((item) => <ItemRow key={item.id} item={item} now={now} showRepo={!picked} onOpen={() => useItemDialogStore.getState().open(item.id)} />)}
+          {items.map((item) => <ItemRow key={item.id} item={item} now={now} showRepo={!picked} onOpen={() => useItemDialogStore.getState().open(item.id, true)} />)}
           {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q || filtering(filters) ? 'Nothing here matches.' : reading ? 'Loading projects…' : 'Nothing in List.'}</p>}
         </Modal.Body>
       </Modal.Content>

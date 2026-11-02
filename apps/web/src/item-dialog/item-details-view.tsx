@@ -146,7 +146,7 @@ export function ItemDescription({ itemId, refresh, read, edit, editable, fill, t
       </div>
       {read.details.spec && <SpecNotice itemId={itemId} spec={read.details.spec} refresh={refresh} />}
       {edit.editing
-        ? <EditDescription body={body} format={format} edit={edit} fill={fill} />
+        ? <EditDescription body={edit.draft ?? body} format={edit.draft === null ? format : 'markdown'} edit={edit} fill={fill} />
         : body ? <>{format === 'markdown' ? <MarkdownDiagrams text={body} /> : <RichText text={body} format={format} />}</> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
       {read.details.spec?.original && <details><summary className="cursor-pointer text-sm text-(--muted-foreground)">Original</summary><RichText text={read.details.spec.original} format={read.details.spec.originalFormat} /></details>}
       {sections?.map((section) => <section key={section.title} className="grid min-w-0 gap-2"><Heading>{section.title}</Heading><RichText text={section.body} format={section.format} /></section>)}

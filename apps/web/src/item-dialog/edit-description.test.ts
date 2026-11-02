@@ -286,3 +286,37 @@ test('Azure read-only setup hides Edit and explains the denial despite allowed e
   expect(editButton()).toBeUndefined();
   expect(text(dialog())).toContain('read-only');
 });
+
+test.each([false, true])('Queue identity replacement preserves description edits while saving is %s', async (saving) => {
+  const server = serve(editing, { [github]: details('Old text.'), I_imported: details('Old text.') });
+  const original = fetchMock.getMockImplementation()!;
+  let completeQueue!: (response: Response) => void;
+  fetchMock.mockImplementation((...args) => args[0] === '/api/queue'
+    ? new Promise<Response>(resolve => { completeQueue = resolve; })
+    : original(...args));
+  await mountPage(editing);
+  await press($<HTMLButtonElement>('.title-bar .list-button')!);
+  await press($<HTMLButtonElement>(`[data-list-modal] [data-item="${github}"]`)!);
+  await press(editButton());
+  await typeAtEnd(' More.');
+  await press(inDialog<HTMLButtonElement>('[data-queue]')!);
+  if (saving) await press(buttonIn(description(), 'Save'));
+  const board = { ...editing, items: editing.items.map(item => item.id === github ? { ...item, id: 'I_imported', status: 'Queued' } : item) };
+  await settle(() => completeQueue(new Response(JSON.stringify({ error: null, board, itemId: 'I_imported' }))));
+  expect(await isOpen()).toBe(true);
+  expect(text(editorArea())).toBe('Old text. More.');
+  if (saving) {
+    expect(prompt()).toBeUndefined();
+    await server.answer(409, { error: 'Save refused' });
+    expect(await isOpen()).toBe(true);
+    expect(text(description())).toContain('Save refused');
+  } else {
+    expect(prompt()).toBeDefined();
+    await press(buttonIn(prompt()!, 'Keep editing'));
+    expect(await isOpen()).toBe(true);
+    expect(text(editorArea())).toBe('Old text. More.');
+  }
+  await escape(editorArea()!);
+  await press(buttonIn(prompt()!, 'Discard'));
+  expect(await isOpen()).toBe(false);
+});

@@ -34,7 +34,7 @@ az devops invoke --area wit --resource comments --organization "$org" \
 
 Queue, Status and shaping or build progress live only in local work records.
 [Tracker structure sync](publication.md) saves concept and multi-repository kind,
-map diagram, parts, Connections, Dependencies and issue grouping when the local
+parts, Connections, Dependencies and issue grouping when the local
 option is ON. That path saves only shaping results needed for structure.
 [Issue creation and Ticket Specs](work-records.md#issue-creation) use independent
 ON-by-default settings. The whole gated brief, including enabled Domain docs,

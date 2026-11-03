@@ -17,7 +17,7 @@ Repository is ON, drafts entries during shaping, includes them in enabled ticket
 Specs, and writes glossary entries and ADRs in the build PR.
 
 Tracker sync is ON by default during onboarding and saves only concept and
-multi-repository structure. It saves kind, map diagram, parts, Connections,
+multi-repository structure. It saves kind, parts, Connections,
 Dependencies and issue grouping, with the shaping results needed to explain
 them. An automatic structural outbox handles local structural edits.
 `lar-work sync-structure <work ID>` requests a drain. Queue, board Status,

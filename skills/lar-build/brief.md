@@ -8,6 +8,14 @@ Read the local [domain-doc setting](shared/domain-docs.md#where-domain-docs-live
 before drafting. With it OFF, write `none` under Domain docs and create no drafts.
 With it ON, use the entries and ADR drafts in the template below.
 
+The whole brief may become the ticket description. Write for the team reviewing
+the result: observable behavior, acceptance criteria and necessary constraints.
+Keep delegation, approval evidence, work IDs and factory workflow mechanics in
+local records. Notes for the builder holds only constraints or prototype evidence
+that cannot be recovered from the code; omit source-file tours, line numbers and
+implementation recipes. Omit empty optional sections. Aim for one screen for
+routine work.
+
 ```markdown
 ## What
 <the change, in the user's domain language>
@@ -19,7 +27,7 @@ With it ON, use the entries and ADR drafts in the template below.
 - <each assumption the user confirmed, and each decision with its gist>
 
 ## Notes for the builder
-<where the code is, the failing test to start from, prototype branch to follow>
+<essential constraints or prototype evidence, only when needed>
 
 ## Domain docs
 - Glossary: <each term to add or change, as a GLOSSARY-FORMAT.md entry>, or "none"

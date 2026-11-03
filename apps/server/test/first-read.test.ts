@@ -1,10 +1,23 @@
 import { test } from 'vite-plus/test';
+import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import type { BoardData } from '@lar-factory/shared';
 import { startBoard, until } from './server-support.ts';
 
 const settled = (board: Parameters<typeof until>[0]) => until(board, (d) => d.firstRead.settled);
+
+/** A file whose existence holds every delayed repository's read, so a test knows which read lands first; removing it lets them finish. */
+async function heldReads(t: TestContext): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'lar-first-read-hold-'));
+  t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  const hold = join(dir, 'hold');
+  await writeFile(hold, '');
+  return hold;
+}
 
 test('the first read settles once the repositories are read, with nothing running', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
@@ -93,7 +106,8 @@ test('the stream pushes the first read as it moves from unsettled to settled, na
 
 test("each repository's items show once its own read lands, while another repository's read still runs", async (t) => {
   const apple = 'maddec01/lar-apple';
-  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 1_500,
+  const hold = await heldReads(t);
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readHold: hold,
     localSetups: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } }, repoIssues: { [apple]: [boardIssue(7, 'List', apple).content] } });
   const early = await until(board, (d) => d.items.length > 0);
   assert.deepEqual(early.items.map((i) => [i.repo, i.number]), [[apple, 7]], "the repository's read still sleeps");
@@ -102,6 +116,7 @@ test("each repository's items show once its own read lands, while another reposi
   assert.deepEqual(early.firstRead.waiting, ['maddec01/lar-server', 'maddec01/lar-factory']);
   assert.equal(early.fetchedAt, null, 'the whole read has yet to land');
   assert.equal(early.error, null);
+  await rm(hold);
   const data = await settled(board);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number]).sort(), [[apple, 7], ['maddec01/lar-factory', 1]]);
   assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
@@ -109,7 +124,7 @@ test("each repository's items show once its own read lands, while another reposi
 
 test('a successful empty repository permits access while another source still reads', async (t) => {
   const apple = 'maddec01/lar-apple';
-  const board = await startBoard(t, { items: [], readDelay: 1_500,
+  const board = await startBoard(t, { items: [], readHold: await heldReads(t),
     localSetups: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } }, repoIssues: { [apple]: [] } });
   const early = await until(board, (d) => d.firstRead.ready === true);
   assert.equal(early.firstRead.settled, false);

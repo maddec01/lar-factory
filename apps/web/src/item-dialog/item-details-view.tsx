@@ -344,6 +344,8 @@ export function ItemMeta({ item, read, refresh, now }: { item: Item; read: ItemD
         : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}
       <FromDetails read={read} label="Created" show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />} />
       <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
+      {item.kind === 'concept' && item.refinement && <Fact label="Refinement"><span>{item.refinement.complete ? 'Complete' : item.refinement.reasons.join(' ')}</span></Fact>}
+      {item.kind === 'concept' && item.completion && <Fact label="Delivery"><span>{item.completion.complete ? 'Complete' : item.completion.reasons.join(' ')}</span></Fact>}
       <AgentWorkNote item={item} />
       <AgentWork item={item} className="@min-[40rem]:hidden" />
       {item.kind === 'build' && <ItemChecksSection key={item.id} itemId={item.id} />}

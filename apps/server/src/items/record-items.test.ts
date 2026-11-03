@@ -464,3 +464,14 @@ test('disabled legacy settings retain pending concept content in board details',
   assert.equal(item?.sync?.state, 'pending');
   assert.deepEqual(records.trackerPending(), pending);
 });
+
+test('concept projection separates refinement from delivery', async () => {
+  const records = await open();
+  const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept' });
+  records.setBody(concept.workId, 1, 'map', '# Map');
+  records.setFogGone(concept.workId, 2, true);
+  const [item] = recordItems(records, [], [REPO]);
+  assert.deepEqual(item!.refinement, { complete: true, reasons: [] });
+  assert.deepEqual(item!.completion, { complete: false, reasons: ['No delivery planned.'] });
+  assert.equal(item!.state, 'open');
+});

@@ -160,6 +160,7 @@ Completion
   complete, and a build stays incomplete while an unmet Dependency holds it.
   Work can start once each of its blockers is complete and no unmet Dependency
   holds it.
+  refinement <work-id>              Print concept refinement and incomplete reasons.
   completion <work-id>              Print whether the record is complete and each
                                     reason it isn't.
   waiting-on <work-id>              Print its blockers that aren't complete, then
@@ -350,7 +351,7 @@ Errors
 class UsageError extends Error {}
 
 const TAKES_WORK_ID = ['kind-disagreement', 'change-kind', 'record-kind-answer', 'create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
-  'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
+  'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion', 'refinement',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
   'set-check-list', 'checks', 'describe-failure', 'resolve-failure', 'review-rounds', 'observe', 'observe-failure', 'observations', 'confirm-thread-deleted', 'set-build-branch', 'invalidate-gate', 'reset-build', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
   'gate', 'record-gate', 'add-dependency', 'dependencies'];
@@ -555,6 +556,8 @@ async function run(records: WorkRecords, command: string, workId: string | undef
       return [...records.blockers(workId!), ...records.unmetDependencies(workId!)];
     case 'dependents':
       return records.dependents(workId!);
+    case 'refinement':
+      return records.refinement(workId!);
     case 'completion':
       return records.completion(workId!);
     case 'waiting-on':

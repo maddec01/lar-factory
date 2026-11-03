@@ -377,6 +377,7 @@ export interface WorkRecords extends ValidationRecords, TrackerCache, Publicatio
    * except set-aside ones, is complete. A build stays incomplete while an unmet Dependency holds it. A Status, a ticket
    * closing or a thread ending never completes work. */
   completion(workId: string): Completion;
+  refinement(workId: string): Completion;
   /** Its blockers that aren't complete yet, then the unmet Dependencies holding it, each with the reasons; the work can
    * start once this is empty. */
   waitingOn(workId: string): ({ workId: string; reasons: string[] } | { dependencyId: string; reasons: string[] })[];
@@ -744,7 +745,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     }
     if (row.kind === 'concept') {
       const reasons = row.fog_gone_at ? [] : ["Its Fog isn't gone."];
-      for (const child of childRows.all(row.work_id) as unknown as Row[]) {
+      const children = childRows.all(row.work_id) as unknown as Row[];
+      if (!row.finished_at && !children.some(child => child.kind === 'build' && !child.set_aside_at)) reasons.push('No delivery planned.');
+      for (const child of children) {
         if (child.set_aside_at || !incomplete(child).length) continue;
         reasons.push(child.kind === 'decision' ? `Its decision ${child.work_id} isn't settled.` : `Its ${child.kind} ${child.work_id} isn't Done.`);
       }
@@ -1270,6 +1273,16 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         return { deleted, kept };
       });
     },
+    refinement: (workId) => database.read(() => {
+      const row = find(workId);
+      if (row.kind !== 'concept') throw invalid('Only a concept has refinement.');
+      const reasons = row.fog_gone_at ? [] : ["Its Fog isn't gone."];
+      if (!db.prepare("SELECT 1 FROM bodies WHERE work_id = ? AND body = 'map' AND has_content = 1").get(workId)) reasons.push("Its map is empty.");
+      for (const child of childRows.all(workId) as unknown as Row[]) {
+        if (child.kind === 'decision' && !child.set_aside_at && incomplete(child).length) reasons.push(`Its decision ${child.work_id} isn't settled.`);
+      }
+      return { complete: !reasons.length, reasons };
+    }),
     completion: (workId) => database.read(() => {
       const reasons = incomplete(find(workId));
       return { complete: !reasons.length, reasons };

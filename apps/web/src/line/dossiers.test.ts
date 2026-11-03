@@ -259,7 +259,7 @@ test('a decision part and a work map node name the running build thread and say 
   expect(text(dossier().querySelector('[data-attention-row="decisions"]'))).toContain('· Working');
   await press(button(dossier(), 'Work map'));
   const node = text(dossier().querySelector('[data-map-part="I_sample10"]'));
-  expect([node.includes('Working· running'), node.includes('Verify')]).toEqual([true, false]);
+  expect([node.includes('Working · child work running'), node.includes('Verify')]).toEqual([true, false]);
 });
 
 test('parts in Verify or Ready to merge get their own row after Needs you, which with the chip counts only Needs you', async () => {
@@ -355,7 +355,7 @@ test('each part shows what it asks next, then its stage track, status, figures a
   const lines = (id: string) => [...step(id).children].map(text);
   expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'Open thread', 'GrillShaping28m · 1.87M · $2.71T3 · Grill: relay broker only or full TURN· running']);
   expect(lines('I_sample12')).toEqual(['#202 Sign-in screen', 'on your desk', 'PrototypeNeeds you41m · 2.95M · $4.35T3 · Prototype: sign-in screen· needs you']);
-  expect(lines('I_sample13').slice(0, 3)).toEqual(['#140 Owner accounts', '1/3Start after #202 ▾', 'ReadyFeature · Active · AnaPR #145T3 · Shape: owner accounts· done']);
+  expect(lines('I_sample13').slice(0, 3)).toEqual(['#140 Owner accounts', '1/3Start after #202 ▾', 'BuildReadyFeature · Active · AnaPR #145T3 · Shape: owner accounts· done']);
   expect(step('I_sample13').querySelector('[data-part-meta] ol')!.getAttribute('title'), "the stage track, dashed while it waits").toBe('Ready, waiting');
   expect(step('I_sample10').querySelector('[data-part-meta] ol')!.getAttribute('title')).toBe('Shaping');
   expect(step('I_sample13').children[3]!.className.split(' '), 'its slice bar under the row').toContain('col-span-2');
@@ -459,12 +459,14 @@ test('Open thread takes Start\'s place while a part has a live thread', async ()
   expect(step('I_d204').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/t1');
 });
 
-test('a map with no End-to-end check section says none is written', async () => {
+test('a map with no End-to-end check draws no check and no placeholder for one', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   const { check: _, ...map } = c200.map!;
   await mountPage(withItem(C200, { map }));
   await press(button(dossier(), 'Work map'));
-  expect(text(dossier().querySelector('[data-work-map]'))).toContain('No end-to-end check written yet');
+  expect(dossier().querySelector('[data-map-check]')).toBeNull();
+  expect(text(dossier().querySelector('[data-work-map]'))).not.toContain('end-to-end');
+  expect(dossier().querySelector('path[data-edge$=" e2e"]')).toBeNull();
 });
 
 test('neither the parts list nor the Work map lanes draw a coloured repository dot', async () => {
@@ -476,15 +478,7 @@ test('neither the parts list nor the Work map lanes draw a coloured repository d
   expect([dossier().querySelectorAll('[data-work-map] .sticky').length, dossier().querySelector('[class*="repo-tone"]')]).toEqual([2, null]);
 });
 
-test('a Map lane named owner/name shows it once', async () => {
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage({ ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork', labels: [] }] });
-  await press(button(dossier(), 'Work map'));
-  const lanes = [...dossier().querySelectorAll('[data-work-map] .sticky')];
-  expect(lanes.map(text)).toEqual(['Decisions', 'maddec01/lar-server']);
-});
-
-test('the Map view draws a lane per repository and Decisions, its parts by wave, and arrows for what waits on what', async () => {
+test('the Map view draws Decisions and Builds lanes, its current parts in order, and arrows for what waits on what', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage();
   const toggle = button(dossier(), 'Work map');
@@ -492,15 +486,12 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   expect([toggle.getAttribute('aria-pressed'), button(dossier(), 'Parts list').getAttribute('aria-pressed')]).toEqual(['true', 'false']);
   const map = dossier().querySelector('[data-work-map]')!;
   expect(dossier().querySelector('[data-parts-list]'), "the map takes the parts list's place").toBeNull();
-  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisions', 'lar-servermaddec01/lar-server']);
-  const subtitle = map.querySelectorAll('.sticky')[1]!.lastElementChild!;
-  expect([subtitle.className.split(' ').includes('truncate'), subtitle.getAttribute('title')], 'owner/name stays on one line').toEqual([true, 'maddec01/lar-server']);
-  expect([...map.querySelectorAll('.h-7\\.5')].map(text)).toEqual(['Wave 1· 2 in parallel', 'Wave 2· 2 in parallel', 'Check']);
-  expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part'))).toEqual(['I_sample18', 'I_sample12', 'I_sample10', 'I_sample13']);
+  expect([...map.querySelectorAll('.sticky')].map(text), "the concept's own repository goes unnamed").toEqual(['Decisions', 'Builds']);
+  expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part')), 'current work only, the question first').toEqual(['I_sample12', 'I_sample10', 'I_sample13']);
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
-    'I_sample18 I_sample10', 'I_sample12 I_sample13', 'I_sample13 e2e',
+    'history I_sample10', 'I_sample12 I_sample13', 'I_sample13 e2e',
   ]);
-  expect(text(map.querySelector('[data-map-check]'))).toBe('end-to-end checkSign in on the website, then stream from a phone off Wi-Fiwaiting · 3 stepsagents run it once #140 land');
+  expect(text(map.querySelector('[data-map-check]'))).toBe('end-to-end checkSign in on the website, then stream from a phone off Wi-Fi3 steps · runs once #140 land');
   const node = (id: string) => map.querySelector(`[data-map-part="${id}"]`)!;
   expect(startIn(node('I_sample13')), 'a blocked part offers Start after alone').toBeNull();
   expect(text(node('I_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
@@ -573,9 +564,11 @@ test('unlabelled local decision parts show the decision lane and completed answe
   await press(button(dossier(),'Work map'));
   const map=dossier().querySelector('[data-work-map]')!;
   expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisions']);
-  const doneNode=map.querySelector(`[data-map-part="${complete.id}"]`)!;
+  expect(map.querySelector(`[data-map-part="${complete.id}"]`),'folded into history').toBeNull();
+  await press(map.querySelector('[data-map-history]')!);
+  const doneNode=map.querySelector(`[data-history-part="${complete.id}"]`)!;
   const pendingNode=map.querySelector(`[data-map-part="${pending.id}"]`)!;
-  expect(text(doneNode)).toContain('No method');expect(text(doneNode)).toContain('Complete');expect(text(doneNode)).not.toContain('Shaping');expect(text(doneNode)).not.toContain('build');
+  expect(text(doneNode)).toContain('No method');expect(text(doneNode)).not.toContain('Shaping');expect(text(doneNode)).not.toContain('build');
   expect(text(pendingNode)).toContain('No method');expect(text(pendingNode)).toContain('Shaping');
   expect(complete.status).toBe('Shaping');expect(pending.status).toBe('Shaping');
 });
@@ -595,6 +588,155 @@ test('a shaping part with a question leads moving parts in the dossier', async (
   expect(dossier().querySelector('a[href="t3code://threads/sample-environment/part-question"]')).not.toBeNull();
 });
 
+/** #200 on its Work map with `parts` as its parts, in place of the sample's. */
+const conceptOf = (parts: Item[], change: Partial<Item> = {}): BoardData => ({
+  ...sample, error: null, fetchedAt: new Date(NOW).toISOString(),
+  items: [{ ...c200, ...change }, ...parts.map((p) => ({ ...p, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'open' as const }, parentId: c200.id }))],
+});
+const base = sample.items.find((i) => i.id === 'I_sample13')!;
+const workPart = (id: string, change: Partial<Item> = {}): Item => ({ ...base, id, number: 0, title: `Part ${id}`, recorded: true, kind: 'build', labels: [], blockers: [], slices: [], threads: [], linkedPrs: [], ...change });
+const settledPart = (id: string, method: 'grill' | 'prototype' | 'research' | 'task', change: Partial<Item> = {}): Item =>
+  workPart(id, { kind: 'decision', decisionMethod: method, status: 'Done', completion: { complete: true, reasons: [] }, ...change });
+const mapOpen = async (data: BoardData) => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  localStorage.setItem(VIEW_KEY + C200, 'map');
+  await mountPage(data);
+  return dossier().querySelector<HTMLElement>('[data-work-map]')!;
+};
+const fiveSettled = (['grill', 'prototype', 'research', 'task', 'grill'] as const).map((method, n) => settledPart(`W_s${n}`, method));
+
+test('5 settled decisions fold into one group, and a running build leads a map short enough to need no scrolling', async () => {
+  const running = workPart('W_build', { status: 'In progress', threads: [{ id: 'b', title: 'Build', state: 'running', currentRunning: true, purpose: 'build', updated: '2026-10-21T09:00:00.000Z' }] });
+  const map = await mapOpen(conceptOf([...fiveSettled, running]));
+  expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part'))).toEqual(['W_build']);
+  const canvas = map.querySelector<HTMLElement>('[data-map-canvas]')!;
+  const y = (el: HTMLElement) => parseInt(el.style.top, 10);
+  expect(parseInt(canvas.style.height, 10), 'one lane and the group').toBeLessThanOrEqual(200);
+  const group = map.querySelector<HTMLElement>('[data-map-history]')!;
+  expect(y(group), 'the group sits below current work').toBeGreaterThan(y(map.querySelector<HTMLElement>('[data-map-part="W_build"]')!.parentElement!));
+  expect([text(group), group.getAttribute('aria-expanded')]).toEqual(['5 settled decisionsShow', 'false']);
+  expect(map.querySelector('[data-map-history-parts]')).toBeNull();
+});
+
+test('expanding the history group lists each settled part with its method; collapsing folds it again', async () => {
+  const map = await mapOpen(conceptOf([...fiveSettled, settledPart('W_merged', 'task', { kind: 'build', decisionMethod: undefined })]));
+  const group = map.querySelector<HTMLElement>('[data-map-history]')!;
+  expect(text(group)).toBe('5 settled decisions · 1 finished buildShow');
+  await press(group);
+  const rows = [...map.querySelectorAll<HTMLElement>('[data-history-part]')];
+  expect(rows.map(text)).toEqual(['ResearchPart W_s2', 'GrillPart W_s0', 'GrillPart W_s4', 'PrototypePart W_s1', 'TaskPart W_s3', 'BuildPart W_merged']);
+  await press(button(rows[1]!, 'Part W_s0'));
+  expect(dialogTitle()).toBe('Part W_s0');
+  await press($('[data-item-dialog] [aria-label="Close"]')!);
+  await press(group);
+  expect(map.querySelector('[data-history-part]')).toBeNull();
+});
+
+test('a part waiting on a settled decision in the group keeps its edge, from the group, with its label', async () => {
+  const held = workPart('W_next', { status: 'In progress', blockers: [{ number: 0, repo: c200.repo!, state: 'closed', workId: 'W_s0', title: 'x' }, { number: 0, repo: c200.repo!, state: 'closed', workId: 'W_s1', title: 'y' }] });
+  const later = workPart('W_later', { status: 'Ready', blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: 'W_next' }] });
+  const map = await mapOpen(conceptOf([...fiveSettled, held, later], { map: { ...c200.map!, check: undefined } }));
+  expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual(['history W_next', 'W_next W_later']);
+  expect(text(map.querySelector('[data-edge-label="history W_next"]'))).toBe('after Part W_s0, Part W_s1');
+  await press(map.querySelector('[data-map-history]')!);
+  expect(map.querySelector('path[data-edge="history W_next"]'), 'expanding leaves the edge').not.toBeNull();
+  await receive(conceptOf([...fiveSettled, { ...held, status: 'Done', completion: { complete: true, reasons: [] } }, later], { map: { ...c200.map!, check: undefined } }));
+  expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge')), 'a board push moves it into the group').toEqual(['history W_later']);
+  expect(text(map.querySelector('[data-edge-label="history W_later"]'))).toBe('after Part W_next');
+});
+
+test('a part a finished part waited on keeps its edge into the group', async () => {
+  const open = workPart('W_open', { status: 'In progress' });
+  const map = await mapOpen(conceptOf([open, settledPart('W_done', 'task', { blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: 'W_open' }] })], { map: { ...c200.map!, check: undefined } }));
+  expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual(['W_open history']);
+  expect(text(map.querySelector('[data-edge-label="W_open history"]'))).toBe('before Part W_done');
+});
+
+test('a build whose planner ended while its child and background work run reads as working, never as done', async () => {
+  const planner: ItemThread = { id: 'plan', title: 'Plan', state: 'done', purpose: 'build', hasRunningChildren: true, updated: '2026-10-21T09:00:00.000Z' };
+  const newest: ItemThread = { id: 'newer', title: 'Later', state: 'done', updated: '2026-10-21T10:00:00.000Z' };
+  const build = workPart('W_build', { status: 'In progress', buildPhase: 'plan', threads: [newest, planner] });
+  const map = await mapOpen(conceptOf([build]));
+  const node = map.querySelector('[data-map-part="W_build"]')!;
+  expect(text(node.querySelector('[data-map-facts]'))).toBe('In progress · Planning · child work running');
+  expect(node.querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/plan');
+  expect(text(line(1).querySelector('[data-threads]')), 'the header counts it as running').toContain('1 running');
+  await receive(conceptOf([{ ...build, threads: [newest, { ...planner, hasRunningChildren: undefined }] }]));
+  expect(text(map.querySelector('[data-map-part="W_build"] [data-map-facts]')), 'once it all ends, it says so').toBe('In progress · Run finished');
+});
+
+test('a finished part with work still running stays with current work', async () => {
+  const map = await mapOpen(conceptOf([settledPart('W_d', 'research', { threads: [{ id: 'd', title: 'D', state: 'done', hasRunningChildren: true, updated: '2026-10-21T09:00:00.000Z' }] })]));
+  expect(map.querySelector('[data-map-history]')).toBeNull();
+  expect(text(map.querySelector('[data-map-part="W_d"] [data-map-facts]'))).toContain('Complete · Working');
+});
+
+test('a status never repeats as its activity, and a part with no thread says nothing about one', async () => {
+  const asks: ItemThread = { id: 'q', title: 'Q', state: 'needs you', updated: '2026-10-21T09:00:00.000Z' };
+  const map = await mapOpen(conceptOf([workPart('W_q', { status: 'Needs you', threads: [asks] }), workPart('W_none', { status: 'Shaping' })]));
+  expect(text(map.querySelector('[data-map-part="W_q"] [data-map-facts]'))).toBe('Needs you');
+  expect(text(map.querySelector('[data-map-part="W_none"] [data-map-facts]'))).toBe('Shaping');
+  expect(text(map)).not.toContain('thread');
+});
+
+test('a held Dependency shows met or not met under the map, naming what it holds, with no repeat of the line on the map', async () => {
+  const hold = (id: string, need: string, met: DependencyHold['met']): DependencyHold => ({ dependencyId: id, revision: 1, owner: 'server team', need, ticket: null, named: [], evidence: '', met, needsReview: false, observation: null });
+  const unmet = hold('d1', 'An export endpoint', null);
+  const met = hold('d2', 'A relay', { by: 'Ana', at: '2026-10-21T09:00:00.000Z' } as DependencyHold['met']);
+  const build = workPart('W_held', { number: 77, status: 'Ready', blockers: [{ number: 0, repo: 'server team', state: 'open', title: unmet.need, dependency: unmet }, { number: 0, repo: 'server team', state: 'closed', title: met.need, dependency: met }] });
+  await mapOpen(conceptOf([build], { map: { ...c200.map!, dependencies: ['An export endpoint, from server team, blocks W_held', 'A handover, from team/docs, blocks W_held'] } }));
+  const row = dossier().querySelector('[data-attention-row="dependencies"]')!;
+  expect([...row.querySelector('dd')!.children].map(text)).toEqual(['server team: An export endpointnot met · holds #77', 'server team: A relaymet · holds #77', 'A handover, from team/docs, blocks W_held']);
+  expect([...row.querySelectorAll('[data-dependency-state]')].map((el) => el.getAttribute('data-dependency-state'))).toEqual(['unmet', 'met']);
+  expect(dossier().querySelector('[data-attention-row="fog"]'), 'the fog keeps its place too').not.toBeNull();
+  const order = [...dossier().querySelectorAll('[data-work-map], [data-attention-row]')].map((el) => el.getAttribute('data-attention-row') ?? 'map');
+  expect(order).toEqual(['map', 'dependencies', 'fog']);
+});
+
+test('the map view leaves out what its nodes already say, keeping a concept question above the map', async () => {
+  await mapOpen(withItem(C200, { status: 'In progress', threads: [thread('own-question', 'needs you')] }));
+  const order = [...dossier().querySelectorAll('[data-work-map], [data-attention-row]')].map((el) => el.getAttribute('data-attention-row') ?? 'map');
+  expect(order).toEqual(['you', 'map', 'fog']);
+  expect(dossier().querySelector('[data-attention-none]')).toBeNull();
+});
+
+test('only a part in another repository names it, by project icon and name, once per lane, apart from its source icon', async () => {
+  const other = 'maddec01/lar-apple';
+  const map = await mapOpen(conceptOf([
+    workPart('W_home', { status: 'Shaping' }), workPart('W_home2', { status: 'Shaping' }),
+    workPart('W_far', { status: 'Shaping', repo: other }), workPart('W_far2', { status: 'Shaping', repo: other }),
+    workPart('W_q', { status: 'Shaping', repo: other, kind: 'decision', decisionMethod: 'grill' }),
+    settledPart('W_old', 'task', { repo: other }), settledPart('W_oldhome', 'task'),
+  ]));
+  const repoName = (el: Element | null) => text(el!.querySelector('[data-part-repo] > .truncate'));
+  const lanes = [...map.querySelectorAll('.sticky')];
+  expect([text(lanes[0]), text(lanes[1]), repoName(lanes[2]!)]).toEqual(['Decisions', 'Builds', 'lar-apple']);
+  expect(lanes[2]!.querySelector('[data-part-repo]')!.children.length, 'the icon and the name').toBe(2);
+  expect(map.querySelector('[data-map-part="W_home"] [data-part-repo]'), 'home goes unnamed').toBeNull();
+  expect(map.querySelector('[data-map-part="W_far"] [data-part-repo]'), 'its lane names it').toBeNull();
+  expect(repoName(map.querySelector('[data-map-part="W_q"]')), 'the Decisions lane does not').toBe('lar-apple');
+  expect(map.querySelector('[data-map-part="W_q"] [data-part-repo] [aria-label^="Saved"], [data-map-part="W_q"] [data-part-repo] [aria-label*="issue"]'), 'the source icon stays apart').toBeNull();
+  await press(map.querySelector('[data-map-history]')!);
+  expect(repoName(map.querySelector('[data-history-part="W_old"]'))).toBe('lar-apple');
+  expect(map.querySelector('[data-history-part="W_oldhome"] [data-part-repo]')).toBeNull();
+});
+
+test('method and kind share one label on nodes, history rows and the parts list', async () => {
+  const map = await mapOpen(conceptOf([workPart('W_b', { status: 'Shaping' }), workPart('W_g', { status: 'Shaping', kind: 'decision', decisionMethod: 'grill' }), settledPart('W_t', 'task')]));
+  await press(map.querySelector('[data-map-history]')!);
+  const label = (el: string) => text(map.querySelector(`${el} [data-part-kind]`));
+  expect([label('[data-map-part="W_b"]'), label('[data-map-part="W_g"]'), label('[data-history-part="W_t"]')]).toEqual(['Build', 'Grill', 'Task']);
+  await press(button(dossier(), 'Parts list'));
+  expect(text(step('W_b').querySelector('[data-part-meta] [data-part-kind]'))).toBe('Build');
+  expect(text(step('W_g').querySelector('[data-part-meta] [data-part-kind]'))).toBe('Grill');
+});
+
+test('a blocked slice shows on its part in the map', async () => {
+  const build = workPart('W_b', { status: 'In progress', slices: [{ ...base.slices[0]!, progress: 'blocked' }] });
+  const map = await mapOpen(conceptOf([build]));
+  expect(text(map.querySelector('[data-map-part="W_b"] [data-map-facts]'))).toContain('1 slice blocked');
+});
+
 const partThread = { id: 'own', title: 'Own thread', state: 'done' as const, updated: '2026-10-21T09:00:00.000Z' };
 const settled = { kind: 'decision' as const, labels: [], decisionMethod: 'research' as const, status: 'Done' as const, completion: { complete: true, reasons: [] } };
 const openThreadIn = (el: Element) => el.querySelector('[data-open-thread]');
@@ -608,7 +750,8 @@ test('a settled decision with a thread offers Open thread and names its method, 
   expect(openThreadIn(step('I_sample10'))!.getAttribute('href')).toBe('t3code://threads/sample-environment/own');
   expect(text(step('I_sample10').querySelector('[data-part-meta]'))).toContain('Research');
   await press(button(dossier(), 'Work map'));
-  const card = dossier().querySelector('[data-map-part="I_sample10"]')!;
+  await press(dossier().querySelector('[data-map-history]')!);
+  const card = dossier().querySelector('[data-history-part="I_sample10"]')!;
   expect(openThreadIn(card)!.getAttribute('href')).toBe('t3code://threads/sample-environment/own');
   expect(text(card)).toContain('Research');
   expect(text(card)).not.toContain('decision');
@@ -622,9 +765,11 @@ test('a settled decision with no thread shows no thread control, and no valid me
   expect(openThreadIn(step('I_sample10'))).toBeNull();
   expect(text(step('I_sample10').querySelector('[data-part-meta]'))).toContain('No method');
   await press(button(dossier(), 'Work map'));
-  const card = dossier().querySelector('[data-map-part="I_sample10"]')!;
+  await press(dossier().querySelector('[data-map-history]')!);
+  const card = dossier().querySelector('[data-history-part="I_sample10"]')!;
   expect(openThreadIn(card)).toBeNull();
   expect(text(card)).toContain('No method');
+  expect(text(dossier().querySelector('[data-work-map]')), 'absence says nothing').not.toContain('no thread');
 });
 
 test('a part that waits on another keeps saying so beside Open thread', async () => {

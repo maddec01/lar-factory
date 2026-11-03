@@ -1,18 +1,20 @@
 // The line's dossiers: each open concept, and each open item with sub-issues on the board. A dossier starts collapsed
 // to its two header lines: its kind, title and chips (parts that need you, open decisions, blocked slices, fog), then
 // its part bar, parts done, what's next, agent figures and repositories in columns that line up across every dossier
-// and In flight row. Opened, it lists what keeps the work moving (parts that need you, parts to verify or merge, open
-// decisions, blocked slices, waiting parts, parts ready to start and the map's fog) or says nothing holds it up, then
-// its Work map or its parts list: each part with what it asks next, its stage track, figures, thread and slices, the
-// done parts folded away. The browser remembers which dossiers are open and which view each shows.
+// and In flight row. Opened, it starts on its Work map, with the concept's own question above and its Dependencies and
+// fog below. Its parts list instead lists what keeps the work moving (parts that need you, parts to verify or merge, open
+// decisions, blocked slices, waiting parts, parts ready to start, Dependencies and fog) or says nothing holds it up, then
+// each part with what it asks next, its stage track, figures, thread and slices, the done parts folded away. The
+// browser remembers which dossiers are open and which view each shows.
 
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
-import { Ban, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
+import { Ban, Check, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
 import { UNREADABLE, needsAnswer, openQuestionThread, blockerGroups, blockerRef, canRetryBuild, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
+import { dependenciesOf } from '../items/dependencies.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar, StructureSync, shownStatus, useActivityUnavailable, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
@@ -20,13 +22,13 @@ import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, partLabel, shownThread, threadsOf } from './dossier-parts.ts';
+import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, partLabel, shownThread, threadAtWork, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { StartBuild } from '../items/start-build.tsx';
 import { PartStart, startable } from './part-start.tsx';
 import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
 import { OnYourDesk, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
-import { WorkMap } from './work-map.tsx';
+import { PartKindLabel, WorkMap } from './work-map.tsx';
 
 const open = (item: Item) => useItemDialogStore.getState().open(item.id);
 /** Keeps a click on a control from opening the item underneath it, nor do clicks in the menu it opens. */
@@ -124,11 +126,15 @@ function Entry({ main, side }: { main: ReactNode; side?: ReactNode }) {
 }
 
 /** What keeps the work moving, as labelled rows, each shown only with entries: parts in Needs you, parts in Verify or
- *  Ready to merge, open decisions, blocked slices, parts waiting on others, parts ready to start, the map's
- *  Dependencies and its fog. */
-function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[]; data: BoardData; find: FindRef }) {
+ *  Ready to merge, open decisions, blocked slices, parts waiting on others, parts ready to start, Dependencies, met or
+ *  not, and the map's fog. `only` limits it to those rows for the parent, since the Work map draws its parts itself. */
+function Attention({ parent, parts, data, find, only }: { parent: Item; parts: Part[]; data: BoardData; find: FindRef; only?: readonly string[] }) {
   const unavailable = useActivityUnavailable();
-  const ahead = parts.filter((p) => !isDone(p.item));
+  const unfinished = parts.filter((p) => !isDone(p.item));
+  const ahead = only ? [] : unfinished;
+  const holds = unfinished.flatMap((part) => dependenciesOf(part.item).map((hold) => ({ part, hold })));
+  // A map's line naming a Dependency the records hold says less than the record, so it goes.
+  const written = (parent.map?.dependencies ?? []).filter((d) => !holds.some(({ hold }) => hold.need && d.toLowerCase().includes(hold.need.toLowerCase())));
   const blocked = ahead.flatMap((part) => part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice })));
   const rows = [
     { key: 'you', label: 'Needs you', tone: 'text-(--warning-foreground)',
@@ -152,14 +158,19 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
         <Entry key={p.item.id} main={<PartLink part={p} />} side={<span onClick={stop}><PartStart part={p} data={data} label="Start" /></span>} />
       )) },
     { key: 'dependencies', label: 'Dependencies', tone: 'text-(--st-review)',
-      entries: (parent.map?.dependencies ?? []).map((d) => (
+      entries: [...holds.map(({ part, hold }) => (
+        <Entry key={`${part.item.id} ${hold.dependencyId}`}
+          main={<span className="flex items-start gap-1.5 text-[13px]" data-dependency-state={hold.met ? 'met' : 'unmet'}>{hold.met ? <Check className="mt-0.5 size-3.5 shrink-0 text-(--st-done)" /> : <Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" />}<span>{hold.owner}: {hold.need}</span></span>}
+          side={<>{hold.met ? 'met' : 'not met'} · holds <button type="button" onClick={() => open(part.item)} title={part.item.title} className="rounded px-0.5 font-medium tabular-nums text-(--primary) hover:bg-(--accent)">{ref(part.item)}</button></>} />
+      )), ...written.map((d) => (
         <Entry key={d} main={<span className="flex items-start gap-1.5 text-[13px]"><Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" /><span><Refs text={d} find={find} /></span></span>} />
-      )) },
+      ))] },
     { key: 'fog', label: 'Fog', tone: 'text-(--st-amber)',
       entries: (parent.map?.fog ?? []).map((q) => (
         <Entry key={q} main={<span className="flex items-start gap-1.5 text-[13px]"><CircleHelp className="mt-0.5 size-3.5 shrink-0 text-(--st-amber)" /><span><Refs text={q} find={find} /></span></span>} />
       )) },
-  ].filter((r) => r.entries.length);
+  ].filter((r) => r.entries.length && (!only || only.includes(r.key)));
+  if (!rows.length && only) return null;
   if (!rows.length) return <p className="m-0 text-[13px] text-(--muted-foreground)" data-attention-none>Nothing holds this up.</p>;
   return (
     // The labels' column is 7.5rem, or as wide as the longest label so none wraps ("To verify or merge" needs more).
@@ -208,7 +219,7 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
         <Action part={part} data={data} />
       </span>
       <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
-        {DECISION_KINDS.includes(part.kind) && <span>{partLabel(part.kind)}</span>}
+        <PartKindLabel kind={part.kind} />
         <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} label={shown.word} waiting={waits.length > 0} /></span>
         <span>{isDone(item) ? 'Complete' : shown.word}</span>
         {s ? <Figures s={s} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
@@ -314,7 +325,7 @@ const META = 'min-w-0 lg:min-w-10 shrink-[1000] truncate';
  *  threads, nothing), so the threads' wording never contradicts the "need you" chip, which counts parts. */
 function threadCounts(threads: ReturnType<typeof threadsOf>): string {
   if (!threads.length) return '';
-  const running = threads.filter((t) => t.state === 'running').length;
+  const running = threads.filter(threadAtWork).length;
   const waiting = threads.filter((t) => t.state === 'needs you').length;
   return [plural(threads.length, 'T3 thread'), running && `${running} running`, waiting && `${waiting} awaiting your reply`].filter(Boolean).join(' · ');
 }
@@ -350,8 +361,12 @@ function Next({ m, data, parent }: { m: Moving; data: BoardData; parent: Item })
   );
 }
 
-/** A concept or coupled parent, in full: what keeps it moving, then its parts as a Work map or a list. */
-function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; data: BoardData; now: number }) {
+/** What the Work map can't draw: the concept's own question over it, what it depends on and doesn't know yet under it. */
+const ABOVE_MAP = ['you'];
+const BELOW_MAP = ['dependencies', 'fog'];
+
+/** A concept or coupled parent, in full: its parts as a Work map or a list, with what keeps them moving. */
+function Dossier({ parent, parts, data }: { parent: Item; parts: Part[]; data: BoardData }) {
   const [view, setView] = useStored(VIEW, parent);
   const [on, setOpen] = useStored(OPEN, parent);
   // Letting go of a drag that selected text in the header leaves the dossier as it was; a key press on the chevron
@@ -399,16 +414,22 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
       </div>
 
       {on && (
-        <div className="grid gap-4 px-4 py-3">
+        <div className="grid gap-3 px-4 py-3">
           {missing > 0 && <p className="m-0 text-xs text-(--muted-foreground)" data-unread-parts>
             {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
           </p>}
           <StructureSync item={parent} />
-          <Attention parent={parent} parts={parts} data={data} find={find} />
-          <div className="grid gap-3">
-            <ViewToggle view={view} onView={setView} />
-            {view === 'map' ? <WorkMap parts={parts} check={parent.map?.check} data={data} now={now} /> : <PartsList parts={parts} data={data} />}
-          </div>
+          <div><ViewToggle view={view} onView={setView} /></div>
+          {view === 'map'
+            ? <>
+              <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />
+              <WorkMap parts={parts} check={parent.map?.check} data={data} home={repoKey(parent)} />
+              <Attention parent={parent} parts={parts} data={data} find={find} only={BELOW_MAP} />
+            </>
+            : <>
+              <Attention parent={parent} parts={parts} data={data} find={find} />
+              <PartsList parts={parts} data={data} />
+            </>}
         </div>
       )}
     </article>
@@ -418,8 +439,8 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
 /** `items` are the line's items in the main area's scope. */
 /** `shows` says which rows the filters leave; a part has no row of its own, so a dossier follows its parent's. */
 export function Dossiers({ items, shows }: { items: Item[]; shows: (item: Item) => boolean }) {
-  const { data, now } = useBoardStore();
+  const { data } = useBoardStore();
   const dossiers = dossiersOf(items, data.items).filter(({ parent }) => shows(parent));
   if (!dossiers.length) return null;
-  return <div className="grid gap-2" data-dossiers>{dossiers.map(({ parent, parts }) => <Dossier key={parent.id} parent={parent} parts={parts} data={data} now={now} />)}</div>;
+  return <div className="grid gap-2" data-dossiers>{dossiers.map(({ parent, parts }) => <Dossier key={parent.id} parent={parent} parts={parts} data={data} />)}</div>;
 }

@@ -1,67 +1,105 @@
-// A dossier's map: one lane per repository plus a Decisions lane, parts placed left to right by what they wait on,
-// arrows between them, ending in the end-to-end check, or a note that none is written yet.
+// A dossier's map, its current work first: a Decisions lane, a Builds lane for the dossier's own repository and a lane
+// for each other repository, named by its project icon and name, parts placed left to right by what they wait on, arrows between them, ending in the end-to-end check when one is written. Finished history folds into
+// one group below, which every arrow to or from a finished part starts or ends on, labelled with the parts it stands for.
 
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { BookOpen, FlaskConical, Hammer, ListChecks, Lightbulb, MessagesSquare, Shapes, Target } from 'lucide-react';
-import { ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
+import { BookOpen, ChevronDown, ChevronRight, FlaskConical, GitPullRequest, Hammer, ListChecks, Lightbulb, MessagesSquare, Shapes } from 'lucide-react';
+import { buildActivity, itemName, needsAnswer, openQuestionThread, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemTitle, SliceBar, useShownStatus } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, SliceBar, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partLabel, partWaves, shownThread, threadsOf, upstreamOf, waitText } from './dossier-parts.ts';
-import type { Part, PartKind } from './dossier-parts.ts';
-import { PartStart } from './part-start.tsx';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
+import { DECISION_KINDS, isDone, isHistory, openWaits, partActivity, partLabel, partWaves, threadsOf, upstreamOf, waitText } from './dossier-parts.ts';
+import type { Part, PartActivity, PartKind } from './dossier-parts.ts';
+import { PartStart, startable } from './part-start.tsx';
+import { YOURS, lastSeen } from './stage-track.tsx';
 
 const DECISIONS = 'Decisions';
 const KIND_ICON: Record<PartKind, typeof Hammer> = { grill: MessagesSquare, prototype: Shapes, research: BookOpen, task: ListChecks, decision: MessagesSquare, build: Hammer };
 const CHECK = 'e2e';
+const HISTORY = 'history';
 /** A part's work ID, which ticketless parts have too. */
 const keyOf = (p: Part) => p.item.id;
 const pickedRing = (on: boolean) => (on ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--card)' : '');
 
 const LABEL_W = 116;
-const NODE_H = 132;
-const GAP = 12;
-const PAD = 14;
-const HEAD_H = 30;
-const MIN_COL = 200;
+const NODE_H = 104;
+const GAP = 20;
+const PAD = 18;
+const MIN_COL = 240;
+const MAX_COL = 340;
+/** The history group's height, and the room above and below it. */
+const GROUP_H = 36;
+const GROUP_PAD = 8;
 
 interface Placed { key: string; part: Part | null; col: number; x: number; y: number }
+interface Edge { from: string; to: string; label?: string }
 
-function layout(parts: Part[], data: BoardData, width: number) {
+/** What leads a lane or a column: a question, then work on your desk, then running work, then what can start. */
+function urgency(p: Part): number {
+  if (needsAnswer(p.item)) return 0;
+  if (partActivity(p).kind === 'working') return 2;
+  if (YOURS.includes(p.item.status)) return 1;
+  return startable(p) ? 3 : 4;
+}
+
+/** The arrows among `parts` with the history group in place of each finished part, one per pair, naming the parts it stands for. */
+function edgesOf(parts: Part[], check: boolean): Edge[] {
   const ups = upstreamOf(parts);
-  const depth = partWaves(parts);
+  const shownKey = (p: Part) => (isHistory(p) ? HISTORY : keyOf(p));
+  const pairs = parts.flatMap((p) => ups(p).map((u) => ({ from: shownKey(u), to: shownKey(p), via: isHistory(u) ? u : p })));
+  if (check) {
+    // The check waits on every build; arrows come only from the last ones, the rest it waits on through them.
+    const sinks = parts.filter((p) => !parts.some((u) => ups(u).includes(p)));
+    const ends = sinks.filter((p) => p.kind === 'build');
+    pairs.push(...(ends.length ? ends : sinks).map((p) => ({ from: shownKey(p), to: CHECK, via: p })));
+  }
+  const edges = new Map<string, Edge & { via: Part[] }>();
+  for (const { from, to, via } of pairs) {
+    if (from === HISTORY && to === HISTORY) continue;
+    const edge = edges.get(`${from} ${to}`) ?? { from, to, via: [] };
+    edge.via.push(via);
+    edges.set(`${from} ${to}`, edge);
+  }
+  return [...edges.values()].map(({ from, to, via }) => {
+    const names = via.map((p) => itemName(p.item)).join(', ');
+    return from === HISTORY ? { from, to, label: `after ${names}` } : to === HISTORY ? { from, to, label: `before ${names}` } : { from, to };
+  });
+}
+
+function layout(parts: Part[], data: BoardData, width: number, check: boolean) {
+  const current = parts.filter((p) => !isHistory(p));
+  const depth = partWaves(current);
   const laneOf = (p: Part) => (DECISION_KINDS.includes(p.kind) ? DECISIONS : repoKey(p.item));
-  const named = [DECISIONS, ...data.repos.map((r) => r.repo), ...parts.map(laneOf)];
-  const lanes = [...new Set(named)].filter((l) => parts.some((p) => laneOf(p) === l));
-  const cols = Math.max(0, ...depth.values()) + 2;
-  const colW = Math.max(MIN_COL, Math.floor((width - LABEL_W) / cols));
+  const named = [DECISIONS, ...data.repos.map((r) => r.repo), ...current.map(laneOf)];
+  const first = (lane: string) => Math.min(...current.filter((p) => laneOf(p) === lane).map(urgency));
+  const lanes = [...new Set(named)].filter((l) => current.some((p) => laneOf(p) === l)).sort((a, b) => first(a) - first(b));
+  const cols = Math.max(1, Math.max(-1, ...depth.values()) + 1 + (check ? 1 : 0));
+  const colW = Math.min(MAX_COL, Math.max(MIN_COL, Math.floor((width - LABEL_W) / cols)));
   const nodeW = colW - 28;
   const placed: Placed[] = [];
   const bands: { lane: string; top: number; height: number }[] = [];
-  let top = HEAD_H;
+  let top = 0;
   lanes.forEach((lane) => {
-    const here = parts.filter((p) => laneOf(p) === lane);
-    const rows = Math.max(1, ...Array.from({ length: cols }, (_, c) => here.filter((p) => depth.get(keyOf(p)) === c).length));
+    const here = current.filter((p) => laneOf(p) === lane);
+    const inCol = (c: number) => here.filter((p) => depth.get(keyOf(p)) === c).sort((a, b) => urgency(a) - urgency(b));
+    const rows = Math.max(1, ...Array.from({ length: cols }, (_, c) => inCol(c).length));
     for (let c = 0; c < cols; c++) {
-      here.filter((p) => depth.get(keyOf(p)) === c).forEach((p, r) => placed.push({ key: keyOf(p), part: p, col: c, x: LABEL_W + c * colW + 14, y: top + PAD + r * (NODE_H + GAP) }));
+      inCol(c).forEach((p, r) => placed.push({ key: keyOf(p), part: p, col: c, x: LABEL_W + c * colW + 14, y: top + PAD + r * (NODE_H + GAP) }));
     }
     const height = PAD * 2 + rows * NODE_H + (rows - 1) * GAP;
     bands.push({ lane, top, height });
     top += height;
   });
-  placed.push({ key: CHECK, part: null, col: cols - 1, x: LABEL_W + (cols - 1) * colW + 14, y: Math.max(HEAD_H + PAD, (HEAD_H + top) / 2 - NODE_H / 2) });
-  // The check waits on every build; arrows come only from the last ones, the rest it waits on through them.
-  const sinks = parts.filter((p) => !parts.some((u) => ups(u).includes(p)));
-  const ends = sinks.filter((p) => p.kind === 'build');
-  const edges = [
-    ...parts.flatMap((p) => ups(p).map((u) => ({ from: keyOf(u), to: keyOf(p) }))),
-    ...(ends.length ? ends : sinks).map((p) => ({ from: keyOf(p), to: CHECK })),
-  ];
-  return { placed, bands, edges, cols, colW, nodeW, width: LABEL_W + cols * colW, height: Math.max(top, HEAD_H + PAD * 2 + NODE_H) };
+  const lanesEnd = check ? Math.max(top, PAD * 2 + NODE_H) : top;
+  if (check) placed.push({ key: CHECK, part: null, col: cols - 1, x: LABEL_W + (cols - 1) * colW + 14, y: lanesEnd / 2 - NODE_H / 2 });
+  const history = parts.length > current.length;
+  const fullWidth = Math.max(LABEL_W + cols * colW, width);
+  return { placed, bands, edges: edgesOf(parts, check), nodeW, colW, width: fullWidth, groupY: lanesEnd + GROUP_PAD, height: lanesEnd + (history ? GROUP_H + GROUP_PAD * 2 : 0) };
 }
 
 function useWidth() {
@@ -77,91 +115,157 @@ function useWidth() {
   return { ref, width };
 }
 
-function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now: number; width: number }) {
+/** A part's method or kind, in the one place and style every map surface shows it. */
+export function PartKindLabel({ kind }: { kind: PartKind }) {
+  const Icon = KIND_ICON[kind];
+  return <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] text-(--muted-foreground)" data-part-kind><Icon className="size-3.5 shrink-0" />{partLabel(kind)}</span>;
+}
+
+/** Another repository's identity, its project icon and name together; the corner's source icon says where the ticket lives instead. */
+function RepoIdentity({ repo, data }: { repo: string; data: BoardData }) {
+  return <span className="inline-flex min-w-0 items-center gap-1.5" title={repo} data-part-repo><ProjectIcon repo={repo} size="small" /><span className="truncate">{repoName(repo, data.repos)}</span></span>;
+}
+
+const ACTIVITY_WORD: Record<PartActivity['kind'], string | null> = { 'needs you': 'Needs you', working: 'Working', 'child waiting': 'Child waiting', stopped: 'Run stopped', finished: 'Run finished', none: null };
+/** The statuses where a finished run is news: work it should still be doing. */
+const RUNS: string[] = ['Shaping', 'In progress', 'Review'];
+
+/** What runs below a part now, and any slice held up: its active slices, else its child or background work. */
+function partDetail({ item }: Part, { kind, thread }: PartActivity): string[] {
+  const active = item.slices.filter((s) => s.progress === 'active').length;
+  const blocked = item.slices.filter((s) => s.progress === 'blocked').length;
+  return [
+    ...(active ? [`${plural(active, 'slice')} active`] : kind === 'working' && thread?.hasRunningChildren ? ['child work running'] : []),
+    ...(blocked ? [`${plural(blocked, 'slice')} blocked`] : []),
+  ];
+}
+
+function PartNode({ part, data, width, home }: { part: Part; data: BoardData; width: number; home: string }) {
   const { item } = part;
   const isPicked = useItemDialogStore((state) => state.itemId === item.id);
-  const Icon = KIND_ICON[part.kind];
   const open = openWaits(part);
   const complete = isDone(item);
   const shown = useShownStatus(item);
-  const thread = shownThread(part, shown.working);
-  const tone = complete ? 'border-(--border) bg-(--muted)'
-    : item.status === 'Needs you' ? 'border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] shadow-[inset_3px_0_0_var(--warning)]'
+  const unavailable = useActivityUnavailable();
+  const activity = partActivity(part, shown.working, unavailable);
+  const asks = needsAnswer(item);
+  const tone = asks ? 'border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] shadow-[inset_3px_0_0_var(--warning)]'
     : open.length ? 'border-dashed border-(--input)' : 'border-(--border)';
   let action: ReactNode = null;
   if (complete) action = null;
-  else if (item.status === 'Needs you') action = <OpenThread item={item} data={data} label="Answer in T3" />;
+  else if (asks) action = <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />;
   else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} label="Start" />;
-  else if (open.length) action = <span className="min-w-0 truncate text-[11px] text-(--muted-foreground)">Waiting on {waitText(item, open)}</span>;
-  else if (thread?.state === 'running') action = <span className="min-w-0 truncate text-[11px] text-(--muted-foreground)">thread working · {shortAgo(thread.updated, now)}</span>;
-  // Open thread joins anything but the card's own Start or answer, as an icon when it has to share the row.
-  const opensThread = threadsOf(item).length > 0 && (complete || !(item.status === 'Needs you' || item.status === 'Ready' || item.status === 'Queued'));
+  // Open thread joins anything but the card's own Start or answer, as an icon beside the status.
+  const opensThread = threadsOf(item).length > 0 && !action;
+  const status = complete ? 'Complete' : shown.word;
+  const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
+  const word = running?.running ? running.label : activity.kind === 'finished' && !RUNS.includes(item.status) ? null : ACTIVITY_WORD[activity.kind];
+  const seen = word && activity.thread ? lastSeen(activity.thread) : '';
+  const waits = !action && open.length ? `Waiting on ${waitText(item, open)}` : null;
+  // One fact once: an activity the status already says, or that the wait replaces, is left out.
+  const facts = [status, ...(word && word !== status && !waits ? [`${word}${seen}`] : []), ...(waits ? [waits] : []), ...partDetail(part, activity)];
   return (
     <div style={{ width, height: NODE_H }} data-map-part={item.id}
-      className={`relative flex flex-col gap-1 rounded-lg border bg-(--card) px-2.5 py-2 text-left shadow-xs ${tone} ${pickedRing(isPicked)}`}>
-      <button type="button" aria-label={`Open ${ref(item)}`} onClick={() => useItemDialogStore.getState().open(item.id)} className="absolute inset-0 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_60%,transparent)]" />
+      className={`relative flex flex-col gap-1 overflow-hidden rounded-lg border bg-(--card) px-2.5 py-2 text-left shadow-xs ${tone} ${pickedRing(isPicked)}`}>
+      <button type="button" aria-label={`Open ${ref(item)}`} onClick={() => useItemDialogStore.getState().open(item.id)} className="absolute inset-0 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_60%,transparent)] focus-visible:outline-2 focus-visible:outline-(--primary)" />
       <SourceIcon item={item} corner className="pointer-events-none" />
-      <span className="pointer-events-none relative flex items-center gap-1.5 pr-5 text-[11px] text-(--muted-foreground)">
-        <Icon className="size-3.5 shrink-0" />{partLabel(part.kind)}
-        <span className="ml-auto inline-flex items-center gap-1" title={thread ? `T3 thread: ${thread.title} (${thread.archived ? 'archived' : thread.state})` : 'No T3 thread'}>
-          {thread ? <><StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />thread</> : 'no thread'}
-        </span>
+      <span className="pointer-events-none relative flex min-w-0 items-center gap-1.5 pr-5 text-[11px] text-(--muted-foreground)">
+        <PartKindLabel kind={part.kind} />
+        {/* A build's lane already names its repository; the Decisions lane doesn't. */}
+        {DECISION_KINDS.includes(part.kind) && repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />}
+        <AzureFields azure={item.azure} />
       </span>
       <span className="pointer-events-none relative line-clamp-2 text-[13px] font-medium leading-snug"><ItemTitle item={item} /></span>
-      <AzureFields azure={item.azure} />
-      {item.slices.length > 0 && <span className="pointer-events-none relative"><SliceBar item={item} /></span>}
-      <span className="pointer-events-none relative mt-auto flex items-center gap-1.5 text-xs">
-        <StatusGlyph status={complete ? 'Done' : shown.glyph} className="size-3" />{complete ? 'Complete' : shown.word}
-        {thread && <span className="truncate text-(--muted-foreground)">· {thread.state}</span>}
+      <span className="relative mt-auto flex min-h-6 min-w-0 items-center gap-1.5 text-xs">
+        <StatusGlyph status={complete ? 'Done' : shown.glyph} className="size-3 shrink-0" />
+        <span className="pointer-events-none min-w-0 flex-1 truncate" title={facts.join(' · ')} data-map-facts>{facts.join(' · ')}</span>
+        {action && <span className="shrink-0">{action}</span>}
+        {opensThread && <span className="shrink-0"><OpenThread item={item} data={data} threadId={activity.thread?.id} iconOnly /></span>}
       </span>
-      {(action || opensThread) && (
-        <span className="relative flex min-h-6 min-w-0 items-center gap-1.5">
-          {action}
-          {opensThread && <span className="ml-auto shrink-0"><OpenThread item={item} data={data} threadId={thread?.id} iconOnly={Boolean(action)} /></span>}
-        </span>
-      )}
+      {item.slices.length > 0 && <span className="pointer-events-none absolute inset-x-2.5 bottom-1"><SliceBar item={item} /></span>}
     </div>
   );
 }
+
+/** A finished part as one row of the expanded history group: its kind, title, what it followed, PR and thread when it has them. */
+function HistoryRow({ part, after, data, home }: { part: Part; after: Part[]; data: BoardData; home: string }) {
+  const { item } = part;
+  return (
+    <li className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-[13px] hover:bg-(--soft)" data-history-part={item.id}>
+      <StatusGlyph status="Done" className="size-3 shrink-0" />
+      <span className="w-22 shrink-0"><PartKindLabel kind={part.kind} /></span>
+      <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} title={itemName(item)} className="min-w-0 truncate rounded text-left hover:underline focus-visible:outline-2 focus-visible:outline-(--primary)"><ItemTitle item={item} /></button>
+      {after.length > 0 && <span className="min-w-0 shrink-[1000] truncate text-[11px] text-(--muted-foreground)" title={`after ${after.map((u) => itemName(u.item)).join(', ')}`}>after {after.map((u) => ref(u.item)).join(', ')}</span>}
+      <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px] text-(--muted-foreground)">
+        {repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />}
+        {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
+        {threadsOf(item).length > 0 && <OpenThread item={item} data={data} iconOnly />}
+      </span>
+    </li>
+  );
+}
+
+/** How the group sums itself up: its settled decisions and finished builds, each left out at zero. */
+const historyText = (parts: Part[]) => {
+  const decisions = parts.filter((p) => DECISION_KINDS.includes(p.kind)).length;
+  const builds = parts.length - decisions;
+  return [decisions && plural(decisions, 'settled decision'), builds && plural(builds, 'finished build')].filter(Boolean).join(' · ');
+};
 
 function CheckNode({ check, width, after }: { check: EndToEndCheck; width: number; after: string }) {
   return (
     <div style={{ width, height: NODE_H }} data-map-check className="flex flex-col gap-1 rounded-lg border-2 border-dashed border-(--input) bg-(--card) px-2.5 py-2 shadow-xs">
       <span className="flex items-center gap-1.5 text-[11px] text-(--muted-foreground)"><FlaskConical className="size-3.5" />end-to-end check</span>
       <span className="line-clamp-2 text-[13px] font-medium leading-snug">{check.title}</span>
-      <span className="mt-auto flex items-center gap-1.5 text-xs"><StatusGlyph status="Queued" className="size-3" />waiting · {check.steps.length} steps</span>
-      <span className="text-[11px] text-(--muted-foreground)">agents run it once {after} land</span>
+      <span className="mt-auto flex min-w-0 items-center gap-1.5 text-xs"><StatusGlyph status="Queued" className="size-3 shrink-0" /><span className="min-w-0 truncate" title={after ? `Agents run it once ${after} land` : undefined}>{plural(check.steps.length, 'step')}{after && ` · runs once ${after} land`}</span></span>
     </div>
   );
 }
 
-/** The map of `parts`, ending in `check`; a dossier with no check written ends in a note saying so. */
-export function WorkMap({ parts, check, data, now }: { parts: Part[]; check: EndToEndCheck | undefined; data: BoardData; now: number }) {
+/** The map of `parts`, current work first and finished history folded below, ending in `check` when one is written. `home` is the dossier's own repository, which needs no naming. */
+export function WorkMap({ parts, check, data, home }: { parts: Part[]; check: EndToEndCheck | undefined; data: BoardData; home: string }) {
   const { ref: box, width } = useWidth();
   const [hover, setHover] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const marker = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const m = layout(parts, data, width);
+  if (!parts.length && !check) return null;
+  const m = layout(parts, data, width, Boolean(check));
   const at = new Map(m.placed.map((p) => [p.key, p]));
   const near = (key: string) => !hover || key === hover || m.edges.some((e) => (e.from === hover && e.to === key) || (e.to === hover && e.from === key));
-  const builds = parts.filter((p) => p.kind === 'build').map((p) => ref(p.item)).join(', ').replace(/, ([^,]*)$/, ' and $1');
-  const inCol = (c: number) => m.placed.filter((p) => p.col === c && p.part).length;
+  const builds = parts.filter((p) => p.kind === 'build' && !isHistory(p)).map((p) => ref(p.item)).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  const history = parts.filter(isHistory);
+  const ups = upstreamOf(parts);
+  /** An arrow's line; the group's run in the gutter beside a column, so none passes behind a node. */
+  const line = (from: Placed | undefined, to: Placed | undefined) => {
+    if (!from && to) {
+      const y = to.y + NODE_H / 2, gx = to.x - 14;
+      return `M${gx} ${m.groupY} L${gx} ${y + 8} Q${gx} ${y} ${gx + 8} ${y} L${to.x - 2} ${y}`;
+    }
+    if (from && !to) {
+      const y = from.y + NODE_H / 2, x = from.x + m.nodeW, gx = x + 10;
+      return `M${x} ${y} L${gx - 8} ${y} Q${gx} ${y} ${gx} ${y + 8} L${gx} ${m.groupY - 2}`;
+    }
+    if (!from || !to) return null;
+    const x1 = from.x + m.nodeW, y1 = from.y + NODE_H / 2, x2 = to.x - 2, y2 = to.y + NODE_H / 2, mid = (x1 + x2) / 2;
+    // Over a column, the arrow leaves from the node's foot and runs in the gap under the row, not behind a node.
+    const sx = x1 - 20, wy = from.y + NODE_H + GAP / 2;
+    return to.col - from.col > 1
+      ? `M${sx} ${from.y + NODE_H} L${sx} ${wy - 6} Q${sx} ${wy} ${sx + 6} ${wy} L${x2 - 30} ${wy} C${x2 - 12} ${wy} ${x2 - 18} ${y2} ${x2} ${y2}`
+      : `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`;
+  };
   return (
     <div ref={box} className="overflow-x-auto rounded-lg border border-(--border) bg-(--background)" data-work-map>
-      <div className="relative" style={{ width: m.width, height: m.height }}>
+      <div className="relative" style={{ width: m.width, height: m.height }} data-map-canvas>
         {m.bands.map((b, n) => (
-          <div key={b.lane} className={`absolute left-0 border-t border-(--border) ${n % 2 ? 'bg-[color-mix(in_srgb,var(--muted)_50%,transparent)]' : ''}`} style={{ top: b.top, height: b.height, width: m.width }}>
+          <div key={b.lane} className={`absolute left-0 ${n ? 'border-t border-(--border)' : ''} ${n % 2 ? 'bg-[color-mix(in_srgb,var(--muted)_50%,transparent)]' : ''}`} style={{ top: b.top, height: b.height, width: m.width }}>
             <div className="sticky left-0 flex h-full flex-col justify-center gap-0.5 bg-[color-mix(in_srgb,var(--background)_85%,transparent)] px-3" style={{ width: LABEL_W }}>
-              <span className="flex items-center gap-1.5 text-xs font-medium">
-                {b.lane === DECISIONS && <Lightbulb className="size-3.5 text-(--muted-foreground)" />}{b.lane === DECISIONS ? b.lane : repoName(b.lane, data.repos)}
+              <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
+                {b.lane === DECISIONS ? <><Lightbulb className="size-3.5 text-(--muted-foreground)" />{DECISIONS}</>
+                  : b.lane === home ? <><Hammer className="size-3.5 text-(--muted-foreground)" />Builds</>
+                  : <RepoIdentity repo={b.lane} data={data} />}
               </span>
-              {b.lane !== DECISIONS && repoName(b.lane, data.repos) !== b.lane && <span className="truncate text-[11px] text-(--muted-foreground)" title={b.lane}>{b.lane}</span>}
             </div>
           </div>
-        ))}
-        {Array.from({ length: m.cols }, (_, c) => (
-          <span key={c} className="absolute flex h-7.5 items-center gap-1 text-[11px] text-(--muted-foreground)" style={{ left: LABEL_W + c * m.colW + 14 }}>
-            {c === m.cols - 1 ? <><Target className="size-3" />Check</> : <>Wave {c + 1}{inCol(c) > 1 && <span>· {inCol(c)} in parallel</span>}</>}
-          </span>
         ))}
         <svg className="pointer-events-none absolute inset-0" width={m.width} height={m.height} aria-hidden="true">
           <defs>
@@ -173,14 +277,9 @@ export function WorkMap({ parts, check, data, now }: { parts: Part[]; check: End
           </defs>
           {m.edges.map((e) => {
             const a = at.get(e.from), b = at.get(e.to);
-            if (!a || !b) return null;
-            const done = !!a.part && isDone(a.part.item);
-            const x1 = a.x + m.nodeW, y1 = a.y + NODE_H / 2, x2 = b.x - 2, y2 = b.y + NODE_H / 2, mid = (x1 + x2) / 2;
-            // Over a column, the arrow leaves from the node's foot and runs in the gap under the row, not behind a node.
-            const sx = x1 - 20, wy = a.y + NODE_H + GAP / 2;
-            const d = b.col - a.col > 1
-              ? `M${sx} ${a.y + NODE_H} L${sx} ${wy - 6} Q${sx} ${wy} ${sx + 6} ${wy} L${x2 - 30} ${wy} C${x2 - 12} ${wy} ${x2 - 18} ${y2} ${x2} ${y2}`
-              : `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`;
+            const d = line(a, b);
+            if (!d) return null;
+            const done = e.from === HISTORY || (!!a?.part && isDone(a.part.item));
             const lit = !!hover && (e.from === hover || e.to === hover);
             return (
               <path key={`${e.from}-${e.to}`} d={d} fill="none" data-edge={`${e.from} ${e.to}`}
@@ -189,17 +288,36 @@ export function WorkMap({ parts, check, data, now }: { parts: Part[]; check: End
             );
           })}
         </svg>
+        {m.edges.map((e) => {
+          if (!e.label) return null;
+          const to = at.get(e.to), from = at.get(e.from);
+          const place = to ? { left: to.x, top: to.y - 15, width: m.nodeW } : from ? { left: from.x + m.nodeW + 14, top: m.groupY - 15, width: m.colW - 20 } : null;
+          return place && <span key={`${e.from}-${e.to}`} className="absolute truncate text-[11px] leading-3.5 text-(--muted-foreground)" style={place} title={e.label} data-edge-label={`${e.from} ${e.to}`}>{e.label}</span>;
+        })}
         {m.placed.map((p) => (
           <div key={p.key} className={`absolute transition-opacity ${near(p.key) ? '' : 'opacity-40'}`} style={{ left: p.x, top: p.y }}
             onMouseEnter={() => setHover(p.key)} onMouseLeave={() => setHover(null)}>
             {p.part
-              ? <PartNode part={p.part} data={data} now={now} width={m.nodeW} />
-              : check
-                ? <CheckNode check={check} width={m.nodeW} after={builds} />
-                : <div style={{ width: m.nodeW, height: NODE_H }} className="grid place-items-center rounded-lg border-2 border-dashed border-(--input) p-3 text-center text-xs text-(--muted-foreground)">No end-to-end check written yet</div>}
+              ? <PartNode part={p.part} data={data} width={m.nodeW} home={home} />
+              : check && <CheckNode check={check} width={m.nodeW} after={builds} />}
           </div>
         ))}
+        {history.length > 0 && (
+          <button type="button" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)} data-map-history
+            onMouseEnter={() => setHover(HISTORY)} onMouseLeave={() => setHover(null)}
+            className={`absolute flex items-center gap-2 rounded-lg border border-(--border) bg-(--card) px-2.5 text-left text-xs shadow-xs transition-opacity hover:bg-(--accent) focus-visible:outline-2 focus-visible:outline-(--primary) ${near(HISTORY) ? '' : 'opacity-40'}`}
+            style={{ left: 12, right: 12, top: m.groupY, height: GROUP_H }}>
+            <StatusGlyph status="Done" className="size-3.5 shrink-0" />
+            <span className="min-w-0 truncate font-medium">{historyText(history)}</span>
+            <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-(--muted-foreground)">{showHistory ? <>Hide<ChevronDown className="size-3.5" /></> : <>Show<ChevronRight className="size-3.5" /></>}</span>
+          </button>
+        )}
       </div>
+      {showHistory && (
+        <ol className="m-0 grid list-none gap-x-4 gap-y-0.5 px-3 pb-2 grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))]" style={{ width: m.width }} data-map-history-parts>
+          {history.map((p) => <HistoryRow key={keyOf(p)} part={p} after={ups(p).filter(isHistory)} data={data} home={home} />)}
+        </ol>
+      )}
     </div>
   );
 }

@@ -107,6 +107,19 @@ test.each<[string, ItemThread[], Partial<Item>, string, string | undefined]>([
   expect([activity.kind, activity.thread?.id]).toEqual([kind, thread]);
 });
 
+test('while activity is unavailable a part claims no live work, and keeps its question and its thread', () => {
+  const slices = [{ number: 1, repo: 'o/r', title: 'S', progress: 'active' }] as Item['slices'];
+  const read = (threads: ItemThread[], change: Partial<Item> = {}) => {
+    const { kind, thread } = partActivity(partWith(threads, change), false, true);
+    return [kind, thread?.id];
+  };
+  expect(read([{ ...quiet, state: 'running' }])).toEqual(['none', 'newest']);
+  expect(read([quiet], { slices }), 'a recorded active slice').toEqual(['none', 'newest']);
+  expect(read([{ ...quiet, hasLiveChildren: true }]), 'a live child').toEqual(['none', 'newest']);
+  expect(read([{ ...quiet, state: 'needs you' }]), 'a question stands').toEqual(['needs you', 'newest']);
+  expect(partActivity(partWith([quiet]), true, true).kind, 'work the status already vouches for').toBe('working');
+});
+
 test('a thread running behind a finished one is the thread a part shows, as running', () => {
   expect(shownThread(partWith([quiet, { ...quiet, id: 'older', hasRunningChildren: true }]))).toMatchObject({ id: 'older', state: 'running' });
 });

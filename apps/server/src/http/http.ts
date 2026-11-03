@@ -498,9 +498,12 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     const item = board.snapshot().items.find((i) => i.id === itemId);
     if (!item) return json(res, 404, { error: 'That item is not on the board.' });
     try {
-      const read = await itemDetails.details(item);
+      const checks = url.pathname === '/api/item-checks';
+      const read = checks
+        ? await itemDetails.checks?.(item) ?? { status: 503, error: 'Checks are unavailable.' }
+        : await itemDetails.details(item);
       if ('error' in read) json(res, read.status, { error: read.error });
-      else json(res, 200, { details: read satisfies ItemDetails });
+      else json(res, 200, checks ? { checks: read } : { details: read });
     } catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
   }
 
@@ -588,7 +591,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     }
     if (path === '/api/events') return openStream(req, res);
     if (path === '/api/onboarding/projects') return projectsRequest(res);
-    if (path === '/api/item-details') return itemDetailsRequest(url, res);
+    if (path === '/api/item-details' || path === '/api/item-checks') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
     if (path === '/api/item-labels') return itemLabelsRequest(url, res);
     if (path === '/api/ticket-preview') {

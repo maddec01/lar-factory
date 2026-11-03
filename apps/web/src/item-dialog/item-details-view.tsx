@@ -1,3 +1,4 @@
+import { ItemChecksSection } from './item-checks.tsx';
 // What the item dialog shows from an item's details: the description and comments in its main column, the people,
 // kind control, labels and their picker, dates, milestone or iteration and area in the meta area under its title, and the
 // sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows its error in the
@@ -345,6 +346,7 @@ export function ItemMeta({ item, read, refresh, now }: { item: Item; read: ItemD
       <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
       <AgentWorkNote item={item} />
       <AgentWork item={item} className="@min-[40rem]:hidden" />
+      {item.kind === 'build' && <ItemChecksSection key={item.id} itemId={item.id} />}
       <KindNotice key={`${item.id} notice`} item={item} read={read} refresh={refresh} />
     </div>
   );

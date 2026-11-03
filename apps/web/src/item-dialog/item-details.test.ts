@@ -308,3 +308,42 @@ test('Spec details show Original collapsed and expose retry plus exact-generatio
   await settle(() => button('Reject edit').click());
   expect(actions.slice(-2)).toEqual([{ itemId: 'I_sample13', generation: 12, action: 'accept' }, { itemId: 'I_sample13', generation: 12, action: 'reject' }]);
 });
+
+test('build checks load once on expansion and retain the empty result on reopen', async () => {
+  await mountPage();
+  const build = sample.items.find((item) => item.kind === 'build')!;
+  await openItem(build.id);
+  const calls = () => fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/item-checks'));
+  expect(calls()).toHaveLength(0);
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify({ checks: { workId: build.id, list: [], runs: [], reuses: [] } })));
+  const section = inDialog<HTMLDetailsElement>('[data-checks]')!;
+  await settle(() => { section.open = true; section.dispatchEvent(new Event('toggle')); });
+  expect(calls()).toHaveLength(1);
+  expect(text(section)).toContain('No checks are recorded.');
+  await settle(() => { section.open = false; section.dispatchEvent(new Event('toggle')); });
+  await settle(() => { section.open = true; section.dispatchEvent(new Event('toggle')); });
+  expect(calls()).toHaveLength(1);
+});
+
+test('checks show outcomes, reasons and named open failures', async () => {
+  await mountPage();
+  const build = sample.items.find((item) => item.kind === 'build')!;
+  await openItem(build.id);
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify({ checks: {
+    workId: build.id, list: [], reuses: [{ checkId: 'one', role: 'approver', reason: 'Only prose changed' }],
+    runs: [{ checkId: 'one', command: ['pnpm', 'test'], folder: 'apps/web', role: 'implementer', reason: 'UI changed', outcome: 'failed',
+      failureState: 'open', failure: { tests: ['opens lazily'], diagnosis: 'Unexpected request' } }],
+  } })));
+  const section = inDialog<HTMLDetailsElement>('[data-checks]')!;
+  await settle(() => { section.open = true; section.dispatchEvent(new Event('toggle')); });
+  for (const phrase of ['pnpm', 'failed', 'UI changed', 'Only prose changed', 'opens lazily', 'Unexpected request']) expect(text(section)).toContain(phrase);
+});
+
+test('a failed checks read stays in the section', async () => {
+  await mountPage();
+  await openItem(sample.items.find((item) => item.kind === 'build')!.id);
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: 'Database unavailable' }), { status: 503 }));
+  const section = inDialog<HTMLDetailsElement>('[data-checks]')!;
+  await settle(() => { section.open = true; section.dispatchEvent(new Event('toggle')); });
+  expect(text(section.querySelector('[role="alert"]'))).toContain('Database unavailable');
+});

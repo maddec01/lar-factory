@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { userInfo, homedir } from 'node:os';
 import { join } from 'node:path';
 import { onAzure, readTicketSpec, sameRepo, stripTrackerStructure, trackerCapabilities } from '@lar-factory/shared';
-import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails, LabelChange, RecordDetails, RepositorySetup, SwapKind, TicketKinds, TrackerLabel, TrackerLabels } from '@lar-factory/shared';
+import type { DescriptionSave, ItemChecks, Item, ItemComment, ItemCommentsPage, ItemDetails, LabelChange, RecordDetails, RepositorySetup, SwapKind, TicketKinds, TrackerLabel, TrackerLabels } from '@lar-factory/shared';
 import { trackerLabels } from '@lar-factory/shared/tracker-labels';
 import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { activeSpecState, editSpec, refreshSpecs, resolveSpecEdit, syncSpecs, type SpecSyncOptions } from '@lar-factory/work-records/spec-sync';
@@ -31,6 +31,7 @@ type SaveDescription = (item: Item, save: Omit<DescriptionSave, 'itemId'>) => Pr
 type ExportItem = (item: Item) => Promise<{ paths: string[] } | Refused>;
 
 export interface ItemDetailsReader {
+  checks?(item: Item): Promise<ItemChecks | Refused>;
   details: ReadItemDetails;
   olderComments: ReadOlderComments;
   saveDescription: SaveDescription;
@@ -68,9 +69,10 @@ export const detailsFileFor = (fixture: string): string => fixture.replace(/\.js
  * maps an item's id to the comments older than its details' (newest first), which are paged by how many were served.
  */
 function fromFile(file: string): ItemDetailsReader {
-  let all: (Record<string, ItemDetails> & { $older?: Record<string, ItemComment[]> }) | undefined;
+  let all: (Record<string, ItemDetails> & { $checks?: Record<string, ItemChecks>; $older?: Record<string, ItemComment[]> }) | undefined;
   const read = () => all ??= JSON.parse(readFileSync(file, 'utf8')) as NonNullable<typeof all>;
   return {
+    checks: async (item) => read().$checks?.[item.id] ?? { workId: item.id, list: [], runs: [], reuses: [] },
     details: async (item) => read()[item.id] ?? NO_DETAILS,
     olderComments: async (item, before) => {
       const older = read().$older?.[item.id] ?? [];
@@ -145,6 +147,11 @@ export function createItemDetails(sampleFile: string | null, ticketOf: (item: It
     return record && !('error' in read) ? { ...read, record } : read;
   };
   return {
+    async checks(work) {
+      if (work.kind !== 'build') return { status: 400, error: 'Checks belong to builds.' };
+      if (!records) return { status: 503, error: 'Work records are unavailable.' };
+      return records.checks(work.id);
+    },
     async details(work) {
       const [read, plan] = await Promise.all([readDetails(work), kindPlan(work)]);
       return plan && !('error' in read) ? { ...read, kindPlan: plan } : read;

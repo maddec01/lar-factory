@@ -367,3 +367,11 @@ test('readiness refuses foreign origins and sample mode without running Azure', 
   assert.equal(sample.status, 403);
   assert.equal((await board.calls()).length, 0);
 });
+
+test('the separate checks route supports sample mode and validates item identity', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const response = await fetch(`${board.url}/api/item-checks?itemId=I_sample13`);
+  assert.deepEqual([response.status, await response.json()], [200, { checks: { workId: 'I_sample13', list: [], runs: [], reuses: [] } }]);
+  assert.equal((await fetch(`${board.url}/api/item-checks`)).status, 400);
+  assert.equal((await fetch(`${board.url}/api/item-checks?itemId=missing`)).status, 404);
+});

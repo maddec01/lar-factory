@@ -104,3 +104,17 @@ export interface ItemCommentsPage {
   /** Where the next 10 older comments start; null when this page reached the oldest. */
   olderCursor: string | null;
 }
+
+/** Validation data read only when a build's Checks section opens. */
+export interface ItemChecks {
+  workId: string;
+  list: { command: string[]; folder: string }[];
+  runs: {
+    checkId: string; command: string[]; folder: string; role: string;
+    reason: string | null; outcome: 'unfinished' | 'interrupted' | 'failed' | 'expired' | 'passed';
+    eligible: boolean; snapshotState: 'unfinished' | 'missing' | 'changed' | 'stable';
+    failureState: 'open' | 'resolved' | null;
+    failure: { tests: string[]; diagnosis: string } | null;
+  }[];
+  reuses: { checkId: string; role: string; reason: string; tree: string; recordedAt: string }[];
+}

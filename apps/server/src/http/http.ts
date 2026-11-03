@@ -14,6 +14,7 @@ import type { Capture } from '../items/capture.ts';
 import type { BoardRetention } from '../items/retention.ts';
 import type { BoardShapingThreadCleanup } from '../items/shaping-thread-cleanup.ts';
 import type { BoardLimitSetting } from '../items/limit-setting.ts';
+import type { BoardAutoBuild } from '../auto-build/auto-build-setting.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { ItemDetailsReader } from '../item-details/item-details.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -32,6 +33,7 @@ export interface HttpDeps {
   shapingThreadCleanup: Pick<BoardShapingThreadCleanup, 'save'>;
   heavyCommandLimit: Pick<BoardLimitSetting, 'save'>;
   buildLimit: Pick<BoardLimitSetting, 'save'>;
+  autoBuild: Pick<BoardAutoBuild, 'save'>;
   /** Archive's work as the records are now, which Settings › Archive reads from /api/archive when it opens. */
   archive(): Item[];
   page: BuiltPage;
@@ -146,7 +148,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectIcon, projectChoices, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectIcon, projectChoices, keepOnboarding, createProject,
   detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
@@ -286,6 +288,13 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       what: 'the build limit', disabled: 'The build limit is disabled in sample mode.',
       async run(input) {
         const saved = buildLimit.save(input);
+        return { ...saved, body: { ...saved.body, board: board.snapshot() } };
+      },
+    },
+    '/api/auto-build': {
+      what: 'the Auto-build setting', disabled: 'Auto-build is disabled in sample mode.',
+      async run(input) {
+        const saved = autoBuild.save(input);
         return { ...saved, body: { ...saved.body, board: board.snapshot() } };
       },
     },

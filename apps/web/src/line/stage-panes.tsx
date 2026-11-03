@@ -1,8 +1,10 @@
-// The Shaping, Ready to build and Build sections. Build's header counts the factory's builds at work against the build limit.
+// The Shaping, Ready to build and Build sections. Shaping's header holds the Auto-build switch, and Build's counts the
+// factory's builds at work against the build limit.
 
 import { activityUnavailable, buildsAtWork, limitNumber } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { AutoBuildSwitch } from './auto-build-switch.tsx';
 import { Pane, PaneEmpty } from './pane.tsx';
 import { StageRow } from './stage-row.tsx';
 import type { StageRow as Row } from './stage-rows.ts';
@@ -17,7 +19,7 @@ function Rows({ rows }: { rows: Row[] }) {
 export function Shaping({ shaping, shows }: { shaping: Row[]; shows: Shows }) {
   const rows = shaping.filter(shows);
   return (
-    <Pane id="shaping" title="Shaping" status="Shaping" count={rows.length}>
+    <Pane id="shaping" title="Shaping" status="Shaping" count={rows.length} right={<AutoBuildSwitch />}>
       {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={shaping.length > 0} none="Nothing in shaping.">Nothing in shaping matches.</PaneEmpty>}
     </Pane>
   );

@@ -26,7 +26,7 @@ it('is Automatic while no file is saved, and saves in its own file beside the he
 });
 
 it('refuses an invalid limit, naming the build limit', () => {
-  expect(() => buildLimitSetting.write(0, tempDir())).toThrow(new WorkRecordError('invalid', 'The build limit needs a limit of "automatic" or a whole number from 1.'));
+  expect(() => buildLimitSetting.write(0, tempDir())).toThrow(new WorkRecordError('invalid', 'The build limit setting needs a limit of "automatic" or a whole number from 1.'));
 });
 
 it("counts a file it can't use as Automatic and says why", () => {

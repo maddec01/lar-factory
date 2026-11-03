@@ -520,6 +520,33 @@ describe('work-record threads and launch intents', () => {
     expect(() => reopened.addThread(build.workId, 5, 'has space', 'build')).toThrow(expect.objectContaining({ code: 'invalid' }));
   });
 
+  it('reads every record\'s threads at once, as each record reads its own', async () => {
+    const records = await open();
+    const [build, bug, quiet] = [lar(records, 'build'), lar(records, 'bug'), lar(records, 'bug')];
+    records.addThread(build.workId, 1, 'thread-shape', 'shape');
+    records.addThread(bug.workId, 1, 'thread-bug', 'shape');
+    records.addThread(build.workId, 2, 'thread-build', 'build');
+    records.confirmThreadDeleted(build.workId, 3, 'thread-shape');
+    const all = records.threadsByWork();
+    expect(all.get(build.workId)).toEqual(records.threads(build.workId));
+    expect(all.get(bug.workId)).toEqual(records.threads(bug.workId));
+    expect(all.has(quiet.workId)).toBe(false);
+  });
+
+  it('copies no record\'s threads as it reads each row', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    for (let i = 0; i < 40; i++) records.addThread(build.workId, i + 1, `thread-${i}`, 'build');
+    const iterator = Array.prototype[Symbol.iterator];
+    let iterations = 0;
+    Array.prototype[Symbol.iterator] = function counted(this: unknown[]) { iterations++; return iterator.call(this); };
+    let all: ReturnType<typeof records.threadsByWork>;
+    try { all = records.threadsByWork(); }
+    finally { Array.prototype[Symbol.iterator] = iterator; }
+    expect(all.get(build.workId)).toHaveLength(40);
+    expect(iterations).toBeLessThan(40);
+  });
+
   it('finds an unresolved launch intent after reopening and resolves it to a thread ID exactly once', async () => {
     const path = join(tempDir(), 'work-records.db');
     const first = await openWorkRecords(path);

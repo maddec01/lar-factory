@@ -1,5 +1,5 @@
 import { it, expect } from 'vite-plus/test';
-import { buildActivity, canRetryBuild, delegatedWorkRunning, workingAgain, type Item } from './model.ts';
+import { buildActivity, buildsAtWork, canRetryBuild, delegatedWorkRunning, limitNumber, workingAgain, type Item, type StartProgress } from './model.ts';
 
 it('requires current build execution and rejects waiting, cached and stale evidence', () => {
   const item = { status: 'In progress', buildPhase: 'implement', threads: [{ purpose: 'build', state: 'running', currentRunning: true }] } as unknown as Item;
@@ -73,3 +73,25 @@ for (const status of ['Verify', 'Ready to merge'] as const) {
     expect(buildActivity(running, true)).toEqual(recorded);
   });
 }
+
+it('counts builds against the build limit while they start, build or work again, never a concept', () => {
+  const item = (id: string, change: Partial<Item>) => ({ id, kind: 'feature', status: 'Ready', threads: [], slices: [], ...change }) as unknown as Item;
+  const again = { threads: [{ purpose: 'build', state: 'running', currentRunning: true }] } as unknown as Partial<Item>;
+  const items = [
+    item('ready', {}), item('starting', {}), item('may', {}), item('failed', {}),
+    item('progress', { status: 'In progress' }), item('review', { status: 'Review' }),
+    item('verify', { status: 'Verify' }), item('again', { status: 'Ready to merge', ...again }),
+    item('concept', { kind: 'concept', status: 'In progress' }), item('shaping', { status: 'Shaping' }),
+  ];
+  const startProgress: Record<string, { build?: StartProgress; shape?: StartProgress }> = {
+    starting: { build: { phase: 'starting' } }, may: { build: { phase: 'may-have-started', message: 'Check T3.' } },
+    failed: { build: { phase: 'failed', message: 'Refused.' } }, shaping: { shape: { phase: 'starting' } },
+  };
+  expect(buildsAtWork({ items, startProgress }).map((i) => i.id)).toEqual(['starting', 'may', 'progress', 'review', 'again']);
+  expect(buildsAtWork({ items, startProgress }, true).map((i) => i.id), 'unknown activity drops a build working again').toEqual(['starting', 'may', 'progress', 'review']);
+});
+
+it('a limit allows its number, or what Automatic gives', () => {
+  expect(limitNumber({ limit: 'automatic', automatic: 3 })).toBe(3);
+  expect(limitNumber({ limit: 5, automatic: 3 })).toBe(5);
+});

@@ -161,7 +161,7 @@ export const toast = () => $('[data-slot="toaster"] [data-toast]')?.closest<HTML
 /** Sends `data` down the page's event stream. */
 export const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));
 /** The sample with the item `id` in `status`. */
-export const moved = (id: string, status: Status): BoardData => ({ ...sample, items: sample.items.map((i) => (i.id === id ? { ...i, status } : i)) });
+export const moved = (id: string, status: Status, data: BoardData = sample): BoardData => ({ ...data, items: data.items.map((i) => (i.id === id ? { ...i, status } : i)) });
 
 let answerPost: ((body: object, status?: number) => Promise<void>) | undefined;
 /** Makes each POST wait until the test answers it, so the pending state can be seen; a board read gets `board`. */

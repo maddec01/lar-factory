@@ -1,11 +1,13 @@
-// The title bar's five counters: need you, building over the in-flight limit, queued, shipped and spend, always for
+// The title bar's five counters: need you, building against the build limit, queued, shipped and spend, always for
 // the whole factory. Each opens a popover of the items behind its number; picking one opens the item dialog.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, moved, mountPage, sample, settle, text, textBesideIcon } from '../../test/support.ts';
 import type { ItemThread } from '@lar-factory/shared';
 
-const completeSample = { ...sample, error: null, items: sample.items.map(item => ({ ...item, stats: item.stats && item.stats !== 'unavailable' ? item.stats : { agentMs: 0, tokens: 0, costUsd: 0 } })) };
+/** The sample with a build limit of 2, which sample mode leaves out. */
+const limited = { ...sample, buildLimit: { limit: 'automatic' as const, automatic: 2 } };
+const completeSample = { ...limited, error: null, items: sample.items.map(item => ({ ...item, stats: item.stats && item.stats !== 'unavailable' ? item.stats : { agentMs: 0, tokens: 0, costUsd: 0 } })) };
 
 const counters = () => $$<HTMLButtonElement>('.counters button[aria-haspopup]');
 const counter = (label: string) => counters().find((b) => b.getAttribute('aria-label')!.startsWith(`${label}: `))!;
@@ -22,10 +24,10 @@ async function openCounter(label: string): Promise<HTMLElement> {
 
 test('the counters show need you, building over the limit of 2, queued, shipped this week and spend, each by its number and named by its label', async () => {
   await mountPage(completeSample);
-  expect(counters().map(text)).toEqual(['7', '3/2', '3', '4', '$190.25']);
+  expect(counters().map(text)).toEqual(['7', '4/2', '3', '4', '$190.25']);
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
     'need you: 7 items waiting on your answer, verification or merge',
-    'building: 1 over the in-flight limit',
+    'building: 2 over the build limit',
     'queued: 3 items ready to shape, 4 more in List',
     'shipped: Done in the last 7 days',
     'spend: Agent cost on open and recent items, an API estimate',
@@ -91,20 +93,36 @@ test('need you lists its items by status, each with its status glyph in its colo
   expect(pop.querySelector('ul')!.className.split(' ')).toContain('grid-cols-[minmax(0,1fr)]');
 });
 
-test('building lists the items in progress, its slots and what the limit means', async () => {
-  await mountPage();
+test('building lists the builds at work, the build limit and what it means', async () => {
+  await mountPage(limited);
   const pop = await openCounter('building');
-  expect(head(pop)).toBe('Building3/2');
-  expect(rows().map((r) => r.split(' ')[0])).toEqual(['#150', '#30', '#180']);
-  expect(foot(pop)).toBe('No free slot: queued items wait for one.');
+  expect(head(pop)).toBe('Building4/2');
+  expect(rows().map((r) => r.split(' ')[0]), 'Review counts; Verify and Ready to merge only when at work again').toEqual(['#150', '#30', '#180', '#141']);
+  expect(foot(pop)).toBe('At the build limit. Start build and Start after still go ahead.');
+  expect(text(pop)).not.toContain('slot');
 });
 
-test('a concept in progress takes no build slot', async () => {
-  await mountPage(moved('I_sample09', 'In progress'));
-  expect(text(counter('building'))).toBe('3/2');
+test('a build counts while its start is in flight or in Review, and the count shows the excess', async () => {
+  const started = { ...limited, buildLimit: { limit: 1, automatic: 2 }, startProgress: { I_sample13: { build: { phase: 'starting' as const } } } };
+  await mountPage(moved('I_sample14', 'Review', started));
+  expect(text(counter('building'))).toBe('5/1');
+  expect(counter('building').getAttribute('aria-label')).toBe('building: 4 over the build limit');
+});
+
+test('without a build limit, as in sample mode, building shows only its count', async () => {
+  await mountPage();
+  expect(text(counter('building'))).toBe('4');
+  expect(counter('building').getAttribute('aria-label')).toBe('building: 4 builds at work');
+  const pop = await openCounter('building');
+  expect([head(pop), pop.querySelector('.border-t')]).toEqual(['Building4', null]);
+});
+
+test('a concept in progress is no build at work', async () => {
+  await mountPage(moved('I_sample09', 'In progress', limited));
+  expect(text(counter('building'))).toBe('4/2');
   const pop = await openCounter('building');
   expect(rows().map((r) => r.split(' ')[0])).not.toContain('#200');
-  expect(head(pop)).toBe('Building3/2');
+  expect(head(pop)).toBe('Building4/2');
 });
 
 test('queued lists the queued items and how many wait in List', async () => {
@@ -178,7 +196,7 @@ test('with nothing on the board each popover says so', async () => {
     ['shipped', 'Nothing shipped this week.'],
     ['spend', 'No priced agent work yet.'],
   ]);
-  expect(counter('building').getAttribute('aria-label')).toBe('building: 2 slots free of 2');
+  expect(counter('building').getAttribute('aria-label')).toBe('building: Room for 2 more builds under the build limit of 2');
 });
 
 test('picking a row closes the popover and opens that item\'s dialog', async () => {

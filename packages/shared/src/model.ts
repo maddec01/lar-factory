@@ -648,6 +648,8 @@ export interface BoardData {
   shapingThreadCleanup?: ShapingThreadCleanupState;
   /** This machine's heavy command limit and the number Automatic gives here. Absent in sample mode. */
   heavyCommandLimit?: HeavyCommandLimitState;
+  /** This machine's build limit and the number Automatic gives here, the heavy command limit. Absent in sample mode. */
+  buildLimit?: BuildLimitState;
 }
 
 /** What the board does to an item's shaping threads once Start build records a build thread. */
@@ -659,6 +661,12 @@ export type ShapingThreadCleanupState = { choice: ShapingThreadCleanup } | { pro
 export type HeavyCommandLimit = 'automatic' | number;
 /** The saved limit, the number Automatic gives on this machine, and why a file that couldn't be read or held an invalid value counts as Automatic. */
 export interface HeavyCommandLimitState { limit: HeavyCommandLimit; automatic: number; problem?: string }
+/** How many builds may work at once on this machine: Automatic, which follows the heavy command limit, or a whole number from 1. */
+export type BuildLimit = HeavyCommandLimit;
+export type BuildLimitState = HeavyCommandLimitState;
+
+/** The number a limit allows: the saved number, or the one Automatic gives. */
+export const limitNumber = ({ limit, automatic }: HeavyCommandLimitState): number => (limit === 'automatic' ? automatic : limit);
 
 /** When finished and set-aside work leaves the board, and when, if ever, it is deleted. */
 export interface RetentionState {
@@ -1245,6 +1253,19 @@ export function workingAgain(item: Item, unavailable = false): boolean {
   if (unavailable || item.paused || item.archived || item.needsYou || openQuestionThread(item)) return false;
   const current = currentBuildThread(item);
   return !!current?.currentRunning || delegatedWorkRunning(item);
+}
+
+/**
+ * The builds that count against the build limit, in every repository: a build whose start is in flight or may have
+ * started, one In progress or Review, and one at Verify or Ready to merge at work again. A concept never counts.
+ */
+export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, unavailable = false): Item[] {
+  return data.items.filter((item) => {
+    if (item.kind === 'concept') return false;
+    const start = startProgressOf(data, item.id, 'build');
+    return start?.phase === 'starting' || start?.phase === 'may-have-started' ||
+      item.status === 'In progress' || item.status === 'Review' || workingAgain(item, unavailable);
+  });
 }
 
 export function buildActivity(item: Item, stale = false, start?: StartProgress): { label: string; running: boolean } {

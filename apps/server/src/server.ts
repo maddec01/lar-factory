@@ -26,7 +26,7 @@ import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources
 import { finishCompleted, observeRecords } from './items/observe-records.ts';
 import { createPrObserver } from './items/pr-observer.ts';
 import { createRetention } from './items/retention.ts';
-import { createHeavyCommandLimit } from './items/heavy-command-limit.ts';
+import { createLimitSettings } from './items/limit-setting.ts';
 import { createShapingThreadCleanup, createShapingThreadSweep, shapingThreadCleanupProblems } from './items/shaping-thread-cleanup.ts';
 import { agreedKind, archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
@@ -120,8 +120,8 @@ if (!fixture) {
 const retention = createRetention({ records, changed: () => reread() });
 /** This Mac's choice for an item's shaping threads after Start build. */
 const shapingThreadCleanup = createShapingThreadCleanup({ records, changed: () => reread() });
-/** How many heavy commands may run at once on this Mac. */
-const heavyCommandLimit = createHeavyCommandLimit({ changed: () => reread() });
+/** How many heavy commands, and how many builds, may run at once on this Mac. */
+const { heavyCommandLimit, buildLimit } = createLimitSettings({ changed: () => reread() });
 /** Work whose retained stats count a shaping thread the sweep deleted, until a fresh read replaces them. */
 const overcountedStats = new Set<string>();
 const sweepShapingThreads = records && createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: lookupThread, send: sendThreadCommand,
@@ -148,7 +148,7 @@ function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tic
   if (!records) return [];
   const repos = items.repos().map((r) => r.repo);
   const hidden = retention.hidden();
-  board.update({ retention: retention.state(), shapingThreadCleanup: shapingThreadCleanup.state(), heavyCommandLimit: heavyCommandLimit.state() });
+  board.update({ retention: retention.state(), shapingThreadCleanup: shapingThreadCleanup.state(), heavyCommandLimit: heavyCommandLimit.state(), buildLimit: buildLimit.state() });
   const setups = board.snapshot().repos.flatMap((r) => r.setup ? [r.setup] : []);
   return recordItems(records, tickets, repos, unread, hidden, setups);
 }
@@ -793,7 +793,7 @@ const startAfter = createStartAfter({ board, commands, offerModelChoices, gone: 
 // Sample mode asks T3 for nothing, so its boards show toned initials.
 const projectIcons = fixture ? null : createProjectIcons(board);
 const { server, endStreams } = createBoardServer({
-  board, commands, capture: adding, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  board, commands, capture: adding, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   reauthorizeT3: async () => {
     const read = await reauthorizeRepositoryProjects();
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });

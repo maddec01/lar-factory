@@ -67,15 +67,21 @@ test('a live board push moves a row between sections with no reload', async () =
   expect(inPane('build')).toContain(140);
 });
 
-test("Build's header counts the factory's builds against the limit, one bar per build past it", async () => {
-  await mountPage();
-  const slots = $('[data-stage="build"] header .build-slots')!;
-  expect(text(slots)).toBe('3/2 building');
-  expect(slots.querySelectorAll('.slot')).toHaveLength(3);
-  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(withItem('I_sample09', { status: 'In progress' })));
-  expect(text($('.build-slots')), 'a concept in progress takes no build slot').toBe('3/2 building');
-  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive({ ...sample, items: sample.items.map((i) => (['I_sample14', 'I_sample23'].includes(i.id) ? { ...i, status: 'Review' as const } : i)) }));
-  expect(text($('.build-slots'))).toBe('1/2 building');
+test("Build's header counts the factory's builds against the build limit, one bar per build past it", async () => {
+  const limited = { ...sample, buildLimit: { limit: 'automatic' as const, automatic: 2 } };
+  const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
+  await mountPage(limited);
+  const header = $('[data-stage="build"] header .build-limit')!;
+  expect(text(header), 'In progress and Review count').toBe('4/2 building');
+  expect(header.querySelectorAll('.bar')).toHaveLength(4);
+  await receive(withItem('I_sample09', { status: 'In progress' }, limited));
+  expect(text($('.build-limit')), 'a concept in progress is no build at work').toBe('4/2 building');
+  await receive({ ...limited, items: sample.items.map((i) => (['I_sample14', 'I_sample23'].includes(i.id) ? { ...i, status: 'Done' as const } : i)) });
+  expect(text($('.build-limit'))).toBe('2/2 building');
+  await receive({ ...limited, buildLimit: { limit: 4, automatic: 2 } });
+  expect([text($('.build-limit')), $$('.build-limit .bar').length]).toEqual(['4/4 building', 4]);
+  await receive(sample);
+  expect([text($('.build-limit')), $$('.build-limit .bar').length], 'no limit in sample mode').toEqual(['4 building', 0]);
 });
 
 test('a row\'s controls are their own focus stops, none nested in the button that opens details', async () => {

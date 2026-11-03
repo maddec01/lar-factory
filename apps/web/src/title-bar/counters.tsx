@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
-import { boardSections, formatUsd, plural, itemName, repoKey, shortAgo } from '@lar-factory/shared';
+import { activityUnavailable, boardSections, buildsAtWork, formatUsd, limitNumber, plural, itemName, repoKey, shortAgo } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
@@ -15,7 +15,6 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-sy
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
 import { ItemTitle, useShownStatus } from '../items/item-parts.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
@@ -96,8 +95,8 @@ function List({ items, max = 8, children }: { items: Item[]; max?: number; child
   );
 }
 
-/** The in-flight slots: one bar per slot, filled for each running build, extra builds past the limit after a gap. */
-function Slots({ used, limit }: { used: number; limit: number }) {
+/** The build limit as bars: one per build it allows, filled for each build at work, extra builds past it after a gap. */
+function LimitBars({ used, limit }: { used: number; limit: number }) {
   const bar = (n: number, on: boolean) => (
     <span key={n} className="h-1.5 w-3 rounded-full" style={{ background: on ? STATUS_COLOR['In progress'] : 'var(--border)' }} />
   );
@@ -112,7 +111,8 @@ function Slots({ used, limit }: { used: number; limit: number }) {
 export function Counters() {
   const { data, now, clientError } = useBoardStore();
   const s = boardSections(data, now, clientError);
-  const building = buildsInSlots(data.items);
+  const building = buildsAtWork(data, activityUnavailable(data, now, clientError));
+  const limit = data.buildLimit && limitNumber(data.buildLimit);
   const costs = data.items
     .map((item) => ({ item, cost: costOf(item) }))
     .filter((x) => x.cost > 0)
@@ -120,7 +120,7 @@ export function Counters() {
   const incomplete = !data.firstRead.settled || !!data.itemSourceProblems?.length || !!data.error || !!data.localProblem ||
     data.items.some(item => item.stats === 'unavailable' || (!item.stats && (item.threads === 'unavailable' || !!item.threads?.length)));
   const spend = costs.reduce((t, c) => t + c.cost, 0);
-  const free = BUILD_LIMIT - building.length;
+  const free = limit === undefined ? undefined : limit - building.length;
   const row = (i: Item, trailing?: ReactNode) => <Row key={i.id} item={i} now={now} trailing={trailing} />;
   const glyph = (status: Status) => <StatusGlyph status={status} />;
 
@@ -146,12 +146,13 @@ export function Counters() {
         </Counter>
 
         <Counter label="building" icon={glyph('In progress')} hideBelow="hidden @min-[40rem]:inline-flex"
-          value={<>{building.length}<span className="font-normal text-(--muted-foreground)">/{BUILD_LIMIT}</span></>}
-          hint={free > 0 ? `${plural(free, 'slot')} free of ${BUILD_LIMIT}` : free === 0 ? 'At the in-flight limit' : `${-free} over the in-flight limit`}>
+          value={<>{building.length}{limit !== undefined && <span className="font-normal text-(--muted-foreground)">/{limit}</span>}</>}
+          hint={free === undefined ? `${plural(building.length, 'build')} at work` : free > 0 ? `Room for ${plural(free, 'more build')} under the build limit of ${limit}`
+            : free === 0 ? 'At the build limit' : `${-free} over the build limit`}>
           <PopHead icon={glyph('In progress')} title="Building"
-            sub={<span className="inline-flex items-center gap-2"><Slots used={building.length} limit={BUILD_LIMIT} />{building.length}/{BUILD_LIMIT}</span>} />
+            sub={limit === undefined ? building.length : <span className="inline-flex items-center gap-2"><LimitBars used={building.length} limit={limit} />{building.length}/{limit}</span>} />
           {building.length ? <List items={building}>{(i) => row(i)}</List> : <Empty>Nothing building right now.</Empty>}
-          <PopFoot>{free > 0 ? `${plural(free, 'slot')} free: the next queued item can start.` : 'No free slot: queued items wait for one.'}</PopFoot>
+          {free !== undefined && <PopFoot>{free > 0 ? `Room for ${plural(free, 'more build')} under the build limit.` : 'At the build limit. Start build and Start after still go ahead.'}</PopFoot>}
         </Counter>
 
         <Counter label="queued" value={s.queued.length} icon={glyph('Queued')} hideBelow="hidden @min-[54rem]:inline-flex"

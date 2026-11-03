@@ -139,7 +139,7 @@ test('when no queued item can start, Start next shows disabled and says why', as
 
 test('the Queue has no Auto-start and never mentions a build slot, and its Start works with every slot taken', async () => {
   await mountPage(withChoices);
-  expect([queue().querySelector('[role="switch"]'), queue().querySelector('.build-slots'), queue().querySelector('.drag')]).toEqual([null, null, null]);
+  expect([queue().querySelector('[role="switch"]'), queue().querySelector('.build-limit'), queue().querySelector('.drag')]).toEqual([null, null, null]);
   expect(text(queue())).not.toContain('build slot');
   expect([start().getAttribute('aria-disabled'), startNext().getAttribute('aria-disabled')]).toEqual(['false', 'false']);
 });

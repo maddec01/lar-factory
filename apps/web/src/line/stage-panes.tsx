@@ -1,7 +1,7 @@
-// The Shaping, Ready to build and Build sections. Build's header counts the factory's builds against the limit, which it shows but doesn't enforce.
+// The Shaping, Ready to build and Build sections. Build's header counts the factory's builds at work against the build limit.
 
+import { activityUnavailable, buildsAtWork, limitNumber } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
-import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
 import { Pane, PaneEmpty } from './pane.tsx';
 import { StageRow } from './stage-row.tsx';
@@ -32,25 +32,26 @@ export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
   );
 }
 
-/** Builds in progress against the limit, one bar per slot, more when they're over it. */
-function BuildSlots({ building }: { building: number }) {
+/** Builds at work against the build limit, one bar per build it allows, more when they're over it. */
+function BuildLimit({ building, limit }: { building: number; limit: number | undefined }) {
   return (
-    <span className="build-slots inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] tabular-nums text-(--muted-foreground)" title="Builds in flight against the limit">
-      <span className="inline-flex gap-[3px]">
-        {Array.from({ length: Math.max(BUILD_LIMIT, building) }, (_, n) => (
-          <span key={n} className="slot h-1.5 w-3 rounded-full" style={{ background: n < building ? STATUS_COLOR['In progress'] : 'var(--border)' }} />
+    <span className="build-limit inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] tabular-nums text-(--muted-foreground)" title="Builds at work against the build limit">
+      {limit !== undefined && <span className="inline-flex gap-[3px]">
+        {Array.from({ length: Math.max(limit, building) }, (_, n) => (
+          <span key={n} className="bar h-1.5 w-3 rounded-full" style={{ background: n < building ? STATUS_COLOR['In progress'] : 'var(--border)' }} />
         ))}
-      </span>
-      {building}/{BUILD_LIMIT} building
+      </span>}
+      {building}{limit !== undefined && `/${limit}`} building
     </span>
   );
 }
 
 export function Build({ build, shows }: { build: Row[]; shows: Shows }) {
-  const building = useBoardStore((state) => buildsInSlots(state.data.items).length);
+  const building = useBoardStore((state) => buildsAtWork(state.data, activityUnavailable(state.data, state.now, state.clientError)).length);
+  const buildLimit = useBoardStore((state) => state.data.buildLimit);
   const rows = build.filter(shows);
   return (
-    <Pane id="build" title="Build" status="In progress" count={rows.length} right={<BuildSlots building={building} />}>
+    <Pane id="build" title="Build" status="In progress" count={rows.length} right={<BuildLimit building={building} limit={buildLimit && limitNumber(buildLimit)} />}>
       {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={build.length > 0} none="Nothing in build.">Nothing in build matches.</PaneEmpty>}
     </Pane>
   );

@@ -1,19 +1,20 @@
-// Settings › General: the heavy command limit, Automatic or a typed whole number from 1, which posts to the board server
-// and shows the board it answers with.
+// Settings › General: the heavy command limit and the build limit, each Automatic or a typed whole number from 1, which
+// posts to the board server and shows the board it answers with.
 
 import { expect, test, vi } from 'vite-plus/test';
-import type { BoardData, HeavyCommandLimitState } from '@lar-factory/shared';
+import type { BoardData, BuildLimitState, HeavyCommandLimitState } from '@lar-factory/shared';
 import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
 
 const row = () => $('.settings-row[data-row="heavy-command-limit"]')!;
-const radios = () => $$<HTMLButtonElement>('[data-heavy-command-limit] [role="radio"]');
+const radios = (name = 'heavy-command-limit') => $$<HTMLButtonElement>(`[data-limit="${name}"] [role="radio"]`);
 const radio = (value: string) => radios().find((r) => r.value === value)!;
-const picked = () => radios().filter((r) => r.getAttribute('aria-checked') === 'true').map((r) => r.value);
-const input = () => $<HTMLInputElement>('[data-heavy-command-limit] input[aria-label="Heavy command limit"]');
-const saveButton = () => $<HTMLButtonElement>('[data-save-heavy-command-limit]')!;
-const alerts = () => $$('[data-heavy-command-limit] [role="alert"]').map(text);
-const posted = () => fetchMock.mock.calls.filter(([url]) => url === '/api/heavy-command-limit').map((call) => JSON.parse((call as unknown as [string, RequestInit])[1].body as string));
-const withLimit = (state?: HeavyCommandLimitState): BoardData => ({ ...sample, ...state && { heavyCommandLimit: state } });
+const picked = (name?: string) => radios(name).filter((r) => r.getAttribute('aria-checked') === 'true').map((r) => r.value);
+const input = () => $<HTMLInputElement>('[data-limit="heavy-command-limit"] input[aria-label="Heavy command limit"]');
+const saveButton = () => $<HTMLButtonElement>('[data-save-limit="heavy-command-limit"]')!;
+const alerts = (name = 'heavy-command-limit') => $$(`[data-limit="${name}"] [role="alert"]`).map(text);
+const posted = (name = 'heavy-command-limit') => fetchMock.mock.calls.filter(([url]) => url === `/api/${name}`).map((call) => JSON.parse((call as unknown as [string, RequestInit])[1].body as string));
+const withLimit = (state?: HeavyCommandLimitState, build?: BuildLimitState): BoardData =>
+  ({ ...sample, ...state && { heavyCommandLimit: state }, ...build && { buildLimit: build } });
 
 async function openGeneral(data: BoardData): Promise<void> {
   fetchMock.mockImplementation((async () => new Response(JSON.stringify(data))) as never);
@@ -32,9 +33,9 @@ async function type(value: string): Promise<void> {
   await settle(() => input()!.dispatchEvent(new Event('input', { bubbles: true })));
 }
 
-test('General has the row in its own group, showing Automatic with the number it gives', async () => {
+test('General has the row in its own group with the build limit, showing Automatic with the number it gives', async () => {
   await openGeneral(withLimit({ limit: 'automatic', automatic: 3 }));
-  expect(row().closest('section')!.querySelectorAll('.settings-row')).toHaveLength(1);
+  expect([...row().closest('section')!.querySelectorAll<HTMLElement>('.settings-row')].map((r) => r.dataset.row)).toEqual(['heavy-command-limit', 'build-limit']);
   expect(text(row().querySelector('.settings-row-title'))).toBe('Heavy commands at once');
   expect(radios().map((r) => text(r.closest('label') ?? r.parentElement))).toEqual(['Automatic (3)', 'Number']);
   expect(picked()).toEqual(['automatic']);
@@ -135,4 +136,29 @@ test('In sample mode nothing is picked and a save shows why it was refused', asy
   await settle(() => radio('automatic').click());
   expect(picked()).toEqual([]);
   expect(alerts()).toEqual(['The heavy command limit is disabled in sample mode.']);
+});
+
+test('Builds at once shows Automatic with the heavy command limit it follows, and saves to its own setting', async () => {
+  await openGeneral(withLimit({ limit: 4, automatic: 2 }, { limit: 'automatic', automatic: 4 }));
+  const build = $('.settings-row[data-row="build-limit"]')!;
+  expect(text(build.querySelector('.settings-row-title'))).toBe('Builds at once');
+  expect(radios('build-limit').map((r) => text(r.closest('label') ?? r.parentElement))).toEqual(['Automatic (4)', 'Number']);
+  expect(picked('build-limit')).toEqual(['automatic']);
+  await settle(() => radios('build-limit').find((r) => r.value === 'number')!.click());
+  const field = $<HTMLInputElement>('[data-limit="build-limit"] input[aria-label="Build limit"]')!;
+  expect(field.value).toBe('4');
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '1');
+  await settle(() => field.dispatchEvent(new Event('input', { bubbles: true })));
+  answerSave(200, { error: null, board: withLimit({ limit: 4, automatic: 2 }, { limit: 1, automatic: 4 }) });
+  await settle(() => $<HTMLButtonElement>('[data-save-limit="build-limit"]')!.click());
+  expect([posted('build-limit'), posted()]).toEqual([[{ limit: 1 }], []]);
+  expect(picked('build-limit')).toEqual(['number']);
+});
+
+test('An invalid build limit file picks no option, with a note', async () => {
+  const problem = 'The build limit setting /data/build-limit.json isn\'t JSON: Unexpected end of JSON input.';
+  await openGeneral(withLimit({ limit: 'automatic', automatic: 2 }, { limit: 'automatic', automatic: 2, problem }));
+  expect(picked('build-limit')).toEqual([]);
+  expect(alerts('build-limit')).toEqual([`${problem} The board uses Automatic until you save a choice.`]);
+  expect(picked()).toEqual(['automatic']);
 });

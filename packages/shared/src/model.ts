@@ -185,8 +185,6 @@ export interface EndToEndCheck {
 
 /** What a concept is for and where its shaping stands. */
 export interface ConceptMap {
-  /** Mermaid source from the Map section. */
-  diagram?: string;
   /** The first paragraph under Destination. */
   destination: string;
   decisions: string[];

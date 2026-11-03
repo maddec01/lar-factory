@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { RichText } from '@lar-factory/ui/rich-text';
 
 /** Mermaid runs locally in strict mode. Issue text cannot enable HTML or links. */
-export function Diagram({ source }: { source: string }) {
+function Diagram({ source }: { source: string }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const host = useRef<HTMLDivElement>(null);
   const [problem, setProblem] = useState<string | null>(null);

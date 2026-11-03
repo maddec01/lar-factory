@@ -50,6 +50,21 @@ describe('recorded thread lookup', () => {
     expect(executionItemThreads([parent, child])(['root'])?.[0]).toMatchObject({ state: 'done', hasRunningChildren: true });
     for (const noSignal of [[], { kind: 'shell' }, undefined]) expect(executionItemThreads([{ ...parent, pendingBackgroundTasks: noSignal }])(['root'])?.[0]).not.toHaveProperty('hasRunningChildren');
   });
+  it('shows current descendant tasks, including background checks, and drops them when they finish', () => {
+    const parent = { ...shell, status: 'completed' };
+    const child = { ...shell, id: 'fixer', title: 'Fix startup test failures', status: 'running', lineage: { parentThreadId: 'missing', rootThreadId: 'root' } };
+    const read = (changes = {}) => executionItemThreads([parent, { ...child, ...changes }])(['root'])![0]!;
+    expect(read().childActivity).toEqual({ titles: ['Fix startup test failures'], count: 1 });
+    expect(read({ status: 'completed', pendingBackgroundTasks: [{ kind: 'shell' }] }).childActivity).toEqual({ titles: ['Fix startup test failures'], count: 1 });
+    for (const status of ['waiting', 'queued', 'completed', 'cancelled']) expect(read({ status }).childActivity).toBeUndefined();
+    expect(read({ deletedAt: shell.updatedAt }).childActivity).toBeUndefined();
+    expect(read({ lineage: { parentThreadId: 'unrelated' } }).childActivity).toBeUndefined();
+  });
+  it('bounds task titles while counting each descendant once through parent and root paths', () => {
+    const children = Array.from({ length: 8 }, (_, i) => ({ ...shell, id: `child-${i}`, title: `Task ${i}`, status: 'running', pendingBackgroundTasks: [{ kind: 'shell' }], lineage: { parentThreadId: 'root', rootThreadId: 'root' } }));
+    const parent = executionItemThreads([shell, ...children])(['root'])![0]!;
+    expect(parent.childActivity).toEqual({ titles: ['Task 0', 'Task 1', 'Task 2'], count: 8 });
+  });
   it('marks a queued thread, still done, and holds its ancestors as live', () => {
     const parent = { ...shell, status: 'idle' };
     const child = { ...shell, id: 'child', status: 'idle', lineage: { parentThreadId: 'root', rootThreadId: 'root' } };

@@ -712,3 +712,42 @@ describe.each(['Verify', 'Ready to merge'] as const)('%s with its build thread r
     expect(text(desk())).toContain(status);
   });
 });
+
+test('finishing the last slice keeps a handoff summary until the builder records its next phase', async () => {
+  const at = (progress: Slice['progress'], buildPhase: string) => withItem('I_sample13', {
+    status: 'In progress', blockers: [], buildPhase,
+    slices: [{ number: 1, title: 'Startup responsiveness', progress }] as Slice[],
+    threads: [{ ...thread('build', 'running'), purpose: 'build', currentRunning: true }],
+  }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() });
+  const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
+  await mountPage(at('active', 'implement'));
+  expect(text(col('I_sample13', 'next'))).toBe('Implementing · active Startup responsiveness');
+  await receive(at('done', 'implement'));
+  expect(text(col('I_sample13', 'next'))).toBe('Finishing build · All slices implemented');
+  await receive(at('done', 'full-checks'));
+  expect(text(col('I_sample13', 'next'))).toBe('Checks · All slices implemented');
+  expect(text(count('I_sample13'))).toBe('1/1 slices');
+});
+
+test('live child tasks replace the slice summary and clear on completion or lost freshness', async () => {
+  const at = (more: Partial<ItemThread> = {}) => withItem('I_sample13', {
+    status: 'In progress', blockers: [], buildPhase: 'full-checks',
+    slices: [{ number: 1, title: 'Startup responsiveness', progress: 'done' }] as Slice[],
+    threads: [{ ...thread('build', 'done'), purpose: 'build', hasRunningChildren: true, ...more }],
+  }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() });
+  const activity = { titles: ['Fix startup test failures', 'Review launch feedback'], count: 2 };
+  const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
+  await mountPage(at({ childActivity: activity }));
+  expect(text(col('I_sample13', 'next'))).toBe('Checks · Fix startup test failures +1 more');
+  expect(col('I_sample13', 'next').title).toContain('Review launch feedback');
+  const firstRead = at({ childActivity: activity });
+  await receive({ ...firstRead, firstRead: { ...firstRead.firstRead, settled: false } });
+  expect(text(col('I_sample13', 'next'))).toContain('Fix startup test failures');
+  await receive(at());
+  expect(text(col('I_sample13', 'next'))).toBe('Checks · All slices implemented');
+  await receive(at({ childActivity: activity, observedAt: new Date(NOW).toISOString() }));
+  expect(text(col('I_sample13', 'next'))).not.toContain('Fix startup');
+  await receive(at({ childActivity: activity }));
+  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().fail('Disconnected'));
+  expect(text(col('I_sample13', 'next'))).not.toContain('Fix startup');
+});

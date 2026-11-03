@@ -46,19 +46,28 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
     order.set(shell.id, orderedBy(shell));
   }
   // A thread's background tasks carry on after its turn ends, so it and its ancestors are still at work.
+  const background = new Set<string>();
   for (const shell of shells) {
     const thread = byId.get(shell.id as string);
     if (!thread || !Array.isArray(shell.pendingBackgroundTasks) || !shell.pendingBackgroundTasks.length) continue;
     thread.hasRunningChildren = true;
+    background.add(thread.id);
     for (const id of ancestorsOf(thread.id, lineages)) { const ancestor = byId.get(id); if (ancestor) ancestor.hasRunningChildren = true; }
   }
   for (const thread of byId.values()) {
-    if (thread.state !== 'running' && thread.state !== 'needs you' && !thread.queued) continue;
+    const live = thread.state === 'running' || thread.state === 'needs you' || thread.queued;
+    const working = thread.currentRunning || background.has(thread.id);
+    if (!live && !working) continue;
     for (const id of ancestorsOf(thread.id, lineages)) {
       const ancestor = byId.get(id);
       if (!ancestor) continue;
-      ancestor.hasLiveChildren = true;
+      if (live) ancestor.hasLiveChildren = true;
       if (thread.currentRunning) ancestor.hasRunningChildren = true;
+      if (working) {
+        const activity = ancestor.childActivity ??= { titles: [], count: 0 };
+        activity.count++;
+        if (activity.titles.length < 3) activity.titles.push(thread.title);
+      }
     }
   }
   /** The recorded threads T3 shows, newest first by `orderedBy` and archived ones last, since archiving updates a thread; undefined for work with no recorded thread. */

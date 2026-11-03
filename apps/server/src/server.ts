@@ -46,6 +46,7 @@ import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectHints } from './t3/repository-project.ts';
+import { createProjectIcons } from './t3/project-icons.ts';
 import { protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
 import { loadT3Reads, warmT3Stats } from './t3/t3-reads.ts';
 import { lookupThread } from './t3/t3.ts';
@@ -789,6 +790,8 @@ const commands = createItemCommands({ clearedFailuresFile: fixture ? null : join
 const adding = createCapture({ board, items, records, reread, repos: () => board.snapshot().repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, gone: armedWorkGone(records, readRepositoryList), file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
+// Sample mode asks T3 for nothing, so its boards show toned initials.
+const projectIcons = fixture ? null : createProjectIcons(board);
 const { server, endStreams } = createBoardServer({
   board, commands, capture: adding, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   reauthorizeT3: async () => {
@@ -796,7 +799,7 @@ const { server, endStreams } = createBoardServer({
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
     if (read.availability !== 'available') throw new Error('T3 unavailable');
   },
-  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), showLabelChange, showTicketType, readSoon, ready: () => firstGhCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), showLabelChange, showTicketType, readSoon, ready: () => firstGhCheck, projectIcon: async (projectId) => projectIcons?.image(projectId), projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   detectSetup: (input) => detectSetup(input), saveSetup: (input) => saveSetup(input),
@@ -829,6 +832,7 @@ if (!fixture) process.on('exit', recordBoard(port));
 if (!fixture) firstGhCheck = new Promise((resolve, reject) => void recheckTools(true, {}, resolve).catch(reject));
 // Onboarding progress shows before the first read, which waits for the tool lookup.
 if (!fixture) board.update({ onboarding: stillOnboarding(onboarded()) });
+const stopProjectIcons = projectIcons?.start();
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).
@@ -856,6 +860,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     clearInterval(timer);
     clearInterval(localTimer);
     clearTimeout(toolRetry);
+    stopProjectIcons?.();
     endStreams();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref();

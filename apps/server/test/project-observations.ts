@@ -11,6 +11,9 @@ export async function repositoryProjects(env: NodeJS.ProcessEnv = process.env): 
   } catch { return { availability: 'unavailable' }; }
 }
 
+/** Spawned boards have no T3 to ask for favicons. */
+export const repositoryProjectAccess = () => undefined;
+
 export async function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
   return repositoryProjects();
 }

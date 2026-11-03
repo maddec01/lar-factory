@@ -52,3 +52,11 @@ test('sample mode offers the fixture model choices', async (t) => {
     ['codex', ['GPT-6 Astra', 'GPT-6.1 Sol', 'gpt-daybreak-blue-latest']],
   ]);
 });
+
+test('sample mode has no project icons, and the image endpoint answers 404', async (t) => {
+  const { url, t3Calls } = await startBoard(t, {}, true);
+  const board = await (await fetch(`${url}/api/board`)).json() as BoardData;
+  assert.equal(board.projectIcons, undefined);
+  assert.equal((await fetch(`${url}/api/project-icon/I_sample`)).status, 404);
+  assert.deepEqual(await t3Calls(), []);
+});

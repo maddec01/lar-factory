@@ -309,13 +309,16 @@ it('keeps a known icon while T3 is unavailable, sends nothing and knows nothing 
   expect(await nothing.image('id-factory')).toBeUndefined();
 });
 
-it('publishes a chosen icon without asking T3 for a favicon, and drops bytes it no longer needs', async () => {
+it.each<ChosenProjectIcon>([
+  { kind: 'emoji', emoji: '🚀' },
+  { kind: 'lucide', name: 'rocket', color: 'sky' },
+  { kind: 'monogram', text: 'LF', color: 'rose' },
+])('publishes a chosen $kind icon without asking T3 for a favicon, and drops bytes it no longer needs', async (chosen) => {
   t3.read = listed(fact('factory'));
   assets = { factory: png('good') };
   const board = boardOf('lar-factory');
   const icons = createProjectIcons(board);
   await icons.refresh();
-  const chosen: ChosenProjectIcon = { kind: 'emoji', emoji: '🚀' };
   t3.read = listed(fact('factory', { projectIcon: chosen }));
   requests = [];
   await icons.refresh();

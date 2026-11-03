@@ -638,7 +638,7 @@ export interface BoardData {
    * the hint that says how to add it in T3. Absent until the first read, and in sample mode.
    */
   repositoryProjects?: Record<string, string | null>;
-  /** The icon of each listed or onboarding repository with exactly one T3 project as its main checkout and an icon. Absent in sample mode. */
+  /** The icon of each listed or onboarding repository with exactly one T3 project as its main checkout and an icon. Sample data holds chosen icons only, never a favicon. */
   projectIcons?: Record<string, ProjectIcon>;
   /** The bundle's skills and checklists, read once at startup; empty when the server can't read them. */
   bundledSkills?: BundledSkill[];

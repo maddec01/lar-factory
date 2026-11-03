@@ -13,7 +13,7 @@ The work of settling a concept's open questions and recording the resulting unde
 _Avoid_: delivery completion.
 
 **Your desk**:
-The board's row of items only the user can move next, including shaping work and concepts with an open question.
+The board's row of items waiting on the user's answer, verification or merge, including shaping work and concepts with an open question.
 _Avoid_: inbox, needs-you list.
 
 **Open question**:

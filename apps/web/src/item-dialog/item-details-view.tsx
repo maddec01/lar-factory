@@ -16,7 +16,7 @@ import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';
-import { ConceptWork } from './concept-parts.tsx';
+import { ConceptState, ConceptWork } from './concept-parts.tsx';
 import { AzureFields, AgentWork, AgentWorkNote, KIND_BADGES, LabelChips, useShownLabels } from '../items/item-parts.tsx';
 import { LabelPicker } from '../labels/label-picker.tsx';
 import { useBoardStore } from '../board/board-store.ts';
@@ -345,8 +345,8 @@ export function ItemMeta({ item, read, refresh, now }: { item: Item; read: ItemD
         : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}
       <FromDetails read={read} label="Created" show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />} />
       <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
-      {item.kind === 'concept' && item.refinement && <Fact label="Refinement"><span>{item.refinement.complete ? 'Complete' : item.refinement.reasons.join(' ')}</span></Fact>}
-      {item.kind === 'concept' && item.completion && <Fact label="Delivery"><span>{item.completion.complete ? 'Complete' : item.completion.reasons.join(' ')}</span></Fact>}
+      {item.kind === 'concept' && item.refinement && <Fact label="Refinement"><ConceptState state={item.refinement} /></Fact>}
+      {item.kind === 'concept' && item.completion && <Fact label="Delivery"><ConceptState state={item.completion} /></Fact>}
       <AgentWorkNote item={item} />
       {item.kind === 'concept' ? <ConceptWork item={item} /> : <AgentWork item={item} className="@min-[40rem]:hidden" />}
       {item.kind === 'build' && <ItemChecksSection key={item.id} itemId={item.id} />}

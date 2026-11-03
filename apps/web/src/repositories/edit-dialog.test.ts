@@ -81,11 +81,11 @@ test('access is a single optional summary and recheck runs a real probe', async 
   expect(sent).toEqual([{ repo: REPO, change: 'recheck' }]);
 });
 
-test('concept sync changes on this machine without a repository PR', async () => {
+test('Settings explains suspension without a publication toggle', async () => {
   const sent = serve(boardWith()); await openEdit(boardWith());
-  const toggle = dialog()!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-  await settle(() => toggle.click());
-  expect(sent).toEqual([{ repo: REPO, change: 'structure-sync', value: false }]);
+  expect(dialog()!.textContent).toContain('Legacy structural publication is suspended');
+  expect(dialog()!.textContent).not.toContain('Save concepts and cross-repository links to issues');
+  expect(sent).toEqual([]);
 });
 
 test('issue defaults start on for existing repositories and persist each choice through Settings', async () => {

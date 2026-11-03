@@ -60,6 +60,21 @@ process.stdout.write('{}');
     access: { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' }, overrides: { structureSync: false, writeRefinedSpec: false, vocabulary: { bug: { type: 'Bug', labels: ['type: bug'] }, feature: { type: 'Feature', labels: ['type: feature'] } } },
   } }] }));
 
+  it('explicit structural sync refuses retries and preserves local content and uncertainty', async () => {
+    const data = tempDir();
+    const records = await openWorkRecords(join(data, 'work-records.db'));
+    const root = records.create({ repository: 'example/product', title: 'Retained concept', kind: 'concept' });
+    records.setBody(root.workId, root.revision, 'map', 'Local map content');
+    records.trackerReserveCreation(root.workId);
+    const before = records.trackerPending();
+    const result = await larWork(data, 'sync-structure', root.workId, '--confirmed-missing-issue', root.workId);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('suspended');
+    expect(records.trackerPending()).toEqual(before);
+    expect(records.trackerReserveCreation(root.workId)).toBe(false);
+    records.close();
+  });
+
   it('change-kind swaps the ticket through the shared path, and update --kind writes nothing to it', async () => {
     const data = join(tempDir(), 'Lar Factory');
     const writes = fakeIssue(tempDir(), { labels: [{ name: 'type: bug' }, { name: 'docs' }], type: { name: 'Bug' } });

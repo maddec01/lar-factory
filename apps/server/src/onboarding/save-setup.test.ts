@@ -49,20 +49,18 @@ test('onboarding persists each issue preference and defaults omitted preferences
   }
 });
 
-test('GitHub sharing checks creation, comments and its discovery label before saving', async (t) => {
+test('setup needs no structural write access', async (t) => {
   const dir = await folder(t);
   const result = await saveSetup(answers, dir, { access: async () => ({ 'publish-ticket': 'allowed', 'edit-ticket': 'refused' }) });
-  expect(result).toMatchObject({ status: 403, error: expect.stringContaining('post comments, set issue labels') });
-  expect(readRepositoryList(dir)).toEqual([]);
-  expect(await saveSetup({ ...answers, structureSync: false }, dir, { access: async () => ({}) })).toEqual({ onboarding: [] });
-  expect(readRepositorySetups(dir)[0]?.structureSync).toBe(false);
+  expect(result).toEqual({ onboarding: [] });
+  expect(readRepositoryList(dir)).toHaveLength(1);
+  expect(readRepositorySetups(dir)[0]?.structureSync).toBe(true);
 });
 
-test('failed access checks block sharing but allow local shaping when sharing is off', async (t) => {
+test('failed access checks allow local shaping', async (t) => {
   const dir = await folder(t);
   const reads: SaveReads = { access: async () => { throw new Error('Not signed in'); } };
-  expect(await saveSetup(answers, dir, reads)).toMatchObject({ status: 403 });
-  expect(await saveSetup({ ...answers, structureSync: false }, dir, reads)).toEqual({ onboarding: [] });
+  expect(await saveSetup(answers, dir, reads)).toEqual({ onboarding: [] });
   expect(readRepositorySetups(dir)[0]?.access['push-branch']).toBe('unverified');
 });
 

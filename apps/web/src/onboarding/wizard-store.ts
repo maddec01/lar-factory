@@ -6,7 +6,7 @@ import {
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
-import { STEP_TITLES, answerProblem, answersOf, connectionsOf, isStep, missingSyncAccess, stepsOf, type StepId } from './wizard-choices.ts';
+import { STEP_TITLES, answerProblem, answersOf, connectionsOf, isStep, stepsOf, type StepId } from './wizard-choices.ts';
 
 /** Where a kept onboarding stopped, as a phrase; a step this dialog doesn't have, as an older board's, reads as the first. */
 export const stoppedAt = ({ step }: OnboardingProgress): string => `stopped at ${STEP_TITLES[isStep(step) ? step : 'project']}`;
@@ -75,7 +75,7 @@ export function stepReady(run: Run, projects: Projects, detection: Read<SetupDet
   const typed = Object.values(run.choices.newLabels ?? {}).flat();
   if (typed.length && (newLabelProblem(detected.repo, detected.access, options) ?? typedLabelsProblem(detected.repo, typed))) return false;
   if (answerProblem(run.step, answers) || !answers.itemSource) return false;
-  return run.step !== 'access' || !answers.structureSync || missingSyncAccess(detected).length === 0;
+  return true;
 }
 
 interface WizardState {

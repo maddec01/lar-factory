@@ -175,6 +175,9 @@ test('suspension retains pending work and uncertain creation across explicit ret
 test('legacy upgrade preserves every stored row and repeats without changing pending identities', async () => {
   const records = await cache();
   const {root, decision} = await concept(records);
+  const finished = records.create({ repository: 'team/apple', title: 'Completed earlier build', kind: 'build' });
+  records.setBody(finished.workId, finished.revision, 'brief', 'Retained finished history');
+  records.recordFinished(finished.workId, records.read(finished.workId).revision);
   records.trackerReserveCreation(decision.workId);
   records.trackerFailed(root.workId, 'Retained conflict', true, 'local-digest');
   const {DatabaseSync} = await import('node:sqlite');

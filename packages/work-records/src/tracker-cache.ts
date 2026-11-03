@@ -7,7 +7,7 @@ import { WorkRecordError } from './database.ts';
 import { validateTrackerSnapshot } from './tracker-snapshot.ts';
 
 type Row = Record<string, string | number | null>;
-export interface StructureNode {
+interface StructureNode {
   key: string; repository: string; kind: Kind; title: string; ticket: string | null;
   parent: string | null; blockers: string[]; map?: string;
 }
@@ -29,7 +29,7 @@ export interface TrackerCache {
   trackerFailed(workId: string, error: string, conflict?: boolean, expectedDigest?: string): void;
   trackerState(workId: string): Item['sync'];
 }
-export const hasTrackerStructure = (snapshot: TrackerSnapshot): boolean => {
+const hasTrackerStructure = (snapshot: TrackerSnapshot): boolean => {
   const repositories=new Set(snapshot.nodes.map(node=>node.repository.toLowerCase()));
   return snapshot.nodes.some(node=>node.kind==='concept') || repositories.size>1 || snapshot.dependencies.some(dependency=>!repositories.has(dependency.owner.toLowerCase()));
 };

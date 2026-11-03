@@ -18,12 +18,12 @@ test('three accessible screens lead straight to the board with no ticket picker 
   expect(button('Next').disabled).toBe(true);
   await pick();
   expect(heading()).toBe('Work and docs');
-  expect(dialog()!.textContent).toContain('Save concepts and cross-repository links to issues');
+  expect(dialog()!.textContent).toContain('Legacy structural publication is suspended');
   expect(dialog()!.querySelector('[data-import-step]')).toBeNull();
   expect(document.activeElement).toBe(dialog()!.querySelector('[data-slot="modal-header"] h2'));
   await settle(() => button('Next').click());
   expect(heading()).toBe('Access and add');
-  expect(dialog()!.textContent).toContain('Save concept maps and links');
+  expect(dialog()!.textContent).not.toContain('Save concept maps and links');
   await settle(() => button('Add repository').click());
   expect(heading()).toBe('Repository added');
   expect(posted('/api/onboarding/setup')).toHaveLength(1);
@@ -33,24 +33,11 @@ test('three accessible screens lead straight to the board with no ticket picker 
   expect($('[data-onboard]')).not.toBeNull();
 });
 
-const syncNeed = () => dialog()!.querySelector('[data-sync-need]');
-
-test('the sync checkbox shows linked-work as the fixed label it needs, only with sync on', async () => {
+test('onboarding explains suspension and has no publication toggle', async () => {
   await openOnboarding([project('app', { repo: 'team/app' })], { '/api/onboarding/detect': { detection: detection({ repo: 'team/app' }) } });
   await pick('app');
-  expect(text(syncNeed())).toContain('Needs this label, which the factory creates and manages:');
-  expect(text(syncNeed())).toContain('linked-work');
-  await settle(() => dialog()!.querySelector<HTMLInputElement>('[data-work-step] input[type="checkbox"]')!.click());
-  expect(syncNeed()).toBeNull();
-});
-
-test('on Azure the sync checkbox says no tag is needed', async () => {
-  const repo = 'organization/project/repository';
-  await openOnboarding([project('app', { repo, provider: 'Azure DevOps' })], {
-    '/api/onboarding/detect': { detection: detection({ repo, provider: 'Azure DevOps', itemSources: { found: [{ kind: 'azure-board', team: 'Team' }] } }) },
-  });
-  await pick('app');
-  expect(text(syncNeed())).toBe('No tag is needed. Azure DevOps stores these links itself.');
+  expect(text(dialog())).toContain('Legacy structural publication is suspended');
+  expect(text(dialog())).not.toContain('Save concepts and cross-repository links to issues');
 });
 
 const accessRow = (name: string) => [...dialog()!.querySelectorAll('[data-access-step] li')].find((row) => row.textContent?.includes(name));
@@ -151,27 +138,22 @@ test('resuming onboarding keeps issue choices and turns legacy private docs off'
   expect(posted('/api/onboarding/setup')[0]).toMatchObject({ createIssuesFromAddItem: false, domainDocs: { kind: 'off' } });
 });
 
-test('the access screen names the missing permission once and blocks enabled sync', async () => {
+test('structural write refusal does not block local setup', async () => {
   const found = detection(); found.access['comment-ticket'] = 'refused';
   await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
   await pick();
   await settle(() => button('Next').click());
-  expect(button('Add repository').disabled).toBe(true);
-  expect(dialog()!.textContent).toContain('Issues: Read and write');
-  await settle(() => button('Back').click());
-  const toggle = [...dialog()!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')][0]!;
-  await settle(() => toggle.click());
-  await settle(() => button('Next').click());
   expect(button('Add repository').disabled).toBe(false);
+  expect(accessRow('Save concept maps and links')).toBeUndefined();
 });
 
-test('unverified token writes never show Ready for concept sync or builds', async () => {
+test('unverified token writes allow setup and never show Ready for builds', async () => {
   const found = detection();
   for (const op of Object.keys(found.access) as (keyof typeof found.access)[]) found.access[op] = 'unverified';
   await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
   await pick();
   await settle(() => button('Next').click());
-  expect(button('Add repository').disabled).toBe(true);
+  expect(button('Add repository').disabled).toBe(false);
   const rows = [...dialog()!.querySelectorAll('[data-access-step] li')];
   expect(rows.slice(1).every((row) => row.textContent?.includes('Not verified'))).toBe(true);
   expect(dialog()!.textContent).toContain('Contents and Pull requests: Read and write');

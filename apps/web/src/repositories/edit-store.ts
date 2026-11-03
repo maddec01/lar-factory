@@ -74,7 +74,6 @@ interface EditState {
   save: (repo: string, key: DraftSetting, setup: RepositorySetup) => Promise<void>;
   reset: (repo: string, key: DraftSetting) => Promise<void>;
   recheck: (repo: string) => Promise<void>;
-  structureSync: (repo: string, on: boolean) => Promise<void>;
   vocabulary: (repo: string, key: VocabularyKey, value: VocabularyTerm, newLabels: string[]) => Promise<boolean>;
   issueDefault: (repo: string, key: IssueSetting, on: boolean) => Promise<void>;
   /** Sends a label change to the tracker; the reason it failed, or null. */
@@ -105,7 +104,6 @@ export const useEditStore = create<EditState>()((set, get) => {
     },
     reset: (repo, key) => call(repo, key, { change: 'override', key }, key),
     recheck: (repo) => call(repo, 'recheck', { change: 'recheck' }),
-    structureSync: (repo, on) => call(repo, 'structure-sync', { change: 'structure-sync', value: on }),
     vocabulary: async (repo, key, value, newLabels) => {
       if (get().running) return false;
       await call(repo, 'vocabulary', { change: 'vocabulary', key, value, ...newLabels.length && { newLabels } });

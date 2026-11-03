@@ -466,6 +466,8 @@ export interface StartResult {
   uncertain?: boolean;
   /** The skills with Drift, when Start build waits for the User to replace them or start anyway. */
   drift?: string[];
+  /** The refusal passes by itself, as T3 or a read comes back, so Auto-build holds instead of pausing the build. */
+  hold?: true;
 }
 
 /** A model Start offers: T3's name for it, else its slug. */
@@ -652,6 +654,8 @@ export interface BoardData {
   buildLimit?: BuildLimitState;
   /** This machine's Auto-build switch and model. Absent in sample mode. */
   autoBuild?: AutoBuildState;
+  /** What Auto-build's last pass found. Absent in sample mode. */
+  autoBuildPass?: AutoBuildPass;
 }
 
 /** What the board does to an item's shaping threads once Start build records a build thread. */
@@ -671,6 +675,18 @@ export type BuildLimitState = HeavyCommandLimitState;
 export interface AutoBuild { on: boolean; model?: ModelChoice }
 /** The saved Auto-build, and why a file that couldn't be read or held an invalid value counts as off. */
 export type AutoBuildState = AutoBuild & { problem?: string };
+
+/** What Auto-build's last pass found, for the Shaping header and the rows. */
+export interface AutoBuildPass {
+  /** Why the pass started nothing it otherwise would have. A hold marks nothing on a build and retries by itself. */
+  hold?: string;
+  /** How many builds a pass with the switch on would start now. */
+  wouldStart: number;
+  /** The builds whose automatic start failed, with its error, until a Start build on one succeeds or a new gate passes. */
+  paused: Record<string, string>;
+  /** The Ready builds Auto-build waits on until their concept's Refinement is complete. */
+  waitsForRefinement: string[];
+}
 
 /** The number a limit allows: the saved number, or the one Automatic gives. */
 export const limitNumber = ({ limit, automatic }: HeavyCommandLimitState): number => (limit === 'automatic' ? automatic : limit);

@@ -1,11 +1,12 @@
 // Owner files: a fully written owner file is linked atomically to a lock path, so a reader never sees a partial one.
 // The owner's process identity survives PID reuse on macOS and Linux. Live owners never expire by timeout.
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { link, open, readFile, unlink } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
 export interface Owner { pid: number; token: string; identity?: string }
-export const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
+const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
 const exists = (error: unknown) => (error as NodeJS.ErrnoException).code === 'EEXIST';
 const validOwner = (value: unknown): value is Owner => typeof value === 'object' && value !== null
   && Number.isSafeInteger((value as Owner).pid) && (value as Owner).pid > 0
@@ -99,4 +100,29 @@ export async function claimPath(base: string, owner: Owner, target: string, dept
     } finally { await releasePath(recovery, owner); }
   }
   return false;
+}
+
+export interface OwnerLease { assertOwned(): Promise<void>; release(): Promise<void> }
+
+/**
+ * Takes the lock at `path` for this process, or returns null at once while another live owner holds it. A dead owner's
+ * generation gets its own atomic recovery guard. `lost` is the error `assertOwned` throws once another owns it.
+ */
+export async function acquireOwnerLock(path: string, lost: () => Error): Promise<OwnerLease | null> {
+  const owner: Owner = { pid: process.pid, token: randomUUID(), identity: await processIdentity(process.pid) };
+  const candidate = await writeOwnerFile(path, owner);
+  try {
+    if (!await claimPath(path, owner, path)) { await unlink(candidate); return null; }
+  } catch (error) { try { await unlink(candidate); } catch { /* The acquisition error remains the useful diagnosis. */ } throw error; }
+  let released = false;
+  return {
+    async assertOwned() {
+      if (released || (await ownerAt(path))?.token !== owner.token) throw lost();
+    },
+    async release() {
+      if (released) return;
+      released = true;
+      try { await releasePath(path, owner); } finally { try { await unlink(candidate); } catch (error) { if (!missing(error)) throw error; } }
+    },
+  };
 }

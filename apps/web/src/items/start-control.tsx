@@ -3,16 +3,16 @@
 // click outside closes it.
 // Once a thread starts or may have started, a tag takes Start's place.
 
-import { useId, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
-import type { SyntheticEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { canResumeShaping, canRetryBuild, currentBuildThread, delegatedWorkRunning, itemName, ref, highlightedChoice, startProgressOf, storedChoice } from '@lar-factory/shared';
+import { canResumeShaping, canRetryBuild, currentBuildThread, delegatedWorkRunning, itemName, ref, highlightedChoice, startProgressOf } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ICON, kind as buttonKind } from '../buttons/button-kinds.tsx';
 import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
+import { ModelEntries, opensOnChecked } from './model-entries.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './item-actions.tsx';
@@ -52,45 +52,10 @@ export function useStartHolds(item: Item, data: BoardData): boolean {
 /** "T3 default", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
 export function StartEntries({ item, data, onPick, requireModel = false }: { item: Item; data: BoardData; requireModel?: boolean; onPick: (choice: ModelChoice | undefined) => void }) {
   const lastChoice = useStartStore((state) => state.lastChoice);
-  const checked = storedChoice(highlightedChoice(data.modelChoices, lastChoice));
-  const held = data.capture?.enabled === false ? 'Disabled in sample mode' : undefined;
-  const headings = useId();
-  const keepOpen = (event: SyntheticEvent | Event) => event.preventDefault();
-  const entry = (label: string, choice?: ModelChoice) => (
-    // A held entry stays hoverable and focusable rather than disabled, so its title says why; picking it does nothing.
-    <DropdownMenu.RadioItem value={storedChoice(choice)} data-opens-here={storedChoice(choice) === checked || undefined}
-      aria-disabled={held !== undefined || requireModel && !choice || undefined} title={held ?? (requireModel && !choice ? 'Choose a model to continue in the existing worktree.' : undefined)}
-      data-start-pick={item.id} data-instance-id={choice?.instanceId} data-model={choice?.model}
-      onSelect={(event) => (held === undefined && (!requireModel || choice) ? onPick(choice) : keepOpen(event))} key={label}>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-    </DropdownMenu.RadioItem>
-  );
-  return (
-    <>
-      <DropdownMenu.RadioGroup value={checked} aria-labelledby={`${headings}-with`}>
-        <DropdownMenu.Label id={`${headings}-with`}>Start with</DropdownMenu.Label>
-        {entry('T3 default')}
-        {data.modelChoices.map((g, i) => (
-          <DropdownMenu.Group key={g.instanceId} aria-labelledby={`${headings}-${i}`}>
-            <DropdownMenu.Label id={`${headings}-${i}`}>{g.name}</DropdownMenu.Label>
-            {g.models.map((m) => entry(m.label, { instanceId: g.instanceId, model: m.slug }))}
-          </DropdownMenu.Group>
-        ))}
-      </DropdownMenu.RadioGroup>
-    </>
-  );
+  return <ModelEntries groups={data.modelChoices} selected={highlightedChoice(data.modelChoices, lastChoice)} heading="Start with"
+    held={data.capture?.enabled === false ? 'Disabled in sample mode' : undefined}
+    defaultHeld={requireModel ? 'Choose a model to continue in the existing worktree.' : undefined} itemId={item.id} onPick={onPick} />;
 }
-
-/**
- * Spread on a Start menu's content, it opens the menu on its checked entry, not on the menu itself. ninna-ui passes Radix's onOpenAutoFocus through to the menu but leaves it out of its
- * props type, which a spread doesn't check.
- */
-export const opensOnChecked = {
-  onOpenAutoFocus: (event: Event): void => {
-    event.preventDefault();
-    (event.target as HTMLElement).querySelector<HTMLElement>('[data-opens-here]')?.focus({ preventScroll: true });
-  },
-};
 
 /**
  * Start, a Start button named `label`, or the tag that took its place; `main` makes it its area's Main action, and

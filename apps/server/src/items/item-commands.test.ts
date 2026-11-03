@@ -7,7 +7,7 @@ import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread, NeedsYouCause, OperationAccess, ShapingThreadCleanup, StartResult, Status } from '@lar-factory/shared';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
-import { createItemCommands } from './item-commands.ts';
+import { createItemCommands, type ItemCommandsDeps } from './item-commands.ts';
 import { NO_THREAD } from './needs-you-causes.ts';
 import type { ItemSource } from './item-source.ts';
 import { archivedItems, recordItems } from './record-items.ts';
@@ -53,6 +53,7 @@ for (const operation of ['push-branch', 'open-pr'] as const) for (const state of
     const reply = await commands.startBuild(build.workId, undefined);
     assert.equal(reply.status, 403);
     assert.match(JSON.stringify(reply.body), new RegExp(operation));
+    assert.equal((reply.body as { hold?: true }).hold, true, 'Auto-build holds instead of pausing the build');
     assert.equal(records.read(build.workId).revision, build.revision);
     assert.deepEqual(records.launchIntents({ workId: build.workId }), []);
     assert.deepEqual(log, []);
@@ -63,11 +64,29 @@ for (const operation of ['push-branch', 'open-pr'] as const) for (const state of
   });
 }
 
+test("Start build marks the refusals that pass by themselves, a project or default-branch read failing, and not a build that can't start", async () => {
+  const records = await openRecords();
+  const build = records.importTicket({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready', ticket: `${WEB}#7` }).record;
+  const failing: [string, Partial<ItemCommandsDeps>][] = [
+    ['T3 has no project for this repository.', { projectOf: async () => ({ error: 'T3 has no project for this repository.' }) }],
+    ['Could not read the repository’s default branch. Retry after checking access.', { baseOf: async () => { throw new Error('offline'); } }],
+  ];
+  for (const [error, deps] of failing) {
+    const { commands } = commandsOn([], undefined, records, [], undefined, undefined, undefined, deps);
+    const { body } = await commands.startBuild(build.workId, undefined, undefined, true);
+    assert.deepEqual([(body as { error: string }).error, (body as { hold?: true }).hold], [error, true]);
+  }
+  const queued = records.importTicket({ title: 'Queued', repository: WEB, kind: 'issue', status: 'Queued', ticket: `${WEB}#8` }).record;
+  const { commands } = commandsOn([], undefined, records);
+  const { body } = await commands.startBuild(queued.workId, undefined);
+  assert.equal((body as { hold?: true }).hold, undefined);
+});
+
 /**
  * Commands on a board holding `items`, whose source records each abandon it gets. Given `records`, the board shows their items and Archive with `tickets` as the source read them, and reads them
  * again after each write.
  */
-function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = [], access: Partial<Record<'push-branch' | 'open-pr', OperationAccess>> = { 'push-branch': 'allowed', 'open-pr': 'allowed' }, whileReopening: () => void = () => {}, provider: { ticket?: ItemSource['observeTicket']; pr?: (repo: string, number: number) => Promise<'open' | 'closed' | 'merged'> } = {}) {
+function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords, tickets: Item[] = [], access: Partial<Record<'push-branch' | 'open-pr', OperationAccess>> = { 'push-branch': 'allowed', 'open-pr': 'allowed' }, whileReopening: () => void = () => {}, provider: { ticket?: ItemSource['observeTicket']; pr?: (repo: string, number: number) => Promise<'open' | 'closed' | 'merged'> } = {}, deps: Partial<ItemCommandsDeps> = {}) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
   const reread = () => {
     if (records) board.update({ items: recordItems(records, tickets, [WEB]) });
@@ -93,7 +112,7 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
       bases.push(worktree && 'base' in worktree ? worktree.base : undefined);
       log.push(`start ${project} ${message.split('\n')[1]}`);
       return { thread: { threadId: `thread-${branches.length}`, title: 't' }, error: null };
-    } });
+    }, ...deps });
   return { board, commands, log, branches, bases, archive, reread };
 }
 

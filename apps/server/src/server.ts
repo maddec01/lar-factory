@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, limitNumber, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
@@ -27,6 +27,7 @@ import { finishCompleted, observeRecords } from './items/observe-records.ts';
 import { createPrObserver } from './items/pr-observer.ts';
 import { createRetention } from './items/retention.ts';
 import { createLimitSettings } from './items/limit-setting.ts';
+import { createAutoBuild } from './auto-build/auto-build.ts';
 import { createAutoBuildSetting } from './auto-build/auto-build-setting.ts';
 import { createShapingThreadCleanup, createShapingThreadSweep, shapingThreadCleanupProblems } from './items/shaping-thread-cleanup.ts';
 import { agreedKind, archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
@@ -121,10 +122,10 @@ if (!fixture) {
 const retention = createRetention({ records, changed: () => reread() });
 /** This Mac's choice for an item's shaping threads after Start build. */
 const shapingThreadCleanup = createShapingThreadCleanup({ records, changed: () => reread() });
-/** How many heavy commands, and how many builds, may run at once on this Mac. */
-const { heavyCommandLimit, buildLimit } = createLimitSettings({ changed: () => reread() });
+/** How many heavy commands, and how many builds, may run at once on this Mac. Auto-build acts on a saved change at once. */
+const { heavyCommandLimit, buildLimit } = createLimitSettings({ changed: () => { reread(); runLocal(() => autoBuildRun.pass()); } });
 /** This Mac's Auto-build switch and the model it starts builds on. */
-const autoBuild = createAutoBuildSetting({ offerModelChoices, changed: () => reread() });
+const autoBuild = createAutoBuildSetting({ offerModelChoices, changed: () => { reread(); runLocal(() => autoBuildRun.pass()); } });
 /** Work whose retained stats count a shaping thread the sweep deleted, until a fresh read replaces them. */
 const overcountedStats = new Set<string>();
 const sweepShapingThreads = records && createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: lookupThread, send: sendThreadCommand,
@@ -445,6 +446,8 @@ function refreshLocalNow(recordsChanged: boolean): void {
   if (finished) board.update({ items: after = withT3Reads(after) });
   runLocal(() => commands.reconcileStarts(after));
   runLocal(() => sweepShapingThreads?.());
+  // Before the return below, so a build that finished, or a hold that passed, starts the next build with nothing else changed.
+  runLocal(() => autoBuildRun.pass());
   if (!recordsChanged && JSON.stringify(after) === JSON.stringify(before)) return;
   board.push();
   void syncPrStats(after);
@@ -706,6 +709,7 @@ async function refresh(): Promise<void> {
   // PR edits take a gh call or two each, and a start runs t3; the board doesn't wait for them.
   if (read) void syncPrStats(board.snapshot().items);
   if (read) runLocal(() => startAfter.startUnblocked());
+  if (read) runLocal(() => autoBuildRun.pass());
   if (read) runLocal(() => observeProviders());
 }
 
@@ -793,6 +797,8 @@ const commands = createItemCommands({ clearedFailuresFile: fixture ? null : join
 const adding = createCapture({ board, items, records, reread, repos: () => board.snapshot().repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, gone: armedWorkGone(records, readRepositoryList), file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
+/** Starts eligible Ready builds up to the build limit while the switch is on; sample mode has no records, so it starts none. */
+const autoBuildRun = createAutoBuild({ board, records, commands, offerModelChoices, setting: () => autoBuild.state(), limit: () => limitNumber(buildLimit.state()) });
 // Sample mode asks T3 for nothing, so its boards show toned initials.
 const projectIcons = fixture ? null : createProjectIcons(board);
 const { server, endStreams } = createBoardServer({
@@ -864,6 +870,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     clearInterval(localTimer);
     clearTimeout(toolRetry);
     stopProjectIcons?.();
+    void autoBuildRun.release();
     endStreams();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref();

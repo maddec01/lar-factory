@@ -941,13 +941,14 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       let accessProblem: string | null;
       try { accessProblem = (['push-branch', 'open-pr'] as const).map(operation => writeAccessProblem(item.repo, operation, buildAccessOf(item.repo))).find(problem => problem !== null) ?? null; }
       catch { accessProblem = 'Could not read repository access. Recheck it in Settings.'; }
-      if (accessProblem) return withBoard(403, { error: accessProblem });
+      if (accessProblem) return withBoard(403, { error: accessProblem, hold: true });
       const busy = busyReason(itemId, 'start');
-      if (busy) return withBoard(409, { error: busy });
+      if (busy) return withBoard(409, { error: busy, hold: true });
+      if (isOnboarding(board.snapshot(), item.repo)) return withBoard(409, { error: WAITS_FOR_ONBOARDING, hold: true });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
       // While T3 can't be read the launch reports any problem, so a retained observation refuses nothing.
-      if (Array.isArray(item.threads) && item.threads.some((t) => t.purpose === PURPOSES.started && !t.observedAt && isLiveThread(t))) return withBoard(409, { error: LIVE_SHAPING });
+      if (Array.isArray(item.threads) && item.threads.some((t) => t.purpose === PURPOSES.started && !t.observedAt && isLiveThread(t))) return withBoard(409, { error: LIVE_SHAPING, hold: true });
       const previous = board.snapshot().startedBuilds?.[itemId];
       const retry = retryBuilds.has(itemId) || previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped')
         || recordedThreads(itemId).some((t) => t.purpose === PURPOSES.startedBuilds) || prClosed(itemId);
@@ -957,12 +958,12 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
         if (records) { await refreshSpecs(records, { workId: item.id }); reread(); }
         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
         const skills = await checkSkills?.(drift);
-        if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true, ...skills.drift && { drift: skills.drift } };
+        if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true, hold: true, ...skills.drift && { drift: skills.drift } };
         const repoProject = await projectOf(repo);
-        if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
+        if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true, hold: true };
         let base: string;
         try { base = await baseOf(repo); }
-        catch { return { thread: null, error: 'Could not read the repository’s default branch. Retry after checking access.', refused: true }; }
+        catch { return { thread: null, error: 'Could not read the repository’s default branch. Retry after checking access.', refused: true, hold: true }; }
         const error = parentInProgress(item);
         if (error) return { thread: null, error };
         // A build snapshots its skills once, so a retry keeps the selection its first start saw.

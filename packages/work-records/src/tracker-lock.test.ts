@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vite-plus/test';
+import { exitWithRunner } from './helper-processes.ts';
 import { acquireTrackerSyncLock, TrackerSyncLockLost } from './tracker-lock.ts';
 const folders:string[]=[];
 const children:ChildProcess[]=[];
@@ -24,7 +25,7 @@ test('a separate process excludes other writers, and its dead lease is recovered
   const path=await database();
   const moduleUrl=new URL('./tracker-lock.ts',import.meta.url).href;
   const child=spawn(process.execPath,['--input-type=module','-e',
-    `import {acquireTrackerSyncLock} from ${JSON.stringify(moduleUrl)}; await acquireTrackerSyncLock(${JSON.stringify(path)});process.stdout.write('locked');setInterval(()=>{},1000);`],{stdio:['ignore','pipe','pipe'],env:{...process.env,TZ:'Pacific/Honolulu'}});
+    `import {acquireTrackerSyncLock} from ${JSON.stringify(moduleUrl)}; ${exitWithRunner()} await acquireTrackerSyncLock(${JSON.stringify(path)});process.stdout.write('locked');setInterval(()=>{},1000);`],{stdio:['ignore','pipe','pipe'],env:{...process.env,TZ:'Pacific/Honolulu'}});
   children.push(child);let stderr='';child.stderr!.on('data',chunk=>{stderr+=String(chunk);});
   await Promise.race([once(child.stdout!,'data'),once(child,'exit').then(()=>{throw Error(`Lock child exited: ${stderr}`);})]);
   expect(await acquireTrackerSyncLock(path)).toBeNull();

@@ -1,11 +1,22 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vite-plus/test';
 import { writeHeavyCommandLimit } from './heavy-command-limit.ts';
+import { alive, helperStart, stopHelpers } from './helper-processes.ts';
 import { openWorkRecords } from './work-records.ts';
+// Commands that run until the test ends them: one by SIGTERM, one by a file named go in its folder.
+const signalledCommand = (cwd: string) => `${helperStart(cwd)} process.on("SIGTERM", () => setTimeout(() => { console.log("finished"); process.exit(23); }, 100)); console.log("ready"); setInterval(() => {}, 1000)`;
+async function loggedHelper(cwd: string) {
+  for (const deadline = Date.now() + 15_000; Date.now() < deadline; await new Promise(done => setTimeout(done, 20))) {
+    const started = existsSync(join(cwd, 'log')) && /^start helper (\d+)/.exec(readFileSync(join(cwd, 'log'), 'utf8'));
+    if (started) return Number(started[1]);
+  }
+  throw Error('The helper never started.');
+}
+const gatedCommand = (cwd: string) => `${helperStart(cwd)} console.log("ready"); setInterval(() => { if (require("fs").existsSync("go")) process.exit(27); }, 20)`;
 it('passes child arguments and status through even without a database', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'check-runner-'));
   try {
@@ -71,9 +82,11 @@ it('waits for a signalled child and records interruption while preserving its ex
   const { openWorkRecords } = await import('./work-records.ts');
   const cwd = mkdtempSync(join(tmpdir(), 'check-signal-'));
   const records = await openWorkRecords(join(cwd, 'work-records.db'));
+  const wrappers: ChildProcess[] = [];
   try {
     const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-    const child = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'run-check', build.workId, '--role', 'implementer', '--', process.execPath, '-e', 'process.on("SIGTERM", () => setTimeout(() => { console.log("finished"); process.exit(23); }, 100)); console.log("ready"); setInterval(() => {}, 1000)'], { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } });
+    const child = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'run-check', build.workId, '--role', 'implementer', '--', process.execPath, '-e', signalledCommand(cwd)], { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } });
+    wrappers.push(child);
     let output = '';
     child.stderr.resume();
     child.stdout.on('data', chunk => { output += chunk; if (String(chunk).includes('ready')) child.kill('SIGTERM'); });
@@ -81,7 +94,22 @@ it('waits for a signalled child and records interruption while preserving its ex
     expect(status).toBe(23);
     expect(output).toContain('finished');
     expect(records.checks(build.workId).runs[0]?.outcome).toBe('interrupted');
-  } finally { records.close(); rmSync(cwd, { recursive: true, force: true }); }
+  } finally { records.close(); await stopHelpers({ folders: [cwd], wrappers, gates: [] }); }
+});
+
+it.each([
+  ['a command waiting for SIGTERM', signalledCommand],
+  ['a command waiting for its gate', gatedCommand],
+])('leaves no wrapper or helper running when a test fails before %s ends', { timeout: 30_000 }, async (_, command) => {
+  const cwd = mkdtempSync(join(tmpdir(), 'check-failed-'));
+  const records = await openWorkRecords(join(cwd, 'work-records.db'));
+  const { workId } = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
+  const wrapper = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'run-check', workId, '--role', 'test', '--', process.execPath, '-e', command(cwd)], { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd }, stdio: 'ignore' });
+  let helper: number;
+  try { helper = await loggedHelper(cwd); } finally { records.close(); await stopHelpers({ folders: [cwd], wrappers: [wrapper], gates: [] }); }
+  expect(wrapper.exitCode !== null || wrapper.signalCode !== null).toBe(true);
+  expect(alive(helper)).toBe(false);
+  expect(existsSync(cwd)).toBe(false);
 });
 
 it('preserves the child status when the log cannot be written or the schema changes at finish', { timeout: 30_000 }, async () => {
@@ -126,12 +154,12 @@ it('retains a signal received while opening the record until the command starts'
   const records = await openWorkRecords(join(cwd, 'work-records.db'));
   try {
     const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-    const script = `import { checkCommand } from ${JSON.stringify(join(import.meta.dirname, 'check-runner.ts'))}; const result = checkCommand(['run-check', ${JSON.stringify(build.workId)}, '--role', 'test', '--', process.execPath, '-e', 'setInterval(() => {}, 1000)']); process.emit('SIGTERM'); process.exitCode = await result;`;
+    const script = `import { checkCommand } from ${JSON.stringify(join(import.meta.dirname, 'check-runner.ts'))}; const result = checkCommand(['run-check', ${JSON.stringify(build.workId)}, '--role', 'test', '--', process.execPath, '-e', ${JSON.stringify(`${helperStart(cwd)} setInterval(() => {}, 1000)`)}]); process.emit('SIGTERM'); process.exitCode = await result;`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd, encoding: 'utf8', timeout: 10_000, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } });
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(143);
     expect(records.checks(build.workId).runs[0]?.outcome).toBe('interrupted');
-  } finally { records.close(); rmSync(cwd, { recursive: true, force: true }); }
+  } finally { records.close(); await stopHelpers({ folders: [cwd], wrappers: [], gates: [] }); }
 });
 
 it('preserves output and the log when the consumer drains output slowly', { timeout: 30_000 }, async () => {
@@ -161,9 +189,11 @@ it('preserves the command status when the database becomes busy at finish', { ti
   const cwd = mkdtempSync(join(tmpdir(), 'check-finish-busy-'));
   const records = await openWorkRecords(join(cwd, 'work-records.db'));
   const lock = new DatabaseSync(join(cwd, 'work-records.db'));
+  const wrappers: ChildProcess[] = [];
   try {
     const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-    const child = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'run-check', build.workId, '--role', 'test', '--', process.execPath, '-e', 'console.log("ready"); setInterval(() => { if (require("fs").existsSync("go")) process.exit(27); }, 20)'], { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } });
+    const child = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'run-check', build.workId, '--role', 'test', '--', process.execPath, '-e', gatedCommand(cwd)], { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } });
+    wrappers.push(child);
     let stderr = '';
     child.stderr.on('data', chunk => { stderr += chunk; });
     child.stdout.once('data', () => { lock.exec('BEGIN IMMEDIATE'); writeFileSync(join(cwd, 'go'), ''); });
@@ -171,7 +201,7 @@ it('preserves the command status when the database becomes busy at finish', { ti
     expect(stderr).toContain('unrecorded');
     lock.exec('ROLLBACK');
     expect(records.checks(build.workId).runs[0]?.outcome).toBe('unfinished');
-  } finally { lock.close(); records.close(); rmSync(cwd, { recursive: true, force: true }); }
+  } finally { lock.close(); records.close(); await stopHelpers({ folders: [cwd], wrappers, gates: [join(cwd, 'go')] }); }
 });
 
 it('preserves the command status when its record table becomes unavailable at finish', { timeout: 30_000 }, async () => {
@@ -188,13 +218,13 @@ it('preserves the command status when its record table becomes unavailable at fi
 
 describe('run-check waiting for a heavy command slot', () => {
   // One slot, held by a heavy command that ends once the gate file exists, and a run-check that waits for it.
-  async function waiting(test: (wait: { child: ChildProcess; status: Promise<number | null>; records: Awaited<ReturnType<typeof openWorkRecords>>; workId: string; ran: string; gate: string }) => Promise<void>) {
+  async function waiting(test: (wait: { child: ChildProcess; status: Promise<number | null>; records: Awaited<ReturnType<typeof openWorkRecords>>; workId: string; ran: string; gate: string; cwd: string }) => Promise<void>) {
     const cwd = mkdtempSync(join(tmpdir(), 'check-slot-'));
     const gate = join(cwd, 'gate'), ran = join(cwd, 'ran');
     const env = { ...process.env, LAR_FACTORY_DATA_DIR: cwd, LAR_WORK_HEAVY_CHECK_MS: '50' };
     writeHeavyCommandLimit(1, cwd);
     const records = await openWorkRecords(join(cwd, 'work-records.db'));
-    const holder = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'heavy', '--', process.execPath, '-e', `console.log("held"); setInterval(() => { if (require("fs").existsSync(${JSON.stringify(gate)})) process.exit(0); }, 20)`], { cwd, env });
+    const holder = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'heavy', '--', process.execPath, '-e', `${helperStart(cwd)} console.log("held"); setInterval(() => { if (require("fs").existsSync(${JSON.stringify(gate)})) process.exit(0); }, 20)`], { cwd, env });
     holder.stderr.resume();
     let child: ChildProcess | undefined;
     try {
@@ -209,15 +239,24 @@ describe('run-check waiting for a heavy command slot', () => {
         if (Date.now() > deadline) throw Error(`run-check never waited: ${stderr}`);
         await new Promise(done => setTimeout(done, 20));
       }
-      await test({ child, status, records, workId, ran, gate });
+      await test({ child, status, records, workId, ran, gate, cwd });
     } finally {
-      writeFileSync(gate, '');
-      if (child?.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
-      if (holder.exitCode === null) await once(holder, 'close');
       records.close();
-      rmSync(cwd, { recursive: true, force: true });
+      await stopHelpers({ folders: [cwd], wrappers: child ? [child, holder] : [holder], gates: [gate] });
     }
   }
+
+  it('leaves no wrapper or helper running when a test fails before its holder ends', { timeout: 30_000 }, async () => {
+    let helper = 0;
+    let folder = '';
+    await expect(waiting(async ({ cwd }) => {
+      folder = cwd;
+      helper = await loggedHelper(cwd);
+      throw Error('The test failed.');
+    })).rejects.toThrow('The test failed.');
+    expect(alive(helper)).toBe(false);
+    expect(existsSync(folder)).toBe(false);
+  });
 
   it('records the row without tree or start time while waiting, then both once the slot is held', { timeout: 30_000 }, () => waiting(async ({ status, records, workId, gate }) => {
     const waited = records.checks(workId).runs[0]!;

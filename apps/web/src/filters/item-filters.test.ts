@@ -133,11 +133,11 @@ test('the filters apply to every pane, their counts follow, and each says when n
   ]));
   expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 0', 'Shaping 0', 'Build 0']);
   expect(text($('.queue'))).toContain('Nothing queued matches.');
-  expect(text($('[data-stage="shaping"] [data-scroll]'))).toBe('Nothing in shaping matches.');
-  expect(text($('[data-ready]'))).toContain('Nothing ready to build matches.');
-  expect(text($('[data-stage="build"] [data-scroll]'))).toBe('Nothing in build matches.');
+  expect(text($('[data-stage="shaping"] p'))).toBe('Nothing in shaping matches.');
+  expect(text($('[data-stage="ready"]'))).toContain('Nothing ready to build matches.');
+  expect(text($('[data-stage="build"] p'))).toBe('Nothing in build matches.');
   await removeChip('Bug');
-  expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 1', 'Shaping 2', 'Build 1']);
+  expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 1', 'Shaping 1', 'Build 1']);
 });
 
 test('the dropdown checklists change the board, add removable chips and save them; Clear removes them all', async () => {

@@ -181,15 +181,14 @@ test.each([
 test('a Ready item has no desk card and keeps Start build on its row', async () => {
   await mountPage(withItem('I_sample13', { parent: null, parentId: null, blockers: [] }));
   expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
-  expect($('[data-ready] [data-item="I_sample13"] [data-start="I_sample13"]')).not.toBeNull();
+  expect($('[data-stage="ready"] [data-item="I_sample13"] [data-start="I_sample13"]')).not.toBeNull();
 });
 
 test('a Ready part has no desk card, shows in Ready to build and stays in its dossier', async () => {
   await mountPage();
   expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
-  expect($('[data-ready] [data-item="I_sample13"]')).not.toBeNull();
-  const expand = $<HTMLButtonElement>('[data-dossier="I_sample09"] button[aria-expanded]')!;
-  if (expand.getAttribute('aria-expanded') === 'false') await settle(() => expand.click());
+  expect($('[data-stage="ready"] [data-item="I_sample13"]')).not.toBeNull();
+  await settle(() => $<HTMLButtonElement>('[data-dossier="I_sample09"] [data-dossier-open]')!.click());
   expect($('[data-dossier="I_sample09"] [data-map-part="I_sample13"], [data-dossier="I_sample09"] [data-part="I_sample13"]')).not.toBeNull();
 });
 

@@ -1,4 +1,4 @@
-// The Queue rail: Queued items, in order, as numbered rows that open the item dialog, each started by hand, and Start
+// The Queue section: Queued items, in order, as numbered rows that open the item dialog, each started by hand, and Start
 // next. An item blocked by an open issue waits, with Start after. A filter only hides rows: the rest keep their numbers,
 // and Start next starts the same item, naming it when its row is hidden. Reordering isn't built yet.
 

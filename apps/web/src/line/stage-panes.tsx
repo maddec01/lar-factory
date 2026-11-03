@@ -1,5 +1,4 @@
-// The Shaping and Build panes. Shaping's Ready to build group stays in view under its scrolling rows. Build's header
-// counts the factory's builds against the limit, which it shows but doesn't enforce.
+// The Shaping, Ready to build and Build sections. Build's header counts the factory's builds against the limit, which it shows but doesn't enforce.
 
 import { useBoardStore } from '../board/board-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
@@ -15,25 +14,20 @@ function Rows({ rows }: { rows: Row[] }) {
   return <ol className="m-0 grid list-none p-0">{rows.map((row) => <StageRow key={row.item.id} row={row} data={data} />)}</ol>;
 }
 
-function ReadyToBuild({ rows, filtered }: { rows: Row[]; filtered: boolean }) {
+export function Shaping({ shaping, shows }: { shaping: Row[]; shows: Shows }) {
+  const rows = shaping.filter(shows);
   return (
-    <div data-ready className="flex max-h-[55%] shrink-0 flex-col border-t border-(--border)">
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-(--border) bg-(--soft) px-3 py-1 text-[11px] font-medium text-(--muted-foreground)">
-        <StatusGlyph status="Ready" className="size-3" />Ready to build <span className="font-normal tabular-nums">{rows.length}</span>
-      </div>
-      <div className="min-h-0 overflow-y-auto">
-        {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={filtered} none="Nothing ready to build.">Nothing ready to build matches.</PaneEmpty>}
-      </div>
-    </div>
+    <Pane id="shaping" title="Shaping" status="Shaping" count={rows.length}>
+      {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={shaping.length > 0} none="Nothing in shaping.">Nothing in shaping matches.</PaneEmpty>}
+    </Pane>
   );
 }
 
-export function Shaping({ shaping, ready, shows }: { shaping: Row[]; ready: Row[]; shows: Shows }) {
-  const rows = shaping.filter(shows);
-  const readyRows = ready.filter(shows);
+export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
+  const rows = ready.filter(shows);
   return (
-    <Pane id="shaping" title="Shaping" status="Shaping" count={rows.length + readyRows.length} footer={<ReadyToBuild rows={readyRows} filtered={ready.length > 0} />}>
-      {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={shaping.length > 0} none="Nothing in shaping.">Nothing in shaping matches.</PaneEmpty>}
+    <Pane id="ready" title="Ready to build" status="Ready" count={rows.length}>
+      {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={ready.length > 0} none="Nothing ready to build.">Nothing ready to build matches.</PaneEmpty>}
     </Pane>
   );
 }

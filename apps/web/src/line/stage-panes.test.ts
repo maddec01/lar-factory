@@ -1,4 +1,4 @@
-// The Shaping and Build panes: their rows from the placement rule, each with its status, agent figures, a build's slices
+// The Shaping, Ready to build and Build sections: their rows from the placement rule, each with its status, agent figures, a build's slices
 // and its side action.
 
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test';
@@ -7,12 +7,12 @@ import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread, RepositorySetup, KindDisagreement, RawItem, Slice } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
-const PANES = ['shaping', 'build'];
+const PANES = ['shaping', 'ready', 'build'];
 const SHAPING = [130, 22, 200, 23];
 const BUILD = [31, 900026, 34, 147, 142, 141, 150, 30, 180];
-const row2 = (id: string) => $(`[data-ready] li[data-item="${id}"]`)!;
+const row2 = (id: string) => $(`[data-stage="ready"] li[data-item="${id}"]`)!;
 const rows = () => PANES.flatMap((pane) => $$(`[data-stage="${pane}"] li[data-item]`));
-const row = (id: string) => $(`:is([data-stage="shaping"], [data-stage="build"]) li[data-item="${id}"]`)!;
+const row = (id: string) => $(`:is([data-stage="shaping"], [data-stage="ready"], [data-stage="build"]) li[data-item="${id}"]`)!;
 const opener = (id: string) => row(id).querySelector<HTMLButtonElement>('[data-row-open]')!;
 const numberOf = (id: string) => sample.items.find((i) => i.id === id)!.number;
 const meta = (id: string) => row(id).querySelector<HTMLElement>('[data-meta]')!;
@@ -47,15 +47,15 @@ const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, ti
 beforeEach(() => localStorage.clear());
 
 const inPane = (pane: string) => $$(`[data-stage="${pane}"] li[data-item]`).map((r) => numberOf(r.dataset.item!));
-const shapingRows = () => $$('[data-stage="shaping"] [data-scroll] li[data-item]').map((r) => numberOf(r.dataset.item!));
-const readyRows = () => $$('[data-ready] li[data-item]').map((r) => numberOf(r.dataset.item!));
+const shapingRows = () => $$('[data-stage="shaping"] li[data-item]').map((r) => numberOf(r.dataset.item!));
+const readyRows = () => $$('[data-stage="ready"] li[data-item]').map((r) => numberOf(r.dataset.item!));
 
 test('each pane holds the rows the placement rule gives it, and Build lists the furthest along first', async () => {
   await mountPage();
   expect(shapingRows()).toEqual(SHAPING);
   expect(readyRows()).toEqual([140]);
   expect(inPane('build')).toEqual(BUILD);
-  expect(text($('#shaping-h'))).toBe(`Shaping ${SHAPING.length + 1}`);
+  expect(text($('#shaping-h'))).toBe(`Shaping ${SHAPING.length}`);
   expect(text($('#build-h'))).toBe(`Build ${BUILD.length}`);
 });
 
@@ -83,11 +83,17 @@ test('a part names its concept on its stage row', async () => {
   expect(text(row2('I_sample13').querySelector('[data-concept]'))).toBe('Concept: lar cloud: website sign-in and relay');
 });
 
+test('the sections run from top to bottom in the order work moves, with the dock last', async () => {
+  await mountPage();
+  expect($$('.stages [data-stage]').map((section) => section.getAttribute('data-stage'))).toEqual(['queue', 'shaping', 'ready', 'build', 'dock']);
+  expect($('[data-scroll]'), 'the page scrolls, and no section scrolls inside itself').toBeNull();
+});
+
 test('with nothing in them, the panes say so', async () => {
   await mountPage({ ...sample, items: sample.items.filter((i) => ['List', 'Queued', 'Done'].includes(i.status)) });
-  expect(text($('[data-stage="shaping"] [data-scroll]'))).toBe('Nothing in shaping.');
-  expect(text($('[data-ready]'))).toContain('Nothing ready to build.');
-  expect(text($('[data-stage="build"] [data-scroll]'))).toBe('Nothing in build.');
+  expect(text($('[data-stage="shaping"] p'))).toBe('Nothing in shaping.');
+  expect(text($('[data-stage="ready"]'))).toContain('Nothing ready to build.');
+  expect(text($('[data-stage="build"] p'))).toBe('Nothing in build.');
 });
 
 test("the panes take the main area's scope", async () => {

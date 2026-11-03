@@ -85,19 +85,30 @@ let lastArchived: Record<string, unknown>[] = [];
 const ARCHIVED_READ_MS = 30_000;
 
 let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; demandArchived?(): void; archivedCurrent?(): boolean; archivedAnswered?(): boolean; archivedFailed?(): boolean; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; shownShells?: Record<string, unknown>[]; shellIds?: Set<unknown>; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
+/** T3's runtime file as this synchronous pass read it, as a refresh asks once per item and slice. */
+let runtimeNow: { key: string; origin: unknown; serverVersion: unknown; running: boolean } | undefined;
+function readRuntime() {
+  if (runtimeNow) return runtimeNow;
+  const path = serverRuntimePath(process.env);
+  const runtime = readJsonRecord(path);
+  const key = JSON.stringify([path, runtime?.origin, runtime?.serverVersion, runtime?.pid]);
+  runtimeNow = { key, origin: runtime?.origin, serverVersion: runtime?.serverVersion, running: (current?.key === key && current.available) || t3Running(path) };
+  queueMicrotask(() => { runtimeNow = undefined; });
+  return runtimeNow;
+}
+
 /**
  * The recorded threads as T3 shows them now. While T3 can't be read, each thread's last observation with when the board
  * saw it, or 'unavailable' once one was never seen. Failures never become empty success.
  */
 export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] | 'unavailable' | undefined {
-  const path = serverRuntimePath(process.env);
-  const runtime = readJsonRecord(path);
-  if (!t3Running(path) || typeof runtime?.origin !== 'string') {
+  const runtime = readRuntime();
+  const { key } = runtime;
+  if (!runtime.running || typeof runtime.origin !== 'string') {
     current?.stop();
     current = undefined;
     return 'unavailable';
   }
-  const key = JSON.stringify([path, runtime.origin, runtime.serverVersion, runtime.pid]);
   if (current?.key !== key) {
     current?.stop();
     const state: NonNullable<typeof current> = { key, stop() {}, available: false };

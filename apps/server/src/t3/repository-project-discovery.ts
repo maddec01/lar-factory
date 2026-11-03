@@ -38,12 +38,14 @@ export function repositoryProjectAccess(): { origin: URL; protocol: Pick<Project
 async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
   const path = serverRuntimePath(env);
   const runtime = readJsonRecord(path);
+  const key = JSON.stringify([path, runtime?.origin, runtime?.serverVersion, runtime?.pid]);
+  // The subscription says when this T3 stops, so while it shows T3 the board need not ask the process.
+  if (current?.key === key && current.read.availability === 'available') return current.read;
   if (!t3Running(path) || typeof runtime?.origin !== 'string') {
     current?.stop();
     if (current) { current.key = ''; current.read = { ...current.read, availability: 'unavailable' }; announce(current.read); }
     return current?.read ?? { availability: 'unavailable' };
   }
-  const key = JSON.stringify([path, runtime.origin, runtime.serverVersion, runtime.pid]);
   if (current?.key === key) return current.read;
   current?.stop();
   try {

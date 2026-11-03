@@ -1,9 +1,9 @@
 import { test, vi, expect } from 'vite-plus/test';
 import { repositoryProjectAccess, repositoryProjects, reauthorizeRepositoryProjects, subscribeRepositoryProjects } from './repository-project-discovery.ts';
 
-const fixture = vi.hoisted(() => ({ read: { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } } as import('./project-protocol.ts').ProjectRead, renew: vi.fn(async () => {}), stop: vi.fn(), running: true, notify: (_read: import('./project-protocol.ts').ProjectRead) => {} }));
+const fixture = vi.hoisted(() => ({ read: { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } } as import('./project-protocol.ts').ProjectRead, renew: vi.fn(async () => {}), stop: vi.fn(), running: vi.fn(() => true), notify: (_read: import('./project-protocol.ts').ProjectRead) => {} }));
 vi.mock('../json-file.ts', () => ({ readJsonRecord: () => ({ origin: 'http://127.0.0.1:3773', serverVersion: undefined }) }));
-vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture/runtime', t3Running: () => fixture.running }));
+vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture/runtime', t3Running: () => fixture.running() }));
 vi.mock('./board-projects.ts', () => ({ boardProjects: () => ({ readProjects: async () => fixture.read, reauthorize: fixture.renew }) }));
 vi.mock('./project-subscription.ts', () => ({ subscribeProjects: (_origin: URL, _version: string, _protocol: unknown, notify: typeof fixture.notify) => { fixture.notify = notify; return fixture.stop; } }));
 
@@ -39,12 +39,25 @@ test('access names the T3 origin and the session discovery holds, until T3 stops
   await repositoryProjects();
   expect(repositoryProjectAccess()?.origin.href).toBe('http://127.0.0.1:3773/');
   expect(repositoryProjectAccess()?.protocol).toHaveProperty('readProjects');
-  fixture.running = false;
+  fixture.notify({ availability: 'unavailable' });
+  fixture.running.mockReturnValue(false);
   await repositoryProjects();
   expect(repositoryProjectAccess()).toBeUndefined();
-  fixture.running = true;
+  fixture.running.mockReturnValue(true);
   await repositoryProjects();
   expect(repositoryProjectAccess()).toBeDefined();
+});
+
+test('asks whether T3\'s process lives only while its subscription shows no T3', async () => {
+  fixture.read = { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } };
+  await reauthorizeRepositoryProjects();
+  fixture.running.mockClear();
+  await repositoryProjects();
+  await repositoryProjects();
+  expect(fixture.running).not.toHaveBeenCalled();
+  fixture.notify({ availability: 'unavailable' });
+  await repositoryProjects();
+  expect(fixture.running).toHaveBeenCalledTimes(1);
 });
 
 test('tells subscribers when project facts or availability change, not when only the observation time does', async () => {
@@ -67,10 +80,10 @@ test('tells subscribers when project facts or availability change, not when only
   fixture.notify({ availability: 'unavailable' });
   expect(changed).toHaveBeenCalledTimes(3);
 
-  fixture.running = false;
+  fixture.running.mockReturnValue(false);
   await repositoryProjects();
   expect(changed).toHaveBeenCalledTimes(3);
-  fixture.running = true;
+  fixture.running.mockReturnValue(true);
   await repositoryProjects();
   fixture.notify(shell('2026-11-03T00:00:04Z', 'logo.png'));
   expect(changed).toHaveBeenCalledTimes(4);

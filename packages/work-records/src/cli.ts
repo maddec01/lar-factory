@@ -25,6 +25,15 @@ const HELP = `Usage: lar-work <command> [options]
 Reads and changes the factory's work records in the work-record database, which
 it opens directly. It works from any folder, with or without the board app.
 
+Validation records, local only and requiring no revision
+  set-check-list <work-id> --file F Save [{"command":["pnpm","test"],"folder":"."}].
+                                    Commands and folders match exactly. Slices use their build.
+  checks <work-id>                 Print the list, runs, reuses and failure states as JSON.
+  describe-failure <check-id> --file F
+                                    Save {"tests":["test name"],"diagnosis":"cause"}.
+  resolve-failure <check-id> --reason X
+                                    Close a failure with its cause or fix. A pass never closes it.
+
 Identifiers
   A work ID names one work record for its whole life. create and import print it.
   A ticket is a published ticket reference, owner/name#12. A record holds at most
@@ -312,7 +321,7 @@ class UsageError extends Error {}
 const TAKES_WORK_ID = ['kind-disagreement', 'change-kind', 'record-kind-answer', 'create-ticket', 'sync-structure', 'read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
   'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
-  'review-rounds', 'observe', 'observe-failure', 'observations', 'confirm-thread-deleted', 'set-build-branch', 'invalidate-gate', 'reset-build', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
+  'set-check-list', 'checks', 'describe-failure', 'resolve-failure', 'review-rounds', 'observe', 'observe-failure', 'observations', 'confirm-thread-deleted', 'set-build-branch', 'invalidate-gate', 'reset-build', 'add-thread', 'threads', 'record-intent', 'resolve-intent', 'export',
   'gate', 'record-gate', 'add-dependency', 'dependencies'];
 const TAKES_DEPENDENCY_ID = ['dependency', 'update-dependency', 'add-dependency-block', 'remove-dependency-block', 'observe-dependency', 'mark-met',
   'clear-met', 'replace-dependency'];
@@ -435,6 +444,11 @@ async function run(records: WorkRecords, command: string, workId: string | undef
     context: values.file === undefined ? undefined : readInput(values),
   });
   switch (command) {
+    case 'set-check-list': return records.setCheckList(workId!, readJson(values, 'check list') as import('./validation-records.ts').CheckEntry[]);
+    case 'checks': return records.checks(workId!);
+    case 'describe-failure': return records.describeFailure(workId!, readJson(values, 'failure') as { tests: string[]; diagnosis: string });
+    case 'resolve-failure': return records.resolveFailure(workId!, need(values, 'reason'));
+
     case 'sync-structure':
       await syncStructures(records, {workId:workId!,dir:values['data-dir'],confirmedMissingIssue:values['confirmed-missing-issue']});
       return {record:records.read(workId!),sync:records.trackerState(workId!)};
@@ -642,8 +656,9 @@ async function main(args: string[]): Promise<number> {
       const sync=id ? records.trackerState(id) : undefined;
       if(sync?.state==='error' || sync?.state==='conflict') process.stderr.write(`lar-work: Structure remains on this machine: ${sync.message}\n`);
     }
-    await syncSpecs(records, { dir: values['data-dir'] });
-    if (workId && !TAKES_DEPENDENCY_ID.includes(command)) {
+    const validationCommand = ['set-check-list', 'checks', 'describe-failure', 'resolve-failure'].includes(command);
+    if (!validationCommand) await syncSpecs(records, { dir: values['data-dir'] });
+    if (!validationCommand && workId && !TAKES_DEPENDENCY_ID.includes(command)) {
       const sync = records.specState(workId);
       if (sync.error || sync.warning) process.stderr.write(`lar-work: ${sync.warning ?? sync.error}\n`);
     }

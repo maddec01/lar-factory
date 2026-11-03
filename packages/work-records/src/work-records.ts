@@ -3,6 +3,9 @@
 // the revision it read; a stale revision changes nothing, so the board and threads never overwrite each other's work.
 
 import { createHash, randomUUID } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { rmSync, lstatSync } from 'node:fs';
+import { validationRecords, type ValidationRecords } from './validation-records.ts';
 import type { StatementSync } from 'node:sqlite';
 import { readTicketSpec, stripTrackerStructure, STATUSES, type NeedsYouCause, type ShapingThreadCleanup, type Status } from '@lar-factory/shared';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
@@ -13,6 +16,7 @@ import { specRecords, type SpecRecords } from './spec-records.ts';
 import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 import type { StructureTicket } from './tracker-sync.ts';
 
+export type { CheckEntry, CheckStart, CheckFinish, CheckRun, CheckReuse, ValidationRecords } from './validation-records.ts';
 export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './database.ts';
 export { DEPENDENCY_OBSERVATION_KINDS, type Dependency, type DependencyChange, type DependencyObservationKind, type NewDependency } from './dependencies.ts';
 export { DEFAULT_RETENTION, readRetention, retentionPath, writeRetention, type Retention } from './retention.ts';
@@ -255,7 +259,7 @@ export interface WorkRecordFilter {
 
 export interface CaptureSubmission { draft: string; ticket: string | null; workId: string | null; failure: string | null; createdTicket: StructureTicket | null }
 
-export interface WorkRecords extends TrackerCache, PublicationRecords, DependencyRecords, SpecRecords {
+export interface WorkRecords extends ValidationRecords, TrackerCache, PublicationRecords, DependencyRecords, SpecRecords {
   captureSubmission(requestId: string): CaptureSubmission | null;
   /** Reserves the request before any provider create; replays return its durable outcome. */
   claimCapture(requestId: string, draft: string, targetWorkId?: string): { fresh: boolean; submission: CaptureSubmission };
@@ -564,10 +568,10 @@ function checkRevision(revision: unknown): number {
 
 /** Opens the work records in the database at `path`, the factory data folder's by default. */
 export async function openWorkRecords(path = workRecordsPath()): Promise<WorkRecords> {
-  return workRecords(await openDatabase(path));
+  return workRecords(await openDatabase(path), dirname(path));
 }
 
-function workRecords(database: Database): WorkRecords {
+function workRecords(database: Database, dataDir: string): WorkRecords {
   const { db } = database;
   const select = db.prepare('SELECT * FROM work_records WHERE work_id = ?');
   const byTicket = db.prepare('SELECT * FROM work_records WHERE ticket = ?');
@@ -755,6 +759,17 @@ function workRecords(database: Database): WorkRecords {
     return (query.all(workId) as unknown as Row[]).map(fromRow);
   });
 
+  function clearChecks(workId: string) {
+    db.prepare('DELETE FROM check_runs WHERE work_id=?').run(workId);
+    db.prepare('DELETE FROM check_lists WHERE work_id=?').run(workId);
+    const logs = join(dataDir, 'check-logs');
+    // Never traverse a redirected log root during recursive cleanup.
+    const root = lstatSync(logs, { throwIfNoEntry: false });
+    if (root?.isDirectory() && !root.isSymbolicLink()) {
+      rmSync(join(logs, workId), { recursive: true, force: true });
+    }
+  }
+
   function resetOwnedBuild(workId: string, row: Row, touched: string[]) {
     if (row.kind !== 'build') throw invalid('Only builds own slices.');
     const slices = childRows.all(workId) as unknown as Row[];
@@ -772,9 +787,11 @@ function workRecords(database: Database): WorkRecords {
       db.prepare("UPDATE capture_submissions SET draft='',created_ticket=NULL,failure='This submission expired.' WHERE work_id=? OR target_work_id=?").run(slice.work_id, slice.work_id);
       db.prepare('DELETE FROM work_records WHERE work_id = ?').run(slice.work_id);
     }
+    clearChecks(workId);
     return { build_phase: null };
   }
   return {
+    ...validationRecords(database, (id) => fromRow(find(id))),
     ...trackerCache(database),
     ...specRecords(database, (workId) => fromRow(find(workId))),
     ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
@@ -1244,6 +1261,7 @@ function workRecords(database: Database): WorkRecords {
           for (const statement of deleteOwned) statement.run(workId);
           deleteBlockers.run(workId, workId);
           db.prepare("UPDATE capture_submissions SET draft='',created_ticket=NULL,failure='This submission expired.' WHERE work_id=? OR target_work_id=?").run(workId, workId);
+          clearChecks(workId);
           deleteRecord.run(workId);
         }
         const at = new Date().toISOString();

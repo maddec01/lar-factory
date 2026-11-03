@@ -473,3 +473,20 @@ it('resets a build through the CLI with revision checks', async () => {
   expect(await larWork(data, 'reset-build', id, '--revision', '1')).toMatchObject({ code: 1 });
   expect(await larWork(data, 'reset-build', id, '--revision', '2')).toMatchObject({ code: 0, record: { buildPhase: null } });
 });
+
+it('manages validation lists and failure descriptions without revisions', async () => {
+  const data = tempDir();
+  const records = await openWorkRecords(join(data, 'work-records.db'));
+  const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
+  const run = records.startCheck(build.workId, { role: 'builder', command: ['test'], folder: '.', tree: null });
+  records.finishCheck(run.checkId, { tree: null, exitStatus: 1, interrupted: false, log: null });
+  records.close();
+  const file = join(data, 'input.json');
+  writeFileSync(file, JSON.stringify([{ command: ['test'], folder: '.' }]));
+  expect((await larWork(data, 'set-check-list', build.workId, '--file', file)).code).toBe(0);
+  writeFileSync(file, JSON.stringify({ tests: ['saves data'], diagnosis: 'Missing fixture' }));
+  expect((await larWork(data, 'describe-failure', run.checkId, '--file', file)).code).toBe(0);
+  expect((await larWork(data, 'checks', build.workId)).record.runs[0]).toMatchObject({ failureState: 'open', failure: { tests: ['saves data'] } });
+  expect((await larWork(data, 'resolve-failure', run.checkId, '--reason', 'Added fixture')).code).toBe(0);
+  expect((await larWork(data, 'checks', build.workId)).record.runs[0].failureState).toBe('resolved');
+}, 30_000);

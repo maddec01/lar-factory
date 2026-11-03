@@ -15,7 +15,8 @@ import { notify } from '../notices/notices.tsx';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 import { postAction, receive } from './card-actions.ts';
 import { writeState } from './item-actions.tsx';
-import { StartControl, StartEntries, opensOnChecked } from './start-control.tsx';
+import { StartControl, StartEntries } from './start-control.tsx';
+import { opensOnChecked } from './model-entries.tsx';
 import type { StartKind } from './start-store.ts';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */

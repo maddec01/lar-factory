@@ -34,9 +34,9 @@ test.each(['map', 'list'])('dossier parts identify their own source in the %s vi
     { ...local, id: 'azure-part', parentId: parent.id, repo: 'example/project/product', number: 23, url: 'https://dev.azure.com/example/project/_workitems/edit/23' },
     { ...local, id: 'local-part', parentId: parent.id },
   ];
-  localStorage.setItem('lar-board:dossier-open:source-concept', '1');
   localStorage.setItem('lar-board:dossier-view:source-concept', view);
   await mountPage({ ...board(parent), items: [parent, ...children] });
+  await settle(() => $<HTMLButtonElement>('[data-dossier-open]')!.click());
   const row = view === 'map' ? 'data-map-part' : 'data-part';
   expect($(`[${row}="github-part"] [role="img"]`)?.getAttribute('aria-label')).toBe('GitHub issue. Saved on GitHub.');
   expect($(`[${row}="azure-part"] [role="img"]`)?.getAttribute('aria-label')).toBe('Azure DevOps work item. Saved in Azure DevOps.');

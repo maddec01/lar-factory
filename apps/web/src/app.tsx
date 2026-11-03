@@ -1,4 +1,4 @@
-// The board shows onboarding in progress, Your desk and the stage layout, scoped to the repository the title
+// The board shows onboarding in progress, Your desk and the stage lists, scoped to the repository the title
 // bar or the List modal picked; a repository whose items the first read hasn't landed yet says it's reading instead
 // of an empty desk and stages. While no t3 is found, the notice replaces the content and the title bar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
@@ -31,15 +31,12 @@ function Content() {
   const scope = useScopeStore((state) => state.scope);
   const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
   return (
-    // The page never scrolls: whatever sits above the stage layout shrinks its panes, which scroll inside themselves.
-    <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-4 pt-3">
+    // Everything under the title bar scrolls as one page, and nothing in it shrinks to fit.
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-4 pt-3 *:shrink-0">
       <OnboardingCards />
       {scope && !loaded && stillReading(data, scope)
         ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Loading projects…</p>
-        : <>
-          <Desk items={boardSections({ ...data, items }, now, clientError).needsYou} />
-          <StageLayout items={items} />
-        </>}
+        : <StageLayout items={items} desk={<Desk items={boardSections({ ...data, items }, now, clientError).needsYou} />} />}
     </div>
   );
 }

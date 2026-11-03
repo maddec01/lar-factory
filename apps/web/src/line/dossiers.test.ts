@@ -1,6 +1,6 @@
-// The dock's dossiers: each started concept, and each open item with sub-issues on the board: its one header line,
-// collapsed until opened, then what keeps the work moving and its parts as a Work map or a list. Ports the old Board
-// view's concept block tests.
+// The dock's dossiers: each started concept, and each open item with sub-issues on the board: its one line, and opened in
+// place of the sections, what keeps the work moving and its parts as a Work map or a list. Ports the old Board view's
+// concept block tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text } from '../../test/support.ts';
@@ -11,13 +11,12 @@ import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 const C200 = 'I_sample09';
 const C180 = 'I_sample23';
 const dossier = (id = C200) => $(`[data-dossier="${id}"]`)!;
-const header = (id = C200) => dossier(id).firstElementChild as HTMLElement;
+const header = (id = C200) => dossier(id).querySelector<HTMLElement>('[data-item]')!;
 const line = (id = C200) => header(id).querySelector<HTMLElement>('[data-line="1"]')!;
 /** The row's "what's next": the part that waits on you, the first part that can start, or the fallback. */
 const next = (id = C200) => header(id).querySelector<HTMLElement>('[data-next]')!;
 const chips = (id = C200) => [...header(id).querySelectorAll('[data-chip]')].map(text);
-const toggle = (id = C200) => header(id).querySelector<HTMLButtonElement>('[aria-expanded]')!;
-const OPEN_KEY = 'lar-board:dossier-open:';
+const opener = (id = C200) => header(id).querySelector<HTMLButtonElement>('[data-dossier-open]')!;
 const VIEW_KEY = 'lar-board:dossier-view:';
 const step = (id: string, d = C200) => dossier(d).querySelector<HTMLElement>(`[data-part="${id}"]`)!;
 /** The parts the parts list shows, in its order. */
@@ -48,21 +47,27 @@ const withDecision = (blockers?: Item['blockers']) => writable({ ...sample, item
 const receive = (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 
-/** Every sample dossier starts open on its parts list here, so the tests of a dossier's body see it; the collapsed
- *  and Work map tests clear this. */
+/** Every sample dossier opens on its parts list here, so the tests of a dossier's body see it; the Work map tests clear this. */
 beforeEach(() => {
   localStorage.clear();
-  for (const id of [C200, C180, 'I_100', 'I_700']) {
-    localStorage.setItem(OPEN_KEY + id, '1');
-    localStorage.setItem(VIEW_KEY + id, 'list');
-  }
+  for (const id of [C200, C180, 'I_100', 'I_700']) localStorage.setItem(VIEW_KEY + id, 'list');
 });
+
+/** The page with dossier `id` open. */
+const mountOpen = async (data: BoardData = sample, id = C200) => {
+  await mountPage(data);
+  await press(opener(id));
+};
+/** Back to the panes, then dossier `id` open. */
+const openInstead = async (id: string) => {
+  await press(backButton());
+  await press(opener(id));
+};
 
 test('each started concept and item with sub-issues on the board is a dossier in the dock, in board order; with none the dock takes no height', async () => {
   await mountPage();
   expect(text($('#dock-h'))).toBe('Concepts and linked work 2');
   expect([...$('[data-dossiers]')!.children].map((el) => el.getAttribute('data-dossier'))).toEqual([C200, C180]);
-  expect($('[data-stage="dock"]')!.className.split(' '), 'it takes at most a third of the main area').toEqual(expect.arrayContaining(['max-h-[33%]', 'shrink-0']));
   await receive({ ...sample, items: sample.items.filter((i) => !i.labels.includes('concept') && i.parent?.number !== 180) });
   expect([$$('[data-dossier]'), $('[data-stage="dock"]')], 'none without a concept or a parent').toEqual([[], null]);
 });
@@ -73,37 +78,82 @@ test('a Queued concept stays out of the dock until it starts', async () => {
   expect([$('[data-dossier="I_queued"]'), $('.queue li[data-item="I_queued"]') !== null]).toEqual([null, true]);
 });
 
-test('a dossier starts collapsed to its one line, and the browser remembers it opened across a reload', async () => {
+const backButton = () => $<HTMLButtonElement>('[data-dossier-back]')!;
+const SECTIONS = ['queue', 'shaping', 'ready', 'build', 'dock'];
+const panes = () => SECTIONS.filter((id) => $(`[data-stage="${id}"]`));
+const escape = (el: Element = document.activeElement ?? document.body) =>
+  settle(() => el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+
+test('a dock row is one line, and opening it replaces the sections with the dossier at full height, on its Work map', async () => {
   localStorage.clear();
-  await mountPage();
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  expect([toggle().getAttribute('aria-expanded'), dossier().children.length, dossier().querySelector('[data-work-map]')]).toEqual(['false', 1, null]);
-  await press(header());
-  expect([toggle().getAttribute('aria-expanded'), localStorage.getItem(OPEN_KEY + C200)]).toEqual(['true', '1']);
+  await mountPage();
+  expect([dossier().querySelector('[data-work-map]'), $('[data-stage="dossier"]'), panes()]).toEqual([null, null, SECTIONS]);
+  await press(opener());
+  expect([panes(), $$('[data-dossier]').length], 'nothing else shares the room').toEqual([[], 1]);
   expect(dossier().querySelector('[data-work-map]'), 'opened, it shows its body').not.toBeNull();
+  expect($('[data-stage="dossier"]')!.className.split(' '), 'it fills the page').toContain('flex-1');
+  expect(document.activeElement, 'focus moves to Back').toBe(backButton());
+  expect([$('.queue'), $('.desk'), $('[data-line-filters]')], 'it takes the whole workspace').toEqual([null, null, null]);
   vi.resetModules();
   await mountPage();
-  expect([toggle().getAttribute('aria-expanded'), toggle(C180).getAttribute('aria-expanded')], 'the others stay collapsed').toEqual(['true', 'false']);
-  await press(toggle());
-  expect([dossier().children.length, localStorage.getItem(OPEN_KEY + C200)]).toEqual([1, '0']);
+  expect($('[data-stage="dossier"]'), 'a reload starts on the panes').toBeNull();
 });
 
-test('only the title opens the item; anywhere else on the header but the chips opens or closes the dossier', async () => {
-  localStorage.clear();
-  await mountPage();
+test('Back and Escape return to the panes, with focus on the row that opened the dossier', async () => {
+  await mountOpen();
+  await press(backButton());
+  expect([panes(), $('[data-stage="dossier"]'), document.activeElement]).toEqual([SECTIONS, null, opener()]);
+  await press(opener(C180));
+  expect(dossier(C180).querySelector('[data-parts-list]')).not.toBeNull();
+  await escape();
+  expect([panes(), document.activeElement]).toEqual([SECTIONS, opener(C180)]);
+  await escape();
+  expect(panes(), 'Escape on the panes does nothing').toEqual(SECTIONS);
+});
+
+test('Escape closes an open item dialog first, then the dossier', async () => {
+  await mountOpen();
   await press(header().querySelector('[data-title]')!);
-  expect([dialogTitle(), toggle().getAttribute('aria-expanded')]).toEqual(['#200 lar cloud: website sign-in and relay', 'false']);
-  await press($('[data-item-dialog] [aria-label="Close"]') ?? document.body);
-  for (const el of [line(), header().querySelector<HTMLElement>('[data-col="bar"]')!]) {
-    const was = toggle().getAttribute('aria-expanded');
-    await press(el);
-    expect(toggle().getAttribute('aria-expanded'), el.outerHTML.slice(0, 40)).not.toBe(was);
-  }
-  const was = toggle().getAttribute('aria-expanded');
-  await press(header().querySelector('[data-chips]')!);
-  expect(toggle().getAttribute('aria-expanded'), 'a chip leaves it as it was').toBe(was);
-  await press(next());
-  expect([dialogTitle(), toggle().getAttribute('aria-expanded')], "what's next opens no dialog; it toggles the dossier").toEqual(['', was === 'true' ? 'false' : 'true']);
+  expect(dialogTitle()).toBe('#200 lar cloud: website sign-in and relay');
+  await escape();
+  expect([dialogTitle(), $('[data-stage="dossier"]') !== null]).toEqual(['', true]);
+  await escape();
+  expect($('[data-stage="dossier"]')).toBeNull();
+});
+
+test('Escape closes an open menu first, then the dossier', async () => {
+  holdPosts(unblocked());
+  await mountOpen(unblocked());
+  await pressMenu(startIn(step('I_sample13'))!);
+  expect(entries().length).toBeGreaterThan(0);
+  await escape();
+  expect([entries().length, $('[data-stage="dossier"]') !== null]).toEqual([0, true]);
+});
+
+test('a dossier that leaves the board returns the panes, and it stays closed if it comes back', async () => {
+  await mountOpen();
+  const without = { ...sample, items: sample.items.filter((i) => i.id !== C200 && i.parentId !== C200) };
+  await receive(without);
+  expect([panes().includes('shaping'), $('[data-stage="dossier"]')]).toEqual([true, null]);
+  await receive(sample);
+  expect([$('[data-stage="dossier"]'), dossier().querySelector('[data-parts-list]')]).toEqual([null, null]);
+});
+
+test('a board push updates the open dossier in place', async () => {
+  await mountOpen();
+  await receive(withItem('I_sample10', { title: 'Relay, renamed' }));
+  expect(text(step('I_sample10'))).toContain('Relay, renamed');
+  expect(panes()).toEqual([]);
+});
+
+test('a board push that puts the open dossier outside the filter leaves it open', async () => {
+  localStorage.setItem('lar-board:filters:board', JSON.stringify({ kinds: [c200.kind], labels: [] }));
+  await mountOpen();
+  await receive(withItem(C200, { kind: 'bug', status: 'Shaping' }));
+  expect($('[data-stage="dossier"]')).not.toBeNull();
+  await press(backButton());
+  expect($('[data-dossier]'), 'on the panes, the filter hides it').toBeNull();
 });
 
 /** A pointer click (`detail` 1) or a key press's click (`detail` 0) on `el`. */
@@ -118,27 +168,62 @@ const select = (el: Element) => {
   window.getSelection()!.addRange(range);
 };
 
-test('letting go of a drag that selected text in the header leaves the dossier as it was', async () => {
-  localStorage.clear();
+test('only the title opens the item; anywhere else on the row but the chips opens the dossier', async () => {
   await mountPage();
-  select(header());
-  await clickWith(header(), 1);
-  expect(toggle().getAttribute('aria-expanded')).toBe('false');
-  window.getSelection()!.removeAllRanges();
-  await clickWith(header(), 1);
-  expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  await press(header().querySelector('[data-title]')!);
+  expect([dialogTitle(), $('[data-stage="dossier"]')]).toEqual(['#200 lar cloud: website sign-in and relay', null]);
+  await press($('[data-item-dialog] [aria-label="Close"]')!);
+  await press(header().querySelector('[data-chips]')!);
+  expect($('[data-stage="dossier"]'), 'a chip leaves it as it was').toBeNull();
+  for (const part of [line, (id?: string) => header(id).querySelector<HTMLElement>('[data-col="bar"]')!, next]) {
+    await press(part());
+    expect($('[data-stage="dossier"]')).not.toBeNull();
+    expect(dialogTitle()).toBe('');
+    await press(backButton());
+  }
 });
 
-test('a selection elsewhere never stops the dossier toggling, nor does one in the header stop a key press on the chevron', async () => {
-  localStorage.clear();
+test('letting go of a drag that selected text in the row leaves the panes; a selection elsewhere or a key press still opens it', async () => {
   await mountPage();
+  select(header());
+  await clickWith(header(), 1);
+  expect($('[data-stage="dossier"]')).toBeNull();
+  await clickWith(opener(), 0);
+  expect($('[data-stage="dossier"]'), 'Enter or Space on the row\'s button, with text selected in it').not.toBeNull();
+  await press(backButton());
   select(header(C180));
   await clickWith(header(), 1);
-  expect(toggle().getAttribute('aria-expanded'), 'a click, with text selected in another dossier').toBe('true');
-  select(header());
-  await clickWith(toggle(), 0);
-  expect(toggle().getAttribute('aria-expanded'), 'Enter or Space on Collapse, with text selected in the header').toBe('false');
+  expect($('[data-stage="dossier"]'), 'a click, with text selected in another row').not.toBeNull();
   window.getSelection()!.removeAllRanges();
+});
+
+const refined = { refinement: { complete: true, reasons: [] }, completion: { complete: false, reasons: ['No delivery planned.'] } };
+
+test('a refined concept leaves Shaping and stays in the dock, where its row says Refined and that no delivery is planned', async () => {
+  await mountPage(withItem(C200, refined));
+  expect(text(header().querySelector('[data-refined]'))).toBe('Refined · no delivery planned');
+  expect($(`[data-stage="shaping"] [data-item="${C200}"]`)).toBeNull();
+  await press(opener());
+  expect(text(header().querySelector('[data-refined]')), 'the open dossier says so too').toBe('Refined · no delivery planned');
+});
+
+test('a refined concept with active builds says Refined alone, and an unrefined one neither', async () => {
+  await mountPage(withItem(C200, { ...refined, completion: { complete: false, reasons: ["Its build W_b isn't Done."] } }));
+  expect(text(header().querySelector('[data-refined]'))).toBe('Refined');
+  await receive(withItem(C200, { refinement: { complete: false, reasons: ["Its map is empty."] }, completion: refined.completion }));
+  expect(header().querySelector('[data-refined]')).toBeNull();
+  await receive(withItem(C200, { refinement: undefined }));
+  expect(header().querySelector('[data-refined]')).toBeNull();
+});
+
+test('a settled decision counts as done in its part bar, whatever its Status says', async () => {
+  const settledDecision: Partial<Item> = { recorded: true, kind: 'decision', labels: [], status: 'Shaping', completion: { complete: true, reasons: [] }, threads: undefined };
+  const pending: Partial<Item> = { ...settledDecision, completion: { complete: false, reasons: ['No answer.'] } };
+  const parts = [{ ...sample.items.find((i) => i.id === 'I_sample10')!, ...settledDecision }, { ...sample.items.find((i) => i.id === 'I_sample12')!, ...pending }];
+  await mountPage({ ...sample, items: [{ ...c200, subIssues: { total: 2, completed: 0 } }, ...parts] });
+  expect(text(col('count'))).toBe('1/2');
+  const bar = [...col('bar').querySelectorAll<HTMLElement>('[data-part-bar] li')];
+  expect(bar.map((li) => [li.title, li.style.background === 'var(--st-done)'])).toEqual([[expect.stringContaining('Complete'), true], [expect.stringContaining('Shaping'), false]]);
 });
 
 test('the line holds the kind, the title and chips that hide at zero, with its T3 threads in its tooltip', async () => {
@@ -199,8 +284,8 @@ test('the line has no stage track and no repository dots; the agent figures sit 
 
 test('a concept keeps the provider counts when Reset hides an unfinished part', async () => {
   const data = withItem(C180, { subIssues: { total: 2, completed: 1 } });
-  await mountPage({ ...data, repos: data.repos.filter((r) => r.repo !== 'maddec01/lar-apple'),
-    items: data.items.filter((i) => i.repo !== 'maddec01/lar-apple') });
+  await mountOpen({ ...data, repos: data.repos.filter((r) => r.repo !== 'maddec01/lar-apple'),
+    items: data.items.filter((i) => i.repo !== 'maddec01/lar-apple') }, C180);
   expect(text(col('count', C180))).toBe('1/2');
   expect(text(dossier(C180))).toContain("1 part the board doesn't read");
   expect(text(next(C180))).not.toContain('Nothing waits on you');
@@ -209,7 +294,7 @@ test('a concept keeps the provider counts when Reset hides an unfinished part', 
 });
 
 test('an open dossier has no About section; what keeps the work moving is in labelled rows, each with its entries', async () => {
-  await mountPage();
+  await mountOpen();
   expect(dossier().querySelector('[data-about]')).toBeNull();
   expect(text(dossier())).not.toContain('Destination');
   const rows = () => [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')];
@@ -225,6 +310,8 @@ test('an open dossier has no About section; what keeps the work moving is in lab
   await press($('[data-item-dialog] [aria-label="Close"]')!);
   await press(button(dossier().querySelector('[data-attention-row="fog"]')!, '#201'));
   expect(dialogTitle(), "a fog question's #n opens its item").toBe(`#201 ${sample.items.find((i) => i.number === 201)!.title}`);
+  await press($('[data-item-dialog] [aria-label="Close"]')!);
+  await openInstead(C180);
   expect([dossier(C180).querySelector('[data-attention]'), text(dossier(C180).querySelector('[data-attention-none]'))], 'no rows when nothing has entries')
     .toEqual([null, 'Nothing holds this up.']);
 });
@@ -233,7 +320,7 @@ test('a part at Verify or Ready to merge counts as moving while its build thread
   const build = { id: 'build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated: '2026-10-21T09:00:00.000Z' } as ItemThread;
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
   const clear = withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, fresh));
-  await mountPage(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [build] }, clear));
+  await mountOpen(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [build] }, clear));
   expect(dossier().querySelector('[data-attention-row="verify"]')).toBeNull();
   expect(text(next())).toBe('Moving#140 Owner accounts');
   const part = text(step('I_sample13'));
@@ -249,7 +336,7 @@ test('a decision part and a work map node name the running build thread and say 
   const build = { id: 'build', title: 'Build', purpose: 'build', state: 'done', hasRunningChildren: true, updated: '2026-10-21T09:00:00.000Z' } as ItemThread;
   const shape = { ...build, id: 'shape', title: 'Shape', purpose: 'shape', hasRunningChildren: undefined };
   const data = withItem('I_sample10', { status: 'Verify', threads: [shape, build] }, { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() });
-  await mountPage(data);
+  await mountOpen(data);
   expect(text(dossier().querySelector('[data-attention-row="decisions"]'))).toContain('· Working');
   await press(button(dossier(), 'Work map'));
   const node = text(dossier().querySelector('[data-map-part="I_sample10"]'));
@@ -257,7 +344,7 @@ test('a decision part and a work map node name the running build thread and say 
 });
 
 test('parts in Verify or Ready to merge get their own row after Needs you, which with the chip counts only Needs you', async () => {
-  await mountPage(withItem('I_sample10', { status: 'Verify' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] })));
+  await mountOpen(withItem('I_sample10', { status: 'Verify' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] })));
   const rows = [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')].map((r) => text(r.firstElementChild));
   expect(rows.slice(0, 2)).toEqual(['Needs you 1', 'To verify or merge 2']);
   expect(chips()).toContain('1 need you');
@@ -277,7 +364,7 @@ test('parts in Verify or Ready to merge get their own row after Needs you, which
 
 test('blocked slices name the part they belong to and what they wait on', async () => {
   const s13 = sample.items.find((i) => i.id === 'I_sample13')!;
-  await mountPage(withItem('I_sample13', { slices: s13.slices.map((x, n) => (n === 0 ? { ...x, progress: 'blocked' as const } : x)) }));
+  await mountOpen(withItem('I_sample13', { slices: s13.slices.map((x, n) => (n === 0 ? { ...x, progress: 'blocked' as const } : x)) }));
   const blocked = dossier().querySelector('[data-attention-row="blocked"]')!;
   expect([text(blocked.firstElementChild), [...blocked.lastElementChild!.children].map(text)])
     .toEqual(['Blocked slices 1', [`#${s13.slices[0]!.number} ${s13.slices[0]!.title}slice of #140 · waits on a re-slice`]]);
@@ -287,7 +374,7 @@ test('blocked slices name the part they belong to and what they wait on', async 
 
 test('a part with nothing to wait on is ready to start, with its Start', async () => {
   holdPosts(unblocked());
-  await mountPage(unblocked());
+  await mountOpen(unblocked());
   const ready = dossier().querySelector('[data-attention-row="ready"]')!;
   expect([text(ready.firstElementChild), text(ready.querySelector('dd > div > span'))]).toEqual(['Ready to start 1', '#140 Owner accounts']);
   expect(dossier().querySelector('[data-attention-row="waiting"]'), 'nothing waits').toBeNull();
@@ -299,7 +386,7 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
 
 test('the Ready to start row and the header agree on what can start: a Queued decision can, a part with a live thread cannot', async () => {
   const data = withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, withDecision());
-  await mountPage(data);
+  await mountOpen(data);
   const ready = () => dossier().querySelector('[data-attention-row="ready"]');
   expect([text(ready()!.firstElementChild), text(startIn(next()))]).toEqual(['Ready to start 1', 'Start ▾']);
   await receive(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
@@ -309,42 +396,44 @@ test('the Ready to start row and the header agree on what can start: a Queued de
 test('a dossier opens on its Work map, and the browser remembers a switch to the parts list for that dossier alone', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   for (const id of [C200, C180]) localStorage.removeItem(VIEW_KEY + id);
-  await mountPage();
+  await mountOpen();
   expect([button(dossier(), 'Work map').getAttribute('aria-pressed'), dossier().querySelector('[data-work-map]') !== null]).toEqual(['true', true]);
   await press(button(dossier(), 'Parts list'));
   expect([dossier().querySelector('[data-work-map]'), dossier().querySelector('[data-parts-list]') !== null, localStorage.getItem(VIEW_KEY + C200)]).toEqual([null, true, 'list']);
   vi.resetModules();
-  await mountPage();
+  await mountOpen();
   expect(button(dossier(), 'Parts list').getAttribute('aria-pressed'), 'it stays on the parts list').toBe('true');
+  await openInstead(C180);
   expect(button(dossier(C180), 'Work map').getAttribute('aria-pressed'), 'the other dossier stays on its Work map').toBe('true');
 });
 
 test('the parts list holds the open parts in dependency order, two columns where there is room, the done ones behind Show N done', async () => {
-  await mountPage();
+  await mountOpen();
   expect(listed()).toEqual(['I_sample12', 'I_sample10', 'I_sample13']);
   expect(dossier().querySelector('[data-parts-list]')!.className.split(' ')).toContain('@4xl:grid-cols-2');
   const fold = button(dossier(), 'Show 1 done');
   await press(fold);
   expect([text(fold), fold.getAttribute('aria-expanded'), listed().length]).toEqual(['Hide 1 done', 'true', 4]);
+  await openInstead(C180);
   expect(listed(C180), 'all done').toEqual([]);
   await press(button(dossier(C180), 'Show 2 done'));
   expect(listed(C180).length).toBe(2);
 });
 
 test('the open body has no Check phase, progress rows or stage header; the Work map keeps the end-to-end check', async () => {
-  await mountPage();
+  await mountOpen();
   expect(text(dossier())).not.toContain('Run end-to-end');
   expect(text(dossier())).not.toContain('Progress · ');
   expect(dossier().querySelectorAll('[data-item]').length, "only the header's").toBe(1);
 });
 
 test("a part's archived thread reads as archived, not as its last state", async () => {
-  await mountPage(withItem('I_sample10', { threads: [{ ...thread('put-away', 'done'), archived: true }] }));
+  await mountOpen(withItem('I_sample10', { threads: [{ ...thread('put-away', 'done'), archived: true }] }));
   expect([...step('I_sample10').children].map(text)[2]).toContain('T3 · Thread put-away· archived');
 });
 
 test('each part shows what it asks next, then its stage track, status, figures and thread, and its slice bar', async () => {
-  await mountPage(withItem('I_sample13', { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' },
+  await mountOpen(withItem('I_sample13', { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' },
     linkedPrs: [{ ...sample.items.flatMap((i) => i.linkedPrs)[0]!, number: 145, state: 'open', isDraft: false }] }));
   const lines = (id: string) => [...step(id).children].map(text);
   expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'Open thread', 'GrillShaping28m · 1.87M · $2.71T3 · Grill: relay broker only or full TURN· running']);
@@ -358,7 +447,7 @@ test('each part shows what it asks next, then its stage track, status, figures a
 });
 
 test('a part waiting on another, with no Start of its own, says what it waits on', async () => {
-  await mountPage(withItem('I_sample10', { threads: [], blockers: [{ number: 140, repo: 'maddec01/lar-server', state: 'open' }] }));
+  await mountOpen(withItem('I_sample10', { threads: [], blockers: [{ number: 140, repo: 'maddec01/lar-server', state: 'open' }] }));
   expect(text(step('I_sample10').children[1])).toBe('waits on #140');
   expect(step('I_sample10').children[1]!.querySelector('[title]')?.className).toContain('truncate');
   expect([...step('I_sample10').children[1]!.querySelectorAll('button, svg')], 'plain text: no chip, no status icon').toEqual([]);
@@ -367,28 +456,28 @@ test('a part waiting on another, with no Start of its own, says what it waits on
 });
 
 test('a part with no thread yet says what it is waiting on', async () => {
-  await mountPage(withItem('I_sample13', { threads: [] }));
+  await mountOpen(withItem('I_sample13', { threads: [] }));
   expect(text(step('I_sample13').querySelector('[data-part-meta]')!.lastElementChild)).toBe('Waiting on #202');
 });
 
 test('a part held by a Dependency says what it is waiting on', async () => {
   const dependency: DependencyHold = { dependencyId: 'dep-1', revision: 1, owner: 'server team', need: 'An export endpoint', ticket: null, named: [], evidence: '',
     met: null, needsReview: false, observation: null };
-  await mountPage(withItem('I_sample13', { threads: [], blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' },
+  await mountOpen(withItem('I_sample13', { threads: [], blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' },
     { number: 0, repo: 'server team', state: 'open', title: dependency.need, dependency }] }));
   expect(text(step('I_sample13').querySelector('[data-part-meta]')!.lastElementChild))
     .toBe('Waiting on #202 and you to mark the Dependency on server team met');
 });
 
 test('a Ready part with completed prerequisites offers Start without blocking wording', async () => {
-  await mountPage(unblocked());
+  await mountOpen(unblocked());
   const part = step('I_sample13');
   expect(text(startIn(part))).toBe('Start ▾');
   expect(text(part)).not.toContain('waits on');
 });
 
 test('a blocked build shows only Start after, a Start, in place of Start build', async () => {
-  await mountPage();
+  await mountOpen();
   expect(startIn(step('I_sample13'))).toBeNull();
   const after = step('I_sample13').querySelector<HTMLElement>('[data-start-after]')!;
   expect([text(after), after.dataset.kind]).toEqual(['Start after #202 ▾', 'start']);
@@ -397,7 +486,7 @@ test('a blocked build shows only Start after, a Start, in place of Start build',
 
 test('once its blockers complete, Start build sends the build, and the header offers it too', async () => {
   holdPosts(unblocked());
-  await mountPage(withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()));
+  await mountOpen(withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()));
   expect(text(startIn(next()))).toBe('Start ▾');
   await pressMenu(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
@@ -410,7 +499,7 @@ test('once its blockers complete, Start build sends the build, and the header of
 /** #140, Ready, also carrying Verify. */
 test("Start on a Queued decision is today's Start", async () => {
   holdPosts(withDecision());
-  await mountPage(withDecision());
+  await mountOpen(withDecision());
   expect(text(step('I_d204'))).toMatch(/^#204 Pick the relay hostStart ▾/);
   await pressMenu(startIn(step('I_d204'))!);
   await press(entries()[0]!);
@@ -421,7 +510,7 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
   const data = withDecision([{ number: 201, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
     { number: 140, repo: 'maddec01/lar-server', state: 'open' }]);
   holdPosts(data);
-  await mountPage(data);
+  await mountOpen(data);
   expect(startIn(step('I_d204'))).toBeNull();
   const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Starts by itself once #201, #140 complete']);
@@ -434,21 +523,21 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
 
 test('the map names unfinished dependencies without promising an automatic start', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'open' }] }));
+  await mountOpen(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'open' }] }));
   await press(button(dossier(), 'Work map'));
   expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('Waiting on #203');
 });
 
 test("in the map, a part waiting on another repository's issue names it without its owner", async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('I_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'open' }] }));
+  await mountOpen(withItem('I_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'open' }] }));
   await press(button(dossier(), 'Work map'));
   expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('Waiting on lar-apple#12');
 });
 
 test('Open thread takes Start\'s place while a part has a live thread', async () => {
   const data = withDecision();
-  await mountPage(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
+  await mountOpen(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
   expect(startIn(step('I_d204'))).toBeNull();
   expect(step('I_d204').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/t1');
 });
@@ -456,7 +545,7 @@ test('Open thread takes Start\'s place while a part has a live thread', async ()
 test('a map with no End-to-end check draws no check and no placeholder for one', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   const { check: _, ...map } = c200.map!;
-  await mountPage(withItem(C200, { map }));
+  await mountOpen(withItem(C200, { map }));
   await press(button(dossier(), 'Work map'));
   expect(dossier().querySelector('[data-map-check]')).toBeNull();
   expect(text(dossier().querySelector('[data-work-map]'))).not.toContain('end-to-end');
@@ -465,7 +554,7 @@ test('a map with no End-to-end check draws no check and no placeholder for one',
 
 test('neither the parts list nor the Work map lanes draw a coloured repository dot', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage();
+  await mountOpen();
   await press(button(dossier(), 'Show 1 done'));
   expect([listed().length, dossier().querySelector('[class*="repo-tone"]')]).toEqual([4, null]);
   await press(button(dossier(), 'Work map'));
@@ -474,7 +563,7 @@ test('neither the parts list nor the Work map lanes draw a coloured repository d
 
 test('the Map view draws Decisions and Builds lanes, its current parts in order, and arrows for what waits on what', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage();
+  await mountOpen();
   const toggle = button(dossier(), 'Work map');
   await press(toggle);
   expect([toggle.getAttribute('aria-pressed'), button(dossier(), 'Parts list').getAttribute('aria-pressed')]).toEqual(['true', 'false']);
@@ -502,7 +591,7 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
   const child = rawIssue('I_102', 102, 'In progress', ['build'], {
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
-  await mountPage({ ...sample, error: null, items: recorded(normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) })) });
+  await mountOpen({ ...sample, error: null, items: recorded(normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) })) }, 'I_100');
   expect(text(line('I_100'))).toContain('Coupled work');
   expect(text(col('count', 'I_100'))).toBe('0/2');
   expect(text(next('I_100'))).toBe('Moving#102 Issue 102');
@@ -521,20 +610,20 @@ test('the parts list keeps cross-repository dependency order even when builds re
   const first = { ...sample.items.find((i) => i.id === 'I_sample24')!, state: 'open' as const, status: 'Ready' as const, blockers: [] };
   const second = { ...sample.items.find((i) => i.id === 'I_sample25')!, state: 'open' as const, status: 'Ready' as const };
   const last: Item = { ...first, id: 'I_last', number: 999, title: 'Finish in the server', blockers: [{ repo: second.repo!, number: second.number!, state: 'open' }] };
-  await mountPage({ ...sample, items: [...sample.items.filter((i) => ![first.id, second.id].includes(i.id)), last, second, first] });
+  await mountOpen({ ...sample, items: [...sample.items.filter((i) => ![first.id, second.id].includes(i.id)), last, second, first] }, C180);
   expect([...dossier(C180).querySelectorAll('[data-parts-list] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([first.id, second.id, last.id]);
 });
 
 test('the parts list keeps a build before a research decision blocked by that build', async () => {
   const build = { ...sample.items.find((i) => i.id === 'I_sample13')!, blockers: [] };
   const research = { ...decision([{ repo: build.repo!, number: build.number!, state: 'open' }]), labels: ['decision-research'] };
-  await mountPage({ ...sample, items: [c200, research, build] });
+  await mountOpen({ ...sample, items: [c200, research, build] });
   expect([...dossier().querySelectorAll('[data-parts-list] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([build.id, research.id]);
 });
 
 test("a concept map's Dependencies show as a Dependencies row, after what waits and before the fog", async () => {
   const dependencies = ['A resume endpoint, from team/relay, blocks #140'];
-  await mountPage(withItem(C200, { map: { ...c200.map!, dependencies } }));
+  await mountOpen(withItem(C200, { map: { ...c200.map!, dependencies } }));
   const rows = [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')].map((r) => r.dataset.attentionRow);
   expect(rows).toEqual(['you', 'decisions', 'waiting', 'dependencies', 'fog']);
   const row = dossier().querySelector('[data-attention-row="dependencies"]')!;
@@ -545,7 +634,7 @@ test("a concept map's Dependencies show as a Dependencies row, after what waits 
 
 test('a concept with no map has no fog row', async () => {
   const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: 'A concept written as ordinary prose.' });
-  await mountPage({ ...sample, items: normalizeItems([concept]) });
+  await mountOpen({ ...sample, items: normalizeItems([concept]) }, 'I_700');
   expect([dossier('I_700').querySelector('[data-attention]'), dossier('I_700').querySelector('[data-about]')]).toEqual([null, null]);
 });
 
@@ -554,7 +643,7 @@ test('unlabelled local decision parts show the decision lane and completed answe
   const complete:Item={...sample.items.find(item=>item.id==='I_sample10')!,recorded:true,kind:'decision',labels:[],status:'Shaping',completion:{complete:true,reasons:[]},threads:undefined};
   const pending:Item={...sample.items.find(item=>item.id==='I_sample12')!,recorded:true,kind:'decision',labels:[],status:'Shaping',completion:{complete:false,reasons:['No answer.']},threads:undefined};
   const parent:Item={...c200,subIssues:{total:2,completed:1}};
-  await mountPage({...sample,items:[parent,complete,pending]});
+  await mountOpen({...sample,items:[parent,complete,pending]});
   expect(text(col('count'))).toBe('1/2');
   await press(button(dossier(),'Work map'));
   const map=dossier().querySelector('[data-work-map]')!;
@@ -569,7 +658,7 @@ test('unlabelled local decision parts show the decision lane and completed answe
 });
 
 test('a concept question takes priority over its parts and appears in Attention', async () => {
-  await mountPage(withItem(C200, { status: 'In progress', threads: [thread('own-question', 'needs you')] }));
+  await mountOpen(withItem(C200, { status: 'In progress', threads: [thread('own-question', 'needs you')] }));
   expect(text(next())).toContain(c200.title);
   expect(text(next())).toContain('Needs you');
   expect(text(dossier())).not.toContain('Nothing holds this up');
@@ -577,7 +666,7 @@ test('a concept question takes priority over its parts and appears in Attention'
 });
 
 test('a shaping part with a question leads moving parts in the dossier', async () => {
-  await mountPage(withItem('I_sample12', { status: 'Shaping', threads: [thread('part-question', 'needs you')] }));
+  await mountOpen(withItem('I_sample12', { status: 'Shaping', threads: [thread('part-question', 'needs you')] }));
   expect(text(next())).toContain('Needs you');
   expect(chips()).toContain('1 need you');
   expect(dossier().querySelector('a[href="t3code://threads/sample-environment/part-question"]')).not.toBeNull();
@@ -595,7 +684,7 @@ const settledPart = (id: string, method: 'grill' | 'prototype' | 'research' | 't
 const mapOpen = async (data: BoardData) => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   localStorage.setItem(VIEW_KEY + C200, 'map');
-  await mountPage(data);
+  await mountOpen(data);
   return dossier().querySelector<HTMLElement>('[data-work-map]')!;
 };
 const fiveSettled = (['grill', 'prototype', 'research', 'task', 'grill'] as const).map((method, n) => settledPart(`W_s${n}`, method));
@@ -739,7 +828,7 @@ const showDone = () => press(button(dossier(), 'Show 2 done'));
 
 test('a settled decision with a thread offers Open thread and names its method, in the list and on its card', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('I_sample10', { ...settled, threads: [partThread] }));
+  await mountOpen(withItem('I_sample10', { ...settled, threads: [partThread] }));
   await press(button(dossier(), 'Parts list'));
   await showDone();
   expect(openThreadIn(step('I_sample10'))!.getAttribute('href')).toBe('t3code://threads/sample-environment/own');
@@ -754,7 +843,7 @@ test('a settled decision with a thread offers Open thread and names its method, 
 
 test('a settled decision with no thread shows no thread control, and no valid method says No method', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('I_sample10', { ...settled, decisionMethod: null, threads: [], stats: undefined }));
+  await mountOpen(withItem('I_sample10', { ...settled, decisionMethod: null, threads: [], stats: undefined }));
   await press(button(dossier(), 'Parts list'));
   await showDone();
   expect(openThreadIn(step('I_sample10'))).toBeNull();
@@ -769,7 +858,7 @@ test('a settled decision with no thread shows no thread control, and no valid me
 
 test('a part that waits on another keeps saying so beside Open thread', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'open' }], threads: [partThread] }));
+  await mountOpen(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'open' }], threads: [partThread] }));
   await press(button(dossier(), 'Parts list'));
   expect(text(step('I_sample10'))).toContain('waits on #203');
   expect(openThreadIn(step('I_sample10'))).not.toBeNull();
@@ -780,7 +869,7 @@ test('a part that waits on another keeps saying so beside Open thread', async ()
 });
 
 test('a row showing its Start or desk marker offers no Open thread', async () => {
-  await mountPage(withItem('I_sample12', { status: 'Verify', threads: [partThread] }, withItem('I_sample13', { status: 'Ready', threads: [partThread] })));
+  await mountOpen(withItem('I_sample12', { status: 'Verify', threads: [partThread] }, withItem('I_sample13', { status: 'Ready', threads: [partThread] })));
   await press(button(dossier(), 'Parts list'));
   expect(text(step('I_sample12'))).toContain('on your desk');
   expect(openThreadIn(step('I_sample12'))).toBeNull();
@@ -789,7 +878,7 @@ test('a row showing its Start or desk marker offers no Open thread', async () =>
 
 test('a part row keeps last-known figures, explains them, and hides all zeros', async () => {
   const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
-  await mountPage({ ...withItem('I_sample10', { stats: usage }, withItem('I_sample12', { stats: { agentMs: 0, tokens: 0, costUsd: 0 } })), usageRead: { readable: false } });
+  await mountOpen({ ...withItem('I_sample10', { stats: usage }, withItem('I_sample12', { stats: { agentMs: 0, tokens: 0, costUsd: 0 } })), usageRead: { readable: false } });
   await press(button(dossier(), 'Parts list'));
   const figures = step('I_sample10').querySelector<HTMLElement>('[data-part-meta] [title^="Agent time"]')!;
   expect(figures.title).toContain("Last known figures: T3 Code's usage can't be read now.");
@@ -798,7 +887,7 @@ test('a part row keeps last-known figures, explains them, and hides all zeros', 
 });
 
 test('a part with no figures yet says its usage can\'t be read', async () => {
-  await mountPage(withItem('I_sample10', { stats: 'unavailable' }));
+  await mountOpen(withItem('I_sample10', { stats: 'unavailable' }));
   await press(button(dossier(), 'Parts list'));
   expect(text(step('I_sample10').querySelector('[data-part-meta]'))).toContain('Usage details are unavailable.');
 });

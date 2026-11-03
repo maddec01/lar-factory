@@ -1,18 +1,20 @@
-// The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board. A dossier
-// starts collapsed to one line: its kind, title and chips (parts that need you, open decisions, blocked slices, fog),
-// then what's next, its part bar, parts done, agent figures and repositories in columns that line up across every
-// dossier. Opened, it expands in the dock and starts on its Work map, with the concept's own question above and its
-// Dependencies and fog below. Its parts list instead lists what keeps the work moving (parts that need you, parts to
-// verify or merge, open decisions, blocked slices, waiting parts, parts ready to start, Dependencies and fog) or says
-// nothing holds it up, then each part with what it asks next, its stage track, figures, thread and slices, the done
-// parts folded away. The browser remembers which dossiers are open and which view each shows.
+// The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board, as one
+// line: its kind, title and chips (parts that need you, open decisions, blocked slices, fog, whether it is refined), then
+// what's next, its part bar, parts done, agent figures and repositories in columns that line up across every dossier.
+// Opened, it takes the whole workspace under that same line and starts on its Work map, with the concept's own question
+// above and its Dependencies and fog below. Its parts list instead lists what keeps the work moving (parts that need you,
+// parts to verify or merge, open decisions, blocked slices, waiting parts, parts ready to start, Dependencies and fog) or
+// says nothing holds it up, then each part with what it asks next, its stage track, figures, thread and slices, the done
+// parts folded away. The browser remembers which view each dossier shows.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
-import { Ban, Check, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
+import { ArrowLeft, Ban, Check, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
 import { UNREADABLE, needsAnswer, openQuestionThread, blockerGroups, blockerRef, canRetryBuild, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { dependenciesOf } from '../items/dependencies.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -72,24 +74,12 @@ function ThreadLine({ part }: { part: Part }) {
 
 type View = 'list' | 'map';
 
-/** A dossier setting this browser remembers across reloads, stored as a string under `lar-board:dossier-<name>:<id>`. */
-interface Stored<T> {
-  name: string;
-  /** The setting from what was stored, or from null before anything is. */
-  read: (stored: string | null) => T;
-  write: (value: T) => string;
-}
-
-/** Open or collapsed, stored as '1' or '0'; a dossier starts collapsed. */
-const OPEN: Stored<boolean> = { name: 'open', read: (s) => s === '1', write: (on) => (on ? '1' : '0') };
-/** Work map or parts list; a dossier starts on its Work map. */
-const VIEW: Stored<View> = { name: 'view', read: (s) => (s === 'list' ? 'list' : 'map'), write: (v) => v };
-
-function useStored<T>({ name, read, write }: Stored<T>, parent: Item): [T, (v: T) => void] {
-  const key = `lar-board:dossier-${name}:${parent.id}`;
-  const [value, setValue] = useState(() => read(localStorage.getItem(key)));
+/** Work map or parts list, stored per dossier in this browser; a dossier starts on its Work map. */
+function useView(parent: Item): [View, (v: View) => void] {
+  const key = `lar-board:dossier-view:${parent.id}`;
+  const [value, setValue] = useState<View>(() => (localStorage.getItem(key) === 'list' ? 'list' : 'map'));
   return [value, (v) => {
-    localStorage.setItem(key, write(v));
+    localStorage.setItem(key, v);
     setValue(v);
   }];
 }
@@ -277,15 +267,6 @@ function moving(parent: Item, parts: Part[], unavailable: boolean): Moving {
   };
 }
 
-function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button type="button" aria-expanded={on} aria-label={on ? 'Collapse' : 'Expand'} onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      className="grid size-6 shrink-0 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground)">
-      {on ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-    </button>
-  );
-}
-
 const kindLabel = (parent: Item) => (parent.kind === 'concept' ? 'Concept' : 'Coupled work');
 const repos = (m: Moving, data: BoardData) => [...new Set(m.parts.map((p) => repoName(repoKey(p.item), data.repos)))].join(' + ');
 
@@ -299,7 +280,7 @@ function PartsBar({ m }: { m: Moving }) {
       {order.map((p) => {
         const { word, glyph } = shownStatus(p.item, unavailable);
         return (
-          <li key={p.item.id} title={`${itemName(p.item)}: ${word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${glyph === 'In progress' ? 'status-pulse' : ''}`}
+          <li key={p.item.id} title={`${itemName(p.item)}: ${isDone(p.item) ? 'Complete' : word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${glyph === 'In progress' ? 'status-pulse' : ''}`}
             style={{ background: isDone(p.item) ? 'var(--st-done)' : glyph === 'Queued' || glyph === 'List' ? 'var(--soft)' : STATUS_COLOR[glyph] }} />
         );
       })}
@@ -347,6 +328,15 @@ function Counts({ m }: { m: Moving }) {
   </>;
 }
 
+/** The reason a concept's delivery record gives when no active build is left to deliver it. */
+const NO_DELIVERY = 'No delivery planned.';
+
+/** A concept whose Refinement is complete, which says nothing of its delivery unless none is planned, per ADR 0003. */
+function Refined({ parent }: { parent: Item }) {
+  if (!parent.refinement?.complete) return null;
+  return <Badge tone="success" className="whitespace-nowrap" data-refined>Refined{parent.completion?.reasons.includes(NO_DELIVERY) && ' · no delivery planned'}</Badge>;
+}
+
 /** Next, as a sentence with its Start. */
 function Next({ m, data, parent }: { m: Moving; data: BoardData; parent: Item }) {
   const n = nextOf(m, parent);
@@ -366,74 +356,104 @@ function Next({ m, data, parent }: { m: Moving; data: BoardData; parent: Item })
 const ABOVE_MAP = ['you'];
 const BELOW_MAP = ['dependencies', 'fog'];
 
-/** A concept or coupled parent, in full: its parts as a Work map or a list, with what keeps them moving. */
-function Dossier({ parent, parts, data }: { parent: Item; parts: Part[]; data: BoardData }) {
-  const [view, setView] = useStored(VIEW, parent);
-  const [on, setOpen] = useStored(OPEN, parent);
-  // Letting go of a drag that selected text in the header leaves the dossier as it was; a key press on the chevron
-  // (a click with no detail) or a selection elsewhere on the page still toggles it.
-  const toggle = (e: MouseEvent<HTMLDivElement>) => {
+/** A dossier's one line, in the dock and over the opened dossier; `lead` sits before its source icon. */
+function DossierLine({ parent, parts, data, lead, onClick, className = '' }: { parent: Item; parts: Part[]; data: BoardData; lead: ReactNode; onClick?: (e: MouseEvent<HTMLDivElement>) => void; className?: string }) {
+  const isPicked = usePicked(parent);
+  const m = moving(parent, parts, useActivityUnavailable());
+  const threads = [parent, ...parts.map((p) => p.item)].flatMap(threadsOf);
+  return (
+    <div onClick={onClick} data-item={parent.id} title={threadCounts(threads) || undefined}
+      className={`grid ${DOCK_COLUMNS} h-9 items-center gap-x-3 pl-1.5 pr-3 ${className} ${picked(isPicked)}`}>
+      <span className="flex min-w-0 items-center gap-1.5" data-line="1">
+        {lead}
+        <SourceIcon item={parent} />
+        <Badge tone="neutral" className="shrink-0">{kindLabel(parent)}</Badge>
+        <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
+          className="min-w-0 truncate rounded text-left text-[13px] font-medium hover:underline"><ItemTitle item={parent} /></button>
+        <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
+        <span onClick={stop} className="ml-auto flex shrink-0 gap-1 pl-1" data-chips><Refined parent={parent} /><Counts m={m} /></span>
+      </span>
+      <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
+      <span data-col="bar"><PartsBar m={m} /></span>
+      <span data-col="count" className="text-right text-[11px] tabular-nums text-(--muted-foreground)" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count}</span>
+      <span data-col="figures" className="hidden min-w-0 @4xl:grid"><Figures s={figuresOf(parent, data, true)} /></span>
+      <span data-col="repos" className="hidden truncate text-right text-[11px] text-(--muted-foreground) @4xl:block" title={repos(m, data)}>{repos(m, data)}</span>
+    </div>
+  );
+}
+
+/** A dossier in the dock: only the title opens the item; anywhere else on the line but the chips opens the dossier. */
+function DossierRow({ parent, parts, data, onOpen }: { parent: Item; parts: Part[]; data: BoardData; onOpen: () => void }) {
+  // Letting go of a drag that selected text in the line leaves the board as it was; a key press on the chevron (a click
+  // with no detail) or a selection elsewhere on the page still opens it.
+  const opened = (e: MouseEvent<HTMLDivElement>) => {
     const selection = window.getSelection();
     if (e.detail > 0 && selection && !selection.isCollapsed && e.currentTarget.contains(selection.anchorNode)) return;
-    setOpen(!on);
+    onOpen();
   };
-  const isPicked = usePicked(parent);
-  const find: FindRef = (repo = parent.repo ?? '', n) => data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
-  const m = moving(parent, parts, useActivityUnavailable());
-  const missing = m.count - parts.length;
-  const threads = [parent, ...parts.map((p) => p.item)].flatMap(threadsOf);
-
+  const lead = (
+    <button type="button" data-dossier-open aria-label={`Open ${itemName(parent)}`}
+      className="grid size-6 shrink-0 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground)">
+      <ChevronRight className="size-4" />
+    </button>
+  );
   return (
     <article className="border-b border-(--border) last:border-b-0" data-dossier={parent.id}>
-      {/* Only the title opens the item; anywhere else on the line but the chips opens or closes the dossier. */}
-      <div onClick={toggle} data-item={parent.id} data-open={on} title={threadCounts(threads) || undefined}
-        className={`grid ${DOCK_COLUMNS} h-9 cursor-pointer items-center gap-x-3 pl-1.5 pr-3 hover:bg-(--accent) ${on ? 'border-b border-(--border)' : ''} ${picked(isPicked)}`}>
-        <span className="flex min-w-0 items-center gap-1.5" data-line="1">
-          <Toggle on={on} onToggle={() => setOpen(!on)} />
-          <SourceIcon item={parent} />
-          <Badge tone="neutral" className="shrink-0">{kindLabel(parent)}</Badge>
-          <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
-            className="min-w-0 truncate rounded text-left text-[13px] font-medium hover:underline"><ItemTitle item={parent} /></button>
-          <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
-          <span onClick={stop} className="ml-auto flex shrink-0 gap-1 pl-1" data-chips><Counts m={m} /></span>
-        </span>
-        <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
-        <span data-col="bar"><PartsBar m={m} /></span>
-        <span data-col="count" className="text-right text-[11px] tabular-nums text-(--muted-foreground)" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count}</span>
-        <span data-col="figures" className="hidden min-w-0 @4xl:grid"><Figures s={figuresOf(parent, data, true)} /></span>
-        <span data-col="repos" className="hidden truncate text-right text-[11px] text-(--muted-foreground) @4xl:block" title={repos(m, data)}>{repos(m, data)}</span>
-      </div>
+      <DossierLine parent={parent} parts={parts} data={data} lead={lead} onClick={opened} className="cursor-pointer hover:bg-(--accent)" />
+    </article>
+  );
+}
 
-      {on && (
-        <div className="grid gap-3 px-4 py-3">
+/** A concept or coupled parent, in full, in the board's workspace: its parts as a Work map or a list, with what keeps them moving. */
+export function OpenDossier({ dossier: { parent, parts }, onBack }: { dossier: DossierItems; onBack: () => void }) {
+  const { data } = useBoardStore();
+  const [view, setView] = useView(parent);
+  // A dialog or a menu takes Escape first: its layer marks the event in the capture phase, before this hears it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented && !useItemDialogStore.getState().itemId) onBack();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onBack]);
+  const find: FindRef = (repo = parent.repo ?? '', n) => data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
+  const missing = Math.max(parent.subIssues.total, parts.length) - parts.length;
+  const back = <Button {...kind('control')} data-dossier-back autoFocus onClick={onBack} title="Back to the board (Esc)" aria-keyshortcuts="Escape" className="shrink-0" leftIcon={<ArrowLeft />}>Back</Button>;
+  return (
+    <article data-stage="dossier" data-dossier={parent.id} aria-label={itemName(parent)} className="@container min-w-0 flex-1 rounded-xl border border-(--border) bg-(--card) shadow-xs">
+      <header className="sticky top-0 z-10 rounded-t-xl border-b border-(--border) bg-(--card)">
+        <DossierLine parent={parent} parts={parts} data={data} lead={back} />
+      </header>
+      <div className="grid gap-3 p-3">
+        <div className="flex items-center gap-3">
           {missing > 0 && <p className="m-0 text-xs text-(--muted-foreground)" data-unread-parts>
             {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
           </p>}
-          <StructureSync item={parent} />
-          <div><ViewToggle view={view} onView={setView} /></div>
-          {view === 'map'
-            ? <>
-              <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />
-              <WorkMap parts={parts} check={parent.map?.check} data={data} home={repoKey(parent)} />
-              <Attention parent={parent} parts={parts} data={data} find={find} only={BELOW_MAP} />
-            </>
-            : <>
-              <Attention parent={parent} parts={parts} data={data} find={find} />
-              <PartsList parts={parts} data={data} />
-            </>}
+          <span className="ml-auto shrink-0"><ViewToggle view={view} onView={setView} /></span>
         </div>
-      )}
+        <StructureSync item={parent} />
+        {view === 'map'
+          ? <>
+            <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />
+            <WorkMap parts={parts} check={parent.map?.check} data={data} home={repoKey(parent)} />
+            <Attention parent={parent} parts={parts} data={data} find={find} only={BELOW_MAP} />
+          </>
+          : <>
+            <Attention parent={parent} parts={parts} data={data} find={find} />
+            <PartsList parts={parts} data={data} />
+          </>}
+      </div>
     </article>
   );
 }
 
 /** The dossiers the filters leave; a dossier follows its parent's row. With none, the dock takes no height. */
-export function Dossiers({ dossiers }: { dossiers: DossierItems[] }) {
+export function Dossiers({ dossiers, onOpen }: { dossiers: DossierItems[]; onOpen: (id: string) => void }) {
   const { data } = useBoardStore();
   if (!dossiers.length) return null;
   return (
-    <Pane id="dock" title="Concepts and linked work" count={dossiers.length} className="max-h-[33%] shrink-0">
-      <div data-dossiers>{dossiers.map(({ parent, parts }) => <Dossier key={parent.id} parent={parent} parts={parts} data={data} />)}</div>
+    <Pane id="dock" title="Concepts and linked work" count={dossiers.length}>
+      <div data-dossiers>{dossiers.map(({ parent, parts }) => <DossierRow key={parent.id} parent={parent} parts={parts} data={data} onOpen={() => onOpen(parent.id)} />)}</div>
     </Pane>
   );
 }

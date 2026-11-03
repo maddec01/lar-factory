@@ -56,7 +56,7 @@ it('retains observations across disconnect and requests a fresh snapshot', async
   await vi.advanceTimersByTimeAsync(0);
   const first = Socket.instances[0]!;
   first.dispatchEvent(new Event('open'));
-  const project = { id: 'one', title: 'One', workspaceRoot: '/one' };
+  const project = { id: 'one', title: 'One', workspaceRoot: '/one', faviconPath: null, projectIcon: null };
   first.chunk([{ kind: 'snapshot', snapshot: { snapshotSequence: 3, projects: [project] } }]);
   first.chunk([{ kind: 'snapshot', resolvedRepositoryIdentityRoots: [], snapshot: { snapshotSequence: 3, projects: [] } }]);
   expect(changed.mock.calls.at(-1)![0].observation.projects).toEqual([project]);

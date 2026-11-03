@@ -6,7 +6,7 @@ export async function repositoryProjects(env: NodeJS.ProcessEnv = process.env): 
   try {
     return { availability: 'available', observation: {
       observedAt: new Date().toISOString(),
-      projects: liveProjects(statsDbPath(env), env.HOME ?? '').map(p => ({ id: p.id, title: p.title, workspaceRoot: p.folder })),
+      projects: liveProjects(statsDbPath(env), env.HOME ?? '').map(p => ({ id: p.id, title: p.title, workspaceRoot: p.folder, faviconPath: null, projectIcon: null })),
     } };
   } catch { return { availability: 'unavailable' }; }
 }

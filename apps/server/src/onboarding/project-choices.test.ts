@@ -29,6 +29,6 @@ test('projects come from checkout origins without reading repository settings', 
 });
 
 vi.mock('../t3/repository-project-discovery.ts', () => ({ repositoryProjects: async (env: NodeJS.ProcessEnv) => {
-  try { return { availability: 'available', observation: { observedAt: '2026-10-31T00:00:00Z', projects: liveProjects(env.T3_STATE_DB!, env.HOME ?? '').map(p => ({ id: p.id, title: p.title, workspaceRoot: p.folder })) } }; }
+  try { return { availability: 'available', observation: { observedAt: '2026-10-31T00:00:00Z', projects: liveProjects(env.T3_STATE_DB!, env.HOME ?? '').map(p => ({ id: p.id, title: p.title, workspaceRoot: p.folder, faviconPath: null, projectIcon: null })) } }; }
   catch { return { availability: 'unavailable' }; }
 } }));

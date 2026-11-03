@@ -573,6 +573,19 @@ export interface FirstRead {
 /** The first read once it has settled, which is how sample mode starts. */
 export const SETTLED_FIRST_READ: FirstRead = { step: 'finishing', running: [], settled: true };
 
+/** The colors T3 lets a chosen project icon use. */
+export const PROJECT_ICON_COLORS = ['gray', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'] as const;
+export type ProjectIconColor = typeof PROJECT_ICON_COLORS[number];
+
+/** The icon someone chose for a project in T3. */
+export type ChosenProjectIcon =
+  | { kind: 'lucide'; name: string; color: ProjectIconColor }
+  | { kind: 'emoji'; emoji: string }
+  | { kind: 'monogram'; text: string; color: ProjectIconColor };
+
+/** A repository's icon: a favicon names the board's image by project and content revision, and no T3 path or URL reaches the page. */
+export type ProjectIcon = { kind: 'favicon'; projectId: string; revision: string } | ChosenProjectIcon;
+
 export interface BoardData {
   /** A local process problem; cached items remain available while it needs attention. */
   localProblem?: string;
@@ -625,6 +638,8 @@ export interface BoardData {
    * the hint that says how to add it in T3. Absent until the first read, and in sample mode.
    */
   repositoryProjects?: Record<string, string | null>;
+  /** The icon of each listed or onboarding repository with exactly one T3 project as its main checkout and an icon. Absent in sample mode. */
+  projectIcons?: Record<string, ProjectIcon>;
   /** The bundle's skills and checklists, read once at startup; empty when the server can't read them. */
   bundledSkills?: BundledSkill[];
   /** This Mac's retention setting and what its last timed delete did. Absent in sample mode. */
@@ -655,6 +670,11 @@ export interface RetentionState {
   problem?: string;
   /** What the last timed delete did: the work it deleted, and the due work it kept with the reason. */
   lastDelete?: { at: string; deleted: string[]; kept: { workId: string; reason: string }[] };
+}
+
+/** The repository's icon, whatever the case; undefined when it has none. */
+export function repositoryProjectIcon(data: Pick<BoardData, 'projectIcons'>, repo: string): ProjectIcon | undefined {
+  return Object.entries(data.projectIcons ?? {}).find(([r]) => sameRepo(r, repo))?.[1];
 }
 
 /** The hint for adding the repository's T3 project when a start can't find it, whatever the case; null when it can, or before the first read. */

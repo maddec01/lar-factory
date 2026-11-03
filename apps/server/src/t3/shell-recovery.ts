@@ -1,4 +1,5 @@
 import { isRecord } from '@lar-factory/shared';
+import { projectIconFields, type ProjectFact } from './project-protocol.ts';
 
 /** Marked shell snapshots update project metadata, not the project/thread membership. */
 export function projectMetadataSnapshot(value: Record<string, unknown>): boolean {
@@ -12,7 +13,7 @@ export function projectMetadataSnapshot(value: Record<string, unknown>): boolean
  */
 export class ShellRecovery {
   private sequence = -1;
-  private projects = new Map<string, { id: string; title: string; workspaceRoot: string }>();
+  private projects = new Map<string, ProjectFact>();
 
   accept(value: unknown): boolean {
     if (!isRecord(value)) throw new Error('Invalid shell event');
@@ -21,15 +22,16 @@ export class ShellRecovery {
     const sequence = snapshot ? snapshot.snapshotSequence : value.sequence;
     if (typeof sequence !== 'number' || !Number.isSafeInteger(sequence) || sequence < 0) throw new Error('Invalid shell sequence');
     if (sequence < this.sequence || (!snapshot && sequence === this.sequence)) return false;
-    const project = (input: unknown) => {
+    // A partial update that omits an icon field keeps the value it knew.
+    const project = (input: unknown, partial: boolean): ProjectFact => {
       if (!isRecord(input) || typeof input.id !== 'string' || typeof input.title !== 'string' || typeof input.workspaceRoot !== 'string') throw new Error('Invalid shell project');
-      return { id: input.id, title: input.title, workspaceRoot: input.workspaceRoot };
+      return { id: input.id, title: input.title, workspaceRoot: input.workspaceRoot, ...projectIconFields(input, partial ? this.projects.get(input.id) : undefined) };
     };
     let changed = false;
     if (snapshot) {
       if (!Array.isArray(snapshot.projects)) throw new Error('Invalid shell snapshot');
-      const projects = snapshot.projects.map(project);
       const metadata = projectMetadataSnapshot(value);
+      const projects = snapshot.projects.map(input => project(input, metadata));
       if (metadata && this.sequence < 0) throw Error('Full shell snapshot required');
       const next = metadata ? new Map(this.projects) : new Map<string, typeof projects[number]>();
       for (const item of projects) if (!metadata || next.has(item.id)) next.set(item.id, item);
@@ -40,7 +42,7 @@ export class ShellRecovery {
       // Metadata does not cover intervening membership events in the live stream.
       if (metadata) return changed;
     } else if (value.kind === 'project.updated') {
-      const next = project(value.project);
+      const next = project(value.project, true);
       this.projects.set(next.id, next);
       changed = true;
     } else if (value.kind === 'project.removed') {

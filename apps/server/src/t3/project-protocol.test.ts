@@ -20,7 +20,7 @@ it('retains the observation after rejection and reports renewal failure', async 
 
 it.each(['0.1.6-nightly.20261031.3977', '1.0.0', 'unknown', ''])('reads compatible projects on T3 %s', async version => {
   const adapter = new ProjectProtocol({ read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }), write: async () => {} }, { issue: async () => { throw Error(); }, revoke: async () => {} }, async () => Response.json({ projects: [{ id: 'repo', title: 'Repository', workspaceRoot: '/repo', futureField: true }], updatedAt: '2026-01-01', futureField: true }), version);
-  expect((await adapter.readProjects()).observation?.projects).toEqual([{ id: 'repo', title: 'Repository', workspaceRoot: '/repo' }]);
+  expect((await adapter.readProjects()).observation?.projects).toEqual([{ id: 'repo', title: 'Repository', workspaceRoot: '/repo', faviconPath: null, projectIcon: null }]);
 });
 
 it('rejects remote endpoints before sending credentials', async () => {
@@ -140,4 +140,47 @@ it('renews an expired cached session once for concurrent consumers', async () =>
   const sessions = await Promise.all([adapter.subscriptionSession(), adapter.subscriptionSession()]);
   expect(sessions.map(session => session.sessionId)).toEqual(['new', 'new']);
   expect(issues).toBe(1);
+});
+
+const projectsWith = async (fields: object) => {
+  const adapter = new ProjectProtocol({ read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }), write: async () => {} }, { issue: async () => { throw Error(); }, revoke: async () => {} }, async () => Response.json({ projects: [{ id: 'repo', title: 'Repository', workspaceRoot: '/repo', ...fields }], updatedAt: '2026-01-01' }), 'fixture-release');
+  const read = await adapter.readProjects();
+  expect(read.availability).toBe('available');
+  return read.observation!.projects[0]!;
+};
+
+it.each([
+  [{ kind: 'lucide', name: 'git-branch', color: 'sky' }],
+  [{ kind: 'emoji', emoji: '🚀' }],
+  [{ kind: 'monogram', text: 'Lá', color: 'rose' }],
+  [{ kind: 'monogram', text: 'क्‍ष', color: 'gray' }],
+])('reads the chosen icon %j', async projectIcon => {
+  expect((await projectsWith({ projectIcon })).projectIcon).toEqual(projectIcon);
+});
+
+it('trims a chosen emoji', async () => {
+  expect((await projectsWith({ projectIcon: { kind: 'emoji', emoji: ' 🚀 ' } })).projectIcon).toEqual({ kind: 'emoji', emoji: '🚀' });
+});
+
+it.each([
+  [{ kind: 'lucide', name: 'Git Branch', color: 'sky' }],
+  [{ kind: 'lucide', name: 'a'.repeat(65), color: 'sky' }],
+  [{ kind: 'lucide', name: 'git', color: 'mauve' }],
+  [{ kind: 'lucide', name: 'git' }],
+  [{ kind: 'emoji', emoji: '   ' }],
+  [{ kind: 'emoji', emoji: 'x'.repeat(33) }],
+  [{ kind: 'monogram', text: '-a', color: 'sky' }],
+  [{ kind: 'monogram', text: 'a'.repeat(33), color: 'sky' }],
+  [{ kind: 'image', url: 'http://elsewhere' }],
+  ['🚀'],
+])('lists a project with the invalid icon %j as having none', async projectIcon => {
+  expect((await projectsWith({ projectIcon })).projectIcon).toBeNull();
+});
+
+it('reads a favicon path, and lists a project with a missing or invalid one', async () => {
+  expect((await projectsWith({ faviconPath: 'assets/logo.svg' })).faviconPath).toBe('assets/logo.svg');
+  expect((await projectsWith({})).faviconPath).toBeNull();
+  expect((await projectsWith({ faviconPath: null })).faviconPath).toBeNull();
+  expect((await projectsWith({ faviconPath: 7 })).faviconPath).toBeNull();
+  expect((await projectsWith({ faviconPath: ' ' })).faviconPath).toBeNull();
 });

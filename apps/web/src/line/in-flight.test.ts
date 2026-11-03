@@ -5,16 +5,16 @@
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text, toast } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
-import type { BoardData, Item, ItemThread, KindDisagreement, RawItem, Slice } from '@lar-factory/shared';
+import type { BoardData, Item, ItemThread, RepositorySetup, KindDisagreement, RawItem, Slice } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
 const table = () => $('[data-in-flight]')!;
 const rows = () => $$('[data-in-flight] [data-item]');
-const row = (id: string) => $(`[data-in-flight] [data-item="${id}"]`) ?? $(`.desk-card[data-item="${id}"]`)!;
+const row = (id: string) => $(`[data-in-flight] [data-item="${id}"]`)!;
 const numberOf = (id: string) => sample.items.find((i) => i.id === id)!.number;
 const meta = (id: string) => row(id).querySelector<HTMLElement>('[data-meta]')!;
 const col = (id: string, name: string) => row(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
-const side = (id: string) => col(id, 'side') ?? row(id).querySelector<HTMLElement>('.desk-actions')!;
+const side = (id: string) => col(id, 'side')!;
 const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-start="${id}"]`)!;
 /** Clicks `el`; a menu it closes hands focus back on the next tick. */
 const press = (el: Element) => settle(() => {
@@ -234,7 +234,7 @@ test("a start the board ran by itself and that failed shows its error under the 
   const failed = { ...unblocked(), armedErrors: { I_sample13: 'T3 is down.' } };
   holdPosts(failed);
   await mountPage(failed);
-  const error = row('I_sample13').querySelector('[data-start-after-error="I_sample13"]')!;
+  const error = $('[data-flight="I_sample13"] [data-start-after-error="I_sample13"]')!;
   expect(text(error.querySelector('[role="alert"]'))).toBe('Start after failed: T3 is down.');
   await press(error.querySelector('button')!);
   expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'I_sample13' }]]);
@@ -251,11 +251,21 @@ test('Open thread on a row opens the latest thread, as an Open with the thread i
   expect([none.disabled, none.title, none.dataset.kind]).toEqual([true, 'No T3 thread has worked on this yet', 'open']);
 });
 
-test('a blocked Ready card shows only Start after, a Start with its icon, never a disabled Start build beside it', async () => {
+test('a blocked Ready row shows only Start after, a Start with its icon, never a disabled Start build beside it', async () => {
   await mountPage(withItem('I_sample13', { status: 'Ready' }, loose));
   expect(startBuild()).toBeNull();
   const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual(['start', true]);
+});
+
+test('known missing delivery access disables Start build without blocking the rest of the board', async () => {
+  const data = unblocked();
+  data.repos = data.repos.map(repo => ({ ...repo, setup: { ...repo.setup, access: { ...repo.setup?.access, 'push-branch': 'refused', 'open-pr': 'allowed' } } as RepositorySetup }));
+  await mountPage(data);
+  const start = $<HTMLButtonElement>('[data-build-unavailable="I_sample13"]')!;
+  expect(start.disabled).toBe(true);
+  expect(start.title).toContain('push branches');
+  expect($('[data-onboard]')).toBeNull();
 });
 
 test('Start build is disabled with the hint while T3 has no project for the repository', async () => {

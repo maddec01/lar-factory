@@ -1,20 +1,11 @@
-// Your desk: Ready, Needs you, Verify and Ready to merge items as cards in one sideways row, each opening the item dialog
+// Your desk: Needs you, Verify and Ready to merge items and open questions as cards in one sideways row, each opening the item dialog
 // and carrying the buttons for its next action; and the line's heading below it.
 
 import { expect, test } from 'vite-plus/test';
-import type { BoardData, Item, RepositorySetup } from '@lar-factory/shared';
-import { $, $$, mountPage, pressMenu, sample, settle, text } from '../../test/support.ts';
+import type { BoardData, Item } from '@lar-factory/shared';
+import { $, $$, mountPage, sample, settle, text } from '../../test/support.ts';
 
 const cards = () => $$('.desk-card');
-test('known missing delivery access disables Start build without blocking the rest of the board', async () => {
-  const data = noBlockers();
-  data.repos = data.repos.map(repo => ({ ...repo, setup: { ...repo.setup, access: { ...repo.setup?.access, 'push-branch': 'refused', 'open-pr': 'allowed' } } as RepositorySetup }));
-  await mountPage(data);
-  const start = $<HTMLButtonElement>('[data-build-unavailable="I_sample13"]')!;
-  expect(start.disabled).toBe(true);
-  expect(start.title).toContain('push branches');
-  expect($('[data-onboard]')).toBeNull();
-});
 const card = (id: string) => $(`.desk-card[data-item="${id}"]`)!;
 /** A card's buttons and links, as their text, an icon button's name in brackets, with a disabled one's title. */
 const controls = (id: string) => [...card(id).querySelectorAll('.desk-actions :is(button, a)')]
@@ -27,10 +18,10 @@ const withItem = (id: string, change: Partial<Item>): BoardData =>
 
 test('the desk shows what only you can move, counted, as cards in one row that scrolls sideways with no scrollbar', async () => {
   await mountPage();
-  expect(text($('#desk-h'))).toBe('Your desk 8');
+  expect(text($('#desk-h'))).toBe('Your desk 7');
   const statuses = cards().map((c) => sample.items.find((i) => i.id === c.dataset.item)!.status);
-  expect(new Set(statuses)).toEqual(new Set(['Ready', 'Needs you', 'Verify', 'Ready to merge']));
-  expect(cards()).toHaveLength(8);
+  expect(new Set(statuses)).toEqual(new Set(['Needs you', 'Verify', 'Ready to merge']));
+  expect(cards()).toHaveLength(7);
   const row = cards()[0]!.parentElement!.className.split(' ');
   expect(row).toEqual(expect.arrayContaining(['-mx-6', 'px-6', 'overflow-x-auto', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden']));
 });
@@ -49,12 +40,11 @@ test("a desk card's title is always two lines tall, cut short, with the whole ti
   expect(title.getAttribute('title')).toBe('#147 Fall back to software transcoding when the GPU is busy');
 });
 
-test('every desk card has the same rows at the same heights, and the row lets a card with a start message grow alone', async () => {
+test('every desk card has the same rows at the same heights', async () => {
   await mountPage();
   const heights = (c: HTMLElement) => [c.querySelector('.desk-meta'), c.querySelector('.desk-title'), c.querySelector('.desk-next'), c.querySelector('.desk-actions')]
     .map((row) => row?.className.split(' ').find((name) => /^h-\d+$/.test(name)));
   for (const c of cards()) expect(heights(c)).toEqual(['h-4', 'h-10', 'h-4', 'h-7']);
-  expect(cards()[0]!.parentElement!.className.split(' ')).toContain('items-start');
 });
 
 test('a desk card opens the item dialog and stays marked while it shows', async () => {
@@ -71,21 +61,13 @@ test('a desk card is no button wrapping buttons: its summary is the button, and 
   expect(dialog()!.textContent).toContain('New artwork grid layout');
 });
 
-const noBlockers = (data: BoardData = sample) => ({ ...data, items: data.items.map((i) => (i.id === 'I_sample13' ? { ...i, blockers: [] } : i)) });
 const liveThread = [{ id: 't1', title: 'Build', state: 'running' as const, updated: '2026-10-21T09:00:00.000Z' }];
 const NO_THREAD = 'No T3 thread has worked on this yet';
-const NO_PROJECT = 'T3 Code has no project for maddec01/lar-server';
 
 test.each<[string, BoardData, string, string, string[]]>([
   ['Needs you with no thread', sample, 'I_sample11', 'Answer in T3', [`Answer in T3 (disabled: ${NO_THREAD})`]],
   ['Needs you', sample, 'I_sample12', 'Answer in T3', ['Answer in T3']],
   ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', 'Answer in T3', ['Answer in T3']],
-  ['Ready with a thread at work on it', withItem('I_sample13', { threads: liveThread }), 'I_sample13', 'A thread is at work on it', ['Open thread']],
-  ['Ready with a queued thread', withItem('I_sample13', { threads: [{ ...liveThread[0]!, state: 'done', queued: true }] }), 'I_sample13', 'A thread is at work on it', ['Open thread']],
-  ['Ready held by open blockers', withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 9, repo: 'maddec01/lar-apple', state: 'open' }, { number: 7, repo: 'maddec01/lar-server', state: 'closed' }] }),
-    'I_sample13', 'Waits on #202, lar-apple#9', ['Start after lar-apple#9 ▾', '[Open thread]']],
-  ['Ready held by its repository', { ...noBlockers(), repositoryProjects: { 'maddec01/lar-server': NO_PROJECT } }, 'I_sample13', NO_PROJECT, [`Start build (disabled: ${NO_PROJECT})`, '[Open thread]']],
-  ['Ready with nothing holding it', noBlockers(), 'I_sample13', 'Brief ready', ['Start build ▾', '[Open thread]']],
   ['Verify', sample, 'I_sample16', 'can merge · 1 passed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
   ['Ready to merge', sample, 'I_sample17', 'can merge · 4 passed · 1 failed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
   ['Verify with no PR', withItem('I_sample16', { linkedPrs: [] }), 'I_sample16', 'Test it with the steps in the PR, then merge',
@@ -96,8 +78,8 @@ test.each<[string, BoardData, string, string, string[]]>([
 });
 
 test("Open thread in a card's corner is a square icon button named and titled Open thread", async () => {
-  await mountPage(noBlockers());
-  const corner = card('I_sample13').querySelector('.desk-actions [data-open-thread]')!;
+  await mountPage(withItem('I_sample16', { threads: liveThread }));
+  const corner = card('I_sample16').querySelector('.desk-actions [data-open-thread]')!;
   expect([corner.getAttribute('aria-label'), corner.getAttribute('title'), corner.getAttribute('data-icon-only')]).toEqual(['Open thread', 'Open thread', '']);
 });
 
@@ -123,17 +105,10 @@ test('a Verify card reads the PR Open PR opens, its first linked one', async () 
   expect(nextLine('I_sample16')).toBe('can merge · 1 passed');
 });
 
-test("clicks on a card's buttons, in the menu one opens, or in its start message open no item dialog", async () => {
+test("clicks on a card's buttons open no item dialog", async () => {
   await mountPage();
   await settle(() => card('I_sample12').querySelector<HTMLElement>('[data-open-thread]')!.click());
   await settle(() => card('I_sample16').querySelector<HTMLElement>('[data-pr-link]')!.click());
-  const after = card('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
-  await pressMenu(after);
-  await settle(() => after.click());
-  const entry = $('[role="menu"] [role="menuitemradio"]');
-  expect(entry).not.toBeNull();
-  await settle(() => entry!.click());
-  await settle(() => card('I_sample13').querySelector<HTMLElement>('.desk-start')!.click());
   expect(dialog()).toBeNull();
 });
 
@@ -143,10 +118,11 @@ test('a click on a card beside its buttons opens the item dialog', async () => {
   expect(dialog()).not.toBeNull();
 });
 
-test('an empty desk says the line runs without you', async () => {
-  await mountPage({ ...sample, items: sample.items.filter((i) => !['Ready', 'Needs you', 'Verify', 'Ready to merge'].includes(i.status)) });
-  expect(text($('#desk-h'))).toBe('Your desk 0');
-  expect(text($('.desk p'))).toBe('Desk clear. The line runs without you.');
+test('an empty desk is one small neutral line under no card row', async () => {
+  await mountPage({ ...sample, items: sample.items.filter((i) => !['Needs you', 'Verify', 'Ready to merge'].includes(i.status)) });
+  expect(cards()).toHaveLength(0);
+  expect(text($('.desk'))).toBe('Your deskNothing waits on you.');
+  expect($('.desk')!.className.split(' ')).toEqual(expect.arrayContaining(['flex', 'items-baseline']));
 });
 
 test('the line follows the desk under its heading', async () => {
@@ -197,9 +173,15 @@ test.each([
   expect(action.getAttribute('href')).toBeNull();
 });
 
-test('a ready item appears once on the desk while its concept family remains available', async () => {
+test('a Ready item has no desk card and keeps Start build on its row', async () => {
+  await mountPage(withItem('I_sample13', { parent: null, parentId: null, blockers: [] }));
+  expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
+  expect($('[data-in-flight] [data-item="I_sample13"] [data-start="I_sample13"]')).not.toBeNull();
+});
+
+test('a Ready part has no desk card and stays in its dossier', async () => {
   await mountPage();
-  expect(card('I_sample13')).not.toBeNull();
+  expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
   expect($('[data-in-flight] [data-item="I_sample13"]')).toBeNull();
   const expand = $<HTMLButtonElement>('[data-dossier="I_sample09"] button[aria-expanded]')!;
   if (expand.getAttribute('aria-expanded') === 'false') await settle(() => expand.click());

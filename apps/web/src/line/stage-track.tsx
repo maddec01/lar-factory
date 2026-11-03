@@ -17,7 +17,7 @@ export const stageOf = (s: Status) => s === 'Done' ? STAGES.length : STAGES.find
 export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
 const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
-/** The desk's statuses the line takes no action on. Ready is on the desk too, but keeps Start build on the line. */
+/** The desk's statuses the line takes no action on. */
 export const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
 
 /** Activity comes from T3, never from the item's workflow status. */

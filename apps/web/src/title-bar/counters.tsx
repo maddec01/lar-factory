@@ -142,7 +142,7 @@ export function Counters() {
                 );
               })}
             </div>
-          ) : <Empty>Desk clear. The line runs without you.</Empty>}
+          ) : <Empty>Nothing waits on you.</Empty>}
         </Counter>
 
         <Counter label="building" icon={glyph('In progress')} hideBelow="hidden @min-[40rem]:inline-flex"

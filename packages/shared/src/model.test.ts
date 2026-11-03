@@ -270,16 +270,15 @@ test('sample covers every status and both repositories', () => {
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/lar-server') && repos.has('maddec01/lar-apple'));
   const { needsYou, inFlight, queued, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
-  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [28, 8, 8, 3, 4]);
+  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [28, 7, 8, 3, 4]);
 });
 
-test('the desk holds Ready, Needs you, Verify and Ready to merge, in flow order, including concepts in Needs you', () => {
+test('the desk holds Needs you, Verify and Ready to merge, in flow order, including concepts in Needs you, and no Ready item', () => {
   const now = Date.parse('2026-10-21T10:00:00Z');
   const items = [item('Verify'), item('Ready'), item('Ready', ['concept']), item('Needs you', ['concept']), item('Ready to merge'), item('Needs you'), item('In progress')]
     .map((i, n) => ({ ...i, id: `i${n}` }));
   const { needsYou } = boardSections({ ...sample, items }, now);
-  assert.deepEqual(needsYou.map((i) => i.status), ['Needs you', 'Needs you', 'Ready', 'Verify', 'Ready to merge']);
-  assert.ok(boardSections(sample, now).needsYou.some((i) => i.status === 'Ready' && i.parent), 'a build sub-issue in Ready is on the desk');
+  assert.deepEqual(needsYou.map((i) => i.status), ['Needs you', 'Needs you', 'Verify', 'Ready to merge']);
 });
 
 test('the sample has a Verify item in each merge state', () => {

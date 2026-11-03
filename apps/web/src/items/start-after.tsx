@@ -84,7 +84,7 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
 }
 
 /** Whether StartOrAfter shows Start after: a blocker is open, and its repository holds no start or one is armed. */
-export const showsStartAfter = (item: Item, data: BoardData): boolean =>
+const showsStartAfter = (item: Item, data: BoardData): boolean =>
   openBlockers(item).length > 0 && (!startHold(data, item.repo) || !!data.armed?.[item.id]);
 
 /**

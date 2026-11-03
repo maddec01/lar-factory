@@ -2,7 +2,7 @@
 // Abandon, the ticket close after it and a Needs you choice ask.
 
 import { STATUSES, activityUnavailable, inRepo, isRecentlyDone, onAzure, itemName, openQuestionThread, repoKey, repoName, sameRepo, workingAgain } from './model.ts';
-import type { BoardData, Item, LinkedPr, NeedsYouOffer, Status } from './model.ts';
+import type { BoardData, Item, LinkedPr, NeedsYouOffer, StartProgress, StartPurpose, Status } from './model.ts';
 import { slug } from './format.ts';
 
 export function byFlowOrder(a: Item, b: Item): number {
@@ -27,7 +27,7 @@ export interface ListGroup {
 }
 
 export interface BoardSections {
-  /** The desk: Items awaiting action, including current shaping and concept questions. */
+  /** Your desk: items waiting on the user's answer, verification or merge, including shaping and concept questions. */
   needsYou: Item[];
   inFlight: Item[];
   concepts: Item[];
@@ -53,6 +53,76 @@ export function needsAnswer(item: Item): boolean {
     (item.kind === 'concept' ? !['List', 'Queued', 'Done'].includes(item.status) : item.status === 'Shaping'));
 }
 
+/** A section of the board's main area. `ready` is the Shaping pane's Ready to build group; `dock` is Concepts and linked work. */
+export type BoardSection = 'desk' | 'queue' | 'shaping' | 'ready' | 'dock' | 'build';
+
+export interface Placement {
+  /** Every section the item shows in, in reading order. */
+  sections: BoardSection[];
+  /** The dossier a part's Queue, Shaping or Build row names; absent when it has no such row. */
+  concept?: Item;
+}
+
+export interface PlacementFacts {
+  /** The item's starts as the server sent them: `data.startProgress?.[item.id]`. */
+  starts?: Partial<Record<StartPurpose, StartProgress>> | undefined;
+  /** `activityUnavailable`: whether the board can't trust what it knows of thread activity. */
+  unavailable: boolean;
+  /** The whole board's items, whatever the scope, so a part finds its parent. */
+  all: readonly Item[];
+}
+
+const hasChildren = (item: Item, all: readonly Item[]) => all.some((child) => child.parentId === item.id);
+const stillOpen = (item: Item) => item.status !== 'List' && item.status !== 'Done';
+
+/** Whether the item heads a dossier: an open concept, or an open item with sub-issues. */
+export function isDossierParent(item: Item, all: readonly Item[]): boolean {
+  return stillOpen(item) && (item.kind === 'concept' || hasChildren(item, all));
+}
+
+/** Whether a start's outcome is still open: a failed one is over. */
+const inFlight = (start: StartProgress | undefined) => !!start && start.phase !== 'failed';
+
+const hasBuildThread = (item: Item) => Array.isArray(item.threads) && item.threads.some((thread) => thread.purpose === 'build');
+
+/** Whether the item waits on the user's answer, verification or merge. */
+const onDesk = (item: Item, unavailable: boolean) => needsAnswer(item)
+  || (item.kind !== 'concept' && (item.status === 'Verify' || item.status === 'Ready to merge') && !workingAgain(item, unavailable));
+
+/** The one stage section an item's row belongs in. A concept builds nothing itself, so it only ever queues or refines. */
+function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSection | null {
+  const shaping = inFlight(starts?.shape);
+  const building = inFlight(starts?.build);
+  if (item.status === 'Done') return null;
+  if (item.kind === 'concept') {
+    if (!shaping && !building && item.status === 'List') return null;
+    if (!shaping && !building && item.status === 'Queued') return 'queue';
+    return item.refinement?.complete ? null : 'shaping';
+  }
+  if (building) return 'build';
+  if (shaping) return 'shaping';
+  switch (item.status) {
+    case 'Queued': return 'queue';
+    case 'Shaping': return 'shaping';
+    case 'Ready': return 'ready';
+    case 'In progress': case 'Review': case 'Verify': case 'Ready to merge': return 'build';
+    case 'Needs you': return hasBuildThread(item) ? 'build' : 'shaping';
+    default: return null;
+  }
+}
+
+/** Every section the item shows in, and the concept its stage row names when it is a dossier's part. */
+export function placementOf(item: Item, { starts, unavailable, all }: PlacementFacts): Placement {
+  const parent = all.find((other) => other.id === item.parentId);
+  const part = !!parent && stillOpen(parent);
+  // A part still being refined lives in its dossier; from Ready on it also shows where its stage is.
+  const dossierOnly = part && (['List', 'Queued', 'Shaping'].includes(item.status) || (item.status === 'Needs you' && !hasBuildThread(item)));
+  const stage = dossierOnly ? null : stageSection(item, starts);
+  const dock = part || (stillOpen(item) && (hasChildren(item, all) || (item.kind === 'concept' && stage !== 'queue')));
+  const sections: BoardSection[] = [...(onDesk(item, unavailable) ? ['desk' as const] : []), ...(stage ? [stage] : []), ...(dock ? ['dock' as const] : [])];
+  return part && stage ? { sections, concept: parent } : { sections };
+}
+
 /** `clientError` is the page's own failed read; the placement of Verify and Ready to merge items depends on it. */
 export function boardSections(data: BoardData, now: number, clientError?: string | null): BoardSections {
   const unavailable = activityUnavailable(data, now, clientError);
@@ -66,7 +136,7 @@ export function boardSections(data: BoardData, now: number, clientError?: string
     .sort((a, b) => b.items.length - a.items.length);
   const notConcept = (i: Item) => i.kind !== 'concept';
   return {
-    needsYou: items.filter((item) => needsAnswer(item) || (notConcept(item) && ['Ready', 'Verify', 'Ready to merge'].includes(item.status) && !workingAgain(item, unavailable))),
+    needsYou: items.filter((item) => placementOf(item, { starts: data.startProgress?.[item.id], unavailable, all: data.items }).sections.includes('desk')),
     inFlight: items.filter((item) => notConcept(item) && (['Shaping', 'Ready', 'In progress', 'Review'].includes(item.status) || workingAgain(item, unavailable))),
     concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),

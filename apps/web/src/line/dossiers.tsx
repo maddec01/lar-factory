@@ -1,6 +1,6 @@
 // The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board, as one
-// line: its source, repository, kind, title and chips (parts that need you, open decisions, blocked slices, fog, whether
-// it is refined), then what's next, its part bar, agent figures, parts done and any other repositories, in the columns the
+// line: its source, repository, kind and title, then chips (parts that need you, open decisions, blocked slices, fog,
+// whether it is refined) and what's next in a stage row's state column, its part bar, agent figures, parts done and any other repositories, in the columns the
 // board's stage rows keep. Its chevron expands it in place under that same line, in the page's scroll, on its Work map,
 // with the concept's own question above and its Dependencies and fog below. Its parts list instead lists what keeps the
 // work moving (parts that need you, parts to verify or merge, open decisions, blocked slices, waiting parts, parts ready to
@@ -388,7 +388,7 @@ function Next({ m, data, parent }: { m: Moving; data: BoardData; parent: Item })
 const ABOVE_MAP = ['you'];
 const BELOW_MAP = ['dependencies', 'fog'];
 
-/** A dossier's one line in the dock; `lead` takes the glyph's column of a stage row, and `tools`, an expanded dossier's own controls, sit after its chips. */
+/** A dossier's one line in the dock; `lead` takes the glyph's column of a stage row, and `tools`, an expanded dossier's own controls, sit after its title. */
 function DossierLine({ parent, parts, data, lead, tools, onClick, className = '' }: { parent: Item; parts: Part[]; data: BoardData; lead: ReactNode; tools?: ReactNode; onClick?: (e: MouseEvent<HTMLDivElement>) => void; className?: string }) {
   const isPicked = usePicked(parent);
   const m = moving(parent, parts, useActivityUnavailable());
@@ -403,10 +403,12 @@ function DossierLine({ parent, parts, data, lead, tools, onClick, className = ''
         <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
           className={`min-w-0 truncate rounded text-left text-[13px] font-medium hover:underline ${ROW_OPENS}`}><ItemTitle item={parent} /></button>
         <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
-        <span onClick={stop} className="ml-auto flex shrink-0 gap-1 pl-1" data-chips><Refined parent={parent} /><Counts m={m} /></span>
-        {tools && <span onClick={stop} className="flex shrink-0 items-center gap-1.5 pl-1" data-dossier-tools>{tools}</span>}
+        {tools && <span onClick={stop} className="ml-auto flex shrink-0 items-center gap-1.5 pl-1" data-dossier-tools>{tools}</span>}
       </span>
-      <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
+      <span className="flex min-w-0 items-center gap-1.5" data-col="state">
+        <span onClick={stop} className="flex shrink-0 gap-1 empty:hidden" data-chips><Refined parent={parent} /><Counts m={m} /></span>
+        <span data-col="next" className="min-w-0 flex-1" data-next><Next m={m} data={data} parent={parent} /></span>
+      </span>
       <span data-col="bar"><PartsBar m={m} /></span>
       <span data-col="figures" className="hidden min-w-0 @6xl:grid"><Figures s={figuresOf(parent, data, true)} /></span>
       <span data-col="count" className="text-right text-[11px] tabular-nums text-(--muted-foreground)" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count}</span>

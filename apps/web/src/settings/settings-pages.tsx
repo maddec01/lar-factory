@@ -11,7 +11,7 @@ import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
-import { HeavyCommandLimitSetting } from './heavy-command-limit.tsx';
+import { LimitSetting } from './limit-setting.tsx';
 import { ShapingThreadCleanupSetting } from './shaping-thread-cleanup.tsx';
 import { TargetProgress } from './target-progress.tsx';
 import { TargetReaders } from './target-readers.tsx';
@@ -257,7 +257,11 @@ export function pages(input: PagesInput): Page[] {
       { title: 'Commands', rows: [{
         id: 'heavy-command-limit', title: 'Heavy commands at once',
         description: "How many heavy commands, such as test suites and builds, may run at once on this Mac, across all builds and worktrees. Automatic allows one for every 4 CPUs or 8 GB of memory, whichever is fewer, and at least one.",
-        control: custom(() => null), below: <HeavyCommandLimitSetting state={data.heavyCommandLimit} />,
+        control: custom(() => null), below: <LimitSetting name="heavy-command-limit" label="Heavy commands at once" field="Heavy command limit" state={data.heavyCommandLimit} />,
+      }, {
+        id: 'build-limit', title: 'Builds at once',
+        description: 'How many builds may work at once on this Mac, across all repositories. Automatic follows the heavy command limit. Start build and Start after always go ahead, even past this limit.',
+        control: custom(() => null), below: <LimitSetting name="build-limit" label="Builds at once" field="Build limit" state={data.buildLimit} />,
       }] },
       { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },
     ] },

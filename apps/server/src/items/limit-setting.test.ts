@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { createHeavyCommandLimit } from './heavy-command-limit.ts';
+import { createLimitSettings } from './limit-setting.ts';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -11,11 +11,11 @@ afterEach(() => {
 });
 
 function setUp() {
-  const dir = mkdtempSync(join(tmpdir(), 'heavy-command-limit-'));
+  const dir = mkdtempSync(join(tmpdir(), 'limit-setting-'));
   dirs.push(dir);
   let changes = 0;
-  const limit = createHeavyCommandLimit({ dir, automatic: 2, changed: () => { changes += 1; } });
-  return { dir, limit, changes: () => changes };
+  const settings = createLimitSettings({ dir, automatic: 2, changed: () => { changes += 1; } });
+  return { dir, limit: settings.heavyCommandLimit, build: settings.buildLimit, changes: () => changes };
 }
 
 test('a saved limit shows in the state beside the automatic number and reaches the board', () => {
@@ -44,4 +44,27 @@ test('an invalid file shows as Automatic with why, and a save replaces it', () =
   assert.match(state.problem ?? '', /needs a limit/);
   assert.equal(limit.save({ limit: 1 }).status, 200);
   assert.deepEqual(limit.state(), { limit: 1, automatic: 2 });
+});
+
+test("the build limit saves beside the heavy command limit, and its Automatic follows that limit's number", () => {
+  const { limit, build, changes } = setUp();
+  assert.deepEqual(build.state(), { limit: 'automatic', automatic: 2 });
+  limit.save({ limit: 4 });
+  assert.deepEqual(build.state(), { limit: 'automatic', automatic: 4 }, 'a saved heavy command limit');
+  assert.deepEqual(build.save({ limit: 3 }), { status: 200, body: { error: null } });
+  assert.deepEqual(build.state(), { limit: 3, automatic: 4 });
+  assert.deepEqual(limit.state(), { limit: 4, automatic: 2 }, 'the heavy command limit stays as it was');
+  limit.save({ limit: 'automatic' });
+  assert.deepEqual(build.state(), { limit: 3, automatic: 2 });
+  assert.equal(build.save({ limit: 0 }).status, 400);
+  assert.equal(changes(), 3);
+});
+
+test('an invalid build limit file shows as Automatic with why', () => {
+  const { dir, build } = setUp();
+  writeFileSync(join(dir, 'build-limit.json'), 'null');
+  const state = build.state();
+  assert.equal(state.limit, 'automatic');
+  assert.match(state.problem ?? '', /build limit setting .* needs a limit/);
+  assert.equal(state.automatic, 2);
 });

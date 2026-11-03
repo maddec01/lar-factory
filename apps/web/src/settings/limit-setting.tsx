@@ -1,5 +1,5 @@
-// Settings › General: how many heavy commands may run at once on this Mac. Automatic shows the number it gives here; a
-// number is a whole number from 1, saved with its own button or Enter.
+// Settings › General: how many heavy commands, or builds, may run at once on this Mac. Automatic shows the number it
+// gives here; a number is a whole number from 1, saved with its own button or Enter.
 
 import { useId, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
@@ -19,7 +19,14 @@ function wholeFromOne(text: string): number | null {
  * Automatic or a number, with none picked until the board has read the setting, which it never does in sample mode, or
  * while the setting file is invalid, so picking either replaces the file.
  */
-export function HeavyCommandLimitSetting({ state }: { state: HeavyCommandLimitState | undefined }) {
+export function LimitSetting({ name, label, field, state }: {
+  /** The setting's id, which also names its endpoint: `heavy-command-limit` or `build-limit`. */
+  name: string;
+  label: string;
+  /** The number field's accessible name. */
+  field: string;
+  state: HeavyCommandLimitState | undefined;
+}) {
   const saved = state?.limit;
   const [mode, setMode] = useState<'automatic' | 'number' | null>(null);
   const [typed, setTyped] = useState<string | null>(null);
@@ -36,7 +43,7 @@ export function HeavyCommandLimitSetting({ state }: { state: HeavyCommandLimitSt
   const save = async (limit: HeavyCommandLimit) => {
     setSaving(true);
     setError(null);
-    const result = await postAction('/api/heavy-command-limit', { limit });
+    const result = await postAction(`/api/${name}`, { limit });
     flushSync(() => {
       receive(result);
       setSaving(false);
@@ -58,8 +65,8 @@ export function HeavyCommandLimitSetting({ state }: { state: HeavyCommandLimitSt
     { value: 'number', label: 'Number' },
   ];
   return (
-    <div className="grid gap-2" data-heavy-command-limit>
-      <Choice label="Heavy commands at once" options={options} value={shown} busy={saving} onChange={(next) => {
+    <div className="grid gap-2" data-limit={name}>
+      <Choice label={label} options={options} value={shown} busy={saving} onChange={(next) => {
         setError(null);
         if (next === 'automatic') void save('automatic');
         else {
@@ -68,9 +75,9 @@ export function HeavyCommandLimitSetting({ state }: { state: HeavyCommandLimitSt
         }
       }} />
       {shown === 'number' && <form className="flex items-center gap-2" onSubmit={submit}>
-        <Input className="w-20" inputMode="numeric" aria-label="Heavy command limit" value={text} readOnly={saving} onChange={(e) => setTyped(e.target.value)}
+        <Input className="w-20" inputMode="numeric" aria-label={field} value={text} readOnly={saving} onChange={(e) => setTyped(e.target.value)}
           aria-invalid={invalid || undefined} aria-describedby={invalid ? hint : undefined} />
-        <Button {...kind('other')} type="submit" disabled={number === null} aria-disabled={held || undefined} className="aria-disabled:opacity-64" data-save-heavy-command-limit>Save</Button>
+        <Button {...kind('other')} type="submit" disabled={number === null} aria-disabled={held || undefined} className="aria-disabled:opacity-64" data-save-limit={name}>Save</Button>
       </form>}
       {shown === 'number' && invalid && <p id={hint} className="m-0 text-xs text-(--error-foreground)">Enter a whole number from 1.</p>}
       {state?.problem && <p className="m-0 text-xs text-(--error-foreground)" role="alert">{state.problem} The board uses Automatic until you save a choice.</p>}

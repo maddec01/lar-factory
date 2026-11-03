@@ -21,7 +21,11 @@ Send it through Gate again before marking it Ready. Follow
   [domain-modeling](shared/domain-docs.md) vocabulary: what exists, where, and
   what the work would change. By default it runs no test suite, build, typecheck
   or lint. It may run the smallest command that settles a specific uncertainty
-  reading cannot settle, and names that uncertainty in its report. It also returns each onboarded repository's
+  reading cannot settle, and names that uncertainty in its report. It runs each
+  heavy command (a whole test suite, a production build, a performance
+  measurement, or anything expected to take over about a minute) on its own as
+  `lar-work heavy -- <command>`, in the background or with its tool's longest
+  timeout. It also returns each onboarded repository's
   **role**: `bash <this skill>/shared/scripts/repo-config.sh --list` lists the
   repositories, and `bash <this skill>/shared/scripts/repo-config.sh <owner/repo>`
   (or an Azure repository's origin URL or `<org>/<project>/<repo>`) prints

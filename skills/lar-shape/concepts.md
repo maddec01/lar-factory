@@ -61,8 +61,11 @@ write "none" under Domain docs and in decision domain-drafts, without drafting e
 
 Work a decision record by the method its text names (**Grilling with docs** in
 [SKILL.md](grilling-with-docs.md), prototype per
-[SKILL.md 2. Size up](size-up.md), research findings, or a small task). Then,
-in this order, so completion reads it as complete:
+[SKILL.md 2. Size up](size-up.md), research findings, or a small task).
+Run each heavy command (a whole test suite, a production build, a performance
+measurement, or anything expected to take over about a minute) on its own as
+`lar-work heavy -- <command>`, in the background or with your tool's longest
+timeout. Then, in this order, so completion reads it as complete:
 
 1. Save the confirmed answer (`lar-work set-body <work ID> --revision N --body answer --file <file>`)
    and, with domain docs ON, the drafts it settled, or "none"

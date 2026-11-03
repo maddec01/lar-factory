@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { readTrackerStructure, writeTrackerStructure, type TrackerStructure, type RepositorySetup } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 import { readStructureSnapshot, syncStructures, structureProvider, type StructureProvider, type StructureTicket } from './tracker-sync.ts';
-import { trackerDigest } from './tracker-cache.ts';
+import { trackerCache, trackerDigest } from './tracker-cache.ts';
 
 const handles: {records:WorkRecords;dir:string}[] = [];
 afterEach(() => { vi.unstubAllEnvs(); for (const {records,dir} of handles.splice(0)) {records.close();rmSync(dir,{recursive:true,force:true});} });
@@ -113,6 +113,24 @@ test('a stale failure checkpoint cannot overwrite a later structural outbox entr
   records.trackerFailed(root.workId,'An obsolete request failed.',true,digest);
   expect(records.trackerState(root.workId)).toEqual({state:'pending'});
   expect(records.trackerCheckpoint(root.workId).error).toBeNull();
+});
+
+test('one refresh reads the tracker graph once, and each record keeps the state it has alone',async()=>{
+  const records=await cache();const {dir}=handles.at(-1)!;
+  const {root,decision,build}=await concept(records);
+  const lone=['team/server#50','team/server#51','team/server#52'].map(ticket=>records.create({repository:'team/server',kind:'build',title:ticket,ticket}));
+  const failed=records.create({repository:'team/server',kind:'concept',title:'Failed',ticket:'team/server#60'});
+  records.trackerFailed(failed.workId,'The tracker refused.',true);
+  const {openDatabase}=await import('./database.ts');
+  const database=await openDatabase(join(dir,'work-records.db'));
+  const graphReads=vi.fn();const prepare=database.db.prepare.bind(database.db);
+  database.db.prepare=((sql:string)=>{if(sql.includes("FROM work_records WHERE kind <> 'slice'"))graphReads();return prepare(sql);}) as typeof database.db.prepare;
+  const stateOf=trackerCache(database).trackerStates();
+  const expected:[string,unknown][]=[[root.workId,{state:'pending'}],[decision.workId,{state:'pending'}],[build.workId,{state:'pending'}],
+    ...lone.map(({workId}):[string,unknown]=>[workId,undefined]),[failed.workId,{state:'conflict',message:'The tracker refused.'}]];
+  for(const [workId,state] of expected){expect(stateOf(workId)).toEqual(state);expect(records.trackerState(workId)).toEqual(state);}
+  expect(graphReads).toHaveBeenCalledTimes(1);
+  database.close();
 });
 
 test('the existing create transport sends GitHub options and Azure Bug HTML with tags, identity, iteration and default area', async () => {

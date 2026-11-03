@@ -12,8 +12,11 @@ Silence leaves the checkpoint pending in Needs you.
 On resume, reuse an explicit confirmation recorded in the thread or the brief's
 Confirmed section only when the proposed understanding is unchanged. Keep the
 confirmed understanding and the user's answer together for that comparison.
-Otherwise ask again. Ready commits the user to no build; Start build remains a
-separate user action.
+Otherwise ask again. A Ready build waits for the user's Start build on the
+board. The exception is Auto-build. With this machine's Auto-build switch on,
+the board starts eligible Ready builds by itself, up to the build limit.
+Auto-build starts a build under a concept only once the concept's Refinement is
+complete.
 
 Record the kind (`bug`, `feature`, `improvement`, `concept`) with
 `lar-work update <work ID> --revision N --kind <kind>`, which stays local. Each

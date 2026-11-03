@@ -80,19 +80,23 @@ timeout. Then, in this order, so completion reads it as complete:
    Map's Dependencies. Once no Fog is left, record it with
    `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
-Start each new research decision at once, as in step 3; every other new
-decision waits in Queued as in step 4, and each build in Ready for the board's
-Start build ([5. Start the build](start-build.md)). `lar-work completion` on
-this decision should now print it complete; fix what its reasons name. Map
-builds follow the build rules: each changes one repository, and work in another
-repository becomes a build there or a Dependency per
-[Other repositories](shared/issue-tracker/work-records.md#other-repositories).
-A blocked build starts once its blockers are complete and the user has marked
-each Dependency holding it met. Consult `lar-work refinement <concept work ID>` independently of delivery.
-Refinement requires a nonempty map, Fog recorded gone and every active decision
-settled. Fix its incomplete reasons. Proposed builds need neither passing gates
-nor merged PRs for refinement. Each child's Start build remains an explicit,
-independent choice when its own gate and blockers permit it.
+Start each new research decision at once, as in step 3; every other new decision
+waits in Queued as in step 4, and each build in Ready for the board to start
+([5. Start the build](start-build.md)). `lar-work completion` on this decision
+should now print it complete; fix what its reasons name. Map builds follow the
+build rules: each changes one repository, and work in another repository becomes
+a build there or a Dependency per [Other
+repositories](shared/issue-tracker/work-records.md#other-repositories). A
+blocked build starts once its blockers are complete and the user has marked each
+Dependency holding it met. Consult `lar-work refinement <concept work ID>`
+independently of delivery. Refinement requires a nonempty map, Fog recorded gone
+and every active decision settled. Fix its incomplete reasons. Proposed builds
+need neither passing gates nor merged PRs for refinement. The user's Start build
+on a child needs only the child's own gate and blockers. A Ready build waits for
+the user's Start build on the board. The exception is Auto-build. With this
+machine's Auto-build switch on, the board starts eligible Ready builds by
+itself, up to the build limit. Auto-build starts a build under a concept only
+once the concept's Refinement is complete.
 
 Read [Completion](shared/issue-tracker/work-records.md#completion) for delivery
 and [Structural publication suspended](shared/issue-tracker/publication.md)

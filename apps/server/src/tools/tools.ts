@@ -5,6 +5,7 @@ import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { GH_FLOOR, type AzCheck, type CommandCheck, type GhCheck, type T3Check, type ToolChecks } from '@lar-factory/shared';
+import { loopTrace } from '../startup/loop-trace.ts';
 import { serverRuntimePath, t3Running } from '../t3/t3-settings.ts';
 import { type RunResult, runTool } from './run-tool.ts';
 
@@ -98,7 +99,7 @@ let loginPath: string | null = null;
  */
 export async function lookUpTools(env: NodeJS.ProcessEnv = process.env, rereadLoginPath = true): Promise<Tools> {
   if (rereadLoginPath || !current) loginPath = await readLoginPath(env);
-  current = findTools(env, loginPath);
+  current = loopTrace.span('tool lookup', () => findTools(env, loginPath));
   return current;
 }
 

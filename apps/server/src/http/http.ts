@@ -7,6 +7,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { kindLabels, pageWithData, sameRepo, trackerCapabilities, writeAccessProblem, type Item, type ItemCommentsPage, type ItemDetails, type LabelChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type RepositorySetup, type TrackerLabel, type SetupDetection } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/editable-repository.ts';
@@ -21,6 +22,7 @@ import type { BuiltPage } from '../page/page.ts';
 import type { StartAfter } from '../start-after/start-after.ts';
 import type { ProjectImage } from '../t3/project-icons.ts';
 import { log } from '../log.ts';
+import { loopTrace } from '../startup/loop-trace.ts';
 import { readAzureReadiness } from '../azure/azure-readiness.ts';
 
 
@@ -580,7 +582,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
   function openStream(req: IncomingMessage, res: ServerResponse): void {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
     if (req.method === 'HEAD') return void res.end();
-    const sendBoard = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+    const sendBoard = (data: object) => res.write(`data: ${loopTrace.span('board stream', () => JSON.stringify(data))}\n\n`);
     streams.add(res);
     const unsubscribe = board.subscribe(sendBoard);
     res.on('close', () => {
@@ -612,8 +614,14 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
     const url = new URL(req.url ?? '/', 'http://localhost');
     const { pathname: path } = url;
+    const startedAt = performance.now();
+    let gateMs = 0;
+    if (path !== '/api/events') res.once('finish', () => loopTrace.request(`${req.method} ${path}`, performance.now() - startedAt, gateMs));
     // The health check must answer at once; everything else runs tools or shows what the lookup found.
-    if (path !== '/healthz' && !path.startsWith('/assets/')) await ready();
+    if (path !== '/healthz' && !path.startsWith('/assets/')) {
+      await ready();
+      gateMs = performance.now() - startedAt;
+    }
     if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
       return json(res, 403, { error: 'Submit from this board page.' });
     }
@@ -634,7 +642,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
     }
     if (path === '/') {
-      return send(res, 200, 'text/html; charset=utf-8', pageWithData(page.template, board.snapshot()));
+      return send(res, 200, 'text/html; charset=utf-8', loopTrace.span('page request', () => pageWithData(page.template, board.snapshot())));
     }
     if (path === '/api/events') return openStream(req, res);
     if (path === '/api/onboarding/projects') return projectsRequest(res);
@@ -654,7 +662,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     }
     if (path === '/api/tickets') return ticketsRequest(url, res);
     if (path === '/api/archive') return json(res, 200, { items: archive() });
-    if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));
+    if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', loopTrace.span('board request', () => JSON.stringify(board.snapshot())));
     if (path === '/healthz') return json(res, 200, {});
     const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
     if (asset) return send(res, 200, asset.type, asset.body);

@@ -1,6 +1,7 @@
 import { executionStats } from './execution-stats.ts';
 import type { ItemThread, StartedThread } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
+import { loopTrace } from '../startup/loop-trace.ts';
 import { boardProjects } from './board-projects.ts';
 import { readArchivedShells, readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead, type ThreadFamilyRead } from './execution-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
@@ -340,6 +341,10 @@ export interface ThreadReads {
 
 /** Where the reads of `threadIds` stand now, or null while T3 runs with its thread list not yet read. Reads nothing by itself. */
 export function protocolThreadReads(threadIds: readonly string[]): ThreadReads | null {
+  return loopTrace.span('thread reads', () => threadReadsNow(threadIds));
+}
+
+function threadReadsNow(threadIds: readonly string[]): ThreadReads | null {
   if (!threadIds.length) return { reads: new Map(), observed: new Set(), demand() {} };
   protocolItemThreads(threadIds);
   if (current && !current.available && !current.shell) return null;

@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { isRecord } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
+import { loopTrace } from '../startup/loop-trace.ts';
 import type { PriceOverride } from '../stats/usage-pricing.ts';
 
 /** T3's state folder under the home folder. */
@@ -56,12 +57,14 @@ export function serverRuntimePath(env: NodeJS.ProcessEnv = process.env): string 
 /**
  * Whether T3 Code runs: the runtime file at `path` names a pid whose process is alive, as T3's
  * isProcessAlive checks it. `t3 thread start` needs that file; a crash can leave it behind, naming a dead pid.
+ * On macOS this blocks the thread while T3 is busy, measured up to 134 ms with 0.1 ms of CPU, so a caller holding an open
+ * subscription to this T3 asks the subscription instead: its socket closes when the process ends.
  */
 export function t3Running(path: string): boolean {
   const pid = readJsonRecord(path)?.pid;
   if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return false;
   try {
-    process.kill(pid, 0);
+    loopTrace.span('t3 liveness', () => process.kill(pid, 0));
     return true;
   } catch (err) {
     // Signal 0 only asks whether the process exists; EPERM means it does, under another user.

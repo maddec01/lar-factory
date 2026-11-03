@@ -2,6 +2,7 @@
 // abandoned laid over what GitHub last reported, and the pages it pushes changes to.
 
 import type { BoardData, Item } from '@lar-factory/shared';
+import { loopTrace } from '../startup/loop-trace.ts';
 
 export interface BoardState {
   /** The board data as served now. */
@@ -43,9 +44,9 @@ export function createBoardState(initial: BoardData): BoardState {
   const abandoned = new Map<string, { item: Item | undefined; revision: number }>();
   const pages = new Set<(data: BoardData) => void>();
 
-  const push = () => {
+  const push = () => loopTrace.span('board push', () => {
     for (const send of pages) send(state);
-  };
+  });
 
   return {
     snapshot: () => state,

@@ -45,7 +45,7 @@ async function setArmed(item: Item, choice: ModelChoice | undefined | null): Pro
 }
 
 /** Start after #n, or Starts after #n ✓ while armed, a Start. */
-function StartAfter({ item, data }: { item: Item; data: BoardData }) {
+function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData; namesBlocker: boolean }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const after = startsAfter(item);
@@ -62,7 +62,7 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
     return (
       <Button {...buttonKind('start')} leftIcon={ICON.play} className={SHRINKS} data-start-after={item.id} aria-pressed aria-label={`Starts after ${after}`}
         title={`Starts by itself once ${waitsFor(item)}. Pressing it again disarms it`} {...writes}
-        onClick={() => !held && void run(null)}><span className="truncate">Starts after {label}</span> ✓</Button>
+        onClick={() => !held && void run(null)}><span className="truncate">Starts after{namesBlocker && ` ${label}`}</span> ✓</Button>
     );
   }
   const pick = (choice: ModelChoice | undefined) => {
@@ -74,7 +74,7 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
     <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
       <DropdownMenu.Trigger asChild>
         <Button {...buttonKind('start')} leftIcon={ICON.play} className={SHRINKS} data-start-after={item.id} aria-label={`Start ${itemName(item)} after ${after}`}
-          title={`Starts by itself once ${waitsFor(item)}`} {...(data.capture?.enabled === false ? {} : writes)}><span className="truncate">Start after {label}</span> ▾</Button>
+          title={`Starts by itself once ${waitsFor(item)}`} {...(data.capture?.enabled === false ? {} : writes)}><span className="truncate">Start after{namesBlocker && ` ${label}`}</span> ▾</Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} after ${after} with`} {...opensOnChecked}>
         <StartEntries item={item} data={data} onPick={pick} />
@@ -92,10 +92,11 @@ const showsStartAfter = (item: Item, data: BoardData): boolean =>
  * repository, where a refining thread and a build both start, while it is still onboarding or T3 has no project for
  * it. While a blocker holds it, Start after takes its place. While only the repository holds it, Start shows
  * disabled, its title giving the hold's reason; an armed start would fail then, so none is offered, but one armed
- * before the hold still shows while a blocker is open, so it can be disarmed.
+ * before the hold still shows while a blocker is open, so it can be disarmed. Beside text that names the blockers,
+ * `namesBlocker` false leaves them out of Start after's label; its accessible name and title keep them.
  */
-export function StartOrAfter({ item, data, label = 'Start', kind = 'refine', linkedBeside }: { item: Item; data: BoardData; label?: string; kind?: StartKind; linkedBeside?: string | undefined }) {
-  if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} />;
+export function StartOrAfter({ item, data, label = 'Start', kind = 'refine', linkedBeside, namesBlocker = true }: { item: Item; data: BoardData; label?: string; kind?: StartKind; linkedBeside?: string | undefined; namesBlocker?: boolean }) {
+  if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} namesBlocker={namesBlocker} />;
   const hold = startHold(data, item.repo);
   if (!hold) return <StartControl item={item} data={data} label={label} kind={kind} linkedBeside={linkedBeside} />;
   // Pointer events stay on while it's disabled, so its title says why.

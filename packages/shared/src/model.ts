@@ -354,7 +354,6 @@ export interface Item {
    * and the board never saw one of them.
    */
   buildPhase?: string | null;
-  buildRequested?: boolean;
   threads?: ItemThread[] | 'unavailable';
   /**
    * Why it waits for its repository's changed item source or domain-doc location to be accepted in Settings, which
@@ -403,6 +402,7 @@ export interface ItemThread {
   queued?: true;
   /** T3 archived this thread. T3 opens New thread for an archived thread's link, so the board never links it. */
   archived?: true;
+  /** A descendant is running, or this thread or a descendant has background tasks pending, so its work goes on after its turn ended. */
   hasRunningChildren?: true;
   /** The work record's thread role, when recorded by the factory. */
   purpose?: string;
@@ -420,6 +420,18 @@ export function canResumeShaping(item: Item): boolean {
   return (shaping.length ? shaping : item.threads)[0]?.state === 'stopped';
 }
 
+/** Whether work a build delegated still runs, a slice's thread or a running child of its build thread, even after that thread's own run ended. */
+export function delegatedWorkRunning(item: Item): boolean {
+  return !!item.slices?.some((slice) => slice.progress === 'active') || !!currentBuildThread(item)?.hasRunningChildren;
+}
+
+/** Retry only a build moved to In progress whose current thread stopped before it recorded a build phase. */
+export function canRetryBuild(item: Item): boolean {
+  if (item.status !== 'In progress' || item.buildPhase || item.needsYou || delegatedWorkRunning(item) || !Array.isArray(item.threads)) return false;
+  if (item.threads.some(thread => thread.observedAt || thread.hasLiveChildren || thread.state === 'running' || thread.state === 'needs you')) return false;
+  return item.threads.find(thread => thread.purpose === 'build')?.state === 'stopped';
+}
+
 /** The deep link that opens a T3 thread in T3 Code, as T3's promptLinks.ts parses it (pingdotgg/t3code d53873b6). */
 export function threadLink(environmentId: string, threadId: string): string {
   return `t3code://threads/${encodeURIComponent(environmentId)}/${encodeURIComponent(threadId)}`;
@@ -430,6 +442,21 @@ export interface StartedThread {
   threadId: string;
   title: string;
 }
+
+/** What a start's thread will do. */
+export type StartPurpose = 'shape' | 'build';
+
+/**
+ * A start the server is running, one that left an unresolved launch intent and may have opened a thread, or one that
+ * was refused or failed. A start with a thread has none.
+ */
+export type StartProgress =
+  | { phase: 'starting' }
+  | { phase: 'may-have-started' | 'failed'; message: string };
+
+/** The item's start for `purpose` as the server sees it. */
+export const startProgressOf = (data: Pick<BoardData, 'startProgress'>, itemId: string, purpose: StartPurpose): StartProgress | undefined =>
+  data.startProgress?.[itemId]?.[purpose];
 
 /** What starting a thread answered: the thread, or why it did not start. */
 export interface StartResult {
@@ -575,6 +602,8 @@ export interface BoardData {
   startedBuilds?: Record<string, StartedThread>;
   /** Threads this board run started, by item id, so every page shows them. */
   started?: Record<string, StartedThread>;
+  /** Each item's start as the server sees it, by item id and purpose, so every page and a reload show it. */
+  startProgress?: Record<string, Partial<Record<StartPurpose, StartProgress>>>;
   /** Starts armed by Start after, by item id, kept in the board server's data folder. Absent in sample mode. */
   armed?: Record<string, ArmedStart>;
   /** Why a start the board ran by itself failed, by item id; the part was disarmed. Arming or disarming it clears this. */
@@ -1171,25 +1200,26 @@ export function activityUnavailable(data: BoardData, now: number, clientError?: 
 }
 
 /**
- * Whether an item at Verify or Ready to merge is at work again: its current build thread or a child of it runs, and
+ * Whether an item at Verify or Ready to merge is at work again: its current build thread, a child of it or a slice runs, and
  * nothing holds it for the user. It then counts as in flight, with its recorded Status unchanged.
  */
 export function workingAgain(item: Item, unavailable = false): boolean {
   if (item.status !== 'Verify' && item.status !== 'Ready to merge') return false;
   if (unavailable || item.paused || item.archived || item.needsYou || openQuestionThread(item)) return false;
   const current = currentBuildThread(item);
-  return !!(current?.currentRunning || current?.hasRunningChildren);
+  return !!current?.currentRunning || delegatedWorkRunning(item);
 }
 
-export function buildActivity(item: Item, stale = false): { label: string; running: boolean } {
+export function buildActivity(item: Item, stale = false, start?: StartProgress): { label: string; running: boolean } {
+  if (start?.phase === 'starting') return { label: 'Starting', running: false };
+  if (start?.phase === 'may-have-started') return { label: 'May have started', running: false };
   if (workingAgain(item, stale)) return { label: 'Working', running: true };
   if (!['In progress', 'Review', 'Ready'].includes(item.status)) return { label: item.status, running: false };
   const current = currentBuildThread(item);
   if (stale || item.paused || item.archived || item.needsYou) return { label: 'Activity unavailable', running: false };
-  if (item.buildRequested) return { label: 'Start requested', running: false };
-  if (!current) return { label: 'Activity unavailable', running: false };
-  const running = !!(current.currentRunning || current.hasRunningChildren);
-  if (!running) return { label: current.state === 'stopped' ? 'Stopped' : current.state === 'needs you' ? 'Needs you' : 'Activity unavailable', running: false };
+  const running = !!current?.currentRunning || delegatedWorkRunning(item);
+  if (!current && !running) return { label: 'Activity unavailable', running: false };
+  if (!running) return { label: current?.state === 'stopped' ? 'Stopped' : current?.state === 'needs you' ? 'Needs you' : 'Activity unavailable', running: false };
   const phases: Record<string, string> = { plan: 'Planning', implement: 'Implementing', review: 'Review', checks: 'Checks', 'full-checks': 'Checks', 'domain-docs': 'Updating docs', approve: 'Awaiting approval', retro: 'Retro' };
   return { label: phases[item.buildPhase ?? ''] ?? 'Working', running };
 }

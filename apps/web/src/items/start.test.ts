@@ -147,7 +147,7 @@ test('picking an entry starts the item with that model, shows the thread, and re
   expect(menu(), 'no menu while a start is in flight').toBeNull();
 
   const thread = { threadId: 'thread-1', title: '#129 Run more than one 4K HDR to 1080p stream at a time' };
-  await answer({ thread, error: null });
+  await answer({ thread, error: null, board: { ...withChoices, started: { I_sample05: thread } } });
   const tag = card().querySelector('[data-start-result]')!;
   expect([tag.classList.contains('started-tag'), tag.getAttribute('data-slot'), tag.className.includes('bg-success/10'), text(tag), tag.getAttribute('title')])
     .toEqual([true, 'badge', true, 'Started', 'T3 thread thread-1']);
@@ -195,7 +195,7 @@ test('a Start that may have run hides Start, Move to List and Abandon; closing i
   await mountItem(withChoices);
   await open();
   await press(entries()[1]!);
-  await answer({ thread: null, uncertain: true, error: 'Check T3.' });
+await answer({ thread: null, uncertain: true, error: 'Check T3.', board: { ...withChoices, startProgress: { I_sample05: { shape: { phase: 'may-have-started', message: 'Check T3.' } } } } });
   expect(card().querySelector('[data-start]')).toBeNull();
   expect(footer()).toBeNull();
   const message = card().querySelector<HTMLElement>('p.start[data-start-result]')!;
@@ -208,6 +208,41 @@ test('a Start that may have run hides Start, Move to List and Abandon; closing i
     .toEqual(['badge', true, 'May have started', 'Check T3 before starting it again']);
   expect(card().querySelector('[data-start]')).toBeNull();
   expect(footer()).toBeNull();
+});
+
+test('the server shows Starting in a page that never pressed it, and after a reload', async () => {
+  await mountItem({ ...withChoices, startProgress: { I_sample05: { shape: { phase: 'starting' } } } });
+  expect([text(start()), start().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
+  expect(footer(), 'a running start holds Move to List and Abandon').toBeNull();
+});
+
+test('a failed start from the server offers Retry start, and closing it clears it on the server', async () => {
+  const failed = { ...withChoices, startProgress: { I_sample05: { shape: { phase: 'failed' as const, message: 'T3 said no' } } } };
+  await mountItem(failed);
+  expect(text(start())).toBe('Retry start ▾');
+  expect(text(card().querySelector('p.start [role="alert"]'))).toBe('T3 said no');
+  expect(footer(), 'a failed start gives Move to List back').not.toBeNull();
+  await press(card().querySelector('p.start button.dismiss')!);
+  expect(posted()).toEqual([['/api/dismiss-start-error', { session: 's1', itemId: 'I_sample05', purpose: 'shape' }]]);
+  await answer({ error: null, board: withChoices });
+  expect(card().querySelector('p.start')).toBeNull();
+  expect(text(start())).toBe('Shape issue ▾');
+});
+
+test('a refusal the board holds no state for, as from a restarted server, keeps its error here', async () => {
+  await mountItem(withChoices);
+  await open();
+  await press(entries()[0]!);
+  await answer({ error: 'The board restarted. Press Start again.', board: withChoices }, 409);
+  expect(text(start())).toBe('Retry start ▾');
+  expect(text(card().querySelector('p.start [role="alert"]'))).toBe('The board restarted. Press Start again.');
+});
+
+test('May have started from the server shows on a page that never pressed it', async () => {
+  await mountItem({ ...withChoices, startProgress: { I_sample05: { shape: { phase: 'may-have-started', message: 'Check T3.' } } } });
+  expect(card().querySelector('[data-start]')).toBeNull();
+  expect(footer()).toBeNull();
+  expect(text(card().querySelector('p.start [role="alert"]'))).toBe('Check T3.');
 });
 
 test('a thread another page started shows on every page', async () => {
@@ -227,7 +262,7 @@ test('in sample mode, Start still opens its menu, and no entry in it starts anyt
   expect(posted()).toEqual([]);
 });
 
-test('local Started clears after its observed server record disappears', async () => {
+test('Started clears after its server record disappears', async () => {
   await mountItem(withChoices, 'I_sample05');
   await press(start());
   const thread = { threadId: 'thread-1', title: 'Refine' };

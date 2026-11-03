@@ -6,11 +6,12 @@ import { inspectCleanups, executeCleanup, type CleanupPlan } from './work-cleanu
 
 import { changeKind, type KindChangeDeps } from '@lar-factory/work-records/change-kind';
 import { refreshSpecs } from '@lar-factory/work-records/spec-sync';
-import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { readTicketSpec, stripTrackerStructure, SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isLiveThread, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
-import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, PickedTicket, ShapingThreadCleanup, SkillCheckOutcome, StartedThread, StartResult, Status, SwapKind } from '@lar-factory/shared';
+import { readTicketSpec, stripTrackerStructure, SWAP_KINDS, WAITS_FOR_ONBOARDING, blockedText, writeAccessProblem, buildBranch, buildMessage, canAbandon, canResumeShaping, canRetryBuild, earlierBuildMessage, earlierWorkMessage, isDriftChoice, isLiveThread, isOnboarding, kindCanChange, sameRepo, workMessage } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, FactoryThreadContext, Item, LabelChange, ModelChoice, ModelGroup, OperationAccess, PickedTicket, ShapingThreadCleanup, SkillCheckOutcome, StartedThread, StartProgress, StartPurpose, StartResult, Status, SwapKind } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { readShapingThreadCleanup, WorkRecordError, type LaunchIntent, type PullRequestState, type SavedShapingThreadCleanup, type WorkRecord, type WorkRecords } from '@lar-factory/work-records';
 import { assertAzureThreadAllowed } from '@lar-factory/shared/azure-safety';
@@ -52,9 +53,9 @@ export interface ItemCommands {
   /**
    * Starts a T3 thread for a Queued item that nothing open blocks, once unless its recorded thread stopped or was
    * deleted. It writes a launch intent on the work record before it asks T3, and settles an unresolved one through T3
-   * before starting again.
+   * before starting again. `quiet` leaves a failure to the caller to show, as Start after does.
    */
-  start(itemId: string, model: unknown): Promise<Reply>;
+  start(itemId: string, model: unknown, quiet?: boolean): Promise<Reply>;
   /**
    * Starts a Ready build's thread in a new worktree, or retries a confirmed stopped or deleted one, once nothing open
    * blocks it, as lar-shape's step 5 does after Go: it moves a parent record that isn't a build to In progress first,
@@ -65,7 +66,9 @@ export interface ItemCommands {
   executeOwnedCleanup(itemId: string, input: unknown): Promise<Reply>;
   inspectRecovery(itemId: string): Promise<Reply>;
   startAgain(itemId: string, model: unknown, options: unknown): Promise<Reply>;
-  startBuild(itemId: string, model: unknown, drift?: unknown): Promise<Reply>;
+  startBuild(itemId: string, model: unknown, drift?: unknown, quiet?: boolean): Promise<Reply>;
+  /** Clears the refused or failed start the item shows for `purpose`, on every page. */
+  dismissStartError(itemId: string, purpose: unknown): Reply;
   /**
    * Sets List or Queued work aside on this Mac, or work whose Needs you offers it, and leaves its ticket as it is.
    * Archive offers closeTicket separately. The combined action closes before setting work aside.
@@ -111,6 +114,8 @@ export interface ItemCommandsDeps {
   checkoutOf?: (projectId: string) => Promise<string>;
   factoryContext?: FactoryThreadContext | null;
   board: BoardState;
+  /** The file that names the failed starts already cleared; none keeps them for this board run only. */
+  clearedFailuresFile?: string | null;
   /** Where the commands write changes to tickets. */
   items: ItemSource;
   /** Where the commands write Status moves; null in sample mode, which moves nothing. */
@@ -219,6 +224,9 @@ const PURPOSES = { started: 'shape', startedBuilds: 'build' } as const;
 type StartRecord = keyof typeof PURPOSES;
 
 const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Check the repository's project in T3 Code; the board settles it once T3 shows it.";
+const START_CRASHED = 'The start failed. Check the board log.';
+const START_PURPOSES: readonly StartPurpose[] = ['shape', 'build'];
+const isStartPurpose = (purpose: unknown): purpose is StartPurpose => START_PURPOSES.includes(purpose as StartPurpose);
 const LIVE_SHAPING = 'A shaping thread is still at work on this item. Wait for it to finish, then start the build.';
 
 export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkRecovery,
@@ -226,12 +234,18 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const checkout = (await checkouts(process.env)).find(p => p.id === projectId);
     if (!checkout) throw new Error('Cannot find the repository checkout.');
     return checkout.folder;
-  }, board, items, records, reread, archive, offerModelChoices, checkSkills, kindTracker, projectOf = currentRepositoryProject,
+  }, clearedFailuresFile = null, board, items, records, reread, archive, offerModelChoices, checkSkills, kindTracker, projectOf = currentRepositoryProject,
   baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
   buildAccessOf = (repo) => readRepositorySetups().find(setup => sameRepo(setup.repo, repo))?.access ?? {},
   showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, shapingThreadCleanupChoice = readShapingThreadCleanup, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
   reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)), readPr = (repo, number) => observePr(repo, number) }: ItemCommandsDeps): ItemCommands {
   const retryBuilds = new Set<string>();
+  /** The starts running now, from the press until T3 answers or a check refuses them. */
+  const running: Record<StartPurpose, Set<string>> = { shape: new Set(), build: new Set() };
+  /** The latest refused or failed start's message, by item id, until it's dismissed or a start runs again. */
+  const failures: Record<StartPurpose, Map<string, string>> = { shape: new Map(), build: new Map() };
+  /** The failed launch intents whose failure was cleared, kept so a restart doesn't show it again. */
+  const clearedIntents = new Set(Object.keys((clearedFailuresFile && readJsonRecord(clearedFailuresFile)) ?? {}));
   /** Thread lookups by thread ID: one in flight, or when the next may run. */
   const checks = new Map<string, { pending: boolean; retryAt: number }>();
   /** Recorded threads the T3 CLI confirmed deleted, which no longer hold a start. */
@@ -269,6 +283,54 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
   const reply = (status: number, body: object): Reply => ({ status, body });
   const withBoard = (status: number, body: object): Reply => reply(status, { ...body, board: board.snapshot() });
 
+  /** Sets the board data's start progress from the running starts, the failures and the unresolved launch intents. */
+  function showStarts(): void {
+    const progress: NonNullable<BoardData['startProgress']> = {};
+    const put = (itemId: string, purpose: StartPurpose, start: StartProgress) => { progress[itemId] = { ...progress[itemId], [purpose]: start }; };
+    for (const purpose of START_PURPOSES) for (const [itemId, message] of failures[purpose]) put(itemId, purpose, { phase: 'failed', message });
+    let intents: LaunchIntent[] = [];
+    try { intents = records?.launchIntents({ unresolved: true }) ?? []; } catch { /* The next read shows them. */ }
+    for (const { workId, purpose } of intents) if (isStartPurpose(purpose)) put(workId, purpose, { phase: 'may-have-started', message: MAY_HAVE_STARTED });
+    for (const purpose of START_PURPOSES) for (const itemId of running[purpose]) put(itemId, purpose, { phase: 'starting' });
+    board.update({ startProgress: progress });
+  }
+
+  /** Shows the starts, and pushes them only when they changed. */
+  function pushStarts(): void {
+    const before = JSON.stringify(board.snapshot().startProgress ?? {});
+    showStarts();
+    if (JSON.stringify(board.snapshot().startProgress) !== before) board.push();
+  }
+
+  /** A failure on the record survives a restart while its item can still start again; No thread shows as Needs you instead. */
+  function restoreFailures(): void {
+    if (!records) return;
+    try {
+      const latest = new Map(records.launchIntents({}).map((intent) => [`${intent.purpose} ${intent.workId}`, intent]));
+      for (const { intentId, workId, purpose, failure } of latest.values()) {
+        if (!isStartPurpose(purpose) || !failure || failure === NO_THREAD || clearedIntents.has(intentId)) continue;
+        const { status, buildPhase } = records.read(workId);
+        if ((purpose === 'build' ? ['Ready', 'In progress'] : ['Queued', 'Shaping']).includes(status) && !buildPhase) failures[purpose].set(workId, failure);
+      }
+    } catch (err) { log(`can't read the failed starts: ${(err as Error).message}`); }
+  }
+  restoreFailures();
+  showStarts();
+
+  /** Clears the item's failure for `purpose`, for good: a restart shows it again only from a later failed intent. */
+  function clearFailure(itemId: string, purpose: StartPurpose): void {
+    failures[purpose].delete(itemId);
+    if (!records || !clearedFailuresFile) return;
+    try {
+      const latest = records.launchIntents({ workId: itemId }).filter((intent) => intent.purpose === purpose).at(-1);
+      if (!latest?.failure || clearedIntents.has(latest.intentId)) return;
+      clearedIntents.add(latest.intentId);
+      mkdirSync(dirname(clearedFailuresFile), { recursive: true });
+      writeFileSync(clearedFailuresFile, JSON.stringify(Object.fromEntries([...clearedIntents].map((id) => [id, true]))));
+    } catch (err) { log(`can't save the cleared start failure of ${itemId}: ${(err as Error).message}`); }
+  }
+  const clearFailures = (itemId: string) => { for (const purpose of START_PURPOSES) clearFailure(itemId, purpose); };
+
   /** Why a command in flight on the item, or a Start this board run, blocks this action; null when nothing does. */
   function busyReason(itemId: string, action: Action): string | null {
     if (abandoning.has(itemId)) return 'Abandon is running. Wait for it to finish.';
@@ -305,6 +367,10 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const busy = busyReason(itemId, action);
     if (busy) return withBoard(409, { error: busy });
     const failed = setStatus(item, to);
+    if (!failed) {
+      clearFailures(itemId);
+      pushStarts();
+    }
     return withBoard(failed?.status ?? 200, { error: failed?.error ?? null });
   }
 
@@ -354,17 +420,51 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       if (!item) return reply(404, { error: GONE });
       const work = begin(item, choice);
       if (typeof work !== 'function') return work;
+      const purpose = PURPOSES[record];
+      running[purpose].add(itemId);
+      failures[purpose].delete(itemId);
       // Keep a started or unconfirmed thread; only a confirmed stop or a failure reported by t3 allows retry.
-      pending = track(runs, itemId, Promise.resolve().then(work).then((result) => {
+      pending = track(runs, itemId, Promise.resolve().then(work).finally(() => {
+        running[purpose].delete(itemId);
+        showStarts();
+      }).then((result) => {
         settled.add(pending!);
         if (result.thread) finishedStarts.set(pending!, result.thread.threadId);
         if (result.thread) board.update({ [record]: { ...board.snapshot()[record], [itemId]: result.thread } } satisfies Partial<BoardData>);
         board.push();
         return result;
       }), (result) => !!result.thread || !!result.uncertain);
+      pushStarts();
     }
     const { refused, ...result } = await pending;
     return withBoard(refused ? 409 : result.error ? 502 : 200, result);
+  }
+
+  /**
+   * Runs a press of Start or Start build, showing whatever refuses or fails it on every page. A failure the caller
+   * shows itself stays off the board, and so does an item that's gone.
+   */
+  async function press(record: StartRecord, itemId: string, quiet: boolean, run: () => Promise<Reply>): Promise<Reply> {
+    const purpose = PURPOSES[record];
+    const fail = (error: string) => {
+      if (quiet) clearFailure(itemId, purpose);
+      else if (board.find(itemId)) failures[purpose].set(itemId, error);
+    };
+    try {
+      const answer = await run();
+      const { error, uncertain } = answer.body as Partial<StartResult>;
+      if (error && !uncertain) fail(error);
+      else failures[purpose].delete(itemId);
+      showStarts();
+      board.push();
+      return withBoard(answer.status, answer.body);
+    } catch (error) {
+      // The log gets the detail, as every page can read this.
+      fail(START_CRASHED);
+      showStarts();
+      board.push();
+      throw error;
+    }
   }
 
   /** The threads the item's work record holds; none without records or a record. */
@@ -563,6 +663,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       if (repoProject.error !== undefined) continue;
       const { thread } = await settle(item, intent, repoProject.projectId);
       if (thread) board.update({ [record]: { ...board.snapshot()[record], [item.id]: thread } } satisfies Partial<BoardData>);
+      showStarts();
       board.push();
     }
   }
@@ -576,6 +677,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
 
   return {
     async reconcileStarts(currentItems) {
+      pushStarts();
       const warnings = { ...board.snapshot().startCheckFailures };
       for (const id of Object.keys(warnings)) if (!currentItems.some((item) => item.id === id)) delete warnings[id];
       if (JSON.stringify(warnings) !== JSON.stringify(board.snapshot().startCheckFailures ?? {})) {
@@ -700,7 +802,14 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       return withBoard(200, { error: null });
     },
 
-    start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {
+    dismissStartError(itemId, purpose) {
+      if (!isStartPurpose(purpose)) return withBoard(422, { error: 'Name the start to dismiss.' });
+      clearFailure(itemId, purpose);
+      pushStarts();
+      return withBoard(200, { error: null });
+    },
+
+    start: (itemId, model, quiet = false) => press('started', itemId, quiet, () => startOnce(starts, 'started', itemId, model, (item, choice) => {
       const held = records && item.status === 'Shaping' ? heldThread(item, PURPOSES.started) : null;
       if (held && records?.launchIntents({ workId: item.id }).some(intent => intent.purpose === 'shape' && intent.threadId === held.threadId))
         return withBoard(200, { thread: held, error: null });
@@ -723,7 +832,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
         const message = workMessage(current, factoryContext);
         return launch(current, 'started', repoProject.projectId, message, () => startIn(repoProject.projectId, message, choice));
       };
-    }),
+    })),
 
     async inspectOwnedCleanup(itemId) {
       const item = board.find(itemId);
@@ -823,9 +932,12 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       });
     },
 
-    startBuild: (itemId, model, drift) => startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
+    startBuild: (itemId, model, drift, quiet = false) => press('startedBuilds', itemId, quiet, () => startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
       if (drift !== undefined && !isDriftChoice(drift)) return reply(422, { error: 'Choose Replace and start or Start anyway.' });
-      if (item.status !== 'Ready') return reply(409, { error: `Only Ready items can start a build; this one is in ${item.status}.` });
+      // A press that crossed the start's move answers with the thread it opened.
+      const held = records && item.status === 'In progress' ? heldThread(item, PURPOSES.startedBuilds) : null;
+      if (held && records?.launchIntents({ workId: item.id }).some(intent => intent.purpose === PURPOSES.startedBuilds && intent.threadId === held.threadId)) return withBoard(200, { thread: held, error: null });
+      if (item.status !== 'Ready' && !canRetryBuild(item)) return reply(409, { error: `Only Ready items can start a build; this one is in ${item.status}.` });
       let accessProblem: string | null;
       try { accessProblem = (['push-branch', 'open-pr'] as const).map(operation => writeAccessProblem(item.repo, operation, buildAccessOf(item.repo))).find(problem => problem !== null) ?? null; }
       catch { accessProblem = 'Could not read repository access. Recheck it in Settings.'; }
@@ -865,7 +977,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           if (records) write(item.id, revision => records.setBuildBranch(item.id, revision, branch));
         });
       };
-    }),
+    })),
 
     async abandon(itemId) {
       const item = board.find(itemId);
@@ -985,6 +1097,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           removeCauses(item, { status: choice === 'back-to-queue' ? 'Queued' : 'List' });
           starts.delete(itemId);
           buildStarts.delete(itemId);
+          clearFailures(itemId);
+          pushStarts();
         } catch (error) { return withBoard(409, { error: (error as Error).message }); }
         return withBoard(200, { error: null });
       }

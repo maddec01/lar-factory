@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight, GitPullRequest } from 'lucide-react';
-import { boardSections, blockedText, currentBuildThread, itemName, openBlockers, prLabel, repoKey, repoName } from '@lar-factory/shared';
+import { boardSections, blockedText, canRetryBuild, currentBuildThread, itemName, openBlockers, prLabel, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -36,7 +36,8 @@ function Side({ item, data }: { item: Item; data: BoardData }) {
   if (YOURS.includes(item.status)) return <OnYourDesk status={item.status} />;
   switch (item.status) {
     case 'Ready': return <Act><StartBuild item={item} data={data} /></Act>;
-    case 'Shaping': case 'In progress': case 'Review': return <Act><OpenThread item={item} data={data} /></Act>;
+    case 'In progress': if (canRetryBuild(item)) return <Act><StartBuild item={item} data={data} /></Act>; return <Act><OpenThread item={item} data={data} /></Act>;
+    case 'Shaping': case 'Review': return <Act><OpenThread item={item} data={data} /></Act>;
     default: return null;
   }
 }
@@ -91,7 +92,7 @@ function FlightRow({ item, data }: { item: Item; data: BoardData }) {
           <span data-col="figures" className="grid min-w-0"><Figures s={figuresOf(item, data)} /></span>
         </span>
       </div>
-      {item.status === 'Ready' && <KeepClicks className="pb-2 pl-10 pr-2 empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
+      {(item.status === 'Ready' || item.status === 'In progress') && <KeepClicks className="pb-2 pl-10 pr-2 empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
       {slices && <div className="pb-2 pl-10 pr-2" data-slices><SliceList item={item} /></div>}
     </div>
   );

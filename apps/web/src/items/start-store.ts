@@ -1,9 +1,9 @@
-// Start on Queued items and Start build on Ready ones: what each start this page ran is doing,
-// and the model choice this browser last started with.
+// Start on Queued items and Start build on Ready ones: what this page alone knows of a start, and the
+// model choice this browser last started with. The board data holds everything the server knows.
 
 import { create } from 'zustand';
 import { readChoice, storedChoice } from '@lar-factory/shared';
-import type { ModelChoice, StartedThread } from '@lar-factory/shared';
+import type { ModelChoice, StartPurpose } from '@lar-factory/shared';
 import { setKey } from './action-store.ts';
 
 /** Where this browser keeps the last model choice Start started with. */
@@ -12,14 +12,16 @@ const CHOICE_KEY = 'lar-board:model-choice';
 /** Which start: today's Start, which refines a Queued item, or Start build on a Ready one. */
 export type StartKind = 'refine' | 'build';
 
+/** What each start kind's thread does, as the board data names it. */
+export const PURPOSE: Record<StartKind, StartPurpose> = { refine: 'shape', build: 'build' };
+
 /**
- * A Start in flight, refused or failed (`error`), possibly run (`uncertain`), or done. A closed
- * message leaves its phase, so a Start that may have run stays hidden.
+ * A Start this page just pressed (`pending`), one the server never answered (`error`), or a May have started message
+ * this page closed (`closed`).
  */
 export type StartState =
-  | { phase: 'pending' }
-  | { phase: 'error' | 'uncertain'; message?: string }
-  | { phase: 'started'; thread: StartedThread };
+  | { phase: 'pending' | 'closed' }
+  | { phase: 'error'; message: string };
 
 interface StartStoreState {
   starts: Record<string, StartState>;

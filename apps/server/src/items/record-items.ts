@@ -65,7 +65,6 @@ export function agreedKind(record: WorkRecord, byTicket: ReadonlyMap<string, Ite
 /** Maps records and their local completion facts to board items, alongside their latest ticket context. */
 function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: readonly RecordSetup[] = []) {
   const byTicket = ticketsByReference(tickets);
-  const requested = new Set(records.launchIntents({ unresolved: true }).filter(intent => intent.purpose === 'build').map(intent => intent.workId));
   const completions = new Map<string, ReturnType<WorkRecords['completion']>>();
   const completionOf = (record: WorkRecord) => {
     let completion = completions.get(record.workId);
@@ -101,7 +100,6 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       id: record.workId,
       recorded: true,
       buildPhase: record.buildPhase,
-      buildRequested: requested.has(record.workId),
       completion: completionOf(record),
       ...(record.kind === 'concept' ? { refinement: records.refinement(record.workId) } : {}),
       ...(ticket?.tracker && {tracker: ticket.tracker}),

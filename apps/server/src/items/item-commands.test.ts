@@ -687,7 +687,7 @@ test("Start build moves the build's concept record to In progress and writes no 
  */
 function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids.map((id) => ({ id, title: 't', state: 'running' as const, updated: '2026-10-31T00:00:00Z' })),
   recover = async (_project: string, _messages: readonly string[]): Promise<{ threadId: string; title: string } | 'absent' | 'unknown'> => 'absent', lookup = async (): Promise<'live' | 'deleted' | 'unknown'> => 'unknown',
-  skills = [] as string[], during = () => {}, beforeLaunch = () => {}, cleanupChoice = (): ShapingThreadCleanup => 'archive', startAnswer = () => null }: { cleanupChoice?: () => ShapingThreadCleanup; startAnswer?: () => StartResult | null; shown?: (ids: string[]) => Item['threads']; recover?: (project: string, messages: readonly string[]) => Promise<{ threadId: string; title: string } | 'absent' | 'unknown'>;
+  skills = [] as string[], during = () => {}, beforeLaunch = () => {}, cleanupChoice = (): ShapingThreadCleanup => 'archive', startAnswer = () => null, clearedFailuresFile = null }: { clearedFailuresFile?: string | null; cleanupChoice?: () => ShapingThreadCleanup; startAnswer?: () => StartResult | null; shown?: (ids: string[]) => Item['threads']; recover?: (project: string, messages: readonly string[]) => Promise<{ threadId: string; title: string } | 'absent' | 'unknown'>;
   lookup?: () => Promise<'live' | 'deleted' | 'unknown'>; skills?: string[]; during?: () => void; beforeLaunch?: (board: ReturnType<typeof createBoardState>) => void } = {}) {
   const board = createBoardState({ items: [], repos: [], modelChoices: [] } as unknown as BoardData);
   const reread = () => board.update({ items: recordItems(records, [], [WEB]).map((item) => {
@@ -696,7 +696,7 @@ function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids
   }) });
   reread();
   const started: string[] = [];
-  const commands = createItemCommands({ factoryContext:null, checkoutOf: async () => '/repo',
+  const commands = createItemCommands({ clearedFailuresFile, factoryContext:null, checkoutOf: async () => '/repo',
     inspectWorkRecovery: async () => ({ branch: 'old', branchExists: true, worktreePath: null, pr: 'none' }), board, items: {} as ItemSource, records, reread, archive: () => [], offerModelChoices: () => [],
     showThread: lookup, projectOf: async (repo) => { beforeLaunch(board); return { projectId: repo }; }, baseOf: async () => 'release', buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }), recoverThread: recover, skillsOf: () => skills, shapingThreadCleanupChoice: cleanupChoice,
     startThread: async (_project, message) => {
@@ -1186,4 +1186,176 @@ test('an update has no kind to take from a ticket with none, and other answers r
   assert.deepEqual(records.read(workId), before);
   assert.equal(commands.answerKind(workId, 'keep', null).status, 200);
   assert.deepEqual(records.read(workId).kindAnswer, { answer: 'keep', itemKind: 'feature', ticketKind: null });
+});
+
+/** The server's view of the item's start for `purpose`. */
+const progressOf = (board: ReturnType<typeof createBoardState>, id: string, purpose: 'shape' | 'build') => board.snapshot().startProgress?.[id]?.[purpose];
+
+test('Starting shows from the press, through the checks before the launch intent, until T3 answers', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  let duringChecks: unknown; let duringAsk: unknown; let unresolvedDuringChecks = -1;
+  const held = { board: null as ReturnType<typeof createBoardState> | null };
+  const { commands, board } = recordedCommands(records, {
+    beforeLaunch: (b) => { held.board = b; duringChecks = progressOf(b, work.workId, 'shape'); unresolvedDuringChecks = records.launchIntents({ workId: work.workId, unresolved: true }).length; },
+    during: () => { duringAsk = progressOf(held.board!, work.workId, 'shape'); },
+  });
+  const pushed: unknown[] = [];
+  board.subscribe((data) => pushed.push(data.startProgress?.[work.workId]?.shape));
+  const pressed = commands.start(work.workId, undefined);
+  assert.deepEqual(progressOf(board, work.workId, 'shape'), { phase: 'starting' }, 'before any check finishes');
+  assert.deepEqual(pushed[0], { phase: 'starting' }, 'every open page hears it at once');
+  await pressed;
+  assert.deepEqual([duringChecks, unresolvedDuringChecks, duringAsk], [{ phase: 'starting' }, 0, { phase: 'starting' }]);
+  assert.equal(progressOf(board, work.workId, 'shape'), undefined);
+});
+
+test('T3 answering moves Queued work to Shaping and Ready work to In progress, and pushes in that step', async () => {
+  const records = await openRecords();
+  const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Queued' });
+  const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  const { commands, board } = recordedCommands(records);
+  const pushed: Status[] = [];
+  board.subscribe((data) => { const status = data.items.find((i) => i.id === build.workId)?.status; if (status) pushed.push(status); });
+  assert.equal((await commands.start(concept.workId, undefined)).status, 200);
+  assert.equal(records.read(concept.workId).status, 'Shaping');
+  assert.equal(board.find(concept.workId)?.status, 'Shaping');
+  assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
+  assert.equal(records.read(build.workId).status, 'In progress');
+  assert.equal(pushed.at(-1), 'In progress');
+});
+
+test('a start restart recovery settles to a thread makes the same move, from the refresh too', async () => {
+  const records = await openRecords();
+  const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Queued' });
+  records.recordLaunchIntent(concept.workId, concept.revision, 'shape');
+  const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  records.recordLaunchIntent(build.workId, build.revision, 'build');
+  const { commands, board } = recordedCommands(records, { recover: async (_project, messages) => ({ threadId: messages[0]!.includes(concept.workId) ? 'shaping' : 'building', title: 't' }) });
+  assert.equal(progressOf(board, concept.workId, 'shape')?.phase, 'may-have-started', 'the server shows it from its first snapshot');
+  await commands.reconcileStarts(board.snapshot().items);
+  assert.deepEqual([records.read(concept.workId).status, records.read(build.workId).status], ['Shaping', 'In progress']);
+  assert.equal(progressOf(board, concept.workId, 'shape'), undefined);
+});
+
+test('a refused start and a failed one move nothing and leave the error for every page until it is dismissed', async () => {
+  const records = await openRecords();
+  const failing = records.create({ title: 'Failing', repository: WEB, kind: 'feature', status: 'Queued' });
+  const { commands, board } = recordedCommands(records, { startAnswer: () => ({ thread: null, error: 'T3 said no' }) });
+  assert.equal((await commands.start(failing.workId, undefined)).status, 502);
+  assert.equal(records.read(failing.workId).status, 'Queued');
+  assert.deepEqual(progressOf(board, failing.workId, 'shape'), { phase: 'failed', message: 'T3 said no' });
+  assert.equal(commands.dismissStartError(failing.workId, 'shape').status, 200);
+  assert.equal(progressOf(board, failing.workId, 'shape'), undefined);
+
+  const refused = await commands.startBuild(failing.workId, undefined);
+  assert.equal(refused.status, 409);
+  assert.ok((refused.body as { board?: unknown }).board, 'a refusal shows the board it left');
+  assert.match(progressOf(board, failing.workId, 'build')?.phase ?? '', /failed/);
+});
+
+test('a failure after the launch intent survives a restart, and a retry clears it', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  const first = recordedCommands(records, { startAnswer: () => ({ thread: null, error: 'T3 said no' }) });
+  await first.commands.start(work.workId, undefined);
+  const after = recordedCommands(records);
+  assert.deepEqual(progressOf(after.board, work.workId, 'shape'), { phase: 'failed', message: 'T3 said no' });
+  assert.equal((await after.commands.start(work.workId, undefined)).status, 200);
+  assert.equal(progressOf(after.board, work.workId, 'shape'), undefined);
+});
+
+test('a Start after keeps its failure where it shows today', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  const { commands, board } = recordedCommands(records, { startAnswer: () => ({ thread: null, error: 'T3 said no' }) });
+  await commands.start(work.workId, undefined, true);
+  assert.equal(progressOf(board, work.workId, 'shape'), undefined);
+});
+
+test('an unresolved start no longer running shows May have started, keeps today\'s recovery and starts nothing more', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  const { commands, board, started } = recordedCommands(records, { startAnswer: () => ({ thread: null, error: 'T3 may have started it.', uncertain: true }) });
+  await commands.start(work.workId, undefined);
+  assert.equal(progressOf(board, work.workId, 'shape')?.phase, 'may-have-started');
+  assert.equal(records.read(work.workId).status, 'Queued');
+  assert.deepEqual(started, []);
+});
+
+test('a duplicate Start build after the move answers with the running thread', async () => {
+  const records = await openRecords();
+  const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  const { commands, started } = recordedCommands(records);
+  await commands.startBuild(build.workId, undefined);
+  const again = await commands.startBuild(build.workId, undefined);
+  assert.equal(again.status, 200);
+  assert.equal((again.body as StartResult).thread?.threadId, 'thread-1');
+  assert.equal(started.length, 1);
+});
+
+test('a moved build whose thread stops before a phase offers a retry on a retry branch', async () => {
+  const records = await openRecords();
+  const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  const { commands, started, board, reread } = recordedCommands(records, { shown: (ids) => ids.map((id) => ({ id, title: 't', state: 'stopped' as const, purpose: 'build', updated: '2026-10-31T00:00:00Z' })) });
+  await commands.startBuild(build.workId, undefined);
+  const firstBranch = records.read(build.workId).buildBranch;
+  reread();
+  assert.equal(board.find(build.workId)?.status, 'In progress');
+  assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
+  assert.equal(started.length, 2);
+  assert.equal(records.read(build.workId).status, 'In progress');
+  assert.match(records.read(build.workId).buildBranch ?? '', new RegExp(`^${firstBranch}-retry-`));
+});
+
+test('a build that recorded a phase is not retried from In progress', async () => {
+  const records = await openRecords();
+  const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  const { commands, started, reread } = recordedCommands(records, { shown: (ids) => ids.map((id) => ({ id, title: 't', state: 'stopped' as const, purpose: 'build', updated: '2026-10-31T00:00:00Z' })) });
+  await commands.startBuild(build.workId, undefined);
+  records.setBuildPhase(build.workId, records.read(build.workId).revision, 'plan');
+  reread();
+  assert.equal((await commands.startBuild(build.workId, undefined)).status, 409);
+  assert.equal(started.length, 1);
+});
+
+test('a thrown start shows a fixed message on every page, not the raw error', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
+  const { commands, board } = recordedCommands(records, { beforeLaunch: () => { throw new Error('/Users/someone/private/path'); } });
+  await assert.rejects(commands.start(work.workId, undefined), /private\/path/);
+  assert.deepEqual(progressOf(board, work.workId, 'shape'), { phase: 'failed', message: 'The start failed. Check the board log.' });
+});
+
+test('a failure cleared by a dismissal, a move or Start after stays cleared across a restart', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cleared-failures-'));
+  const clearedFailuresFile = join(dir, 'nested', 'cleared.json');
+  try {
+    const records = await openRecords();
+    const dismissed = records.create({ title: 'Dismissed', repository: WEB, kind: 'feature', status: 'Queued' });
+    const moved = records.create({ title: 'Moved', repository: WEB, kind: 'feature', status: 'Queued' });
+    const armed = records.create({ title: 'Armed', repository: WEB, kind: 'feature', status: 'Queued' });
+    const kept = records.create({ title: 'Kept', repository: WEB, kind: 'feature', status: 'Queued' });
+    const { commands } = recordedCommands(records, { startAnswer: () => ({ thread: null, error: 'T3 said no' }), clearedFailuresFile });
+    for (const { workId } of [dismissed, moved, kept]) await commands.start(workId, undefined);
+    await commands.start(armed.workId, undefined, true);
+    commands.dismissStartError(dismissed.workId, 'shape');
+    assert.equal(commands.backToList(moved.workId).status, 200);
+    assert.equal((await commands.queue(moved.workId)).status, 200);
+    const after = recordedCommands(records, { clearedFailuresFile });
+    assert.equal(progressOf(after.board, dismissed.workId, 'shape'), undefined);
+    assert.equal(progressOf(after.board, moved.workId, 'shape'), undefined);
+    assert.equal(progressOf(after.board, armed.workId, 'shape'), undefined);
+    assert.equal(progressOf(after.board, kept.workId, 'shape')?.phase, 'failed');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a restart restores no failed retry of a build that recorded a phase', async () => {
+  const records = await openRecords();
+  const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'In progress' });
+  const { intent } = records.recordLaunchIntent(build.workId, build.revision, 'build');
+  records.resolveLaunchIntent(build.workId, build.revision + 1, intent.intentId, { failure: 'T3 said no' });
+  assert.equal(progressOf(recordedCommands(records).board, build.workId, 'build')?.phase, 'failed');
+  records.setBuildPhase(build.workId, records.read(build.workId).revision, 'plan');
+  assert.equal(progressOf(recordedCommands(records).board, build.workId, 'build'), undefined);
 });

@@ -225,7 +225,8 @@ test("Shape issue opens its menu without opening the dialog, and starts its row'
   expect([text(start('I_sample06')), start('I_sample06').getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
 
   const title = `#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`;
-  await answer({ thread: { threadId: 'thread-1', title }, error: null });
+  const thread = { threadId: 'thread-1', title };
+  await answer({ thread, error: null, board: { ...withChoices, started: { I_sample06: thread } } });
   const tag = row('I_sample06').querySelector('[data-start-result]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread thread-1']);
   expect(row('I_sample06').querySelector('[data-start]')).toBeNull();
@@ -271,7 +272,7 @@ test('a Start that may have run hides Shape issue; closing its message leaves a 
   await mountPage(withChoices);
   await pressMenu(start());
   await press(entries()[0]!);
-  await answer({ thread: null, uncertain: true, error: 'Check T3.' });
+await answer({ thread: null, uncertain: true, error: 'Check T3.', board: { ...withChoices, startProgress: { I_sample05: { shape: { phase: 'may-have-started', message: 'Check T3.' } } } } });
   expect(row('I_sample05').querySelector('[data-start]')).toBeNull();
   const message = row('I_sample05').querySelector<HTMLElement>('p.start[data-start-result]')!;
   expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');

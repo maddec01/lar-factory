@@ -1206,3 +1206,36 @@ describe('shaping thread cleanup rows', () => {
     expect(pendingIds(records)).toEqual([]);
   });
 });
+
+describe('launch moves and repeated Statuses', () => {
+  it('moves Queued work to Shaping and Ready work to In progress when a matching intent gets its thread', async () => {
+    const records = await open();
+    const shaped = records.create({ title: 'Shape', repository: 'maddec01/lar', kind: 'concept', status: 'Queued' });
+    const { intent: shape } = records.recordLaunchIntent(shaped.workId, shaped.revision, 'shape');
+    expect(records.resolveLaunchIntent(shaped.workId, shaped.revision + 1, shape.intentId, { threadId: 'a' }).record.status).toBe('Shaping');
+    const built = records.create({ title: 'Build', repository: 'maddec01/lar', kind: 'build', status: 'Ready' });
+    const { intent: build } = records.recordLaunchIntent(built.workId, built.revision, 'build');
+    expect(records.resolveLaunchIntent(built.workId, built.revision + 1, build.intentId, { threadId: 'b' }).record.status).toBe('In progress');
+  });
+
+  it('moves nothing on a failure, and only the Status each purpose starts from', async () => {
+    const records = await open();
+    const failed = records.create({ title: 'Failed', repository: 'maddec01/lar', kind: 'build', status: 'Ready' });
+    const { intent } = records.recordLaunchIntent(failed.workId, failed.revision, 'build');
+    expect(records.resolveLaunchIntent(failed.workId, failed.revision + 1, intent.intentId, { failure: 'no' }).record.status).toBe('Ready');
+    const ready = records.create({ title: 'Ready shaping', repository: 'maddec01/lar', kind: 'build', status: 'Ready' });
+    const { intent: shape } = records.recordLaunchIntent(ready.workId, ready.revision, 'shape');
+    expect(records.resolveLaunchIntent(ready.workId, ready.revision + 1, shape.intentId, { threadId: 'c' }).record.status).toBe('Ready');
+    const queued = records.create({ title: 'Queued build', repository: 'maddec01/lar', kind: 'build', status: 'Queued' });
+    const { intent: early } = records.recordLaunchIntent(queued.workId, queued.revision, 'build');
+    expect(records.resolveLaunchIntent(queued.workId, queued.revision + 1, early.intentId, { threadId: 'd' }).record.status).toBe('Queued');
+  });
+
+  it('writes nothing when a record already has the Status', async () => {
+    const records = await open();
+    const made = records.create({ title: 'Work', repository: 'maddec01/lar', kind: 'feature', status: 'Shaping' });
+    const again = records.update(made.workId, made.revision, { status: 'Shaping' });
+    expect([again.revision, again.updatedAt]).toEqual([made.revision, made.updatedAt]);
+    expect(records.update(made.workId, made.revision, { status: 'Ready' }).revision).toBe(made.revision + 1);
+  });
+});

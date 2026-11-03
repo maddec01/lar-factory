@@ -14,6 +14,8 @@ import { statsDbPath, t3SettingsPath } from './t3-settings.ts';
 import type { ModelSelection, RepoConfig } from '@lar-factory/shared';
 
 const MAX_DOT_GIT_BYTES = 8 * 1024;
+/** How many checkouts' origins are read at once. */
+const ORIGINS_AT_ONCE = 4;
 
 export type RepositoryProject = { projectId: string; error?: undefined } | { error: string };
 
@@ -74,7 +76,12 @@ export async function checkouts(env: NodeJS.ProcessEnv): Promise<Checkout[]> {
 /** The observation's projects with each one's `origin` URL, which a retained observation has too. */
 export async function observedCheckouts(observation: ProjectObservation): Promise<Checkout[]> {
   const projects = observation.projects.map(p => ({ id: p.id, title: p.title, folder: p.workspaceRoot }));
-  const origins = await Promise.all(projects.map((p) => mainCheckout(p.folder) ? originUrl(p.folder) : null));
+  const origins: (string | null)[] = [];
+  let next = 0;
+  // Starting a git per project at once blocked the board's thread for every start together, and each start took longer beside the others.
+  await Promise.all(Array.from({ length: Math.min(ORIGINS_AT_ONCE, projects.length) }, async () => {
+    for (let at = next++; at < projects.length; at = next++) origins[at] = mainCheckout(projects[at]!.folder) ? await originUrl(projects[at]!.folder) : null;
+  }));
   return projects.map((p, i) => ({ ...p, origin: origins[i] ?? null }));
 }
 

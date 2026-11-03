@@ -9,6 +9,7 @@ import { Button } from '@lar-factory/ui/design-system/Button';
 import { ArchiveActions, archivedAs, RetentionSetting } from '../archive/archive.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { useEditStore } from '../repositories/edit-store.ts';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { HeavyCommandLimitSetting } from './heavy-command-limit.tsx';
 import { ShapingThreadCleanupSetting } from './shaping-thread-cleanup.tsx';
@@ -29,6 +30,8 @@ function DialogPreference({ preference, label }: { preference: keyof typeof DIAL
 interface Row {
   id: string;
   title: string;
+  /** Beside the title, in its line. */
+  icon?: ReactNode;
   description?: ReactNode;
   control: Control;
   /** Shown under the title and the control, across the row's whole width. */
@@ -120,11 +123,11 @@ function onboardingDescription(progress: OnboardingProgress): string {
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}</>,
+    id: `repo-${r.repo}`, title: shownRepo(r.repo), icon: <ProjectIcon repo={r.repo} size="small" />, description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}</>,
     control: custom(() => r.setup ? <Button {...kind('other')} onClick={() => useEditStore.getState().open(r.repo)}>Edit</Button> : null),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
-    id: `repo-${repo}`, title: shownRepo(repo), description: onboardingDescription(progress),
+    id: `repo-${repo}`, title: shownRepo(repo), icon: <ProjectIcon repo={repo} size="small" />, description: onboardingDescription(progress),
     control: custom(() => <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>),
   }));
   return { title: 'Repositories', description: 'Settings stay on this machine. Repositories need no factory files.',

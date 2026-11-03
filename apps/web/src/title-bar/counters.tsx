@@ -8,7 +8,7 @@
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
 import { boardSections, formatUsd, plural, itemName, repoKey, shortAgo } from '@lar-factory/shared';
-import type { BoardData, Item, Status } from '@lar-factory/shared';
+import type { Item, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
@@ -16,9 +16,10 @@ import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
-import { ItemTitle, repoTone, useShownStatus } from '../items/item-parts.tsx';
+import { ItemTitle, useShownStatus } from '../items/item-parts.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? item.stats.costUsd ?? 0 : 0);
 
@@ -63,8 +64,8 @@ function Empty({ children }: { children: ReactNode }) {
   return <p className="m-0 px-3 py-6 text-center text-xs text-(--muted-foreground)">{children}</p>;
 }
 
-/** One item: its status glyph, its number and title, then its repository's dot and age (or a trailing figure). Picking it opens the item dialog. */
-function Row({ item, data, now, trailing }: { item: Item; data: BoardData; now: number; trailing?: ReactNode }) {
+/** One item: its status glyph, its number and title, then its repository's icon and age (or a trailing figure). Picking it opens the item dialog. */
+function Row({ item, now, trailing }: { item: Item; now: number; trailing?: ReactNode }) {
   const shown = useShownStatus(item);
   return (
     <li>
@@ -76,7 +77,7 @@ function Row({ item, data, now, trailing }: { item: Item; data: BoardData; now: 
           <span className="min-w-0 flex-1 truncate"><ItemTitle item={item} /></span>
           <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums">
             {trailing ?? <>
-              <span className={`${repoTone(repoKey(item), data.repos)} size-1.5 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
+              <ProjectIcon repo={repoKey(item)} size="small" />
               <span className="min-w-7 whitespace-nowrap text-right">{shortAgo(item.closedAt ?? item.updatedAt, now)}</span>
             </>}
           </span>
@@ -120,7 +121,7 @@ export function Counters() {
     data.items.some(item => item.stats === 'unavailable' || (!item.stats && (item.threads === 'unavailable' || !!item.threads?.length)));
   const spend = costs.reduce((t, c) => t + c.cost, 0);
   const free = BUILD_LIMIT - building.length;
-  const row = (i: Item, trailing?: ReactNode) => <Row key={i.id} item={i} data={data} now={now} trailing={trailing} />;
+  const row = (i: Item, trailing?: ReactNode) => <Row key={i.id} item={i} now={now} trailing={trailing} />;
   const glyph = (status: Status) => <StatusGlyph status={status} />;
 
   return (

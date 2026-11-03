@@ -23,8 +23,8 @@ import { AddItem } from '../add-item/add-item.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { useScopeStore } from '../board/scope-store.ts';
-import { repoTone } from '../items/item-parts.tsx';
 import { ListButton } from '../list/list-modal.tsx';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { SettingsButton } from '../settings/settings.tsx';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { Counters } from './counters.tsx';
@@ -69,11 +69,11 @@ function Scope() {
       <DropdownMenu.Content align="start">
         <DropdownMenu.Label>Show</DropdownMenu.Label>
         <DropdownMenu.RadioGroup value={scope ?? ''} onValueChange={(value) => setScope(value || null)}>
-          <DropdownMenu.RadioItem value="">All repositories</DropdownMenu.RadioItem>
+          <DropdownMenu.RadioItem value=""><span>All repositories</span></DropdownMenu.RadioItem>
           <DropdownMenu.Separator />
           {groups.map(({ repo, name }) => (
-            <DropdownMenu.RadioItem key={repo} value={repo}>
-              <span className={`${repoTone(repo, data.repos)} size-2 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} aria-hidden="true" />
+            <DropdownMenu.RadioItem key={repo} value={repo} textValue={name}>
+              <ProjectIcon repo={repo} size="small" />
               {name}
             </DropdownMenu.RadioItem>
           ))}

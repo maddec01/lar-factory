@@ -4,7 +4,7 @@
 // the targets and updates explain that they need the board app.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
+import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, textBesideIcon, toolChecks, updatesOff } from '../../test/support.ts';
 import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type InstallOperationResult, type InstallSnapshot, type RepositorySetup, type TargetSnapshot, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { dialog, project, serve } from '../onboarding/onboarding-support.ts';
@@ -167,12 +167,25 @@ test('Repositories only shows each repository with its provider and item source'
   expect(groups()).toEqual([['Repositories', repos.map((r) => `repo-${r.repo}`)]]);
   expect(row('gh')).toBeNull();
   expect(row('az')).toBeNull();
-  expect(repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual([
+  expect(repos.map((r) => textBesideIcon(row(`repo-${r.repo}`)))).toEqual([
     `${repos[0]!.repo}GitHub · Issues`,
     `${repos[1]!.repo}GitHub · Issues`,
     'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint',
     'contoso/Fabrikam/lar-webAzure DevOps · Web Team\'s backlog and current sprint',
   ]);
+});
+
+test('onboarded and onboarding repository rows show the project icon or toned initial beside the name, and other rows show none', async () => {
+  const data: BoardData = { ...sample, projectIcons: { [sample.repos[0]!.repo]: { kind: 'emoji', emoji: '🚀' } },
+    onboarding: [{ repo: 'maddec01/lar-web', progress: { step: 'work', done: ['project'], answers: { projectId: 'lar-web', provider: 'GitHub' } } }] };
+  serve(data, [project('lar-web', { onBoard: true })]);
+  await open('Repositories', data);
+  const icon = (id: string) => row(id).querySelector('.settings-row-title [data-project-icon]');
+  expect(text(icon(`repo-${sample.repos[0]!.repo}`))).toBe('🚀');
+  expect(text(icon(`repo-${sample.repos[1]!.repo}`))).toBe('L');
+  expect(text(icon('repo-maddec01/lar-web'))).toBe('L');
+  await settle(() => section('Integrations').click());
+  expect($('.settings-body [data-project-icon]')).toBeNull();
 });
 
 test('an onboarded repository whose setup the board read has Edit, one without none, and Add repository opens the onboarding dialog over Settings', async () => {
@@ -202,8 +215,8 @@ test('a repository still onboarding is listed with its provider and its step, an
   serve(data, [project('lar-web', { onBoard: true })]);
   await open('Repositories', data);
   expect(groups()[0]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
-  expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Work and docsResume');
-  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResume');
+  expect(textBesideIcon(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Work and docsResume');
+  expect(textBesideIcon(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResume');
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Work and docs');

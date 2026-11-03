@@ -46,6 +46,8 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(text(row('I_sample05').querySelector('.queue-title'))).toBe(`#129 ${sample05.title}`);
   expect(text(row('I_sample05').querySelector('.queue-age'))).toBe('lar-server · queued 2h ago');
   expect(text(row('I_sample21').querySelector('.queue-age'))).toBe('lar-server · queued 24h ago');
+  expect(text(row('I_sample05').querySelector('[data-project-icon]'))).toBe('L');
+  expect(row('I_sample05').querySelector('.rounded-full[class*="repo-tone"]'), 'no tone dot').toBeNull();
 
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));

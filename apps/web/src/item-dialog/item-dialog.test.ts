@@ -3,7 +3,7 @@
 // requests in a sidebar, and its footer carries GitHub and the action the item's status asks for.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, answer, detailsRead, fetchMock, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, NOW, answer, detailsRead, fetchMock, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, textBesideIcon, toast } from '../../test/support.ts';
 import type { Blocker, BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
@@ -34,7 +34,8 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   await openItem('I_sample13');
   expect(dialog()!.getAttribute('role')).toBe('dialog');
   const summary = inDialog('[data-item-summary] > div')!;
-  expect(text(summary)).toBe('lar-server Ready· updated 1h agoblocked by 1. Blocked by #202 until it completes');
+  expect(text(summary.querySelector('[data-project-icon]'))).toBe('L');
+  expect(textBesideIcon(summary)).toBe('lar-server Ready· updated 1h agoblocked by 1. Blocked by #202 until it completes');
   expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
   const parent = inDialog<HTMLAnchorElement>('[data-item-parent] a')!;
   expect([text(parent), parent.href]).toEqual(['#200 lar cloud: website sign-in and relay', 'https://github.com/maddec01/lar-server/issues/200']);
@@ -131,7 +132,7 @@ test('the dialog shows the hint, each pull request with its checks, and the agen
   await mountPage();
   await openItem('I_sample14');
   const work = inDialog('header [data-agent-work]')!;
-  expect(text(inDialog('[data-item-summary]'))).toBe('lar-apple In progress· updated 25m agoFeature');
+  expect(textBesideIcon(inDialog('[data-item-summary]'))).toBe('lar-apple In progress· updated 25m agoFeature');
   expect(text(inDialog('header'))).toBe('#30 Chapter markers in the scrubber$24.18 · 2h 14m · 16.6M tokens · 1h 20m wall');
   expect(work.title).toBe('Cost $24.18 · Agent time 2h 14m · Tokens 16.6M · Wall time 1h 20m');
   expect(inDialog('[data-meta] [data-agent-work]')!.className, 'a narrow dialog shows them in the meta area instead').toContain('@min-[40rem]:hidden');

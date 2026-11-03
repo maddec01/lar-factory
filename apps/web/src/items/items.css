@@ -20,10 +20,8 @@
 .title:hover { text-decoration: underline; }
 .ref { color: var(--muted-foreground); font-weight: 500; font-variant-numeric: tabular-nums; }
 
-/* The dot the design system's Badge doesn't draw, coloured by repository; the List modal's group avatars take the same
-   colour. Each repository takes the next colour in the board's list order (repoTone); unlisted repositories keep the muted
-   colour. */
-.repo-tag::before { content: ""; width: --spacing(1.75); height: --spacing(1.75); border-radius: 50%; background: var(--k, var(--muted-foreground)); }
+/* The colour behind a project icon's initial. Each repository takes the next colour in the board's list order (repoTone);
+   unlisted repositories keep the muted colour. */
 .repo-tone-0 { --k: var(--color-sky-500); }
 .repo-tone-1 { --k: var(--color-pink-500); }
 .repo-tone-2 { --k: var(--color-teal-500); }

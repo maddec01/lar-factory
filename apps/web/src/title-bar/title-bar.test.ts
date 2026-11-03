@@ -4,7 +4,7 @@
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { clock, type InstallSnapshot } from '@lar-factory/shared';
-import { $, $$, NOW, fullScreen, mountPage, pressMenu, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
+import { $, $$, NOW, fullScreen, mountPage, pressMenu, push, sample, settle, stubApp, text, textBesideIcon, toolChecks, updatesOff } from '../../test/support.ts';
 
 // jsdom has no ResizeObserver, which the copied Modal's scroll fade observes with.
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
@@ -194,12 +194,24 @@ test('the scope menu is headed Show, then All repositories, a separator and a re
   expect(menu()).toBeNull();
   await pressMenu(trigger());
   expect(text($('[role="menu"] [role="menuitemradio"]')!.parentElement!.previousElementSibling)).toBe('Show');
-  expect(entries().map(text)).toEqual(['All repositories', 'lar-server', 'lar-apple']);
+  expect(entries().map(textBesideIcon)).toEqual(['All repositories', 'lar-server', 'lar-apple']);
   expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
   expect($('[role="menu"] [role="separator"]')).not.toBeNull();
-  expect(entries()[1]!.querySelector('.repo-tone-0')).not.toBeNull();
-  expect(entries()[2]!.querySelector('.repo-tone-1')).not.toBeNull();
-  expect(entries()[0]!.querySelector('[class*="repo-tone-"]'), 'All repositories has no dot').toBeNull();
+  expect(text(entries()[1]!.querySelector('[data-project-icon].repo-tone-0'))).toBe('L');
+  expect(text(entries()[2]!.querySelector('[data-project-icon]'))).toBe('🍎');
+  expect(entries()[1]!.querySelector('.rounded-full'), 'no tone dot').toBeNull();
+  expect(entries()[0]!.querySelector('[data-project-icon]'), 'All repositories has no icon').toBeNull();
+  // theme.css hides the radio indicator only beside a sibling element, so bare text would sit under it.
+  expect(entries().every((e) => e.querySelector(':scope > span:first-child:not(:only-child)')), 'no row shows the indicator').toBe(true);
+});
+
+test('the scope menu shows a repository\'s chosen icon, and typing its name still finds it', async () => {
+  await mountPage({ ...sample, projectIcons: { 'maddec01/lar-server': { kind: 'emoji', emoji: '🚀' } } });
+  await pressMenu(trigger());
+  expect(text(entries()[1]!.querySelector('[data-project-icon]'))).toBe('🚀');
+  await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'l', bubbles: true })));
+  await settle(() => vi.advanceTimersByTime(0));
+  expect(document.activeElement).toBe(entries()[1]);
 });
 
 test('picking a repository sets the scope and closes the menu; All repositories clears it', async () => {

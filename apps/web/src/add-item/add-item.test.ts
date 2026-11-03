@@ -1,7 +1,7 @@
 // The Add item dialog: the New work form and each phase of a submission, and the Pick a ticket pane.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, chooseOption, fetchMock, formValue, mountPage, openOptions, push, sample, settle, text } from '../../test/support.ts';
+import { $, $$, addStylesheet, chooseOption, fetchMock, formValue, mountPage, openOptions, push, sample, settle, text, textBesideIcon } from '../../test/support.ts';
 import { pastePlain, selectEnd, typeInto } from '../../test/editor.ts';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -41,6 +41,12 @@ async function fillDraft(): Promise<void> {
 
 const respond = (body: object, status = 200) => fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify(body), { status }));
 const posted = () => JSON.parse(String((fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>;
+
+test('the repository selector shows each repository\'s project icon, or its toned initial', async () => {
+  await open({ ...withFactory, projectIcons: { 'maddec01/lar-server': { kind: 'emoji', emoji: '🚀' } } });
+  await openOptions(field('item-repo'));
+  expect($$('[role="option"]').map((option) => text(option.querySelector('[data-project-icon]')))).toEqual(['🚀', 'L', 'L', 'L']);
+});
 
 test('Add item opens a dialog with the configured repositories and kinds, and no labels to pick', async () => {
   await open();
@@ -182,7 +188,7 @@ test('picking in a Select clears the message and keeps the draft, and reopening 
   await settle(() => vi.advanceTimersByTime(50));
   await settle(() => addButton().click());
   expect([formValue('repo'), formValue('kind')]).toEqual(['maddec01/lar-apple', 'feature']);
-  expect([text(field('item-repo')), text(field('item-kind'))]).toEqual(['lar-apple', 'Feature']);
+  expect([textBesideIcon(field('item-repo')), text(field('item-kind'))]).toEqual(['lar-apple', 'Feature']);
 });
 
 test('the list opens above the dialog, after it in the page, and Escape closes only the list', async () => {
@@ -361,7 +367,7 @@ test('Pick a ticket searches the repository picked and lists its open tickets, s
   expect(text($('#pick-ticket'))).toContain('Find tickets outside your list, or open one you’ve already added.');
   await openOptions(field('pick-repo'));
   expect(dialog()!.compareDocumentPosition($('[role="listbox"]')!) & Node.DOCUMENT_POSITION_FOLLOWING, 'the list opens above the dialog').toBeTruthy();
-  await settle(() => $$('[role="option"]').find((option) => text(option) === 'lar-apple')!.click());
+  await settle(() => $$('[role="option"]').find((option) => textBesideIcon(option) === 'lar-apple')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }, { number: 9, title: 'Seek is slow', url: 'u9', workId: 'work-9' }], error: null });
   await searchFor('seek');

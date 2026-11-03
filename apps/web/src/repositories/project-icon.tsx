@@ -5,9 +5,17 @@
 
 import { lazy, Suspense, useState, type ComponentProps, type ComponentType } from 'react';
 import type { DynamicIcon, IconName } from 'lucide-react/dynamic';
-import { repoName, repositoryProjectIcon, type ProjectIconColor } from '@lar-factory/shared';
+import { repoName, repositoryProjectIcon, sameRepo, type ProjectIconColor, type RepoConfig } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
-import { repoTone } from '../items/item-parts.tsx';
+
+const REPO_TONES = 8;
+
+/** A repository's colour class: the palette entry for its place among the board's repositories, or the muted
+ *  colour for a repository the board doesn't list. `repo` is a repository key. */
+export function repoTone(repo: string, repos: readonly RepoConfig[]): string {
+  const at = repos.findIndex((r) => sameRepo(r.repo, repo));
+  return at < 0 ? 'repo-tone-none' : `repo-tone-${at % REPO_TONES}`;
+}
 
 const SIZES = {
   small: { square: 'size-3.5 text-[8px]', emoji: 'text-[10px]', monogram: 'text-[7px]' },

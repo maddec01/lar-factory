@@ -201,7 +201,7 @@ function PartNode({ part, data, width, home }: { part: Part; data: BoardData; wi
 function HistoryRow({ part, after, data, home }: { part: Part; after: Part[]; data: BoardData; home: string }) {
   const { item } = part;
   return (
-    <li className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-[13px] hover:bg-(--soft)" data-history-part={item.id}>
+    <li className="flex min-h-10 min-w-0 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-(--soft)" data-history-part={item.id}>
       <StatusGlyph status="Done" className="size-3 shrink-0" />
       <span className="w-22 shrink-0"><PartKindLabel kind={part.kind} /></span>
       <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} title={itemName(item)} className="min-w-0 truncate rounded text-left hover:underline focus-visible:outline-2 focus-visible:outline-(--primary)"><ItemTitle item={item} /></button>

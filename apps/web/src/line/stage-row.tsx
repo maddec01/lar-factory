@@ -77,7 +77,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
     <li data-item={item.id} className={`@container border-b border-(--border) last:border-b-0 hover:bg-(--accent) ${picked(isPicked)}`}>
       <div className="flex items-center gap-2 pr-2">
         <button type="button" data-row-open data-meta onClick={() => useItemDialogStore.getState().open(item.id)}
-          className={`grid h-8 min-w-0 flex-1 ${ROW_COLUMNS} items-center gap-x-2 pl-1.5 text-left text-[11px] text-(--muted-foreground) ${ROW_OPENS}`}>
+          className={`grid h-10 min-w-0 flex-1 ${ROW_COLUMNS} items-center gap-x-2 pl-1.5 text-left text-[11px] text-(--muted-foreground) ${ROW_OPENS}`}>
           {n === undefined
             ? <span className="grid size-6 place-items-center" data-glyph><StatusGlyph status={shown.glyph} /></span>
             : <span className="queue-n text-center font-medium tabular-nums">{n + 1}</span>}

@@ -1,4 +1,4 @@
-import type { ProjectChoice, Provider } from '@lar-factory/shared';
+import type { ProjectChoice, ProjectIcon, Provider } from '@lar-factory/shared';
 import type { OnboardedRepository } from '../config/repository-config.ts';
 import { azureRepo, checkouts, githubRepo, linkedWorktree, onAzureDevOps, originHost, tilde } from '../t3/repository-project.ts';
 
@@ -9,9 +9,9 @@ function providerOf(origin: string): Provider | null {
 }
 
 /**
- * T3's projects and their repository origins, read without contacting the tracker.
+ * T3's projects, their repository origins and their `icons` by project ID, read without contacting the tracker.
  */
-export async function projectChoices(list: readonly OnboardedRepository[], env: NodeJS.ProcessEnv = process.env): Promise<ProjectChoice[]> {
+export async function projectChoices(list: readonly OnboardedRepository[], icons: ReadonlyMap<string, ProjectIcon>, env: NodeJS.ProcessEnv = process.env): Promise<ProjectChoice[]> {
   let found;
   try { found = await checkouts(env); }
   catch { throw new Error("Can't read T3 Code's projects; reconnect T3 Code before onboarding"); }
@@ -21,6 +21,6 @@ export async function projectChoices(list: readonly OnboardedRepository[], env: 
     const repo = provider === 'GitHub' ? githubRepo(origin) : provider === 'Azure DevOps' ? azureRepo(origin!) : null;
     const entry = repo ? listed.get(repo.toLowerCase()) : undefined;
     const blocked = repo ? null : linkedWorktree(folder) ? 'linked-worktree' : 'no-provider-origin';
-    return { id, name: title, folder, shownFolder: tilde(folder, env.HOME ?? ''), repo, provider: repo ? provider : null, blocked, onBoard: !!entry };
+    return { id, name: title, folder, shownFolder: tilde(folder, env.HOME ?? ''), repo, provider: repo ? provider : null, blocked, onBoard: !!entry, icon: icons.get(id) ?? null };
   }));
 }

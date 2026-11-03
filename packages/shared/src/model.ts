@@ -1169,6 +1169,8 @@ export interface ProjectChoice {
   blocked: 'linked-worktree' | 'no-provider-origin' | null;
   /** Whether the repository is already on the board or is onboarding. Unusable settings can start fresh. */
   onBoard: boolean;
+  /** The project's icon from T3; null when it has none or T3 hasn't given one yet. */
+  icon: ProjectIcon | null;
 }
 
 /**

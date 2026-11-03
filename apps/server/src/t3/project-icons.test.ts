@@ -273,7 +273,55 @@ it('leaves a repository without exactly one main checkout out of the map', async
   const board = boardOf('lar-server', 'lar-docs', 'lar-factory');
   await createProjectIcons(board).refresh();
   expect(Object.keys(board.snapshot().projectIcons!)).toEqual(['maddec01/lar-factory']);
-  expect(requests).toHaveLength(1);
+});
+
+it('holds the icon of every project T3 lists, on the board or not, with no T3 path, URL or token', async () => {
+  const chosen: ChosenProjectIcon = { kind: 'emoji', emoji: '🚀' };
+  t3.read = listed(fact('factory'), fact('apple', { faviconPath: 'logo.png' }), fact('server', { projectIcon: chosen }), fact('docs'));
+  assets = { factory: png('a'), apple: png('b'), docs: () => new Response('', { status: 404 }) };
+  const board = boardOf('lar-factory');
+  const icons = createProjectIcons(board);
+
+  const held = await icons.byProject();
+
+  // The revision is the first 16 hex digits of the body's SHA-256, from shasum.
+  expect(Object.fromEntries(held)).toEqual({
+    'id-factory': { kind: 'favicon', projectId: 'id-factory', revision: 'ca978112ca1bbdca' },
+    'id-apple': { kind: 'favicon', projectId: 'id-apple', revision: '3e23e8160039594a' },
+    'id-server': chosen,
+  });
+  expect(JSON.stringify([...held])).not.toMatch(/signed-secret|\/api\/assets\/|board-token|logo\.png/);
+  expect((await icons.image('id-apple'))?.body, 'the endpoint serves a project off the board').toEqual(Buffer.from('b'));
+  expect(Object.keys(board.snapshot().projectIcons!), 'the board still only names its own').toEqual(['maddec01/lar-factory']);
+});
+
+it('reads T3 again for each list, so a project added since the last read has its icon', async () => {
+  t3.read = listed(fact('factory'));
+  assets = { factory: png('a'), apple: png('b') };
+  const icons = createProjectIcons(boardOf());
+  const running = icons.refresh();
+  await vi.waitFor(() => expect(requests).toHaveLength(1));
+  t3.read = listed(fact('factory'), fact('apple'));
+  const held = await icons.byProject();
+  await running;
+  expect([...held.keys()]).toEqual(['id-factory', 'id-apple']);
+});
+
+it('answers a list within 2 seconds with what it knows when T3 is slow', async () => {
+  t3.read = listed(fact('factory'));
+  assets = { factory: png('a') };
+  const icons = createProjectIcons(boardOf());
+  const known = await icons.byProject();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  assets = { factory: rpcHangs };
+  let held: ReadonlyMap<string, unknown> | undefined;
+  const list = icons.byProject().then(found => { held = found; });
+  await vi.advanceTimersByTimeAsync(1_900);
+  expect(held).toBeUndefined();
+  await vi.advanceTimersByTimeAsync(200);
+  await list;
+  expect(held).toEqual(known);
+  await vi.advanceTimersByTimeAsync(5_000);
 });
 
 it('covers onboarding repositories', async () => {

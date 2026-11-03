@@ -7,7 +7,7 @@ import type { BoardData, ProjectChoice, SetupDetection } from '@lar-factory/shar
 export const empty: BoardData = { ...sample, repos: [], items: [], error: null };
 
 export const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
-  id: name, name, folder: `/Users/me/Developer/${name}`, shownFolder: `~/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', blocked: null, onBoard: false, ...parts,
+  id: name, name, folder: `/Users/me/Developer/${name}`, shownFolder: `~/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', blocked: null, onBoard: false, icon: null, ...parts,
 });
 
 /** A board answer to an onboarding call: a body, or one made from the call's body; an `error` answers 502 unless it's a Response. */

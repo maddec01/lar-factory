@@ -176,7 +176,7 @@ const items = onboardedSources(async () => {
   moveFirstRead({ step: 'items', ...(read.configs.length === 0 ? { ready: true } : {}) });
   return read;
 });
-const choices = () => projectChoices(onboarded());
+const choices = async () => projectChoices(onboarded(), await projectIcons?.byProject() ?? new Map());
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;

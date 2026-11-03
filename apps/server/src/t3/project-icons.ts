@@ -1,4 +1,4 @@
-// Repository icons from T3: each project's chosen icon, or its favicon's bytes held in memory for the board's image
+// Icons from T3: each listed project's chosen icon, or its favicon's bytes held in memory for the board's image
 // endpoint. The page only gets a project ID and a content hash, so T3's paths, signed URLs and session stay here.
 
 import { createHash } from 'node:crypto';
@@ -14,6 +14,7 @@ const REFRESH_MS = 240_000;
 const FETCH_MS = 5_000;
 const MAX_BYTES = 1024 * 1024;
 const MAX_FETCHES = 4;
+const LIST_WAIT_MS = 2_000;
 /** T3 also allows .icns, which a browser can't draw. */
 const MEDIA_TYPES = new Set(['image/avif', 'image/gif', 'image/x-icon', 'image/vnd.microsoft.icon', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/webp']);
 
@@ -91,12 +92,15 @@ export interface ProjectIcons {
   refresh(): Promise<void>;
   /** Refreshes now, on a timer of its own and when the repositories change, until the returned function is called. */
   start(): () => void;
+  /** The icon of every project T3 lists, by project ID, once a read started by this call ends or after 2 seconds. */
+  byProject(): Promise<ReadonlyMap<string, ProjectIcon>>;
   /** The favicon's bytes for a project in T3's current or retained observation. */
   image(projectId: string): Promise<ProjectImage | undefined>;
 }
 
 export function createProjectIcons(board: Pick<BoardState, 'snapshot' | 'update' | 'push' | 'subscribe'>): ProjectIcons {
   const favicons = new Map<string, Favicon>();
+  let known: ReadonlyMap<string, ProjectIcon> = new Map();
   let published = '{}';
   let pending: Promise<void> | undefined;
 
@@ -112,10 +116,9 @@ export function createProjectIcons(board: Pick<BoardState, 'snapshot' | 'update'
       return project ? [[repo, project]] : [];
     });
     const access = projectRead.availability === 'available' ? repositoryProjectAccess() : undefined;
-    const owned = [...new Map(owners.map(([, project]) => [project.id, project])).values()];
-    for (const { id, projectIcon } of owned) if (projectIcon) favicons.delete(id);
+    for (const { id, projectIcon } of projects.values()) if (projectIcon) favicons.delete(id);
     if (access) {
-      const queue = owned.filter(({ projectIcon }) => !projectIcon);
+      const queue = [...projects.values()].filter(({ projectIcon }) => !projectIcon);
       await Promise.all(Array.from({ length: MAX_FETCHES }, async () => {
         for (let project = queue.shift(); project; project = queue.shift()) {
           const favicon = await readFavicon(access, project);
@@ -124,10 +127,14 @@ export function createProjectIcons(board: Pick<BoardState, 'snapshot' | 'update'
         }
       }));
     }
-    const icons = Object.fromEntries(owners.flatMap(([repo, { id, projectIcon }]): [string, ProjectIcon][] => {
+    known = new Map([...projects.values()].flatMap(({ id, projectIcon }): [string, ProjectIcon][] => {
       const favicon = favicons.get(id);
-      if (projectIcon) return [[repo, projectIcon]];
-      return favicon ? [[repo, { kind: 'favicon', projectId: id, revision: favicon.revision }]] : [];
+      if (projectIcon) return [[id, projectIcon]];
+      return favicon ? [[id, { kind: 'favicon', projectId: id, revision: favicon.revision }]] : [];
+    }));
+    const icons = Object.fromEntries(owners.flatMap(([repo, { id }]): [string, ProjectIcon][] => {
+      const icon = known.get(id);
+      return icon ? [[repo, icon]] : [];
     }));
     const next = JSON.stringify(icons);
     if (next === published) return;
@@ -145,18 +152,26 @@ export function createProjectIcons(board: Pick<BoardState, 'snapshot' | 'update'
     refresh,
     start() {
       const listed = () => repositories(board.snapshot()).join('\n');
-      let known = listed();
+      let listedRepositories = listed();
       void refresh();
       const timer = setInterval(() => void refresh(), REFRESH_MS);
       const unsubscribe = board.subscribe(() => {
-        if (listed() === known) return;
-        known = listed();
+        if (listed() === listedRepositories) return;
+        listedRepositories = listed();
         void refresh();
       });
       return () => {
         clearInterval(timer);
         unsubscribe();
       };
+    },
+    async byProject() {
+      // A read already running may have started before the project this list is for was added.
+      const read = (pending ?? Promise.resolve()).then(refresh);
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([read, new Promise(resolve => { timer = setTimeout(resolve, LIST_WAIT_MS); })]);
+      clearTimeout(timer);
+      return known;
     },
     async image(projectId) {
       const { observation } = await repositoryProjects();

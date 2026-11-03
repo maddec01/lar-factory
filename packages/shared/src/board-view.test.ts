@@ -355,3 +355,15 @@ test('the desk leaves out Ready and a merged build counts under shipped', () => 
   assert.deepEqual(boardSections(boardWith(ready), AT).needsYou, []);
   assert.deepEqual(boardSections(boardWith(merged), AT).done.map((item) => item.id), [merged.id]);
 });
+
+test('queued follows the placement rule: a pending start and a part still in its dossier leave the count', () => {
+  const queued = delivered('Queued', { state: 'done' });
+  assert.deepEqual(boardSections(boardWith(queued), AT).queued.map((item) => item.id), [queued.id]);
+  const starting = { startProgress: { [queued.id]: { shape: { phase: 'starting' } } } } as unknown as Partial<BoardData>;
+  assert.deepEqual(boardSections(boardWith(queued, starting), AT).queued, []);
+  const failed = { startProgress: { [queued.id]: { shape: { phase: 'failed' } } } } as unknown as Partial<BoardData>;
+  assert.deepEqual(boardSections(boardWith(queued, failed), AT).queued.map((item) => item.id), [queued.id], 'a failed start waits in the Queue again');
+  const parent = delivered('In progress', { state: 'done' }, { id: 'parent' });
+  const part = { ...queued, parentId: 'parent' };
+  assert.deepEqual(boardSections(boardWith(part, { items: [parent, part] }), AT).queued, []);
+});

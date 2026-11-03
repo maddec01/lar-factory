@@ -18,6 +18,8 @@ export interface GateEvidence {
 export interface GateResult {
   briefDigest: string | null;
   current: boolean;
+  /** The latest gate that passed the current brief and wasn't invalidated since, or null when none did. */
+  passing: GateEvidence | null;
   evidence: GateEvidence[];
 }
 

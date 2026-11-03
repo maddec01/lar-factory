@@ -4,9 +4,9 @@
 // a JSON file in the data folder, until a Start build on it succeeds or a new gate passes. Only the board that owns the
 // data folder's Auto-build lock starts builds, so two running boards never both do.
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildsAtWork, isRecord, ref, type AutoBuildPass, type AutoBuildState, type Item, type ModelGroup, type StartResult } from '@lar-factory/shared';
+import { blockedText, buildsAtWork, isRecord, ref, type AutoBuildPass, type AutoBuildState, type Item, type ModelGroup, type StartResult } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { acquireOwnerLock, type OwnerLease, type WorkRecords } from '@lar-factory/work-records';
 import type { BoardState } from '../board/board-state.ts';
@@ -39,6 +39,8 @@ export interface AutoBuildDeps {
   offerModelChoices(): ModelGroup[];
   /** The data folder, which holds the pauses and the lock; tests give their own. */
   dir?: string;
+  /** The clock; tests give their own. */
+  now?: () => number;
 }
 
 /** A build's automatic pause: the error its start gave, and the gate it had then, so a new gate ends the pause. */
@@ -48,6 +50,8 @@ const T3_UNREACHABLE = "Auto-build waits for T3, which the board can't reach.";
 const MODELS_UNREADABLE = "Auto-build waits for T3's model choices, which the board can't read.";
 const MODEL_GONE = "Auto-build's model isn't offered now. Choose another in Settings.";
 const ANOTHER_BOARD = 'Another board on this Mac starts the builds.';
+/** How long a build Start build held waits before Auto-build tries it again, as each try rereads its Spec. */
+export const HOLD_RETRY_MS = 30_000;
 
 function readPauses(file: string): Record<string, Pause> {
   return Object.fromEntries(Object.entries(readJsonRecord(file) ?? {}).flatMap(([workId, entry]) =>
@@ -55,27 +59,25 @@ function readPauses(file: string): Record<string, Pause> {
       ? [[workId, { error: entry.error, gateId: entry.gateId }]] : []));
 }
 
-export function createAutoBuild({ board, records, commands, setting, limit, offerModelChoices, dir = boardDataDir() }: AutoBuildDeps): AutoBuild {
+export function createAutoBuild({ board, records, commands, setting, limit, offerModelChoices, dir = boardDataDir(), now = Date.now }: AutoBuildDeps): AutoBuild {
   const file = join(dir, 'auto-build-pauses.json');
   let pauses = records ? readPauses(file) : {};
   let lease: OwnerLease | null = null;
   let running: Promise<void> | null = null;
   let again = false;
+  /** The builds Start build held, with why and when Auto-build may try each again. */
+  const held = new Map<string, { error: string; retryAt: number }>();
 
   /** The work's current passing gate, or null when its brief has none. */
-  function passingGate(workId: string): { gateId: string; at: string } | null {
-    const { current, briefDigest, evidence } = records!.gate(workId);
-    if (!current) return null;
-    const passed = evidence.findLast((gate) => gate.briefDigest === briefDigest && (gate.source === 'gate' || gate.source === 'user'));
-    return passed ? { gateId: passed.gateId, at: passed.recordedAt } : null;
-  }
+  const passingGate = (workId: string) => records!.gate(workId).passing;
 
   function savePauses(next: Record<string, Pause>): void {
     if (JSON.stringify(next) === JSON.stringify(pauses)) return;
     pauses = next;
     try {
       mkdirSync(dir, { recursive: true });
-      writeFileSync(file, JSON.stringify(next));
+      writeFileSync(`${file}.${process.pid}.tmp`, JSON.stringify(next));
+      renameSync(`${file}.${process.pid}.tmp`, file);
     } catch (err) {
       log(`could not save Auto-build's paused builds to ${file}: ${(err as Error).message}`);
     }
@@ -85,26 +87,35 @@ export function createAutoBuild({ board, records, commands, setting, limit, offe
   const startPending = (item: Item) => records!.launchIntents({ workId: item.id, unresolved: true }).some((intent) => intent.purpose === 'build')
     || !!board.snapshot().startedBuilds?.[item.id];
 
+  /**
+   * Whether the board's item may start now: with the time of its passing gate, 'refinement' when it waits for its concept's
+   * Refinement, or null. The board's own facts come first, as they need no read.
+   */
+  function startable(itemId: string): { at: string } | 'refinement' | null {
+    const data = board.snapshot();
+    const item = data.items.find((candidate) => candidate.id === itemId);
+    if (!item || item.status !== 'Ready' || item.kind === 'concept' || item.kind === 'decision' || item.archived || item.needsYou
+      || data.armed?.[item.id] || pauses[item.id] || blockedText(item)) return null;
+    try {
+      const record = records!.read(item.id);
+      if (record.setAside || record.status !== 'Ready') return null;
+      const gate = passingGate(item.id);
+      if (!gate || records!.specState(item.id).held || records!.waitingOn(item.id).length || startPending(item)) return null;
+      if (record.parentId && records!.read(record.parentId).kind === 'concept' && !records!.refinement(record.parentId).complete) return 'refinement';
+      return { at: gate.recordedAt };
+    } catch (err) {
+      log(`Auto-build can't read ${item.id}: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
   /** The Ready builds that may start now, oldest passing gate first and then by work ID, and those waiting for Refinement. */
   function eligible(): { builds: Item[]; waitsForRefinement: string[] } {
-    const data = board.snapshot();
     const waitsForRefinement: string[] = [];
-    const builds = data.items.flatMap((item) => {
-      if (item.status !== 'Ready' || item.kind === 'concept' || item.kind === 'decision' || item.archived || item.needsYou || data.armed?.[item.id]) return [];
-      try {
-        const record = records!.read(item.id);
-        if (record.setAside || record.status !== 'Ready') return [];
-        const gate = passingGate(item.id);
-        if (!gate || pauses[item.id] || records!.specState(item.id).held || records!.waitingOn(item.id).length || startPending(item)) return [];
-        if (record.parentId && records!.read(record.parentId).kind === 'concept' && !records!.refinement(record.parentId).complete) {
-          waitsForRefinement.push(item.id);
-          return [];
-        }
-        return [{ item, at: gate.at }];
-      } catch (err) {
-        log(`Auto-build can't read ${item.id}: ${(err as Error).message}`);
-        return [];
-      }
+    const builds = board.snapshot().items.flatMap((item) => {
+      const found = startable(item.id);
+      if (found === 'refinement') waitsForRefinement.push(item.id);
+      return found && found !== 'refinement' ? [{ item, at: found.at }] : [];
     });
     builds.sort((a, b) => a.at.localeCompare(b.at) || a.item.id.localeCompare(b.item.id));
     return { builds: builds.map(({ item }) => item), waitsForRefinement };
@@ -118,14 +129,18 @@ export function createAutoBuild({ board, records, commands, setting, limit, offe
     return counted.size;
   };
 
-  /** Ends the pauses whose build started by a person's Start build, or whose brief passed a new gate since. */
+  /**
+   * Ends the pauses whose build left Ready, as a person's Start build moves it, or whose brief passed a new gate since.
+   * A pause stays while its record can't be read or is set aside.
+   */
   function endPauses(): void {
     savePauses(Object.fromEntries(Object.entries(pauses).filter(([workId, pause]) => {
       try {
-        const record = records!.read(workId);
-        return record.status === 'Ready' && !record.setAside && passingGate(workId)?.gateId === pause.gateId;
-      } catch {
-        return false;
+        if (records!.read(workId).status !== 'Ready') return false;
+        const gate = passingGate(workId);
+        return !gate || gate.gateId === pause.gateId;
+      } catch (err) {
+        return (err as { code?: string }).code !== 'not-found';
       }
     })));
   }
@@ -169,33 +184,48 @@ export function createAutoBuild({ board, records, commands, setting, limit, offe
     if (!records) return;
     endPauses();
     const { builds, waitsForRefinement } = eligible();
-    const room = () => Math.max(0, limit() - atWork());
-    const shown = (held?: string | null) => ({ ...held && { hold: held }, wouldStart: Math.min(room(), builds.length),
+    let room = Math.max(0, limit() - atWork());
+    /** The builds still eligible: a start, a pause or a change since the scan drops a build. */
+    let waiting = builds.length;
+    const shown = (held?: string | null) => ({ ...held && { hold: held }, wouldStart: Math.min(room, waiting),
       paused: Object.fromEntries(Object.entries(pauses).map(([workId, { error }]) => [workId, error])), waitsForRefinement });
     const { on, model } = setting();
-    if (!on || !builds.length || !room()) return show(shown());
-    const held = hold() ?? (await owns() ? null : ANOTHER_BOARD);
-    if (held) return show(shown(held));
+    if (!on || !builds.length || !room) return show(shown());
+    const holds = hold() ?? (await owns() ? null : ANOTHER_BOARD);
+    if (holds) return show(shown(holds));
     let buildHold: string | null = null;
     for (const item of builds) {
-      if (!room()) break;
-      const { body } = await commands.startBuild(item.id, model, undefined, true);
-      const { error, uncertain, hold: holds } = body as Partial<StartResult>;
-      if (!error) {
-        log(`Auto-build started ${ref(item)}`);
+      if (!room) break;
+      const retry = held.get(item.id);
+      if (retry && retry.retryAt > now()) {
+        buildHold ??= retry.error;
         continue;
       }
-      // T3 may have made the thread; the start keeps its place and the existing recovery settles it.
-      if (uncertain) continue;
-      if (holds) {
+      held.delete(item.id);
+      // An earlier start, or a change while it ran, may have made this build ineligible.
+      const found = startable(item.id);
+      if (!found || found === 'refinement') {
+        waiting--;
+        continue;
+      }
+      const { body } = await commands.startBuild(item.id, model, undefined, true);
+      const { error, uncertain, hold: passes } = body as Partial<StartResult>;
+      if (passes && error) {
         log(`Auto-build held ${ref(item)}: ${error}`);
+        held.set(item.id, { error, retryAt: now() + HOLD_RETRY_MS });
         buildHold ??= error;
         continue;
       }
-      log(`Auto-build paused ${ref(item)}: ${error}`);
-      savePauses({ ...pauses, [item.id]: { error, gateId: passingGate(item.id)?.gateId ?? null } });
+      waiting--;
+      // A start T3 may have made keeps its place, and the existing recovery settles it.
+      if (!error || uncertain) room--;
+      if (!error) log(`Auto-build started ${ref(item)}`);
+      else if (!uncertain) {
+        log(`Auto-build paused ${ref(item)}: ${error}`);
+        savePauses({ ...pauses, [item.id]: { error, gateId: passingGate(item.id)?.gateId ?? null } });
+      }
     }
-    show({ ...shown(buildHold), wouldStart: Math.min(room(), eligible().builds.length) });
+    show(shown(buildHold));
   }
 
   return {

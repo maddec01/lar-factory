@@ -104,19 +104,20 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       gateId: String(row.gate_id), workId, sourceRevision: Number(row.source_revision), briefDigest: String(row.brief_digest),
       approvedBy: String(row.approved_by), evidence: String(row.evidence), recordedAt: String(row.recorded_at), source: row.source as GateEvidence['source'],
     }));
-    return { briefDigest, current: briefDigest !== null && Boolean(db.prepare("SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND invalidated = 0 AND source IN ('gate', 'user')").get(workId, briefDigest)), evidence };
+    const passed = db.prepare("SELECT gate_id FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND invalidated = 0 AND source IN ('gate', 'user') ORDER BY rowid DESC LIMIT 1").get(workId, briefDigest);
+    const passing = evidence.find((item) => item.gateId === passed?.gate_id) ?? null;
+    return { briefDigest, current: passing !== null, passing, evidence };
   };
   const children = (workId: string): WorkRecord[] => db.prepare('SELECT work_id FROM work_records WHERE parent_id = ? AND set_aside_at IS NULL AND kind <> \'slice\' ORDER BY rowid').all(workId).map((row) => find(String(row.work_id)));
   const source = (workId: string): PublicationSource => {
     const record = find(workId);
     const bodies = db.prepare('SELECT body, markdown FROM bodies WHERE work_id = ? ORDER BY body').all(workId);
     const blockers = db.prepare('SELECT blocker_id FROM blockers WHERE work_id = ? ORDER BY blocker_id').all(workId);
-    const { evidence, briefDigest } = gate(workId);
     return {
       workId, revision: record.revision,
       digest: digest({ title: record.title, repository: record.repository, kind: record.kind, parentId: record.parentId,
         setAside: record.setAside, fogGone: record.fogGone, bodies, blockers, children: children(workId).map((child) => child.workId) }),
-      gate: evidence.findLast((item) => item.briefDigest === briefDigest && (item.source === 'gate' || item.source === 'user') && Boolean(db.prepare('SELECT 1 FROM brief_gates WHERE gate_id = ? AND invalidated = 0').get(item.gateId))) ?? null,
+      gate: gate(workId).passing,
     };
   };
   type Refinement = Pick<WorkRecord, 'workId' | 'kind' | 'setAside' | 'fogGone'>;

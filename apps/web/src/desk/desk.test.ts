@@ -72,6 +72,8 @@ test.each<[string, BoardData, string, string, string[]]>([
   ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', '', ['Answer in T3']],
   ['Verify', sample, 'I_sample16', 'can merge · 1 passed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
   ['Ready to merge', sample, 'I_sample17', 'can merge · 4 passed · 1 failed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
+  ['Verify with a recorded PR', withItem('I_sample16', { linkedPrs: [{ number: 9, url: 'https://github.com/o/r/pull/9', state: 'open', isDraft: false, checks: null, mergeState: 'checking', pipelineUnread: true }] }),
+    'I_sample16', 'Test it with the steps in the PR, then merge', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
   ['Verify with no PR', withItem('I_sample16', { linkedPrs: [] }), 'I_sample16', 'Test it with the steps in the PR, then merge',
     ['Open PR (disabled: No pull request is linked to this item yet)', `[Open thread] (disabled: ${NO_THREAD})`]],
 ])('a %s card says its next step and has its action on the left, Open thread in the corner unless that is the action', async (_card, data, id, next, buttons) => {

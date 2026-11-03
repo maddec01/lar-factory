@@ -314,6 +314,7 @@ test("an item's PR is the one Open PR opens: its first linked PR", () => {
   const linked = (number: number, mergeState: 'can merge' | 'conflicts') => ({ number, url: `u${number}`, state: 'open' as const, isDraft: false, checks: null, mergeState });
   assert.deepEqual(itemPr(item('Verify', [], { linkedPrs: [linked(1, 'conflicts'), linked(2, 'can merge')] })), { url: 'u1', pipeline: linked(1, 'conflicts') });
   assert.equal(itemPr(item('Verify')), null, 'no PR, no link and no pipeline');
+  assert.deepEqual(itemPr(item('Verify', [], { linkedPrs: [{ ...linked(1, 'can merge'), pipelineUnread: true }] })), { url: 'u1', pipeline: null }, 'a recorded PR links with no pipeline to claim');
 });
 
 test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {

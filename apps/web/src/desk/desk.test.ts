@@ -135,6 +135,20 @@ test('an empty desk is one small neutral line under no card row', async () => {
   expect($('.desk')!.className.split(' ')).toEqual(expect.arrayContaining(['flex', 'items-baseline']));
 });
 
+const noWaiting = sample.items.filter((i) => !['Needs you', 'Verify', 'Ready to merge'].includes(i.status));
+
+test('an empty desk during the first read shows the loader, as the read may still add items', async () => {
+  await mountPage({ ...sample, items: noWaiting, firstRead: { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] } });
+  expect(text($('.desk'))).toBe('Your deskLoading projects…');
+  expect($('.desk [data-loader]')).not.toBeNull();
+});
+
+test('a desk with cards stays as it is during the first read', async () => {
+  await mountPage({ ...sample, firstRead: { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] } });
+  expect(cards().length).toBeGreaterThan(0);
+  expect($('.desk [data-loader]')).toBeNull();
+});
+
 test('the stage layout follows the desk', async () => {
   await mountPage();
   expect($('.desk')!.compareDocumentPosition($('.stages')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

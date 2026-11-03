@@ -5,7 +5,6 @@
 // it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
 // settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
 
-import { LoaderCircle } from 'lucide-react';
 import { boardSections, failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
 import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
@@ -15,6 +14,7 @@ import { Desk } from './desk/desk.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
 import { AbandonDialog } from './items/abandon-dialog.tsx';
 import { StageLayout } from './line/stage-layout.tsx';
+import { Loader } from './loading/loader.tsx';
 import { LoadingScreen } from './loading/loading-screen.tsx';
 import { Warnings } from './notices/warnings.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
@@ -35,7 +35,7 @@ function Content() {
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-4 pt-3 *:shrink-0">
       <OnboardingCards />
       {scope && !loaded && stillReading(data, scope)
-        ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Loading projects…</p>
+        ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><Loader label="Loading projects…" className="size-4" /></p>
         : <StageLayout items={items} desk={<Desk items={boardSections({ ...data, items }, now, clientError).needsYou} />} />}
     </div>
   );

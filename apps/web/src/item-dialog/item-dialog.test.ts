@@ -1220,6 +1220,14 @@ test('an item whose family failed with no figures says so though the board reads
   expect(text(inDialog('[data-meta]'))).toContain('Usage details are unavailable.');
 });
 
+test('an item whose threads T3 has not answered for yet says usage is loading, never that it has no thread', async () => {
+  const data = withoutFigures('loading');
+  await mountPage({ ...data, items: data.items.map((item) => item.id === CONCEPT ? { ...item, threads: 'unavailable' as const } : item) });
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-meta]'))).toContain('Usage totals are still loading.');
+  expect(text(inDialog('[data-meta]'))).not.toContain('No T3 thread');
+});
+
 test('an item still loading with all-zero figures says it is loading, never zero', async () => {
   await mountPage(withoutFigures('loading'));
   await openItem(CONCEPT);

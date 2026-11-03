@@ -154,13 +154,24 @@ export function AgentWork({ item, stats: s = item.stats, label, className = '' }
   );
 }
 
+/**
+ * Whether the item's figures are still to come: its usage is loading, its figures are provisional, or no stats read has
+ * reached its threads yet. Figures frozen at merge are final, and a settled read with nothing, or no thread, is known empty.
+ */
+export const usageLoading = ({ stats, usageState, threads }: Item): boolean => {
+  if (typeof stats === 'object' && stats.frozen) return false;
+  if (usageState === 'loading' || typeof stats === 'object' && stats.provisional) return true;
+  return !usageState && stats === undefined && Array.isArray(threads) && threads.length > 0;
+};
+
 /** Whether T3's usage can't be read for this item: an item known to have no thread has none to lose. */
 export const usageUnreadable = (item: Item): boolean => (item.stats === 'unavailable' || item.usageState === 'failed' && !(item.stats && hasFigures(item.stats)))
   && !(Array.isArray(item.threads) && !item.threads.length);
 
 /** The line that says why there are no agent work figures: no T3 thread worked on the item, or T3's database can't be read. */
 export function AgentWorkNote({ item }: { item: Item }) {
-  const hasThread = Array.isArray(item.threads) && item.threads.length > 0;
+  // Usage loads only for recorded threads, which T3 may not have answered for yet.
+  const hasThread = item.usageState === 'loading' || Array.isArray(item.threads) && item.threads.length > 0;
   const s = usageUnreadable(item) ? 'unavailable' : hasThread ? item.stats : undefined;
   // Known figures answer for an item still loading; none, or all zeros, say no more than having none.
   if (s && s !== 'unavailable' && (item.usageState !== 'loading' || hasFigures(s))) return null;

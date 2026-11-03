@@ -199,6 +199,15 @@ test('with nothing on the board each popover says so', async () => {
   expect(counter('building').getAttribute('aria-label')).toBe('building: Room for 2 more builds under the build limit of 2');
 });
 
+test('queued says it is loading, not empty, while the first read could add items', async () => {
+  await mountPage({ ...completeSample, items: [], firstRead: { step: 'items', running: [], settled: false } });
+  expect(counter('queued').getAttribute('aria-label')).toBe('queued: Still loading projects');
+  const pop = await openCounter('queued');
+  expect(text(pop.querySelector('p'))).toBe('Loading projects…');
+  expect(pop.querySelector('[data-loader]')).not.toBeNull();
+  expect(text(pop)).not.toContain('List is empty.');
+});
+
 test('picking a row closes the popover and opens that item\'s dialog', async () => {
   await mountPage();
   await openCounter('building');
@@ -217,14 +226,56 @@ test('spend does not present partial histories as a complete total', async () =>
   expect(text(pop)).toContain('Usage totals are incomplete or unavailable.');
 });
 
-test.each(['failed', 'loading'] as const)('spend reads as incomplete with a %s item, though it shows known figures', async (usageState) => {
+test('spend reads as unavailable with a failed item, though it shows known figures', async () => {
   const data = structuredClone(completeSample);
-  data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 200 }, usageState };
+  data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 200 }, usageState: 'failed' };
   await mountPage(data);
   expect(text(counter('spend'))).toBe('Unavailable');
   const pop = await openCounter('spend');
   expect(head(pop)).toBe('Agent spendIncomplete');
   expect(text(pop)).toContain('$200.00');
+});
+
+test('spend shows the loader with a loading item, and its popover keeps known figures', async () => {
+  const data = structuredClone(completeSample);
+  data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 200 }, usageState: 'loading' };
+  await mountPage(data);
+  expect(counter('spend').querySelector('[data-loader]')).not.toBeNull();
+  expect(text(counter('spend'))).not.toContain('Unavailable');
+  const pop = await openCounter('spend');
+  expect(head(pop)).toBe('Agent spendLoading');
+  expect(text(pop)).toContain('$200.00');
+  expect(text(pop)).toContain('Usage totals are still loading.');
+});
+
+test('spend while T3 has not answered yet is loading', async () => {
+  const data: BoardData = structuredClone(completeSample);
+  data.items[0] = { ...data.items[0]!, stats: undefined, threads: 'unavailable', usageState: 'loading' };
+  await mountPage(data);
+  expect(counter('spend').querySelector('[data-loader]')).not.toBeNull();
+});
+
+test('spend with T3 stopped is unavailable', async () => {
+  const data: BoardData = structuredClone(completeSample);
+  data.items[0] = { ...data.items[0]!, stats: undefined, threads: 'unavailable', usageState: undefined };
+  await mountPage(data);
+  expect(text(counter('spend'))).toBe('Unavailable');
+});
+
+test('a failed whole read says unavailable at once, though items read as loading', async () => {
+  const data = structuredClone(completeSample);
+  data.items[0] = { ...data.items[0]!, usageState: 'loading' };
+  await mountPage({ ...data, usageRead: { readable: false } });
+  expect(text(counter('spend'))).toBe('Unavailable');
+});
+
+test('an empty need-you popover during the first read shows the loader', async () => {
+  const data = structuredClone(completeSample);
+  data.items = [];
+  data.firstRead = { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] };
+  await mountPage(data);
+  expect(counter('need you').getAttribute('aria-label')).toBe('need you: Still loading projects');
+  expect(text((await openCounter('need you')).querySelector('p'))).toBe('Loading projects…');
 });
 
 test('spend stays complete with figures frozen at merge, or an item with no threads', async () => {
@@ -235,11 +286,19 @@ test('spend stays complete with figures frozen at merge, or an item with no thre
   expect(text(counter('spend'))).not.toBe('Unavailable');
 });
 
-test.each(['pending', 'failed'] as const)('spend remains incomplete when an empty source succeeds and another is %s', async (state) => {
+test('spend is loading when an empty source succeeds and another still reads', async () => {
   const data = structuredClone(completeSample);
   data.items = [];
-  if (state === 'pending') data.firstRead = { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] };
-  else data.itemSourceProblems = [{ repo: 'owner/failed', problem: 'Read failed' }];
+  data.firstRead = { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] };
+  await mountPage(data);
+  expect(counter('spend').querySelector('[data-loader]')).not.toBeNull();
+  expect(head(await openCounter('spend'))).toBe('Agent spendLoading');
+});
+
+test('spend remains incomplete when an empty source succeeds and another failed', async () => {
+  const data = structuredClone(completeSample);
+  data.items = [];
+  data.itemSourceProblems = [{ repo: 'owner/failed', problem: 'Read failed' }];
   await mountPage(data);
   expect(text(counter('spend'))).toBe('Unavailable');
   expect(head(await openCounter('spend'))).toBe('Agent spendIncomplete');

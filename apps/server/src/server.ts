@@ -55,7 +55,7 @@ import { createShownStats } from './stats/shown-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectReads } from './t3/repository-project.ts';
 import { createProjectIcons } from './t3/project-icons.ts';
-import { protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
+import { protocolAwaitingFirstShell, protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
 import type { T3Reads } from './t3/t3-reads.ts';
 import { createUsageCatchUp } from './t3/usage-catch-up.ts';
 import { lookupThread } from './t3/t3.ts';
@@ -378,7 +378,10 @@ function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
   return items.map((item) => {
     if (item.recorded === false) return item;
     const ids = liveIds(item.id);
-    const shown = { ...item, stats: shownStats(item, previousStats.get(item.id), withStats), usageState: ids.length ? previousUsage.get(item.id) : undefined, threads: threads(item.id) };
+    const observed = threads(item.id);
+    // Until a stats read answers, recorded threads are still to come, unless T3 stopped and so has nothing coming.
+    const usageState = ids.length ? previousUsage.get(item.id) ?? (observed !== 'unavailable' || protocolAwaitingFirstShell() ? 'loading' : undefined) : undefined;
+    const shown = { ...item, stats: shownStats(item, previousStats.get(item.id), withStats), usageState, threads: observed };
     shown.slices = item.slices.map((slice): typeof slice => {
       if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
       const ids = slice.workId && records ? recorded(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];

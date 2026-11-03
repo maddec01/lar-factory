@@ -6,7 +6,8 @@
 
 import { duration, formatTokens, formatUsd, itemTotal } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats } from '@lar-factory/shared';
-import { hasFigures, INCOMPLETE_TOTAL, useLastKnown } from '../items/item-parts.tsx';
+import { hasFigures, INCOMPLETE_TOTAL, useLastKnown, usageLoading } from '../items/item-parts.tsx';
+import { Loader } from '../loading/loader.tsx';
 import { statsOf } from './stage-track.tsx';
 
 /** A stage row's action slot follows these, in the row's own 10rem and gap; a dock row has it as its last column. */
@@ -24,16 +25,20 @@ export const figuresOf = (item: Item, data: BoardData, total?: boolean): ItemSta
   return sum === null ? statsOf(item) : sum === 'unavailable' ? { agentMs: 0, tokens: 0, incomplete: true } : sum;
 };
 
-/** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. An incomplete total says so beside them, and its tooltip says why, as it does when they are the last ones seen. */
+/** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. An incomplete total says so beside them, and its tooltip says why, as it does when they are the last ones seen. While usage loads, known figures stay with a spinner beside them, and none known yet give a spinner and its label. */
 export function Figures({ s, item }: { s: ItemStats | null; item: Item }) {
   const lastKnown = useLastKnown(item);
-  if (!s || !(hasFigures(s) || s.incomplete)) return <span />;
+  const loading = usageLoading(item);
+  if (!s || !(hasFigures(s) || s.incomplete)) return loading ? <Loader label="Loading usage" /> : <span />;
   const text = hasFigures(s) ? [duration(s.agentMs), formatTokens(s.tokens), s.costUsd !== undefined ? formatUsd(s.costUsd) : null].filter(Boolean).join(' · ') : null;
-  const title = s.frozen ? 'Agent time · tokens · cost, as it stood at merge' : [text && 'Agent time · tokens · cost', text && lastKnown, s.incomplete && INCOMPLETE_TOTAL].filter(Boolean).join('. ');
+  const title = s.frozen ? 'Agent time · tokens · cost, as it stood at merge' : [text && 'Agent time · tokens · cost', text && lastKnown, s.incomplete && INCOMPLETE_TOTAL, loading && UPDATING].filter(Boolean).join('. ');
   return (
-    <span className="flex min-w-0 justify-end gap-1 text-[11px] tabular-nums text-(--muted-foreground)" title={title}>
+    <span className="flex min-w-0 items-center justify-end gap-1 text-[11px] tabular-nums text-(--muted-foreground)" title={title}>
+      {loading && <Loader title={UPDATING} />}
       {text && <span className="truncate">{text}</span>}
       {s.incomplete && <span className="shrink-0">{text ? '· partial' : 'Incomplete'}</span>}
     </span>
   );
 }
+
+const UPDATING = 'Updating usage';

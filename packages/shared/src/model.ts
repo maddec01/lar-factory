@@ -249,6 +249,10 @@ export function usageIncomplete(item: Item): boolean {
   return !usageState && !stats && (threads === 'unavailable' || !!threads?.length);
 }
 
+/** Whether an item's incomplete usage failed, rather than still loading: T3 stopped, or a read of it failed. */
+export const usageFailed = (item: Item): boolean => usageIncomplete(item)
+  && (item.stats === 'unavailable' || item.usageState === 'failed' || item.threads === 'unavailable' && item.usageState !== 'loading');
+
 /**
  * An item's stats plus the item total of each of its sub-issues among `items`, each
  * item counted once. Wall time only when every figure has it; frozen only when all
@@ -984,6 +988,13 @@ export const sameRepo = (a: string, b: string): boolean => a.toLowerCase() === b
 /** Whether the first read hasn't landed the repository's items yet, as its source still reads or waits for its tool's check. */
 export const stillReading = (data: Pick<BoardData, 'firstRead'>, repo: string): boolean =>
   data.firstRead.waiting?.some((waiting) => sameRepo(waiting, repo)) === true;
+
+/**
+ * Whether the first read may still add items to a scope: the whole board until it settles, or one repository until its
+ * items land, which, before any repository's have, is every repository.
+ */
+export const readingScope = (data: Pick<BoardData, 'firstRead'>, repo?: string): boolean =>
+  !data.firstRead.settled && (!repo || !data.firstRead.waiting || stillReading(data, repo));
 
 /** Whether the item shows in the repository's List and Scope: it's the item's repository, or one of its untagged repositories. */
 export const inRepo = (item: Pick<Item, 'repo' | 'untaggedFor'>, repo: string): boolean =>

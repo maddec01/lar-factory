@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, dependencyNotice, buildBranch, buildMessage, canAbandon, canResumeShaping, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, providerTool, repositoryProjectHint, sameRepo, startHold, sharedT3Default, sliceProgress, statusLabel, t3DefaultDetail, threadLink, usesGh, workMessage, earlierWorkMessage, earlierBuildMessage } from './model.ts';
+import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, dependencyNotice, buildBranch, buildMessage, canAbandon, canResumeShaping, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, providerTool, repositoryProjectHint, sameRepo, startHold, sharedT3Default, sliceProgress, statusLabel, t3DefaultDetail, threadLink, usesGh, workMessage, earlierWorkMessage, earlierBuildMessage, usageFailed, usageIncomplete } from './model.ts';
 import type { BoardData, Blocker, Checks, DependencyHold, DependencyObservationKind, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -251,6 +251,19 @@ test('an item total adds each sub-issue on the board once, at any depth, and is 
     'each item counts once, even listed twice or in a loop');
   assert.equal(itemTotal(parent, [parent, { ...build, stats: 'unavailable' }]), 'unavailable', 'an unreadable figure leaves the total unknown');
   assert.equal(itemTotal({ ...parent, stats: 'unavailable' }, [build]), 'unavailable');
+});
+
+test('usage that failed is told from usage still loading', () => {
+  const part = (extra: Partial<Item>) => item('In progress', [], extra);
+  const running = [{ threadId: 't' }] as unknown as Item['threads'];
+  assert.equal(usageFailed(part({ threads: 'unavailable', usageState: 'loading' })), false, 'T3 has not answered yet');
+  assert.equal(usageIncomplete(part({ threads: 'unavailable', usageState: 'loading' })), true);
+  assert.equal(usageFailed(part({ threads: 'unavailable' })), true, 'T3 stopped');
+  assert.equal(usageFailed(part({ threads: running, usageState: 'failed' })), true);
+  assert.equal(usageFailed(part({ stats: 'unavailable' })), true);
+  assert.equal(usageFailed(part({ threads: running, usageState: 'loading' })), false);
+  assert.equal(usageFailed(part({ stats: { agentMs: 1, tokens: 1, frozen: true }, usageState: 'failed' })), false, 'frozen figures are complete');
+  assert.equal(usageFailed(part({ threads: [], stats: 'unavailable' })), false, 'no thread has nothing to lose');
 });
 
 test('an item total with a member loading or failed says it is incomplete, or unavailable with no figures to add', () => {

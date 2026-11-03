@@ -57,7 +57,7 @@ test('List and the details it opens identify local work even in an Azure reposit
 
 test.each<[string, Partial<Item>, string]>([
   ['Queue', { status: 'Queued', statuses: ['Queued'] }, '.queue [data-item]'],
-  ['in-flight row', { status: 'Shaping', statuses: ['Shaping'] }, '[data-in-flight] [data-item]'],
+  ['stage row', { status: 'Shaping', statuses: ['Shaping'] }, '[data-stage="shaping"] li[data-item]'],
   ['dossier', { status: 'Shaping', statuses: ['Shaping'], kind: 'concept' }, '[data-dossier] [data-item]'],
 ])('%s identifies its source alongside the title', async (_name, change, selector) => {
   await mountPage(board({ ...local, number: 17, url: 'https://github.com/example/product/issues/17', ...change }));
@@ -81,10 +81,10 @@ test('expanded slice rows and their details keep each slice source', async () =>
     { number: 23, repo: 'example/project/product', title: 'Azure slice', url: 'https://dev.azure.com/example/project/_workitems/edit/23', state: 'open', progress: 'waiting' },
   ] };
   await mountPage(board(item));
-  await settle(() => $<HTMLButtonElement>('[data-flight] button[aria-label="Show slices"]')!.click());
+  await settle(() => $<HTMLButtonElement>('[data-stage="build"] button[aria-label="Show slices"]')!.click());
   const labels = (selector: string) => [...$(selector)!.querySelectorAll('[role="img"]')].map(icon => icon.getAttribute('aria-label'));
-  expect(labels('[data-flight] [data-slices]')).toEqual(['Saved only on this machine.', 'GitHub issue. Saved on GitHub.', 'Azure DevOps work item. Saved in Azure DevOps.']);
-  await settle(() => $<HTMLElement>('[data-flight] [data-item]')!.click());
+  expect(labels('[data-stage="build"] [data-slices]')).toEqual(['Saved only on this machine.', 'GitHub issue. Saved on GitHub.', 'Azure DevOps work item. Saved in Azure DevOps.']);
+  await settle(() => $<HTMLElement>('[data-stage="build"] [data-row-open]')!.click());
   expect(labels('[data-item-dialog] [data-slices]')).toEqual(['Saved only on this machine.', 'GitHub issue. Saved on GitHub.', 'Azure DevOps work item. Saved in Azure DevOps.']);
 });
 

@@ -1,11 +1,11 @@
-// The line's dossiers: each open concept, and each open item with sub-issues on the board. A dossier starts collapsed
-// to its two header lines: its kind, title and chips (parts that need you, open decisions, blocked slices, fog), then
-// its part bar, parts done, what's next, agent figures and repositories in columns that line up across every dossier
-// and In flight row. Opened, it starts on its Work map, with the concept's own question above and its Dependencies and
-// fog below. Its parts list instead lists what keeps the work moving (parts that need you, parts to verify or merge, open
-// decisions, blocked slices, waiting parts, parts ready to start, Dependencies and fog) or says nothing holds it up, then
-// each part with what it asks next, its stage track, figures, thread and slices, the done parts folded away. The
-// browser remembers which dossiers are open and which view each shows.
+// The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board. A dossier
+// starts collapsed to one line: its kind, title and chips (parts that need you, open decisions, blocked slices, fog),
+// then what's next, its part bar, parts done, agent figures and repositories in columns that line up across every
+// dossier. Opened, it expands in the dock and starts on its Work map, with the concept's own question above and its
+// Dependencies and fog below. Its parts list instead lists what keeps the work moving (parts that need you, parts to
+// verify or merge, open decisions, blocked slices, waiting parts, parts ready to start, Dependencies and fog) or says
+// nothing holds it up, then each part with what it asks next, its stage track, figures, thread and slices, the done
+// parts folded away. The browser remembers which dossiers are open and which view each shows.
 
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
@@ -22,11 +22,12 @@ import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, partLabel, shownThread, threadAtWork, threadsOf } from './dossier-parts.ts';
-import type { Part } from './dossier-parts.ts';
+import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partLabel, shownThread, threadAtWork, threadsOf } from './dossier-parts.ts';
+import type { DossierItems, Part } from './dossier-parts.ts';
 import { StartBuild } from '../items/start-build.tsx';
 import { PartStart, startable } from './part-start.tsx';
-import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
+import { DOCK_COLUMNS, Figures, figuresOf } from './columns.tsx';
+import { Pane } from './pane.tsx';
 import { OnYourDesk, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
 import { PartKindLabel, WorkMap } from './work-map.tsx';
 
@@ -383,34 +384,24 @@ function Dossier({ parent, parts, data }: { parent: Item; parts: Part[]; data: B
   const threads = [parent, ...parts.map((p) => p.item)].flatMap(threadsOf);
 
   return (
-    <article className="overflow-hidden rounded-xl border border-(--border) bg-(--card)" data-dossier={parent.id}>
-      {/* Only the title opens the item; anywhere else on the two lines but the chips opens or closes the dossier. */}
-      <div onClick={toggle} data-item={parent.id} data-open={on} className={`${HEAD_A1} cursor-pointer rounded-xl hover:bg-(--accent) ${on ? 'rounded-b-none border-b border-(--border)' : ''} ${picked(isPicked)}`}>
-        <Toggle on={on} onToggle={() => setOpen(!on)} />
-        <span className="flex min-w-0 items-start justify-between gap-x-2 gap-y-1 pt-0.5" data-line="1">
-          {/* One row: the threads and Azure fields shrink first, down to an ellipsis, so the title keeps its room. */}
-          <span className="flex min-w-0 flex-1 items-baseline gap-x-2">
-            {/* The badge and title stay together, so a long title wraps beside the badge instead of below it. */}
-            <span className="flex min-w-0 items-start gap-2">
-              <SourceIcon item={parent} />
-              <Badge tone="neutral" className="mt-px shrink-0">{kindLabel(parent)}</Badge>
-              <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
-                className="min-w-0 rounded text-left text-[14px] font-medium hover:underline"><ItemTitle item={parent} /></button>
-            </span>
-            <span className={`${META} text-[11px] text-(--muted-foreground) empty:hidden`} title={threadCounts(threads) || undefined} data-threads>
-              {threadCounts(threads)}
-            </span>
-            <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
-          </span>
-          <span onClick={stop} className="flex shrink-0 gap-1" data-chips><Counts m={m} /></span>
+    <article className="border-b border-(--border) last:border-b-0" data-dossier={parent.id}>
+      {/* Only the title opens the item; anywhere else on the line but the chips opens or closes the dossier. */}
+      <div onClick={toggle} data-item={parent.id} data-open={on} title={threadCounts(threads) || undefined}
+        className={`grid ${DOCK_COLUMNS} h-9 cursor-pointer items-center gap-x-3 pl-1.5 pr-3 hover:bg-(--accent) ${on ? 'border-b border-(--border)' : ''} ${picked(isPicked)}`}>
+        <span className="flex min-w-0 items-center gap-1.5" data-line="1">
+          <Toggle on={on} onToggle={() => setOpen(!on)} />
+          <SourceIcon item={parent} />
+          <Badge tone="neutral" className="shrink-0">{kindLabel(parent)}</Badge>
+          <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
+            className="min-w-0 truncate rounded text-left text-[13px] font-medium hover:underline"><ItemTitle item={parent} /></button>
+          <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
+          <span onClick={stop} className="ml-auto flex shrink-0 gap-1 pl-1" data-chips><Counts m={m} /></span>
         </span>
-        <span className={`col-start-2 grid ${LINE2_A1} items-center gap-x-4`} data-line="2">
-          <span data-col="bar"><PartsBar m={m} /></span>
-          <span className="text-[11px] tabular-nums text-(--muted-foreground)">{m.done}/{m.count} parts</span>
-          <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
-          <span data-col="figures" className="grid min-w-0"><Figures s={figuresOf(parent, data, true)} /></span>
-          <span data-col="repos" className="hidden truncate text-right text-[11px] text-(--muted-foreground) lg:block" title={repos(m, data)}>{repos(m, data)}</span>
-        </span>
+        <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
+        <span data-col="bar"><PartsBar m={m} /></span>
+        <span data-col="count" className="text-right text-[11px] tabular-nums text-(--muted-foreground)" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count}</span>
+        <span data-col="figures" className="hidden min-w-0 @4xl:grid"><Figures s={figuresOf(parent, data, true)} /></span>
+        <span data-col="repos" className="hidden truncate text-right text-[11px] text-(--muted-foreground) @4xl:block" title={repos(m, data)}>{repos(m, data)}</span>
       </div>
 
       {on && (
@@ -436,11 +427,13 @@ function Dossier({ parent, parts, data }: { parent: Item; parts: Part[]; data: B
   );
 }
 
-/** `items` are the line's items in the main area's scope. */
-/** `shows` says which rows the filters leave; a part has no row of its own, so a dossier follows its parent's. */
-export function Dossiers({ items, shows }: { items: Item[]; shows: (item: Item) => boolean }) {
+/** The dossiers the filters leave; a dossier follows its parent's row. With none, the dock takes no height. */
+export function Dossiers({ dossiers }: { dossiers: DossierItems[] }) {
   const { data } = useBoardStore();
-  const dossiers = dossiersOf(items, data.items).filter(({ parent }) => shows(parent));
   if (!dossiers.length) return null;
-  return <div className="grid gap-2" data-dossiers>{dossiers.map(({ parent, parts }) => <Dossier key={parent.id} parent={parent} parts={parts} data={data} />)}</div>;
+  return (
+    <Pane id="dock" title="Concepts and linked work" count={dossiers.length} className="max-h-[33%] shrink-0">
+      <div data-dossiers>{dossiers.map(({ parent, parts }) => <Dossier key={parent.id} parent={parent} parts={parts} data={data} />)}</div>
+    </Pane>
+  );
 }

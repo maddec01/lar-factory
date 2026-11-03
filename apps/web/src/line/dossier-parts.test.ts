@@ -4,7 +4,7 @@
 import { expect, test } from 'vite-plus/test';
 import type { Item, ItemThread } from '@lar-factory/shared';
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
-import { DECISION_KINDS, dossiersOf, inDossiers, isDone, isHistory, openWaits, partActivity, partKind, partWaves, partsOf, shownThread } from './dossier-parts.ts';
+import { DECISION_KINDS, dossiersOf, isDone, isHistory, openWaits, partActivity, partKind, partWaves, partsOf, shownThread } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 
 const items = (sampleJson as unknown as { items: Item[] }).items;
@@ -49,11 +49,6 @@ test('a part waits on its open blockers until a thread takes it on', () => {
   expect(openWaits(build!).map((b) => b.number)).toEqual([202]);
   expect(openWaits(grill!), 'its blocker closed').toEqual([]);
   expect(openWaits({ ...build!, item: { ...build!.item, status: 'In progress' } }), 'building, whatever it waited for').toEqual([]);
-});
-
-test('the dossiers take their parents and parts off the rest of the line', () => {
-  const ids = inDossiers(dossiersOf(items, items));
-  expect(items.filter((i) => ids.has(i.id)).map((i) => i.number)).toEqual([200, 201, 202, 140, 180, 203, 181, 40]);
 });
 
 test('parts follow dependency waves across repositories, with stable ties and external blockers ignored', () => {

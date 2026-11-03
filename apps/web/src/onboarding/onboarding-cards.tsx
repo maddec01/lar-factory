@@ -15,7 +15,7 @@ export function OnboardingCards() {
   const resume = useWizardStore((s) => s.resume);
   if (!onboarding?.length) return null;
   return (
-    <div className="grid gap-2">
+    <div className="grid max-h-[35%] shrink-0 gap-2 overflow-y-auto">
       {onboarding.map(({ repo, progress }) => {
         const where = stoppedAt(progress);
         return (

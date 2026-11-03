@@ -26,17 +26,18 @@ test('the desk shows what only you can move, counted, as cards in one row that s
   expect(row).toEqual(expect.arrayContaining(['-mx-6', 'px-6', 'overflow-x-auto', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden']));
 });
 
-test('a desk card shows its status, repository and age, numbered title, next step and status track, in that order', async () => {
+test('a desk card shows its status, repository and age, numbered title, then its next step beside its action', async () => {
   await mountPage();
   const rows = [...card('I_sample16').querySelector('button')!.children];
-  expect(rows.slice(0, 3).map(text)).toEqual(['Verify· lar-apple · 1h ago', '#31 New artwork grid layout', 'can merge · 1 passed']);
-  expect(rows[3]!.querySelectorAll('ol > li')).toHaveLength(8);
+  expect(rows.map(text)).toEqual(['Verify· lar-apple · 1h ago', '#31 New artwork grid layout']);
+  expect(nextLine('I_sample16')).toBe('can merge · 1 passed');
+  expect(card('I_sample16').querySelector('ol'), 'no status track').toBeNull();
 });
 
-test("a desk card's title is always two lines tall, cut short, with the whole title in its tooltip", async () => {
+test("a desk card's title is one line, cut short, with the whole title in its tooltip", async () => {
   await mountPage();
   const title = card('I_sample28').querySelector('.desk-title')!;
-  expect(title.className.split(' ')).toEqual(expect.arrayContaining(['line-clamp-2', 'h-10']));
+  expect(title.className.split(' ')).toEqual(expect.arrayContaining(['truncate', 'h-5']));
   expect(title.getAttribute('title')).toBe('#147 Fall back to software transcoding when the GPU is busy');
 });
 
@@ -44,7 +45,7 @@ test('every desk card has the same rows at the same heights', async () => {
   await mountPage();
   const heights = (c: HTMLElement) => [c.querySelector('.desk-meta'), c.querySelector('.desk-title'), c.querySelector('.desk-next'), c.querySelector('.desk-actions')]
     .map((row) => row?.className.split(' ').find((name) => /^h-\d+$/.test(name)));
-  for (const c of cards()) expect(heights(c)).toEqual(['h-4', 'h-10', 'h-4', 'h-7']);
+  for (const c of cards()) expect(heights(c)).toEqual(['h-4', 'h-5', 'h-4', 'h-7']);
 });
 
 test('a desk card opens the item dialog and stays marked while it shows', async () => {
@@ -65,9 +66,9 @@ const liveThread = [{ id: 't1', title: 'Build', state: 'running' as const, updat
 const NO_THREAD = 'No T3 thread has worked on this yet';
 
 test.each<[string, BoardData, string, string, string[]]>([
-  ['Needs you with no thread', sample, 'I_sample11', 'Answer in T3', [`Answer in T3 (disabled: ${NO_THREAD})`]],
-  ['Needs you', sample, 'I_sample12', 'Answer in T3', ['Answer in T3']],
-  ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', 'Answer in T3', ['Answer in T3']],
+  ['Needs you with no thread', sample, 'I_sample11', '', [`Answer in T3 (disabled: ${NO_THREAD})`]],
+  ['Needs you', sample, 'I_sample12', '', ['Answer in T3']],
+  ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', '', ['Answer in T3']],
   ['Verify', sample, 'I_sample16', 'can merge · 1 passed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
   ['Ready to merge', sample, 'I_sample17', 'can merge · 4 passed · 1 failed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
   ['Verify with no PR', withItem('I_sample16', { linkedPrs: [] }), 'I_sample16', 'Test it with the steps in the PR, then merge',
@@ -75,6 +76,11 @@ test.each<[string, BoardData, string, string, string[]]>([
 ])('a %s card says its next step and has its action on the left, Open thread in the corner unless that is the action', async (_card, data, id, next, buttons) => {
   await mountPage(data);
   expect([nextLine(id), controls(id)]).toEqual([next, buttons]);
+});
+
+test("a card's check counts read in full in a tooltip, since they can truncate", async () => {
+  await mountPage();
+  expect(card('I_sample17').querySelector('.desk-next [title]')!.getAttribute('title')).toBe('can merge · 4 passed · 1 failed');
 });
 
 test("Open thread in a card's corner is a square icon button named and titled Open thread", async () => {
@@ -125,10 +131,9 @@ test('an empty desk is one small neutral line under no card row', async () => {
   expect($('.desk')!.className.split(' ')).toEqual(expect.arrayContaining(['flex', 'items-baseline']));
 });
 
-test('the line follows the desk under its heading', async () => {
+test('the stage layout follows the desk', async () => {
   await mountPage();
-  expect(text($('#line-h'))).toBe('The line');
-  expect($('.desk')!.compareDocumentPosition($('.line')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect($('.desk')!.compareDocumentPosition($('.stages')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
 const questionBoard = (child: Partial<Item> = {}, concept: Partial<Item> = {}): BoardData => ({ ...sample, items: sample.items.map((item) =>
@@ -140,7 +145,7 @@ test('a decision with no thread answers in its concept thread without inheriting
   await mountPage(data);
   const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
   expect([text(action), action.href]).toEqual(['Answer in concept thread', 't3code://threads/sample-environment/concept-question']);
-  expect(nextLine('I_sample12')).toBe('Answer in T3');
+  expect(nextLine('I_sample12'), 'its action says it').toBe('');
   const { useBoardStore } = await import('../board/board-store.ts');
   const child = useBoardStore.getState().data.items.find((item) => item.id === 'I_sample12')!;
   expect(child.threads).toEqual([]);
@@ -176,13 +181,13 @@ test.each([
 test('a Ready item has no desk card and keeps Start build on its row', async () => {
   await mountPage(withItem('I_sample13', { parent: null, parentId: null, blockers: [] }));
   expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
-  expect($('[data-in-flight] [data-item="I_sample13"] [data-start="I_sample13"]')).not.toBeNull();
+  expect($('[data-ready] [data-item="I_sample13"] [data-start="I_sample13"]')).not.toBeNull();
 });
 
-test('a Ready part has no desk card and stays in its dossier', async () => {
+test('a Ready part has no desk card, shows in Ready to build and stays in its dossier', async () => {
   await mountPage();
   expect($('.desk-card[data-item="I_sample13"]')).toBeNull();
-  expect($('[data-in-flight] [data-item="I_sample13"]')).toBeNull();
+  expect($('[data-ready] [data-item="I_sample13"]')).not.toBeNull();
   const expand = $<HTMLButtonElement>('[data-dossier="I_sample09"] button[aria-expanded]')!;
   if (expand.getAttribute('aria-expanded') === 'false') await settle(() => expand.click());
   expect($('[data-dossier="I_sample09"] [data-map-part="I_sample13"], [data-dossier="I_sample09"] [data-part="I_sample13"]')).not.toBeNull();
@@ -194,7 +199,7 @@ test('shaping questions target the older question and leave the desk on a board 
     { id: 'question', title: 'Question', state: 'needs you', updated: '2026-11-01' },
   ] });
   await mountPage(data);
-  expect(nextLine('I_sample12')).toBe('Answer in T3');
+  expect(nextLine('I_sample12'), 'its action says it').toBe('');
   expect(card('I_sample12').querySelector('a')?.getAttribute('href')).toBe('t3code://threads/sample-environment/question');
   await settle(() => card('I_sample12').click());
   expect([...dialog()!.querySelectorAll('[data-slot="modal-footer"] [data-open-thread]')].map((a) => [text(a), a.getAttribute('href')])).toEqual([

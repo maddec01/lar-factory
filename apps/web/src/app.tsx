@@ -1,6 +1,6 @@
-// The board shows onboarding in progress, Your desk and the line, scoped to the repository the title
+// The board shows onboarding in progress, Your desk and the stage layout, scoped to the repository the title
 // bar or the List modal picked; a repository whose items the first read hasn't landed yet says it's reading instead
-// of an empty desk and line. While no t3 is found, the notice replaces the content and the title bar shows only its
+// of an empty desk and stages. While no t3 is found, the notice replaces the content and the title bar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
 // it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
 // settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
@@ -14,7 +14,7 @@ import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
 import { AbandonDialog } from './items/abandon-dialog.tsx';
-import { Line } from './line/line.tsx';
+import { StageLayout } from './line/stage-layout.tsx';
 import { LoadingScreen } from './loading/loading-screen.tsx';
 import { Warnings } from './notices/warnings.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
@@ -31,16 +31,15 @@ function Content() {
   const scope = useScopeStore((state) => state.scope);
   const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="grid gap-7 px-6 py-5">
-        <OnboardingCards />
-        {scope && !loaded && stillReading(data, scope)
-          ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Loading projects…</p>
-          : <>
-            <Desk items={boardSections({ ...data, items }, now, clientError).needsYou} />
-            <Line items={items} />
-          </>}
-      </div>
+    // The page never scrolls: whatever sits above the stage layout shrinks its panes, which scroll inside themselves.
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-4 pt-3">
+      <OnboardingCards />
+      {scope && !loaded && stillReading(data, scope)
+        ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Loading projects…</p>
+        : <>
+          <Desk items={boardSections({ ...data, items }, now, clientError).needsYou} />
+          <StageLayout items={items} />
+        </>}
     </div>
   );
 }

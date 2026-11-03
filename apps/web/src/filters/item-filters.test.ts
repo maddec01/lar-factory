@@ -108,28 +108,36 @@ test('a shown Start next item keeps the plain button', async () => {
 const parent = item('P', { number: 10, title: 'Parent', kind: 'bug', status: 'In progress', labels: ['area: web'] });
 const part = item('C', { number: 11, title: 'Part', kind: 'feature', status: 'In progress', labels: ['only-on-part'], parentId: 'P' });
 
-test('a part has no row of its own, so a part that matches keeps no dossier whose parent does not', async () => {
+test('a dossier follows its parent, whatever its part matches; a part past shaping keeps its own stage row', async () => {
   seed(BOARD_KEY, ['feature']);
   await mountPage(withItems([parent, part]));
-  expect($('[data-dossiers]')).toBeNull();
-  expect($('[data-flight="C"]'), 'nor a row of its own').toBeNull();
+  expect($('[data-dossiers]'), 'the part matches, its parent does not').toBeNull();
+  expect($('[data-stage="dock"]'), 'with no dossiers the dock takes no height').toBeNull();
+  expect($('[data-stage="build"] li[data-item="C"]')).not.toBeNull();
 });
 
-test('a dossier follows its parent\'s row, and the Labels filter offers none of its part\'s labels', async () => {
+test("a dossier stays while its parent matches, and the Labels filter offers what the rows show", async () => {
   seed(BOARD_KEY, ['bug']);
   await mountPage(withItems([parent, part]));
   expect($('[data-dossiers]'), 'the parent matches, its part does not').not.toBeNull();
+  expect($('[data-stage="build"] li[data-item="C"]')).toBeNull();
   await open('labels');
-  expect(choices()).toEqual(['area: web']);
+  expect(choices()).toEqual(['area: web', 'only-on-part']);
 });
 
-test('in flight rows follow the filter, and the empty line says nothing matches', async () => {
+test('the filters apply to every pane, their counts follow, and each says when nothing matches', async () => {
   seed(BOARD_KEY, ['bug']);
-  await mountPage(withItems([item('F', { number: 5, kind: 'feature', status: 'In progress' }), item('Q', { number: 6, kind: 'feature' })]));
-  expect($('[data-flight="F"]')).toBeNull();
-  expect(text($('[data-in-flight-title]'))).toBe('Everything else in flight · 0');
-  expect(text($('[data-in-flight]'))).toContain('Nothing in flight matches.');
+  await mountPage(withItems([
+    item('F', { number: 5, kind: 'feature', status: 'In progress' }), item('Q', { number: 6, kind: 'feature' }),
+    item('S', { number: 7, kind: 'feature', status: 'Shaping' }), item('R', { number: 8, kind: 'feature', status: 'Ready' }),
+  ]));
+  expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 0', 'Shaping 0', 'Build 0']);
   expect(text($('.queue'))).toContain('Nothing queued matches.');
+  expect(text($('[data-stage="shaping"] [data-scroll]'))).toBe('Nothing in shaping matches.');
+  expect(text($('[data-ready]'))).toContain('Nothing ready to build matches.');
+  expect(text($('[data-stage="build"] [data-scroll]'))).toBe('Nothing in build matches.');
+  await removeChip('Bug');
+  expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 1', 'Shaping 2', 'Build 1']);
 });
 
 test('the dropdown checklists change the board, add removable chips and save them; Clear removes them all', async () => {

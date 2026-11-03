@@ -384,4 +384,6 @@ export const MIGRATIONS: readonly Migration[] = [
     CREATE TABLE check_reuses(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, check_id TEXT NOT NULL REFERENCES check_runs(check_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
     CREATE INDEX check_reuses_owner ON check_reuses(work_id);
   `),
+  // Fence legacy structural writers without changing their journals or settings.
+  () => {},
 ];

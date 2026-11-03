@@ -1,17 +1,14 @@
 // One durable structural writer. A manifest commits only after every immutable chunk is readable.
-import { createHash, randomUUID } from 'node:crypto';
-import { gzipSync, gunzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { formatTicketSpec, readTicketSpec, trackerMarkdownHtml, type TicketOptions, writeAccessProblem, mapConcurrent, STRUCTURE_LABEL, structureSyncOperations, trackerKind, readTrackerStructure, stripTrackerStructure, sameRepo, trackerReference, writeTrackerStructure, type Kind, type RepositorySetup, type TrackerPart, type TrackerStructure } from '@lar-factory/shared';
+import { formatTicketSpec, readTicketSpec, trackerMarkdownHtml, type TicketOptions, mapConcurrent, STRUCTURE_LABEL, trackerKind, readTrackerStructure, stripTrackerStructure, sameRepo, trackerReference, writeTrackerStructure, type Kind, type RepositorySetup, type TrackerPart, type TrackerStructure } from '@lar-factory/shared';
 import { providerCommand } from '@lar-factory/shared/provider-command';
-import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
-import { boardDataDir } from '@lar-factory/shared/data-dir';
 import type { WorkRecords } from './work-records.ts';
 import { validateTrackerSnapshot } from './tracker-snapshot.ts';
-import { acquireTrackerSyncLock, TrackerSyncLockLost, type TrackerSyncLease } from './tracker-lock.ts';
-import { hasTrackerStructure, trackerDigest, type TrackerSnapshot, type StructureNode } from './tracker-cache.ts';
+import { type TrackerSnapshot } from './tracker-cache.ts';
 
 export interface StructureTicket { repository: string; number: number; body: string; version: string; title?: string; kind?:Kind; bodyField?: 'System.Description' | 'Microsoft.VSTS.TCM.ReproSteps'; editorWrite?: boolean; titleEditorWrite?: boolean }
 export interface StructureProvider {
@@ -264,185 +261,8 @@ export async function readStructureSnapshot(ticket: StructureTicket, metadata: T
   return { snapshot, digest: manifest.digest };
 }
 
-const running = new WeakMap<WorkRecords, Promise<void>>();
-const retries = new WeakMap<WorkRecords, Map<string, {digest:string; after:number}>>();
 export interface StructureSyncOptions { provider?: StructureProvider; setups?: RepositorySetup[]; dir?: string; workId?: string; confirmedMissingIssue?: string }
-/** Drain structural changes. Failed saves stay in the durable outbox; changed remote generations are never overwritten. */
-export function syncStructures(records: WorkRecords, options: StructureSyncOptions = {}): Promise<void> {
-  const prior = running.get(records); if (prior) return prior;
-  const task = drainDatabase(records, options).finally(() => running.delete(records)); running.set(records, task); return task;
-}
-class StaleStructure extends Error {}
-function leaseProvider(provider: StructureProvider, lease: TrackerSyncLease): StructureProvider {
-  return new Proxy(provider,{get(target,key,receiver){
-    const method=Reflect.get(target,key,receiver);
-    if(typeof method!=='function')return method;
-    return async (...args:unknown[])=>{await lease.assertOwned();const value=await Reflect.apply(method,target,args);await lease.assertOwned();return value;};
-  }});
-}
-async function drainDatabase(records: WorkRecords, options: StructureSyncOptions): Promise<void> {
-  const database=records.trackerDatabasePath();
-  let previousAfter: string | undefined;
-  let first=true;
-  for(;;){
-    const lease=await acquireTrackerSyncLock(database);
-    if(!lease)return;
-    let lastSeen='';
-    try{
-      const provider=leaseProvider(options.provider ?? structureProvider(),lease);
-      let passOptions=first ? {...options,provider} : {...options,provider,workId:undefined,confirmedMissingIssue:undefined};
-      for(;;){
-        const before=records.trackerPending();
-        const beforeById=new Map(before.map(entry=>[entry.workId,entry.sequence]));
-        await drain(records,passOptions);
-        const after=records.trackerPending();lastSeen=JSON.stringify(after);
-        const changed=after.some(entry=>entry.sequence>(beforeById.get(entry.workId) ?? -1));
-        // An explicit request still drains other pending work once, since a busy CLI may have already returned.
-        const otherWork=passOptions.workId!==undefined && after.length>0;
-        if(!changed && !otherWork)break;
-        passOptions={...options,provider,workId:undefined,confirmedMissingIssue:undefined};
-      }
-    }finally{await lease.release();}
-    first=false;
-    // Check after releasing: a caller that saw the lock busy necessarily committed its mutation before this read.
-    const afterRelease=JSON.stringify(records.trackerPending());
-    if(afterRelease===lastSeen || afterRelease===previousAfter)return;
-    previousAfter=afterRelease;
-  }
-}
-async function drain(records: WorkRecords, options: StructureSyncOptions): Promise<void> {
-  let setups: RepositorySetup[];
-  try { setups = options.setups ?? readRepositorySetups(options.dir ?? boardDataDir()); } catch { return; }
-  const provider = options.provider ?? structureProvider();
-  const pending = records.trackerPending();
-  const sequence = Math.max(0, ...pending.map(entry => entry.sequence));
-  const seen = new Set<string>();
-  for (const entry of options.workId ? [{ workId: options.workId, sequence }] : pending) {
-    let snapshot: TrackerSnapshot;
-    try { snapshot = records.trackerSnapshot(entry.workId); } catch { continue; }
-    if (seen.has(snapshot.root)) continue; seen.add(snapshot.root);
-    const current=()=>{try{return trackerDigest(records.trackerSnapshot(entry.workId))===trackerDigest(snapshot);}catch{return false;}};
-    const assertCurrent=()=>{if(!current())throw new StaleStructure();};
-    const structural = hasTrackerStructure(snapshot);
-    const configs = snapshot.nodes.map(node => setups.find(setup => sameRepo(setup.repo, node.repository)));
-    if (configs.some(setup => setup?.structureSync === false)) continue;
-    const checkpoint = records.trackerCheckpoint(entry.workId);
-    if(checkpoint.conflict && !options.workId) continue;
-    if (!structural) {
-      if(checkpoint.remoteDigest){
-        try {
-          for(const node of snapshot.nodes){
-            if(!node.ticket)continue;
-            const setup=setups.find(setup=>sameRepo(setup.repo,node.repository));
-            if(!setup || structureSyncOperations(node.repository).filter(operation=>operation!=='publish-ticket').some(operation=>writeAccessProblem(node.repository,operation,setup.access)!==null))throw Error(`${node.repository}: issue editing access is unverified. Check access in repository settings.`);
-            const ticket=await provider.read(node.repository,numberOf(node.ticket));const prior=readTrackerStructure(ticket.body);
-            if(!prior?.snapshot)continue;
-            if(prior.identity!==node.key || prior.snapshot.digest!==checkpoint.remoteDigest){if(current())records.trackerFailed(entry.workId,'This issue changed on another machine. Its pending structural removal was kept.',true,trackerDigest(snapshot));throw Error('Structural removal conflicts with another machine.');}
-            assertCurrent();
-            await provider.replace(ticket,writeTrackerStructure(ticket.body,{version:1,kind:node.kind,identity:node.key,repository:node.repository}));
-          }
-        }catch(error){if(error instanceof TrackerSyncLockLost)throw error;if(!(error instanceof StaleStructure)&&current())records.trackerFailed(entry.workId,fail(error),true,trackerDigest(snapshot));continue;}
-      }
-      records.trackerSaved(entry.workId, sequence, trackerDigest(snapshot), ''); continue;
-    }
-    const retryMap = retries.get(records) ?? new Map<string,{digest:string;after:number}>(); retries.set(records,retryMap);
-    const fingerprint = trackerDigest(snapshot);
-    const retry = retryMap.get(snapshot.root);
-    if (!options.workId && retry?.digest === fingerprint && Date.now() < retry.after) continue;
-    if (trackerDigest(snapshot) === checkpoint.localDigest && !checkpoint.error) { records.trackerSaved(entry.workId, sequence, checkpoint.localDigest, checkpoint.remoteDigest ?? ''); continue; }
-    try {
-      for (let index = 0; index < configs.length; index++) {
-        const setup = configs[index];
-        if (!setup) throw Error(`Add ${snapshot.nodes[index]!.repository} before saving this concept's structure.`);
-        for (const operation of structureSyncOperations(setup.repo)) {
-          const problem = writeAccessProblem(setup.repo, operation, setup.access);
-          if (problem) throw Error(problem);
-        }
-      }
-      // A dependency's existing owner issue is a durable member too, so it can recover the graph from its own List.
-      for(const node of snapshot.nodes){
-        if(node.ticket && !records.trackerWorkId(node.key)){
-          const remote=await provider.read(node.repository,numberOf(node.ticket));
-          records.trackerRememberMember({...node,kind:remote.kind ?? node.kind},remote.title || node.title,stripTrackerStructure(remote.body));
-        }
-      }
-      snapshot=records.trackerSnapshot(entry.workId);
-      // Stable public identities reconcile an uncertain create before a second request is possible.
-      for (const node of snapshot.nodes) {
-        if (node.ticket) continue;
-        const matches = await provider.find(node.repository, node.key);
-        if (matches.length > 1) throw Error('More than one issue has this concept part identity. Resolve the duplicate before saving.');
-        const setup = setups.find(setup => sameRepo(setup.repo, node.repository))!;
-        const marker: TrackerStructure = { version: 1, kind: node.kind, identity: node.key, repository:node.repository };
-        const target = node.repository.split('/').length !== 2 && setup.itemSource?.kind === 'azure-board'
-          ? await provider.creationTarget?.(node.repository,setup.itemSource.team) : undefined;
-        assertCurrent();
-        if (!matches.length) {
-          if (options.confirmedMissingIssue === node.key) records.trackerClearCreation(node.key);
-          if (!records.trackerReserveCreation(node.key)) throw Error(`Issue creation for ${node.title} is unconfirmed. Check the tracker before retrying with --confirmed-missing-issue ${node.key}.`);
-        }
-        const created = matches[0] ?? await provider.create(node.repository, node.title, writeTrackerStructure('', marker), target?.type ?? setup.vocabulary?.[node.kind as 'concept']?.type ?? undefined,target?.areaPath);
-        // Imported identities may differ from their local cache IDs.
-        const localId = records.trackerWorkId(node.key);
-        const local = localId ? records.read(localId) : undefined;
-        if (!local) throw Error('The concept part changed while its issue was created. Its issue identity remains available for recovery.');
-        records.attachTicket(local.workId, local.revision, `${node.repository}#${created.number}`);
-        records.trackerClearCreation(node.key);
-        node.ticket = `${node.repository}#${created.number}`;
-      }
-      const snapshotSequence = Math.max(sequence, ...records.trackerPending().map(item => item.sequence));
-      snapshot = records.trackerSnapshot(entry.workId);
-      const root = snapshot.nodes.find(node => node.key === snapshot.root)!;
-      const rootTicket = await provider.read(root.repository, numberOf(root.ticket!));
-      const remote = readTrackerStructure(rootTicket.body);
-      const remoteDigest = remote?.snapshot?.digest ?? null;
-      assertCurrent();
-      const payload = JSON.stringify(snapshot); const digest = sha(payload);
-      const alreadyCommitted = remoteDigest === digest ? remote?.snapshot : undefined;
-      if (checkpoint.remoteDigest !== remoteDigest && remoteDigest !== null && !alreadyCommitted) {
-        if(current())records.trackerFailed(entry.workId, 'This concept changed on another machine. Your pending structure was kept. Resolve the two versions before saving.', true,trackerDigest(snapshot)); continue;
-      }
-      let manifest = alreadyCommitted;
-      if (!manifest) {
-        const generation = randomUUID();
-        const encoded = gzipSync(payload).toString('base64');
-        const chunks: { id: string; digest: string }[] = [];
-        for (let offset = 0, index = 0; offset < encoded.length; offset += 48_000, index++) {
-          const data = encoded.slice(offset, offset + 48_000);
-          assertCurrent();
-          const id = await provider.comment(rootTicket, `<!-- lar-factory:chunk ${generation} ${index}\n${data}\n-->`);
-          chunks.push({ id, digest: sha(data) });
-        }
-        manifest = { root: structureIssueUrl(root.repository, rootTicket.number), repository:root.repository, generation, digest, previous:remote?.snapshot?.root===structureIssueUrl(root.repository,rootTicket.number) ? remoteDigest : null, chunks };
-      }
-      const part = (node: StructureNode): TrackerPart => ({ url: structureIssueUrl(node.repository, numberOf(node.ticket!)), title: node.title, kind: node.kind, repository:node.repository });
-      const metadata = (node: StructureNode): TrackerStructure => ({ version: 1, kind: node.kind, identity: node.key, repository:node.repository, snapshot: manifest,
-        ...(node.kind === 'concept' && node.map && node.map.length < 24_000 ? { map: node.map } : {}),
-        ...(node.parent ? { parent: part(snapshot.nodes.find(parent => parent.key === node.parent)!) } : {}),
-        parts: snapshot.nodes.filter(child => child.parent === node.key).map(part),
-        blockers: node.blockers.map(key => part(snapshot.nodes.find(blocker => blocker.key === key)!)),
-        connections: snapshot.nodes.filter(other => other.repository !== node.repository).map(part),
-        dependencies: snapshot.dependencies.filter(dependency => dependency.work === node.key).map(({key:_key,work:_work,blocks,...dependency}) => ({...dependency,blocks:blocks.map(key => part(snapshot.nodes.find(build=>build.key===key)!).url)})),
-      });
-      // Commit the root first. Child projections resolve the latest committed root generation on every import.
-      assertCurrent();
-      if (!alreadyCommitted) await provider.replace(rootTicket, writeTrackerStructure(rootTicket.body, metadata(root)));
-      records.trackerCommitted(snapshot.root,digest);
-      const verifiedRoot = await provider.read(root.repository, rootTicket.number);
-      if (readTrackerStructure(verifiedRoot.body)?.snapshot?.digest !== digest) throw Error('The tracker did not preserve the structure manifest. The local structure remains pending.');
-      for (const node of snapshot.nodes.filter(node => node.key !== root.key)) {
-        const ticket = await provider.read(node.repository, numberOf(node.ticket!));
-        assertCurrent();
-        const next=metadata(node);
-        if(JSON.stringify(readTrackerStructure(ticket.body))!==JSON.stringify(next))await provider.replace(ticket, writeTrackerStructure(ticket.body, next));
-      }
-      assertCurrent();
-      records.trackerSaved(entry.workId, snapshotSequence, trackerDigest(snapshot), digest);
-    } catch (error) {
-      if(error instanceof TrackerSyncLockLost)throw error;
-      if(error instanceof StaleStructure || !current())continue;
-      records.trackerFailed(entry.workId, fail(error), /concurrent tracker versions|changed on another machine/i.test(fail(error)),trackerDigest(snapshot));
-      retryMap.set(snapshot.root,{digest:trackerDigest(snapshot),after:Date.now()+30_000});
-    }
-  }
+/** Structural publication is suspended. Keep all journals intact for recovery. */
+export function syncStructures(_records: WorkRecords, _options: StructureSyncOptions = {}): Promise<void> {
+  return Promise.resolve();
 }

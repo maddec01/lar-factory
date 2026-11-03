@@ -205,22 +205,64 @@ test('letting go of a drag that selected text in the row leaves it as it was; a 
 });
 
 const refined = { refinement: { complete: true, reasons: [] }, completion: { complete: false, reasons: ['No delivery planned.'] } };
+const more = (id = C200) => header(id).querySelector('[data-chips-more]');
+/** C200 with nothing that asks for the user's action and no fog left: no part in Needs you and no open decision. */
+const calm = (over: Partial<Item>) => ({ ...sample, items: sample.items.filter((i) => i.kind !== 'decision' && i.status !== 'Needs you').map((i) => i.id === C200 ? { ...i, map: i.map && { ...i.map, fog: [] }, ...over } : i) });
 
 test('a refined concept leaves Shaping and stays in the dock, where its row says Refined and that no delivery is planned', async () => {
-  await mountPage(withItem(C200, refined));
-  expect(text(header().querySelector('[data-refined]'))).toBe('Refined · no delivery planned');
+  await mountPage(calm(refined));
+  expect(text(header().querySelector('[data-refined]'))).toBe('Refined');
+  expect(text(more()!.querySelector('.sr-only')), 'no delivery planned, beside the short badge, keeps the next step its room').toBe('no delivery planned');
+  expect(header().getAttribute('title')).toContain('Refined · no delivery planned');
   expect($(`[data-stage="shaping"] [data-item="${C200}"]`)).toBeNull();
   await press(opener());
-  expect(text(header().querySelector('[data-refined]')), 'an expanded dossier says so too').toBe('Refined · no delivery planned');
+  expect(text(header().querySelector('[data-refined]')), 'an expanded dossier keeps its Refined').toBe('Refined');
+  expect(text(dossier().querySelector('[data-no-delivery]')), 'and says so in words').toBe('No delivery planned.');
+});
+
+test("a refined concept's next step says no delivery is planned, once nothing else has a claim on it", async () => {
+  const quiet = (data: BoardData): BoardData => ({ ...data, items: data.items.filter((i) => i.parentId !== C200) });
+  const partless = { ...refined, subIssues: { completed: 0, total: 0 } };
+  await mountPage(quiet(calm(partless)));
+  expect(text(next())).toBe('No delivery planned');
+  expect(chips(), 'the badge keeps its own word').toEqual(['Refined']);
+  await receive(quiet(calm({ ...refined, subIssues: { completed: 0, total: 3 } })));
+  expect(text(next()), 'unread parts come first').toBe('Some parts are outside the board');
+  await receive(calm(refined));
+  expect(text(next()), 'moving work comes first').not.toContain('No delivery planned');
+  await receive(quiet(calm({ ...partless, completion: { complete: false, reasons: [] } })));
+  expect(text(next()), 'with delivery planned, the usual words').toBe('Nothing waits on you');
 });
 
 test('a refined concept with active builds says Refined alone, and an unrefined one neither', async () => {
-  await mountPage(withItem(C200, { ...refined, completion: { complete: false, reasons: ["Its build W_b isn't Done."] } }));
+  await mountPage(calm({ ...refined, completion: { complete: false, reasons: ["Its build W_b isn't Done."] } }));
   expect(text(header().querySelector('[data-refined]'))).toBe('Refined');
-  await receive(withItem(C200, { refinement: { complete: false, reasons: ["Its map is empty."] }, completion: refined.completion }));
+  await receive(calm({ refinement: { complete: false, reasons: ["Its map is empty."] }, completion: refined.completion }));
   expect(header().querySelector('[data-refined]')).toBeNull();
-  await receive(withItem(C200, { refinement: undefined }));
+  await receive(calm({ refinement: undefined }));
   expect(header().querySelector('[data-refined]')).toBeNull();
+});
+
+test('the row shows one chip by priority: what asks for action over Refined, Refined over fog, and the rest count in its tooltip', async () => {
+  const words = (id = C200) => header(id).getAttribute('title');
+  await mountPage(withItem(C200, refined));
+  expect(chips(), 'a part in Needs you over open decisions and Refined').toEqual(['1 need you']);
+  expect(header().querySelector('[data-refined]')).toBeNull();
+  expect(text(more()!.querySelector('[aria-hidden]'))).toBe('+4');
+  expect(text(more()!.querySelector('.sr-only')), 'the rest read to a screen reader').toBe('2 decisions, Refined, no delivery planned, 2 fog');
+  expect(words()).toContain('1 need you · 2 decisions · Refined · no delivery planned · 2 fog');
+  const title = next().querySelector('[title]')!;
+  expect([title.getAttribute('title'), title.className.split(' ').includes('truncate')], 'the next step cuts off, with its full text in its tooltip').toEqual(['#202 Sign-in screen', true]);
+  await receive(withItem('I_sample12', { status: 'Verify' }, withItem(C200, refined)));
+  expect(chips(), 'an open decision over Refined').toEqual(['2 decisions']);
+  await receive(calm({ ...refined, map: { ...c200.map!, fog: ['An open question.'] } }));
+  expect(chips(), 'Refined over fog').toEqual(['Refined']);
+  expect(words()).toContain('Refined · no delivery planned · 1 fog');
+  await receive(calm({ refinement: undefined, map: { ...c200.map!, fog: ['An open question.'] } }));
+  expect(chips(), 'fog with nothing above it').toEqual(['1 fog']);
+  expect(more(), 'nothing more to count').toBeNull();
+  await receive(calm({ refinement: undefined }));
+  expect(header().querySelector('[data-chips]'), 'no chips, no room').toBeNull();
 });
 
 test('a settled decision counts as done in its part bar, whatever its Status says', async () => {
@@ -240,16 +282,17 @@ test('the line holds the kind, the title and chips that hide at zero, with its T
   expect(text(line())).toContain('#200 lar cloud: website sign-in and relay');
   expect(text(title)).toBe('#200 lar cloud: website sign-in and relay');
   expect(title.getAttribute('title'), 'its cut-off title reads in full in a tooltip').toBe('lar cloud: website sign-in and relay');
-  expect(header().getAttribute('title')).toBe('4 T3 threads · 1 running · 1 awaiting your reply');
-  expect(chips(), 'parts in Needs you, open decisions and the fog left').toEqual(['1 need you', '2 decisions', '2 fog']);
+  expect(header().getAttribute('title'), 'every chip reads in the tooltip, even one that does not show').toBe('1 need you · 2 decisions · 2 fog · 4 T3 threads · 1 running · 1 awaiting your reply');
+  expect(chips(), 'the part in Needs you, ahead of the open decisions and the fog left').toEqual(['1 need you']);
   expect(text(header(C180).querySelector('[data-kind]'))).toBe('Coupled work');
   expect(chips(C180)).toEqual([]);
   expect(header(C180).getAttribute('title'), 'a zero count is left out').toBe('3 T3 threads · 1 running');
   await receive({ ...sample, items: sample.items.map((i) => ({ ...i, threads: [] })) });
-  expect(header().getAttribute('title'), 'with no threads, nothing: never "0 T3 threads"').toBeNull();
+  expect(header().getAttribute('title'), 'with no threads, the chips alone: never "0 T3 threads"').toBe('1 need you · 2 decisions · 2 fog');
+  expect(header(C180).getAttribute('title'), 'with no threads or chips, nothing').toBeNull();
 });
 
-test('a dossier stays on one line: nothing wraps, the title and Azure fields give up their room to an ellipsis, and the chips keep theirs', async () => {
+test('a dossier stays on one line: nothing wraps, the title and Azure fields give up their room to an ellipsis, and the first chip keeps its full width', async () => {
   await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
   const classes = (el: Element) => el.className.split(' ');
   expect(classes(header())).toContain('h-10');
@@ -258,8 +301,10 @@ test('a dossier stays on one line: nothing wraps, the title and Azure fields giv
   const azure = header().querySelector('[data-azure]')!;
   expect(classes(azure.parentElement!)).toEqual(expect.arrayContaining(['shrink-[1000]', 'truncate']));
   expect(azure.getAttribute('title')).toBe('Feature · Active · Ana');
-  // The chips give way before the next step, whole, in their one-chip-high box.
-  expect(classes(header().querySelector('[data-chips]')!)).toEqual(expect.arrayContaining(['h-5', 'min-w-0', 'shrink-[1000]', 'flex-wrap', 'overflow-hidden']));
+  // The next step's title truncates before the first chip gives up any width.
+  const box = classes(header().querySelector('[data-chips]')!);
+  expect(box).toContain('shrink-0');
+  expect(box).not.toContain('overflow-hidden');
   expect(classes(next())).toContain('min-w-0');
   expect(classes(next())).not.toContain('flex-1');
 });
@@ -267,7 +312,9 @@ test('a dossier stays on one line: nothing wraps, the title and Azure fields giv
 test('the blocked chip counts the blocked slices of unfinished parts', async () => {
   const s13 = sample.items.find((i) => i.id === 'I_sample13')!;
   await mountPage(withItem('I_sample13', { slices: s13.slices.map((x, n) => (n < 2 ? { ...x, progress: 'blocked' as const } : x)) }));
-  expect(chips()).toContain('2 blocked');
+  expect(header().getAttribute('title')).toContain('2 blocked');
+  await receive(withItem('I_sample13', { slices: s13.slices.map((x, n) => (n < 2 ? { ...x, progress: 'blocked' as const } : x)) }, calm({})));
+  expect(chips(), 'with nothing above it, it shows').toEqual(['2 blocked']);
 });
 
 const col = (name: string, id = C200) => header(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
@@ -362,7 +409,7 @@ test('parts in Verify or Ready to merge get their own row after Needs you, which
   expect(chips()).toContain('1 need you');
   expect(text(next()), "what's next names the part in Needs you first").toBe('Needs you#202 Sign-in screen');
   await receive(withItem('I_sample12', { status: 'Verify' }, withItem('I_sample10', { status: 'Verify' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] }))));
-  expect([chips(), text(next())], 'with none in Needs you, no need-you chip and no Needs you wording').toEqual([['2 decisions', '2 fog'], 'To verify#202 Sign-in screen']);
+  expect([chips(), text(next())], 'with none in Needs you, no need-you chip and no Needs you wording').toEqual([['2 decisions'], 'To verify#202 Sign-in screen']);
   await receive(withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] }))));
   expect(text(next()), 'a part ready to merge is named to merge').toBe('To merge#140 Owner accounts');
   await receive(withItem('I_sample10', { status: 'Verify' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] })));
@@ -501,6 +548,7 @@ test('once its blockers complete, Start build sends the build, and the header of
   holdPosts(unblocked());
   await mountOpen(withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()));
   expect(text(startIn(next()))).toBe('Start ▾');
+  expect(next().querySelector('.sr-only')?.textContent, 'Next reads to a screen reader and leaves its room to the title').toBe('Next');
   await pressMenu(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
   await press(entries()[1]!);

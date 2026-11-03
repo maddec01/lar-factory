@@ -220,3 +220,15 @@ test('a failed first Spec write shows local Spec, collapsed Original and durable
   assert.match(body, /Exact approved text\./);
   records.close();
 });
+
+test('checks reads the validation record separately from ordinary details', async () => {
+  const { records } = await recordsOn();
+  const build = records.create({ title: 'Checks', repository: WEB, kind: 'build' });
+  const run = records.startCheck(build.workId, { command: ['pnpm', 'test'], folder: '.', role: 'implementer', tree: null, reason: 'Changed tests' });
+  records.finishCheck(run.checkId, { tree: null, exitStatus: 1, interrupted: false, log: null });
+  records.describeFailure(run.checkId, { tests: ['renders checks'], diagnosis: 'Missing section' });
+  const reader = createItemDetails(null, () => undefined, { records });
+  assert.deepEqual(await reader.checks!(boardItem(build.workId)), records.checks(build.workId));
+  assert.equal('checks' in await reader.details(boardItem(build.workId)), false);
+  records.close();
+});

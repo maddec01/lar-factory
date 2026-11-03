@@ -24,21 +24,23 @@ const statsLookup = (reader: ItemStatsReader): T3Reads['stats'] => (threadIds) =
 /** The same answer for every item. */
 const every = <T>(value: T) => (): T => value;
 
+/** A failed read: every item with threads can't be read, while an item with none still has no stats to lose. */
+const failedRead: T3Reads = { stats: (threadIds) => (threadIds.length ? 'unavailable' : undefined), statsUnavailable: true, priced: null };
+
 /** The stats and their residual usage pricing; item threads read apart, through protocolItemThreads. */
 export function loadT3Reads(sources: StatsSources, now: number, withStats = true, threadIds?: readonly string[]): T3Reads {
   if (!withStats) return { stats: every(undefined), statsUnavailable: false, priced: null };
-  if (!existsSync(sources.db)) return { stats: every('unavailable'), statsUnavailable: true, priced: null };
-  const unavailable = { stats: every('unavailable' as const), statsUnavailable: true, priced: null };
+  if (!existsSync(sources.db)) return failedRead;
   try {
     return readT3Db(sources.db, (db) => {
       const { rows, sessions } = protocolStatsInputs(threadIds);
       let stats: ItemStatsReader;
       try { stats = itemStats(db, rows, sources, now, sessions); }
-      catch { return unavailable; }
+      catch { return failedRead; }
       return { stats: statsLookup(stats), statsUnavailable: false, priced: stats.priced };
     });
   } catch {
-    return unavailable;
+    return failedRead;
   }
 }
 

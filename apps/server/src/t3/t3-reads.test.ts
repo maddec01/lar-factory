@@ -38,11 +38,13 @@ test("one read of the database gives each item its record's threads' stats, and 
 test('a missing or unreadable usage database reports unavailable stats', (t) => {
   const missing = loadT3Reads({ db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite'), ...NOWHERE }, NOW);
   assert.deepEqual([missing.stats(['a']), missing.statsUnavailable, missing.priced], ['unavailable', true, null]);
+  assert.equal(missing.stats([]), undefined, 'an item with no threads has nothing a failed read lost');
   const changed = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`] }]);
   vi.stubEnv('T3_STATE_DB', changed + '.unavailable');
   t.onTestFinished(() => { vi.unstubAllEnvs(); });
   const broken = loadT3Reads({ db: changed, ...NOWHERE }, NOW);
   assert.deepEqual([broken.stats(['a']), broken.statsUnavailable, broken.priced], ['unavailable', true, null]);
+  assert.equal(broken.stats([]), undefined);
 });
 
 test('a stats read that fails reports unavailable stats', (t) => {

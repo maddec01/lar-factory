@@ -193,7 +193,7 @@ describe('openDatabase', () => {
 
 it('upgrading purges orphaned capture drafts without dropping their replay tombstones', async () => {
   const path = join(tempDir(), 'records.db');
-  const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -9) });
+  const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -10) });
   old.db.prepare('INSERT INTO capture_submissions(request_id,draft,ticket,work_id,target_work_id) VALUES (?,?,?,?,?)')
     .run('capture', 'Private capture description', 'example/product#1', 'deleted-capture', null);
   old.db.prepare('INSERT INTO capture_submissions(request_id,draft,ticket,work_id,target_work_id) VALUES (?,?,?,?,?)')
@@ -208,4 +208,21 @@ it('upgrading purges orphaned capture drafts without dropping their replay tombs
       { request_id: 'pending', draft: 'Pending description', ticket: null },
     ]);
   } finally { updated.close(); }
+});
+
+
+it('refuses an upgrade while a structural writer owns the lease', async () => {
+  const path = join(tempDir(), 'work-records.db');
+  const old = await openDatabase(path, { migrations: [NOTES] });
+  old.write(() => old.db.exec("INSERT INTO notes VALUES ('pending identity')"));
+  const { acquireTrackerSyncLock } = await import('./tracker-lock.ts');
+  const lease = await acquireTrackerSyncLock(path);
+  try {
+    await expect(openDatabase(path, { migrations: [NOTES, () => {}] })).rejects.toThrow(/Restart/);
+    expect(noteTexts(old.db)).toEqual(['pending identity']);
+  } finally { await lease!.release(); }
+  const upgraded = await openDatabase(path, { migrations: [NOTES, () => {}] });
+  expect(noteTexts(upgraded.db)).toEqual(['pending identity']);
+  expect(() => old.read(() => null)).toThrow(/newer/);
+  upgraded.close(); old.close();
 });

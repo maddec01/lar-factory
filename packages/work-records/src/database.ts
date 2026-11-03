@@ -10,6 +10,7 @@ import { chmodSync, closeSync, existsSync, mkdirSync, openSync, rmSync } from 'n
 import { dirname, join } from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
+import { acquireTrackerSyncLock } from './tracker-lock.ts';
 import { MIGRATIONS } from './migrations.ts';
 
 /** The work-record database in the factory's data folder. */
@@ -169,7 +170,17 @@ export async function openDatabase(path = workRecordsPath(), { migrations = MIGR
       : new WorkRecordError('unwritable', `The work-record database ${path} can't be opened: ${error instanceof Error ? error.message : String(error)}.`);
   }
   try {
-    await migrate(db, path, migrations);
+    if (userVersion(db) < migrations.length) {
+      // Old writers check their schema after acquiring this same lease. Holding it
+      // through commit excludes in-flight calls and fences the next old drain.
+      const lease = await acquireTrackerSyncLock(path).catch(() => null);
+      if (!lease) throw new WorkRecordError('busy',
+        'Restart all Lar Factory servers and CLI commands before upgrading. A structural writer could not be excluded; no migration was applied.');
+      try { await migrate(db, path, migrations); }
+      finally { await lease.release(); }
+    } else {
+      await migrate(db, path, migrations);
+    }
   } catch (error) {
     db.close();
     throw error;

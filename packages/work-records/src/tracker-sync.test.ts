@@ -1,9 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { readTrackerStructure, type RepositorySetup } from '@lar-factory/shared';
+import { readTrackerStructure, writeTrackerStructure, type TrackerStructure, type RepositorySetup } from '@lar-factory/shared';
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 import { readStructureSnapshot, syncStructures, structureProvider, type StructureProvider, type StructureTicket } from './tracker-sync.ts';
 import { trackerDigest } from './tracker-cache.ts';
@@ -47,181 +46,6 @@ async function concept(records:WorkRecords) {
   return {root,build,decision,slice};
 }
 
-test('concept and cross-repository structure round trips through tracker, while progress and private refinement stay local',async()=>{
-  const records=await cache();const {root,build}=await concept(records);const fake=fakeProvider();fake.put('team/server',42);
-  const setups=[settings('team/server'),settings('team/apple'),settings('team/relay')];
-  await syncStructures(records,{provider:fake.provider,setups});
-  expect(records.trackerState(root.workId)).toEqual({state:'saved'});
-  expect(fake.writes.filter(write=>write.startsWith('create'))).toHaveLength(2);
-  const saved=await fake.provider.read('team/server',42);expect(saved.body.startsWith('Author text.\n')).toBe(true);
-  const metadata=readTrackerStructure(saved.body)!;expect(metadata.parts).toHaveLength(2);expect(metadata.connections?.some(connection=>connection.url.includes('/team/apple/'))).toBe(true);
-  const {snapshot,digest}=await readStructureSnapshot(saved,metadata,fake.provider,setups);
-  const encoded=JSON.stringify(snapshot);expect(encoded).toContain('flowchart LR');
-  for(const privateText of ['PRIVATE BRIEF','PRIVATE DECISION','PRIVATE ANSWER','PRIVATE SLICE','PRIVATE DOMAIN DRAFT','Queued','queueOrder','buildPhase'])expect(encoded).not.toContain(privateText);
-  const fresh=await cache();const imported=fresh.trackerRestore(snapshot,digest);
-  expect(imported).not.toBe(root.workId);
-  const children=fresh.children(imported);expect(children.map(child=>child.kind).sort()).toEqual(['build','decision']);
-  expect(fresh.list({}).every(record=>record.status==='List')).toBe(true);
-  expect(fresh.body(imported,'map')).toContain('flowchart LR');
-  const restoredBuild=children.find(child=>child.kind==='build')!;
-  expect(fresh.body(restoredBuild.workId,'brief')).toBeNull();expect(fresh.children(restoredBuild.workId)).toEqual([]);
-  expect(fresh.blockingDependencies(restoredBuild.workId)[0]).toMatchObject({need:'Relay contract',owner:'team/relay',ticket:'team/relay#6'});
-  expect(records.read(build.workId).status).toBe('Queued');
-});
-
-test('ordinary tickets and status, brief, decision-answer and slice changes make no tracker writes',async()=>{
-  const records=await cache();let ordinary=records.create({repository:'team/server',kind:'bug',title:'Fix playback',ticket:'team/server#9'});
-  const fake=fakeProvider();await syncStructures(records,{provider:fake.provider,setups:[settings('team/server')]});expect(fake.writes).toEqual([]);
-  ordinary=records.setBody(ordinary.workId,ordinary.revision,'brief','Private');ordinary=records.update(ordinary.workId,ordinary.revision,{status:'Queued'});
-  await syncStructures(records,{provider:fake.provider,setups:[settings('team/server')]});expect(fake.writes).toEqual([]);
-  const {root,build,decision}=await concept(records);fake.put('team/server',42);const setups=[settings('team/server'),settings('team/apple'),settings('team/relay')];
-  await syncStructures(records,{provider:fake.provider,setups});fake.writes.length=0;
-  records.update(build.workId,records.read(build.workId).revision,{status:'Shaping'});
-  records.setBody(build.workId,records.read(build.workId).revision,'brief','A changed private brief');
-  records.setBody(decision.workId,records.read(decision.workId).revision,'answer','Another private answer');
-  await syncStructures(records,{provider:fake.provider,setups});expect(fake.writes).toEqual([]);expect(records.trackerState(root.workId)).toEqual({state:'saved'});
-});
-
-test('disabled saving and unverified issue access never silently write',async()=>{
-  const records=await cache();const {root}=await concept(records);const fake=fakeProvider();fake.put('team/server',42);
-  await syncStructures(records,{provider:fake.provider,setups:[settings('team/server',false),settings('team/apple')]});expect(fake.writes).toEqual([]);
-  const setup=settings('team/server');setup.access['tag-ticket']='unverified';
-  await syncStructures(records,{provider:fake.provider,setups:[setup,settings('team/apple'),settings('team/relay')]});expect(fake.writes).toEqual([]);
-  expect(records.trackerState(root.workId)).toMatchObject({state:'error',message:expect.stringContaining('Access to tag-ticket is not checked yet')});
-});
-
-test('incomplete chunks never commit; corrupt chunks never import; remote changes preserve pending local structure',async()=>{
-  const records=await cache();let root=records.create({repository:'team/server',title:'Concept',kind:'concept',ticket:'team/server#42'});
-  const longMap=`## Destination\nThere.\n\n## Map\n${randomBytes(100_000).toString('base64')}`;
-  root=records.setBody(root.workId,root.revision,'map',longMap);
-  const fake=fakeProvider();fake.put('team/server',42);fake.failComment(2);
-  const setups=[settings('team/server')];await syncStructures(records,{provider:fake.provider,setups});
-  expect(readTrackerStructure((await fake.provider.read('team/server',42)).body)).toBeUndefined();expect(records.trackerState(root.workId)?.state).toBe('error');
-  await syncStructures(records,{provider:fake.provider,setups,workId:root.workId});
-  const saved=await fake.provider.read('team/server',42);const meta=readTrackerStructure(saved.body)!;expect(meta.snapshot!.chunks.length).toBeGreaterThan(1);
-  const first=meta.snapshot!.chunks[0]!;const original=fake.comments.get(first.id)!;fake.comments.set(first.id,original.replace(/\n[A-Za-z0-9+/=]+\n/,'\nAAAA\n'));
-  await expect(readStructureSnapshot(saved,meta,fake.provider,setups)).rejects.toThrow('chunk');fake.comments.set(first.id,original);
-  // Another machine commits a different generation before this machine's changed map is saved.
-  const changed={...meta,snapshot:{...meta.snapshot!,digest:'b'.repeat(64)}};const {writeTrackerStructure}=await import('@lar-factory/shared');
-  fake.issues.set('team/server#42',{...saved,body:writeTrackerStructure(saved.body,changed),version:'99'});
-  records.setBody(root.workId,records.read(root.workId).revision,'map','## Destination\nLocal pending map');const before=fake.writes.length;
-  await syncStructures(records,{provider:fake.provider,setups,workId:root.workId});expect(fake.writes).toHaveLength(before);
-  expect(records.trackerState(root.workId)).toMatchObject({state:'conflict'});expect(records.body(root.workId,'map')).toContain('Local pending map');
-});
-
-test('Azure creates and restores structural work through a local fake CLI, with revision guards and no state or git writes',async()=>{
-  const records=await cache();const dir=handles.at(-1)!.dir;const state=join(dir,'azure.json');const fake=join(dir,'az.mjs');
-  writeFileSync(state,JSON.stringify({items:{},comments:{},writes:[],next:40}));
-  writeFileSync(fake,`#!/usr/bin/env node
-import {readFileSync,writeFileSync,renameSync} from 'node:fs';
-const args=process.argv.slice(2),stateFile=${JSON.stringify(state)},state=JSON.parse(readFileSync(stateFile,'utf8'));
-const value=flag=>args[args.indexOf(flag)+1],resource=value('--resource'),method=value('--http-method');
-const route=Object.fromEntries(args.slice(args.indexOf('--route-parameters')+1).filter(arg=>arg.includes('=')).map(arg=>{const i=arg.indexOf('=');return [arg.slice(0,i),arg.slice(i+1)];}));
-const body=args.includes('--in-file')?JSON.parse(readFileSync(value('--in-file'),'utf8')):undefined;
-const emit=value=>process.stdout.write(JSON.stringify(value));const save=()=>{const next=stateFile+'.'+process.pid;writeFileSync(next,JSON.stringify(state));renameSync(next,stateFile);};
-if(args[0]==='rest'){
- const id=value('--url').match(/workitems\\/(\\d+)/)[1],patch=JSON.parse(readFileSync(value('--body').slice(1),'utf8')),item=state.items[id];
- if(value('--method')!=='patch'||patch[0].path!=='/rev'||patch[0].value!==item.rev)throw Error('Missing REST revision guard');
- state.writes.push({resource:'workitems/rest',method:'PATCH',body:patch});for(const op of patch.slice(1))item.fields[op.path.slice('/fields/'.length)]=op.value;item.rev++;save();emit(item);process.exit(0);
-}
-if(args[0]!=='devops'||args[1]!=='invoke'||!['work','wit'].includes(value('--area')))throw Error('Unexpected write transport');
-if(method!=='GET')state.writes.push({resource,method,body});
-if(resource==='backlogconfiguration')emit({requirementBacklog:{workItemTypes:[{name:'Issue'}]}});
-else if(resource==='teamfieldvalues')emit({defaultValue:'Project\\\\Team'});
-else if(resource==='wiql')emit({workItems:Object.values(state.items).filter(item=>item.fields['System.Description'].includes(body.query.match(/CONTAINS '([^']+)'/)[1])).map(item=>({id:item.id}))});
-else if(resource==='workitemsbatch')emit({value:body.ids.map(id=>state.items[id]).filter(Boolean)});
-else if(resource==='workitems'){
- if(route.id)throw Error('Ambiguous invoke workitems/id route is forbidden');
- if(method==='GET')throw Error('Existing workitems must use the batch resource');
- else if(method==='POST'){const id=++state.next;const item={id,rev:1,fields:{}};for(const op of body)item.fields[op.path.slice('/fields/'.length)]=op.value;state.items[id]=item;save();emit(item);}
- else if(method==='PATCH'){const item=state.items[route.id];if(body[0].path!=='/rev'||body[0].value!==item.rev)throw Error('Missing revision guard');for(const op of body.slice(1))item.fields[op.path.slice('/fields/'.length)]=op.value;item.rev++;save();emit(item);}
- else throw Error('Unexpected work item method');
-}else if(resource==='comments'){
- if(method==='POST'){if(value('--api-version')!=='7.1-preview.4'||!args.includes('format=markdown'))throw Error('Comment format missing');const id=String(++state.next);state.comments[id]=body.text;save();emit({id});}
- else emit({id:route.commentId,text:state.comments[route.commentId]});
-}else throw Error('Unexpected fake Azure resource '+resource);
-if(method!=='GET')save();
-`,{mode:0o755});
-  vi.stubEnv('AZ_PATH',fake);vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY','');
-  let root=records.create({repository:'sample/Project/app',kind:'concept',title:'Cross platform playback'});
-  root=records.setBody(root.workId,root.revision,'map',MAP);
-  root=records.update(root.workId,root.revision,{status:'Shaping'});
-  let build=records.create({repository:'sample/Project/app',kind:'build',title:'Playback implementation',status:'Queued'});
-  build=records.setParent(build.workId,build.revision,root.workId);
-  build=records.setBody(build.workId,build.revision,'brief','PRIVATE AZURE BRIEF');
-  const slice=records.create({repository:'sample/Project/app',kind:'slice',title:'PRIVATE AZURE SLICE'});
-  records.setParent(slice.workId,slice.revision,build.workId);
-  const setup={...settings('sample/Project/app'),itemSource:{kind:'azure-board' as const,team:'Team'}};
-  const provider=structureProvider();await syncStructures(records,{provider,setups:[setup]});
-  expect(records.trackerState(root.workId)).toEqual({state:'saved'});
-  const current=records.read(root.workId);expect(current.ticket).toMatch(/^sample\/Project\/app#\d+$/);
-  const number=Number(current.ticket!.slice(current.ticket!.lastIndexOf('#')+1));
-  const ticket=await provider.read('sample/Project/app',number);const metadata=readTrackerStructure(ticket.body)!;
-  const recovered=await readStructureSnapshot(ticket,metadata,provider,[setup]);const fresh=await cache();
-  const local=fresh.trackerRestore(recovered.snapshot,recovered.digest);expect(fresh.body(local,'map')).toContain('flowchart LR');expect(fresh.read(local).status).toBe('List');
-  expect(records.read(root.workId).status).toBe('Shaping');expect(records.read(build.workId).status).toBe('Queued');
-  expect(fresh.list({}).every(record=>record.status==='List')).toBe(true);
-  for(const privateText of ['Shaping','Queued','PRIVATE AZURE BRIEF','PRIVATE AZURE SLICE','queueOrder','buildPhase'])expect(JSON.stringify(recovered.snapshot)).not.toContain(privateText);
-  const restoredBuild=fresh.children(local).find(record=>record.kind==='build')!;
-  expect(fresh.body(restoredBuild.workId,'brief')).toBeNull();expect(fresh.children(restoredBuild.workId)).toEqual([]);
-  const {writes,items}=JSON.parse(readFileSync(state,'utf8'));expect(items[String(number)].fields['System.AreaPath']).toBe('Project\\Team');
-  expect(writes.some((write:{method:string})=>write.method==='PATCH')).toBe(true);
-  expect(JSON.stringify(writes)).not.toContain('System.State');expect(JSON.stringify(writes)).not.toContain('System.Tags');
-}, 30_000);
-
-test('independent cross-repository roots share one manifest and checkpoint, including edits from either root',async()=>{
-  const records=await cache();let server=records.create({repository:'team/server',kind:'build',title:'Server change',ticket:'team/server#1'});
-  const apple=records.create({repository:'team/apple',kind:'build',title:'Apple change',ticket:'team/apple#2'});
-  server=records.addBlocker(server.workId,server.revision,apple.workId);
-  const fake=fakeProvider();fake.put('team/server',1);fake.put('team/apple',2);const setups=[settings('team/server'),settings('team/apple'),settings('team/relay')];
-  await syncStructures(records,{provider:fake.provider,setups});
-  expect(records.trackerState(server.workId)).toEqual({state:'saved'});expect(records.trackerState(apple.workId)).toEqual({state:'saved'});
-  const first=readTrackerStructure((await fake.provider.read('team/server',1)).body)!.snapshot!;
-  const second=readTrackerStructure((await fake.provider.read('team/apple',2)).body)!.snapshot!;expect(second).toEqual(first);
-  records.addDependency(server.workId,{need:'Server contract',owner:'team/relay'});
-  await syncStructures(records,{provider:fake.provider,setups});expect(records.trackerState(apple.workId)).toEqual({state:'saved'});
-  records.addDependency(apple.workId,{need:'Apple entitlement',owner:'team/platform'});
-  await syncStructures(records,{provider:fake.provider,setups});expect(records.trackerState(server.workId)).toEqual({state:'saved'});
-  for(const [repository,number] of [['team/server',1],['team/apple',2]] as const){
-    const ticket=await fake.provider.read(repository,number);const data=await readStructureSnapshot(ticket,readTrackerStructure(ticket.body)!,fake.provider,setups);
-    const fresh=await cache();const root=fresh.trackerRestore(data.snapshot,data.digest);expect(fresh.trackerSnapshot(root).dependencies).toHaveLength(2);expect(fresh.trackerSnapshot(root).nodes).toHaveLength(2);
-  }
-});
-
-test('ordinary issues linked by a same-repository blocker remain local',async()=>{
-  const records=await cache();const first=records.create({repository:'team/server',kind:'feature',title:'First',ticket:'team/server#1'});
-  const second=records.create({repository:'team/server',kind:'bug',title:'Second',ticket:'team/server#2'});records.addBlocker(first.workId,first.revision,second.workId);
-  const fake=fakeProvider();await syncStructures(records,{provider:fake.provider,setups:[settings('team/server')]});expect(fake.writes).toEqual([]);expect(records.trackerState(first.workId)).toBeUndefined();
-});
-
-test('detaching a concept part retires its old parent manifest and blocker splits retire both old memberships',async()=>{
-  const records=await cache();let root=records.create({repository:'team/server',kind:'concept',title:'Parent',ticket:'team/server#1'});
-  let child=records.create({repository:'team/server',kind:'build',title:'Part',ticket:'team/server#2'});child=records.setParent(child.workId,child.revision,root.workId);
-  const fake=fakeProvider();fake.put('team/server',1,'Author root.');fake.put('team/server',2,'Author child.');const setups=[settings('team/server'),settings('team/apple'),settings('team/relay')];
-  await syncStructures(records,{provider:fake.provider,setups});records.clearParent(child.workId,records.read(child.workId).revision);
-  await syncStructures(records,{provider:fake.provider,setups});
-  const detached=await fake.provider.read('team/server',2);expect(detached.body.startsWith('Author child.')).toBe(true);
-  expect(readTrackerStructure(detached.body)).toMatchObject({kind:'build'});expect(readTrackerStructure(detached.body)?.parent).toBeUndefined();expect(readTrackerStructure(detached.body)?.snapshot).toBeUndefined();
-  const parent=await fake.provider.read('team/server',1);const parentSnapshot=await readStructureSnapshot(parent,readTrackerStructure(parent.body)!,fake.provider,setups);expect(parentSnapshot.snapshot.nodes).toHaveLength(1);
-  let apple=records.create({repository:'team/apple',kind:'build',title:'Apple',ticket:'team/apple#3'});fake.put('team/apple',3,'Author Apple.');
-  child=records.addBlocker(child.workId,records.read(child.workId).revision,apple.workId);await syncStructures(records,{provider:fake.provider,setups});
-  records.removeBlocker(child.workId,records.read(child.workId).revision,apple.workId);await syncStructures(records,{provider:fake.provider,setups});
-  for(const [repo,number] of [['team/server',2],['team/apple',3]] as const){const ticket=await fake.provider.read(repo,number);const metadata=readTrackerStructure(ticket.body)!;expect(metadata.snapshot).toBeUndefined();expect(metadata.blockers).toBeUndefined();expect(metadata.parent).toBeUndefined();}
-});
-
-test('moving a part to another concept updates both parent manifests and fresh imports follow the new owner',async()=>{
-  const records=await cache();const oldParent=records.create({repository:'team/server',kind:'concept',title:'Old',ticket:'team/server#1'});
-  const newParent=records.create({repository:'team/server',kind:'concept',title:'New',ticket:'team/server#3'});
-  let child=records.create({repository:'team/server',kind:'build',title:'Move me',ticket:'team/server#2'});child=records.setParent(child.workId,child.revision,oldParent.workId);
-  const fake=fakeProvider();fake.put('team/server',1);fake.put('team/server',2);fake.put('team/server',3);const setups=[settings('team/server')];
-  await syncStructures(records,{provider:fake.provider,setups});child=records.clearParent(child.workId,records.read(child.workId).revision);records.setParent(child.workId,child.revision,newParent.workId);
-  await syncStructures(records,{provider:fake.provider,setups});
-  const ticket=await fake.provider.read('team/server',2);const metadata=readTrackerStructure(ticket.body)!;expect(metadata.parent?.url).toBe('https://github.com/team/server/issues/3');
-  const recovered=await readStructureSnapshot(ticket,metadata,fake.provider,setups);const fresh=await cache();const root=fresh.trackerRestore(recovered.snapshot,recovered.digest);
-  expect(fresh.read(root).ticket).toBe('team/server#3');expect(fresh.children(root)[0]?.ticket).toBe('team/server#2');
-  const old=await fake.provider.read('team/server',1);expect(readTrackerStructure(old.body)?.parts).toEqual([]);
-});
-
 test('GitHub structural commits append comments, preserve interleaved author edits, find older managed comments and reject forks',async()=>{
   const records=await cache();const dir=handles.at(-1)!.dir;const state=join(dir,'github.json');const fake=join(dir,'gh.mjs');
   writeFileSync(state,JSON.stringify({body:'Author original.',labels:[],comments:[],writes:[],next:100,interleave:true}));
@@ -259,29 +83,6 @@ if(method!=='GET')save();
   await expect(provider.read('team/server',1)).rejects.toThrow('concurrent tracker versions');
 }, 30_000);
 
-test('a dependency owner issue is a reverse-linked durable member and can recover its concept after reset',async()=>{
-  const records=await cache();const root=records.create({repository:'team/server',kind:'concept',title:'Playback',ticket:'team/server#1'});
-  let build=records.create({repository:'team/server',kind:'build',title:'Player',ticket:'team/server#2'});build=records.setParent(build.workId,build.revision,root.workId);
-  const dependency=records.addDependency(root.workId,{need:'Relay endpoint',owner:'team/relay',ticket:'team/relay#6'});records.addDependencyBlock(dependency.dependencyId,dependency.revision,build.workId);
-  const fake=fakeProvider();fake.put('team/server',1);fake.put('team/server',2);const setups=[settings('team/server'),settings('team/relay')];
-  const nativeRead=fake.provider.read;fake.provider.read=async(repo,number)=>({...await nativeRead(repo,number),...(repo==='team/relay'?{title:'Relay author title',kind:'bug' as const}:{})});
-  await syncStructures(records,{provider:fake.provider,setups});expect(records.trackerState(root.workId)).toEqual({state:'saved'});
-  const relay=await fake.provider.read('team/relay',6);const metadata=readTrackerStructure(relay.body)!;
-  expect(metadata.kind).toBe('bug');expect(metadata.connections?.some(connection=>connection.url==='https://github.com/team/server/issues/1')).toBe(true);
-  const saved=await readStructureSnapshot(relay,metadata,fake.provider,setups);expect(saved.snapshot.nodes.find(node=>node.ticket==='team/relay#6')).toMatchObject({repository:'team/relay',kind:'bug',title:'Relay author title'});
-  const fresh=await cache();const restored=fresh.trackerRestore(saved.snapshot,saved.digest);
-  expect(fresh.read(restored).ticket).toBe('team/server#1');expect(fresh.dependencies(restored)[0]?.ticket).toBe('team/relay#6');
-  const owner=fresh.list({repository:'team/relay'})[0]!;expect(owner.title).toBe('Relay author title');expect(owner.status).toBe('List');expect(fresh.trackerSnapshot(owner.workId).root).toBe(saved.snapshot.root);
-  expect(fake.writes).toContain('replace team/relay#6');
-});
-
-test('an unonboarded dependency repository blocks the whole structural save before any provider write',async()=>{
-  const records=await cache();const root=records.create({repository:'team/server',kind:'concept',title:'Playback',ticket:'team/server#1'});
-  records.addDependency(root.workId,{need:'Relay endpoint',owner:'team/relay',ticket:'team/relay#6'});const fake=fakeProvider();fake.put('team/server',1);
-  await syncStructures(records,{provider:fake.provider,setups:[settings('team/server')]});expect(fake.writes).toEqual([]);
-  expect(records.trackerState(root.workId)).toMatchObject({state:'error',message:expect.stringContaining('Add team/relay')});
-});
-
 test('Azure dependency PR references retain their repository URL and round trip separately from work items',async()=>{
   const records=await cache();const root=records.create({repository:'org/Project/server',kind:'concept',title:'Playback',ticket:'org/Project/server#1'});
   records.addDependency(root.workId,{need:'Relay endpoint',owner:'org/Project/relay',ticket:'org/Project/relay#6',pullRequests:['org/Project/relay#7']});
@@ -304,108 +105,6 @@ test('untrusted snapshot shape and repository mismatches fail before any context
     })).rejects.toThrow();expect(contextReads).toBe(0);expect(fresh.list({})).toEqual([]);
   }
 });
-
-test('removing a dependency ticket after recovery retires that owner issue reverse projection',async()=>{
-  const records=await cache();const root=records.create({repository:'team/server',kind:'concept',title:'Playback',ticket:'team/server#1'});
-  records.addDependency(root.workId,{need:'Relay endpoint',owner:'team/relay',ticket:'team/relay#6'});const fake=fakeProvider();fake.put('team/server',1);const setups=[settings('team/server'),settings('team/relay')];
-  await syncStructures(records,{provider:fake.provider,setups});const owner=await fake.provider.read('team/relay',6);const saved=await readStructureSnapshot(owner,readTrackerStructure(owner.body)!,fake.provider,setups);
-  const fresh=await cache();const imported=fresh.trackerRestore(saved.snapshot,saved.digest);const dependency=fresh.dependencies(imported)[0]!;
-  fresh.updateDependency(dependency.dependencyId,dependency.revision,{ticket:null});await syncStructures(fresh,{provider:fake.provider,setups});
-  const retired=readTrackerStructure((await fake.provider.read('team/relay',6)).body)!;expect(retired.snapshot).toBeUndefined();expect(retired.connections).toBeUndefined();
-  expect(fresh.trackerState(imported)).toEqual({state:'saved'});
-});
-
-function deferred() {
-  let resolve!:()=>void;
-  const promise=new Promise<void>(done=>{resolve=done;});
-  return {promise,resolve};
-}
-async function sharedCache(records:WorkRecords) {
-  const second=await openWorkRecords(records.trackerDatabasePath());
-  return second;
-}
-test('two handles to one database drain a busy caller latest map without a board timer or duplicate manifest',async()=>{
-  const records=await cache();const second=await sharedCache(records);
-  try {
-    let root=records.create({repository:'team/server',kind:'concept',title:'Concept',ticket:'team/server#42'});
-    root=records.setBody(root.workId,root.revision,'map','## Destination\nInitial map');
-    const fake=fakeProvider();fake.put('team/server',42);const entered=deferred(),resume=deferred();let paused=false;
-    const provider:StructureProvider={...fake.provider,read:async(repo,num)=>{
-      if(!paused){paused=true;entered.resolve();await resume.promise;}
-      return fake.provider.read(repo,num);
-    }};
-    const options={provider,setups:[settings('team/server')]};
-    const first=syncStructures(records,options);await entered.promise;
-    second.setBody(root.workId,second.read(root.workId).revision,'map','## Destination\nLatest map');
-    await syncStructures(second,options); // The live lease returns immediately with durable work pending.
-    expect(second.trackerState(root.workId)).toEqual({state:'pending'});
-    expect(fake.writes).toEqual([]);
-    resume.resolve();await first;
-    expect(fake.writes.filter(write=>write==='replace team/server#42')).toHaveLength(1);
-    expect(fake.writes.filter(write=>write==='comment')).toHaveLength(1);
-    const ticket=await fake.provider.read('team/server',42);
-    const saved=await readStructureSnapshot(ticket,readTrackerStructure(ticket.body)!,fake.provider,options.setups);
-    expect(saved.snapshot.nodes[0]!.map).toContain('Latest map');
-    expect(records.trackerPending()).toEqual([]);
-    expect(second.trackerState(root.workId)).toEqual({state:'saved'});
-  } finally {second.close();}
-});
-
-test('a failed stale attempt does not mark newer work failed and an explicit owner also drains other components',async()=>{
-  const records=await cache();const second=await sharedCache(records);
-  try {
-    const root=records.create({repository:'team/server',kind:'concept',title:'First',ticket:'team/server#42'});
-    let other=records.create({repository:'team/apple',kind:'concept',title:'Other',ticket:'team/apple#7'});
-    other=records.setBody(other.workId,other.revision,'map','## Destination\nOther initial');
-    const fake=fakeProvider();fake.put('team/server',42);fake.put('team/apple',7);
-    const entered=deferred(),resume=deferred();let paused=false;
-    const provider:StructureProvider={...fake.provider,read:async(repo,num)=>{
-      if(!paused){paused=true;entered.resolve();await resume.promise;throw Error('Obsolete read failed.');}
-      return fake.provider.read(repo,num);
-    }};
-    const options={provider,setups:[settings('team/server'),settings('team/apple')]};
-    const first=syncStructures(records,{...options,workId:root.workId});await entered.promise;
-    second.setBody(root.workId,second.read(root.workId).revision,'map','## Destination\nFirst latest');
-    second.setBody(other.workId,second.read(other.workId).revision,'map','## Destination\nOther latest');
-    await syncStructures(second,{...options,workId:other.workId});resume.resolve();await first;
-    expect(records.trackerPending()).toEqual([]);
-    for(const id of [root.workId,other.workId])expect(second.trackerState(id)).toEqual({state:'saved'});
-    expect(fake.writes.filter(write=>write.startsWith('replace '))).toHaveLength(2);
-    const ticket=await fake.provider.read('team/apple',7);
-    expect((await readStructureSnapshot(ticket,readTrackerStructure(ticket.body)!,fake.provider,options.setups)).snapshot.nodes[0]!.map).toContain('Other latest');
-  } finally {second.close();}
-});
-
-test('a local map change after root commit resumes from its own checkpoint without a false cross-machine conflict',async()=>{
-  const records=await cache();const second=await sharedCache(records);
-  try {
-    const root=records.create({repository:'team/server',kind:'concept',title:'Concept',ticket:'team/server#42'});
-    const fake=fakeProvider();fake.put('team/server',42);const entered=deferred(),resume=deferred();let paused=false;
-    const provider:StructureProvider={...fake.provider,replace:async(ticket,body)=>{
-      await fake.provider.replace(ticket,body);
-      if(!paused){paused=true;entered.resolve();await resume.promise;}
-    }};
-    const options={provider,setups:[settings('team/server')]};const first=syncStructures(records,options);await entered.promise;
-    second.setBody(root.workId,second.read(root.workId).revision,'map','## Destination\nAfter commit');
-    await syncStructures(second,options);resume.resolve();await first;
-    expect(second.trackerState(root.workId)).toEqual({state:'saved'});expect(records.trackerPending()).toEqual([]);
-    const ticket=await fake.provider.read('team/server',42);
-    const saved=await readStructureSnapshot(ticket,readTrackerStructure(ticket.body)!,fake.provider,options.setups);
-    expect(saved.snapshot.nodes[0]!.map).toContain('After commit');
-    // Each digest was committed once. The second commit is the actual later edit, not a duplicate.
-    expect(fake.writes.filter(write=>write==='replace team/server#42')).toHaveLength(2);
-  } finally {second.close();}
-});
-
-test('an unchanged failure stays pending without an immediate drain retry loop',async()=>{
-  const records=await cache();const root=records.create({repository:'team/server',kind:'concept',title:'Concept',ticket:'team/server#42'});
-  const fake=fakeProvider();let attempts=0;
-  const provider:StructureProvider={...fake.provider,read:async()=>{attempts++;throw Error('Service unavailable.');}};
-  await syncStructures(records,{provider,setups:[settings('team/server')],workId:root.workId});
-  expect(attempts).toBe(1);expect(records.trackerPending()).toHaveLength(1);
-  expect(records.trackerState(root.workId)).toEqual({state:'error',message:'Service unavailable.'});
-});
-
 
 test('a stale failure checkpoint cannot overwrite a later structural outbox entry',async()=>{
   const records=await cache();const root=records.create({repository:'team/server',kind:'concept',title:'Concept',ticket:'team/server#42'});
@@ -454,4 +153,66 @@ if(args[0]==='api') {
     { labels: ['backend', 'triage'], assignee: 'writer@example.test', iteration: 'Project\\Sprint' });
   expect(bug.body).toContain('<h2>Steps</h2>');
   expect(bug.number).toBe(9);
+});
+
+test('suspension retains pending work and uncertain creation across explicit retries and setting variants', async () => {
+  const records = await cache();
+  const {root, decision} = await concept(records);
+  records.trackerReserveCreation(decision.workId);
+  const before = records.trackerPending();
+  const checkpoint = records.trackerCheckpoint(root.workId);
+  const fake = fakeProvider();
+  for (const structureSync of [undefined, false, true]) {
+    await syncStructures(records, {provider: fake.provider, setups: [{...settings('team/server'), structureSync} as RepositorySetup],
+      workId: root.workId, confirmedMissingIssue: decision.workId});
+  }
+  expect(fake.writes).toEqual([]);
+  expect(records.trackerPending()).toEqual(before);
+  expect(records.trackerCheckpoint(root.workId)).toEqual(checkpoint);
+  expect(records.trackerReserveCreation(decision.workId)).toBe(false);
+});
+
+test('legacy upgrade preserves every stored row and repeats without changing pending identities', async () => {
+  const records = await cache();
+  const {root, decision} = await concept(records);
+  records.trackerReserveCreation(decision.workId);
+  records.trackerFailed(root.workId, 'Retained conflict', true, 'local-digest');
+  const {DatabaseSync} = await import('node:sqlite');
+  const {MIGRATIONS} = await import('./migrations.ts');
+  const {openDatabase} = await import('./database.ts');
+  const path = records.trackerDatabasePath();
+  const raw = new DatabaseSync(path);
+  raw.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`);
+  const rows = () => raw.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all()
+    .map(({name}) => [name, raw.prepare(`SELECT * FROM "${String(name).replaceAll('"', '""')}"`).all()]);
+  const before = JSON.stringify(rows());
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const upgraded = await openDatabase(path);
+    expect(JSON.stringify(rows())).toBe(before);
+    upgraded.close();
+  }
+  raw.close();
+});
+
+test('legacy snapshot chunks still recover without structural publication', async () => {
+  const {gzipSync} = await import('node:zlib');
+  const {createHash} = await import('node:crypto');
+  const records = await cache();
+  const root = records.create({repository:'team/server',title:'Legacy concept',kind:'concept',ticket:'team/server#42'});
+  const snapshot = records.trackerSnapshot(root.workId);
+  const payload = JSON.stringify(snapshot);
+  const digest = (text: string) => createHash('sha256').update(text).digest('hex');
+  const data = gzipSync(payload).toString('base64');
+  const fake = fakeProvider();
+  fake.put('team/server',42);
+  fake.comments.set('123', `<!-- lar-factory:chunk 11111111-1111-1111-1111-111111111111 0\n${data}\n-->`);
+  const ticket = await fake.provider.read('team/server',42);
+  const metadata: TrackerStructure = {
+    version:1,kind:'concept',identity:root.workId,
+    snapshot:{root:'https://github.com/team/server/issues/42',repository:'team/server',generation:'11111111-1111-1111-1111-111111111111',digest:digest(payload),previous:null,chunks:[{id:'123',digest:digest(data)}]},
+  };
+  ticket.body = writeTrackerStructure('', metadata);
+  const recovered = await readStructureSnapshot(ticket, metadata, fake.provider, [settings('team/server')]);
+  expect(recovered.snapshot).toEqual(snapshot);
+  expect(fake.writes).toEqual([]);
 });

@@ -72,3 +72,15 @@ _Avoid_: required label, system label.
 **Validation record**:
 The broad check runs of a build, each with the tree it tested, its outcome and a log reference, plus each reuse of a result with its stated reason. Later roles read it before running a check again.
 _Avoid_: test log, evidence file.
+
+**Heavy command**:
+A command that can use much of the machine, as the agent running it declares: a whole test suite, a production build, a performance measurement, or anything expected to run over about a minute. Servers and watchers are never heavy commands.
+_Avoid_: expensive check, long command.
+
+**Heavy command limit**:
+How many heavy commands may run at once on one machine, across all builds and worktrees.
+_Avoid_: budget, concurrency setting.
+
+**Slot**:
+Permission to run one heavy command. The heavy command limit is the number of slots.
+_Avoid_: lease, token.

@@ -17,10 +17,9 @@ Install the Mac app from [GitHub Releases](https://github.com/maddec01/lar-facto
 and open it with T3 Code running. In Settings > Repositories, choose Add repository:
 
 1. Choose a repository from your T3 Code projects.
-2. Choose its issue source, domain docs and tracker sync. GitHub uses repository
+2. Choose its issue source and domain docs. GitHub uses repository
    issues; Azure DevOps uses a team's backlog and current sprint together.
-   Choose whether to write domain docs. Tracker structure sync is ON by default
-   and creates a `linked-work` label when first used.
+   Choose whether to write domain docs. Legacy structural publication is suspended.
 3. Choose issue defaults and optional vocabulary mappings, then review Access
    and add the repository. Create issues from Add item, Create issues from retro
    captures and Write the refined spec to the issue all default to ON, including
@@ -82,8 +81,7 @@ It keeps the work ID and works regardless of the Add item default. It sends the
 description, or the current passing brief as Spec with Original when Spec writing
 is ON. Picked retro suggestions use the separate retro default, kind mappings
 and their description. Failed retro creates stay local and report the error for
-later conversion. `lar-work create` alone stays local. Concept captures follow
-structure sync. Each card, row and item details shows GitHub, Azure or a laptop
+later conversion. `lar-work create` alone stays local. Concept captures keep their structure local. Each card, row and item details shows GitHub, Azure or a laptop
 for local work; conversion updates the source icon.
 
 ## Ticket Specs
@@ -119,37 +117,31 @@ safe fallback for sanitizers that strip HTML comments or details. Bugs use Repro
 content intact. Fake-provider fixtures cover preserved and stripped markup; they
 do not establish how a live Azure deployment sanitizes these fields.
 
-## Tracker structure sync
+## Concept refinement and delivery
 
-The ON-by-default onboarding option saves concepts and multi-repository structure
-only. It saves kind, map diagram, parts, Connections between repositories,
-Dependencies on other owners, and which issues belong together. It includes only
-shaping results necessary to explain that structure. Decision records, slices
-and progress stay local. A whole gated brief and its enabled domain drafts use
-the separate Ticket Spec setting. Turning sync OFF keeps
-structure local too and causes no later publish prompt.
+Concept refinement requires a nonempty map, Fog recorded gone and all active
+decisions settled. `lar-work refinement <work ID>` reports incomplete reasons.
+Proposed builds need neither passing gates nor merged PRs for refinement.
+The board shows refinement separately from delivery. Each child's Start build
+remains an explicit choice when its own gate and blockers permit it.
 
-Local structural changes enter an outbox that drains automatically while sync is
-ON. `lar-work sync-structure <work ID>` requests structural sync explicitly.
-The app and local-settings helper use only `structureSync` for this local option,
-stored as `settings.structureSync`.
+Delivery still requires completion of the concept's decisions and builds and
+Fog gone. An unfinished concept with zero active builds has no delivery planned.
+Refinement alone neither releases blockers nor starts retention. Previously
+finished concepts keep their finished history.
 
-GitHub saves managed projections, manifests and compressed chunks in immutable
-comments. The `linked-work` label makes them discoverable. The factory creates
-the label if absent when structure is first used and preserves existing labels.
-Structure sync never patches authored GitHub issue bodies; Ticket Specs use the
-separate body-write path. Azure saves a managed description
-block with revision checks and stores compressed chunks in Markdown comments.
-Onboarding checks the access each provider needs before enabling sync.
+## Structural publication suspended
 
-Conflicting versions stop sync and retain both copies. There is no conflict
-resolution UI yet. Read [the structural protocol](skills/shared/issue-tracker/publication.md#storage-and-conflicts)
-for save, recovery and detach behavior.
+Concept exploration, attachment, local decomposition and cross-repository
+relationships stay local. Settings cannot restore legacy structural publication;
+`lar-work sync-structure` reports the suspension. Pending and recovery data
+remain retained locally. Explicit issue creation and ordinary non-concept Ticket
+Specs retain their Access and duplicate protections.
 
-On a fresh installation, add the repository and add the saved concept or
-multi-repository work from List. This restores kind, map, parts and relationships,
-including Connections and Dependencies. Restored items start in List. Tracker
-sync does not restore ordinary briefs, decisions, slices or build progress.
+Previously committed snapshots can still provide historical structural recovery,
+with no ordinary briefs, decisions, slices or build progress. See
+[publication](skills/shared/issue-tracker/publication.md) for its limits.
+No new sharing arrangement is introduced.
 
 ## Domain docs
 

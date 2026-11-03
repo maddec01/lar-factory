@@ -50,12 +50,11 @@ it. Cached shared values are ignored, and the server reads no repository config.
 reads as OFF. OFF means no drafts, Domain docs says "none", and builds write no
 glossary or ADR files or offer publication later. ON names the glossary and ADR
 paths; shaping drafts entries, enabled ticket Specs include them, and builds
-write them in their PR. The tracker option is ON by default and uses
-only `structureSync`, stored as `settings.structureSync`. Its scope is kind, map
-diagram, parts, Connections, Dependencies and issue grouping. It includes only
-shaping results needed to explain that structure. Queue, board Status, decision
-records, slices and per-item progress stay local. Separate defaults create
-issues from Add item and retro captures and write whole gated briefs as ticket
+write them in their PR. Legacy structural publication is suspended. The prior
+`settings.structureSync` value is retained but cannot enable writes. Pending
+structural content, journals and historical recovery data remain available;
+local exploration creates no structural tracker content. Separate defaults create
+issues from Add item and retro captures and write ordinary gated briefs as ticket
 Specs. All three default to ON and verified Access controls their writes.
 See [issue creation and Specs](../../skills/shared/issue-tracker/work-records.md#issue-creation)
 for conversion, failures, Original preservation and tracker edit provenance.

@@ -131,8 +131,8 @@ Changes
 
 Structure
   sync-structure <work-id>          Suspended; local legacy content is retained.
-                                    Automatic saves use the same durable outbox.
-                                    This path omits briefs and decision answers.
+                                    No structural tracker writes run. Pending data
+                                    and historical recovery material are retained.
                                     Queue order, Status, slices and progress stay local.
                                     Whole gated briefs use the separate Spec path.
   A concept owns decisions and builds. Buildable work owns slices, including
@@ -155,9 +155,13 @@ Completion
   thread ending never completes work. A build, or any other record that becomes
   a PR, completes once its recorded PR is observed merged. A slice completes once
   it is finished. A decision completes once its answer and domain drafts are
-  recorded and its concept's map is written after them. A concept completes once
-  its Fog is gone and every decision and build it owns, except set-aside ones, is
-  complete, and a build stays incomplete while an unmet Dependency holds it.
+  recorded and its concept's map is written after them. Concept refinement needs
+  a nonempty map, Fog gone and every active decision incorporated into that map.
+  Proposed builds need not be ready or merged for refinement. Concept delivery
+  needs active builds, Fog gone and every active decision and build complete.
+  An unfinished concept with no active builds has no delivery planned and stays
+  incomplete. Previously finished history is preserved. Refinement alone neither
+  starts retention nor releases blockers. An unmet Dependency holds its build.
   Work can start once each of its blockers is complete and no unmet Dependency
   holds it.
   refinement <work-id>              Print concept refinement and incomplete reasons.

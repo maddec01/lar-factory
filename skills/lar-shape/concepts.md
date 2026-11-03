@@ -74,17 +74,13 @@ timeout. Then, in this order, so completion reads it as complete:
    the destination is fully decided, make a build record for it
    (`slice.sh <concept work ID> "<title>" <brief file> --kind build`) with a
    brief ([3. Brief](brief.md)) whose Domain docs copies the map entries that
-   build needs, run the [gate](gate.md) and set it Ready.
+   build needs. Proposed builds can remain ungated. Run the [gate](gate.md)
+   and set a build Ready when preparing it for implementation.
 3. Save the concept's map. Put only results needed to explain parts or
    relationships in Decisions so far; keep the full answer in the decision
    record. Copy its drafts into Domain docs, remove cleared fog and redraw the
    Map. Once no Fog is left, record it with
    `lar-work set-fog <concept work ID> --revision N --fog gone`.
-
-After saving a structural change, follow
-[Tracker structure sync](shared/issue-tracker/publication.md). Sync does not
-require passing build gates or a commitment to implement. Ordinary decision
-answers and domain drafts remain local.
 
 Start each new research decision at once, as in step 3; every other new
 decision waits in Queued as in step 4, and each build in Ready for the board's
@@ -94,6 +90,12 @@ builds follow the build rules: each changes one repository, and work in another
 repository becomes a build there or a Dependency per
 [Other repositories](shared/issue-tracker/work-records.md#other-repositories).
 A blocked build starts once its blockers are complete and the user has marked
-each Dependency holding it met. The concept is complete once its Fog is gone and
-every decision and build it owns is complete
-([Completion](shared/issue-tracker/work-records.md#completion)).
+each Dependency holding it met. Consult `lar-work refinement <concept work ID>` independently of delivery.
+Refinement requires a nonempty map, Fog recorded gone and every active decision
+settled. Fix its incomplete reasons. Proposed builds need neither passing gates
+nor merged PRs for refinement. Each child's Start build remains an explicit,
+independent choice when its own gate and blockers permit it.
+
+Read [Completion](shared/issue-tracker/work-records.md#completion) for delivery
+and [Structural publication suspended](shared/issue-tracker/publication.md)
+for local structure and retained recovery data.

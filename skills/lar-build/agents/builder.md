@@ -44,8 +44,8 @@ Build step 1 and plan from the brief.
 - **Project rules**: every prompt carries `<lar-build>/project-rules.md`.
 - **Fixer**: commits on the build branch here as `git commit --fixup <sha>`
   (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
-  never `--no-verify`, and reruns only the project checks for the
-  files its fix touched, never the full suite. Its prompt carries
+  never `--no-verify`, and follows Checks in `<lar-build>/project-rules.md`, rerunning only the
+  failed check when fixing a check failure. Its prompt carries
   `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
 
 ## Build
@@ -72,8 +72,7 @@ Build step 1 and plan from the brief.
    worktree, test first per `<lar-build>/test-first.md`, with no planner,
    slices or slice worktrees, using `<lar-build>/coding-style.md`,
    plus `<lar-build>/design-modules.md` when a module's shape changes. Commit
-   per the repo's commit rules, run the project checks for the
-   changed files, then go to step 5. Any other build starts a **planner**
+   per the repo's commit rules, follow Checks in `<lar-build>/project-rules.md`, then go to step 5. Any other build starts a **planner**
    subagent with `planner.md`, the build's work ID and the repo path; it
    returns the slice list.
 3. **Implement.** Follow **Launch reporting and recovery** in
@@ -126,7 +125,7 @@ Build step 1 and plan from the brief.
 6. A subagent runs the full project check suite, once, on the build
    branch HEAD, and returns that commit's tree (`git rev-parse HEAD^{tree}`):
    the step 6 tree. Failures go to the fixer. All must pass. A fix for a
-   failing step 6 check reruns only the fixer's checks, and the step 6 tree
+   failing step 6 check reruns only that failed check, and the step 6 tree
    stays the tree the full suite ran on, so the approver finds a changed tree
    and reruns the full suite.
 7. Push the branch. Don't open the PR yet.

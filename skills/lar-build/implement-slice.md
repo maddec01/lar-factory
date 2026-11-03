@@ -4,7 +4,7 @@ Implement the work the slice's brief describes. The builder passes the slice's w
 
 Follow `test-first.md` at public boundaries chosen from the brief and existing tests.
 
-Follow the repository's rules per `project-rules.md`. Run only the project checks for the changed files. The builder runs the full suite once per build.
+Follow the repository's rules per `project-rules.md`. Follow its Checks section while implementing.
 
 The builder arranges review after slices are integrated.
 

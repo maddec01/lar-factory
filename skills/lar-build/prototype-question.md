@@ -22,6 +22,13 @@ The two branches produce very different artifacts, so getting this wrong wastes 
 5. **Surface the state.** After every action (logic) or on every variant switch (UI), print or render the full relevant state so the user can see what changed.
 6. **Capture it when done.** Record the validated decision without implementing the product change. Capture the prototype itself as a **primary source**: commit it to a `prototype/<slug>` branch, out of main, and leave a context pointer to that branch in the work record's brief or decision answer. Capture the answer too (the verdict and the question it settled) in the work record or a commit. Shaping leaves the main branch unchanged.
 
+## Run the prototype
+
+Run no project-wide typecheck, lint, unused-code check or test suite, even when
+project instructions ask for them on changes. Build only what starting the
+prototype needs. Then drive the interaction its question depends on, including
+every variant or walkthrough once. Fix what fails or name it in your report.
+
 ## Show the variants inside T3
 
 The Prototype child returns each variant's start command or HTML path, worktree path, branch, preferred port and short description. Keep screenshots in the child's context. The shaping or decision thread shows every variant inside T3; never hand the user a path, URL or command or open anything outside T3.

@@ -198,8 +198,8 @@ const PR_STATS_MS = 5 * 60_000;
 /** The running tool check, so Recheck and the retry never run two at once. */
 let checkingTools: Promise<void> | null = null;
 /**
- * The startup check of gh, while an onboarded repository needs it, which runs once the board listens; requests other
- * than /healthz and assets wait for it, as a gh that blocks the read has its notice. They wait for no other check: an
+ * The startup check of gh, while an onboarded repository needs it, which runs once the board listens; requests that run
+ * tools wait for it, as a gh that blocks the read has its notice. They wait for no other check: an
  * Azure DevOps source names its own az problems, and the other tools' notices show as their checks land.
  */
 let firstGhCheck: Promise<void> | undefined;

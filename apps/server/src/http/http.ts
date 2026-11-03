@@ -56,7 +56,7 @@ export interface HttpDeps {
    * repositories' configs again and reads every source.
    */
   readSoon(url?: string): void;
-  /** The startup tool check; requests other than /healthz and assets wait for it. */
+  /** The startup tool check; requests that run tools wait for it. */
   ready(): Promise<void> | undefined;
   /** A T3 project's favicon, or undefined when T3 hasn't listed the project or it has none. */
   projectIcon(projectId: string): Promise<ProjectImage | undefined>;
@@ -101,6 +101,13 @@ const SECURITY_HEADERS = {
 
 /** T3's policy for a project's SVG favicon, which blocks the file's scripts even when opened as a page. */
 const SVG_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+
+/** The views of the board's data, which say which checks still run, so a page shows the first check's progress as it runs. */
+const BOARD_VIEWS = new Set(['/', '/api/board', '/api/events']);
+
+/** Whether a request needs no tool: the health check, assets and the board's views answer at once; the rest run tools or act on what the lookup found. */
+const answersAtOnce = (method: string | undefined, path: string) =>
+  path === '/healthz' || path.startsWith('/assets/') || (method === 'GET' || method === 'HEAD') && BOARD_VIEWS.has(path);
 
 function send(res: ServerResponse, status: number, type: string, body: string | Buffer): void {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
@@ -617,8 +624,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     const startedAt = performance.now();
     let gateMs = 0;
     if (path !== '/api/events') res.once('finish', () => loopTrace.request(`${req.method} ${path}`, performance.now() - startedAt, gateMs));
-    // The health check must answer at once; everything else runs tools or shows what the lookup found.
-    if (path !== '/healthz' && !path.startsWith('/assets/')) {
+    if (!answersAtOnce(req.method, path)) {
       await ready();
       gateMs = performance.now() - startedAt;
     }

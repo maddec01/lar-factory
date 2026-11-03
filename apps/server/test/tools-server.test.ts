@@ -20,19 +20,24 @@ const allOk = { gh: 'ok', t3: 'ok', git: 'ok', jq: 'ok', curl: 'ok' };
 const ghMissing = { ...allOk, gh: { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' } };
 const ghLoggedOut = { ...allOk, gh: { result: 'logged-out', version: '2.96.0', fix: 'gh auth login' } };
 
-/** Whether t3, git, jq and curl have landed, which the page doesn't wait for. */
-const landed = (data: BoardData) => (['t3', 'git', 'jq', 'curl'] as const).every((name) => data.tools?.[name]);
+/** Whether every check the first lookup asked for has landed. */
+const landed = (data: BoardData) => (['t3', 'git', 'jq', 'curl'] as const).every((name) => data.tools?.[name]) && !data.toolProgress?.checking.includes('gh');
 const checked = (board: Board) => until(board, landed);
 
 /** The board data once the first read has finished, or failed, and every check has landed. */
 const afterRead = (board: Board) => until(board, (d) => Boolean(d.fetchedAt || d.error) && landed(d));
 
-test('the board listens before a slow login shell answers, and its data waits for that first lookup', async (t) => {
+test('the board listens before a slow login shell answers, and its data shows the check running until that first lookup lands', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'lar-slow-shell-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const shell = join(dir, 'slow-shell');
   writeFileSync(shell, '#!/bin/sh\nsleep 1\nexec /bin/sh -c "$2"\n', { mode: 0o755 });
   const board = await startBoard(t, {}, false, false, { SHELL: shell, GH_PATH: '/nowhere/gh' });
+  // The shell sleeps 1 s, so these answer while the first lookup still runs.
+  const early = await (await fetch(`${board.url}/api/board`)).json() as BoardData;
+  assert.equal(early.tools, undefined);
+  assert.deepEqual(early.toolProgress?.checking, ['gh', 't3', 'git', 'jq', 'curl', 'az']);
+  assert.equal((await fetch(`${board.url}/`)).status, 200);
   assert.deepEqual(results((await checked(board)).tools), ghMissing);
   await board.untilLogged('gh was not found');
   const logs = board.logs();
@@ -322,4 +327,18 @@ test('a slow t3 or jq check holds up neither the page nor the read, and its noti
   const landed = await until(board, (d) => d.tools?.t3 !== undefined && d.tools.jq !== undefined);
   assert.deepEqual(landed.tools?.t3, { result: 'not-running', version: '0.1.4-nightly.1' });
   assert.equal(landed.tools?.jq?.result, 'ok');
+});
+
+test('a request that runs tools waits for the first lookup', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'lar-slow-shell-'));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const shell = join(dir, 'slow-shell');
+  writeFileSync(shell, '#!/bin/sh\nsleep 1\nexec /bin/sh -c "$2"\n', { mode: 0o755 });
+  const board = await startBoard(t, {}, false, false, { SHELL: shell });
+  const held = fetch(`${board.url}/api/item-labels?repo=none`).then(() => 'answered');
+  const first = await Promise.race([held, fetch(`${board.url}/api/board`).then(() => 'board')]);
+  assert.equal(first, 'board', 'the board data answers first');
+  await held;
+  await board.untilLogged('request GET /api/item-labels');
+  assert.match(board.logs(), /request GET \/api\/item-labels took \d+ ms, \d+ ms of it waiting for the first tool check/);
 });

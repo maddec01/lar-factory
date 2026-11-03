@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, limitNumber, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ItemStats, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
@@ -50,7 +51,9 @@ import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectReads } from './t3/repository-project.ts';
 import { createProjectIcons } from './t3/project-icons.ts';
 import { protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
-import { loadT3Reads, warmT3Stats } from './t3/t3-reads.ts';
+import { loadT3Reads } from './t3/t3-reads.ts';
+import type { T3Reads } from './t3/t3-reads.ts';
+import { createUsageCatchUp } from './t3/usage-catch-up.ts';
 import { lookupThread } from './t3/t3.ts';
 import { sendThreadCommand } from './t3/thread-commands.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
@@ -239,23 +242,20 @@ const firstReadProgress: ReadProgress = {
   },
 };
 
-/** Whether T3's transcripts are being read, or were, for the stats. */
-let warming = false;
+/** When the server started listening, which the startup log lines count from. */
+let listeningAt = 0;
+/** Logs a startup step with its time since the server started listening, so a slow restart names the step that took the time. */
+const timed = (step: string) => log(`startup ${Math.round(performance.now() - listeningAt)} ms: ${step}`);
+
 /**
- * The first read ends: it read the repositories, failed, or the provider's tool blocked it. Then the board reads T3's
- * transcripts for the stats, which would slow the first read, as their parsing shares its thread, and shows and writes
- * them.
+ * The first read ends: it read the repositories, failed, or the provider's tool blocked it. If the board showed no thread
+ * yet, usage catch-up starts now, and its last stats read waits for this.
  */
 const settleFirstRead = () => {
+  if (board.snapshot().firstRead.settled) return;
   moveFirstRead({ running: [], waiting: undefined, ready: undefined, settled: true });
-  if (warming || fixture) return;
-  warming = true;
-  void warmT3Stats(statsSources, recordedThreadIds(board.snapshot().items)).finally(() => {
-    transcriptsRead = true;
-    refreshLocal();
-    // The first read had no fresh stats to write to the builds' open PRs; they have now.
-    void syncPrStats(board.snapshot().items);
-  });
+  timed('first read settled');
+  runLocal(() => usageCatchUp?.advance());
 };
 
 /** Whether gh's check blocks sources of `kind`. A gh that wasn't checked, as no listed repository was on GitHub, blocks nothing. */
@@ -281,8 +281,8 @@ const pricingUnavailable = flipLog(`API cost unavailable: can't read rates from 
 const modelsUnavailable = flipLog(`only T3 default offered: no models read from ${statsSources.settings} and ${modelManifest}`, 'model choices readable again');
 
 /**
- * Whether T3's transcripts were read once since the board started. A cold read of every transcript takes about 12 s,
- * so warmT3Stats reads them without blocking once the first read settles, and the board shows without waiting for it.
+ * Whether usage caught up once since the board started: every thread of the settled first read's items was read or failed,
+ * and a warm read their transcripts. Until then only usageCatchUp reads stats, and the board writes no PR's stats.
  */
 let transcriptsRead = false;
 
@@ -294,14 +294,17 @@ function recordedThreadIds(items: readonly Item[]): string[] {
 }
 
 /**
- * Attaches each item's stats and T3 threads, from one read of T3 Code's database. Stats are those frozen in its
- * latest merged linked PR's block once no linked PR is open, else read afresh from the database and transcripts once
- * those were read; the threads its work record holds are read afresh. The board keeps working without either.
+ * Attaches each item's stats and T3 threads, from one read of T3 Code's database, or from `read`, the stats read
+ * usageCatchUp warmed for. Stats are those frozen in its latest merged linked PR's block once no linked PR is open, else
+ * read afresh from the database and transcripts once those were read; the threads its work record holds are read afresh.
+ * The board keeps working without either.
  */
-function withT3Reads(items: Item[], withStats = true): Item[] {
+function withT3Reads(items: Item[], read: boolean | T3Reads = true): Item[] {
   const now = Date.now();
   const needed = recordedThreadIds(items);
-  const fresh = withStats && transcriptsRead && needed.length > 0;
+  const withStats = read !== false;
+  const warmed = typeof read === 'object';
+  const fresh = warmed || read && transcriptsRead && needed.length > 0 && !usageCatchUp?.active(needed);
   // A deleted thread never counts, even before T3's shells drop it, and an ID T3 can't show would make a read during an outage unavailable.
   const threadIds = (workId: string | undefined) => (workId && records ? records.threads(workId).filter((t) => !t.deletedAt).map((t) => t.threadId) : []);
   const threads = (workId: string | undefined) => {
@@ -312,7 +315,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     const purposes = new Map(records.threads(workId).map(thread => [thread.threadId, thread.purpose]));
     return observed.map(thread => ({ ...thread, purpose: purposes.get(thread.id) }));
   };
-  const { stats, usage, statsUnavailable: unreadable, priced, allObserved } = loadT3Reads(statsSources, now, fresh, needed);
+  const { stats, usage, statsUnavailable: unreadable, priced, allObserved } = warmed ? read : loadT3Reads(statsSources, now, fresh, needed);
   // A partial set moves shared records between items, and needed covers only the items shown, so figures wait for both.
   const provisional = fresh && !(allObserved && board.snapshot().firstRead.settled);
   if (fresh) {
@@ -337,10 +340,13 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     const live = fresh ? stats(ids) : overcounted ? undefined : carried;
     // An item the board just changed carries its old stats until a read reports the change.
     if (overcounted && fresh && usage(ids) === 'current' && !board.changing(item.id)) overcountedStats.delete(item.id);
+    // A read that reads no stats says nothing of the figures already showing.
+    const kept = (): Item['stats'] => isProvisional(before) ? before : known ?? previous;
     const shownStats = (): Item['stats'] => {
-      if (!withStats) return isProvisional(before) ? before : known ?? previous;
+      if (!withStats) return kept();
       const merged = mergedStats({ ...item, stats: known }, provisional ? undefined : live);
       if (merged) return merged;
+      if (!fresh) return kept();
       const figures = retainStats(known, live);
       return provisional && typeof live === 'object' ? { ...figures as ItemStats, provisional: true } : figures;
     };
@@ -376,6 +382,36 @@ const TEST_READ_MS = Number(process.env.BOARD_READ_MS) || 0;
 const LOCAL_REFRESH_MS = 2_000;
 const LOCAL_STATS_MS = 30_000;
 let statsReadAt = -Infinity;
+let figuresShown = false;
+/** How often a stats read may run while thread reads land. Tests shorten it with BOARD_CATCH_UP_MS. */
+const CATCH_UP_STATS_MS = Number(process.env.BOARD_CATCH_UP_MS) || 5_000;
+/** The sample board reads no T3 data. */
+const usageCatchUp = fixture ? null : createUsageCatchUp({
+  sources: statsSources,
+  threadIds: () => recordedThreadIds(board.snapshot().items),
+  settled: () => board.snapshot().firstRead.settled,
+  sinceStatsRead: () => Date.now() - statsReadAt,
+  // An unreadable database recovers at the normal pace; only landing reads hurry a stats read.
+  paceMs: () => board.snapshot().usageRead?.readable === false ? LOCAL_STATS_MS : CATCH_UP_STATS_MS,
+  quietMs: LOCAL_STATS_MS,
+  // Shows the figures on the items as they are, so this path applies no read over the revision guard, shows no record a read
+  // hasn't, and leaves PR writes and armed starts to a local refresh.
+  publish: (reads) => {
+    board.update({ items: withT3Reads(board.snapshot().items, reads) });
+    if (!figuresShown && board.snapshot().items.some((item) => typeof item.stats === 'object' && !item.stats.frozen)) {
+      figuresShown = true;
+      timed('first item with figures');
+    }
+    board.push();
+  },
+  caughtUp: () => {
+    transcriptsRead = true;
+    refreshLocal();
+    // The first read had no fresh stats to write to the builds' open PRs; they have now.
+    void syncPrStats(board.snapshot().items);
+  },
+  timed,
+});
 /** How long an item stays active after its thread stops running or it closes, so a source reads what the agent wrote last. */
 const SETTLE_MS = 5 * 60_000;
 /** The statuses an agent works in, which keep an item active while T3 can't say whether its thread runs. */
@@ -495,6 +531,17 @@ function showTicketType(item: Item, type: string): void {
 function showRecords(withStats = false): void {
   board.applyRead(recordedItems(), board.revision(), (shown) => withT3Reads(shown, withStats));
   if (board.snapshot().items.length > 0) moveFirstRead({ ready: true });
+  recordsShown();
+}
+
+let recordsLogged = false;
+/** The board shows its first items, which may have threads for usage catch-up to read. */
+function recordsShown(): void {
+  const { length } = board.snapshot().items;
+  if (recordsLogged || !length) return;
+  recordsLogged = true;
+  timed(`records shown (${length} items)`);
+  runLocal(() => usageCatchUp?.advance());
 }
 
 /**
@@ -671,6 +718,7 @@ async function refresh(): Promise<void> {
       // A read so far confirms no change the board made, as the source of one may not have read yet, and isn't the
       // whole read fetchedAt times.
       board.applyRead(recordedItems(partial), readRevision, withT3Reads, () => false);
+      recordsShown();
       board.update({ itemSourceProblems: partial.problems ?? [] });
       const successful = items.repos().some(repo =>
         !partial.waiting?.includes(repo.repo) && !partial.problems?.some(problem => problem.repo === repo.repo));
@@ -689,6 +737,7 @@ async function refresh(): Promise<void> {
       specWorkIds = records.list({}).filter(record => record.ticket && refs.has(record.ticket.toLowerCase())).map(record => record.workId);
     }
     board.applyRead(recordedItems(snapshot), readRevision, withT3Reads, items.readAfresh);
+    recordsShown();
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting, ready: true });
     board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? recordsProblem, itemSourceProblems: snapshot.problems ?? [],
       t3Availability: await t3Availability(), t3EnvironmentId: readEnvironmentId(environmentIdFile), ...await repositoryProjectReads(repos) });
@@ -852,6 +901,8 @@ const ports = pinned ? [Number(pinned)] : BOARD_PORTS;
 const port = await listenOnFreePort(server, HOST, ports) ?? await exitWith(ports.length === 1
   ? `port ${ports[0]} is taken; stop what holds it or choose another BOARD_PORT`
   : `ports ${ports[0]} to ${ports.at(-1)} are all taken; stop a board or set BOARD_PORT`);
+listeningAt = performance.now();
+timed('server listening');
 log(`board on http://${HOST}:${port}, reading active work every ${ACTIVE_READ_MS / 1000} s and the rest every ${settings.refreshSeconds} s`);
 reportListening(port);
 // status.sh finds live boards by their records; a sample board isn't one to refresh.
@@ -877,6 +928,7 @@ const localTimer = setInterval(() => {
   if (!fixture) {
     runLocal(() => {
       refreshLocal();
+      runLocal(() => usageCatchUp?.advance());
       runLocal(() => prObserver?.poll());
       if (records?.specPending().length) runLocal(() => syncSpecs(records));
     });

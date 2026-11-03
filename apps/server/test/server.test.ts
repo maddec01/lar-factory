@@ -99,9 +99,9 @@ const rawBuild = (number: number, status: string) => boardIssue(number, status, 
 
 /** The board's items once its first read lands. */
 const readItems = async (board: Board): Promise<Item[]> => (await until(board, (d) => d.items.length > 0)).items;
-/** The items once the board shows live stats, which wait for T3's transcripts to be read after the first read. */
+/** The items once the board shows settled live stats, whose figures are provisional until a stats read after the first read. */
 const readLiveStats = async (board: Board): Promise<Item[]> =>
-  (await until(board, (d) => d.items.some((i) => typeof i.stats === 'object' && !i.stats.frozen))).items;
+  (await until(board, (d) => d.items.some((i) => typeof i.stats === 'object' && !i.stats.frozen && !i.stats.provisional))).items;
 
 test('a failed usage read tells the board, so kept figures can say they are last known', async (t) => {
   const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['build'] }, items: [boardIssue(12, 'Review')] }, false, true, { T3_STATE_DB: join(tmpdir(), 'lar-no-such-t3-database') });
@@ -123,7 +123,8 @@ test('one failed thread fails only the item whose family holds it: its known fig
   const db = statsDb(t, [thread('a'), thread('b')]);
   const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'], 'maddec01/lar-factory#13': ['b'] }, items: [boardIssue(12, 'Review'), boardIssue(13, 'Review'), boardIssue(14, 'Review')] }, false, true, { T3_STATE_DB: db });
   const item = (data: BoardData, number: number) => data.items.find((i) => i.number === number);
-  const known = (await until(board, (d) => typeof item(d, 12)?.stats === 'object' && typeof item(d, 13)?.stats === 'object'));
+  const settled = (stats: Item['stats']) => typeof stats === 'object' && !stats.provisional;
+  const known = await until(board, (d) => settled(item(d, 12)?.stats) && settled(item(d, 13)?.stats));
   assert.equal(item(known, 12)?.usageState, 'current');
   assert.equal(item(known, 14)?.usageState, undefined, 'work with no thread has no usage to wait for');
   writeFileSync(`${db}.execution.json`, JSON.stringify([thread('a', 'failed'), thread('b')]));

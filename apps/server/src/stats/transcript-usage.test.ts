@@ -132,6 +132,20 @@ test('a warm reads the transcripts a scan would read afresh, so the scan after i
   assert.deepEqual(scan().map((r) => r.dedupeKey), ['msg-1:req-msg-1', 'msg-2:req-msg-2']);
 });
 
+test('a warm lets the event loop run between files', async (t) => {
+  const sessions = Object.fromEntries(Array.from({ length: 5 }, (_, i) => [`session-${i}`, { main: [assistant(`msg-${i}`, 0, 0, 0, 1)] }]));
+  const read = claudeSessionRecords(claudeHome(t, sessions));
+  const files = transcriptMisses(() => Object.keys(sessions).flatMap(read));
+  assert.equal(files.length, 5);
+  let turns = 0;
+  let running = true;
+  const turn = () => { turns++; if (running) setImmediate(turn); };
+  setImmediate(turn);
+  await warmTranscripts(files);
+  running = false;
+  assert.ok(turns >= 5, `the loop turned ${turns} times`);
+});
+
 test('a Codex session\'s records come from its rollout, found by the session ID in its file name', (t) => {
   const own = '01a13627-9790-70d0-8342-58f71022e222';
   const fork = '01a13628-c84a-7f33-9a04-c55eb4c75845';

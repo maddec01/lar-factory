@@ -6,6 +6,7 @@ import { itemStats, transcriptsToRead } from '../stats/item-stats.ts';
 import { warmTranscripts } from '../stats/transcript-usage.ts';
 import type { ItemStatsReader, StatsSources } from '../stats/item-stats.ts';
 import { protocolStatsInputs } from './item-execution.ts';
+import type { StatsInputs } from './item-execution.ts';
 import { readT3Db } from './t3-db.ts';
 
 /** Item stats from execution observations and usage, as the board shows them. */
@@ -37,10 +38,14 @@ const loadingRead: T3Reads = { stats: every(undefined), usage: withThreads('load
 /** The stats and their residual usage pricing; item threads read apart, through protocolItemThreads. */
 export function loadT3Reads(sources: StatsSources, now: number, withStats = true, threadIds?: readonly string[]): T3Reads {
   if (!withStats) return { stats: every(undefined), usage: every('current'), statsUnavailable: false, priced: null, allObserved: false };
+  return readStats(sources, now, () => protocolStatsInputs(threadIds));
+}
+
+function readStats(sources: StatsSources, now: number, statsInputs: () => StatsInputs | null): T3Reads {
   if (!existsSync(sources.db)) return failedRead;
   try {
     return readT3Db(sources.db, (db) => {
-      const inputs = protocolStatsInputs(threadIds);
+      const inputs = statsInputs();
       if (!inputs) return loadingRead;
       let stats: ItemStatsReader;
       try { stats = itemStats(db, inputs.rows, sources, now, inputs.sessions); }
@@ -62,19 +67,32 @@ export function loadT3Reads(sources: StatsSources, now: number, withStats = true
   }
 }
 
+/** A warm of the transcripts one stats read needs. */
+export interface WarmedStats {
+  /** How many transcripts the warm read. */
+  files: number;
+  /** The longest one transcript's parsing held the board's thread, in milliseconds. */
+  longestMs: number;
+  /** The stats read over the threads' reads as they stood when the warm started, so it finds their transcripts read. */
+  read(now: number): T3Reads;
+}
+
 /**
- * Reads the transcripts of T3's threads that the next stats read would read afresh, without blocking, and resolves with
- * how many: the first stats read reads every transcript, seconds of work the board shouldn't stop for. A database that
- * can't be read leaves it to the stats read to say so.
+ * Reads the transcripts of T3's threads that the stats read would read afresh, without blocking: the first stats read reads
+ * every transcript, seconds of work the board shouldn't stop for. A database that can't be read leaves its read to say so.
  */
-export async function warmT3Stats(sources: StatsSources, threadIds?: readonly string[]): Promise<number> {
-  if (!existsSync(sources.db)) return 0;
+export async function warmT3Stats(sources: StatsSources, threadIds?: readonly string[]): Promise<WarmedStats> {
+  if (!existsSync(sources.db)) return { files: 0, longestMs: 0, read: () => failedRead };
+  let inputs: StatsInputs | null;
   let files;
   try {
-    files = readT3Db(sources.db, (db) => transcriptsToRead(db, sources, protocolStatsInputs(threadIds)?.sessions ?? []));
+    inputs = protocolStatsInputs(threadIds);
+    if (!inputs) return { files: 0, longestMs: 0, read: () => loadingRead };
+    const { sessions } = inputs;
+    files = readT3Db(sources.db, (db) => transcriptsToRead(db, sources, sessions));
   } catch {
-    return 0;
+    return { files: 0, longestMs: 0, read: () => failedRead };
   }
-  await warmTranscripts(files);
-  return files.length;
+  const longestMs = await warmTranscripts(files);
+  return { files: files.length, longestMs, read: (now) => readStats(sources, now, () => inputs) };
 }

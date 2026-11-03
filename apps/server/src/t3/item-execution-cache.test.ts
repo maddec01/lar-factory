@@ -132,6 +132,49 @@ it('does not acquire histories for shell-only consumers', async () => {
   expect(fixture.read).not.toHaveBeenCalled();
 });
 
+it('a failing thread is read again only on demand, and not before retryAt', async () => {
+  const { protocolItemThreads, protocolThreadReads } = await import('./item-execution.ts');
+  const observedAt = '2026-10-31T12:00:00Z';
+  fixture.read.mockResolvedValue({ availability: 'unavailable' });
+  protocolItemThreads([]);
+  fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [{ id: 'bad', updatedAt: observedAt }], archivedThreads: [] } } });
+  const clock = vi.spyOn(Date, 'now');
+  clock.mockReturnValue(1_000_000);
+  protocolThreadReads(['bad'])!.demand();
+  await vi.waitFor(() => expect(protocolThreadReads(['bad'])!.reads.get('bad')).toBe('failed'));
+  expect(fixture.read).toHaveBeenCalledTimes(1);
+  for (let i = 0; i < 20; i++) protocolThreadReads(['bad'])!.demand();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  expect(fixture.read, 'each demand inside the wait reads nothing, and a failure asks for no read itself').toHaveBeenCalledTimes(1);
+  clock.mockReturnValue(1_001_001);
+  protocolThreadReads(['bad'])!.demand();
+  await vi.waitFor(() => expect(fixture.read).toHaveBeenCalledTimes(2));
+  clock.mockRestore();
+});
+
+it('a thread on neither list reads as failed once the archived list fails, so no catch-up waits on it', async () => {
+  const { protocolItemThreads, protocolThreadReads } = await import('./item-execution.ts');
+  const observedAt = '2026-10-31T12:00:00Z';
+  fixture.archived.mockResolvedValue({ availability: 'unavailable' });
+  protocolItemThreads([]);
+  expect(protocolThreadReads(['lost'])).toBeNull();
+  fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [], archivedThreads: [] } } });
+  expect(protocolThreadReads(['lost'])!.reads.get('lost')).toBe('never');
+  await vi.waitFor(() => expect(protocolThreadReads(['lost'])!.reads.get('lost')).toBe('failed'));
+});
+
+it('stats inputs answer for the reads as they stood, though a read lands after them', async () => {
+  const { protocolItemThreads, protocolStatsInputs } = await import('./item-execution.ts');
+  const observedAt = '2026-10-31T12:00:00Z';
+  fixture.read.mockImplementation(async id => ({ availability: 'available', observation: { observedAt, projection: { thread: { id }, messages: [], providerSessions: [], providerThreads: [], providerTurns: [], runtimeRequests: [], subagents: [] } } }));
+  protocolItemThreads([]);
+  fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [{ id: 'late', updatedAt: observedAt }], archivedThreads: [] } } });
+  const inputs = protocolStatsInputs(['late'])!;
+  await vi.waitFor(() => expect(protocolStatsInputs(['late'])!.familyReads(['late'])).toEqual(['current']));
+  expect(inputs.familyReads(['late']), 'its rows hold no read of it, so it answers for none').toEqual(['never']);
+  expect(inputs.allObserved).toBe(false);
+});
+
 it('coalesces concurrent global demand, bounds reads and includes archived children', async () => {
   const { protocolItemThreads, protocolStatsInputs } = await import('./item-execution.ts');
   const observedAt = '2026-10-31T12:00:00Z';

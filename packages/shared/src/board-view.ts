@@ -52,7 +52,7 @@ export function needsAnswer(item: Item): boolean {
     (item.kind === 'concept' ? !['List', 'Queued', 'Done'].includes(item.status) : item.status === 'Shaping'));
 }
 
-/** A section of the board's main area. `ready` is the Shaping pane's Ready to build group; `dock` is Concepts and linked work. */
+/** A section of the board's main area. `ready` is Ready to build, its own section; `dock` is Concepts and linked work. */
 export type BoardSection = 'desk' | 'queue' | 'shaping' | 'ready' | 'dock' | 'build';
 
 export interface Placement {

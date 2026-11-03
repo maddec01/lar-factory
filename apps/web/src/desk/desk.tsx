@@ -1,9 +1,10 @@
 // Your desk: the items awaiting your action, including shaping and concept questions, as small cards in one row that
 // scrolls sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the
-// same three rows at the same heights, so they line up across cards: status, repository and age; the title; and the
-// next step beside the card's action, with Open thread as an icon in the right corner. An empty desk is one small line.
+// same three rows at the same heights, so they line up across cards: status, source, repository, kind and age; the
+// title; and the next step beside the card's action, with Open thread as an icon in the right corner. An empty desk is
+// one small line.
 
-import { decisionMethodName, needsAnswer, openQuestionThread, HINTS, itemPr, itemName, repoKey, repoName, shortAgo } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, HINTS, itemPr, itemName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -12,7 +13,8 @@ import { KeepClicks } from '../items/keep-clicks.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
-import { SourceIcon } from '../items/source-icon.tsx';
+import { RowKind, RowSource } from '../line/row-identity.tsx';
+import { ROW_OPENS } from '../line/stage-track.tsx';
 
 const MERGE_COLOR: Record<MergeState, string> = { 'can merge': 'var(--st-done)', checking: 'var(--warning)', blocked: 'var(--muted-foreground)', conflicts: 'var(--error)' };
 
@@ -50,23 +52,18 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
   );
 }
 
-/** The status's neighbours on one line, which may truncate, so its tooltip keeps them whole. */
-function DeskFacts({ facts }: { facts: (string | null)[] }) {
-  const text = facts.filter(Boolean).join(' · ');
-  return <span className="truncate text-(--muted-foreground)" title={text}>· {text}</span>;
-}
-
 function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: number }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   // The card takes the click; its summary is a button too, so the keyboard can open the dialog.
   return (
     <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
       className={`desk-card relative grid w-80 shrink-0 cursor-pointer content-start gap-1 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) py-2 pl-3.5 pr-2.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
-      <SourceIcon item={item} corner />
-      <button type="button" className="grid min-w-0 gap-0.5 text-left">
-        <span className="desk-meta flex h-4 min-w-0 items-center gap-1.5 pr-5 text-[11px]">
+      <button type="button" className={`grid min-w-0 gap-0.5 rounded text-left ${ROW_OPENS}`}>
+        <span className="desk-meta flex h-4 min-w-0 items-center gap-1.5 text-[11px]">
           <StatusGlyph status={item.status} className="size-3" /><span className="shrink-0 font-semibold text-(--warning-foreground)">{item.status}</span>
-          <DeskFacts facts={[decisionMethodName(item), repoName(repoKey(item), data.repos), shortAgo(item.updatedAt, now)]} />
+          <RowSource item={item} />
+          <RowKind item={item} />
+          <span className="ml-auto shrink-0 text-(--muted-foreground)">{shortAgo(item.updatedAt, now)}</span>
         </span>
         <span className="desk-title h-5 truncate text-[13px]/5 font-medium" title={`${itemName(item)}`}><ItemTitle item={item} /></span>
         <AzureFields azure={item.azure} />

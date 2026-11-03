@@ -236,12 +236,13 @@ test('a settled decision counts as done in its part bar, whatever its Status say
 test('the line holds the kind, the title and chips that hide at zero, with its T3 threads in its tooltip', async () => {
   await mountPage();
   const title = header().querySelector('[data-title]')!;
-  expect(text(line())).toContain('Concept#200 lar cloud: website sign-in and relay');
+  expect(text(header().querySelector('[data-kind]'))).toBe('Concept');
+  expect(text(line())).toContain('#200 lar cloud: website sign-in and relay');
   expect(text(title)).toBe('#200 lar cloud: website sign-in and relay');
   expect(title.getAttribute('title'), 'its cut-off title reads in full in a tooltip').toBe('lar cloud: website sign-in and relay');
   expect(header().getAttribute('title')).toBe('4 T3 threads · 1 running · 1 awaiting your reply');
   expect(chips(), 'parts in Needs you, open decisions and the fog left').toEqual(['1 need you', '2 decisions', '2 fog']);
-  expect(text(line(C180))).toContain('Coupled work');
+  expect(text(header(C180).querySelector('[data-kind]'))).toBe('Coupled work');
   expect(chips(C180)).toEqual([]);
   expect(header(C180).getAttribute('title'), 'a zero count is left out').toBe('3 T3 threads · 1 running');
   await receive({ ...sample, items: sample.items.map((i) => ({ ...i, threads: [] })) });
@@ -251,7 +252,7 @@ test('the line holds the kind, the title and chips that hide at zero, with its T
 test('a dossier stays on one line: nothing wraps, the title and Azure fields give up their room to an ellipsis, and the chips keep theirs', async () => {
   await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
   const classes = (el: Element) => el.className.split(' ');
-  expect(classes(header())).toContain('h-9');
+  expect(classes(header())).toContain('h-8');
   expect(classes(line())).not.toContain('flex-wrap');
   expect(classes(header().querySelector('[data-title]')!)).toContain('truncate');
   const azure = header().querySelector('[data-azure]')!;
@@ -272,11 +273,12 @@ test("the line's what's next, part bar, parts done, agent figures and repositori
   await mountPage();
   const grid = (id: string) => header(id).className.split(' ').filter((c) => c.includes('grid-cols'));
   expect(grid(C180)).toEqual(grid(C200));
-  expect(['next', 'count', 'figures', 'repos'].map((name) => text(col(name)))).toEqual(['Needs you#202 Sign-in screen', '2/6', '1h 31m · 6.23M · $9.11', 'lar-server']);
+  expect(['next', 'count', 'figures', 'repos'].map((name) => text(col(name)))).toEqual(['Needs you#202 Sign-in screen', '2/6', '1h 31m · 6.23M · $9.11', '']);
   expect(col('bar').querySelectorAll('[data-part-bar] li').length, 'a segment per part').toBe(6);
   expect(next().querySelector('[title]')!.className.split(' '), "what's next ends in an ellipsis").toContain('truncate');
-  expect(col('repos').className.split(' '), 'repositories are muted text that drops when the dock is narrow').toEqual(expect.arrayContaining(['hidden', '@4xl:block', 'text-(--muted-foreground)']));
-  expect([text(col('count', C180)), text(next(C180)), text(col('repos', C180))]).toEqual(['2/2', 'Nothing waits on you', 'lar-server + lar-apple']);
+  expect(col('repos').className.split(' '), 'other repositories are muted text').toContain('text-(--muted-foreground)');
+  expect(text(header(C180).querySelector('[data-repo-cell]')), 'the row names its own repository in its identity cell').toContain('lar-server');
+  expect([text(col('count', C180)), text(next(C180)), text(col('repos', C180))]).toEqual(['2/2', 'Nothing waits on you', '+ lar-apple']);
   expect(next(C180).querySelector('[title]')!.getAttribute('title'), 'its cut-off text reads in full in a tooltip').toBe('Nothing waits on you');
 });
 
@@ -435,21 +437,22 @@ test('the open body has no Check phase, progress rows or stage header; the Work 
 });
 
 test("a part's archived thread reads as archived, not as its last state", async () => {
-  await mountOpen(withItem('I_sample10', { threads: [{ ...thread('put-away', 'done'), archived: true }] }));
-  expect([...step('I_sample10').children].map(text)[2]).toContain('T3 · Thread put-away· archived');
+await mountOpen(withItem('I_sample10', { threads: [{ ...thread('put-away', 'done'), archived: true }] }));
+  expect(text(step('I_sample10').querySelector('[data-part-meta]'))).toContain('T3 · Thread put-away· archived');
 });
 
 test('each part shows what it asks next, then its stage track, status, figures and thread, and its slice bar', async () => {
   await mountOpen(withItem('I_sample13', { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' },
     linkedPrs: [{ ...sample.items.flatMap((i) => i.linkedPrs)[0]!, number: 145, state: 'open', isDraft: false }] }));
-  const lines = (id: string) => [...step(id).children].map(text);
-  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'Open thread', 'GrillShaping28m · 1.87M · $2.71T3 · Grill: relay broker only or full TURN· running']);
-  expect(lines('I_sample12')).toEqual(['#202 Sign-in screen', 'on your desk', 'PrototypeNeeds you41m · 2.95M · $4.35T3 · Prototype: sign-in screen· needs you']);
-  expect(lines('I_sample13').slice(0, 3)).toEqual(['#140 Owner accounts', '1/3Start after #202 ▾', 'BuildReadyFeature · Active · AnaPR #145T3 · Shape: owner accounts· done']);
+  const lines = (id: string) => [step(id).querySelector('[data-row-open] > :first-child'), step(id).querySelector('[data-part-meta]'), step(id).children[1]].map(text);
+  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'GrillShaping28m · 1.87M · $2.71T3 · Grill: relay broker only or full TURN· running', 'Open thread']);
+  expect(lines('I_sample12')).toEqual(['#202 Sign-in screen', 'PrototypeNeeds you41m · 2.95M · $4.35T3 · Prototype: sign-in screen· needs you', 'on your desk']);
+  expect(lines('I_sample13')).toEqual(['#140 Owner accounts', 'BuildReadyFeature · Active · AnaPR #145T3 · Shape: owner accounts· done', '1/3Start after #202 ▾']);
+  expect(step('I_sample13').querySelector('[data-row-open] :is(button, a)'), 'the action is no part of the button that opens details').toBeNull();
   expect(step('I_sample13').querySelector('[data-part-meta] ol')!.getAttribute('title'), "the stage track, dashed while it waits").toBe('Ready, waiting');
   expect(step('I_sample10').querySelector('[data-part-meta] ol')!.getAttribute('title')).toBe('Shaping');
-  expect(step('I_sample13').children[3]!.className.split(' '), 'its slice bar under the row').toContain('col-span-2');
-  await press(button(step('I_sample10'), '#201 Relay: broker only or full TURN?'));
+  expect(step('I_sample13').querySelector('[data-row-open] > :last-child ol'), 'its slice bar under the row').not.toBeNull();
+  await press(step('I_sample10').querySelector('[data-row-open]')!);
   expect(dialogTitle(), 'a part opens its item').toBe('#201 Relay: broker only or full TURN?');
 });
 
@@ -506,8 +509,8 @@ test('once its blockers complete, Start build sends the build, and the header of
 /** #140, Ready, also carrying Verify. */
 test("Start on a Queued decision is today's Start", async () => {
   holdPosts(withDecision());
-  await mountOpen(withDecision());
-  expect(text(step('I_d204'))).toMatch(/^#204 Pick the relay hostStart ▾/);
+await mountOpen(withDecision());
+  expect(text(step('I_d204').children[1])).toBe('Start ▾');
   await pressMenu(startIn(step('I_d204'))!);
   await press(entries()[0]!);
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_d204' }]]);
@@ -520,7 +523,7 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
   await mountOpen(data);
   expect(startIn(step('I_d204'))).toBeNull();
   const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
-  expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Starts by itself once #201, #140 complete']);
+  expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Pick a model to start it once #201, #140 complete']);
   await pressMenu(after);
   await press(entries()[0]!);
   expect(posted(), 'T3 default arms it with no model').toEqual([['/api/arm', { session: 's1', itemId: 'I_d204' }]]);
@@ -563,9 +566,9 @@ test('neither the parts list nor the Work map lanes draw a coloured repository d
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountOpen();
   await press(button(dossier(), 'Show 1 done'));
-  expect([listed().length, dossier().querySelector('[class*="repo-tone"]')]).toEqual([4, null]);
+  expect([listed().length, dossier().querySelector('[class*="repo-tone"]:not([data-project-icon])')]).toEqual([4, null]);
   await press(button(dossier(), 'Work map'));
-  expect([dossier().querySelectorAll('[data-work-map] .sticky').length, dossier().querySelector('[class*="repo-tone"]')]).toEqual([2, null]);
+  expect([dossier().querySelectorAll('[data-work-map] .sticky').length, dossier().querySelector('[class*="repo-tone"]:not([data-project-icon])')]).toEqual([2, null]);
 });
 
 test('the Map view draws Decisions and Builds lanes, its current parts in order, and arrows for what waits on what', async () => {
@@ -599,12 +602,13 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
   const child = rawIssue('I_102', 102, 'In progress', ['build'], {
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
-  await mountOpen({ ...sample, error: null, items: recorded(normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) })) }, 'I_100');
-  expect(text(line('I_100'))).toContain('Coupled work');
+await mountOpen({ ...sample, error: null, items: recorded(normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) })) }, 'I_100');
+  expect(text(header('I_100').querySelector('[data-kind]'))).toBe('Coupled work');
   expect(text(col('count', 'I_100'))).toBe('0/2');
   expect(text(next('I_100'))).toBe('Moving#102 Issue 102');
   expect(listed('I_100'), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
-  expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();
+  expect($$('[data-stage] [data-part="I_102"]').length, 'its own row is in its dossier').toBe(1);
+  expect($('[data-stage="build"] li[data-item="I_102"] [data-concept]'), 'its Build row names its parent').not.toBeNull();
 });
 
 test('the dossiers take the main area\'s scope', async () => {

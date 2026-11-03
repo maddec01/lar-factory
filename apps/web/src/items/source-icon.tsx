@@ -9,13 +9,15 @@ const SOURCE_TEXT = {
 };
 
 /** The ticket determines the source, including when its provider's details haven't loaded yet. */
-export function SourceIcon({ item, corner = false, className = '' }: { item: Pick<Item, 'number' | 'repo' | 'azure'>; corner?: boolean; className?: string }) {
+export function SourceIcon({ item, corner = false, className = '' }: { item: Pick<Item, 'number' | 'repo' | 'azure'> & Partial<Pick<Item, 'sync'>>; corner?: boolean; className?: string }) {
   const source = !item.number ? 'local' : item.azure || onAzure(item.repo) ? 'azure' : 'github';
+  // Planning that hasn't reached the tracker changes nothing the row asks of you, so only the tooltip says so.
+  const text = `${SOURCE_TEXT[source]}${item.sync && item.sync.state !== 'saved' ? ' Planning is saved on this Mac.' : ''}`;
   const shape = corner
     ? 'absolute right-0 top-0 z-10 size-6 rounded-bl-lg rounded-tr-[inherit] border-b border-l'
     : 'size-5 shrink-0 rounded-md border';
   return (
-    <span role="img" aria-label={SOURCE_TEXT[source]} title={SOURCE_TEXT[source]}
+    <span role="img" aria-label={text} title={text}
       className={`grid place-items-center bg-(--soft) text-(--muted-foreground) border-(--border) ${shape} ${className}`}>
       {source === 'local' ? <Laptop className="size-3" strokeWidth={1.75} aria-hidden="true" />
         : source === 'github'

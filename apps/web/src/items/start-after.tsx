@@ -1,6 +1,6 @@
 // Start after, in place of a blocked item's Start: its menu arms the start on a model choice, so the board server
 // starts the item once every issue it's blocked by closes. It reads "Starts after #n ✓" until then, and pressing it
-// again disarms it. A start the server ran by itself and that failed leaves its error on the item. StartOrAfter is
+// again disarms it. Only an armed one says it starts by itself. A start the server ran by itself and that failed leaves its error on the item. StartOrAfter is
 // the item's Start wherever a start can be blocked: Start after alone while it's blocked.
 
 import { useRef, useState } from 'react';
@@ -74,7 +74,7 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
     <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
       <DropdownMenu.Trigger asChild>
         <Button {...buttonKind('start')} leftIcon={ICON.play} className={SHRINKS} data-start-after={item.id} aria-label={`Start ${itemName(item)} after ${after}`}
-          title={`Starts by itself once ${waitsFor(item)}`} {...(data.capture?.enabled === false ? {} : writes)}><span className="truncate">Start after{namesBlocker && ` ${label}`}</span> ▾</Button>
+          title={`Pick a model to start it once ${waitsFor(item)}`} {...(data.capture?.enabled === false ? {} : writes)}><span className="truncate">Start after{namesBlocker && ` ${label}`}</span> ▾</Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} after ${after} with`} {...opensOnChecked}>
         <StartEntries item={item} data={data} onPick={pick} />

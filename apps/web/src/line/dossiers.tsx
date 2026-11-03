@@ -1,11 +1,11 @@
 // The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board, as one
-// line: its kind, title and chips (parts that need you, open decisions, blocked slices, fog, whether it is refined), then
-// what's next, its part bar, parts done, agent figures and repositories in columns that line up across every dossier.
-// Its chevron expands it in place under that same line, in the page's scroll, on its Work map, with the concept's own
-// question above and its Dependencies and fog below. Its parts list instead lists what keeps the work moving (parts that need you,
-// parts to verify or merge, open decisions, blocked slices, waiting parts, parts ready to start, Dependencies and fog) or
-// says nothing holds it up, then each part with what it asks next, its stage track, figures, thread and slices, the done
-// parts folded away. The browser remembers which dossiers are expanded and which view each shows.
+// line: its source, repository, kind, title and chips (parts that need you, open decisions, blocked slices, fog, whether
+// it is refined), then what's next, its part bar, agent figures, parts done and any other repositories, in the columns the
+// board's stage rows keep. Its chevron expands it in place under that same line, in the page's scroll, on its Work map,
+// with the concept's own question above and its Dependencies and fog below. Its parts list instead lists what keeps the
+// work moving (parts that need you, parts to verify or merge, open decisions, blocked slices, waiting parts, parts ready to
+// start, Dependencies and fog) or says nothing holds it up, then each part with what it asks next, its stage track, figures,
+// thread and slices, the done parts folded away. The browser remembers which dossiers are expanded and which view each shows.
 
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
@@ -17,7 +17,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-sy
 import { useBoardStore } from '../board/board-store.ts';
 import { dependenciesOf } from '../items/dependencies.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemTitle, SliceBar, StructureSync, shownStatus, useActivityUnavailable, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, RepoCell, SliceBar, StructureSync, shownStatus, useActivityUnavailable, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
@@ -29,7 +29,8 @@ import { StartBuild } from '../items/start-build.tsx';
 import { PartStart, startable } from './part-start.tsx';
 import { DOCK_COLUMNS, Figures, figuresOf } from './columns.tsx';
 import { Pane } from './pane.tsx';
-import { OnYourDesk, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
+import { OnYourDesk, ROW_OPENS, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
+import { RowKind, RowSource } from './row-identity.tsx';
 import { PartKindLabel, WorkMap } from './work-map.tsx';
 
 const open = (item: Item) => useItemDialogStore.getState().open(item.id);
@@ -112,15 +113,23 @@ function LocalPlanning({ item }: { item: Item }) {
   );
 }
 
-/** A part as a link to its item dialog: its status and its title, up to two lines. */
-function PartLink({ part }: { part: Part }) {
+/** A part's source, status and title, up to two lines. */
+function PartName({ part }: { part: Part }) {
   const { glyph } = useShownStatus(part.item);
   return (
-    <button type="button" onClick={(e) => { e.stopPropagation(); open(part.item); }} title={`${itemName(part.item)}`}
-      className="flex min-w-0 items-start gap-1.5 rounded text-left text-[13px] hover:underline">
+    <span className="flex min-w-0 items-start gap-1.5 text-[13px]">
       <SourceIcon item={part.item} />
       <span className="mt-0.5 inline-flex"><StatusGlyph status={glyph} className="size-3.5" /></span>
       <span className="line-clamp-2"><ItemTitle item={part.item} /></span>
+    </span>
+  );
+}
+
+/** A part as a link to its item dialog. */
+function PartLink({ part }: { part: Part }) {
+  return (
+    <button type="button" onClick={() => open(part.item)} title={itemName(part.item)} className={`min-w-0 rounded text-left hover:underline ${ROW_OPENS}`}>
+      <PartName part={part} />
     </button>
   );
 }
@@ -165,7 +174,7 @@ function Attention({ parent, parts, data, find, only }: { parent: Item; parts: P
       )) },
     { key: 'ready', label: 'Ready to start', tone: 'text-(--st-now)',
       entries: ahead.filter(startable).map((p) => (
-        <Entry key={p.item.id} main={<PartLink part={p} />} side={<span onClick={stop}><PartStart part={p} data={data} label="Start" /></span>} />
+        <Entry key={p.item.id} main={<PartLink part={p} />} side={<PartStart part={p} data={data} label="Start" />} />
       )) },
     { key: 'dependencies', label: 'Dependencies', tone: 'text-(--st-review)',
       entries: [...holds.map(({ part, hold }) => (
@@ -201,59 +210,63 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
   const { status } = part.item;
   const { working } = useShownStatus(part.item);
   const done = isDone(part.item);
-  if (!done && working) return <span onClick={stop}><OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} /></span>;
-  if (!done && YOURS.includes(status)) return <OnYourDesk status={status} />;
-  if (!done && (status === 'Ready' || status === 'Queued')) return <span onClick={stop}><PartStart part={part} data={data} label="Start" /></span>;
+  if (!done && working) return <OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} />;
+  if (!done && YOURS.includes(status)) return <OnYourDesk />;
+  if (!done && (status === 'Ready' || status === 'Queued')) return <PartStart part={part} data={data} label="Start" />;
   const waiting = !done && openWaits(part).length > 0;
-  if (!done && !waiting && canRetryBuild(part.item)) return <span onClick={stop}><StartBuild item={part.item} data={data} /></span>;
+  if (!done && !waiting && canRetryBuild(part.item)) return <StartBuild item={part.item} data={data} />;
   const thread = threadsOf(part.item).length > 0 || (!done && !waiting && ['Shaping', 'In progress', 'Review'].includes(status));
   return <>
     {waiting && <span className="max-w-48 truncate" title={waitsOn(part)}>{waitsOn(part)}</span>}
-    {thread && <span onClick={stop}><OpenThread item={part.item} data={data} /></span>}
+    {thread && <OpenThread item={part.item} data={data} />}
   </>;
 }
 
-/** One part of the parts list: its title and what it asks next, then its stage track, status, agent figures, Azure
- *  fields, PR and thread, its slice bar, and its start's message or error. */
-function PartRow({ part, data }: { part: Part; data: BoardData }) {
+/** One part of the parts list: one button opens its details from its title, stage track, status, agent figures, Azure
+ *  fields, PR, thread and slice bar; what it asks next sits beside that button, and its start's message or error under
+ *  it. `home` is the dossier's own repository, which needs no naming. */
+function PartRow({ part, data, home }: { part: Part; data: BoardData; home: string }) {
   const { item } = part;
   const isPicked = usePicked(item);
   const waits = openWaits(part);
   const shown = useShownStatus(item);
   const s = figuresOf(item, data);
   return (
-    <li onClick={() => open(item)} data-part={item.id} className={`grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 hover:bg-(--accent) ${picked(isPicked)}`}>
-      <span className="flex min-w-0 items-center gap-2"><PartLink part={part} /></span>
-      <span className="flex items-center justify-end gap-2 text-[11px] text-(--muted-foreground)">
-        {item.slices.length > 0 && <span className="tabular-nums">{item.slices.filter((x) => x.progress === 'done').length}/{item.slices.length}</span>}
-        <Action part={part} data={data} />
-      </span>
-      <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
+    <li data-part={item.id} className={`grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 rounded-md px-2 py-1.5 hover:bg-(--accent) ${picked(isPicked)}`}>
+      <button type="button" data-row-open onClick={() => open(item)} title={itemName(item)} className={`grid min-w-0 gap-y-1 rounded text-left ${ROW_OPENS}`}>
+        <PartName part={part} />
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
         <PartKindLabel kind={part.kind} />
+        {repoKey(item) !== home && <RepoCell item={item} />}
         <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} label={shown.word} waiting={waits.length > 0} /></span>
         <span>{isDone(item) ? 'Complete' : shown.word}</span>
         {s ? <Figures s={s} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
         <AzureFields azure={item.azure} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
         <span className="min-w-0 empty:hidden"><ThreadLine part={part} /></span>
+        </span>
+        {item.slices.length > 0 && <span className="pl-5"><SliceBar item={item} /></span>}
+      </button>
+      <span className="flex items-center justify-end gap-2 text-[11px] text-(--muted-foreground)">
+        {item.slices.length > 0 && <span className="tabular-nums">{item.slices.filter((x) => x.progress === 'done').length}/{item.slices.length}</span>}
+        <Action part={part} data={data} />
       </span>
-      {item.slices.length > 0 && <span className="col-span-2 pl-3.5"><SliceBar item={item} /></span>}
       {!isDone(item) && ['Ready', 'Queued', 'In progress'].includes(item.status) && (
-        <span className="col-span-2 pl-5 empty:hidden" onClick={stop}><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /></span>
+        <span className="col-span-2 pl-5 empty:hidden"><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /></span>
       )}
     </li>
   );
 }
 
 /** The parts list: one row per open part in two columns where there's room, the done ones folded into a count. */
-function PartsList({ parts, data }: { parts: Part[]; data: BoardData }) {
+function PartsList({ parts, data, home }: { parts: Part[]; data: BoardData; home: string }) {
   const [showDone, setShowDone] = useState(false);
   const shown = parts.filter((p) => showDone || !isDone(p.item));
   const done = parts.filter((p) => isDone(p.item)).length;
   return (
     <div className="grid gap-1">
       <ol className="m-0 grid list-none gap-x-4 gap-y-0.5 p-0 @4xl:grid-cols-2" data-parts-list>
-        {shown.map((p) => <PartRow key={p.item.id} part={p} data={data} />)}
+        {shown.map((p) => <PartRow key={p.item.id} part={p} data={data} home={home} />)}
       </ol>
       {done > 0 && <button type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)} className="justify-self-start rounded px-2 py-1 text-[11px] text-(--muted-foreground) hover:bg-(--accent)">{showDone ? `Hide ${done} done` : `Show ${done} done`}</button>}
     </div>
@@ -286,8 +299,8 @@ function moving(parent: Item, parts: Part[], unavailable: boolean): Moving {
   };
 }
 
-const kindLabel = (parent: Item) => (parent.kind === 'concept' ? 'Concept' : 'Coupled work');
-const repos = (m: Moving, data: BoardData) => [...new Set(m.parts.map((p) => repoName(repoKey(p.item), data.repos)))].join(' + ');
+/** The repositories the parts work in beyond the dossier's own, which its row already names. */
+const otherRepos = (parent: Item, m: Moving, data: BoardData) => [...new Set(m.parts.filter((p) => repoKey(p.item) !== repoKey(parent)).map((p) => repoName(repoKey(p.item), data.repos)))].map((name) => `+ ${name}`).join(' ');
 
 /** Every part as a segment in its status colour, done first, so the bar fills left to right; a dashed one per part the board doesn't read. */
 function PartsBar({ m }: { m: Moving }) {
@@ -375,29 +388,30 @@ function Next({ m, data, parent }: { m: Moving; data: BoardData; parent: Item })
 const ABOVE_MAP = ['you'];
 const BELOW_MAP = ['dependencies', 'fog'];
 
-/** A dossier's one line in the dock; `lead` sits before its source icon, and `tools`, an expanded dossier's own controls, after its chips. */
+/** A dossier's one line in the dock; `lead` takes the glyph's column of a stage row, and `tools`, an expanded dossier's own controls, sit after its chips. */
 function DossierLine({ parent, parts, data, lead, tools, onClick, className = '' }: { parent: Item; parts: Part[]; data: BoardData; lead: ReactNode; tools?: ReactNode; onClick?: (e: MouseEvent<HTMLDivElement>) => void; className?: string }) {
   const isPicked = usePicked(parent);
   const m = moving(parent, parts, useActivityUnavailable());
   const threads = [parent, ...parts.map((p) => p.item)].flatMap(threadsOf);
   return (
     <div onClick={onClick} data-item={parent.id} title={threadCounts(threads) || undefined}
-      className={`grid ${DOCK_COLUMNS} h-9 items-center gap-x-3 pl-1.5 pr-3 ${className} ${picked(isPicked)}`}>
+      className={`grid ${DOCK_COLUMNS} h-8 items-center gap-x-2 pl-1.5 pr-2 ${className} ${picked(isPicked)}`}>
+      {lead}
+      <RowSource item={parent} />
+      <span className="flex min-w-0" data-kind>{parent.kind === 'concept' ? <RowKind item={parent} /> : <Badge tone="neutral">Coupled work</Badge>}</span>
       <span className="flex min-w-0 items-center gap-1.5" data-line="1">
-        {lead}
-        <SourceIcon item={parent} />
-        <Badge tone="neutral" className="shrink-0">{kindLabel(parent)}</Badge>
         <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
-          className="min-w-0 truncate rounded text-left text-[13px] font-medium hover:underline"><ItemTitle item={parent} /></button>
+          className={`min-w-0 truncate rounded text-left text-[13px] font-medium hover:underline ${ROW_OPENS}`}><ItemTitle item={parent} /></button>
         <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
         <span onClick={stop} className="ml-auto flex shrink-0 gap-1 pl-1" data-chips><Refined parent={parent} /><Counts m={m} /></span>
         {tools && <span onClick={stop} className="flex shrink-0 items-center gap-1.5 pl-1" data-dossier-tools>{tools}</span>}
       </span>
       <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
       <span data-col="bar"><PartsBar m={m} /></span>
+      <span />
+      <span data-col="figures" className="hidden min-w-0 @6xl:grid"><Figures s={figuresOf(parent, data, true)} /></span>
       <span data-col="count" className="text-right text-[11px] tabular-nums text-(--muted-foreground)" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count}</span>
-      <span data-col="figures" className="hidden min-w-0 @4xl:grid"><Figures s={figuresOf(parent, data, true)} /></span>
-      <span data-col="repos" className="hidden truncate text-right text-[11px] text-(--muted-foreground) @4xl:block" title={repos(m, data)}>{repos(m, data)}</span>
+      <span data-col="repos" className="truncate text-right text-[11px] text-(--muted-foreground)" title={otherRepos(parent, m, data)}>{otherRepos(parent, m, data)}</span>
     </div>
   );
 }
@@ -422,7 +436,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
         </>
         : <>
           <Attention parent={parent} parts={parts} data={data} find={find} />
-          <PartsList parts={parts} data={data} />
+          <PartsList parts={parts} data={data} home={repoKey(parent)} />
         </>}
     </div>
   );
@@ -440,12 +454,12 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
   };
   const lead = (
     <button type="button" data-dossier-open aria-expanded={on} aria-label={`${on ? 'Collapse' : 'Expand'} ${itemName(parent)}`} onClick={(e) => { stop(e); setOn(!on); }}
-      className="grid size-6 shrink-0 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground) focus-visible:outline-2 focus-visible:outline-(--primary)">
+      className={`grid size-6 shrink-0 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground) ${ROW_OPENS}`}>
       <ChevronRight className={`size-4 ${on ? 'rotate-90' : ''}`} />
     </button>
   );
   return (
-    <article className="border-b border-(--border) last:border-b-0" data-dossier={parent.id} aria-label={itemName(parent)}>
+    <article className="@container border-b border-(--border) last:border-b-0" data-dossier={parent.id} aria-label={itemName(parent)}>
       <DossierLine parent={parent} parts={parts} data={data} lead={lead} onClick={toggle} className="cursor-pointer hover:bg-(--accent)"
         tools={on && <><LocalPlanning item={parent} /><ViewToggle view={view} onView={setView} /></>} />
       {on && <DossierBody parent={parent} parts={parts} data={data} view={view} />}
@@ -453,6 +467,7 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
   );
 }
 
+/** The dossiers the filters leave; a dossier follows its parent's row. With none, the dock takes no height. */
 export function Dossiers({ dossiers }: { dossiers: DossierItems[] }) {
   const { data } = useBoardStore();
   if (!dossiers.length) return null;

@@ -23,7 +23,7 @@ export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoCon
 /** A row's repository: its project icon and name. Where the ticket is saved is SourceIcon's to say, beside it. */
 export function RepoCell({ item }: { item: Item }) {
   const repos = useBoardStore((state) => state.data.repos);
-  return <span data-repo-cell className="flex min-w-10 items-center gap-1"><ProjectIcon repo={repoKey(item)} size="small" /><span className="truncate">{itemRepoNames(item, repos)}</span></span>;
+  return <span data-repo-cell className="flex min-w-0 items-center gap-1"><ProjectIcon repo={repoKey(item)} size="small" /><span className="truncate">{itemRepoNames(item, repos)}</span></span>;
 }
 
 export function TitleLink({ item, className = 'title' }: { item: Item; className?: string }) {

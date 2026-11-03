@@ -508,7 +508,7 @@ test('a stopped build replaces its remembered Started tag with recovery, also in
   expect(side('I_sample13').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/stopped-build');
   await press(row('I_sample13'));
   expect(text(dialog()!.querySelector('[data-slot="modal-footer"]'))).toContain('Run stopped.');
-  expect(dialog()!.querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/stopped-build');
+  expect(dialog()!.querySelector('[data-open-thread][href$="/stopped-build"]'), 'the recovery keeps its own thread').not.toBeNull();
   const again = side('I_sample13').querySelector<HTMLButtonElement>('[data-start]')!;
   expect(text(again)).toBe('Start again ▾');
   expect(text(dialog()!.querySelector('[data-start]'))).toBe('Start again ▾');

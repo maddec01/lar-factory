@@ -154,7 +154,7 @@ test.each([
   ['Queued', 'I_sample05', ['Move to List', 'Abandon', 'GitHub', 'Shape issue ▾']],
     ['Shaping', 'I_sample07', ['GitHub', 'Open thread']],
   ['Needs you', 'I_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
-  ['blocked Ready', 'I_sample13', ['GitHub', 'Start after #202 ▾']],
+  ['blocked Ready', 'I_sample13', ['GitHub', 'Open thread', 'Start after #202 ▾']],
   ['In progress', 'I_sample14', ['GitHub', 'Open thread']],
   ['Review', 'I_sample15', ['GitHub', 'Open thread']],
   ['Verify', 'I_sample16', ['GitHub', 'Verify build']],
@@ -315,8 +315,8 @@ test('an earlier shaping thread lists beside an archived one, and only the archi
 });
 
 test('a shaping thread still the latest and an earlier build show no row', async () => {
-  await mountPage(withThreads('I_sample10', [{ ...thread('shaping', 'running'), purpose: 'shape' }, { ...thread('old-build', 'done'), purpose: 'build' }]));
-  await openItem('I_sample10');
+  await mountPage(withThreads('I_sample14', [{ ...thread('shaping', 'running'), purpose: 'shape' }, { ...thread('old-build', 'done'), purpose: 'build' }]));
+  await openItem('I_sample14');
   expect(inDialog('[data-earlier-threads]')).toBeNull();
 });
 
@@ -421,7 +421,7 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
   holdPosts(readyBuild);
   await mountPage(readyBuild);
   await openItem('I_sample13');
-  expect(footerControls()).toEqual(['GitHub', 'Start build ▾']);
+  expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Start build ▾']);
   await pressMenu(button('start', 'I_sample13'));
   await settle(() => vi.advanceTimersByTime(20));
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
@@ -436,7 +436,7 @@ test('a build the board started, through Start after or from another page, shows
   await openItem('I_sample13');
   const tag = inDialog('[data-start-result="I_sample13"]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread build-1']);
-  expect(footerControls()).toEqual(['GitHub']);
+  expect(footerControls()).toEqual(['GitHub', 'Open thread']);
 });
 
 test('a failed Start build shows in the dialog and offers Retry start', async () => {
@@ -455,13 +455,13 @@ test('Start build is disabled with the hint while T3 has no project for the repo
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   await mountPage({ ...readyBuild, repositoryProjects: { 'maddec01/lar-server': hint } });
   await openItem('I_sample13');
-  expect(footerControls()).toEqual(['GitHub', `Start build (disabled: ${hint})`]);
+  expect(footerControls()).toEqual(['GitHub', 'Open thread', `Start build (disabled: ${hint})`]);
 });
 
 test("Start build is disabled until onboarding's PR merges while the repository is still onboarding", async () => {
   await mountPage({ ...readyBuild, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
   await openItem('I_sample13');
-  expect(footerControls()).toEqual(['GitHub', "Start build (disabled: Waits for onboarding to finish)"]);
+  expect(footerControls()).toEqual(['GitHub', 'Open thread', "Start build (disabled: Waits for onboarding to finish)"]);
 });
 
 test.each([['running'], ['needs you']] as const)('a Ready item with a %s thread offers Open thread instead of Start build', async (state) => {
@@ -834,7 +834,7 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
   expect([text(ticket), ticket.href, ticket.target], 'its ticket opens in the browser').toEqual(['maddec01/lar-server#40', 'https://github.com/maddec01/lar-server/issues/40', '_blank']);
   expect(text(dependencyRow().querySelector('[data-dependency-evidence]'))).toBe('Evidence: The endpoint answers in staging');
   expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toBe('Its ticket maddec01/lar-server#40 is closed. Mark it met once the change is delivered.');
-  expect(footerControls()).toEqual(['GitHub', 'Start after server team ▾']);
+  expect(footerControls()).toEqual(['GitHub', 'Open thread', 'Start after server team ▾']);
   expect(inDialog<HTMLButtonElement>('[data-start-after]')!.title).toBe('Starts by itself once you mark the Dependency on server team met');
   expect(dependencyRow().querySelector('button')!.getAttribute('aria-label')).toMatch(/^Mark the Dependency on server team met: #140 /);
   await press(dependencyRow().querySelector<HTMLButtonElement>('button')!);
@@ -1072,4 +1072,177 @@ test('choosing a branch uses the model menu and sends recovery options', async (
   expect(posted().at(-1)).toEqual(['/api/start-again', { itemId: id, options: { branchChoice: 'new', confirmedOpenPr: false } }]);
   await answer({ error: 'Start refused' }, 409);
   expect(text($('#needs-you-dialog [data-slot="alert"]'))).toBe('Start refused');
+});
+
+/** The dialog's footer with `threads` on an item at `status`. */
+const footerAt = async (status: Item['status'], threads: Item['threads'], data: BoardData = sample) => {
+  const board = withThreads('I_sample16', threads, data);
+  await mountPage({ ...board, items: board.items.map((i) => (i.id === 'I_sample16' ? { ...i, status, completion: undefined } : i)) });
+  await openItem('I_sample16');
+  return footerControls();
+};
+
+test.each([
+  ['Verify', ['GitHub', 'Open thread', 'Verify build']],
+  ['Ready to merge', ['GitHub', 'Open thread', 'Merge PR']],
+  ['Done', ['GitHub', 'Open thread']],
+  ['Review', ['GitHub', 'Open thread']],
+] as const)('a %s item with a thread has exactly one way to its thread', async (status, controls) => {
+  expect(await footerAt(status, [thread('latest', 'done')])).toEqual(controls);
+  expect(inDialog('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/latest');
+});
+
+test('a stopped run\'s latest thread is linked once, beside Start again', async () => {
+  const data = withThreads('I_sample13', [thread('stopped-build', 'stopped')], { ...sample, startedBuilds: { I_sample13: { threadId: 'stopped-build', title: 'Build' } } });
+  await mountPage({ ...data, items: data.items.map((i) => (i.id === 'I_sample13' ? { ...i, blockers: [] } : i)) });
+  await openItem('I_sample13');
+  expect(text(footer())).toContain('Run stopped.');
+  expect(footerControls().filter((control) => control === 'Open thread')).toHaveLength(1);
+});
+
+test('an item with no recorded thread shows no extra Open thread', async () => {
+  expect(await footerAt('Verify', [])).toEqual(['GitHub', 'Verify build']);
+});
+
+test.each([
+  ['threads can\'t be read', 'unavailable' as const, sample, 'The T3 Code database could not be read'],
+  ['the thread is archived', [{ ...thread('old', 'done'), archived: true as const }], sample, 'This thread is archived in T3 Code'],
+  ['the environment id is missing', [thread('latest', 'done')], { ...sample, t3EnvironmentId: undefined }, 'T3 Code hasn\'t written its environment id'],
+])('beside the Status\'s action, Open thread is disabled when %s', async (_case, threads, data, reason) => {
+  expect(await footerAt('Verify', threads, data)).toEqual(['GitHub', `Open thread (disabled: ${reason})`, 'Verify build']);
+});
+
+test('Answer in T3 keeps the question\'s thread, and Open thread joins it only for a different thread', async () => {
+  expect(await footerAt('Needs you', [thread('latest', 'running'), thread('question', 'needs you')])).toEqual(['GitHub', 'Open thread', 'Answer in T3']);
+  expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/question');
+  await openItem('I_sample12');
+  expect(footerControls()).toEqual(['GitHub', 'Answer in T3']);
+});
+
+const CONCEPT = 'I_sample09';
+const stats = (costUsd: number) => ({ agentMs: 60_000, tokens: 1000, costUsd });
+const conceptBoard = (own: Item['stats'], part: Item['stats'], threads: Item['threads'] = [thread('part', 'done')]): BoardData => ({ ...sample,
+  items: sample.items.map((i) => (i.id === CONCEPT ? { ...i, kind: 'concept' as const, stats: own } : i.parentId === CONCEPT ? { ...i, stats: undefined, threads: i.id === 'I_sample10' ? threads : [] } : i))
+    .map((i) => (i.id === 'I_sample10' ? { ...i, stats: part } : i)) });
+
+test('concept details label its own cost and its total on the board', async () => {
+  await mountPage(conceptBoard(stats(1), stats(2)));
+  await openItem(CONCEPT);
+  const meta = text(inDialog('[data-meta]'));
+  expect(meta).toContain('Own cost: $1.00');
+  expect(meta).toContain('Total on the board: $3.00');
+  expect(inDialog('[data-slot="modal-header"] [data-agent-work]'), 'the labelled figures sit in the meta area alone').toBeNull();
+});
+
+test('a concept with no usable total shows its own cost only, and unreadable usage says so', async () => {
+  await mountPage(conceptBoard(stats(1), 'unavailable'));
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-meta]'))).toContain('Own cost: $1.00');
+  expect(text(inDialog('[data-meta]'))).not.toContain('Total on the board');
+  expect(text(inDialog('[data-concept-part="I_sample10"]'))).toContain('Usage details are unavailable.');
+});
+
+test('a concept whose usage can\'t be read says so instead of a number', async () => {
+  await mountPage(conceptBoard('unavailable', 'unavailable'));
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-meta]'))).toContain('Usage details are unavailable.');
+  expect(text(inDialog('[data-meta]'))).not.toContain('$');
+});
+
+test('concept details list each part with its status, cost and Open thread, and a part opens its own details', async () => {
+  await mountPage(conceptBoard(stats(1), stats(2)));
+  await openItem(CONCEPT);
+  const row = inDialog('[data-concept-part="I_sample10"]')!;
+  expect(text(row)).toContain('#201 Relay: broker only or full TURN?');
+  expect(text(row)).toContain('Shaping');
+  expect(text(row)).toContain('$2.00');
+  expect(row.querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/part');
+  expect(inDialog('[data-concept-part="I_sample13"] [data-open-thread]'), 'a part with no thread has no control').toBeNull();
+  await press(row.querySelector('button')!);
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#201 Relay: broker only or full TURN?');
+});
+
+const decisionBoard = (change: Partial<Item>): BoardData => ({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, kind: 'decision' as const, labels: [], status: 'Done' as const, ...change } : i)) });
+
+test('decision details show the method, cost and every thread, and pick up the next stats read', async () => {
+  const threads = [{ ...thread('latest', 'done'), purpose: 'build' }, { ...thread('older', 'done'), purpose: 'research' }];
+  const data = decisionBoard({ decisionMethod: 'research', stats: stats(4), threads });
+  await mountPage(data);
+  await openItem('I_sample05');
+  expect(text(inDialog('[data-item-kind]'))).toContain('Research');
+  expect(text(inDialog('[data-item-kind]'))).not.toContain('Decision');
+  expect(text(inDialog('[data-slot="modal-header"]'))).toContain('$4.00');
+  expect(inDialog('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/latest');
+  expect(inDialog<HTMLAnchorElement>('[data-earlier-threads] a')!.getAttribute('href')).toBe('t3code://threads/sample-environment/older');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(decisionBoard({ decisionMethod: 'research', stats: stats(5), threads })));
+  expect(text(inDialog('[data-slot="modal-header"]'))).toContain('$5.00');
+});
+
+test('a settled decision with no thread and no valid method shows no control, no cost and No method', async () => {
+  await mountPage(decisionBoard({ decisionMethod: null, threads: [], stats: undefined }));
+  await openItem('I_sample05');
+  expect(text(inDialog('[data-item-kind]'))).toContain('No method');
+  expect(inDialog('[data-open-thread]')).toBeNull();
+  expect(inDialog('[data-agent-work]')).toBeNull();
+});
+
+test('while T3 can\'t be read, known figures stay and say they are last known', async () => {
+  const data = { ...conceptBoard(stats(1), stats(2)), usageRead: { readable: false, readAt: '2026-11-03T10:00:00.000Z' } };
+  await mountPage(data);
+  await openItem(CONCEPT);
+  const meta = text(inDialog('[data-meta]'));
+  expect(meta).toContain('Own cost: $1.00');
+  expect(meta).toContain('Total on the board: $3.00');
+  expect(meta).toContain('last known');
+  expect(meta).not.toContain('Usage details are unavailable.');
+  expect(inDialog('[data-agent-work]')!.title).toMatch(/Last known figures from 3 Nov, \d\d:\d\d: T3 Code's usage can't be read now\./);
+});
+
+test('figures of all zeros show no misleading number', async () => {
+  await mountPage(conceptBoard({ agentMs: 0, tokens: 0, costUsd: 0 }, undefined));
+  await openItem(CONCEPT);
+  expect(inDialog('[data-agent-work]')).toBeNull();
+});
+
+test('a T3 outage that leaves usage readable shows figures as current', async () => {
+  await mountPage({ ...conceptBoard(stats(1), stats(2)), t3Availability: { availability: 'unavailable' }, usageRead: { readable: true } });
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-meta]'))).not.toContain('last known');
+});
+
+test('a settled decision with no thread leaves out the unfinished-sounding note', async () => {
+  await mountPage(decisionBoard({ decisionMethod: 'grill', threads: [], stats: undefined, completion: { complete: true, reasons: [] } }));
+  await openItem('I_sample05');
+  expect(text(inDialog('[data-meta]'))).not.toContain('No T3 thread');
+});
+
+test('a concept with no thread of its own says so beside its total', async () => {
+  await mountPage({ ...conceptBoard(undefined, stats(2)), items: conceptBoard(undefined, stats(2)).items.map((i) => (i.id === CONCEPT ? { ...i, threads: [] } : i)) });
+  await openItem(CONCEPT);
+  const meta = text(inDialog('[data-meta]'));
+  expect(meta).toContain('No T3 thread of its own.');
+  expect(meta).toContain('Total on the board: $2.00');
+  expect(meta).not.toContain('has worked on this yet');
+});
+
+test('a decision\'s question thread is linked by Answer in T3 alone, not again among its earlier threads', async () => {
+  await mountPage(decisionBoard({ status: 'Needs you', threads: [thread('newer', 'done'), thread('question', 'needs you')] }));
+  await openItem('I_sample05');
+  expect(footerControls()).toEqual(expect.arrayContaining(['Open thread', 'Answer in T3']));
+  expect(inDialog('[data-earlier-threads]')).toBeNull();
+});
+
+test('a settled decision keeps a link to an older thread that once asked a question', async () => {
+  await mountPage(decisionBoard({ threads: [thread('newer', 'done'), thread('question', 'needs you')] }));
+  await openItem('I_sample05');
+  expect(inDialog('[data-earlier-threads] a')!.getAttribute('href')).toBe('t3code://threads/sample-environment/question');
+});
+
+test('during a usage outage, work known to have no thread doesn\'t claim lost usage', async () => {
+  await mountPage(decisionBoard({ threads: [], stats: 'unavailable', completion: { complete: true, reasons: [] } }));
+  await openItem('I_sample05');
+  const meta = text(inDialog('[data-meta]'));
+  expect(meta).not.toContain('Usage details are unavailable.');
+  expect(meta).not.toContain('No T3 thread');
 });

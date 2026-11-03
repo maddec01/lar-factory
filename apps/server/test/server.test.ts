@@ -103,6 +103,11 @@ const readItems = async (board: Board): Promise<Item[]> => (await until(board, (
 const readLiveStats = async (board: Board): Promise<Item[]> =>
   (await until(board, (d) => d.items.some((i) => typeof i.stats === 'object' && !i.stats.frozen))).items;
 
+test('a failed usage read tells the board, so kept figures can say they are last known', async (t) => {
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['build'] }, items: [boardIssue(12, 'Review')] }, false, true, { T3_STATE_DB: join(tmpdir(), 'lar-no-such-t3-database') });
+  assert.equal((await until(board, (d) => d.usageRead !== undefined)).usageRead?.readable, false);
+});
+
 test("a build's slices show their records' progress, and its build sub-issue stays a board item", async (t) => {
   const repository = { nameWithOwner: 'maddec01/lar-factory' };
   const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/lar-factory/issues/${number}`,

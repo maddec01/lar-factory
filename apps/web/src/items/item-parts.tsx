@@ -4,10 +4,11 @@
 
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, activityUnavailable, buildActivity, startProgressOf, workingAgain, checkState, decisionType, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
-import type { AzureWorkItem, Checks, Item, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
+import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
+import type { AzureWorkItem, Checks, Item, ItemStats, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
+import { isDone } from '../line/dossier-parts.ts';
 import { PURPOSE, useStart } from './start-store.ts';
 import { tint } from './label-tint.ts';
 import { PrReadiness } from './pr-readiness.tsx';
@@ -133,26 +134,49 @@ export function PrList({ item }: { item: Item }) {
   );
 }
 
-/** Cost, agent time, tokens and wall time as one small muted line, each named in the tooltip; nothing when no thread worked on the item or T3's database can't be read. */
-export function AgentWork({ item, className = '' }: { item: Item; className?: string }) {
-  const s = item.stats;
-  if (!s || s === 'unavailable') return null;
+/** While T3's usage can't be read, the sentence that says shown figures are the ones last seen; otherwise null. */
+export function useLastKnown(): string | null {
+  const read = useBoardStore((state) => state.data.usageRead);
+  if (!read || read.readable) return null;
+  const at = read.readAt ? ` from ${day(read.readAt, undefined)}, ${clock(read.readAt, undefined)}` : '';
+  return `Last known figures${at}: T3 Code's usage can't be read now.`;
+}
+
+/** Whether figures say anything: all-zero ones say no more than having none. */
+export const hasFigures = (s: ItemStats) => Boolean(s.agentMs || s.wallMs || s.tokens || s.costUsd);
+
+/**
+ * Cost, agent time, tokens and wall time as one small muted line after any `label`, each named in the tooltip; nothing
+ * when no thread worked on the item or T3's database can't be read. While T3 can't be read, the board keeps the figures
+ * it last saw, and the line says so. `stats` shows other figures than the item's own.
+ */
+export function AgentWork({ item, stats: s = item.stats, label, className = '' }: { item: Item; stats?: ItemStats | 'unavailable'; label?: string; className?: string }) {
+  const lastKnown = useLastKnown();
+  if (!s || s === 'unavailable' || !hasFigures(s)) return null;
+  const old = !s.frozen ? lastKnown : null;
   const figures: [label: string, value: string, unit: string][] = [];
   if (s.costUsd !== undefined) figures.push(['Cost', formatUsd(s.costUsd), '']);
   figures.push(['Agent time', duration(s.agentMs), ''], ['Tokens', formatTokens(s.tokens), ' tokens']);
   if (s.wallMs) figures.push(['Wall time', duration(s.wallMs), ' wall']);
   return (
-    <p data-agent-work title={figures.map(([k, v]) => `${k} ${v}`).join(' · ')} className={`m-0 text-xs text-(--muted-foreground) tabular-nums ${className}`}>
-      {figures.map(([, v, unit]) => v + unit).join(' · ')}
+    <p data-agent-work data-last-known={old ? '' : undefined} title={`${figures.map(([k, v]) => `${k} ${v}`).join(' · ')}${old ? `. ${old}` : ''}`} className={`m-0 text-xs text-(--muted-foreground) tabular-nums ${className}`}>
+      {label && `${label}: `}{figures.map(([, v, unit]) => v + unit).join(' · ')}{old && ' · last known'}
     </p>
   );
 }
 
+/** Whether T3's usage can't be read for this item: an item known to have no thread has none to lose. */
+export const usageUnreadable = (item: Item): boolean => item.stats === 'unavailable' && !(Array.isArray(item.threads) && !item.threads.length);
+
 /** The line that says why there are no agent work figures: no T3 thread worked on the item, or T3's database can't be read. */
 export function AgentWorkNote({ item }: { item: Item }) {
-  const s = item.stats;
   const hasThread = Array.isArray(item.threads) && item.threads.length > 0;
-  return s && s !== 'unavailable' ? null : <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : 'No T3 thread has worked on this yet.'}</p>;
+  const s = usageUnreadable(item) ? 'unavailable' : hasThread ? item.stats : undefined;
+  if (s && s !== 'unavailable') return null;
+  // A settled decision may have no thread of its own, which is nothing to wait for.
+  if (!s && !hasThread && item.kind === 'decision' && isDone(item)) return null;
+  const none = item.kind === 'concept' ? 'No T3 thread of its own.' : 'No T3 thread has worked on this yet.';
+  return <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : none}</p>;
 }
 
 export const KIND_BADGES: Partial<Record<Kind, { name: string; icon: LucideIcon; hue: number }>> = {
@@ -196,9 +220,9 @@ export function LabelChips({ item }: { item: LabelledItem }) {
 /** Kind and relationships remain visible before an issue is queued. `onRow` leaves out the word for work with no kind badge. */
 export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean }) {
   const words: string[] = [];
-  const method = item.kind === 'decision' ? decisionType(item) : null;
-  if (method) words.push(`${method.charAt(0).toUpperCase()}${method.slice(1)}`);
-  else if (!onRow && !KIND_BADGES[item.kind]) words.push(item.kind === 'decision' ? 'Decision' : 'Work');
+  const method = decisionMethodName(item);
+  if (method) words.push(method);
+  else if (!onRow && !KIND_BADGES[item.kind]) words.push('Work');
   const parentKind = useBoardStore((state) => state.data.items.find((parent) => Boolean(item.parentId && parent.id === item.parentId || item.parent?.url && parent.url === item.parent.url))?.kind);
   const parentIsConcept = item.tracker?.parent?.kind === 'concept' || parentKind === 'concept';
   if (parentIsConcept) words.push('Part of a concept');

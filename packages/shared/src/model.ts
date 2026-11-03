@@ -578,6 +578,8 @@ export interface BoardData {
   localProblem?: string;
   /** Sanitized authenticated source state. Credentials stay in the server. */
   t3Availability?: { availability: 'available' | 'unavailable' | 'renewal-required' | 'unsupported-version' | 'malformed'; observedAt?: string };
+  /** The latest read of T3's usage figures, and when one last succeeded. While it fails, items keep the figures last seen. */
+  usageRead?: { readable: boolean; readAt?: string | undefined };
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
   repos: RepoConfig[];
@@ -786,6 +788,14 @@ export function parseDecisionMethod(body: string): Item['decisionMethod'] {
   const method = /^Method:\s*(grill|prototype|research|task)\s*$/i.exec(body.split('\n')[0]?.trim() ?? '')?.[1]?.toLowerCase();
   return method as Item['decisionMethod'] ?? null;
 }
+
+/** How the board names a decision's method: Grill, Prototype, Research or Task, or No method for anything else. */
+export function methodName(method: string | null): string {
+  return method && ['grill', 'prototype', 'research', 'task'].includes(method) ? `${method.charAt(0).toUpperCase()}${method.slice(1)}` : 'No method';
+}
+
+/** A decision's method as `methodName` gives it; null for any other kind of item. */
+export const decisionMethodName = (item: Item): string | null => (item.kind === 'decision' ? methodName(decisionType(item)) : null);
 
 /** The kind a ticket's labels give it. */
 export function labelKind(labels: readonly string[]): Kind {

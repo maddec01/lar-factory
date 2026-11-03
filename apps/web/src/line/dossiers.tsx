@@ -9,18 +9,18 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { needsAnswer, openQuestionThread, blockerGroups, blockerRef, canRetryBuild, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
+import { UNREADABLE, needsAnswer, openQuestionThread, blockerGroups, blockerRef, canRetryBuild, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemTitle, SliceBar, StructureSync, shownStatus, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, SliceBar, StructureSync, shownStatus, useActivityUnavailable, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, shownThread, threadsOf } from './dossier-parts.ts';
+import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, partLabel, shownThread, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { StartBuild } from '../items/start-build.tsx';
 import { PartStart, startable } from './part-start.tsx';
@@ -136,7 +136,7 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
     { key: 'verify', label: 'To verify or merge', tone: 'text-(--warning-foreground)',
       entries: ahead.filter((p) => (p.item.status === 'Verify' || p.item.status === 'Ready to merge') && !workingAgain(p.item, unavailable)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={p.item.status} />) },
     { key: 'decisions', label: 'Open decisions', tone: 'text-(--primary)',
-      entries: ahead.filter((p) => DECISION_KINDS.includes(p.kind)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={`${p.kind} · ${shownStatus(p.item, unavailable).word}`} />) },
+      entries: ahead.filter((p) => DECISION_KINDS.includes(p.kind)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={`${partLabel(p.kind)} · ${shownStatus(p.item, unavailable).word}`} />) },
     { key: 'blocked', label: 'Blocked slices', tone: 'text-(--st-review)',
       entries: blocked.map(({ part, slice }, i) => (
         <Entry key={i}
@@ -174,19 +174,22 @@ function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[];
   );
 }
 
-/** The one thing a part asks next: on your desk, its Start (or Start after while it waits), or its thread while one
- *  works on it. A part that waits on another and has no Start says what it waits on instead. */
+/** The one thing a part asks next: on your desk, or its Start (or Start after while it waits). Otherwise its thread,
+ *  when it has one, or while its status says one works on it, and what it waits on beside that. */
 function Action({ part, data }: { part: Part; data: BoardData }) {
   const { status } = part.item;
   const { working } = useShownStatus(part.item);
-  if (isDone(part.item)) return null;
-  if (working) return <span onClick={stop}><OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} /></span>;
-  if (YOURS.includes(status)) return <OnYourDesk status={status} />;
-  if (status === 'Ready' || status === 'Queued') return <span onClick={stop}><PartStart part={part} data={data} label="Start" /></span>;
-  if (openWaits(part).length) return <span className="max-w-48 truncate" title={waitsOn(part)}>{waitsOn(part)}</span>;
-  if (canRetryBuild(part.item)) return <span onClick={stop}><StartBuild item={part.item} data={data} /></span>;
-  if (['Shaping', 'In progress', 'Review'].includes(status)) return <span onClick={stop}><OpenThread item={part.item} data={data} /></span>;
-  return null;
+  const done = isDone(part.item);
+  if (!done && working) return <span onClick={stop}><OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} /></span>;
+  if (!done && YOURS.includes(status)) return <OnYourDesk status={status} />;
+  if (!done && (status === 'Ready' || status === 'Queued')) return <span onClick={stop}><PartStart part={part} data={data} label="Start" /></span>;
+  const waiting = !done && openWaits(part).length > 0;
+  if (!done && !waiting && canRetryBuild(part.item)) return <span onClick={stop}><StartBuild item={part.item} data={data} /></span>;
+  const thread = threadsOf(part.item).length > 0 || (!done && !waiting && ['Shaping', 'In progress', 'Review'].includes(status));
+  return <>
+    {waiting && <span className="max-w-48 truncate" title={waitsOn(part)}>{waitsOn(part)}</span>}
+    {thread && <span onClick={stop}><OpenThread item={part.item} data={data} /></span>}
+  </>;
 }
 
 /** One part of the parts list: its title and what it asks next, then its stage track, status, agent figures, Azure
@@ -205,10 +208,10 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
         <Action part={part} data={data} />
       </span>
       <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
-        {DECISION_KINDS.includes(part.kind) && <span className="capitalize">{part.kind}</span>}
+        {DECISION_KINDS.includes(part.kind) && <span>{partLabel(part.kind)}</span>}
         <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} label={shown.word} waiting={waits.length > 0} /></span>
         <span>{isDone(item) ? 'Complete' : shown.word}</span>
-        {s && <Figures s={s} />}
+        {s ? <Figures s={s} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
         <AzureFields azure={item.azure} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
         <span className="min-w-0 empty:hidden"><ThreadLine part={part} /></span>

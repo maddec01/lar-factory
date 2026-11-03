@@ -8,9 +8,10 @@ import { useEditStore } from '../repositories/edit-store.ts';
 // comments. Work that needs you shows why above the meta area, with the board's choices for it, beside any problem cleaning up
 // its shaping threads. The board's fields show at
 // once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
-// item, and the one action the item's status asks for, with Move to List and Abandon at its left. Its description has
-// Edit, and its header an expand control that grows it, the open editor taking the height. Closing it with unsaved edits
-// asks "Discard changes?" first.
+// item, Open thread on its latest thread unless that is the action, and the one action the item's status asks for, with
+// Move to List and Abandon at its left. A concept also lists its parts, each opening its own details. Its description has
+// Edit, and its header an expand control that grows it, the open editor taking the height. Closing it
+// or opening a part with unsaved edits asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { currentBuildThread, needsAnswer, openQuestionThread, writeAccessProblem, HINTS, blockedText, canResumeShaping, canRetryBuild, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
@@ -33,6 +34,7 @@ import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
+import { ConceptParts } from './concept-parts.tsx';
 import { ItemComments, ItemDescription, ItemMeta, ItemRelations } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
 import { useDescriptionEdit } from './use-description-edit.ts';
@@ -44,25 +46,44 @@ import { AttachTicket } from './attach-ticket.tsx';
 import { Diagram } from '../diagrams/markdown-diagrams.tsx';
 import { RecordText } from './record-text.tsx';
 
-/** The one thing the item's status asks of you. */
-function StatusAction({ item, data }: { item: Item; data: BoardData }) {
-  const { working } = useShownStatus(item);
-  if (working) return <OpenThread item={item} data={data} threadId={currentBuildThread(item)?.id} />;
-  if (needsAnswer(item)) return <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />;
+/** A status's action: a thread it opens, the latest when `opens` names none, or another control. */
+type StatusAction = { opens: string | undefined; label?: string } | { control: ReactNode };
+
+const LATEST_THREAD: StatusAction = { opens: undefined };
+
+const latestThread = (item: Item) => (Array.isArray(item.threads) ? item.threads[0]?.id : undefined);
+
+/** The one thing the item's status asks of you. A Start leaves the latest thread to the Open thread beside it. */
+function statusAction(item: Item, data: BoardData, working: boolean): StatusAction {
+  const linkedBeside = latestThread(item);
+  if (working) return { opens: currentBuildThread(item)?.id };
+  if (needsAnswer(item)) return { opens: openQuestionThread(item)?.id, label: 'Answer in T3' };
   switch (item.status) {
-    case 'List': return <QueueButton item={item} data={data} />;
+    case 'List': return { control: <QueueButton item={item} data={data} /> };
     case 'Queued':
-      if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-      return <StartOrAfter item={item} data={data} label="Shape issue" />;
-    case 'Ready': return <StartBuild item={item} data={data} />;
-    case 'Shaping': return canResumeShaping(item) ? <StartOrAfter item={item} data={data} label="Resume shaping" /> : <OpenThread item={item} data={data} />;
-    case 'In progress': if (canRetryBuild(item)) return <StartBuild item={item} data={data} />; return <OpenThread item={item} data={data} />;
-    case 'Review': return <OpenThread item={item} data={data} />;
-    case 'Needs you': return <OpenThread item={item} data={data} label="Answer in T3" />;
-    case 'Verify': return <PrLink item={item} label="Verify build" />;
-    case 'Ready to merge': return <PrLink item={item} label="Merge PR" />;
-    default: return null;
+      if (hasLiveThread(item)) return LATEST_THREAD;
+      return { control: <StartOrAfter item={item} data={data} label="Shape issue" linkedBeside={linkedBeside} /> };
+    case 'Ready': return hasLiveThread(item) ? LATEST_THREAD : { control: <StartBuild item={item} data={data} linkedBeside={linkedBeside} /> };
+    case 'Shaping': return canResumeShaping(item) ? { control: <StartOrAfter item={item} data={data} label="Resume shaping" linkedBeside={linkedBeside} /> } : LATEST_THREAD;
+    case 'In progress': return canRetryBuild(item) ? { control: <StartBuild item={item} data={data} linkedBeside={linkedBeside} /> } : LATEST_THREAD;
+    case 'Review': return LATEST_THREAD;
+    case 'Verify': return { control: <PrLink item={item} label="Verify build" /> };
+    case 'Ready to merge': return { control: <PrLink item={item} label="Merge PR" /> };
+    default: return { control: null };
   }
+}
+
+/** The status's action, with Open thread on the latest thread beside it unless the action already opens that thread. */
+function StatusActions({ item, data }: { item: Item; data: BoardData }) {
+  const { working } = useShownStatus(item);
+  const action = statusAction(item, data, working);
+  const latest = latestThread(item);
+  const opensThread = 'opens' in action;
+  const beside = item.threads === 'unavailable' ? !opensThread : latest !== undefined && !(opensThread && (action.opens ?? latest) === latest);
+  return <>
+    {beside && <OpenThread item={item} data={data} />}
+    {opensThread ? <OpenThread item={item} data={data} threadId={action.opens} label={action.label} /> : action.control}
+  </>;
 }
 
 /** Move to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. */
@@ -94,9 +115,10 @@ interface ContentProps {
   refresh: () => Promise<boolean>;
   expanded: boolean;
   toggleExpanded: () => void;
+  openPart: (itemId: string) => void;
 }
 
-function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, toggleExpanded }: ContentProps) {
+function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, toggleExpanded, openPart }: ContentProps) {
   const aside = hasRelations(item, read);
   const record = read.state === 'loaded' ? read.details.record : undefined;
   // Work with no ticket has no ticket text to show beside its record's.
@@ -112,7 +134,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
   return (
     <Modal.Content title={`${itemName(item)}`} presentation="workspace" data-item-dialog style={expanded ? EXPANDED : undefined} focusFirstField={false}
       headerActions={<>
-        <AgentWork item={item} className="whitespace-nowrap text-xs text-base-700 @max-[40rem]:hidden" />
+        {item.kind !== 'concept' && <AgentWork item={item} className="whitespace-nowrap text-xs text-base-700 @max-[40rem]:hidden" />}
         <ExpandButton expanded={expanded} toggle={toggleExpanded} />
       </>}>
       <div className="@container grid shrink-0 gap-1 border-b border-base-300 px-5 pb-3 text-xs text-base-700 sm:px-6" data-item-summary>
@@ -145,6 +167,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
           <NeedsYou item={item} data={data} />
           <ItemMeta item={item} read={read} refresh={refresh} now={now} />
           <EarlierThreads item={item} data={data} />
+          {item.kind === 'concept' && <ConceptParts item={item} data={data} openPart={openPart} />}
           <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}>
             {record && <RecordText item={item} record={record} spec={read.state === 'loaded' && Boolean(read.details.spec)} className="@min-[45rem]:col-start-1" />}
             {ticket && <ItemDescription itemId={item.id} refresh={refresh} read={read} edit={edit} editable={editable} fill={fill} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}
@@ -168,7 +191,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
       <Modal.Footer leading={<span className="inline-flex items-center gap-3 text-xs"><MoveActions item={item} data={data} /></span>}>
         <span className="inline-flex items-center gap-1.5">
           {item.url && <LinkButton kind="other" href={item.url} target="_blank" rel="noopener">{item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}</LinkButton>}
-          <StatusAction item={item} data={data} />
+          <StatusActions item={item} data={data} />
         </span>
       </Modal.Footer>
     </Modal.Content>
@@ -194,6 +217,8 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
   const { read, refresh } = useItemDetails(item.id, item.updatedAt);
   const edit = useDescriptionEdit(item.id, read, refresh);
   const [asking, setAsking] = useState(false);
+  /** The part to open once unsaved edits are discarded, rather than closing. */
+  const [nextPart, setNextPart] = useState<string | null>(null);
   const [expanded, toggleExpanded] = useExpand(asking);
   useEffect(() => {
     useItemDialogStore.setState({ dismiss: () => {
@@ -204,11 +229,20 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
     } });
     return () => { useItemDialogStore.setState({ dismiss: null }); };
   }, [edit.saving, edit.dirty, close]);
+  const openPart = (itemId: string) => {
+    if (edit.saving) return;
+    if (!edit.dirty) useItemDialogStore.getState().open(itemId);
+    else { setNextPart(itemId); setAsking(true); }
+  };
   return <>
     <Modal onClose={() => (edit.dirty ? setAsking(true) : close())} loading={edit.saving}>
-      <ItemDialogContent item={item} data={data} now={now} read={read} edit={edit} refresh={refresh} expanded={expanded} toggleExpanded={toggleExpanded} />
+      <ItemDialogContent item={item} data={data} now={now} read={read} edit={edit} refresh={refresh} expanded={expanded} toggleExpanded={toggleExpanded} openPart={openPart} />
     </Modal>
-    {asking && <DiscardPrompt keep={() => setAsking(false)} discard={() => { setAsking(false); close(); }} />}
+    {asking && <DiscardPrompt keep={() => { setAsking(false); setNextPart(null); }} discard={() => {
+      setAsking(false);
+      if (nextPart) useItemDialogStore.getState().open(nextPart);
+      else close();
+    }} />}
   </>;
 }
 

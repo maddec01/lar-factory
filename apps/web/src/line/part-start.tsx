@@ -15,12 +15,12 @@ export const startable = (part: Part): boolean =>
   (part.item.status === 'Ready' || part.item.status === 'Queued') && !openWaits(part).length
   && !hasLiveThread(part.item);
 
-/** `label` names the Start, Start build on a Ready build and Start on a Queued one by default; other statuses get none. */
-export function PartStart({ part, data, label }: { part: Part; data: BoardData; label?: string }) {
+/** `label` names the Start, Start build on a Ready build and Start on a Queued one by default; other statuses get none. The Work map's state line names the blockers, so its Start after leaves them out. */
+export function PartStart({ part, data, label, namesBlocker = true }: { part: Part; data: BoardData; label?: string; namesBlocker?: boolean }) {
   const { item } = part;
-  if (item.status === 'Ready') return <StartBuild item={item} data={data} label={label ?? 'Start build'} />;
+  if (item.status === 'Ready') return <StartBuild item={item} data={data} label={label ?? 'Start build'} namesBlocker={namesBlocker} />;
   if (item.status !== 'Queued') return null;
   // A thread already at work on the item would get a second one.
   if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-  return <StartOrAfter item={item} data={data} label={label} />;
+  return <StartOrAfter item={item} data={data} label={label} namesBlocker={namesBlocker} />;
 }

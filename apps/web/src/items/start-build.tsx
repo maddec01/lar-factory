@@ -10,11 +10,11 @@ import { OpenThread, hasLiveThread } from './open-thread.tsx';
 import { StartOrAfter } from './start-after.tsx';
 
 /** A dossier names it `label`. */
-export function StartBuild({ item, data, label = 'Start build', linkedBeside }: { item: Item; data: BoardData; label?: string; linkedBeside?: string | undefined }) {
+export function StartBuild({ item, data, label = 'Start build', linkedBeside, namesBlocker }: { item: Item; data: BoardData; label?: string; linkedBeside?: string | undefined; namesBlocker?: boolean }) {
   // A thread already at work on the item would get a second one.
   if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
   const setup = data.repos.find(repo => sameRepo(repo.repo, item.repo))?.setup;
   const problem = setup && buildAccessProblem(setup.access);
   if (problem) return <Button {...kind('start')} leftIcon={ICON.play} disabled title={problem} data-build-unavailable={item.id}>{label}</Button>;
-  return <StartOrAfter item={item} data={data} label={label} kind="build" linkedBeside={linkedBeside} />;
+  return <StartOrAfter item={item} data={data} label={label} kind="build" linkedBeside={linkedBeside} {...(namesBlocker === undefined ? {} : { namesBlocker })} />;
 }

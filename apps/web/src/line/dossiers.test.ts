@@ -581,10 +581,11 @@ test('the Map view draws Decisions and Builds lanes, its current parts in order,
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
     'history I_sample10', 'I_sample12 I_sample13', 'I_sample13 e2e',
   ]);
-  expect(text(map.querySelector('[data-map-check]'))).toBe('end-to-end checkSign in on the website, then stream from a phone off Wi-Fi3 steps · runs once #140 land');
+  expect(text(map.querySelector('[data-map-check]'))).toBe('end-to-end checkSign in on the website, then stream from a phone off Wi-Fi3 steps · after #140');
   const node = (id: string) => map.querySelector(`[data-map-part="${id}"]`)!;
   expect(startIn(node('I_sample13')), 'a blocked part offers Start after alone').toBeNull();
-  expect(text(node('I_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
+  expect(text(node('I_sample13').querySelector('[data-start-after]')), 'the state line names what it waits on').toBe('Start after ▾');
+  expect(node('I_sample13').querySelector('[data-start-after]')!.getAttribute('aria-label')).toBe('Start #140 Owner accounts after #202');
   expect(text(node('I_sample12').querySelector('[data-open-thread]'))).toBe('Answer in T3');
   await press(node('I_sample10').querySelector('button')!);
   expect(dialogTitle()).toBe('#201 Relay: broker only or full TURN?');
@@ -728,19 +729,59 @@ test('a part waiting on a settled decision in the group keeps its edge, from the
   const later = workPart('W_later', { status: 'Ready', blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: 'W_next' }] });
   const map = await mapOpen(conceptOf([...fiveSettled, held, later], { map: { ...c200.map!, check: undefined } }));
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual(['history W_next', 'W_next W_later']);
-  expect(text(map.querySelector('[data-edge-label="history W_next"]'))).toBe('after Part W_s0, Part W_s1');
+  const label = () => map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
+  expect([text(label()), label().tagName, label().getAttribute('aria-label')]).toEqual(['2 completed prerequisites', 'BUTTON', '2 completed prerequisites: Part W_s0, Part W_s1']);
   await press(map.querySelector('[data-map-history]')!);
   expect(map.querySelector('path[data-edge="history W_next"]'), 'expanding leaves the edge').not.toBeNull();
   await receive(conceptOf([...fiveSettled, { ...held, status: 'Done', completion: { complete: true, reasons: [] } }, later], { map: { ...c200.map!, check: undefined } }));
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge')), 'a board push moves it into the group').toEqual(['history W_later']);
-  expect(text(map.querySelector('[data-edge-label="history W_later"]'))).toBe('after Part W_next');
+  const single = map.querySelector('[data-edge-label="history W_later"]')!;
+  expect([text(single), single.getAttribute('aria-label')]).toEqual(['1 completed prerequisite', '1 completed prerequisite: Part W_next']);
 });
 
 test('a part a finished part waited on keeps its edge into the group', async () => {
   const open = workPart('W_open', { status: 'In progress' });
   const map = await mapOpen(conceptOf([open, settledPart('W_done', 'task', { blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: 'W_open' }] })], { map: { ...c200.map!, check: undefined } }));
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual(['W_open history']);
-  expect(text(map.querySelector('[data-edge-label="W_open history"]'))).toBe('before Part W_done');
+  const label = map.querySelector('[data-edge-label="W_open history"]')!;
+  expect([text(label), label.getAttribute('aria-label')]).toEqual(['before 1 completed part', 'before 1 completed part: Part W_done']);
+});
+
+test('an edge label counts each finished blocker once, names them on focus, and shows them in history when pressed; an open blocker stays named', async () => {
+  const closed = (workId: string) => ({ number: 0, repo: c200.repo!, state: 'closed' as const, workId, title: workId });
+  const held = workPart('W_next', { status: 'Ready', blockers: [closed('W_s0'), closed('W_s0'), closed('W_s1'), { number: 0, repo: c200.repo!, state: 'open', workId: 'W_open', title: 'Part W_open' }] });
+  const map = await mapOpen(conceptOf([...fiveSettled, workPart('W_open', { status: 'In progress' }), held], { map: { ...c200.map!, check: undefined } }));
+  const label = map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
+  expect(text(label), 'the same part listed twice counts once').toBe('2 completed prerequisites');
+  expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge')).sort()).toEqual(['W_open W_next', 'history W_next']);
+  expect(text(map.querySelector('[data-map-part="W_next"] [data-map-facts]'))).toBe('Ready · Waiting on Part W_open');
+  await settle(() => label.focus());
+  await settle(() => vi.advanceTimersByTime(1000));
+  expect(text(document.querySelector('[role="tooltip"]')), 'focus shows the names').toBe('Part W_s0, Part W_s1');
+  expect(map.querySelector('[data-history-part]')).toBeNull();
+  await press(label);
+  expect(map.querySelector('[data-history-part="W_s0"]')).not.toBeNull();
+  expect(map.querySelector('path[data-edge="history W_next"]'), 'expanding leaves the edge').not.toBeNull();
+});
+
+test('a node holds one waiting reason, on a state line that shares no width with its action', async () => {
+  const blockers = [{ number: 201, repo: c200.repo!, state: 'open' as const }, { number: 140, repo: c200.repo!, state: 'open' as const }];
+  const running: ItemThread = { id: 'r', title: 'R', state: 'running', updated: '2026-10-21T09:00:00.000Z' };
+  const map = await mapOpen(writable(conceptOf([
+    workPart('W_both', { number: 77, status: 'Ready', blockers, slices: [{ ...base.slices[0]!, progress: 'active' }] }),
+    workPart('W_kids', { status: 'In progress', threads: [{ ...running, state: 'done', hasLiveChildren: true }], slices: [{ ...base.slices[0]!, progress: 'blocked' }] }),
+    workPart('W_q', { status: 'Shaping', blockers, threads: [{ ...running, state: 'needs you' }] }),
+  ])));
+  const node = (id: string) => map.querySelector<HTMLElement>(`[data-map-part="${id}"]`)!;
+  const facts = (id: string) => node(id).querySelector<HTMLElement>('[data-map-facts]')!;
+  expect(text(facts('W_both')), 'both blockers, once, and nothing competing with them').toBe('Ready · Waiting on #201, #140');
+  expect(text(node('W_both').querySelector('[data-start-after]'))).toBe('Start after ▾');
+  expect(facts('W_both').parentElement!.querySelector('button, a'), 'the action sits on another line').toBeNull();
+  expect(node('W_both').querySelector('[data-map-head] [data-start-after]')).not.toBeNull();
+  expect(text(facts('W_kids')), 'a blocked slice, not also a waiting child').toBe('In progress · 1 slice blocked');
+  expect(text(facts('W_q')), 'a question is the reason while one is open').toBe('Shaping · Needs you');
+  expect(node('W_q').querySelector('[data-map-head] [data-open-thread]')).not.toBeNull();
+  expect(node('W_both').querySelector('button')!.title, 'the whole line reads on hover, whatever it cuts off').toBe('#77 Part W_both · Ready · Waiting on #201, #140');
 });
 
 test('a build whose planner ended while its child and background work run reads as working, never as done', async () => {
@@ -749,7 +790,7 @@ test('a build whose planner ended while its child and background work run reads 
   const build = workPart('W_build', { status: 'In progress', buildPhase: 'plan', threads: [newest, planner] });
   const map = await mapOpen(conceptOf([build]));
   const node = map.querySelector('[data-map-part="W_build"]')!;
-  expect(text(node.querySelector('[data-map-facts]'))).toBe('In progress · Planning · child work running');
+  expect(text(node.querySelector('[data-map-facts]'))).toBe('Planning · child work running');
   expect(node.querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/plan');
   expect(header().getAttribute('title'), 'the header counts it as running').toContain('1 running');
   await receive(conceptOf([{ ...build, threads: [newest, { ...planner, hasRunningChildren: undefined }] }]));
@@ -767,6 +808,8 @@ test('a status never repeats as its activity, and a part with no thread says not
   const map = await mapOpen(conceptOf([workPart('W_q', { status: 'Needs you', threads: [asks] }), workPart('W_none', { status: 'Shaping' })]));
   expect(text(map.querySelector('[data-map-part="W_q"] [data-map-facts]'))).toBe('Needs you');
   expect(text(map.querySelector('[data-map-part="W_none"] [data-map-facts]'))).toBe('Shaping');
+  await receive(conceptOf([workPart('W_q', { status: 'In progress', threads: [{ ...asks, state: 'running' }] })]));
+  expect(text(map.querySelector('[data-map-part="W_q"] [data-map-facts]')), 'Working says In progress already').toBe('Working');
   expect(text(map)).not.toContain('thread');
 });
 

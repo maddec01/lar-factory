@@ -1,12 +1,13 @@
 // A dossier's map, its current work first: a Decisions lane, a Builds lane for the dossier's own repository and a lane
 // for each other repository, named by its project icon and name, parts placed left to right by what they wait on, arrows between them, ending in the end-to-end check when one is written. Finished history folds into
-// one group below, which every arrow to or from a finished part starts or ends on, labelled with the parts it stands for.
+// one group below, which every arrow to or from a finished part starts or ends on, labelled with how many parts it stands for and naming them on hover and focus.
 
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BookOpen, ChevronDown, ChevronRight, FlaskConical, GitPullRequest, Hammer, ListChecks, Lightbulb, MessagesSquare, Shapes } from 'lucide-react';
 import { buildActivity, itemName, needsAnswer, openQuestionThread, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
@@ -30,14 +31,14 @@ const LABEL_W = 116;
 const NODE_H = 104;
 const GAP = 20;
 const PAD = 18;
-const MIN_COL = 240;
+const MIN_COL = 268;
 const MAX_COL = 340;
 /** The history group's height, and the room above and below it. */
 const GROUP_H = 36;
 const GROUP_PAD = 8;
 
 interface Placed { key: string; part: Part | null; col: number; x: number; y: number }
-interface Edge { from: string; to: string; label?: string }
+interface Edge { from: string; to: string; label?: string; names?: string }
 
 /** What leads a lane or a column: a question, then work on your desk, then running work, then what can start. */
 function urgency(p: Part): number {
@@ -47,7 +48,7 @@ function urgency(p: Part): number {
   return startable(p) ? 3 : 4;
 }
 
-/** The arrows among `parts` with the history group in place of each finished part, one per pair, naming the parts it stands for. */
+/** The arrows among `parts` with the history group in place of each finished part, one per pair, counting the parts it stands for. */
 function edgesOf(parts: Part[], check: boolean): Edge[] {
   const ups = upstreamOf(parts);
   const shownKey = (p: Part) => (isHistory(p) ? HISTORY : keyOf(p));
@@ -58,16 +59,17 @@ function edgesOf(parts: Part[], check: boolean): Edge[] {
     const ends = sinks.filter((p) => p.kind === 'build');
     pairs.push(...(ends.length ? ends : sinks).map((p) => ({ from: shownKey(p), to: CHECK, via: p })));
   }
-  const edges = new Map<string, Edge & { via: Part[] }>();
+  const edges = new Map<string, { from: string; to: string; via: Set<Part> }>();
   for (const { from, to, via } of pairs) {
     if (from === HISTORY && to === HISTORY) continue;
-    const edge = edges.get(`${from} ${to}`) ?? { from, to, via: [] };
-    edge.via.push(via);
+    const edge = edges.get(`${from} ${to}`) ?? { from, to, via: new Set<Part>() };
+    edge.via.add(via);
     edges.set(`${from} ${to}`, edge);
   }
   return [...edges.values()].map(({ from, to, via }) => {
-    const names = via.map((p) => itemName(p.item)).join(', ');
-    return from === HISTORY ? { from, to, label: `after ${names}` } : to === HISTORY ? { from, to, label: `before ${names}` } : { from, to };
+    const names = [...via].map((p) => itemName(p.item)).join(', ');
+    if (from === HISTORY) return { from, to, label: plural(via.size, 'completed prerequisite'), names };
+    return to === HISTORY ? { from, to, label: `before ${plural(via.size, 'completed part')}`, names } : { from, to };
   });
 }
 
@@ -154,35 +156,43 @@ function PartNode({ part, data, width, home }: { part: Part; data: BoardData; wi
   let action: ReactNode = null;
   if (complete) action = null;
   else if (asks) action = <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />;
-  else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} label="Start" />;
-  // Open thread joins anything but the card's own Start or answer, as an icon beside the status.
+  else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} label="Start" namesBlocker={false} />;
+  // Open thread joins anything but the card's own Start or answer, as an icon.
   const opensThread = threadsOf(item).length > 0 && !action;
   const status = complete ? 'Complete' : shown.word;
   const running = activity.kind === 'working' ? buildActivity(item, unavailable) : null;
   const word = running?.running ? running.label : activity.kind === 'finished' && !RUNS.includes(item.status) ? null : ACTIVITY_WORD[activity.kind];
   const seen = word && activity.thread ? lastSeen(activity.thread) : '';
-  const waits = !action && open.length ? `Waiting on ${waitText(item, open)}` : null;
-  // One fact once: an activity the status already says, or that the wait replaces, is left out.
-  const facts = [status, ...(word && word !== status && !waits ? [`${word}${seen}`] : []), ...(waits ? [waits] : []), ...partDetail(part, activity)];
+  // One waiting reason: a question, else what blocks it, else a blocked slice over a waiting child.
+  const waits = !asks && open.length ? `Waiting on ${waitText(item, open)}` : null;
+  const detail = partDetail(part, activity);
+  const heldBySlice = activity.kind === 'child waiting' && item.slices.some((s) => s.progress === 'blocked');
+  // One fact once: a run says In progress already, and an activity the status says, or that the wait replaces, is left out.
+  const facts = waits ? [status, waits] : [
+    ...(status === 'In progress' && activity.kind === 'working' ? [] : [status]),
+    ...(word && word !== status && !heldBySlice ? [`${word}${seen}`] : []),
+    ...detail,
+  ];
+  const state = facts.join(' · ');
   return (
     <div style={{ width, height: NODE_H }} data-map-part={item.id}
       className={`relative flex flex-col gap-1 overflow-hidden rounded-lg border bg-(--card) px-2.5 py-2 text-left shadow-xs ${tone} ${pickedRing(isPicked)}`}>
-      <button type="button" aria-label={`Open ${ref(item)}`} onClick={() => useItemDialogStore.getState().open(item.id)} className="absolute inset-0 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_60%,transparent)] focus-visible:outline-2 focus-visible:outline-(--primary)" />
+      <button type="button" aria-label={`Open ${ref(item)}`} title={`${itemName(item)} · ${state}`} onClick={() => useItemDialogStore.getState().open(item.id)} className="absolute inset-0 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_60%,transparent)] focus-visible:outline-2 focus-visible:outline-(--primary)" />
       <SourceIcon item={item} corner className="pointer-events-none" />
-      <span className="pointer-events-none relative flex min-w-0 items-center gap-1.5 pr-5 text-[11px] text-(--muted-foreground)">
+      <span className="pointer-events-none relative flex min-h-6 min-w-0 items-center gap-1.5 pr-5 text-[11px] text-(--muted-foreground)" data-map-head>
         <PartKindLabel kind={part.kind} />
         {/* A build's lane already names its repository; the Decisions lane doesn't. */}
         {DECISION_KINDS.includes(part.kind) && repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />}
         <AzureFields azure={item.azure} />
+        {action && <span className="pointer-events-auto ml-auto shrink-0">{action}</span>}
+        {opensThread && <span className="pointer-events-auto ml-auto shrink-0"><OpenThread item={item} data={data} threadId={activity.thread?.id} iconOnly /></span>}
       </span>
       <span className="pointer-events-none relative line-clamp-2 text-[13px] font-medium leading-snug"><ItemTitle item={item} /></span>
-      <span className="relative mt-auto flex min-h-6 min-w-0 items-center gap-1.5 text-xs">
+      <span className="pointer-events-none relative mt-auto flex min-w-0 items-center gap-1.5 text-xs">
         <StatusGlyph status={complete ? 'Done' : shown.glyph} className="size-3 shrink-0" />
-        <span className="pointer-events-none min-w-0 flex-1 truncate" title={facts.join(' · ')} data-map-facts>{facts.join(' · ')}</span>
-        {action && <span className="shrink-0">{action}</span>}
-        {opensThread && <span className="shrink-0"><OpenThread item={item} data={data} threadId={activity.thread?.id} iconOnly /></span>}
+        <span className="min-w-0 flex-1 truncate" data-map-facts>{state}</span>
       </span>
-      {item.slices.length > 0 && <span className="pointer-events-none absolute inset-x-2.5 bottom-1"><SliceBar item={item} /></span>}
+      {item.slices.length > 0 && <span className="pointer-events-none absolute inset-x-2.5 bottom-0.5"><SliceBar item={item} /></span>}
     </div>
   );
 }
@@ -217,7 +227,7 @@ function CheckNode({ check, width, after }: { check: EndToEndCheck; width: numbe
     <div style={{ width, height: NODE_H }} data-map-check className="flex flex-col gap-1 rounded-lg border-2 border-dashed border-(--input) bg-(--card) px-2.5 py-2 shadow-xs">
       <span className="flex items-center gap-1.5 text-[11px] text-(--muted-foreground)"><FlaskConical className="size-3.5" />end-to-end check</span>
       <span className="line-clamp-2 text-[13px] font-medium leading-snug">{check.title}</span>
-      <span className="mt-auto flex min-w-0 items-center gap-1.5 text-xs"><StatusGlyph status="Queued" className="size-3 shrink-0" /><span className="min-w-0 truncate" title={after ? `Agents run it once ${after} land` : undefined}>{plural(check.steps.length, 'step')}{after && ` · runs once ${after} land`}</span></span>
+      <span className="mt-auto flex min-w-0 items-center gap-1.5 text-xs"><StatusGlyph status="Queued" className="size-3 shrink-0" /><span className="min-w-0 truncate" title={after ? `After ${after}` : undefined}>{plural(check.steps.length, 'step')}{after && ` · after ${after}`}</span></span>
     </div>
   );
 }
@@ -292,7 +302,16 @@ export function WorkMap({ parts, check, data, home }: { parts: Part[]; check: En
           if (!e.label) return null;
           const to = at.get(e.to), from = at.get(e.from);
           const place = to ? { left: to.x, top: to.y - 15, width: m.nodeW } : from ? { left: from.x + m.nodeW + 14, top: m.groupY - 15, width: m.colW - 20 } : null;
-          return place && <span key={`${e.from}-${e.to}`} className="absolute truncate text-[11px] leading-3.5 text-(--muted-foreground)" style={place} title={e.label} data-edge-label={`${e.from} ${e.to}`}>{e.label}</span>;
+          return place && (
+            <Tooltip key={`${e.from}-${e.to}`}>
+              <TooltipTrigger asChild>
+                <button type="button" aria-label={`${e.label}: ${e.names}`} onClick={() => setShowHistory(true)} data-edge-label={`${e.from} ${e.to}`}
+                  className="absolute truncate rounded text-left text-[11px] leading-3.5 text-(--muted-foreground) hover:text-(--foreground) hover:underline focus-visible:outline-2 focus-visible:outline-(--primary)"
+                  style={{ left: place.left, top: place.top, maxWidth: place.width }}>{e.label}</button>
+              </TooltipTrigger>
+              <TooltipPopup side="top">{e.names}</TooltipPopup>
+            </Tooltip>
+          );
         })}
         {m.placed.map((p) => (
           <div key={p.key} className={`absolute transition-opacity ${near(p.key) ? '' : 'opacity-40'}`} style={{ left: p.x, top: p.y }}
@@ -309,7 +328,7 @@ export function WorkMap({ parts, check, data, home }: { parts: Part[]; check: En
             style={{ left: 12, right: 12, top: m.groupY, height: GROUP_H }}>
             <StatusGlyph status="Done" className="size-3.5 shrink-0" />
             <span className="min-w-0 truncate font-medium">{historyText(history)}</span>
-            <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-(--muted-foreground)">{showHistory ? <>Hide<ChevronDown className="size-3.5" /></> : <>Show<ChevronRight className="size-3.5" /></>}</span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-(--muted-foreground)">{showHistory ? <>Hide<ChevronDown className="size-3.5" /></> : <>Show<ChevronRight className="size-3.5" /></>}</span>
           </button>
         )}
       </div>

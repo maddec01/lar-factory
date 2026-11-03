@@ -21,6 +21,17 @@ it('shows a relaunch after stopped or finished build threads, also while activit
   }
 });
 
+it('does not call finished slices Implementing while the builder moves to its next phase', () => {
+  const item = { status: 'In progress', buildPhase: 'implement', slices: [{ progress: 'done' }],
+    threads: [{ purpose: 'build', state: 'running', currentRunning: true }] } as unknown as Item;
+  expect(buildActivity(item)).toEqual({ label: 'Finishing build', running: true });
+  expect(buildActivity({ ...item, buildPhase: 'full-checks' })).toEqual({ label: 'Checks', running: true });
+  expect(buildActivity({ ...item, slices: [...item.slices, { progress: 'active' }] } as Item).label).toBe('Implementing');
+  expect(buildActivity({ ...item, slices: [] }).label).toBe('Implementing');
+  expect(buildActivity(item, true)).toEqual({ label: 'Activity unavailable', running: false });
+  expect(buildActivity({ ...item, threads: [{ purpose: 'build', state: 'done' }] } as Item).running).toBe(false);
+});
+
 it('active delegated work counts as working after the parent run ended', () => {
   const finished = { status: 'In progress', buildPhase: 'implement', slices: [{ progress: 'active' }], threads: [{ purpose: 'build', state: 'done' }] } as unknown as Item;
   expect(delegatedWorkRunning(finished)).toBe(true);

@@ -1,11 +1,11 @@
 // The board's one work row, in Queue, Shaping, Ready to build and Build alike: a single line in columns that line up down
 // the whole board, one button that opens the item's details with the row's action beside it. A row with slices or a run
 // at work adds a progress line under it, with a long bar and the slice count, which unfolds its slices, as its own focus
-// stop, and the phase and first blocked or active slice.
+// stop, and the phase and current delegated task or first blocked or active slice.
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, GitPullRequest } from 'lucide-react';
-import { blockedText, canRetryBuild, currentBuildThread, itemName, prLabel, shortAgo } from '@lar-factory/shared';
+import { blockedText, canRetryBuild, currentBuildThread, isStale, itemName, prLabel, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -64,15 +64,20 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
   const feedback = useActivityFeedback(item);
   const shown = useShownStatus(item);
   const now = useBoardStore((state) => state.now);
+  const disconnected = useBoardStore((state) => !!state.clientError);
   const unavailable = useActivityUnavailable();
   const [slices, setSlices] = useState(false);
   const isPicked = useItemDialogStore((state) => state.itemId === item.id);
   const done = item.slices.filter((s) => s.progress === 'done').length;
+  const implemented = item.slices.length > 0 && done === item.slices.length;
   const note = sliceNote(item);
   const blocked = blockedText(item);
   const runKnown = !unavailable && threadsOf(item).some(threadAtWork);
   const state = shown.working ? 'Working' : stateText(item, shown.word, feedback, runKnown);
   const working = feedback.running || state === 'Working';
+  // Fresh T3 tasks need not wait for unrelated repositories to finish their first read.
+  const childActivity = !disconnected && !isStale(data, now) && !item.paused && !item.archived
+    ? currentBuildThread(item)?.childActivity : undefined;
   const phase = feedback.running && feedback.label !== state ? feedback.label : null;
   const figures = figuresOf(item, data);
   const pr = item.linkedPrs[0];
@@ -107,7 +112,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
         </button>
         <span data-col="side" className={`${ROW_ACTION} w-40 shrink-0`}><Side item={item} data={data} /></span>
       </div>
-      {(item.slices.length > 0 || working) && (
+      {(item.slices.length > 0 || working || childActivity) && (
         <div data-progress className="grid grid-cols-[20rem_auto_minmax(0,1fr)] items-center gap-x-3 pb-2.5 pl-12 pr-3 text-[12px] text-(--muted-foreground)">
           <span data-col="bar">{item.slices.length > 0 ? <SliceBar item={item} /> : <ActivityFeedback feedback={{ ...feedback, running: true }} />}</span>
           {item.slices.length > 0
@@ -116,9 +121,12 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
                 {done}/{item.slices.length} slices{slices ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
               </button>
             : <span />}
-          <span data-col="next" className="min-w-0 truncate" title={note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n') || undefined}>
-            {phase && <span data-phase>{phase}{note[0] && ' · '}</span>}
-            {note[0] && <><span className={`font-medium ${note[0].tone}`}>{note[0].word}</span> <span className="text-(--foreground)">{note[0].s.title}</span>{note.length > 1 && ` +${note.length - 1} more`}</>}
+          <span data-col="next" className="min-w-0 truncate" title={childActivity?.titles.join('\n') || note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n') || undefined}>
+            {phase && <span data-phase>{phase}{(childActivity || note[0] || implemented) && ' · '}</span>}
+            {childActivity
+              ? <span data-child-activity className="text-(--foreground)">{childActivity.titles[0]}{childActivity.count > 1 && ` +${childActivity.count - 1} more`}</span>
+              : <>{note[0] && <><span className={`font-medium ${note[0].tone}`}>{note[0].word}</span> <span className="text-(--foreground)">{note[0].s.title}</span>{note.length > 1 && ` +${note.length - 1} more`}</>}
+                {implemented && <span>All slices implemented</span>}</>}
           </span>
         </div>
       )}

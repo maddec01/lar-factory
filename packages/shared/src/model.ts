@@ -404,6 +404,8 @@ export interface ItemThread {
   archived?: true;
   /** A descendant is running, or this thread or a descendant has background tasks pending, so its work goes on after its turn ended. */
   hasRunningChildren?: true;
+  /** Current descendant tasks: at most three titles, with the total count. Absent once they stop. */
+  childActivity?: { titles: string[]; count: number };
   /** The work record's thread role, when recorded by the factory. */
   purpose?: string;
 }
@@ -1301,6 +1303,10 @@ export function buildActivity(item: Item, stale = false, start?: StartProgress):
   const running = !!current?.currentRunning || delegatedWorkRunning(item);
   if (!current && !running) return { label: 'Activity unavailable', running: false };
   if (!running) return { label: current?.state === 'stopped' ? 'Stopped' : current?.state === 'needs you' ? 'Needs you' : 'Activity unavailable', running: false };
+  // A builder can still be integrating or checking after its last slice finishes, before it records the next phase.
+  if (item.buildPhase === 'implement' && item.slices?.length > 0 && item.slices.every((slice) => slice.progress === 'done')) {
+    return { label: 'Finishing build', running };
+  }
   const phases: Record<string, string> = { plan: 'Planning', implement: 'Implementing', review: 'Review', checks: 'Checks', 'full-checks': 'Checks', 'domain-docs': 'Updating docs', approve: 'Awaiting approval', retro: 'Retro' };
   return { label: phases[item.buildPhase ?? ''] ?? 'Working', running };
 }

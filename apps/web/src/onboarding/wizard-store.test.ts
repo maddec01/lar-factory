@@ -27,18 +27,14 @@ test('onboarding chooses a source without importing individual tickets or changi
   expect(routes.some((url) => /onboarding\/(?:import|pr(?:\/|$))|config/.test(url))).toBe(false);
 });
 
-test('enabled concept sync requires positive write access; local-only shaping remains available', async () => {
+test('legacy enabled sync does not require structural access for setup', async () => {
   const found = detection();
   found.access['comment-ticket'] = 'unverified';
   const { wizard, ready } = await start(found);
   await settle(() => wizard.getState().next());
-  expect(ready()).toBe(false);
-  await settle(() => wizard.getState().save());
-  expect(posted('/api/onboarding/setup')).toEqual([]);
-  wizard.getState().choose({ structureSync: false });
   expect(ready()).toBe(true);
   await settle(() => wizard.getState().save());
-  expect(posted('/api/onboarding/setup')[0]?.structureSync).toBe(false);
+  expect(posted('/api/onboarding/setup')).toHaveLength(1);
 });
 
 test('an Azure source needs a readable team, not individual item picks', async () => {

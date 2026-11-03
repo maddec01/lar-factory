@@ -1,6 +1,6 @@
 // Onboarding chooses a source and local settings, then checks access once.
-import { structureSyncOperations, sameRepo, shownRepo, type Detected, type DomainDocLocation, type OnboardingChoices,
-  type RepoConfig, type RepositoryItemSource, type RepositoryOperation, type SetupDetection } from '@lar-factory/shared';
+import { sameRepo, shownRepo, type Detected, type DomainDocLocation, type OnboardingChoices,
+  type RepoConfig, type RepositoryItemSource, type SetupDetection } from '@lar-factory/shared';
 
 export const STEP_TITLES = { project: 'Repository', work: 'Work and docs', access: 'Access and add' } as const;
 export type StepId = keyof typeof STEP_TITLES;
@@ -47,10 +47,4 @@ export function answersOf(detection: SetupDetection, choices: OnboardingChoices)
 }
 export function answerProblem(step: StepId, answers: Answers): string | null {
   return step === 'work' && !answers.itemSource ? 'Choose a team to continue.' : null;
-}
-export const missingSyncAccess = (detection: SetupDetection): RepositoryOperation[] => structureSyncOperations(detection.repo).filter((op) => detection.access[op] !== 'allowed');
-export function operationTitle(op: RepositoryOperation, detection: Pick<SetupDetection, 'provider'>): string {
-  const issue = detection.provider === 'GitHub' ? 'issues' : 'work items';
-  return ({ 'push-branch': 'Push branches', 'open-pr': 'Open pull requests', 'publish-ticket': `Create ${issue}`,
-    'edit-ticket': `Edit ${issue}`, 'comment-ticket': 'Post comments', 'tag-ticket': 'Set labels or tags', 'manage-labels': 'Manage labels or tags', 'type-ticket': 'Set item types', 'relate-ticket': 'Link items' })[op];
 }

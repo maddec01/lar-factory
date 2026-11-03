@@ -12,7 +12,6 @@ import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource,
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
-import { syncStructures } from '@lar-factory/work-records/tracker-sync';
 import { createBoardState } from './board/board-state.ts';
 import { readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { observePr } from './config/pr-host.ts';
@@ -845,7 +844,6 @@ const localTimer = setInterval(() => {
       refreshLocal();
       runLocal(() => prObserver?.poll());
       if (records?.specPending().length) runLocal(() => syncSpecs(records));
-      if (records?.trackerPending().length) runLocal(() => syncStructures(records));
     });
   }
 }, LOCAL_REFRESH_MS);

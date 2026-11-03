@@ -1,8 +1,10 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vite-plus/test';
-import { formatTicketSpec, readTrackerStructure, type RepositorySetup } from '@lar-factory/shared';
+import { formatTicketSpec, writeTrackerStructure, readTrackerStructure, type RepositorySetup } from '@lar-factory/shared';
 import * as settings from '@lar-factory/shared/repository-settings';
 import { openWorkRecords } from '@lar-factory/work-records';
 import * as tracker from '@lar-factory/work-records/tracker-sync';
@@ -26,7 +28,19 @@ test('structure recovery extracts each marked ticket Original and restores no br
       comment: async (_ticket, body) => { const id = String(comments.size + 1); comments.set(id, body); return id; },
       readComment: async (_ticket, id) => comments.get(id)!,
     } as tracker.StructureProvider;
-    await tracker.syncStructures(source, { provider, setups });
+    const payload = JSON.stringify(source.trackerSnapshot(root.workId));
+    const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+    const data = gzipSync(payload).toString('base64');
+    const generation = '11111111-1111-1111-1111-111111111111';
+    comments.set('1', `<!-- lar-factory:chunk ${generation} 0
+${data}
+-->`);
+    const legacy = tickets.get(1)!;
+    legacy.body = writeTrackerStructure(legacy.body, {
+      version: 1, kind: 'concept', identity: root.workId,
+      snapshot: { root: 'https://github.com/example/product/issues/1', repository, generation,
+        digest: digest(payload), previous: null, chunks: [{ id: '1', digest: digest(data) }] },
+    });
     const ticket = tickets.get(1)!;
     const metadata = readTrackerStructure(ticket.body)!;
     expect(metadata.snapshot).toBeDefined();

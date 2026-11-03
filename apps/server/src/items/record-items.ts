@@ -89,7 +89,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     const mapBody = record.kind === 'concept' ? records.body(record.workId, 'map') : null;
     const map = mapBody !== null ? parseConceptMap(mapBody) : record.kind === 'concept' ? ticket?.map ?? parseConceptMap('') : ticket?.map;
     const done = isDone(record);
-    const sync = setups.find(setup=>sameRepo(setup.repo,record.repository))?.structureSync === false ? undefined : records.trackerState(record.workId);
+    const sync = records.trackerState(record.workId);
     const spec = setups.find(setup => sameRepo(setup.repo, record.repository))?.writeRefinedSpec === false ? null : records.specState(record.workId);
     const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
     const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;

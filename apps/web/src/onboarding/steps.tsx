@@ -1,8 +1,8 @@
 // Onboarding screens built from the board's existing controls.
-import { FolderPlus, LoaderCircle, Check, Lock, Minus } from 'lucide-react';
+import { FolderPlus, LoaderCircle, Check, Minus } from 'lucide-react';
 import { effectiveIssueSettings, isOnboarding, shownRepo, trackerCapabilities, type OperationAccess, type SetupDetection } from '@lar-factory/shared';
-import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
@@ -13,7 +13,7 @@ import { kind } from '../buttons/button-kinds.tsx';
 import { Choice, Field, Group } from './setup-fields.tsx';
 import { KindMapping } from './kind-mapping.tsx';
 import { IssueDefaults } from '../repositories/issue-defaults.tsx';
-import { answersOf, connectionOptions, connectionsOf, found, missingSyncAccess, operationTitle, repositoryDocs, skillOptions, sourceOptions } from './wizard-choices.ts';
+import { answersOf, connectionOptions, connectionsOf, found, repositoryDocs, skillOptions, sourceOptions } from './wizard-choices.ts';
 import { detectedOf, unpickable, useWizardStore, type Run } from './wizard-store.ts';
 
 function ProjectStep({ run }: { run: Run }) {
@@ -53,15 +53,6 @@ function DetectionPending() {
     : <Pending>Checking the repository and your access…</Pending>;
 }
 
-/** What sync needs from the tracker: its fixed label, or nothing. */
-function SyncNeed({ detection }: { detection: SetupDetection }) {
-  const { noun, syncLabel } = trackerCapabilities(detection.repo);
-  return <p data-sync-need className="m-0 -mt-2 flex flex-wrap items-center gap-1.5 pl-7 text-xs text-base-700">
-    {syncLabel ? <>Needs this {noun}, which the factory creates and manages:<Badge><span className="inline-flex items-center gap-1"><Lock className="size-3 shrink-0" aria-label="Factory-managed" />{syncLabel}</span></Badge></>
-      : `No ${noun} is needed. ${detection.provider} stores these links itself.`}
-  </p>;
-}
-
 function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
   const { choose, detect } = useWizardStore();
   const repos = useBoardStore((s) => s.data.repos);
@@ -79,8 +70,7 @@ function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
         choices={sources.map((source) => ({ value: source.id, name: source.title }))} />}
     </Field>
     <div className="grid gap-4 rounded-lg border p-4">
-      <Checkbox label="Save concepts and cross-repository links to issues" checked={answers.structureSync} onChange={() => choose({ structureSync: !answers.structureSync })} />
-      {answers.structureSync && <SyncNeed detection={detection} />}
+      <p className="m-0 text-sm text-base-700">Legacy structural publication is suspended. Concepts and links stay on this machine.</p>
       <Checkbox label="Write glossary and decisions in build PRs" checked={answers.domainDocs.kind === 'repository'} onChange={() => choose({ domainDocs: answers.domainDocs.kind === 'repository' ? { kind: 'off' } : repositoryDocs(detection) })} />
       <p className="m-0 -mt-2 pl-7 text-xs text-base-700">Builds include new domain terms and decisions for review.</p>
     </div>
@@ -100,16 +90,12 @@ function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
   </div>;
 }
 
-function AccessStep({ run, detection }: { run: Run; detection: SetupDetection }) {
+function AccessStep({ detection }: { run: Run; detection: SetupDetection }) {
   const detect = useWizardStore((s) => s.detect);
-  const answers = answersOf(detection, run.choices);
-  const missing = answers.structureSync ? missingSyncAccess(detection) : [];
-  const syncAccess: OperationAccess = missing.length === 0 ? 'allowed' : missing.some((op) => detection.access[op] === 'refused') ? 'refused' : 'unverified';
   const labels = trackerCapabilities(detection.repo).heading.toLowerCase();
   const manageLabels = detection.access['manage-labels'];
   const rows: { name: string; access: OperationAccess }[] = [
     { name: 'Read issues', access: 'found' in detection.itemSources && detection.itemSources.found.length > 0 ? 'allowed' : 'refused' },
-    ...answers.structureSync ? [{ name: 'Save concept maps and links', access: syncAccess }] : [],
     { name: `Manage ${labels}`, access: manageLabels },
     { name: 'Push build branches', access: detection.access['push-branch'] },
     { name: 'Open build pull requests', access: detection.access['open-pr'] },
@@ -121,9 +107,6 @@ function AccessStep({ run, detection }: { run: Run; detection: SetupDetection })
         <span className={`flex shrink-0 items-center gap-1.5 text-xs ${row.access === 'allowed' ? 'text-base-700' : 'text-(--lar-danger-text)'}`}>{row.access === 'allowed' ? <Check className="size-4" /> : <Minus className="size-4" />}{row.access === 'allowed' ? 'Ready' : row.access === 'unverified' ? 'Not verified' : 'Needs access'}</span>
       </li>)}
     </ul>
-    {missing.length > 0 && <Alert tone="danger" title="Concept sync needs write access">
-      Allow {missing.map((op) => operationTitle(op, detection).toLowerCase()).join(', ')} in {detection.provider}. {detection.provider === 'GitHub' ? 'Grant Issues: Read and write to your GitHub token or app.' : 'Grant work item read, write and comment permissions in Azure DevOps.'} Then recheck, or turn off concept sync in the previous step.
-    </Alert>}
     {manageLabels !== 'allowed' && <p className="m-0 text-sm text-base-700">You can add this repository without it. Until it is allowed, Settings can't create, rename or delete {labels}.</p>}
     {rows.slice(-2).some((row) => row.access !== 'allowed') && <p className="m-0 text-sm text-base-700">You can shape issues now. Builds need permission to push branches and open pull requests.</p>}
     {detection.provider === 'GitHub' && rows.slice(-2).some((row) => row.access !== 'allowed') && <p className="m-0 text-sm text-base-700">Builds need Contents and Pull requests: Read and write in your GitHub token or app.</p>}

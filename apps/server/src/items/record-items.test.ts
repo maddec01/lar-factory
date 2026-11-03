@@ -454,3 +454,13 @@ test('the kind a record and its ticket agree on comes from the last read and the
   assert.equal(agreedKind(record, new Map(), vocabulary), null);
   assert.equal(agreedKind(record, byTicket(['bug']), undefined), null);
 });
+
+test('disabled legacy settings retain pending concept content in board details', async () => {
+  const records = await open();
+  const concept = records.create({ repository: REPO, title: 'Retained concept', kind: 'concept' });
+  records.setBody(concept.workId, concept.revision, 'map', 'Pending local map');
+  const pending = records.trackerPending();
+  const item = recordItems(records, [], [REPO], [{ repo: REPO, structureSync: false }]).find(item => item.id === concept.workId);
+  assert.equal(item?.sync?.state, 'pending');
+  assert.deepEqual(records.trackerPending(), pending);
+});

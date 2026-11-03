@@ -1,10 +1,10 @@
 import { discoverVocabulary, saveVocabularyLabels, type VocabularyReads } from '@lar-factory/shared/publication-settings';
 import { isVocabularyMapping, vocabularySelectionProblem, VOCABULARY_KEYS, type VocabularyKey, type VocabularySettingsResponse } from '@lar-factory/shared/vocabulary';
 import { setVocabularyOverride } from '@lar-factory/shared/repository-settings';
-import { SHARED_SETTINGS, structureSyncOperations, writeAccessProblem, sameRepo, type RepositorySetup, type RepositoryConfigProblem, type SharedSetting, type SharedRepositorySettings } from '@lar-factory/shared';
+import { SHARED_SETTINGS, writeAccessProblem, sameRepo, type RepositorySetup, type RepositoryConfigProblem, type SharedSetting, type SharedRepositorySettings } from '@lar-factory/shared';
 import { detectAccess } from '../onboarding/detect-setup.ts';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
-import { readRepositorySetups, setOverride, setStructureSync, replaceAccess } from '@lar-factory/shared/repository-settings';
+import { readRepositorySetups, setOverride, replaceAccess } from '@lar-factory/shared/repository-settings';
 export { readRepositorySetups, saveLocalSetup, setOverride, validateRepositorySettings } from '@lar-factory/shared/repository-settings';
 import { notEditable, type Refused } from './editable-repository.ts';
 import { isRepo, onTheBoard, type OnboardedRepository, type RepositoryConfig } from './repository-config.ts';
@@ -36,10 +36,7 @@ export async function changeRepositorySettings(input: Record<string, unknown>, d
     }
     else if (change === 'recheck') replaceAccess(repo, await detectAccess(repo), dir);
     else if (change === 'structure-sync') {
-      if (typeof value !== 'boolean') throw new Error('Choose whether to save concepts and links.');
-      const setup = readRepositorySetups(dir).find((s) => sameRepo(s.repo, repo))!;
-      if (value && structureSyncOperations(repo).some((op) => writeAccessProblem(repo, op, setup.access) !== null)) throw new Error('Saving concepts and links needs permission to create issues, post comments and save their structure. Recheck access or leave it off.');
-      setStructureSync(repo, value, dir);
+      throw new Error('Legacy structural publication is suspended. Local content and prior settings are retained.');
     }
     else setOverride(repo, key as SharedSetting, value as SharedRepositorySettings[SharedSetting], dir);
   } catch (err) {

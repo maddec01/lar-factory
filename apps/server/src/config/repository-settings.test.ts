@@ -78,12 +78,16 @@ test('changing docs applies directly and leaves no acceptance gate', async (t) =
   expect(JSON.parse(await readFile(join(dir, 'repository-settings.json'), 'utf8')).repositories[0].settings).not.toHaveProperty('accepted');
 });
 
-test('sharing cannot be enabled with unchecked access', async (t) => {
+test('stale publication settings requests preserve the complete settings file', async (t) => {
   const dir = await folder(t);
   saveOnboarded('team/app', null, dir);
-  expect(await changeRepositorySettings({ repo: 'team/app', change: 'structure-sync', value: false }, dir)).toMatchObject({ setup: { structureSync: false } });
-  expect(await changeRepositorySettings({ repo: 'team/app', change: 'structure-sync', value: true }, dir)).toMatchObject({ status: 400 });
-  expect(readRepositorySetups(dir)[0]?.structureSync).toBe(false);
+  const path = join(dir, 'repository-settings.json');
+  const before = await readFile(path, 'utf8');
+  for (const value of [false, true]) {
+    expect(await changeRepositorySettings({ repo: 'team/app', change: 'structure-sync', value }, dir))
+      .toMatchObject({ status: 400, error: expect.stringContaining('suspended') });
+    expect(await readFile(path, 'utf8')).toBe(before);
+  }
 });
 
 test('vocabulary rejects malformed mappings before provider reads', async (t) => {

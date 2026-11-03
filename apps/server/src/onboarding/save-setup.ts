@@ -1,6 +1,6 @@
 import { discoverVocabulary, saveVocabularyLabels, type VocabularyReads } from '@lar-factory/shared/publication-settings';
 import { isVocabularyMapping, vocabularySelectionProblem } from '@lar-factory/shared/vocabulary';
-import { writeAccessProblem, structureSyncOperations, isRecord, onAzure, type LocalSetupAnswers, type OnboardingRepository, type RepositoryItemSource } from '@lar-factory/shared';
+import { writeAccessProblem, isRecord, onAzure, type LocalSetupAnswers, type OnboardingRepository, type RepositoryItemSource } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { isRepo, saveConnections, saveOnboarded, stillOnboarding } from '../config/repository-config.ts';
 import { saveLocalSetup, validateRepositorySettings } from '../config/repository-settings.ts';
@@ -71,11 +71,6 @@ export async function saveSetup(input: Record<string, unknown>, dir = boardDataD
         if (problem) return { status: 403, error: problem };
       }
     }
-  }
-  if (answers.structureSync !== false) {
-    const needed = { 'publish-ticket': 'create issues or work items', 'edit-ticket': 'edit issues or work items', 'comment-ticket': 'post comments', 'tag-ticket': 'set issue labels' } as const;
-    const missing = structureSyncOperations(repo).filter((op) => writeAccessProblem(repo, op, access) !== null).map((op) => needed[op as keyof typeof needed]);
-    if (missing.length) return { status: 403, error: `Saving concepts and links needs verified permission to ${missing.join(', ')}. ${onAzure(repo) ? 'Grant work item write and comment access.' : 'GitHub needs Issues: Read and write. This read-only check cannot verify fine-grained token permissions; sign in with a classic token or gh OAuth login with repo scope.'} Recheck access or turn off sharing concepts and links.` };
   }
   try {
     if (input.newLabels !== undefined) {

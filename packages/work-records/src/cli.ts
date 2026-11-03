@@ -15,7 +15,6 @@ import { isRecord, sameRepo } from '@lar-factory/shared';
 import type { Status, SwapKind } from '@lar-factory/shared';
 import { exportMarkdown } from './export.ts';
 import { refreshSpecs, syncSpecs } from './spec-sync.ts';
-import { syncStructures } from './tracker-sync.ts';
 import {
   openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
   type DependencyChange, type DependencyObservationKind, type NewDependency, type NewObservation, type NewReviewRound, type Observed,
@@ -131,7 +130,7 @@ Changes
                                     change only future builds.
 
 Structure
-  sync-structure <work-id>          Save concept and cross-repository structure now.
+  sync-structure <work-id>          Suspended; local legacy content is retained.
                                     Automatic saves use the same durable outbox.
                                     This path omits briefs and decision answers.
                                     Queue order, Status, slices and progress stay local.
@@ -482,8 +481,7 @@ async function run(records: WorkRecords, command: string, workId: string | undef
     case 'resolve-failure': return records.resolveFailure(workId!, need(values, 'reason'));
 
     case 'sync-structure':
-      await syncStructures(records, {workId:workId!,dir:values['data-dir'],confirmedMissingIssue:values['confirmed-missing-issue']});
-      return {record:records.read(workId!),sync:records.trackerState(workId!)};
+      throw new UsageError('Legacy structural publication is suspended. Local content is retained.');
     case 'gate': {
       await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
       const state = records.specState(workId!);
@@ -680,16 +678,7 @@ async function main(args: string[]): Promise<number> {
       return 0;
     }
     records = await openWorkRecords(workRecordsPath(values['data-dir']));
-    const before = JSON.stringify(records.trackerPending());
-    let result = await run(records, command, workId, values);
-    if (command !== 'sync-structure' && before !== JSON.stringify(records.trackerPending())) {
-      await syncStructures(records, {dir:values['data-dir']});
-      if (isRecord(result) && typeof result.workId === 'string' && typeof result.revision === 'number' && !('dependencyId' in result)) result = records.read(result.workId);
-      else if (isRecord(result) && isRecord(result.record) && typeof result.record.workId === 'string') result = {...result,record:records.read(result.record.workId)};
-      const id=isRecord(result) && typeof result.workId==='string' ? result.workId : isRecord(result) && isRecord(result.record) && typeof result.record.workId==='string' ? result.record.workId : undefined;
-      const sync=id ? records.trackerState(id) : undefined;
-      if(sync?.state==='error' || sync?.state==='conflict') process.stderr.write(`lar-work: Structure remains on this machine: ${sync.message}\n`);
-    }
+    const result = await run(records, command, workId, values);
     const validationCommand = ['set-check-list', 'checks', 'describe-failure', 'resolve-failure'].includes(command);
     if (!validationCommand) await syncSpecs(records, { dir: values['data-dir'] });
     if (!validationCommand && workId && !TAKES_DEPENDENCY_ID.includes(command)) {

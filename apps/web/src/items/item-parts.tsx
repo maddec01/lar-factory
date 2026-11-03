@@ -209,7 +209,7 @@ export function StructureSync({ item }: { item: Item }) {
   return <>
     {item.specSync && <span data-spec-sync role="status" className="text-xs text-base-700">{item.specSync.warning ?? item.specSync.error ?? 'Spec waiting to save to tracker'}</span>}
     {item.sync && item.sync.state !== 'saved' && <span data-structure-sync title={item.sync.message} role={item.sync.state === 'error' || item.sync.state === 'conflict' ? 'status' : undefined}
-    className="text-xs text-base-700">{item.sync.state === 'pending' ? 'Saving concept links…' : item.sync.state === 'conflict' ? 'Concept links changed on another machine' : 'Concept links could not save'}{item.sync.message && `. ${item.sync.message}`}</span>}
+    className="text-xs text-base-700">Legacy structural publication is suspended. Pending content is retained on this machine.</span>}
   </>;
 }
 

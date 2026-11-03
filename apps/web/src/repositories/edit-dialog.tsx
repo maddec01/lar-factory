@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, trackerCapabilities, type OperationAccess, type RepositoryOperation, type RepositorySetup } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
-import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
@@ -98,9 +97,7 @@ export function EditDialog() {
         </Text>
         <Modal.Body>
           <div className="grid gap-5">
-            <Checkbox label="Save concepts and cross-repository links to issues" checked={setup.structureSync} disabled={running !== null}
-              onChange={() => void useEditStore.getState().structureSync(repo, !setup.structureSync)} />
-            <p className="m-0 -mt-3 pl-7 text-xs text-base-700">This creates a linked-work label to restore maps and relationships on another machine.</p>
+            <p className="m-0 text-sm text-base-700">Legacy structural publication is suspended. Local content and prior settings are retained.</p>
             <IssueDefaults setup={setup} disabled={running !== null} onChange={(key, value) => void useEditStore.getState().issueDefault(repo, key, value)} />
             <EditVocabulary key={repo} setup={setup} />
             <Settings repo={repo} setup={setup} />

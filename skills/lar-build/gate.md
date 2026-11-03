@@ -22,5 +22,9 @@
 5. Set **Ready** on each build: this record if it's a build, and each build
    record made while shaping. Tell the user which builds are Ready and which
    work each waits on (`lar-work waiting-on`). This shaping thread is done.
-   Ready commits the user to no implementation. The saved Spec setting needs
-   no separate publication or permission prompt at this gate.
+   A Ready build waits for the user's Start build on the board. The exception is
+   Auto-build. With this machine's Auto-build switch on, the board starts
+   eligible Ready builds by itself, up to the build limit. Auto-build starts a
+   build under a concept only once the concept's Refinement is complete.
+   The saved Spec setting needs no separate publication or permission prompt
+   at this gate.

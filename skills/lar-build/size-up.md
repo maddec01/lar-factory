@@ -5,8 +5,11 @@ Pick the route from the issue, code and existing project conventions. State what
 you understood, the repositories involved, open questions and the next shaping
 step in plain words. Continue within the user's request without asking them to
 approve the route. Ask only for missing decisions or an expansion of scope.
-Any issue can be shaped independently. Ready means refinement passed its gate;
-it commits the user to no build and starts no implementation.
+Any issue can be shaped independently. Ready means refinement passed its gate.
+A Ready build waits for the user's Start build on the board. The exception is
+Auto-build. With this machine's Auto-build switch on, the board starts eligible
+Ready builds by itself, up to the build limit. Auto-build starts a build under a
+concept only once the concept's Refinement is complete.
 
 Record the kind (`bug`, `feature`, `improvement`, `concept`) with
 `lar-work update <work ID> --revision N --kind <kind>`. Anything the user adds

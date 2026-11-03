@@ -597,12 +597,19 @@ export interface BoardData {
   retention?: RetentionState;
   /** This Mac's choice for shaping threads after Start build, or why it can't be read. Absent in sample mode. */
   shapingThreadCleanup?: ShapingThreadCleanupState;
+  /** This machine's heavy command limit and the number Automatic gives here. Absent in sample mode. */
+  heavyCommandLimit?: HeavyCommandLimitState;
 }
 
 /** What the board does to an item's shaping threads once Start build records a build thread. */
 export const SHAPING_THREAD_CLEANUPS = ['keep', 'settle', 'archive', 'delete'] as const;
 export type ShapingThreadCleanup = typeof SHAPING_THREAD_CLEANUPS[number];
 export type ShapingThreadCleanupState = { choice: ShapingThreadCleanup } | { problem: string };
+
+/** How many heavy commands may run at once on this machine, across all builds and worktrees: Automatic, or a whole number from 1. */
+export type HeavyCommandLimit = 'automatic' | number;
+/** The saved limit, the number Automatic gives on this machine, and why a file that couldn't be read or held an invalid value counts as Automatic. */
+export interface HeavyCommandLimitState { limit: HeavyCommandLimit; automatic: number; problem?: string }
 
 /** When finished and set-aside work leaves the board, and when, if ever, it is deleted. */
 export interface RetentionState {

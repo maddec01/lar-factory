@@ -24,6 +24,10 @@ _Avoid_: pending input.
 The reason work waits on the user, shown with the actions that resolve it.
 _Avoid_: notification, alert.
 
+**Project icon**:
+The icon a repository's T3 project shows, either a favicon file or a chosen lucide, emoji or monogram icon.
+_Avoid_: repository logo, avatar.
+
 **Abandon**:
 Setting work aside on this machine. Closing its linked tracker ticket is a separate, optional action.
 _Avoid_: delete work.

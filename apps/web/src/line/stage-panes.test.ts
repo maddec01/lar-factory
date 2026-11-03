@@ -107,6 +107,14 @@ test('rows share their columns down all four sections', async () => {
   expect(inEach.every((li) => li.querySelector('[data-repo-cell]') && li.querySelector('[data-col="state"]') && li.querySelector('[data-col="side"]'))).toBe(true);
 });
 
+test('a row with no pull request or figures gives their room to its title', async () => {
+  await mountPage();
+  const queue = $('[data-stage="queue"] li[data-item]')!;
+  expect(queue.querySelector('[data-col="pr"]')).toBeNull();
+  expect(queue.querySelector('[data-col="figures"]')).toBeNull();
+  expect(queue.querySelector('[data-row-open]')!.className.split(' '), 'in the shared 48px row').toContain('h-12');
+});
+
 test('only a row with slices or a run at work has a progress line, with a long bar and readable text, and nothing of it sits in the base row', async () => {
   await mountPage(withItem('I_sample14', { status: 'In progress', buildPhase: 'implement', slices: [], threads: [{ ...thread('t1', 'running'), purpose: 'build', currentRunning: true }] }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() }));
   const progress = (id: string) => row(id).querySelector<HTMLElement>('[data-progress]');

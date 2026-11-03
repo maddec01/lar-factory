@@ -2,7 +2,7 @@
 // most one per area, is filled; a Start is tinted, with the play icon; an Open is outlined, with the thread or pull
 // request icon; an App control has no border and an icon; any Other button is outlined, with no icon. A dialog or a
 // form is an area of its own, so its submit is its Main action. Each kind keeps its look while disabled. Its button
-// carries `data-kind`, which button-kinds.css sizes to 28 px and tints for a Start, so no Copy in packages/ui changes.
+// carries `data-kind`, which button-kinds.css sizes to 28 px, or 32 px in a row's action slot, and tints for a Start, so no Copy in packages/ui changes.
 // The sheet reads four marks a call site adds: `data-icon-only` makes a button 28 px square, its icon 20 px when the
 // mark is "large"; `data-tint` gives an App control Start's tint, as Update has; `data-toggle` keeps a toggle at its
 // own size, off the kinds' 28 px; and `data-wrap` lets a long label wrap, growing the button past 28 px.

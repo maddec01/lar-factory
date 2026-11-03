@@ -106,7 +106,7 @@ test('the chevron is a real button that says whether the row is expanded, and fo
 test('clicks on the title, a chip, a nested Start, the view toggle or the body leave the row as it is', async () => {
   holdPosts(unblocked());
   await mountPage(withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()));
-  await press(startIn(next())!);
+  await press(startIn(col('side'))!);
   await press(header().querySelector('[data-chips]')!);
   expect(body(), 'still collapsed').toBeNull();
   await press(header().querySelector('[data-title]')!);
@@ -178,6 +178,19 @@ const select = (el: Element) => {
   window.getSelection()!.removeAllRanges();
   window.getSelection()!.addRange(range);
 };
+
+test("a dossier's Start and view controls sit in its one action slot, and a click beside them toggles the row", async () => {
+  await mountPage(writable(withItem('I_sample13', { blockers: [] }, calm({}))));
+  expect(next().querySelector('[data-start]'), 'its next step keeps its room').toBeNull();
+  await press(opener());
+  const slot = col('side');
+  expect(startIn(slot)).not.toBeNull();
+  expect(slot.querySelector('[data-dossier-tools]')).not.toBeNull();
+  expect(line().querySelector('[data-dossier-tools]'), 'none beside the title').toBeNull();
+  expect(slot.firstElementChild!.className.split(' ')).toEqual(expect.arrayContaining(['row-action', 'justify-end', 'items-center']));
+  await press(slot.firstElementChild!);
+  expect(body(), 'its empty room still toggles').toBeNull();
+});
 
 test('only the title opens the item; anywhere else on the row but its controls toggles the dossier', async () => {
   await mountPage();
@@ -295,7 +308,7 @@ test('the line holds the kind, the title and chips that hide at zero, with its T
 test('a dossier stays on one line: nothing wraps, the title and Azure fields give up their room to an ellipsis, and the first chip keeps its full width', async () => {
   await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
   const classes = (el: Element) => el.className.split(' ');
-  expect(classes(header())).toContain('h-10');
+  expect(classes(header())).toContain('h-12');
   expect(classes(line())).not.toContain('flex-wrap');
   expect(classes(header().querySelector('[data-title]')!)).toContain('truncate');
   const azure = header().querySelector('[data-azure]')!;
@@ -447,9 +460,9 @@ test('the Ready to start row and the header agree on what can start: a Queued de
   const data = withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, withDecision());
   await mountOpen(data);
   const ready = () => dossier().querySelector('[data-attention-row="ready"]');
-  expect([text(ready()!.firstElementChild), text(startIn(next()))]).toEqual(['Ready to start 1', 'Start ▾']);
+  expect([text(ready()!.firstElementChild), text(startIn(col('side')))]).toEqual(['Ready to start 1', 'Start ▾']);
   await receive(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
-  expect([ready(), startIn(next())], 'a live thread').toEqual([null, null]);
+  expect([ready(), startIn(col('side'))], 'a live thread').toEqual([null, null]);
 });
 
 test('a dossier opens on its Work map, and the browser remembers a switch to the parts list for that dossier alone', async () => {
@@ -547,7 +560,7 @@ test('a blocked build shows only Start after, a Start, in place of Start build',
 test('once its blockers complete, Start build sends the build, and the header offers it too', async () => {
   holdPosts(unblocked());
   await mountOpen(withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()));
-  expect(text(startIn(next()))).toBe('Start ▾');
+  expect(text(startIn(col('side')))).toBe('Start ▾');
   expect(next().querySelector('.sr-only')?.textContent, 'Next reads to a screen reader and leaves its room to the title').toBe('Next');
   await pressMenu(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
@@ -725,6 +738,16 @@ test('a concept question takes priority over its parts and appears in Attention'
   expect(text(next())).toContain('Needs you');
   expect(text(dossier())).not.toContain('Nothing holds this up');
   expect(dossier().querySelector('a[href="t3code://threads/sample-environment/own-question"]')).not.toBeNull();
+});
+
+test('Needs you beside a badge that says it reads only to a screen reader, and shows when no badge says it', async () => {
+  await mountPage();
+  expect([chips(), next().querySelector('.sr-only')?.textContent], 'the badge says it').toEqual([['1 need you'], 'Needs you']);
+  expect(text(next())).toBe('Needs you#202 Sign-in screen');
+  await receive(withItem(C200, { status: 'In progress', threads: [thread('own-question', 'needs you')] }, calm({})));
+  expect(chips(), 'the concept itself asks, and no part does').not.toContain('1 need you');
+  expect(text(next())).toContain('Needs you');
+  expect(next().querySelector('.sr-only'), 'no badge says it').toBeNull();
 });
 
 test('a shaping part with a question leads moving parts in the dossier', async () => {

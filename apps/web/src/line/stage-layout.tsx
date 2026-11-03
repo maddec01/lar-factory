@@ -24,7 +24,7 @@ export function StageLayout({ items, desk }: { items: Item[]; desk: ReactNode })
   const filterable = [...queue, ...shaping, ...ready, ...build].map(({ item }) => item).concat(dock.map(({ parent }) => parent));
   return <>
     {desk}
-    <section className="stages flex flex-col gap-2.5" aria-label="Work by stage">
+    <section className="stages flex flex-col gap-3" aria-label="Work by stage">
       <div data-line-filters><ItemFilterBar filters={filters} onChange={setFilters} rows={filterable} /></div>
       <Queue rows={queue} shows={showsRow} />
       <Shaping shaping={shaping} shows={showsRow} />

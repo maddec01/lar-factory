@@ -4,6 +4,7 @@
 // Once a thread starts or may have started, a tag takes Start's place.
 
 import { useId, useRef, useState } from 'react';
+import { LoaderCircle } from 'lucide-react';
 import type { SyntheticEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { canResumeShaping, itemName, ref, highlightedChoice, storedChoice } from '@lar-factory/shared';
@@ -118,7 +119,7 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
       {stopped && <><span className="basis-full">Run stopped.</span><OpenThread item={item} data={data} threadId={observed.id} /></>}
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
-          <Button {...buttonKind(main ? 'main' : 'start')} leftIcon={start?.phase !== 'pending' && !main && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}
+          <Button {...buttonKind(main ? 'main' : 'start')} aria-busy={start?.phase === 'pending' || undefined} leftIcon={start?.phase === 'pending' ? <LoaderCircle className="animate-spin" /> : !main && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}
             {...naming && { className: 'max-w-96', title: `A filter hides ${itemName(item)}` }}>
             {naming ? <span className="truncate">{verb}: {itemName(item)}</span> : verb}{start?.phase !== 'pending' && ' ▾'}
           </Button>

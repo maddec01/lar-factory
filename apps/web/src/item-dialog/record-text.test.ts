@@ -71,6 +71,20 @@ test('a concept shows its map and a decision its text, each with a note while no
   expect(text(record()!.querySelector('[data-record-body]'))).toBe('No decision written yet.');
 });
 
+test('a settled decision leads with its outcome and folds the original question', async () => {
+  const decision = ticketless('W_decision', 'Relay', { kind: 'decision', status: 'Done' });
+  answer({ W_decision: { ...NO_TICKET, record: { bodyKind: 'decision', body: 'Method: grill\n\nBroker only?', answer: 'Use a **relay broker**.', context: '', buildPhase: null, reviewRounds: [] } } });
+  await mountPage({ ...sample, items: [decision, ...sample.items] });
+  await openItem('W_decision');
+  expect(text(record()!.querySelector('h2'))).toBe('Outcome');
+  expect(text(record()!.querySelector('[data-record-body]'))).toBe('Use a relay broker.');
+  const question = record()!.querySelector('details')!;
+  expect(question.open).toBe(false);
+  expect(text(question.querySelector('summary'))).toBe('Original question');
+  expect(text(question)).toContain('Broker only?');
+  expect(text(question)).not.toContain('Method:');
+});
+
 test('ticketless work shows its record alone, with its private slices and the work it waits on', async () => {
   const blocker = ticketless('W_blocker', 'Relay broker');
   const build = ticketless('W_build', 'Owner accounts', {

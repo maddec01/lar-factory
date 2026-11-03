@@ -3,7 +3,7 @@
 // writes it to Downloads as `lar-work export` does and names the files it wrote, or says why it couldn't.
 
 import { useState, type ReactNode } from 'react';
-import type { Item, RecordDetails } from '@lar-factory/shared';
+import { parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
@@ -36,7 +36,10 @@ export function ExportedLine({ exported }: { exported: Exported }) {
 
 export function RecordText({ item, record, className, spec = false }: { spec?: boolean; item: Item; record: RecordDetails; className: string }) {
   const [exported, setExported] = useState<Exported>({ state: 'idle' });
-  const title = spec ? 'Work record' : TITLE[record.bodyKind];
+  const answer = record.bodyKind === 'decision' ? record.answer?.trim() : undefined;
+  const body = record.bodyKind === 'decision' && record.body && parseDecisionMethod(record.body)
+    ? record.body.split('\n').slice(1).join('\n').trimStart() : record.body;
+  const title = spec ? 'Work record' : answer ? 'Outcome' : TITLE[record.bodyKind];
   return (
     <section className={`grid min-w-0 gap-2 ${className}`} data-record>
       <div className="flex h-7 items-center justify-between gap-2">
@@ -45,8 +48,12 @@ export function RecordText({ item, record, className, spec = false }: { spec?: b
       </div>
       <ExportedLine exported={exported} />
       {!spec && <div data-record-body>
-        {record.body ? <MarkdownDiagrams text={record.body} /> : <p className="m-0 text-sm text-(--muted-foreground)">No {title.toLowerCase()} written yet.</p>}
+        {answer ? <MarkdownDiagrams text={answer} /> : body ? <MarkdownDiagrams text={body} /> : <p className="m-0 text-sm text-(--muted-foreground)">No {title.toLowerCase()} written yet.</p>}
       </div>}
+      {!spec && answer && body && <details>
+        <summary className="cursor-pointer text-sm text-(--muted-foreground)">Original question</summary>
+        <div className="pt-2"><MarkdownDiagrams text={body} /></div>
+      </details>}
       {record.buildPhase && <Fact label="Build phase" data-build-phase>{record.buildPhase}</Fact>}
       {record.reviewRounds.length > 0 && (
         <div className="grid gap-1" data-review-rounds>

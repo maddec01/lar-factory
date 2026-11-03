@@ -54,6 +54,16 @@ describe('recorded thread lookup', () => {
     expect(executionItemThreads([parent, child, grandchild])(['root'])?.[0]).not.toHaveProperty('hasRunningChildren');
     expect(executionItemThreads([parent])(['root'])?.[0]).not.toHaveProperty('queued');
   });
+  it('keeps an active run visible when a newer message was cancelled or queued', () => {
+    for (const status of ['cancelled', 'queued', 'completed']) {
+      const lookup = executionItemThreads([{ ...shell, status, activeRunId: 'older-run', activityRunStatus: 'running' }]);
+      expect(lookup(['root'])?.[0]).toMatchObject({ state: 'running', currentRunning: true });
+      expect(lookup(['root'])?.[0]).not.toHaveProperty('queued');
+    }
+    expect(executionItemThreads([{ ...shell, status: 'cancelled', activityRunStatus: 'waiting' }])(['root'])?.[0]).toMatchObject({ state: 'running' });
+    expect(executionItemThreads([{ ...shell, activityRunStatus: 'running', pendingRuntimeRequest: { id: 'question' } }])(['root'])?.[0]).toMatchObject({ state: 'needs you' });
+    expect(executionItemThreads([{ ...shell, status: 'cancelled', activityRunStatus: null }])(['root'])?.[0]).toMatchObject({ state: 'stopped' });
+  });
   it('shows a subagent thread only when it is recorded', () => {
     const child = { ...shell, id: 'child', lineage: { relationshipToParent: 'subagent' } };
     expect(executionItemThreads([child])(['child'])).toHaveLength(1);

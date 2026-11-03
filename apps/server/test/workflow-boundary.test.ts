@@ -36,7 +36,7 @@ test('a repository with no factory files onboards, captures work and starts it w
   assert.equal(started.status, 200);
   const [start] = (await board.t3Calls()).filter((args) => args[1] === 'start');
   assert.deepEqual(start, ['thread', 'start', 'lar-web', shapePrompt(board,'Dark mode',created.workId), '--json']);
-  assert.equal((await board.board() as BoardData).items.find((i) => i.id === created.workId)?.status, 'Queued', 'a start moves no Status');
+  assert.equal((await board.board() as BoardData).items.find((i) => i.id === created.workId)?.status, 'Shaping', 'a confirmed start moves into Shaping');
   assert.deepEqual((await board.calls()).filter(writesRepository), []);
 });
 

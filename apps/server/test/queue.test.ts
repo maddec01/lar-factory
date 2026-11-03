@@ -124,6 +124,7 @@ test('Back to List is refused while a Start is in flight, uncertain or done for 
   await until(unsure, (d) => d.items.length === 1);
   assert.equal((await startItem(unsure, unsure.id(12))).status, 502);
   assert.equal((await backToList(unsure, unsure.id(12))).status, 409, 'uncertain');
-  assert.equal(await recordedStatus(board, id), 'Queued');
+  assert.equal(await recordedStatus(board, id), 'Shaping');
+  assert.equal(await recordedStatus(unsure, unsure.id(12)), 'Queued');
 });
 

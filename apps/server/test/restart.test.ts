@@ -149,5 +149,5 @@ test('an uncertain start stays unresolved across a restart: T3 is read before an
   assert.ok(recovered.title.length <= 80);
   assert.equal(await starts(after), 0);
   assert.deepEqual(await intents(after, workId), [{ threadId: 'thread-1', failure: false, resolved: true }]);
-  assert.equal((await after.board() as BoardData).items.find((i) => i.id === workId)?.status, 'Queued', 'settling a start moves no Status');
+  assert.equal((await after.board() as BoardData).items.find((i) => i.id === workId)?.status, 'Shaping', 'settling a confirmed start moves into Shaping');
 });

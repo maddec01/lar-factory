@@ -55,6 +55,19 @@ describe('markdown export', () => {
     expect(readFileSync(join(to, 'decision-etc-passwd-v1-2.md'), 'utf8')).toBe('# ../../etc/passwd v1.2\n\nUse SQLite.\n');
   });
 
+  it("keeps a decision's outcome in both its own export and its concept's export", async () => {
+    const records = await open();
+    const [concept, decision] = [lar(records, 'concept'), lar(records, 'decision')];
+    records.setParent(decision.workId, 1, concept.workId);
+    records.setBody(decision.workId, 2, 'decision', '# Question');
+    records.setBody(decision.workId, 3, 'answer', '# Outcome\n\nUse a relay.');
+    for (const workId of [decision.workId, concept.workId]) {
+      const to = tempDir();
+      expect(exportMarkdown(records, workId, to)).toEqual([join(to, 'decision-question.md'), join(to, 'answer-outcome.md')]);
+      expect(readFileSync(join(to, 'answer-outcome.md'), 'utf8')).toBe('# Outcome\n\nUse a relay.');
+    }
+  });
+
   it("writes a build's brief and tells apart two bodies with the same title", async () => {
     const records = await open();
     const [concept, first, second] = [lar(records, 'concept'), lar(records, 'decision'), lar(records, 'decision')];

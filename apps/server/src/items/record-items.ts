@@ -2,7 +2,7 @@
 // read the ticket. The record owns Status, kind, title, structure, blockers, Dependencies and slices; the ticket adds its URL, labels,
 // PRs and provider fields. Spec sync can update title and brief; it never moves, restructures or blocks work.
 
-import { kindDisagreement, onAzure, parseConceptMap, refKey, sameRepo, ticketKindOf } from '@lar-factory/shared';
+import { kindDisagreement, onAzure, parseConceptMap, parseDecisionMethod, refKey, sameRepo, ticketKindOf } from '@lar-factory/shared';
 import type { Blocker, DependencyHold, EffectiveVocabulary, IssueRef, Item, Slice, SliceProgress, SwapKind, TicketKindFacts } from '@lar-factory/shared';
 import type { Dependency, WorkRecord, WorkRecords } from '@lar-factory/work-records';
 import { workItemUrl } from '../azure/azure-items.ts';
@@ -113,6 +113,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
       status: record.status,
       statuses: done ? [] : [record.status],
       kind: record.kind === 'slice' ? 'issue' : record.kind,
+      ...(record.kind === 'decision' ? { decisionMethod: parseDecisionMethod(records.body(record.workId, 'decision') ?? '') } : {}),
       number: ticketNumber(record.ticket),
       title: record.title || ticket?.title || '',
       url: ticket?.url ?? attachment?.url ?? null,

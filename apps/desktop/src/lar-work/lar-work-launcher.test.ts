@@ -146,6 +146,13 @@ describe("install", () => {
 });
 
 describe("onLaunch", () => {
+  it.effect("installs the matching command when a dev run opts into skill installation", () =>
+    Effect.gen(function* () {
+      const home = tempDir("lar-work-home-");
+      yield* LarWorkLauncher.onLaunch({ isPackaged: false, installInDevelopment: true, home, executablePath: ELECTRON, commandFile, dataDir: boardDataDir(home) });
+      assert.include(NodeFS.readFileSync(LarWorkLauncher.launcherPath(home), "utf8"), commandFile);
+    }));
+
   it.effect("installs nothing in a dev run", () =>
     Effect.gen(function* () {
       const home = tempDir("lar-work-home-");

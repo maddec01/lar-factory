@@ -25,6 +25,14 @@ async function open(): Promise<WorkRecords> {
 }
 const tickets = (...issues: Parameters<typeof boardIssue>[]) => normalizeItems(issues.map((args) => boardIssue(...args)));
 
+test('ticketless decisions expose their local method as soon as it is written', async () => {
+  const records = await open();
+  const decision = records.create({ title: 'Choose the layout', repository: REPO, kind: 'decision' });
+  assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, null);
+  records.setBody(decision.workId, decision.revision, 'decision', 'Method: prototype\nChoose the stage layout.');
+  assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'prototype');
+});
+
 test('recorded work keeps its progress and unpicked tracker issues appear fresh in List', async () => {
   const records = await open();
   const recorded = records.importTicket({ title: 'Recorded', repository: REPO, kind: 'feature', status: 'Queued', ticket: `${REPO}#12` }).record;

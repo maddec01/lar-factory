@@ -701,6 +701,9 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     },
 
     start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {
+      const held = records && item.status === 'Shaping' ? heldThread(item, PURPOSES.started) : null;
+      if (held && records?.launchIntents({ workId: item.id }).some(intent => intent.purpose === 'shape' && intent.threadId === held.threadId))
+        return withBoard(200, { thread: held, error: null });
       if (item.status !== 'Queued' && !canResumeShaping(item)) return reply(409, { error: `Only Queued items or stopped shaping sessions can be started; this one is in ${item.status}.` });
       const busy = busyReason(itemId, 'start');
       if (busy) return withBoard(409, { error: busy });

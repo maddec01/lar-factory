@@ -101,7 +101,8 @@ test('a Dependency whose ticket closed still holds Start and Start after until t
   const refused = await board.postSession({ itemId: board.id(12) }, '/api/start-build');
   assert.equal(refused.status, 409);
   assert.match((await refused.json()).error, /^Blocked by the Dependency on server team until you mark it met/);
-  assert.equal((await arm(board, board.id(12), OPUS)).status, 200);
+  const armed = await arm(board, board.id(12), OPUS);
+  assert.equal(armed.status, 200, JSON.stringify(await armed.json()));
   assert.deepEqual((await read(board)).armed, { [board.id(12)]: { model: OPUS } }, 'the closed ticket alone starts nothing');
   const marked = await markMet(board, dependencyId, true);
   assert.equal(marked.status, 200);

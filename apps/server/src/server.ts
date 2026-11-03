@@ -319,7 +319,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     const live = fresh ? stats(threadIds(item.id)) : withStats && threadIds(item.id).length ? 'unavailable' : item.stats;
     // An item the board just changed carries its old stats until a read reports the change.
     if (overcounted && fresh && live !== 'unavailable' && !board.changing(item.id)) overcountedStats.delete(item.id);
-    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? (live === 'unavailable' ? live : retainStats(known, live)) : known, threads: threads(item.id) };
+    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item.id) };
     shown.slices = item.slices.map((slice): typeof slice => {
       if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
       const ids = slice.workId && records ? records.threads(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];

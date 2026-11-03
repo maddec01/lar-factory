@@ -35,10 +35,13 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
   for (const shell of shells) {
     if (typeof shell.id !== 'string' || shell.deletedAt) continue;
     if (typeof shell.updatedAt !== 'string' || !Number.isFinite(Date.parse(shell.updatedAt))) throw Error('Invalid execution timestamp');
+    // A newer queued or cancelled message can hide an older run that is still at work.
+    const status = ['preparing', 'starting', 'running', 'waiting', 'queued'].includes(String(shell.activityRunStatus))
+      ? String(shell.activityRunStatus) : String(shell.status);
     const state: ItemThread['state'] = shell.pendingRuntimeRequest ? 'needs you'
-      : ['preparing', 'starting', 'running', 'waiting'].includes(String(shell.status)) ? 'running'
-      : ['failed', 'interrupted', 'cancelled'].includes(String(shell.status)) ? 'stopped' : 'done';
-    byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, ...(!shell.pendingRuntimeRequest && shell.status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && shell.status === 'queued' ? { queued: true as const } : {}), ...(shell.archivedAt ? { archived: true as const } : {}), updated: shell.updatedAt });
+      : ['preparing', 'starting', 'running', 'waiting'].includes(status) ? 'running'
+      : ['failed', 'interrupted', 'cancelled'].includes(status) ? 'stopped' : 'done';
+    byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, ...(!shell.pendingRuntimeRequest && status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && status === 'queued' ? { queued: true as const } : {}), ...(shell.archivedAt ? { archived: true as const } : {}), updated: shell.updatedAt });
     lineages.set(shell.id, shell.lineage as Lineage);
     order.set(shell.id, orderedBy(shell));
   }

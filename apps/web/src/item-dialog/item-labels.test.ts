@@ -195,11 +195,11 @@ test('a failed read says why, and opening again reads again', async () => {
   expect($('[role="alert"]')).toBeNull();
 });
 
-test('local work has no label control and says how to get labels', async () => {
+test('local work omits irrelevant ticket-label controls and instructions', async () => {
   const local = boardWith({ number: 0, labels: [], url: '' });
   serve(local);
   await mountPage(local);
   await openItem();
   expect(pencil()).toBeNull();
-  expect(text($('[data-item-dialog] [data-local-labels]'))).toBe('Local work has no ticket, so it has a kind alone. Create a ticket to add labels.');
+  expect(text($('[data-item-dialog]'))).not.toContain('Create a ticket');
 });

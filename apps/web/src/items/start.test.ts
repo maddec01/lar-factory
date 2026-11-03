@@ -139,6 +139,8 @@ test('picking an entry starts the item with that model, shows the thread, and re
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'claudeAgent', model: 'claude-opus-5-5' } }]]);
   expect(menu()).toBeNull();
   expect([text(start()), start().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
+  expect(start().getAttribute('aria-busy')).toBe('true');
+  expect(start().querySelector('svg.animate-spin')).not.toBeNull();
   expect(document.activeElement, 'focus is back on Start').toBe(start());
   expect(footer(), 'no Move to List or Abandon while Start is pending').toBeNull();
   await pressMenu(start());

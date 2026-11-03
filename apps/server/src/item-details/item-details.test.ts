@@ -149,6 +149,8 @@ test("a concept's details hold its map and a decision's its text, each empty unt
   records.setBody(decision.workId, decision.revision, 'decision', '# Relay\n\nBroker only?');
   assert.deepEqual([await recordOf(concept.workId), await recordOf(decision.workId)].map((r) => [r.bodyKind, r.body]),
     [['map', '## Destination\n\nStream anywhere.'], ['decision', '# Relay\n\nBroker only?']]);
+  records.setBody(decision.workId, records.read(decision.workId).revision, 'answer', 'Use a relay broker.');
+  assert.equal((await reader.details(boardItem(decision.workId)) as ItemDetails).record?.answer, 'Use a relay broker.');
 });
 
 test('export writes the files lar-work export writes, into the export folder', async () => {

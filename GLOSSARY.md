@@ -96,3 +96,11 @@ _Avoid_: budget, concurrency setting.
 **Slot**:
 Permission to run one heavy command. The heavy command limit is the number of slots.
 _Avoid_: lease, token.
+
+**Build limit**:
+How many builds may work at once on one machine. Auto-build starts builds only up to this number.
+_Avoid_: build slot, concurrency setting.
+
+**Auto-build**:
+This machine's choice to have the board start eligible Ready builds by itself, up to the build limit.
+_Avoid_: auto-start.

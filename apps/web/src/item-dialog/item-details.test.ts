@@ -347,3 +347,15 @@ test('a failed checks read stays in the section', async () => {
   await settle(() => { section.open = true; section.dispatchEvent(new Event('toggle')); });
   expect(text(section.querySelector('[role="alert"]'))).toContain('Database unavailable');
 });
+
+test('concept details show refinement independently of delivery', async () => {
+  const item: Item = { ...sample.items[0]!, kind: 'concept',
+    refinement: { complete: true, reasons: [] },
+    completion: { complete: false, reasons: ['No delivery planned.'] } };
+  await mountPage({ ...sample, items: [item] });
+  await openItem(item.id);
+  expect(meta()).toContain('Refinement');
+  expect(meta()).toContain('Complete');
+  expect(meta()).toContain('Delivery');
+  expect(meta()).toContain('No delivery planned.');
+});

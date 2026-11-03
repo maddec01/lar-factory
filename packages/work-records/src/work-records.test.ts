@@ -684,6 +684,63 @@ describe('work-record completion', () => {
     records.setBody(concept, at(records, concept), 'map', '# Map\n\nSettled.');
   };
 
+  it('refines a mapped concept independently of its unstarted builds', async () => {
+    const records = await open();
+    const concept = lar(records, 'concept');
+    const build = lar(records, 'build');
+    records.setParent(build.workId, 1, concept.workId);
+    records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map');
+    records.setFogGone(concept.workId, at(records, concept.workId), true);
+    expect(records.refinement(concept.workId)).toEqual({ complete: true, reasons: [] });
+    expect(records.completion(concept.workId).complete).toBe(false);
+    expect(records.read(concept.workId).finishedAt).toBeNull();
+  });
+
+  it('keeps refinement without delivery incomplete for blockers and retention', async () => {
+    const records = await open();
+    const concept = lar(records, 'concept');
+    const dependent = lar(records, 'build');
+    records.addBlocker(dependent.workId, 1, concept.workId);
+    records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map');
+    records.setFogGone(concept.workId, at(records, concept.workId), true);
+    expect(records.refinement(concept.workId).complete).toBe(true);
+    expect(records.completion(concept.workId)).toEqual({ complete: false, reasons: ['No delivery planned.'] });
+    expect(records.waitingOn(dependent.workId)).toHaveLength(1);
+    expect(records.read(concept.workId).finishedAt).toBeNull();
+  });
+
+  it('rechecks refinement when decisions are rewritten or restored and Fog returns', async () => {
+    const records = await open();
+    const concept = lar(records, 'concept');
+    const decision = lar(records, 'decision');
+    records.setParent(decision.workId, 1, concept.workId);
+    settle(records, decision.workId, concept.workId);
+    records.setFogGone(concept.workId, at(records, concept.workId), true);
+    expect(records.refinement(concept.workId).complete).toBe(true);
+    records.setBody(decision.workId, at(records, decision.workId), 'answer', 'Use Postgres.');
+    expect(records.refinement(concept.workId).complete).toBe(false);
+    records.setAside(decision.workId, at(records, decision.workId));
+    expect(records.refinement(concept.workId).complete).toBe(true);
+    records.restore(decision.workId, at(records, decision.workId));
+    expect(records.refinement(concept.workId).complete).toBe(false);
+    settle(records, decision.workId, concept.workId);
+    expect(records.refinement(concept.workId).complete).toBe(true);
+    records.setFogGone(concept.workId, at(records, concept.workId), false);
+    expect(records.refinement(concept.workId).complete).toBe(false);
+  });
+
+  it('requires delivery after every build is set aside but preserves finished history', async () => {
+    const records = await open();
+    const concept = lar(records, 'concept');
+    const build = lar(records, 'build');
+    records.setParent(build.workId, 1, concept.workId);
+    records.setFogGone(concept.workId, at(records, concept.workId), true);
+    records.setAside(build.workId, at(records, build.workId));
+    expect(records.completion(concept.workId).reasons).toContain('No delivery planned.');
+    records.recordFinished(concept.workId, at(records, concept.workId));
+    expect(records.completion(concept.workId).complete).toBe(true);
+  });
+
   it('completes a build only once its recorded PR is observed merged', async () => {
     const records = await open();
     const build = lar(records, 'build');

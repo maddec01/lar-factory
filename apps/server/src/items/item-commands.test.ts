@@ -673,6 +673,8 @@ test("Start build moves the build's concept record to In progress and writes no 
   const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Shaping' });
   const made = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
   const build = records.setParent(made.workId, made.revision, concept.workId);
+  const decision = records.create({ title: 'Open decision', repository: WEB, kind: 'decision' });
+  records.setParent(decision.workId, decision.revision, concept.workId);
   const { commands, log } = commandsOn([], undefined, records);
   assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
   assert.equal(records.read(concept.workId).status, 'In progress');

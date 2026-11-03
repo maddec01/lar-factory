@@ -36,6 +36,17 @@ async function blockedBuild() {
 }
 
 describe('Dependencies', () => {
+  it('finishes concept refinement without meeting an external Dependency or releasing its build', async () => {
+    const { records, concept, build, dependency } = await blockedBuild();
+    records.setBody(concept.workId, at(records, concept.workId), 'map', '# Map\nUse the external sign-in endpoint.');
+    records.setFogGone(concept.workId, at(records, concept.workId), true);
+    expect(records.refinement(concept.workId)).toEqual({ complete: true, reasons: [] });
+    expect(records.dependency(dependency.dependencyId)).toEqual(dependency);
+    expect(records.waitingOn(build.workId)).toEqual([{ dependencyId: dependency.dependencyId, reasons: ["It isn't marked met."] }]);
+    expect(records.completion(concept.workId).complete).toBe(false);
+    expect(records.read(concept.workId).finishedAt).toBeNull();
+  });
+
   it('keeps a Dependency inside its work record across close and reopen', async () => {
     const path = join(tempDir(), 'work-records.db');
     const records = await openWorkRecords(path);

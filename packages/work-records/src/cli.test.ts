@@ -357,9 +357,10 @@ throw Error('Local exploration must not call a tracker');
     expect(await larWork(data, 'finish', build, '--revision', '2')).toMatchObject({ code: 1, stderr: expect.stringContaining('Only a slice') });
 
     expect((await larWork(data, 'set-fog', concept, '--revision', '1', '--fog', 'gone')).record).toMatchObject({ fogGone: true });
-    expect((await larWork(data, 'completion', concept)).record).toEqual({ complete: true, reasons: [] });
+    expect((await larWork(data, 'completion', concept)).record).toEqual({ complete: false, reasons: ['No delivery planned.'] });
+    expect((await larWork(data, 'refinement', concept)).record).toEqual({ complete: false, reasons: ['Its map is empty.'] });
     expect((await larWork(data, 'set-fog', concept, '--revision', '2', '--fog', 'remaining')).record).toMatchObject({ fogGone: false });
-    expect((await larWork(data, 'completion', concept)).record).toEqual({ complete: false, reasons: ["Its Fog isn't gone."] });
+    expect((await larWork(data, 'completion', concept)).record).toEqual({ complete: false, reasons: ["Its Fog isn't gone.", "No delivery planned."] });
     expect(await larWork(data, 'set-fog', concept, '--revision', '3', '--fog', 'thin')).toMatchObject({ code: 2, stderr: expect.stringContaining('--fog takes gone or remaining') });
   });
 

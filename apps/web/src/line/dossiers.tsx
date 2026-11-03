@@ -1,6 +1,6 @@
 // The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board, as one
-// line: its source, repository, kind and title, then chips (parts that need you, open decisions, blocked slices, fog,
-// whether it is refined) and what's next in a stage row's state column, its part bar, agent figures, parts done and any other repositories, in the columns the
+// line: its source, repository, kind and title, then its most important chip (parts that need you, open decisions, blocked
+// slices, whether it is refined, fog) and what's next in a stage row's state column, its part bar, agent figures, parts done and any other repositories, in the columns the
 // board's stage rows keep. Its chevron expands it in place under that same line, in the page's scroll, on its Work map,
 // with the concept's own question above and its Dependencies and fog below. Its parts list instead lists what keeps the
 // work moving (parts that need you, parts to verify or merge, open decisions, blocked slices, waiting parts, parts ready to
@@ -328,10 +328,11 @@ function nextOf(m: Moving, parent: Item): { tone: 'you' | 'start' | 'moving' | '
   if (yours) return { tone: 'you', part: yours, text: `${itemName(yours.item)}` };
   if (m.ready[0]) return { tone: 'start', part: m.ready[0], text: `${itemName(m.ready[0].item)}` };
   if (m.active[0]) return { tone: 'moving', part: m.active[0], text: `${itemName(m.active[0].item)}` };
-  return { tone: 'none', text: m.count > m.parts.length ? 'Some parts are outside the board' : 'Nothing waits on you' };
+  if (m.count > m.parts.length) return { tone: 'none', text: 'Some parts are outside the board' };
+  return { tone: 'none', text: noDelivery(parent) ? 'No delivery planned' : 'Nothing waits on you' };
 }
 
-/** Line 1's thread counts and Azure fields: they give up their room before the title does, ending in an ellipsis.
+/** Line 1's Azure fields: they give up their room before the title does, ending in an ellipsis.
  *  Below `lg` they may shrink to nothing, so a narrow line's title keeps its room; their tooltips keep the text. */
 const META = 'min-w-0 lg:min-w-10 shrink-[1000] truncate';
 
@@ -344,30 +345,45 @@ function threadCounts(threads: ReturnType<typeof threadsOf>): string {
   return [plural(threads.length, 'T3 thread'), running && `${running} running`, waiting && `${waiting} awaiting your reply`].filter(Boolean).join(' · ');
 }
 
-/** A small count chip: `n` and its word, coloured by `tone`, hidden at zero. */
-function Count({ n, word, tone, icon }: { n: number; word: string; tone: 'warning' | 'danger' | 'neutral' | 'accent'; icon?: ReactNode }) {
-  if (!n) return null;
-  return <Badge tone={tone} className="tabular-nums whitespace-nowrap" data-chip>{icon}{n} {word}</Badge>;
-}
-
-/** What needs the user's eye: parts in Needs you, open decisions, blocked slices and the map's remaining fog. */
-function Counts({ m }: { m: Moving }) {
-  return <>
-    <Count n={m.needsYou.length} word="need you" tone="warning" icon={<StatusGlyph status="Needs you" className="size-3" />} />
-    <Count n={m.decisions.length} word={m.decisions.length === 1 ? 'decision' : 'decisions'} tone="accent" icon={<MessagesSquare />} />
-    <Count n={m.blockedSlices.length} word="blocked" tone="danger" icon={<Ban />} />
-    <Count n={m.fog.length} word="fog" tone="neutral" icon={<CircleHelp />} />
-  </>;
-}
-
 /** The reason a concept's delivery record gives when no active build is left to deliver it. */
 const NO_DELIVERY = 'No delivery planned.';
 
-/** A concept whose Refinement is complete, which says nothing of its delivery unless none is planned, per ADR 0003. */
-function Refined({ parent }: { parent: Item }) {
-  if (!parent.refinement?.complete) return null;
-  return <Badge tone="success" className="whitespace-nowrap" data-refined>Refined{parent.completion?.reasons.includes(NO_DELIVERY) && ' · no delivery planned'}</Badge>;
+interface Chip { words: string; tone: 'warning' | 'danger' | 'neutral' | 'accent' | 'success'; icon?: ReactNode; refined?: boolean }
+
+const noDelivery = (parent: Item) => Boolean(parent.refinement?.complete && parent.completion?.reasons.includes(NO_DELIVERY));
+
+/** The dossier's chips, most important first, each left out at zero: what asks the user to act (parts in Needs you, open
+ *  decisions, blocked slices), then a complete Refinement, which says nothing of delivery unless none is planned, per
+ *  ADR 0003, then the map's remaining fog. */
+function chipsOf(parent: Item, m: Moving): Chip[] {
+  const count = (n: number, word: string, tone: Chip['tone'], icon: ReactNode): Chip[] => n ? [{ words: `${n} ${word}`, tone, icon }] : [];
+  return [
+    ...count(m.needsYou.length, 'need you', 'warning', <StatusGlyph status="Needs you" className="size-3" />),
+    ...count(m.decisions.length, m.decisions.length === 1 ? 'decision' : 'decisions', 'accent', <MessagesSquare />),
+    ...count(m.blockedSlices.length, 'blocked', 'danger', <Ban />),
+    ...(parent.refinement?.complete ? [{ words: 'Refined', tone: 'success' as const, refined: true }] : []),
+    ...(noDelivery(parent) ? [{ words: 'no delivery planned', tone: 'neutral' as const }] : []),
+    ...count(m.fog.length, 'fog', 'neutral', <CircleHelp />),
+  ];
 }
+
+/** The first chip whole, at its full width, and how many more the row's tooltip names. An empty dossier takes no room. */
+function Chips({ chips }: { chips: Chip[] }) {
+  const [first, ...rest] = chips;
+  if (!first) return null;
+  return (
+    <span onClick={stop} className="flex shrink-0 items-center gap-1" data-chips>
+      <Badge tone={first.tone} className="tabular-nums whitespace-nowrap" data-chip data-refined={first.refined || undefined}>{first.icon}{first.words}</Badge>
+      {rest.length > 0 && <span className="text-[11px] tabular-nums text-(--muted-foreground)" data-chips-more>
+        <span aria-hidden="true">+{rest.length}</span><span className="sr-only">{rest.map((c) => c.words).join(', ')}</span>
+      </span>}
+    </span>
+  );
+}
+
+/** The row's tooltip: every chip's words, so one that doesn't show still reads, then the thread counts. */
+const rowTooltip = (chips: Chip[], threads: ReturnType<typeof threadsOf>) =>
+  [...chips.map((c) => c.words), threadCounts(threads)].filter(Boolean).join(' · ') || undefined;
 
 /** Next, as a sentence with its Start. */
 function Next({ m, data, parent }: { m: Moving; data: BoardData; parent: Item }) {
@@ -377,7 +393,8 @@ function Next({ m, data, parent }: { m: Moving; data: BoardData; parent: Item })
   const word = { you: yours, start: 'Next', moving: 'Moving', none: '' }[n.tone];
   return (
     <span className="flex min-w-0 items-center gap-2 text-[12px]">
-      {word && <span className={`shrink-0 font-medium ${n.tone === 'you' ? 'text-(--warning-foreground)' : 'text-(--muted-foreground)'}`}>{word}</span>}
+      {/* Start says "Next" itself, so the word stays for screen readers and leaves its room to the title. */}
+      {word && <span className={`shrink-0 font-medium ${n.tone === 'you' ? 'text-(--warning-foreground)' : 'text-(--muted-foreground)'} ${n.tone === 'start' ? 'sr-only' : ''}`}>{word}</span>}
       <span className="min-w-0 truncate" title={n.text}>{n.text}</span>
       {n.part && n.tone === 'start' && <span className="shrink-0" onClick={stop}><PartStart part={n.part} data={data} label="Start" /></span>}
     </span>
@@ -393,8 +410,9 @@ function DossierLine({ parent, parts, data, lead, tools, onClick, className = ''
   const isPicked = usePicked(parent);
   const m = moving(parent, parts, useActivityUnavailable());
   const threads = [parent, ...parts.map((p) => p.item)].flatMap(threadsOf);
+  const chips = chipsOf(parent, m);
   return (
-    <div onClick={onClick} data-item={parent.id} title={threadCounts(threads) || undefined}
+    <div onClick={onClick} data-item={parent.id} title={rowTooltip(chips, threads)}
       className={`grid ${DOCK_COLUMNS} h-10 items-center gap-x-2 pl-1.5 pr-2 ${className} ${picked(isPicked)}`}>
       {lead}
       <RowSource item={parent} />
@@ -406,8 +424,8 @@ function DossierLine({ parent, parts, data, lead, tools, onClick, className = ''
         {tools && <span onClick={stop} className="ml-auto flex shrink-0 items-center gap-1.5 pl-1" data-dossier-tools>{tools}</span>}
       </span>
       <span className="flex min-w-0 items-center gap-1.5" data-col="state">
-        {/* The next step keeps its room: chips give way first, each one that no longer fits wrapping out of the one-chip-high box. */}
-        <span onClick={stop} className="flex h-5 min-w-0 shrink-[1000] flex-wrap gap-1 overflow-hidden empty:hidden" data-chips><Refined parent={parent} /><Counts m={m} /></span>
+        {/* The first chip keeps its full width and the next step truncates; the rest of the chips wait in the tooltip. */}
+        <Chips chips={chips} />
         <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
       </span>
       <span data-col="bar"><PartsBar m={m} /></span>
@@ -426,6 +444,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
   const { sync: _, ...unsynced } = parent;
   return (
     <div className="grid gap-3 border-t border-(--border) p-3" data-dossier-body>
+      {noDelivery(parent) && <p className="m-0 text-xs text-(--muted-foreground)" data-no-delivery>{NO_DELIVERY}</p>}
       {missing > 0 && <p className="m-0 text-xs text-(--muted-foreground)" data-unread-parts>
         {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
       </p>}

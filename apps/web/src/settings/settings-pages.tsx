@@ -266,7 +266,7 @@ export function pages(input: PagesInput): Page[] {
       }] },
       { title: 'Auto-build', rows: [{
         id: 'auto-build-model', title: 'Auto-build model',
-        description: 'The model of the build threads Auto-build starts. T3 default leaves it to T3. Turn Auto-build on in the Shaping header.',
+        description: 'The model of the build threads Auto-build starts. T3 default leaves it to T3. Turn Auto-build on in the Ready to build header.',
         control: custom(() => null), below: <AutoBuildModelSetting state={data.autoBuild} groups={data.modelChoices} />,
       }] },
       { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },

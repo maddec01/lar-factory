@@ -1,4 +1,4 @@
-// The Shaping header's Auto-build switch: this Mac's choice to have the board start eligible Ready builds by itself.
+// The Ready to build header's Auto-build switch: this Mac's choice to have the board start eligible Ready builds by itself.
 // Its tooltip says how many builds would start now, and a hold shows beside it. Sample mode has no Auto-build, so the
 // switch shows off and disabled there.
 

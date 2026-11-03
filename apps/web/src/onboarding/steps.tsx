@@ -1,6 +1,6 @@
 // Onboarding screens built from the board's existing controls.
 import { FolderPlus, LoaderCircle, Check, Minus } from 'lucide-react';
-import { effectiveIssueSettings, isOnboarding, shownRepo, trackerCapabilities, type OperationAccess, type SetupDetection } from '@lar-factory/shared';
+import { effectiveIssueSettings, isOnboarding, shownRepo, trackerCapabilities, type OperationAccess, type ProjectChoice, type SetupDetection } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -21,16 +21,17 @@ function ProjectStep({ run }: { run: Run }) {
   const onboarding = useBoardStore((s) => s.data.onboarding);
   if (projects.state === 'loading') return <Pending>Loading repositories…</Pending>;
   if (projects.state === 'failed') return <Alert tone="danger" title="Could not load repositories" action={<Button {...kind('other')} onClick={() => void loadProjects()}>Retry</Button>}>{projects.error}</Alert>;
-  return <Group legend="Choose a repository">
-    <RadioGroup value={run.projectId ?? (creating ? 'new' : '')} onValueChange={(id) => id === 'new' ? chooseNew() : pick(id as string)} className="gap-2">
-      {projects.projects.map((project) => {
-        const reason = unpickable(project, run, { onboarding });
-        return <Choice key={project.id} value={project.id} disabled={!!reason} title={<span className="flex flex-wrap items-center gap-2">{project.name}
-          {project.provider && <Badge>{project.provider}</Badge>}{project.onBoard && <Badge>{isOnboarding({ onboarding }, project.repo) ? 'Setup in progress' : 'Added'}</Badge>}</span>}>
-          <span className="block break-all">{project.folder}</span>{reason && <span className="block">{reason}</span>}
-        </Choice>;
-      })}
-      <Choice value="new" title="Add a repository folder">Choose a folder already on this machine.</Choice>
+  const rows = projects.projects.map((project) => ({ project, reason: unpickable(project, run, { onboarding }) }));
+  const added = rows.filter(({ project, reason }) => reason && project.onBoard);
+  const blocked = rows.filter(({ project, reason }) => reason && !project.onBoard);
+  return <><Group legend="Choose a repository">
+    <RadioGroup value={run.projectId ?? (creating ? 'new' : '')} onValueChange={(id) => id === 'new' ? chooseNew() : pick(id as string)} className="min-w-0 gap-1.5">
+      {rows.filter(({ reason }) => !reason).map(({ project }) => <Choice key={project.id} value={project.id}><ProjectLine project={project} badge={project.provider} /></Choice>)}
+      <Choice value="new"><span className="flex min-w-0 flex-1 items-center gap-2">
+        <FolderPlus aria-hidden className="size-4 shrink-0" />
+        <span className="shrink-0 font-medium">Add a repository folder</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-base-700">Choose a folder already on this machine.</span>
+      </span></Choice>
     </RadioGroup>
     {creating && <div className="grid gap-3 rounded-lg border p-3">
       <Field label="Repository folder">
@@ -40,7 +41,32 @@ function ProjectStep({ run }: { run: Run }) {
       <span><Button {...kind('other')} leftIcon={<FolderPlus />} disabled={!creating.folder.trim()} loading={creating.adding} onClick={() => void createProject()}>Add folder</Button></span>
       {creating.error && <Alert tone="danger" title="Could not add folder">{creating.error}</Alert>}
     </div>}
-  </Group>;
+  </Group>
+  <ProjectSection name="added" title="Already added" count={added.length}>
+    {added.map(({ project }) => <li key={project.id} className="flex min-w-0"><ProjectLine project={project} badge={isOnboarding({ onboarding }, project.repo) ? 'Setup in progress' : 'Added'} /></li>)}
+  </ProjectSection>
+  <ProjectSection name="blocked" title="Can't be added" count={blocked.length}>
+    {blocked.map(({ project, reason }) => <li key={project.id} className="grid min-w-0 gap-0.5"><ProjectLine project={project} badge={null} /><span className="pl-6 text-xs text-base-700">{reason}</span></li>)}
+  </ProjectSection></>;
+}
+
+/** A project on one line: its icon's spot, name and badge, then its path, which gives way first. */
+function ProjectLine({ project, badge }: { project: ProjectChoice; badge: string | null }) {
+  return <span className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+    <span data-project-icon aria-hidden className="size-4 shrink-0" />
+    <span title={project.name} className="max-w-1/2 shrink-0 truncate font-medium">{project.name}</span>
+    {badge && <span className="shrink-0 whitespace-nowrap"><Badge>{badge}</Badge></span>}
+    <span data-project-path aria-hidden title={project.folder} className="min-w-0 flex-1 truncate text-xs text-base-700">{project.shownFolder}</span>
+    <span className="sr-only">{project.folder}</span>
+  </span>;
+}
+
+/** Projects that can't be picked, folded under their count; nothing when there are none. */
+function ProjectSection({ name, title, count, children }: { name: string; title: string; count: number; children: React.ReactNode }) {
+  return count > 0 && <details data-project-section={name} className="min-w-0 rounded-lg border px-3 py-2">
+    <summary className="cursor-pointer text-sm font-medium">{title} ({count})</summary>
+    <ul className="m-0 mt-2 grid min-w-0 list-none gap-2 p-0">{children}</ul>
+  </details>;
 }
 
 function Pending({ children }: { children: React.ReactNode }) {

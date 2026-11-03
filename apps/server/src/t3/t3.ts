@@ -1,9 +1,10 @@
-import { launchExistingWorktree, type ExistingWorktree } from './existing-worktree.ts';
 // Starts T3 Code threads, and adds onboarding's new T3 projects, through the local `t3` CLI.
 
 import { isRecord, type ModelChoice, type StartedThread, type StartResult } from '@lar-factory/shared';
 import { runTool, type RunResult } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
+import { launchThread, type ExistingWorktree, type LaunchThread, type LaunchWorkspace } from './launch-thread.ts';
+import { launchSelection, projectDefaults, type ProjectDefaults } from './model-choices.ts';
 
 const UNCERTAIN: StartResult = { thread: null, uncertain: true,
   error: "The thread's start could not be confirmed. Check the repository's project in T3 Code before starting it again." };
@@ -15,19 +16,33 @@ export interface NewWorktree {
 }
 
 /**
- * Runs `t3 thread start <project id> <message> --json`, with `--provider <instance id>
- * --model <slug>` for a model choice; without one T3 uses the project's default. With
- * `worktree`, `--worktree <base> --branch <branch>` runs the thread in a new worktree
- * instead of the project's folder.
+ * A model choice launches through T3's `orchestration.launchThread`, whose selection can hold options, which the CLI's
+ * can't. Without one, `t3 thread start <project id> <message> --json` lets T3 use the project's default; `worktree`
+ * adds `--worktree <base> --branch <branch>` to run the thread in a new worktree instead of the project's folder.
  */
-export async function startThread(project: string, message: string, choice?: ModelChoice, worktree?: NewWorktree | ExistingWorktree, run: T3Run = runT3): Promise<StartResult> {
-  if (worktree && 'type' in worktree) return launchExistingWorktree(project, message, choice, worktree);
-  const model = choice ? ['--provider', choice.instanceId, '--model', choice.model] : [];
-  const where = worktree ? ['--worktree', worktree.base, '--branch', worktree.branch] : [];
+export async function startThread(project: string, message: string, choice?: ModelChoice, worktree?: NewWorktree | ExistingWorktree, run: T3Run = runT3,
+  defaults: (project: string) => ProjectDefaults | null = projectDefaults, launch: LaunchThread = launchThread): Promise<StartResult> {
+  const existing = worktree && 'type' in worktree ? worktree : undefined;
+  const created = worktree && !('type' in worktree) ? worktree : undefined;
+  if (existing && !choice) return { thread: null, error: 'Choose a model before continuing in an existing worktree.' };
+  if (choice) {
+    const found = defaults(project);
+    if (!found) return { thread: null, error: "Can't read T3 Code's settings. Check T3 Code, then start again." };
+    const selection = launchSelection(choice, found.selection);
+    // A resumed build's message matches its earlier thread, so a lost answer stays uncertain rather than finding that one.
+    if (existing) {
+      const result = await launch(project, message, selection, existing, 'approval-required');
+      return result.uncertain ? UNCERTAIN : result;
+    }
+    const workspace: LaunchWorkspace = created ? { type: 'worktree', baseRef: created.base, branch: created.branch } : { type: 'root' };
+    const result = await launch(project, message, selection, workspace, found.runtimeMode);
+    return result.uncertain ? recoverStart(project, message, run) : result;
+  }
+  const where = created ? ['--worktree', created.base, '--branch', created.branch] : [];
   const missing = `${missingTool('t3')}. Install the T3 Code CLI or set T3_PATH.`;
   let result: RunResult;
   try {
-    result = await run(['thread', 'start', project, message, ...model, ...where, '--json'], 60_000);
+    result = await run(['thread', 'start', project, message, ...where, '--json'], 60_000);
   } catch {
     return recoverStart(project, message, run);
   }

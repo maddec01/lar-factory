@@ -47,7 +47,7 @@ import { parentSkillCheck } from './skills/skill-check.ts';
 import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
-import { anyOnAzureDevOps, repositoryProjectHints } from './t3/repository-project.ts';
+import { anyOnAzureDevOps, repositoryProjectReads } from './t3/repository-project.ts';
 import { createProjectIcons } from './t3/project-icons.ts';
 import { protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
 import { loadT3Reads, warmT3Stats } from './t3/t3-reads.ts';
@@ -672,7 +672,7 @@ async function refresh(): Promise<void> {
     board.applyRead(recordedItems(snapshot), readRevision, withT3Reads, items.readAfresh);
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting, ready: true });
     board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? recordsProblem, itemSourceProblems: snapshot.problems ?? [],
-      t3Availability: await t3Availability(), t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
+      t3Availability: await t3Availability(), t3EnvironmentId: readEnvironmentId(environmentIdFile), ...await repositoryProjectReads(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;
   } catch (err) {

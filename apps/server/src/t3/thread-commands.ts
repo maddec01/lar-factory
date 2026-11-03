@@ -55,7 +55,7 @@ export async function sendThreadCommand(command: ThreadCommand): Promise<ThreadC
   } finally { await authority.revoke(session.sessionId).catch(() => {}); }
 }
 
-function rejectionReason(cause: unknown): string | undefined {
+export function rejectionReason(cause: unknown): string | undefined {
   if (!Array.isArray(cause)) return undefined;
   for (const part of cause as unknown[]) {
     if (isRecord(part) && part._tag === 'Fail' && isRecord(part.error) && typeof part.error.message === 'string' && part.error.message) return part.error.message;

@@ -3,7 +3,7 @@ import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { findModelChoice, loadModelChoices } from './model-choices.ts';
+import { effectiveDefaults, findModelChoice, launchSelection, loadModelChoices } from './model-choices.ts';
 import { modelManifestPath } from './t3-settings.ts';
 import { tempDir } from '../../test/stats-db.ts';
 
@@ -111,4 +111,57 @@ test('T3_MODEL_MANIFEST overrides where the manifest is read, else it sits besid
   assert.equal(modelManifestPath({ T3_MODEL_MANIFEST: '/x/m.json', HOME: '/h' }), '/x/m.json');
   assert.equal(modelManifestPath({ HOME: '/h' }), '/h/.t3/userdata/model-manifest.json');
   assert.equal(modelManifestPath({ T3_SETTINGS: '/s/settings.json', HOME: '/h' }), '/s/model-manifest.json');
+});
+
+const GLOBAL = { instanceId: 'codex', model: 'gpt-a', options: [{ id: 'reasoningEffort', value: 'xhigh' }, { id: 'serviceTier', value: 'default' }] };
+const OVERRIDE = { instanceId: 'claudeAgent', model: 'claude-opus', options: [{ id: 'effort', value: 'medium' }] };
+const LEGACY = { instanceId: 'codex', model: 'gpt-b' };
+const noLegacy = () => { throw Error('folded settings never read the database'); };
+
+test('the T3 default follows the project override when settings are folded, ignoring the project row', () => {
+  const settings = { projectSettingsFolded: true, defaultModelSelection: GLOBAL, projectSettingsOverrides: { p: { defaultModelSelection: OVERRIDE } } };
+  assert.deepEqual(effectiveDefaults(settings, 'p', noLegacy).selection, OVERRIDE);
+  assert.deepEqual(effectiveDefaults(settings, 'other', noLegacy).selection, GLOBAL);
+});
+
+test('before folding, the project row applies under its stored override', () => {
+  const base = { defaultModelSelection: GLOBAL, projectSettingsOverrides: {} };
+  assert.deepEqual(effectiveDefaults(base, 'p', () => LEGACY).selection, LEGACY);
+  assert.deepEqual(effectiveDefaults(base, 'p', () => null).selection, GLOBAL);
+  assert.deepEqual(effectiveDefaults({ ...base, projectSettingsOverrides: { p: { defaultModelSelection: OVERRIDE } } }, 'p', () => LEGACY).selection, OVERRIDE);
+});
+
+test('an unread project row leaves the T3 default unknown, so no options are copied', () => {
+  const answer = effectiveDefaults({ defaultModelSelection: GLOBAL }, 'p', () => { throw Error('no database'); });
+  assert.equal(answer.selection, null);
+});
+
+test('a project override on a disabled instance falls back to the global default', () => {
+  const folded = { projectSettingsFolded: true, defaultModelSelection: GLOBAL };
+  const off = { ...folded, providerInstances: { claudeAgent: { driver: 'claudeAgent', enabled: false } }, projectSettingsOverrides: { p: { defaultModelSelection: OVERRIDE } } };
+  assert.deepEqual(effectiveDefaults(off, 'p', noLegacy).selection, GLOBAL);
+  const onHere = { ...off, projectSettingsOverrides: { p: { defaultModelSelection: OVERRIDE, providerInstances: { claudeAgent: { enabled: true } } } } };
+  assert.deepEqual(effectiveDefaults(onHere, 'p', noLegacy).selection, OVERRIDE);
+  const unlisted = { ...folded, projectSettingsOverrides: { p: { defaultModelSelection: { instanceId: 'gone', model: 'm' } } } };
+  assert.deepEqual(effectiveDefaults(unlisted, 'p', noLegacy).selection, GLOBAL);
+});
+
+test('only instance, model and option ids and values leave the settings', () => {
+  const settings = { projectSettingsFolded: true, defaultModelSelection: { ...OVERRIDE, secret: 'x', options: [{ id: 'effort', value: 'medium', secret: 'y' }, { id: 'bad', value: {} }, 'junk'] } };
+  assert.deepEqual(effectiveDefaults(settings, 'p', noLegacy).selection, OVERRIDE);
+});
+
+test('the runtime mode follows the project override, then the global setting, then T3\'s own default', () => {
+  const folded = { projectSettingsFolded: true };
+  assert.equal(effectiveDefaults(folded, 'p', noLegacy).runtimeMode, 'full-access');
+  assert.equal(effectiveDefaults({ ...folded, defaultRuntimeMode: 'auto' }, 'p', noLegacy).runtimeMode, 'auto');
+  assert.equal(effectiveDefaults({ ...folded, defaultRuntimeMode: 'auto', projectSettingsOverrides: { p: { defaultRuntimeMode: 'approval-required' } } }, 'p', noLegacy).runtimeMode, 'approval-required');
+});
+
+test('a choice takes the default\'s options only for the same instance and model', () => {
+  const choice = { instanceId: OVERRIDE.instanceId, model: OVERRIDE.model };
+  assert.deepEqual(launchSelection(choice, OVERRIDE), OVERRIDE);
+  assert.deepEqual(launchSelection(choice, { ...choice }), choice);
+  assert.deepEqual(launchSelection(choice, GLOBAL), choice);
+  assert.deepEqual(launchSelection(choice, null), choice);
 });

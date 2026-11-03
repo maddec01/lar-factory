@@ -1,7 +1,7 @@
 // Settings uses the same provider groups and keyboard navigation as Start, with its saved model checked.
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
-import type { AutoBuildState, ModelChoice, ModelGroup } from '@lar-factory/shared';
+import type { AutoBuildState, ModelChoice, ModelGroup, ModelSelection } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -16,7 +16,7 @@ function modelLabel(groups: ModelGroup[], selected: ModelChoice | undefined): st
 }
 
 /** Disabled until the board has read the setting, which it never does in sample mode. */
-export function AutoBuildModelSetting({ state, groups }: { state: AutoBuildState | undefined; groups: ModelGroup[] }) {
+export function AutoBuildModelSetting({ state, groups, t3Default }: { state: AutoBuildState | undefined; groups: ModelGroup[]; t3Default?: ModelSelection | undefined }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function AutoBuildModelSetting({ state, groups }: { state: AutoBuildState
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" aria-label="Auto-build model" {...opensOnChecked}>
-        <ModelEntries groups={groups} selected={state?.model} heading="Build with" onPick={(model) => void save(model)} />
+        <ModelEntries groups={groups} t3Default={t3Default} selected={state?.model} heading="Build with" onPick={(model) => void save(model)} />
       </DropdownMenu.Content>
     </DropdownMenu>
     {error && <p className="m-0 text-xs text-(--error-foreground)" role="alert">{error}</p>}

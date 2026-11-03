@@ -110,8 +110,8 @@ test('Start build runs the thread on the picked model choice', async (t) => {
   const response = await startBuild(board, board.id(12), { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
   assert.equal(response.status, 200);
   assert.deepEqual(await board.t3Calls(), [
-    ['thread', 'start', 'project-factory', message(home, board.id(12)), '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5',
-      '--worktree', 'main', '--branch', 'fix/12-issue-12', '--json'],
+    ['launch', 'project-factory', message(home, board.id(12)), { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' },
+      { type: 'worktree', baseRef: 'main', branch: 'fix/12-issue-12' }, 'full-access'],
   ]);
   assert.match((await (await startBuild(board, board.id(12), { instanceId: 'codex', model: '--help' })).json()).error, /isn't offered/);
 });

@@ -5,10 +5,15 @@
 // resolveProviderInstanceEnabled in packages/contracts/src/settings.ts,
 // deriveProviderInstanceConfigMap in apps/server/src/provider/ProviderInstanceRegistryHydration.ts
 // and resolveProviderInstanceDisplayName in packages/client-runtime/src/state/providerInstanceDisplay.ts.
+// The project's effective default follows pingdotgg/t3code main at 97e35bcf23e4dcf34c2dcffadd37c08db0e01e52:
+// resolveProjectOverrides in packages/shared/src/projectSettings.ts and
+// resolveProjectProviderInstanceEnabled in packages/contracts/src/settings.ts.
 
 import { readJsonRecord } from '../json-file.ts';
 import { isRecord, offers } from '@lar-factory/shared';
-import type { ModelChoice, ModelGroup, ModelOption } from '@lar-factory/shared';
+import type { ModelChoice, ModelGroup, ModelOption, ModelSelection, ModelSelectionOption } from '@lar-factory/shared';
+import { projectDefaultSelection, readT3Db } from './t3-db.ts';
+import { statsDbPath, t3SettingsPath } from './t3-settings.ts';
 
 /** Each driver's name in T3 (PROVIDER_DISPLAY_NAMES). */
 const DRIVER_NAMES: Record<string, string> = {
@@ -52,6 +57,61 @@ export function findModelChoice(groups: readonly ModelGroup[], input: unknown): 
   if (typeof instanceId !== 'string' || typeof model !== 'string') return null;
   const choice = { instanceId, model };
   return offers(groups, choice) ? choice : null;
+}
+
+/** What T3 gives a new thread in a project: its default model selection, null when it has none or it can't be read, and its runtime mode. */
+export interface ProjectDefaults {
+  selection: ModelSelection | null;
+  runtimeMode: string;
+}
+
+/** T3's DEFAULT_RUNTIME_MODE, for settings that don't name one. */
+const DEFAULT_RUNTIME_MODE = 'full-access';
+
+/** The project's defaults from T3's `settings`. `projectRow` reads the database's selection, which T3 ignores once settings are folded. */
+export function effectiveDefaults(settings: Record<string, unknown>, projectId: string, projectRow: () => unknown): ProjectDefaults {
+  const overrides = isRecord(settings.projectSettingsOverrides) ? settings.projectSettingsOverrides[projectId] : undefined;
+  const stored = isRecord(overrides) ? overrides : {};
+  const runtimeMode = [stored.defaultRuntimeMode, settings.defaultRuntimeMode].find((mode) => typeof mode === 'string') as string | undefined ?? DEFAULT_RUNTIME_MODE;
+  let row: unknown;
+  if (settings.projectSettingsFolded !== true && stored.defaultModelSelection === undefined) {
+    try { row = projectRow(); } catch { return { selection: null, runtimeMode }; }
+  }
+  const override = stored.defaultModelSelection === undefined ? row ?? undefined : stored.defaultModelSelection;
+  // T3 skips an override on an instance disabled here. A null override clears the default.
+  if (override === null) return { selection: null, runtimeMode };
+  const selection = parseSelection(override);
+  const chosen = selection && instanceEnabled(settings, stored, selection.instanceId) ? selection : parseSelection(settings.defaultModelSelection);
+  return { selection: chosen, runtimeMode };
+}
+
+/** A project's defaults from T3's settings file and database, or null when the settings can't be read. */
+export function projectDefaults(projectId: string, settingsPath = t3SettingsPath(), dbPath = statsDbPath()): ProjectDefaults | null {
+  const settings = readJsonRecord(settingsPath);
+  return settings && effectiveDefaults(settings, projectId, () => readT3Db(dbPath, (db) => projectDefaultSelection(db, projectId)));
+}
+
+/** What a launch sends for `choice`: the default's options when it names the default's instance and model, else none, as options belong to one model. */
+export function launchSelection(choice: ModelChoice, selection: ModelSelection | null): ModelSelection {
+  const same = selection?.instanceId === choice.instanceId && selection.model === choice.model;
+  return same && selection.options?.length ? { ...choice, options: selection.options } : choice;
+}
+
+/** Only the instance, model and option ids and values: the settings may hold secrets. */
+function parseSelection(value: unknown): ModelSelection | null {
+  if (!isRecord(value) || typeof value.instanceId !== 'string' || typeof value.model !== 'string') return null;
+  const options = (Array.isArray(value.options) ? value.options : []).flatMap((option): ModelSelectionOption[] =>
+    isRecord(option) && typeof option.id === 'string' && (typeof option.value === 'string' || typeof option.value === 'boolean')
+      ? [{ id: option.id, value: option.value }] : []);
+  return { instanceId: value.instanceId, model: value.model, ...options.length ? { options } : {} };
+}
+
+/** The project's own switch for an instance, then the settings', then whether it is a built-in one. */
+function instanceEnabled(settings: Record<string, unknown>, stored: Record<string, unknown>, instanceId: string): boolean {
+  const here = isRecord(stored.providerInstances) ? stored.providerInstances[instanceId] : undefined;
+  if (isRecord(here) && typeof here.enabled === 'boolean') return here.enabled;
+  const listed = instances(settings).find((instance) => instance.id === instanceId);
+  return listed ? enabled(listed) : false;
 }
 
 /** The manifest inside T3's cached model list, or null when it can't be read. */

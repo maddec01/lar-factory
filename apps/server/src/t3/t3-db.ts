@@ -201,6 +201,12 @@ export function liveProjects(db: string, home: string): { id: string; title: str
     typeof id === 'string' && typeof root === 'string' ? [{ id, title: typeof title === 'string' ? title : id, folder: normalPath(root, home) }] : []));
 }
 
+/** The project row's default model selection, which T3 still applies before its settings are folded; null when it has none. */
+export function projectDefaultSelection(db: DatabaseSync, projectId: string): unknown {
+  const row = db.prepare('SELECT default_model_selection_json AS selection FROM projection_projects WHERE project_id = ? AND deleted_at IS NULL').get(projectId) as { selection: unknown } | undefined;
+  return typeof row?.selection === 'string' ? JSON.parse(row.selection) as unknown : null;
+}
+
 // A project's live threads with a title, newest first, each with its latest assistant message.
 const THREAD_BY_TITLE = `
 SELECT t.thread_id AS id, (

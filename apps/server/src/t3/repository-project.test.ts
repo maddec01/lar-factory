@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
-import { anyOnAzureDevOps, azureRepo, linkedWorktree, onAzureDevOps, repositoryProjectHints } from './repository-project.ts';
+import { anyOnAzureDevOps, azureRepo, linkedWorktree, onAzureDevOps, repositoryProjectReads } from './repository-project.ts';
 import { checkouts } from '../../test/repo-support.ts';
 import { projectsDb } from '../../test/stats-db.ts';
 
@@ -70,11 +70,22 @@ test('every Azure DevOps origin form names its organization, project and reposit
 test('Start finds the checkout of a GitHub or an Azure DevOps repository', async (t) => {
   const env = t3Home(t, { 'lar-factory': GITHUB[0]!, 'lar-api': AZURE[0]! });
   const repo = (name: string) => ({ repo: name, role: 'server', labels: [] });
-  assert.deepEqual(await repositoryProjectHints([repo('maddec01/lar-factory'), repo('contoso/fabrikam/lar-api'), repo('contoso/fabrikam/lar-web')], env), {
+  assert.deepEqual((await repositoryProjectReads([repo('maddec01/lar-factory'), repo('contoso/fabrikam/lar-api'), repo('contoso/fabrikam/lar-web')], env)).repositoryProjects, {
     'maddec01/lar-factory': null,
     'contoso/fabrikam/lar-api': null,
     'contoso/fabrikam/lar-web': 'No T3 project is a checkout of contoso/fabrikam/lar-web; add the checkout in T3 Code',
   });
+});
+
+test('each repository gets its project\'s T3 default; one without a project or a readable default gets none', async (t) => {
+  const env = t3Home(t, { 'lar-factory': GITHUB[0]! });
+  env.T3_SETTINGS = join(env.HOME!, 't3-settings.json');
+  const repo = (name: string) => ({ repo: name, role: 'server', labels: [] });
+  const repos = [repo('maddec01/lar-factory'), repo('maddec01/other')];
+  assert.deepEqual((await repositoryProjectReads(repos, env)).t3Defaults, {});
+  const opus = { instanceId: 'claudeAgent', model: 'claude-opus', options: [{ id: 'effort', value: 'medium' }] };
+  writeFileSync(env.T3_SETTINGS, JSON.stringify({ projectSettingsFolded: true, defaultModelSelection: opus }));
+  assert.deepEqual((await repositoryProjectReads(repos, env)).t3Defaults, { 'maddec01/lar-factory': opus });
 });
 
 vi.mock('./repository-project-discovery.ts', () => ({ repositoryProjects: async (env: NodeJS.ProcessEnv) => {

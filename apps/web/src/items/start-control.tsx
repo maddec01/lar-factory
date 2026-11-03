@@ -6,7 +6,7 @@
 import { useRef, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { flushSync } from 'react-dom';
-import { canResumeShaping, canRetryBuild, currentBuildThread, delegatedWorkRunning, itemName, ref, highlightedChoice, startProgressOf } from '@lar-factory/shared';
+import { canResumeShaping, canRetryBuild, currentBuildThread, delegatedWorkRunning, itemName, ref, highlightedChoice, repositoryT3Default, startProgressOf } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -52,7 +52,7 @@ export function useStartHolds(item: Item, data: BoardData): boolean {
 /** "T3 default", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
 export function StartEntries({ item, data, onPick, requireModel = false }: { item: Item; data: BoardData; requireModel?: boolean; onPick: (choice: ModelChoice | undefined) => void }) {
   const lastChoice = useStartStore((state) => state.lastChoice);
-  return <ModelEntries groups={data.modelChoices} selected={highlightedChoice(data.modelChoices, lastChoice)} heading="Start with"
+  return <ModelEntries groups={data.modelChoices} t3Default={repositoryT3Default(data, item.repo)} selected={highlightedChoice(data.modelChoices, lastChoice)} heading="Start with"
     held={data.capture?.enabled === false ? 'Disabled in sample mode' : undefined}
     defaultHeld={requireModel ? 'Choose a model to continue in the existing worktree.' : undefined} itemId={item.id} onPick={onPick} />;
 }

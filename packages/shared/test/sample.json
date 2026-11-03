@@ -27,6 +27,10 @@
       "items": "issues"
     }
   ],
+  "projectIcons": {
+    "maddec01/lar-server": { "kind": "lucide", "name": "server", "color": "sky" },
+    "maddec01/lar-apple": { "kind": "emoji", "emoji": "🍎" }
+  },
   "refreshSeconds": 45,
   "fetchedAt": "2026-10-21T09:40:00.000Z",
   "error": "gh api graphql failed: error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com",

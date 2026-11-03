@@ -358,14 +358,82 @@ describe('project icons', () => {
     expect(image('lar-server')!.hidden).toBe(true);
   });
 
-  test('a repository with no icon, or a chosen one, shows the toned initial', async () => {
-    await mountPage({ ...sample, projectIcons: { [REPO]: { kind: 'emoji', emoji: '🚀' } } });
+  test('a repository with no icon shows the toned initial', async () => {
+    await mountPage({ ...sample, projectIcons: {} });
     await open();
     for (const name of ['lar-server', 'lar-apple']) {
       expect(image(name)).toBeNull();
       expect(text(icon(name))).toBe('L');
       expect(icon(name).className).toMatch(/repo-tone-\d/);
     }
+  });
+
+  test('an emoji shows in the square, in place of the initial and with no color', async () => {
+    await mountPage({ ...sample, projectIcons: { [REPO]: { kind: 'emoji', emoji: '🚀' } } });
+    await open();
+    expect(text(icon('lar-server'))).toBe('🚀');
+    expect(icon('lar-server').className).toContain('size-5');
+    expect(icon('lar-server').className).not.toMatch(/repo-tone-|text-white/);
+    expect(image('lar-server')).toBeNull();
+  });
+
+  test('a monogram shows its first two graphemes in its T3 color', async () => {
+    await mountPage({ ...sample, projectIcons: { [REPO]: { kind: 'monogram', text: 'e\u0301xyz', color: 'rose' } } });
+    await open();
+    expect(text(icon('lar-server'))).toBe('e\u0301x');
+    expect(icon('lar-server').className).toContain('text-rose-500');
+    expect(icon('lar-server').className).not.toMatch(/repo-tone-|text-white/);
+    expect(image('lar-server')).toBeNull();
+  });
+
+  describe('a lucide icon', () => {
+    const lucide = { kind: 'lucide', name: 'git-branch', color: 'sky' } as const;
+    const svg = () => icon('lar-server').querySelector('svg');
+    /** Lets the real chunk imports finish, which takes more than React's own settling and far longer during a full suite run. */
+    const until = (check: () => void) => vi.waitFor(async () => { await settle(); check(); }, { timeout: 12_000 });
+
+    afterEach(() => { vi.doUnmock('lucide-react/dynamic'); });
+
+    test('shows in its T3 color over the toned initial once its chunk loads, in a square that keeps its size', async () => {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      vi.doMock('lucide-react/dynamic', async (importOriginal) => {
+        await held;
+        return importOriginal();
+      });
+      await mountPage({ ...sample, projectIcons: { [REPO]: lucide } });
+      await open();
+      const classes = icon('lar-server').className;
+      expect(text(icon('lar-server')), 'the initial shows while the chunk loads').toBe('L');
+      expect(classes).toMatch(/repo-tone-\d/);
+      expect(svg()).toBeNull();
+      release();
+      await until(() => expect(svg()).not.toBeNull());
+      expect(svg()!.getAttribute('class')).toContain('text-sky-500');
+      expect(svg()!.getAttribute('class')).toContain('absolute');
+      expect(icon('lar-server').className).toBe(classes);
+      expect(image('lar-server')).toBeNull();
+    });
+
+    test('a name lucide doesn\'t have leaves the toned initial', async () => {
+      const failure = vi.spyOn(console, 'error').mockImplementation(() => {});
+      await mountPage({ ...sample, projectIcons: { [REPO]: { ...lucide, name: 'not-a-lucide-icon' } } });
+      await open();
+      await until(() => expect(failure).toHaveBeenCalled());
+      expect(svg()).toBeNull();
+      expect(text(icon('lar-server'))).toBe('L');
+      failure.mockRestore();
+    });
+
+    test('a chunk that fails to load leaves the toned initial', async () => {
+      vi.doMock('lucide-react/dynamic', () => Promise.reject(new Error('chunk failed')));
+      await mountPage({ ...sample, projectIcons: { [REPO]: lucide } });
+      await open();
+      await settle();
+      expect(svg()).toBeNull();
+      expect(text(icon('lar-server'))).toBe('L');
+      expect($('[data-list-modal]'), 'the failure stays inside the square').not.toBeNull();
+    });
   });
 
   test('an item row that names its repository shows its icon, whatever the case of its key', async () => {

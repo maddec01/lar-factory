@@ -53,10 +53,12 @@ test('sample mode offers the fixture model choices', async (t) => {
   ]);
 });
 
-test('sample mode has no project icons, and the image endpoint answers 404', async (t) => {
+test('sample mode shows only the sample\'s chosen icons, and the image endpoint answers 404', async (t) => {
   const { url, t3Calls } = await startBoard(t, {}, true);
   const board = await (await fetch(`${url}/api/board`)).json() as BoardData;
-  assert.equal(board.projectIcons, undefined);
+  const icons = Object.values(board.projectIcons ?? {});
+  assert.ok(icons.length > 0);
+  assert.ok(icons.every(icon => icon.kind !== 'favicon'));
   assert.equal((await fetch(`${url}/api/project-icon/I_sample`)).status, 404);
   assert.deepEqual(await t3Calls(), []);
 });

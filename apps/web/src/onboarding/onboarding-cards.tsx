@@ -1,7 +1,6 @@
 // A card above the board for each repository still onboarding: its name, the step it stopped at or its PR's wait for
 // the merge, and Resume, which reopens the onboarding dialog there.
 
-import { FolderGit2 } from 'lucide-react';
 import { shownRepo } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
@@ -9,6 +8,7 @@ import { NoticeCard } from '@lar-factory/ui/design-system/NoticeCard';
 import { useBoardStore } from '../board/board-store.ts';
 import { stoppedAt, useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
 
 export function OnboardingCards() {
   const onboarding = useBoardStore((state) => state.data.onboarding);
@@ -20,7 +20,7 @@ export function OnboardingCards() {
         const where = stoppedAt(progress);
         return (
           <div key={repo} data-onboarding-card={repo}>
-            <NoticeCard tone="warning" icon={<FolderGit2 />} title={shownRepo(repo)} badge={<Badge tone="warning">Setting up</Badge>}
+            <NoticeCard tone="warning" icon={<ProjectIcon repo={repo} size="medium" />} title={shownRepo(repo)} badge={<Badge tone="warning">Setting up</Badge>}
               description={`${where[0]!.toUpperCase()}${where.slice(1)}`} actions={<Button {...kind('other')} onClick={() => resume(repo)} data-resume>Resume</Button>} />
           </div>
         );

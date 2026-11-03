@@ -2,7 +2,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, mountPage, sample, settle, text, toast } from '../../test/support.ts';
-import type { BoardData } from '@lar-factory/shared';
+import type { BoardData, ProjectIcon } from '@lar-factory/shared';
 import { detection, dialog, empty, project, serve } from './onboarding-support.ts';
 
 const waiting = (data: BoardData, step = 'work'): BoardData => ({ ...data,
@@ -68,4 +68,16 @@ test("closing a run the server can't keep says why in a toast", async () => {
   await resume();
   await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
   expect(text(toast())).toContain('Couldn\'t keep onboarding maddec01/lar-web on the board. maddec01/lar-web is ready already.');
+});
+
+test.each<[string, ProjectIcon | null, (icon: Element) => void]>([
+  ['a favicon', { kind: 'favicon', projectId: 'lar-web', revision: 'abc' }, (icon) => expect(icon.querySelector('img')!.getAttribute('src')).toBe('/api/project-icon/lar-web?v=abc')],
+  ['a chosen icon', { kind: 'emoji', emoji: '🚀' }, (icon) => expect(text(icon)).toBe('🚀')],
+  ['the toned initial with no icon', null, (icon) => { expect(text(icon)).toBe('L'); expect(icon.className).toContain('repo-tone-none'); }],
+])('a card shows %s in place of the folder', async (_case, icon, shown) => {
+  const data: BoardData = { ...waiting(empty), projectIcons: icon ? { 'maddec01/lar-web': icon } : {} };
+  serve(data, []);
+  await mountPage(data);
+  shown(card()!.querySelector('[data-project-icon]')!);
+  expect(card()!.querySelector('article > div > span svg')).toBeNull();
 });

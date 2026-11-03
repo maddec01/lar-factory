@@ -258,7 +258,10 @@ test('a dossier stays on one line: nothing wraps, the title and Azure fields giv
   const azure = header().querySelector('[data-azure]')!;
   expect(classes(azure.parentElement!)).toEqual(expect.arrayContaining(['shrink-[1000]', 'truncate']));
   expect(azure.getAttribute('title')).toBe('Feature · Active · Ana');
-  expect(classes(header().querySelector('[data-chips]')!)).toContain('shrink-0');
+  // The chips give way before the next step, whole, in their one-chip-high box.
+  expect(classes(header().querySelector('[data-chips]')!)).toEqual(expect.arrayContaining(['h-5', 'min-w-0', 'shrink-[1000]', 'flex-wrap', 'overflow-hidden']));
+  expect(classes(next())).toContain('min-w-0');
+  expect(classes(next())).not.toContain('flex-1');
 });
 
 test('the blocked chip counts the blocked slices of unfinished parts', async () => {

@@ -84,7 +84,15 @@ let lastArchived: Record<string, unknown>[] = [];
 /** How long one read of the archived list answers. Refresh runs about every 2 seconds. Any recorded thread missing from the active shells asks for the list, so with one the board reads it every 30 seconds for the server's life. */
 const ARCHIVED_READ_MS = 30_000;
 
-let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; demandArchived?(): void; archivedCurrent?(): boolean; archivedAnswered?(): boolean; archivedFailed?(): boolean; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; shownShells?: Record<string, unknown>[]; shellIds?: Set<unknown>; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
+let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; demandArchived?(): void; archivedCurrent?(): boolean; archivedAnswered?(): boolean; archivedFailed?(): boolean; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; shownShells?: Record<string, unknown>[]; shownById?: Map<unknown, Record<string, unknown>>; shellIds?: Set<unknown>; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
+/** Each shell's JSON. T3's events replace a shell's record rather than change it, so a record's JSON never goes stale. */
+const shellJson = new WeakMap<Record<string, unknown>, string>();
+function fingerprintOf(shell: Record<string, unknown>): string {
+  let json = shellJson.get(shell);
+  if (json === undefined) { json = JSON.stringify(shell); shellJson.set(shell, json); }
+  return json;
+}
+
 /** T3's runtime file as this synchronous pass read it, as a refresh asks once per item and slice. */
 let runtimeNow: { key: string; origin: unknown; serverVersion: unknown; running: boolean } | undefined;
 function readRuntime() {
@@ -130,7 +138,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
           if (active.has(id)) continue;
           queued.delete(id);
           if ((retryAt.get(id) ?? 0) > Date.now()) continue;
-          const fingerprint = JSON.stringify(shell);
+          const fingerprint = fingerprintOf(shell);
           if (fingerprints.get(id) === fingerprint && entries.get(id)?.availability === 'available') continue;
           active.add(id);
           const startedEpoch = epoch;
@@ -147,7 +155,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
       state.demand = shells => {
         for (const shell of shells) {
           if (typeof shell.id !== 'string' || (retryAt.get(shell.id) ?? 0) > Date.now()) continue;
-          if (fingerprints.get(shell.id) === JSON.stringify(shell) && entries.get(shell.id)?.availability === 'available') continue;
+          if (fingerprints.get(shell.id) === fingerprintOf(shell) && entries.get(shell.id)?.availability === 'available') continue;
           queued.set(shell.id, shell);
         }
         drain();
@@ -164,6 +172,8 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
       /** The shells a thread lookup shows: the subscribed ones, which win, then the archived list. */
       const showShells = () => {
         state.shownShells = [...state.shells!, ...lastArchived.filter(shell => !state.shellIds!.has(shell.id))];
+        // The first shell with an ID wins, as a search of the list finds it.
+        state.shownById = new Map([...state.shownShells].reverse().map(shell => [shell.id, shell]));
         state.lookup = executionItemThreads(state.shownShells);
         lastSeen = { lookup: state.lookup, observedAt: state.observedAt! };
       };
@@ -252,7 +262,7 @@ export function protocolStartedThread(projectId: string, messages: readonly stri
 
 /** A fresh observation of this thread, independent of another thread's history read. */
 function executionAvailable(shell: Record<string, unknown>): boolean {
-  return !!current?.available && current.fingerprints?.get(String(shell.id)) === JSON.stringify(shell)
+  return !!current?.available && current.fingerprints?.get(String(shell.id)) === fingerprintOf(shell)
     && current.reads?.get(String(shell.id))?.availability === 'available';
 }
 
@@ -260,7 +270,7 @@ function executionAvailable(shell: Record<string, unknown>): boolean {
 export function protocolThreadById(threadId: string): ExecutionRead {
   protocolItemThreads([]);
   const read = current?.reads?.get(threadId);
-  const shell = current?.shownShells?.find(shell => shell.id === threadId);
+  const shell = current?.shownById?.get(threadId);
   if (shell) current?.demand?.([shell]);
   return { availability: shell && executionAvailable(shell) && read ? read.availability : 'unavailable',
     ...(read?.observation ? { observation: read.observation } : {}) };
@@ -294,7 +304,7 @@ export function threadCleanupState(threadId: string): ThreadCleanupState {
     current.demandArchived?.();
     return 'unavailable';
   }
-  const shell = current.shownShells?.find(shell => shell.id === threadId);
+  const shell = current.shownById?.get(threadId);
   if (!shell || shell.deletedAt) return 'absent';
   return { archived: !!shell.archivedAt, settled: isSettled(shell), live: mayBeLive(threadId, current.shownShells!) };
 }
@@ -331,7 +341,7 @@ function threadFamily(threadIds: readonly string[], shells: Record<string, unkno
 }
 
 function threadUsageRead(id: string): ThreadUsageRead {
-  const shell = current?.shownShells?.find(shell => shell.id === id);
+  const shell = current?.shownById?.get(id);
   if (!shell) return current?.archivedAnswered?.() ? 'gone' : 'never';
   if (shell.deletedAt) return 'gone';
   const read = current?.reads?.get(id);

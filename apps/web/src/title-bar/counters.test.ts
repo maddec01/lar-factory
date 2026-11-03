@@ -24,7 +24,7 @@ test('the counters show need you, building over the limit of 2, queued, shipped 
   await mountPage(completeSample);
   expect(counters().map(text)).toEqual(['7', '3/2', '3', '4', '$190.25']);
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
-    'need you: 7 items only you can move',
+    'need you: 7 items waiting on your answer, verification or merge',
     'building: 1 over the in-flight limit',
     'queued: 3 items ready to shape, 4 more in List',
     'shipped: Done in the last 7 days',

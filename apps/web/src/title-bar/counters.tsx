@@ -128,7 +128,7 @@ export function Counters() {
     <div className="counters flex shrink-0">
       <div className="flex items-center gap-0.5 whitespace-nowrap">
         <Counter label="need you" value={s.needsYou.length} icon={glyph('Needs you')}
-          hint={s.needsYou.length ? `${plural(s.needsYou.length, 'item')} only you can move` : 'Nothing waits on you'}>
+          hint={s.needsYou.length ? `${plural(s.needsYou.length, 'item')} waiting on your answer, verification or merge` : 'Nothing waits on you'}>
           <PopHead icon={glyph('Needs you')} title="Needs you" sub={s.needsYou.length} />
           {s.needsYou.length ? (
             <div className="grid gap-1 py-1">

@@ -16,7 +16,7 @@ const dialog = () => $('[data-item-dialog]');
 const withItem = (id: string, change: Partial<Item>): BoardData =>
   ({ ...sample, items: sample.items.map((i) => (i.id === id ? { ...i, ...change } : i)) });
 
-test('the desk shows what only you can move, counted, as cards in one row that scrolls sideways with no scrollbar', async () => {
+test('the desk shows what waits on you, counted, as cards in one row that scrolls sideways with no scrollbar', async () => {
   await mountPage();
   expect(text($('#desk-h'))).toBe('Your desk 7');
   const statuses = cards().map((c) => sample.items.find((i) => i.id === c.dataset.item)!.status);

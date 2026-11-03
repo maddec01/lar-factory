@@ -130,13 +130,13 @@ export async function pressMenu(el: Element): Promise<void> {
 export async function openOptions(trigger: Element): Promise<string[]> {
   await settle(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })));
   await settle(() => vi.advanceTimersByTime(50));
-  return $$('[role="option"]').map(text);
+  return $$('[role="option"]').map(textBesideIcon);
 }
 
 /** Opens a design-system Select and picks the option called `name`. */
 export async function chooseOption(trigger: Element, name: string): Promise<void> {
   await openOptions(trigger);
-  await settle(() => $$('[role="option"]').find((option) => text(option) === name)!.click());
+  await settle(() => $$('[role="option"]').find((option) => textBesideIcon(option) === name)!.click());
   await settle(() => vi.advanceTimersByTime(50));
 }
 
@@ -146,6 +146,12 @@ export const formValue = (name: string) => $<HTMLInputElement>(`input[type="hidd
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';
+/** An element's text without its project icon's initial or monogram, which screen readers skip. */
+export const textBesideIcon = (el: Element | null | undefined) => {
+  const copy = el?.cloneNode(true) as Element | undefined;
+  copy?.querySelectorAll('[data-project-icon]').forEach((icon) => icon.remove());
+  return text(copy);
+};
 /** A warning's title and description. */
 export const warningText = (el: Element) => ['title', 'description'].map((slot) => text(el.querySelector(`[data-slot="${slot}"]`)));
 

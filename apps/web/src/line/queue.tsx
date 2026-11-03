@@ -13,12 +13,13 @@ import { kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
-import { AzureFields, ItemTitle, KindBadge, KindMarker, LabelChips, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, KindBadge, KindMarker, LabelChips } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
 
 const NONE_STARTS = 'Every queued item is blocked, needs a T3 project, waits for onboarding, or has a thread at work.';
@@ -42,7 +43,6 @@ function RowAction({ item, data }: { item: Item; data: BoardData }) {
 /** `waits` marks the row Start next starts while every build slot is taken. */
 function Row({ item, n, data, now, waits }: { item: Item; n: number; data: BoardData; now: number; waits: boolean }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
-  const repo = repoKey(item);
   return (
     <li data-item={item.id} onClick={() => useItemDialogStore.getState().open(item.id)}
       className={`flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 border-b border-(--border) px-3 py-2 last:border-b-0 hover:bg-(--accent) ${picked ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : ''}`}>
@@ -50,7 +50,7 @@ function Row({ item, n, data, now, waits }: { item: Item; n: number; data: Board
         <GripVertical className="size-3.5" />
       </button>
       <span className="queue-n w-4 shrink-0 text-right text-[11px] font-medium tabular-nums text-(--muted-foreground)">{n + 1}</span>
-      <span className={`${repoTone(repo, data.repos)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
+      <ProjectIcon repo={repoKey(item)} size="small" />
       {/* With no room for the action beside a readable title, it wraps under it, at the right. */}
       <button type="button" className="grid min-w-28 flex-1 gap-0.5 text-left">
         <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><SourceIcon item={item} /><span className="truncate"><ItemTitle item={item} /></span></span>

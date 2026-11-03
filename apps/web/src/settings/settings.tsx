@@ -47,7 +47,7 @@ function GroupView({ group }: { group: Group }) {
           <div key={row.id} className="settings-row grid gap-2 px-4 py-3" data-row={row.id}>
             <div className="flex items-center gap-x-6 gap-y-2">
               <div className="min-w-0 flex-1">
-                <div className="settings-row-title min-w-0 text-[13px] font-medium [overflow-wrap:anywhere]">{row.title}</div>
+                <div className="settings-row-title flex min-w-0 items-center gap-1.5 text-[13px] font-medium [overflow-wrap:anywhere]">{row.icon}{row.title}</div>
                 {row.control.type !== 'unavailable' && row.description && <div className="text-xs text-(--muted-foreground)">{row.description}</div>}
               </div>
               {/* The title wraps, so a long path never pushes the control out of the row. */}

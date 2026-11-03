@@ -2,7 +2,7 @@
 // the whole factory. Each opens a popover of the items behind its number; picking one opens the item dialog.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, moved, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, NOW, moved, mountPage, sample, settle, text, textBesideIcon } from '../../test/support.ts';
 import type { ItemThread } from '@lar-factory/shared';
 
 const completeSample = { ...sample, error: null, items: sample.items.map(item => ({ ...item, stats: item.stats && item.stats !== 'unavailable' ? item.stats : { agentMs: 0, tokens: 0, costUsd: 0 } })) };
@@ -10,7 +10,7 @@ const completeSample = { ...sample, error: null, items: sample.items.map(item =>
 const counters = () => $$<HTMLButtonElement>('.counters button[aria-haspopup]');
 const counter = (label: string) => counters().find((b) => b.getAttribute('aria-label')!.startsWith(`${label}: `))!;
 const popup = () => $('[data-state="open"] .counter-popup');
-const rows = () => [...popup()!.querySelectorAll('li')].map(text);
+const rows = () => [...popup()!.querySelectorAll('li')].map(textBesideIcon);
 /** The popover's head, its title and count, and its foot. */
 const head = (pop: HTMLElement) => text(pop.querySelector('.h-10'));
 const foot = (pop: HTMLElement) => text(pop.querySelector('.border-t'));
@@ -58,6 +58,15 @@ test('need you leaves out a Verify item while its build thread runs, and counts 
   expect(count()).toBe(waiting - 1);
   await settle(() => useBoardStore.getState().receive(verify('done')));
   expect(count()).toBe(waiting);
+});
+
+test('a counter row shows its repository\'s project icon, not a tone dot', async () => {
+  await mountPage({ ...sample, projectIcons: { 'maddec01/lar-server': { kind: 'emoji', emoji: '🚀' } } });
+  const pop = await openCounter('need you');
+  const icons = [...pop.querySelectorAll('li')].map((li) => li.querySelector('[data-project-icon]'));
+  expect(icons.every(Boolean)).toBe(true);
+  expect(icons.map(text)).toContain('🚀');
+  expect(pop.querySelector('li [class*="repo-tone"].rounded-full')).toBeNull();
 });
 
 test('need you lists its items by status, each with its status glyph in its colour', async () => {

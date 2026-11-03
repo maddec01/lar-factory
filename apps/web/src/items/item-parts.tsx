@@ -1,14 +1,15 @@
 // The bits every view draws for an item: its numbered title, title link, kind badge, label chips, status track and
-// slice bar, and the item dialog's repository tag, slices, pull requests, checks, and agent work. The tag is the design system's Badge; the
-// board's CSS adds the coloured dot.
+// slice bar, and the item dialog's repository tag, slices, pull requests, checks, and agent work. The tag is the design system's Badge, with
+// the repository's project icon.
 
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
+import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, ItemStats, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { isDone } from '../line/dossier-parts.ts';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { PURPOSE, useStart } from './start-store.ts';
 import { tint } from './label-tint.ts';
 import { PrReadiness } from './pr-readiness.tsx';
@@ -16,18 +17,9 @@ import { STATUS_COLOR } from './status-glyph.tsx';
 import { WORKFLOW_STEPS } from './workflow-steps.ts';
 import { SourceIcon } from './source-icon.tsx';
 
-const REPO_TONES = 8;
-
-/** A repository's colour class: the palette entry for its place among the board's repositories, or the muted
- *  colour for a repository the board doesn't list. `repo` is a repository key. */
-export function repoTone(repo: string, repos: readonly RepoConfig[]): string {
-  const at = repos.findIndex((r) => sameRepo(r.repo, repo));
-  return at < 0 ? 'repo-tone-none' : `repo-tone-${at % REPO_TONES}`;
-}
-
 /** The control room's repository badge, with a medium label. */
 export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoConfig[] }) {
-  return <Badge className={`repo-tag ${repoTone(repo, repos)} gap-1.5`}>{repoName(repo, repos)}</Badge>;
+  return <Badge className="gap-1.5"><ProjectIcon repo={repo} size="small" />{repoName(repo, repos)}</Badge>;
 }
 
 export function TitleLink({ item, className = 'title' }: { item: Item; className?: string }) {

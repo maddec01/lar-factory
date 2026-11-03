@@ -14,6 +14,7 @@ import { CreateIssueBox, IssueFields, PanelSection, ticketOptions } from './issu
 import { TicketPicker } from './ticket-picker.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';
 import { EXPANDED, ExpandButton, useExpand } from '../expand-dialog/expand-dialog.tsx';
@@ -40,7 +41,7 @@ function RepoSelect({ id, repo, onRepo }: { id: string; repo: string; onRepo: (r
   const hint = noneOnboarded(data);
   return (<>
     <FormSelect id={id} name="repo" value={repo} onChange={onRepo} aria-describedby={hint ? `${id}-hint` : undefined}
-      choices={data.repos.map((r) => ({ value: r.repo, name: repoName(r.repo, data.repos) }))} />
+      choices={data.repos.map((r) => ({ value: r.repo, name: repoName(r.repo, data.repos), icon: <ProjectIcon repo={r.repo} size="small" /> }))} />
     {hint && <p className={HINT} id={`${id}-hint`}>No repository is onboarded. <AddingARepository /></p>}
   </>);
 }

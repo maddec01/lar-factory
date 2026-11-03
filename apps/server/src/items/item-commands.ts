@@ -94,9 +94,11 @@ export interface ItemCommands {
   resolveNeedsYou(itemId: string, choice: unknown, briefChoice?: unknown): Promise<Reply>;
   /**
    * Marks a Dependency holding the item met, as the user decided, or clears the mark when `met` is false. `revision` is
-   * the Dependency's as the board showed it, so a change since then refuses the write.
+   * the Dependency's as the board showed it, so a change since then refuses the write, except the board's own observations.
    */
   markDependencyMet(itemId: string, dependencyId: unknown, revision: unknown, met: unknown): Reply;
+  /** Hears that the board's own observation alone moved the Dependency from revision `from` to `to`, and whether it `changed` the kind it shows. */
+  observedDependency(dependencyId: string, from: number, to: number, changed: boolean): void;
   /**
    * Gives an ordinary item `kind`, through the same path as `lar-work change-kind`, making its record first if it has none. The
    * answer's `line` says what changed, also after a failure, its `itemId` where the item is now, and `labelChanges` the
@@ -670,6 +672,19 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     }
   }
 
+  /** Each Dependency's revisions, `from` through `to`, that differ only by the board's own observations of an unchanged kind. */
+  const observedRevisions = new Map<string, { from: number; to: number }>();
+
+  /**
+   * The revision a mark at `revision` names: the Dependency's current one when only the board's own observations wrote
+   * since, whether or not a page shows them yet, and none changed the kind the mark decides on.
+   */
+  function markedAt(dependencyId: string, revision: unknown): unknown {
+    const range = observedRevisions.get(dependencyId);
+    const observedOnly = range && typeof revision === 'number' && range.from <= revision && revision <= range.to;
+    return observedOnly && records!.dependency(dependencyId).revision === range.to ? range.to : revision;
+  }
+
   /** Moves the item's parent record to In progress, unless it's a build or there already: the error to show, else null. */
   function parentInProgress({ parentId }: Item): string | null {
     showObservations();
@@ -1122,6 +1137,12 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       return withBoard(200, { error: null });
     },
 
+    observedDependency(dependencyId, from, to, changed) {
+      const range = observedRevisions.get(dependencyId);
+      // A mark made before a change of kind decided on what the page no longer shows.
+      observedRevisions.set(dependencyId, { from: changed ? to : range?.to === from ? range.from : from, to });
+    },
+
     markDependencyMet(itemId, dependencyId, revision, met) {
       const item = board.find(itemId);
       if (!item) return reply(404, { error: GONE });
@@ -1130,8 +1151,9 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
       if (typeof met !== 'boolean') return withBoard(400, { error: 'Say whether the Dependency is met.' });
       let refused: Error | null = null;
       try {
-        if (met) records.markDependencyMet(dependencyId as string, revision as number, userInfo().username);
-        else records.clearDependencyMet(dependencyId as string, revision as number);
+        const at = markedAt(dependencyId as string, revision);
+        if (met) records.markDependencyMet(dependencyId as string, at as number, userInfo().username);
+        else records.clearDependencyMet(dependencyId as string, at as number);
       } catch (err) {
         refused = err as Error;
       }

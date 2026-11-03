@@ -134,16 +134,9 @@ async function recordClosedDependency(board: Board): Promise<string> {
   return dependencyId;
 }
 
-const markMetAt = async (board: Board, dependencyId: string, met: boolean) => {
+const markMet = async (board: Board, dependencyId: string, met: boolean) => {
   const hold = (await board.board() as BoardData).items.flatMap((i) => i.blockers).find((b) => b.dependency?.dependencyId === dependencyId)!.dependency!;
   return board.postSession({ itemId: board.id(12), dependencyId, revision: hold.revision, met }, '/api/dependency-met');
-};
-/** Marks as the page does. The board's own observation of the Dependency may land between its read and the mark, so a refusal reads it once more. */
-const markMet = async (board: Board, dependencyId: string, met: boolean) => {
-  const marked = await markMetAt(board, dependencyId, met);
-  if (marked.status !== 409) return marked;
-  await setTimeout(100);
-  return markMetAt(board, dependencyId, met);
 };
 
 test('a Dependency whose ticket closed still holds Start and Start after until the user marks it met, which fires the armed start', async (t) => {
@@ -169,7 +162,7 @@ test('clearing the met mark holds the build again', async (t) => {
   assert.equal(cleared.status, 200);
   const item = (await cleared.json()).board.items.find((i: { id: string }) => i.id === board.id(12));
   assert.deepEqual(item.blockers.map((b: { state: string; dependency: { met: unknown } }) => [b.state, b.dependency.met]), [['open', null]]);
-  assert.equal((await markMetAt(board, dependencyId, false)).status, 409, 'a stale revision is refused');
+  assert.equal((await markMet(board, dependencyId, false)).status, 409, 'a stale revision is refused');
 });
 
 test("a Queued decision starts with today's Start once its blockers complete", async (t) => {

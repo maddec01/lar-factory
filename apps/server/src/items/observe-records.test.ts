@@ -374,6 +374,27 @@ test("a Dependency's GitHub ticket and PR read as each kind, and the reads write
   assert.deepEqual([...new Set(gh.calls.map((call) => call.slice(0, 2).join(' ')))], ['issue view', 'pr view'], 'only views, never an edit');
 });
 
+test("each Dependency observation says whether it changed the kind a mark decides on, which a failed read never does", async () => {
+  const records = await open();
+  dependencyOn(records, 'acme/auth');
+  const answers = { ticket: issue('OPEN'), pr: () => 'OPEN' };
+  const gh = ghAnswering(answers);
+  const heard: boolean[] = [];
+  const reads = { ...gh.reads, observed: (_id: string, _from: number, _to: number, changed: boolean) => { heard.push(changed); } };
+  const observed = async (ticket: () => string, pr: () => string) => {
+    Object.assign(answers, { ticket, pr });
+    heard.length = 0;
+    await observeRecords(records, [REPO], reads);
+    return [...heard];
+  };
+  assert.deepEqual(await observed(issue('OPEN'), () => 'OPEN'), [true, true], 'a first observation is news to the page');
+  assert.deepEqual(await observed(issue('OPEN'), () => 'OPEN'), [false, false]);
+  assert.deepEqual(await observed(issue('OPEN'), () => 'MERGED'), [false, true]);
+  assert.deepEqual(await observed(fails('HTTP 502: Bad Gateway'), fails('HTTP 502: Bad Gateway')), [false, false]);
+  assert.deepEqual(await observed(issue('OPEN'), () => 'MERGED'), [false, false], 'the read after a failure shows what the page showed');
+  assert.deepEqual(await observed(issue('OPEN'), () => 'OPEN'), [false, true], 'a merged PR read open is reopened');
+});
+
 test("a Dependency's Azure work item and PR read as each kind, and the reads write nothing", async () => {
   const API = 'contoso/Fabrikam%20Fiber/Web%20Api';
   const records = await open();

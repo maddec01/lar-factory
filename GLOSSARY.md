@@ -4,6 +4,14 @@ The board tracks work saved on this machine and in a repository's issue tracker.
 
 ## Language
 
+**Concept**:
+A workspace for understanding an outcome through questions, evidence, decisions and proposed work. Its refinement can finish before its delivery.
+_Avoid_: delivery ticket as a synonym for concept.
+
+**Refinement**:
+The work of settling a concept's open questions and recording the resulting understanding in its map. Completed refinement does not mean the proposed work has shipped.
+_Avoid_: delivery completion.
+
 **Your desk**:
 The board's row of items only the user can move next, including shaping work and concepts with an open question.
 _Avoid_: inbox, needs-you list.

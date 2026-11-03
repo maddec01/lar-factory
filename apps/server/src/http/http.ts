@@ -111,7 +111,7 @@ const answersAtOnce = (method: string | undefined, path: string) =>
 
 function send(res: ServerResponse, status: number, type: string, body: string | Buffer): void {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
-  res.end(body);
+  loopTrace.span('response write', () => res.end(body));
 }
 
 function json(res: ServerResponse, status: number, value: unknown): void {
@@ -589,7 +589,10 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
   function openStream(req: IncomingMessage, res: ServerResponse): void {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
     if (req.method === 'HEAD') return void res.end();
-    const sendBoard = (data: object) => res.write(`data: ${loopTrace.span('board stream', () => JSON.stringify(data))}\n\n`);
+    const sendBoard = (data: object) => {
+      const body = `data: ${loopTrace.span('board stream', () => JSON.stringify(data))}\n\n`;
+      loopTrace.span('board stream write', () => res.write(body));
+    };
     streams.add(res);
     const unsubscribe = board.subscribe(sendBoard);
     res.on('close', () => {

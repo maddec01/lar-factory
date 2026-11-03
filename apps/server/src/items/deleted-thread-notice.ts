@@ -1,14 +1,14 @@
 import type { Item } from '@lar-factory/shared';
-import type { WorkRecords } from '@lar-factory/work-records';
+import type { RecordedThread, WorkRecords } from '@lar-factory/work-records';
 
 /** Derive the notice after T3 observations, so a live item thread always holds it back. It names what the work already waits on, and a closed PR keeps its own notice. */
-export function deletedThreadNotice(records: WorkRecords, item: Item): Item['needsYou'] {
-  // The item's threads answer for most items, so only the rest read their record.
+export function deletedThreadNotice(records: WorkRecords, item: Item, recorded?: readonly RecordedThread[]): Item['needsYou'] {
+  // The item's threads and its recorded threads, which a refresh reads for every record at once, answer for most items, so only the rest read their record.
   if (!Array.isArray(item.threads) || item.threads.some(t => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)) return item.needsYou;
+  const latest = (recorded ?? records.threads(item.id)).filter(t => t.purpose === 'shape' || t.purpose === 'build').at(-1);
+  if (!latest?.deletedAt) return item.needsYou;
   const record = records.read(item.id);
   if (record.kind === 'slice' || !['Shaping', 'Needs you', 'In progress', 'Review'].includes(record.status)) return item.needsYou;
-  const latest = records.threads(item.id).filter(t => t.purpose === 'shape' || t.purpose === 'build').at(-1);
-  if (!latest?.deletedAt) return item.needsYou;
   const causes = item.needsYou?.causes ?? [];
   if (causes.some(c => c.type === 'pr-closed')) return item.needsYou;
   const observations = records.observations(item.id);

@@ -2,9 +2,10 @@
 // which items they take off the rest of the line.
 
 import { expect, test } from 'vite-plus/test';
-import type { Item } from '@lar-factory/shared';
+import type { Item, ItemThread } from '@lar-factory/shared';
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
-import { DECISION_KINDS, dossiersOf, inDossiers, isDone, openWaits, partKind, partWaves, partsOf } from './dossier-parts.ts';
+import { DECISION_KINDS, dossiersOf, inDossiers, isDone, isHistory, openWaits, partActivity, partKind, partWaves, partsOf, shownThread } from './dossier-parts.ts';
+import type { Part } from './dossier-parts.ts';
 
 const items = (sampleJson as unknown as { items: Item[] }).items;
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
@@ -83,4 +84,37 @@ test('recorded decisions need no factory labels, and local completion facts over
   const build=child(0,parent,{id:'W_build',recorded:true,kind:'build',status:'Ready',labels:['decision-grill'],completion:{complete:false,reasons:['No merged PR.']}});
   expect(partsOf(parent,[complete,pending,build]).map(part=>part.kind)).toEqual(['decision','decision','build']);
   expect(isDone(complete)).toBe(true);expect(complete.status).toBe('Shaping');expect(isDone(pending)).toBe(false);expect(isDone(build)).toBe(false);
+});
+
+const quiet: ItemThread = { id: 'newest', title: 'Newest', state: 'done', updated: '2026-10-21T09:00:00.000Z' };
+const partWith = (threads: ItemThread[], change: Partial<Item> = {}): Part => {
+  const item = child(1, byNumber(200), { status: 'In progress', threads, slices: [], ...change });
+  return { item, kind: 'build', waitsOn: [], thread: threads[0] };
+};
+
+test.each<[string, ItemThread[], Partial<Item>, string, string | undefined]>([
+  ['its running thread, behind a newer finished one', [quiet, { ...quiet, id: 'older', state: 'running' }], {}, 'working', 'older'],
+  ['a finished planner with running child work', [{ ...quiet, hasRunningChildren: true }], {}, 'working', 'newest'],
+  ['a finished thread with background tasks, behind a newer finished one', [quiet, { ...quiet, id: 'older', hasRunningChildren: true }], {}, 'working', 'older'],
+  ['an active slice', [quiet], { slices: [{ number: 1, repo: 'o/r', title: 'S', progress: 'active' }] as Item['slices'] }, 'working', 'newest'],
+  ['a child that is live without running', [{ ...quiet, hasLiveChildren: true }], {}, 'child waiting', 'newest'],
+  ['a question beside a running thread', [{ ...quiet, state: 'running' }, { ...quiet, id: 'asks', state: 'needs you' }], {}, 'needs you', 'asks'],
+  ['a stopped run', [{ ...quiet, state: 'stopped' }], {}, 'stopped', 'newest'],
+  ['a run that ended with nothing left', [quiet], {}, 'finished', 'newest'],
+  ['no thread at all', [], {}, 'none', undefined],
+])('a build reads its activity from every thread and descendant: %s', (_name, threads, change, kind, thread) => {
+  const activity = partActivity(partWith(threads, change));
+  expect([activity.kind, activity.thread?.id]).toEqual([kind, thread]);
+});
+
+test('a thread running behind a finished one is the thread a part shows, as running', () => {
+  expect(shownThread(partWith([quiet, { ...quiet, id: 'older', hasRunningChildren: true }]))).toMatchObject({ id: 'older', state: 'running' });
+});
+
+test('a finished part folds into history only once nothing of it is still at work', () => {
+  const finished = { status: 'Done', completion: { complete: true, reasons: [] } } as Partial<Item>;
+  expect(isHistory(partWith([quiet], finished))).toBe(true);
+  expect(isHistory(partWith([], finished)), 'no thread is normal').toBe(true);
+  expect(isHistory(partWith([{ ...quiet, hasRunningChildren: true }], finished)), 'background work goes on').toBe(false);
+  expect(isHistory(partWith([quiet])), 'not finished').toBe(false);
 });

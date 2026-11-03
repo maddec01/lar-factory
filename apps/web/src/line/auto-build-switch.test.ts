@@ -49,3 +49,23 @@ test("a refused save leaves the switch as the board has it and says why", async 
   expect(on()).toBe(false);
   expect(text(toast())).toContain("Can't save the Auto-build setting /data/auto-build.json: EACCES.");
 });
+
+const header = () => $('[data-stage="shaping"] header .auto-build')!;
+const holdShown = () => $('[data-stage="shaping"] header [data-auto-build-hold]');
+
+test('the tooltip says how many builds would start now', async () => {
+  await mountPage({ ...live({ on: false }), autoBuildPass: { wouldStart: 2, paused: {}, waitsForRefinement: [] } });
+  expect(header().title).toBe('2 builds would start now.');
+});
+
+test('a hold shows beside the switch while it is on', async () => {
+  await mountPage({ ...live({ on: true }), autoBuildPass: { hold: "Auto-build waits for T3, which the board can't reach.", wouldStart: 1, paused: {}, waitsForRefinement: [] } });
+  expect(header().title).toBe('1 build would start now.');
+  expect(text(holdShown())).toBe("Auto-build waits for T3, which the board can't reach.");
+});
+
+test('with the switch off no hold shows', async () => {
+  await mountPage({ ...live({ on: false }), autoBuildPass: { hold: 'Held.', wouldStart: 0, paused: {}, waitsForRefinement: [] } });
+  expect(holdShown()).toBeNull();
+  expect(header().title).toBe('No builds would start now.');
+});

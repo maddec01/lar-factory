@@ -16,6 +16,7 @@ import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
+import { AutoBuildNote } from './auto-build-note.tsx';
 import { FIGURES_COLUMN, Figures, LINK_COLUMN, ROW_ACTION, ROW_COLUMNS, figuresOf } from './columns.tsx';
 import { threadAtWork, threadsOf } from './dossier-parts.ts';
 import { RowKind, RowSource } from './row-identity.tsx';
@@ -121,7 +122,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
           </span>
         </div>
       )}
-      {['Queued', 'Ready', 'In progress'].includes(item.status) && <div className="pb-2.5 pl-12 pr-3 empty:hidden"><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /></div>}
+      {['Queued', 'Ready', 'In progress'].includes(item.status) && <div className="pb-2.5 pl-12 pr-3 empty:hidden"><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /><AutoBuildNote item={item} data={data} /></div>}
       {slices && <div className="pb-2.5 pl-10 pr-3" data-slices><SliceList item={item} /></div>}
     </li>
   );

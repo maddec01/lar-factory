@@ -43,12 +43,13 @@ export interface PartActivity {
   thread: ItemThread | undefined;
 }
 
-/** Reads every thread of the part, since its newest can have finished while an older one, a child, a background task or a slice works on. */
-export function partActivity(part: Part, working = false): PartActivity {
+/** Reads every thread of the part, since its newest can have finished while an older one, a child, a background task or a slice works on. While `unavailable`, the board can't say what any of them does now, so only a question and `working` count. */
+export function partActivity(part: Part, working = false, unavailable = false): PartActivity {
   const { item } = part;
   const question = openQuestionThread(item);
   if (question) return { kind: 'needs you', thread: question };
   const thread = shownThread(part, working);
+  if (unavailable && !working) return { kind: 'none', thread };
   if (thread?.state === 'running' || working || delegatedWorkRunning(item)) return { kind: 'working', thread };
   const waiting = threadsOf(item).find((t) => !t.observedAt && (t.hasLiveChildren || t.queued));
   if (waiting) return { kind: 'child waiting', thread: waiting };

@@ -25,7 +25,12 @@ const BLOCKERS: { kind: 'decision' | 'concept' | 'build'; start(records: WorkRec
       const concept = records.read(workId).parentId!;
       records.setBody(concept, at(records, concept), 'map', '# Map\n\nSettled.');
     } },
-  { kind: 'concept', start() {}, finish: (records, workId) => void records.setFogGone(workId, at(records, workId), true) },
+  { kind: 'concept', start(records, workId) {
+    const build = records.create({ title: 'Delivery', repository: REPO, kind: 'build' });
+    records.setParent(build.workId, build.revision, workId);
+    records.setPullRequest(build.workId, at(records, build.workId), `${REPO}#91`);
+    records.observe(build.workId, at(records, build.workId), { of: 'pr', state: 'merged' });
+  }, finish: (records, workId) => void records.setFogGone(workId, at(records, workId), true) },
   { kind: 'build',
     start(records, workId) {
       records.setPullRequest(workId, at(records, workId), `${REPO}#90`);

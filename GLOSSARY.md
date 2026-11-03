@@ -68,3 +68,7 @@ _Avoid_: custom label.
 **Managed label**:
 A label the factory reads as meaning, which it hides from rows and locks in settings.
 _Avoid_: required label, system label.
+
+**Validation record**:
+The broad check runs of a build, each with the tree it tested, its outcome and a log reference, plus each reuse of a result with its stated reason. Later roles read it before running a check again.
+_Avoid_: test log, evidence file.

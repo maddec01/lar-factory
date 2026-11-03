@@ -86,7 +86,7 @@ test("a failed fetch says the server can't be reached and keeps the last data", 
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect(warningText($('[data-warning="client-error"]')!)).toEqual(["Can't reach the board server.", 'HTTP 502 Showing the last data this page received.']);
+  expect(warningText($('[data-warning="client-error"]')!)).toEqual(['Board disconnected — showing last received data', 'HTTP 502']);
   expect($$('.desk-card')).toHaveLength(7);
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
@@ -99,7 +99,7 @@ test("the lost server's warning closes, and the next failure after the server an
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
   const close = $<HTMLButtonElement>('[data-warning="client-error"] .dismiss')!;
-  expect(close.getAttribute('aria-label')).toBe("Dismiss: can't reach the board server");
+  expect(close.getAttribute('aria-label')).toBe('Dismiss: board disconnected');
   close.focus();
   await settle(() => close.click());
   expect($('[data-warning="client-error"]')).toBeNull();
@@ -111,7 +111,7 @@ test("the lost server's warning closes, and the next failure after the server an
   await settle(() => vi.advanceTimersByTime(15_000));
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect(warningText($('[data-warning="client-error"]')!)[0]).toBe("Can't reach the board server.");
+  expect(warningText($('[data-warning="client-error"]')!)[0]).toBe('Board disconnected — showing last received data');
 });
 
 test('new data keeps focus', async () => {

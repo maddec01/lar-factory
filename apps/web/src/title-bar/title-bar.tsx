@@ -83,8 +83,8 @@ function Scope() {
   );
 }
 
-type Health = 'waiting' | 'live' | 'stale';
-const DOT = { waiting: 'bg-base-500', live: 'bg-success', stale: 'bg-amber-500' } as const;
+type Health = 'waiting' | 'live' | 'stale' | 'disconnected';
+const DOT = { waiting: 'bg-base-500', live: 'bg-success', stale: 'bg-amber-500', disconnected: 'bg-danger' } as const;
 
 /** How many reads landed after this page opened: a newer `fetchedAt` than the one shown. */
 function useLandedReads(fetchedAt: string | null) {
@@ -98,21 +98,23 @@ function useLandedReads(fetchedAt: string | null) {
   return landed;
 }
 
-function RefreshDetails({ data, now }: { data: BoardData; now: number }) {
+function RefreshDetails({ data, now, clientError }: { data: BoardData; now: number; clientError: string | null }) {
   return (
     <span className="flex flex-col gap-0.5">
       <span data-line>{data.fetchedAt ? `Updated ${shortAgo(data.fetchedAt, now)} · ${clock(data.fetchedAt, undefined)}` : 'Not read yet'}</span>
       <span data-line className="text-base-700">
-        {data.error ? `Last read failed: ${data.error.split('\n')[0]}` : `Checks GitHub for changes every 5s, reads everything every ${data.refreshSeconds}s`}
+        {clientError ? `Board disconnected: ${clientError}` : data.error ? `Last read failed: ${data.error.split('\n')[0]}` : `Checks GitHub for changes every 5s, reads everything every ${data.refreshSeconds}s`}
       </span>
     </span>
   );
 }
 
 /** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. A tab stop, so
- *  keyboard users reach its tooltip. Only the dot changes colour (amber when stale) and only the dot pings. */
+ *  keyboard users reach its tooltip. Only the dot changes colour (amber when stale, red while the page has lost the
+ *  board server) and only the dot pings. */
 function Refreshed({ data }: { data: BoardData }) {
   const { fetchedAt } = data;
+  const clientError = useBoardStore((state) => state.clientError);
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     setNow(Date.now());
@@ -122,7 +124,7 @@ function Refreshed({ data }: { data: BoardData }) {
   const landed = useLandedReads(fetchedAt);
   // A repository whose items haven't landed would show as empty, so the board says it still reads instead.
   const reading = data.firstRead.waiting ?? [];
-  const health: Health = reading.length ? 'waiting' : (isStale(data, now) || data.itemSourceProblems?.length) ? 'stale' : fetchedAt ? 'live' : 'waiting';
+  const health: Health = clientError ? 'disconnected' : reading.length ? 'waiting' : (isStale(data, now) || data.itemSourceProblems?.length) ? 'stale' : fetchedAt ? 'live' : 'waiting';
   const ago = fetchedAt ? shortAgo(fetchedAt, now) : null;
   return (
     <Tooltip>
@@ -136,11 +138,11 @@ function Refreshed({ data }: { data: BoardData }) {
             <span data-dot className={`size-1.5 rounded-full ${DOT[health]}`} />
           </span>
           <span className="@max-[48rem]:sr-only">
-            {reading.length ? 'Loading projects' : !fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
+            {health === 'disconnected' ? (fetchedAt ? <time dateTime={fetchedAt}>Disconnected · {ago}</time> : 'Disconnected') : reading.length ? 'Loading projects' : !fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
           </span>
         </span>
       </TooltipTrigger>
-      <TooltipPopup side="bottom"><RefreshDetails data={data} now={now} /></TooltipPopup>
+      <TooltipPopup side="bottom"><RefreshDetails data={data} now={now} clientError={clientError} /></TooltipPopup>
     </Tooltip>
   );
 }

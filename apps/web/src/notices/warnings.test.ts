@@ -70,7 +70,7 @@ test.each(['empty', 'T3 Code missing'])('server failures stay closed through cha
   expect($(screen === 'empty' ? '[data-empty-state]' : '.tool-missing')).not.toBeNull();
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect(warningText(warning('client-error')!)).toEqual(["Can't reach the board server.", 'HTTP 502 Showing the last data this page received.']);
+  expect(warningText(warning('client-error')!)).toEqual(['Board disconnected — showing last received data', 'HTTP 502']);
   const entry = warning('client-error');
   fetchMock.mockImplementation(async () => new Response('', { status: 503 }));
   await settle(() => vi.advanceTimersByTime(60_000));
@@ -234,4 +234,30 @@ test.each(['item', 'settings'])('closing a focused warning keeps focus in the op
   await settle(() => warning('gh')!.querySelector<HTMLElement>('.dismiss')!.focus());
   await closeWarning('gh');
   expect(dialog.contains(document.activeElement)).toBe(true);
+});
+
+test('while the page has lost the board, the notice shows uncollapsed, freshness stops reading as live, the desk adds no card, and recovery clears it all', async () => {
+  const empty: BoardData = { ...healthy, error: null, fetchedAt: new Date(Date.now()).toISOString(), items: sample.items.filter((i) => i.status === 'Queued') };
+  await mountPage(empty);
+  const dot = () => $('.refreshed [data-dot]')!;
+  const fresh = () => $('.refreshed')!.textContent;
+  expect(dot().className).toContain('bg-success');
+  fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
+  await settle(() => vi.advanceTimersByTime(15_000));
+  const notice = warning('client-error')!;
+  expect(warningText(notice)).toEqual(['Board disconnected — showing last received data', 'HTTP 502']);
+  expect(notice.closest('details'), 'not behind a collapsed summary').toBeNull();
+  expect(dot().className).toContain('bg-danger');
+  expect(dot().className).not.toContain('bg-success');
+  expect($('.refreshed [data-ping]')).toBeNull();
+  expect(fresh()).toContain('Disconnected');
+  expect($$('.desk-card')).toHaveLength(0);
+  expect($('section.desk')!.textContent).toBe('Your deskNothing waited on you at the last read.');
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify({ ...empty, fetchedAt: new Date(Date.now()).toISOString() })));
+  await settle(() => vi.advanceTimersByTime(15_000));
+  expect(warning('client-error')).toBeNull();
+  expect($('[data-board-notices]')).toBeNull();
+  expect(dot().className).toContain('bg-success');
+  expect(fresh()).not.toContain('Disconnected');
+  expect($('section.desk')!.textContent).toBe('Your deskNothing waits on you.');
 });

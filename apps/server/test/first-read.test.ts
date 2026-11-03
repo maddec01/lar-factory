@@ -5,8 +5,9 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import type { BoardData } from '@lar-factory/shared';
+import type { BoardData, ItemStats } from '@lar-factory/shared';
 import { startBoard, until } from './server-support.ts';
+import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 
 const settled = (board: Parameters<typeof until>[0]) => until(board, (d) => d.firstRead.settled);
 
@@ -131,4 +132,26 @@ test('a successful empty repository permits access while another source still re
   assert.deepEqual(early.items, []);
   assert.deepEqual(early.firstRead.waiting, ['maddec01/lar-server', 'maddec01/lar-factory']);
   assert.equal(early.fetchedAt, null);
+});
+
+test('an item with recorded threads shows figures while another repository still reads, and a ticketed record there stays hidden', async (t) => {
+  const apple = 'maddec01/lar-apple';
+  const home = claudeHome(t, { 'session-a': { main: [assistant('a', 0, 0, 0, 7)] }, 'session-b': { main: [assistant('b', 0, 0, 0, 9)] } });
+  const thread = (id: string) => ({ id, sessions: [{ session: `session-${id}`, instance: 'claudeAgent_personal' }], turns: [{ id: `turn-${id}`, startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }] });
+  const hold = await heldReads(t);
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readHold: hold, threads: { [`${apple}#7`]: ['a'], 'maddec01/lar-factory#1': ['b'] },
+    localSetups: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } }, repoIssues: { [apple]: [boardIssue(7, 'List', apple).content] } },
+    false, false, { T3_STATE_DB: statsDb(t, [thread('a'), thread('b')]), T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) });
+  const early = await until(board, (d) => typeof d.items[0]?.stats === 'object');
+  assert.equal(early.firstRead.settled, false);
+  assert.deepEqual(early.items.map((i) => [i.repo, i.number]), [[apple, 7]], 'the ticketed record in the held repository stays hidden');
+  assert.deepEqual(early.items[0]?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 7, provisional: true });
+  assert.equal(early.items[0]?.usageState, 'current');
+  await rm(hold);
+  const data = await until(board, (d) => d.firstRead.settled && d.items.every((i) => typeof i.stats === 'object' && !i.stats.provisional));
+  assert.deepEqual(data.items.map((i) => (i.stats as ItemStats).tokens).sort(), [7, 9], 'the figures settle once the first read does');
+  await board.untilLogged('every item settled');
+  for (const step of ['server listening', 'records shown (1 items)', 'warmup started', 'first item with figures', 'first read settled', 'every item settled']) assert.match(board.logs(), new RegExp(`startup \\d+ ms: ${step.replace(/[()]/g, '\\$&')}`));
+  assert.match(board.logs(), /startup \d+ ms: thread reads complete \(read \d+, failed 0, total \d+\)/);
+  assert.match(board.logs(), /startup \d+ ms: stats read took \d+ ms elapsed, \d+ ms CPU, after warming \d+ transcripts in \d+ ms, longest \d+ ms/);
 });

@@ -114,8 +114,11 @@ test("a warm reads the transcripts of T3's threads not read yet, so the stats re
   vi.stubEnv('T3_STATE_DB', db);
   t.onTestFinished(() => { vi.unstubAllEnvs(); });
   const sources = { ...NOWHERE, db, home };
-  assert.equal(await warmT3Stats(sources), 1, 'only the transcript of a T3 thread');
-  assert.equal(await warmT3Stats(sources), 0);
-  assert.equal(found(loadT3Reads(sources, NOW).stats(['a'])).tokens, 7);
-  assert.equal(await warmT3Stats({ ...sources, db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite') }), 0, 'no database, nothing to read');
+  assert.equal((await warmT3Stats(sources)).files, 1, 'only the transcript of a T3 thread');
+  const warm = await warmT3Stats(sources);
+  assert.equal(warm.files, 0);
+  assert.equal(found(warm.read(NOW).stats(['a'])).tokens, 7);
+  const missing = await warmT3Stats({ ...sources, db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite') });
+  assert.equal(missing.files, 0, 'no database, nothing to read');
+  assert.equal(missing.read(NOW).statsUnavailable, true, 'and its read says so');
 });

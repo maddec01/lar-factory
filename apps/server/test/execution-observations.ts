@@ -1,7 +1,7 @@
 import { executionStats } from '../src/t3/execution-stats.ts';
 import { readFileSync } from 'node:fs';
 import { executionItemThreads } from '../src/t3/item-execution.ts';
-import type { ThreadUsageRead } from '../src/t3/item-execution.ts';
+import type { ThreadReads, ThreadUsageRead } from '../src/t3/item-execution.ts';
 import type { FixtureRequest, FixtureThread } from './stats-db.ts';
 
 export function protocolItemThreads(threadIds: readonly string[]) {
@@ -51,14 +51,31 @@ export function protocolStatsInputs() {
     subagents: threads.flatMap(child => child.rootThreadId === thread.id || child.parentThreadId === thread.id
       ? [child.subagent ?? []].flat().map(run => ({ ...run, childThreadId: child.id, completedAt: run.completedAt ?? null })) : []),
   })));
-  return { ...inputs, allObserved: threads.every(thread => thread.read !== 'never'), familyReads(threadIds: readonly string[]): ThreadUsageRead[] {
-    const family = new Set(threadIds);
-    for (const _ of threads) for (const { id, rootThreadId, parentThreadId } of threads) if (family.has(rootThreadId ?? '') || family.has(parentThreadId ?? '')) family.add(id);
-    return [...family].map((id): ThreadUsageRead => {
-      const thread = threads.find(candidate => candidate.id === id);
-      return !thread || thread.deletedAt ? 'gone' : thread.read ?? 'current';
-    });
-  } };
+  const reads = threadUsage(threads);
+  return { ...inputs, allObserved: threads.every(thread => thread.read !== 'never'), familyReads: (threadIds: readonly string[]) => [...threadFamily(threads, threadIds)].map(reads) };
+}
+
+function threadFamily(threads: FixtureThread[], threadIds: readonly string[]): Set<string> {
+  const family = new Set(threadIds);
+  for (const _ of threads) for (const { id, rootThreadId, parentThreadId } of threads) if (family.has(rootThreadId ?? '') || family.has(parentThreadId ?? '')) family.add(id);
+  return family;
+}
+
+const threadUsage = (threads: FixtureThread[]) => (id: string): ThreadUsageRead => {
+  const thread = threads.find(candidate => candidate.id === id);
+  return !thread || thread.deletedAt ? 'gone' : thread.read ?? 'current';
+};
+
+/** Spawned boards read each fixture thread as its `read` says; with no fixture, T3 can't answer for any of them. */
+export function protocolThreadReads(threadIds: readonly string[]): ThreadReads {
+  let threads: FixtureThread[];
+  try {
+    if (process.env.FAKE_EXECUTION_STATS_UNAVAILABLE === '1') throw Error('Usage unavailable');
+    threads = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
+  } catch { return { reads: new Map(threadIds.map(id => [id, 'failed'])), observed: new Set(), demand() {} }; }
+  const family = [...threadFamily(threads, threadIds)];
+  const reads = threadUsage(threads);
+  return { reads: new Map(family.map(id => [id, reads(id)])), observed: new Set(family.filter(id => ['current', 'failed'].includes(reads(id)))), demand() {} };
 }
 
 export function liveWorktreePaths(): string[] | undefined {

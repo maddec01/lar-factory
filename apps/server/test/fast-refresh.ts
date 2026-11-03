@@ -4,6 +4,7 @@ import { setInterval as realSetInterval } from 'node:timers';
 
 // Every source reads on each refresh tick, active or not.
 if (!process.env.FAST_LOCAL_REFRESH_ONLY) process.env.BOARD_READ_MS ||= process.env.FAST_REFRESH_MS || '100';
+process.env.BOARD_CATCH_UP_MS ||= process.env.FAST_REFRESH_MS || '100';
 
 /** The refresh tick's own interval in server.ts, which FAST_REFRESH_TICKS marks. */
 const REFRESH_TICK_MS = 1_000;

@@ -16,6 +16,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { codexRecords } from './codex-usage.ts';
 import { isObject, parseTimestampMs } from './usage-record.ts';
 import type { UsageRecord } from './usage-record.ts';
@@ -147,17 +148,23 @@ export function transcriptMisses(scan: () => unknown): TranscriptFile[] {
 
 /**
  * Reads each transcript into the cache, one at a time and without blocking between them, so a scan after it reads
- * none: a cold scan of every transcript takes seconds, which the board shouldn't stop for.
+ * none: a cold scan of every transcript takes seconds, which the board shouldn't stop for. Resolves with the longest
+ * one file held the board's thread, in milliseconds, as a file's parsing runs without a break.
  */
-export async function warmTranscripts(files: TranscriptFile[]): Promise<void> {
+export async function warmTranscripts(files: TranscriptFile[]): Promise<number> {
+  let longestMs = 0;
   for (const { path, parse } of files) {
     try {
       const { mtimeMs, size } = await stat(path);
-      cache.set(path, { mtimeMs, size, records: parse((await readFile(path, 'utf8')).split('\n')) });
+      const text = await readFile(path, 'utf8');
+      const start = performance.now();
+      cache.set(path, { mtimeMs, size, records: parse(text.split('\n')) });
+      longestMs = Math.max(longestMs, performance.now() - start);
     } catch {
       // A transcript gone since is read, or left out, by the next scan.
     }
   }
+  return longestMs;
 }
 
 function fileRecords(path: string, parse: (lines: string[]) => UsageRecord[]): UsageRecord[] {

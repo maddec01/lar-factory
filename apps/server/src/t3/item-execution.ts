@@ -83,7 +83,7 @@ let lastArchived: Record<string, unknown>[] = [];
 /** How long one read of the archived list answers. Refresh runs about every 2 seconds. Any recorded thread missing from the active shells asks for the list, so with one the board reads it every 30 seconds for the server's life. */
 const ARCHIVED_READ_MS = 30_000;
 
-let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; demandArchived?(): void; archivedCurrent?(): boolean; archivedAnswered?(): boolean; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; shownShells?: Record<string, unknown>[]; shellIds?: Set<unknown>; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
+let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; demandArchived?(): void; archivedCurrent?(): boolean; archivedAnswered?(): boolean; archivedFailed?(): boolean; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; shownShells?: Record<string, unknown>[]; shellIds?: Set<unknown>; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
 /**
  * The recorded threads as T3 shows them now. While T3 can't be read, each thread's last observation with when the board
  * saw it, or 'unavailable' once one was never seen. Failures never become empty success.
@@ -145,8 +145,10 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
       let archivedFresh = false;
       /** A read answered since a thread last left the active shells. Unlike `archivedFresh`, ageing or a failed reread keeps it, as neither brings a thread back. */
       let archivedAnswered = false;
+      /** The latest read of the archived list failed, so a thread on neither list has no read coming yet. */
+      let archivedFailed = false;
       let archivedEpoch = 0;
-      const forgetArchived = () => { archivedEpoch++; archivedFresh = false; archivedAnswered = false; archivedReadAt = -Infinity; };
+      const forgetArchived = () => { archivedEpoch++; archivedFresh = false; archivedAnswered = false; archivedFailed = false; archivedReadAt = -Infinity; };
       /** The shells a thread lookup shows: the subscribed ones, which win, then the archived list. */
       const showShells = () => {
         state.shownShells = [...state.shells!, ...lastArchived.filter(shell => !state.shellIds!.has(shell.id))];
@@ -155,6 +157,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
       };
       state.archivedCurrent = () => archivedFresh && Date.now() - archivedReadAt < ARCHIVED_READ_MS;
       state.archivedAnswered = () => archivedAnswered;
+      state.archivedFailed = () => archivedFailed;
       state.demandArchived = () => {
         if (!state.available || archivedReading || Date.now() - archivedReadAt < ARCHIVED_READ_MS) return;
         archivedReading = true;
@@ -166,7 +169,8 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
           try {
             if (!threads) throw Error('T3 archived threads unavailable');
             executionItemThreads(threads);
-          } catch { archivedFresh = false; return; }
+          } catch { archivedFresh = false; archivedFailed = startedEpoch === archivedEpoch; return; }
+          archivedFailed = false;
           lastArchived = threads;
           showShells();
           // A thread that left the active shells during the read may be missing from its answer.
@@ -324,6 +328,33 @@ function threadUsageRead(id: string): ThreadUsageRead {
   return executionAvailable(shell) ? 'current' : 'pending';
 }
 
+/** How far the reads of some threads and their lineage descendants have landed, as the usage catch-up paces itself by them. */
+export interface ThreadReads {
+  /** Each thread's read. A thread T3 can't answer for reads as failed, so it holds up no catch-up. */
+  reads: Map<string, ThreadUsageRead>;
+  /** The threads with an observation, whose transcripts a warm can read. */
+  observed: Set<string>;
+  /** Asks for the reads still needed. */
+  demand(): void;
+}
+
+/** Where the reads of `threadIds` stand now, or null while T3 runs with its thread list not yet read. Reads nothing by itself. */
+export function protocolThreadReads(threadIds: readonly string[]): ThreadReads | null {
+  if (!threadIds.length) return { reads: new Map(), observed: new Set(), demand() {} };
+  protocolItemThreads(threadIds);
+  if (current && !current.available && !current.shell) return null;
+  if (!current?.available || !current.reads) return { reads: new Map(threadIds.map(id => [id, 'failed'])), observed: new Set(), demand() {} };
+  const state = current;
+  const shells = (state.shownShells ?? []).filter(shell => !shell.deletedAt);
+  const family = threadFamily(threadIds, shells);
+  const reads = new Map([...family].map((id): [string, ThreadUsageRead] => {
+    const read = threadUsageRead(id);
+    return [id, read === 'never' && state.archivedFailed?.() && !state.shellIds?.has(id) ? 'failed' : read];
+  }));
+  return { reads, observed: new Set([...family].filter(id => state.reads!.get(id)?.observation)),
+    demand: () => state.demand?.(shells.filter(shell => family.has(String(shell.id)))) };
+}
+
 /**
  * What the latest observations can count, with no database fallback for timing facts: a pending thread counts from its last
  * read, and a failed one from its retained observation, so it still takes part in deduplication. Null while T3 runs with its
@@ -339,13 +370,12 @@ export function protocolStatsInputs(threadIds?: readonly string[]): StatsInputs 
   const requested = shells.filter(shell => !wanted || wanted.has(String(shell.id)));
   current.demand?.(requested);
   const observation = (id: string) => current!.reads!.get(id)?.observation;
+  // A warm reads these inputs' transcripts before the stats read that uses them, so a read landing in between waits for the next inputs.
+  const reads = new Map([...wanted ?? requested.map(shell => String(shell.id))].map(id => [id, threadUsageRead(id)]));
   return {
     ...executionStats(requested.flatMap(shell => observation(String(shell.id))?.projection ?? [])),
-    familyReads: ids => [...threadFamily(ids, shells)].map(threadUsageRead),
-    allObserved: [...wanted ?? requested.map(shell => String(shell.id))].every(id => {
-      const read = threadUsageRead(id);
-      return read !== 'never' && (read !== 'failed' || !!observation(id));
-    }),
+    familyReads: ids => [...threadFamily(ids, shells)].map(id => reads.get(id) ?? 'never'),
+    allObserved: [...reads].every(([id, read]) => read !== 'never' && (read !== 'failed' || !!observation(id))),
   };
 }
 

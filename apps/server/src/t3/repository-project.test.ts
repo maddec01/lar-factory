@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
-import { anyOnAzureDevOps, azureRepo, linkedWorktree, onAzureDevOps, repositoryProjectReads } from './repository-project.ts';
+import { anyOnAzureDevOps, azureRepo, linkedWorktree, observedCheckouts, onAzureDevOps, repositoryProjectReads } from './repository-project.ts';
 import { checkouts } from '../../test/repo-support.ts';
 import { projectsDb } from '../../test/stats-db.ts';
 
@@ -16,6 +16,27 @@ const AZURE = [
   'contoso@vs-ssh.visualstudio.com:v3/contoso/Fabrikam/lar-api',
 ];
 const GITHUB = ['https://github.com/maddec01/lar-factory.git', 'git@github.com:maddec01/lar-factory.git', 'ssh://git@github.com/maddec01/lar-factory'];
+
+const gits = vi.hoisted(() => ({ running: 0, most: 0 }));
+vi.mock('../tools/run-tool.ts', async (actual) => {
+  const { runTool } = await actual<typeof import('../tools/run-tool.ts')>();
+  return { runTool: async (...args: Parameters<typeof runTool>) => {
+    gits.most = Math.max(gits.most, ++gits.running);
+    try { return await runTool(...args); } finally { gits.running--; }
+  } };
+});
+
+test('a few checkouts read their origins at a time, each keeping its own', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-origins-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  const names = Array.from({ length: 12 }, (_, i) => `repo-${i}`);
+  checkouts(home, Object.fromEntries(names.map((name) => [name, `https://github.com/maddec01/${name}`])));
+  const projects = names.map((name) => ({ id: name, title: name, workspaceRoot: join(home, 'Developer/lar', name), faviconPath: null, projectIcon: null }));
+  gits.most = 0;
+  const found = await observedCheckouts({ projects, observedAt: '2026-11-03T00:00:00Z' });
+  assert.deepEqual(found.map(({ id, origin }) => [id, origin]), names.map((name) => [name, `https://github.com/maddec01/${name}`]));
+  assert.ok(gits.most <= 4, `${gits.most} git processes ran at once`);
+});
 
 test('only a small regular .git file can name a linked worktree', (t) => {
   const folder = mkdtempSync(join(tmpdir(), 'lar-dot-git-'));

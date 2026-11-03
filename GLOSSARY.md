@@ -57,6 +57,10 @@ _Avoid_: In progress slice.
 A T3 thread recorded for an item's work that T3 confirms no longer exists.
 _Avoid_: missing thread, lost thread.
 
+**Thread family**:
+A work record's T3 threads and their lineage descendants. An item's usage is complete only when its whole thread family has been read.
+_Avoid_: thread tree, thread group.
+
 **Start again**:
 Opening a new thread for work whose thread was deleted, keeping the work ID.
 _Avoid_: restart, retry.

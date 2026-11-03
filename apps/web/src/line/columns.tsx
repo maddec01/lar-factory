@@ -25,8 +25,8 @@ export const figuresOf = (item: Item, data: BoardData, total?: boolean): ItemSta
 };
 
 /** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. Its tooltip says when they are the last ones seen. */
-export function Figures({ s }: { s: ItemStats | null }) {
-  const lastKnown = useLastKnown();
+export function Figures({ s, item }: { s: ItemStats | null; item: Item }) {
+  const lastKnown = useLastKnown(item);
   if (!s || !hasFigures(s)) return <span />;
   const text = [duration(s.agentMs), formatTokens(s.tokens), s.costUsd !== undefined ? formatUsd(s.costUsd) : null].filter(Boolean).join(' · ');
   return <span className="truncate text-right text-[11px] tabular-nums text-(--muted-foreground)" title={s.frozen ? 'Agent time · tokens · cost, as it stood at merge' : `Agent time · tokens · cost${lastKnown ? `. ${lastKnown}` : ''}`}>{text}</span>;

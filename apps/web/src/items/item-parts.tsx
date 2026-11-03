@@ -116,11 +116,15 @@ export function PrList({ item }: { item: Item }) {
   );
 }
 
-/** While T3's usage can't be read, the sentence that says shown figures are the ones last seen; otherwise null. */
-export function useLastKnown(): string | null {
+/**
+ * While usage can't be read for this item, or for any, the sentence that says shown figures are the ones last seen; otherwise
+ * null. The whole board's last read says when only while it fails, as a read that works says nothing of a failing family.
+ */
+export function useLastKnown(item: Item): string | null {
   const read = useBoardStore((state) => state.data.usageRead);
-  if (!read || read.readable) return null;
-  const at = read.readAt ? ` from ${day(read.readAt, undefined)}, ${clock(read.readAt, undefined)}` : '';
+  const unreadable = read?.readable === false;
+  if (!unreadable && item.usageState !== 'failed') return null;
+  const at = unreadable && read.readAt ? ` from ${day(read.readAt, undefined)}, ${clock(read.readAt, undefined)}` : '';
   return `Last known figures${at}: T3 Code's usage can't be read now.`;
 }
 
@@ -133,7 +137,7 @@ export const hasFigures = (s: ItemStats) => Boolean(s.agentMs || s.wallMs || s.t
  * it last saw, and the line says so. `stats` shows other figures than the item's own.
  */
 export function AgentWork({ item, stats: s = item.stats, label, className = '' }: { item: Item; stats?: ItemStats | 'unavailable'; label?: string; className?: string }) {
-  const lastKnown = useLastKnown();
+  const lastKnown = useLastKnown(item);
   if (!s || s === 'unavailable' || !hasFigures(s)) return null;
   const old = !s.frozen ? lastKnown : null;
   const figures: [label: string, value: string, unit: string][] = [];
@@ -148,17 +152,19 @@ export function AgentWork({ item, stats: s = item.stats, label, className = '' }
 }
 
 /** Whether T3's usage can't be read for this item: an item known to have no thread has none to lose. */
-export const usageUnreadable = (item: Item): boolean => item.stats === 'unavailable' && !(Array.isArray(item.threads) && !item.threads.length);
+export const usageUnreadable = (item: Item): boolean => (item.stats === 'unavailable' || item.usageState === 'failed' && !(item.stats && hasFigures(item.stats)))
+  && !(Array.isArray(item.threads) && !item.threads.length);
 
 /** The line that says why there are no agent work figures: no T3 thread worked on the item, or T3's database can't be read. */
 export function AgentWorkNote({ item }: { item: Item }) {
   const hasThread = Array.isArray(item.threads) && item.threads.length > 0;
   const s = usageUnreadable(item) ? 'unavailable' : hasThread ? item.stats : undefined;
-  if (s && s !== 'unavailable') return null;
+  // Known figures answer for an item still loading; none, or all zeros, say no more than having none.
+  if (s && s !== 'unavailable' && (item.usageState !== 'loading' || hasFigures(s))) return null;
   // A settled decision may have no thread of its own, which is nothing to wait for.
   if (!s && !hasThread && item.kind === 'decision' && isDone(item)) return null;
   const none = item.kind === 'concept' ? 'No T3 thread of its own.' : 'No T3 thread has worked on this yet.';
-  return <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : none}</p>;
+  return <p className="m-0 text-xs text-(--muted-foreground)">{s === 'unavailable' ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : none}</p>;
 }
 
 export const KIND_BADGES: Partial<Record<Kind, { name: string; icon: LucideIcon; hue: number }>> = {

@@ -108,6 +108,16 @@ test('a failed usage read tells the board, so kept figures can say they are last
   assert.equal((await until(board, (d) => d.usageRead !== undefined)).usageRead?.readable, false);
 });
 
+test('a failed usage read stays unreadable through the refreshes that read no usage, and never reads as loading', async (t) => {
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['build'] }, items: [boardIssue(12, 'Review'), boardIssue(13, 'Review')] }, false, true, { T3_STATE_DB: join(tmpdir(), 'lar-no-such-t3-database') });
+  await until(board, (d) => d.usageRead?.readable === false && d.items.some((i) => i.number === 12 && i.stats === 'unavailable'));
+  // The thread refreshes between usage reads rewrite the items, every 100 ms here.
+  await new Promise((r) => setTimeout(r, 1_000));
+  const later = await until(board, (d) => d.fetchedAt !== null);
+  assert.equal(later.items.find((i) => i.number === 12)?.stats, 'unavailable');
+  assert.equal(later.items.find((i) => i.number === 13)?.stats, undefined, 'work with no thread has no usage to report missing');
+});
+
 test("a build's slices show their records' progress, and its build sub-issue stays a board item", async (t) => {
   const repository = { nameWithOwner: 'maddec01/lar-factory' };
   const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/lar-factory/issues/${number}`,

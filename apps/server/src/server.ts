@@ -316,11 +316,13 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   return items.map((item) => {
     if (item.recorded === false) return item;
     const overcounted = withStats && overcountedStats.has(item.id);
-    const known = overcounted ? undefined : retainStats(previousStats.get(item.id), item.stats);
-    const live = fresh ? stats(threadIds(item.id)) : withStats && threadIds(item.id).length ? 'unavailable' : item.stats;
+    const previous = overcounted ? undefined : previousStats.get(item.id);
+    const known = overcounted ? undefined : retainStats(previous, item.stats);
+    // Until transcripts are first read, no usage read has failed: the item's figures are still to come.
+    const live = fresh ? stats(threadIds(item.id)) : overcounted ? undefined : item.stats;
     // An item the board just changed carries its old stats until a read reports the change.
     if (overcounted && fresh && live !== 'unavailable' && !board.changing(item.id)) overcountedStats.delete(item.id);
-    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known, threads: threads(item.id) };
+    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known ?? previous, threads: threads(item.id) };
     shown.slices = item.slices.map((slice): typeof slice => {
       if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
       const ids = slice.workId && records ? records.threads(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];

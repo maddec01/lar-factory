@@ -62,7 +62,7 @@ export async function releasePath(path: string, owner: Owner): Promise<void> {
   try { await unlink(path); } catch (error) { if (!missing(error)) throw error; }
 }
 /** The file `owner` writes under `base` before linking it to a lock path. */
-export const ownerFile = (base: string, owner: Owner): string => `${base}.owner.${owner.pid}.${owner.token}`;
+const ownerFile = (base: string, owner: Owner): string => `${base}.owner.${owner.pid}.${owner.token}`;
 
 /** Writes `owner` whole to its owner file under `base` and returns that file's path. */
 export async function writeOwnerFile(base: string, owner: Owner): Promise<string> {

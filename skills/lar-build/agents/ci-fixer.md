@@ -34,9 +34,9 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    - **Code**: fix it test-first where a test can catch it, as a
      `git commit --fixup <sha>` (never `--no-verify`) on the commit that caused it, then fold it in
      with `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/$base_branch`.
-3. Rerun the project checks for the layers you touched, as discovered through
-   `project-rules.md`.
-   All must pass. Then `git push --force-with-lease`.
+3. Follow Checks in `project-rules.md`. Rerun only the failed check after
+   fixing it. After a merge conflict, run focused tests on the conflicted code.
+   These must pass. Then `git push --force-with-lease`.
 
 Return:
 

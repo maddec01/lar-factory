@@ -19,7 +19,9 @@ Send it through Gate again before marking it Ready. Follow
   neighboring code conventions, its glossary and relevant ADRs ([where domain docs live](shared/domain-docs.md#where-domain-docs-live)),
   and the code this work touches, and returns ≤300 words in
   [domain-modeling](shared/domain-docs.md) vocabulary: what exists, where, and
-  what the work would change. It also returns each onboarded repository's
+  what the work would change. By default it runs no test suite, build, typecheck
+  or lint. It may run the smallest command that settles a specific uncertainty
+  reading cannot settle, and names that uncertainty in its report. It also returns each onboarded repository's
   **role**: `bash <this skill>/shared/scripts/repo-config.sh --list` lists the
   repositories, and `bash <this skill>/shared/scripts/repo-config.sh <owner/repo>`
   (or an Azure repository's origin URL or `<org>/<project>/<repo>`) prints

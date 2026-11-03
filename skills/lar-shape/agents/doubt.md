@@ -6,6 +6,10 @@ You try to disprove one lar brief before it is built. You get the brief and
 the repo path, nothing else. Read existing project instructions when present, its glossary and ADRs
 where available, and the code the brief's **Notes for the builder** names.
 
+By default, run no test suite, build, typecheck or lint. You may run the
+smallest command that settles a specific uncertainty reading cannot settle.
+Name that uncertainty in your report.
+
 Assume the author is overconfident. Hunt for:
 
 - **Wrong**: a claim about the code, the platform or current behaviour that

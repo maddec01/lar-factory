@@ -30,6 +30,15 @@ options against the request; report a capability mismatch, never downgrade.
 - Every prompt names the work ID it serves and carries the factory report
   rule: ≤300 words, no whole files, logs or screenshots.
 
+## Recover unfinished work
+
+When a delegated task ends, errors or is cancelled before finishing, read what
+it left. List what is proven and what is missing, and delegate only the missing
+part. An earlier result stays valid on the identical tree, or when you read the
+diff since it ran and state why that diff cannot affect the result. Otherwise
+rerun that part. The full check step, the approver and re-slicing a blocked slice
+keep their own rules.
+
 ## Roles
 
 - **Implementer**: worktree child task; it first runs

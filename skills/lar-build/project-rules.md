@@ -9,7 +9,7 @@ setup PR.
 
 When instructions are absent, infer conventions from neighboring code and
 existing tests. Inspect package scripts, manifests and CI to select test,
-typecheck, lint and build commands for the changed layers. Use those commands
+typecheck, lint and build commands. Use those commands under Checks below
 where later steps say "project checks". A full check suite means the applicable
 project suite discovered here. Missing instructions never block work.
 
@@ -26,6 +26,21 @@ given in the session.
 
 Read the local domain-doc setting per
 [where domain docs live](shared/domain-docs.md#where-domain-docs-live).
+
+## Checks
+
+While writing code, run focused tests on what changed, plus typecheck and lint
+when they take seconds. The builder's full check step runs whole suites once
+per build. That run meets project instructions asking for a suite on each
+change. Another agent may run a broad check earlier only by naming what focused
+tests cannot catch. A failed check counts as a run; its fixer reruns that check
+alone. Commit hooks still run.
+
+Run a build only when opening the app or running a focused test needs it, and
+only when the code changed since the last build or no build exists yet. No agent
+runs a build as a check, except a project check that is itself a build still
+runs at the full check step, in the approver's checks and when rerunning a failed
+check.
 
 ## Base branch
 

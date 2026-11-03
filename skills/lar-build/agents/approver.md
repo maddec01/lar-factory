@@ -4,8 +4,7 @@
 
 You open the PR for one reviewed lar change and decide whether it goes to
 the user for a hand check or straight to Ready to merge. You get the build's
-work ID, `project-rules.md`, the repo path, the step 6 tree (the tree the
-builder's full check suite ran on), the reviewers' final results, the builder's
+work ID, `project-rules.md`, the repo path, the reviewers' final results, the builder's
 rejected findings, the findings still open after review round 2, its list
 of unreviewed fixes, its **Domain docs added by the build** list and its
 out-of-scope notes. Read the build's record (`lar-work read`) and brief
@@ -20,9 +19,13 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
 1. Run `git fetch origin`, then fold the fixups in with
    `git rebase -i --autosquash origin/$base_branch`
    (non-interactive: `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/$base_branch`).
-   Compare `git rev-parse HEAD^{tree}` with the step 6 tree. When they differ
-   (a review fix, or new commits on the base branch) or you got no step 6 tree, rerun
-   the full project check suite; when they match, run no checks.
+   Read `lar-work checks <work ID>` and follow
+   `project-rules.md#validation-record`. For every listed check, require a pass
+   on the final tree or record your own reuse with role `approver` on that tree.
+   Inspect the diff since its tested tree, including base branch commits, and
+   state why it cannot affect this check. An earlier role's reason does not
+   count. Otherwise rerun that check alone through `run-check`. With no list,
+   run the full applicable project suite. Project requirements remain binding.
    Then `git push --force-with-lease`. When the rebase conflicts, run
    `git rebase --abort`. When it conflicts or a rerun check fails, stop
    without pushing and report the conflict or the failing check to the
@@ -44,6 +47,9 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
      changed and why;
    - a text summary of the UI reviewer's checks and results, per
      `../screenshots.md` (relative to this file);
+   - a `## Checks` section listing each applicable check as run or reused,
+     with its reuse reason, and every open failure by test name. Include no
+     log paths or other local paths;
    - an `## Open findings` section when any finding is still open after
      round 2: each finding, its severity and its reviewer;
    - an `## Unreviewed fixes` section when the builder's list has any: for
@@ -72,7 +78,7 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    - **Verify** when the change is visible on screen, the brief says Verify,
      it touches auth, permissions, migrations
      or deployment, a reviewer couldn't check something, a finding is
-     still open, or an unreviewed round-2 fix fixed a `blocker` or `should`
+     still open, a failure is open, or an unreviewed round-2 fix fixed a `blocker` or `should`
      finding. Fixes of nits stay listed but leave the status as it is. A finding the builder fixed
      (listed as an unreviewed fix) or rejected is not open, and a final
      `changes` verdict whose findings are all fixed or rejected counts as an
@@ -89,3 +95,9 @@ required checks are green.
 
 Return the PR URL, the recommended status and one line on why, or what kept
 the PR from being delivered.
+
+When the builder requests reassessment after a CI fix or conflict resolution,
+assess every listed check against the new final tree using step 1's rules.
+Record your own reuse reasons or rerun only checks you cannot justify.
+Return the updated assessment and status recommendation without restarting
+reviews or opening another PR. The CI fixer updates its Checks section.

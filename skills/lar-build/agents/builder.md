@@ -44,8 +44,12 @@ Build step 1 and plan from the brief.
 - **Project rules**: every prompt carries `<lar-build>/project-rules.md`.
 - **Fixer**: commits on the build branch here as `git commit --fixup <sha>`
   (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
-  never `--no-verify`, and follows Checks in `<lar-build>/project-rules.md`, rerunning only the
-  failed check when fixing a check failure. Its prompt carries
+  never `--no-verify`. It follows Checks in `<lar-build>/project-rules.md`,
+  uses focused tests for its change and reruns the
+  failed check through `run-check`, even when broad. It does not rerun other
+  broad checks merely because their files or layers changed. Follow
+  `project-rules.md#validation-record` for recording and diagnosing failures.
+  Its prompt carries
   `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
 
 ## Build
@@ -122,12 +126,16 @@ Build step 1 and plan from the brief.
    Keep a list of each, headed **Domain docs added by the build**,
    current through review fixes, for the reviewers and approver. With domain
    docs OFF, leave this list empty and offer no later publication.
-6. A subagent runs the full project check suite, once, on the build
-   branch HEAD, and returns that commit's tree (`git rev-parse HEAD^{tree}`):
-   the step 6 tree. Failures go to the fixer. All must pass. A fix for a
-   failing step 6 check reruns only that failed check, and the step 6 tree
-   stays the tree the full suite ran on, so the approver finds a changed tree
-   and reruns the full suite.
+6. A check subagent reads `project-rules.md#validation-record` and saves the
+   applicable checks with `lar-work set-check-list <work ID> --file <file>`.
+   The JSON list contains each command and folder, selected from project rules
+   and the diff, leaving out suites the diff cannot reach. It runs every listed
+   check for real once on the integrated branch through `run-check`, reusing
+   only results from the identical tree. It names failures before retries.
+   You own every open failure and make one diagnosis attempt, through the
+   Fixer when helpful. The Fixer reruns the failed check after a fix; it does
+   not repeat unrelated suites. Close failures with their cause or fix.
+   All checks must pass; an unexplained failure that later passed stays open.
 7. Push the branch. Don't open the PR yet.
 
 Ordinary questions to the user follow `<lar-build>/shared/questions.md`: Needs you,
@@ -145,8 +153,8 @@ followed by the handoff,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
 The handoff names the step and review round to resume at. For a Small build
 it says `Small build` and whether the change is done, so the next thread skips
-**Plan** instead of reading no slices as not planned. Once step 6 has run it
-names the step 6 tree, and it carries the **Domain docs added by the build**
+**Plan** instead of reading no slices as not planned. It carries the
+**Domain docs added by the build**
 list. At a review round, `lar-work review-rounds` already holds each round's
 base, verdicts and findings; the handoff adds the unreviewed fixes so far,
 each as the line **Approve** describes, and every UI app report so far,
@@ -225,8 +233,8 @@ what its report names and stops only the ones that do.
 ## Approve
 
 Start the **Approver subagent** with `approver.md`,
-`<lar-build>/project-rules.md`, the build's work ID, the repo path, the step 6
-tree, every reviewer's final result, your rejected findings, the findings still
+`<lar-build>/project-rules.md`, the build's work ID, the repo path, every reviewer's final result,
+your rejected findings, the findings still
 open after round 2, the unreviewed fixes, the **Domain docs added by the
 build** list and the out-of-scope notes. An unreviewed fix is a round-2 fix;
 list each as a line naming the finding, its severity and its reviewer. It opens
@@ -257,8 +265,12 @@ or `running` while it runs. Then:
   `unwatch_pull_request`, go to **Retro**.
 - **A required check failed, or the branch conflicts**: start a **CI fixer
   subagent** with `ci-fixer.md`, the build's work ID, repo path, PR URL and
-  the failing check (or "merge conflict"). The watch stays; end your turn when
-  it returns.
+  the failing check (or "merge conflict"). The watch stays. If the fix or conflict resolution changed the final tree,
+  obtain an updated Approver assessment of every listed check against that
+  tree before handback. It records its own reuse reasons or reruns only checks
+  it cannot justify, without restarting reviews or repeating unaffected checks.
+  Then have the CI fixer update the PR's Checks section from the record and
+  use the updated status recommendation. Then end your turn.
 - **Anything else** (checks running, a comment or review, a non-required check
   failing, a run cancelled by a newer run on the same head):
   end your turn. Non-required checks never block the status or start a fix.

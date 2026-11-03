@@ -11,7 +11,8 @@ When instructions are absent, infer conventions from neighboring code and
 existing tests. Inspect package scripts, manifests and CI to select test,
 typecheck, lint and build commands. Use those commands under Checks below
 where later steps say "project checks". A full check suite means the applicable
-project suite discovered here. Missing instructions never block work.
+project suite discovered here, limited to checks the diff can reach. Project
+requirements remain binding. Missing instructions never block work.
 
 Take extra coding guidance from the project skills selected for this build.
 `lar-work read <build work ID> | jq -r '.skills[]'` prints the Start build snapshot.
@@ -51,3 +52,48 @@ refreshing it with `git remote set-head origin --auto` when absent. Keep the
 resolved name as `base_branch` and pass it to implementers, reviewers and the
 approver. Substitute it in every diff, rebase and PR target below. Never assume
 a repository's default branch is named `main`.
+
+## Validation record
+
+Before running or reusing a package-wide or wider check, read
+`lar-work checks <work ID>`. Implementers, the Small build builder, Fixers,
+the CI fixer and later roles run broad checks through
+`lar-work run-check <work ID> --role <role> [--live] [--reason <reason>] -- <command>`.
+Run it in the check's folder. Focused tests on named files stay outside the
+record. These rules do not require additional implementer checks.
+
+Keep the checkout free of edits while validation runs. Only a recorded pass
+with stable, available start and end trees is evidence. Interrupted or
+unfinished runs stay visible and must be rerun; they are not failures.
+Never reuse a run known to overlap temporary edits, even if its trees match.
+A missing record is no evidence. If the tested tree object is gone, rerun.
+Trees exclude ignored files, including installed dependencies and built assets,
+and installed tools. Rerun affected checks when you know these changed or
+when a check reads stale built assets, even on an identical tree.
+
+For a non-live pass, inspect the diff from its tested tree to the current tree.
+Record justified reuse with
+`lar-work reuse-check <work ID> --check <check ID> --role <role> --reason <reason>`.
+Match the applicable list by exact command and folder. A live result counts
+for another role only on the identical tree within 24 hours of its end;
+never use `reuse-check` for it. Rerun expired live checks.
+
+Before retrying a failed run, the agent that saw it names the failing tests
+and adds a short diagnosis with `lar-work describe-failure <check ID> --file <file>`.
+Use the command's help for the file format. Diagnostic retries target those
+tests. After a fix, rerun the failed check, even if broad, without repeating
+unrelated suites. A later pass does not close the failure.
+The builder owns every open failure and makes one diagnosis attempt, using
+the Fixer when helpful. Close a failure only with a cause or fix, using
+`lar-work resolve-failure <check ID> --reason <reason>`.
+A check that still fails stops the build. Only a failure that later passed
+with no cause found may reach the PR as open.
+
+### Reviewer checks
+
+Code, security and performance reviewers read the validation record before
+checking. Before a broad run, record its reason with `run-check --reason`:
+no result covers the reviewed tree, a named reuse reason is disputed, or a
+concrete concern needs that check. State which reason applies and use the
+narrowest command that answers it. Focused tests remain free. Leave the
+worktree as you found it. The UI reviewer still runs no test suites.

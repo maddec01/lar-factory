@@ -121,6 +121,8 @@ export interface ItemCommandsDeps {
   records: WorkRecords | null;
   /** Shows the work records as they are now, after a write or a refused one. */
   reread(): void;
+  /** Shows the writes of the board's own observations it doesn't show yet, so a write at a shown revision isn't refused for them. */
+  showObservations?(): void;
   /** Archive's work as the records are now: set aside, or finished and hidden by retention. */
   archive(): Item[];
   /** Reads the model choices T3 offers now into the board data. */
@@ -233,7 +235,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     const checkout = (await checkouts(process.env)).find(p => p.id === projectId);
     if (!checkout) throw new Error('Cannot find the repository checkout.');
     return checkout.folder;
-  }, clearedFailuresFile = null, board, items, records, reread, archive, offerModelChoices, checkSkills, kindTracker, projectOf = currentRepositoryProject,
+  }, clearedFailuresFile = null, board, items, records, reread, showObservations = () => {}, archive, offerModelChoices, checkSkills, kindTracker, projectOf = currentRepositoryProject,
   baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
   buildAccessOf = (repo) => readRepositorySetups().find(setup => sameRepo(setup.repo, repo))?.access ?? {},
   showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, shapingThreadCleanupChoice = readShapingThreadCleanup, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
@@ -359,6 +361,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
   }
 
   function move(itemId: string, { action, from, to, refused }: Move): Reply {
+    showObservations();
     const item = board.find(itemId);
     if (!item) return reply(404, { error: GONE });
     if (item.status === to) return withBoard(200, { error: null });
@@ -669,6 +672,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
 
   /** Moves the item's parent record to In progress, unless it's a build or there already: the error to show, else null. */
   function parentInProgress({ parentId }: Item): string | null {
+    showObservations();
     const parent = parentId ? board.find(parentId) : undefined;
     if (!parent || parent.kind === 'build' || parent.status === 'In progress') return null;
     return setStatus(parent, 'In progress')?.error ?? null;
@@ -980,6 +984,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     })),
 
     async abandon(itemId) {
+      showObservations();
       const item = board.find(itemId);
       // A second press after Abandon finished has nothing left to do.
       if (!item && board.removed(itemId)) return withBoard(200, { error: null });

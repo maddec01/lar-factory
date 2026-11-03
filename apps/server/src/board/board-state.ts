@@ -11,6 +11,8 @@ export interface BoardState {
   update(fields: Partial<BoardData>): void;
   /** The revision a read starting now runs against; pass it to applyRead. */
   revision(): number;
+  /** A count that moves each time a read or a change made through the board reaches the items. */
+  applied(): number;
   /**
    * Takes in the items a read started at `since` got from GitHub, keeping each change
    * this board made until GitHub reports it. Abandoned items stay hidden until their provider reports a newer open version.
@@ -38,6 +40,7 @@ const sameStatuses = (a: Item, b: Item) => a.statuses.join() === b.statuses.join
 export function createBoardState(initial: BoardData): BoardState {
   const state = initial;
   let revision = 0;
+  let applied = 0;
   /** Items this board just created or moved, shown as changed until GitHub reports the change. */
   const recentItems = new Map<string, { item: Item; revision: number; unconfirmedReads: number }>();
   /** Abandoned items stay hidden while reads still report their old version. */
@@ -52,7 +55,9 @@ export function createBoardState(initial: BoardData): BoardState {
     snapshot: () => state,
     update: (fields) => void Object.assign(state, fields),
     revision: () => revision,
+    applied: () => applied,
     applyRead(items, since, enrich, afresh = () => true) {
+      applied++;
       for (const [id, recent] of recentItems) {
         if (since < recent.revision || !afresh(recent.item)) continue;
         // Give GitHub three reads of the item's source to expose the change, then trust what it reports.
@@ -68,11 +73,13 @@ export function createBoardState(initial: BoardData): BoardState {
     },
     showChanged(item) {
       if (abandoned.has(item.id)) return;
+      applied++;
       recentItems.set(item.id, { item, revision: ++revision, unconfirmedReads: 0 });
       state.items = [...state.items.filter((i) => i.id !== item.id), item];
       push();
     },
     remove(itemId) {
+      applied++;
       abandoned.set(itemId, { item: state.items.find((i) => i.id === itemId), revision: ++revision });
       recentItems.delete(itemId);
       state.items = state.items.filter((i) => i.id !== itemId);

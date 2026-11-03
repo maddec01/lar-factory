@@ -15,6 +15,7 @@ import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
 import { createBoardState } from './board/board-state.ts';
 import { coalesced } from './board/coalesced.ts';
+import { showInTurns } from './board/show-in-turns.ts';
 import { readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { observePr } from './config/pr-host.ts';
 import { changeRepositoryLabels } from './config/repository-labels.ts';
@@ -32,7 +33,7 @@ import { createLimitSettings } from './items/limit-setting.ts';
 import { createAutoBuild } from './auto-build/auto-build.ts';
 import { createAutoBuildSetting } from './auto-build/auto-build-setting.ts';
 import { createShapingThreadCleanup, createShapingThreadSweep, shapingThreadCleanupProblems } from './items/shaping-thread-cleanup.ts';
-import { agreedKind, archivedItems, recordItems, ticketsByReference } from './items/record-items.ts';
+import { agreedKind, archivedItems, recordItems, recordItemsInTurns, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
@@ -42,7 +43,7 @@ import { projectChoices } from './onboarding/project-choices.ts';
 import { detectSetup } from './onboarding/detect-setup.ts';
 import { saveSetup } from './onboarding/save-setup.ts';
 import { loadBuild } from './page/page.ts';
-import { loopTrace } from './startup/loop-trace.ts';
+import { loopTrace, nextTurn } from './startup/loop-trace.ts';
 import { recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
@@ -153,15 +154,27 @@ const ticketOf = (item: Item): Item | undefined => (item.number ? ticketsByRef.g
  * affects waits, as the rows' setups say.
  */
 function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tickets, waiting: unread }): Item[] {
+  const args = recordArgs(read);
+  return args ? loopTrace.span('records', () => recordItems(...args)) : [];
+}
+
+/** recordedItems, mapping the records in turns of the event loop. */
+async function recordedItemsInTurns(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tickets, waiting: unread }): Promise<Item[]> {
+  const args = recordArgs(read);
+  return args ? recordItemsInTurns(...args, nextTurn) : [];
+}
+
+/** Keeps `read`'s tickets for later and gives what recordItems reads the records with, or null with no records. */
+function recordArgs(read: Pick<ItemsRead, 'items' | 'waiting'>) {
   if (read.items !== tickets) ticketsByRef = ticketsByReference(read.items);
   tickets = read.items;
   unread = read.waiting ?? [];
-  if (!records) return [];
+  if (!records) return null;
   const repos = items.repos().map((r) => r.repo);
   const hidden = retention.hidden();
   board.update({ retention: retention.state(), shapingThreadCleanup: shapingThreadCleanup.state(), heavyCommandLimit: heavyCommandLimit.state(), buildLimit: buildLimit.state(), autoBuild: autoBuild.state() });
   const setups = board.snapshot().repos.flatMap((r) => r.setup ? [r.setup] : []);
-  return loopTrace.span('records', () => recordItems(records!, tickets, repos, unread, hidden, setups));
+  return [records, tickets, repos, unread, hidden, setups] as const;
 }
 
 /** Archive's work as the records are now, with the last tickets read: set aside, or finished and hidden by retention. */
@@ -493,14 +506,20 @@ function refreshLocal(recordsChanged = false): void {
   runLocal(() => loopTrace.span('local refresh', () => refreshLocalNow(recordsChanged)));
 }
 
-function refreshLocalNow(recordsChanged: boolean): void {
+async function refreshLocalNow(recordsChanged: boolean): Promise<void> {
   if (refreshing && !recordsChanged) return;
   void t3Availability().then(source => {
     board.update({ t3Availability: source });
     board.push();
   });
   const before = board.snapshot().items;
-  if (board.snapshot().fetchedAt !== null || before.length) showRecords();
+  if (board.snapshot().fetchedAt !== null || before.length) await showRecordsInTurns();
+  // What the refresh showed is checked in a turn of its own.
+  await nextTurn();
+  loopTrace.span('local refresh', () => afterLocalRefresh(before, recordsChanged));
+}
+
+function afterLocalRefresh(before: Item[], recordsChanged: boolean): void {
   if (Date.now() - statsReadAt >= LOCAL_STATS_MS && !usageCatchUp?.reading()) askForStats();
   const after = board.snapshot().items;
   const running = (item: Item) => Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running');
@@ -538,9 +557,24 @@ function showTicketType(item: Item, type: string): void {
   board.push();
 }
 
+/** The observations' writes so far, and how many of them the board shows; a command shows the rest before it writes at a shown revision. */
+let observations = 0;
+let shownObservations = 0;
 /** Shows the work records as they are now with the last tickets read, and their T3 threads; stats only when `withStats`. */
 function showRecords(withStats = false): void {
+  shownObservations = observations;
   board.applyRead(recordedItems(), board.revision(), (shown) => withT3Reads(shown, withStats));
+  if (board.snapshot().items.length > 0) moveFirstRead({ ready: true });
+  recordsShown();
+}
+
+/** showRecords for the board's own refreshes, in turns of the event loop, which a command's change needn't wait for. */
+async function showRecordsInTurns(): Promise<void> {
+  const seen = observations;
+  await showInTurns(board, () => recordedItemsInTurns(), null, (read) => {
+    board.applyRead(read, board.revision(), (shown) => withT3Reads(shown));
+    shownObservations = seen;
+  });
   if (board.snapshot().items.length > 0) moveFirstRead({ ready: true });
   recordsShown();
 }
@@ -750,7 +784,8 @@ async function refresh(): Promise<void> {
       const refs = new Set(ticketsByReference(fresh).keys());
       specWorkIds = records.list({}).filter(record => record.ticket && refs.has(record.ticket.toLowerCase())).map(record => record.workId);
     }
-    board.applyRead(recordedItems(snapshot), readRevision, (shown) => withT3Reads(shown), items.readAfresh);
+    await showInTurns(board, () => recordedItemsInTurns(snapshot), () => recordedItems(snapshot),
+      (read) => board.applyRead(read, readRevision, (shown) => withT3Reads(shown), items.readAfresh));
     recordsShown();
     askForStats();
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting, ready: true });
@@ -809,7 +844,11 @@ function knownTicket(repo: string, number: number): TicketObservation | undefine
 
 /** How far apart a pass of observations shows the records, whose every read lands with changes to show. */
 const OBSERVED_SHOW_MS = 1_000;
-const showObserved = coalesced(() => runLocal(() => showRecords()), OBSERVED_SHOW_MS);
+const showPass = coalesced(() => runLocal(() => showRecordsInTurns()), OBSERVED_SHOW_MS);
+const showObserved = () => {
+  observations++;
+  showPass();
+};
 
 /** When the records' tickets and PRs were last observed, which runs at the idle pace as each record takes a call or two. */
 let observedAt = -Infinity;
@@ -880,7 +919,8 @@ const reread = () => {
   showRecords();
   board.push();
 };
-const commands = createItemCommands({ clearedFailuresFile: fixture ? null : join(boardDataDir(), 'cleared-start-failures.json'), board, items, records, reread, archive, offerModelChoices, checkSkills: parentSkillCheck() });
+const commands = createItemCommands({ clearedFailuresFile: fixture ? null : join(boardDataDir(), 'cleared-start-failures.json'), board, items, records, reread,
+  showObservations: () => { if (shownObservations !== observations) reread(); }, archive, offerModelChoices, checkSkills: parentSkillCheck() });
 const adding = createCapture({ board, items, records, reread, repos: () => board.snapshot().repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, gone: armedWorkGone(records, readRepositoryList), file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });

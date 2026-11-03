@@ -630,6 +630,17 @@ test('live slice transitions update the bar, expanded list and count without a r
   }
 });
 
+test('a build with no ticket says Build in the kind cell', async () => {
+  await mountPage(withItem('I_sample13', { kind: 'build', labels: [], recorded: true, number: 0 }, loose));
+  expect(text(row('I_sample13').querySelector('[data-kind]'))).toBe('Build');
+});
+
+test('a ticket with no recognised kind leaves the kind cell empty', async () => {
+  const shaping = sample.items.find((i) => i.number === 130)!.id;
+  await mountPage(withItem(shaping, { kind: 'issue' }));
+  expect(text(row(shaping).querySelector('[data-kind]'))).toBe('');
+});
+
 test('a row shows a kind disagreement', async () => {
   const kindDisagreement: KindDisagreement = { ticketKind: 'bug', changed: 'item', kept: false, swap: { add: [], remove: [], type: null } };
   await mountPage({ ...loose, items: loose.items.map((i) => (i.id === 'I_sample14' ? { ...i, kindDisagreement } : i)) });

@@ -2,18 +2,21 @@
 
 Reshape keeps the brief text and requires a new passing gate before Ready.
 
-Shaping marks Ready after a passing gate and commits the user to no
-implementation. A later agent edit to the local brief needs a fresh gate.
-Trusted tracker edits keep Status; a details Save records the user's approval
-of that exact Spec. Concept refinement is independent of delivery. Each child can start when its
-own gate and blockers permit it, regardless of the parent's refinement result.
+Shaping marks Ready after a passing gate. A later agent edit to the local brief
+needs a fresh gate. Trusted tracker edits keep Status; a details Save records
+the user's approval of that exact Spec. Concept refinement is independent of
+delivery. The user's Start build on a child needs only the child's own gate and
+blockers, whatever the parent's Refinement result.
 
-The board's **Start build** on a Ready build is the user's Go. A build blocked by
-other work starts only once that work is complete
-([Completion](shared/issue-tracker/work-records.md#completion)), by hand or
-through the board's **Start after**. With no repository project for the build's
-repo, Start build stays disabled until the user adds the project in T3. Start
-build:
+The board's **Start build** on a Ready build is the user's Go. The exception is
+**Auto-build**. With this machine's Auto-build switch on, the board starts
+eligible Ready builds by itself, up to the build limit. Auto-build starts a
+build under a concept only once the concept's Refinement is complete. A build
+blocked by other work starts only once that work is complete
+([Completion](shared/issue-tracker/work-records.md#completion)), by hand,
+through the board's **Start after** or through Auto-build. With no repository
+project for the build's repo, Start build stays disabled until the user adds the
+project in T3. Start build:
 
 1. rereads the ticket Spec before launch. The build uses that text, or the last
    local copy with a warning if the read fails. Held GitHub edits stay out until

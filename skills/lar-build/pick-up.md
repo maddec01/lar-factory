@@ -14,7 +14,7 @@ Send it through Gate again before marking it Ready. Follow
 
 - A decision: [Decisions](concepts.md#decisions).
 - A record with a current passing brief, also when resuming a shaping
-  handoff: set **Ready** if it isn't and stop; report its readiness without starting a build.
+  handoff: set **Ready** if it isn't and stop; report its readiness and leave the start to the board. A Ready build waits for the user's Start build on the board. The exception is Auto-build. With this machine's Auto-build switch on, the board starts eligible Ready builds by itself, up to the build limit. Auto-build starts a build under a concept only once the concept's Refinement is complete.
 - Anything else: set Shaping. An **Explore subagent** reads existing project instructions when present,
   neighboring code conventions, its glossary and relevant ADRs ([where domain docs live](shared/domain-docs.md#where-domain-docs-live)),
   and the code this work touches, and returns ≤300 words in

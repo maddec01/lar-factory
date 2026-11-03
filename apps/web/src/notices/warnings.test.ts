@@ -261,3 +261,21 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
   expect(fresh()).not.toContain('Disconnected');
   expect($('section.desk')!.textContent).toBe('Your deskNothing waits on you.');
 });
+
+test('closing the disconnected notice leaves the title bar saying Disconnected until the board recovers', async () => {
+  const empty: BoardData = { ...healthy, error: null, fetchedAt: new Date(Date.now()).toISOString(), items: [] };
+  await mountPage(empty);
+  const fresh = () => $('.refreshed')!.textContent;
+  fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
+  await settle(() => vi.advanceTimersByTime(15_000));
+  await closeWarning('client-error');
+  expect(warning('client-error')).toBeNull();
+  await settle(() => vi.advanceTimersByTime(15_000));
+  expect(warning('client-error'), 'stays closed while the board is still gone').toBeNull();
+  expect(fresh()).toContain('Disconnected');
+  expect($('.refreshed [data-dot]')!.className).toContain('bg-danger');
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify({ ...empty, fetchedAt: new Date(Date.now()).toISOString() })));
+  await settle(() => vi.advanceTimersByTime(15_000));
+  expect(fresh()).not.toContain('Disconnected');
+  expect($('.refreshed [data-dot]')!.className).toContain('bg-success');
+});

@@ -1013,6 +1013,15 @@ test('a part row keeps last-known figures, explains them, and hides all zeros', 
   expect(step('I_sample12').querySelector('[data-part-meta] [title^="Agent time"]')).toBeNull();
 });
 
+test('a failed family marks its own known figures last known while the board reads usage', async () => {
+  const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
+  await mountOpen({ ...withItem('I_sample10', { stats: usage, usageState: 'failed' }, withItem('I_sample12', { stats: usage, usageState: 'current' })), usageRead: { readable: true, readAt: '2026-11-03T10:00:00.000Z' } });
+  await press(button(dossier(), 'Parts list'));
+  const figures = (id: string) => step(id).querySelector<HTMLElement>('[data-part-meta] [title^="Agent time"]')!;
+  expect(figures('I_sample10').title).toContain("Last known figures: T3 Code's usage can't be read now.");
+  expect(figures('I_sample12').title).not.toContain('Last known');
+});
+
 test('a part with no figures yet says its usage can\'t be read', async () => {
   await mountOpen(withItem('I_sample10', { stats: 'unavailable' }));
   await press(button(dossier(), 'Parts list'));

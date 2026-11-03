@@ -1200,6 +1200,33 @@ test('while T3 can\'t be read, known figures stay and say they are last known', 
   expect(inDialog('[data-agent-work]')!.title).toMatch(/Last known figures from 3 Nov, \d\d:\d\d: T3 Code's usage can't be read now\./);
 });
 
+test('an item whose family failed marks its known figures last known though the board reads usage', async () => {
+  const board = conceptBoard(stats(1), stats(2));
+  const items = board.items.map((i) => (i.id === CONCEPT ? { ...i, usageState: 'failed' as const } : i));
+  await mountPage({ ...board, items, usageRead: { readable: true, readAt: '2026-11-03T10:00:00.000Z' } });
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-meta]'))).toContain('last known');
+  expect(inDialog('[data-agent-work]')!.title).toContain("Last known figures: T3 Code's usage can't be read now.");
+});
+
+const withoutFigures = (usageState: 'failed' | 'loading') => {
+  const board = conceptBoard(undefined, undefined);
+  return { ...board, items: board.items.map((i) => (i.id === CONCEPT ? { ...i, usageState, stats: { agentMs: 0, tokens: 0 }, threads: [thread('own', 'done')] } : i)), usageRead: { readable: true } };
+};
+
+test('an item whose family failed with no figures says so though the board reads usage', async () => {
+  await mountPage(withoutFigures('failed'));
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-meta]'))).toContain('Usage details are unavailable.');
+});
+
+test('an item still loading with all-zero figures says it is loading, never zero', async () => {
+  await mountPage(withoutFigures('loading'));
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-meta]'))).toContain('Usage totals are still loading.');
+  expect(inDialog('[data-agent-work]')).toBeNull();
+});
+
 test('figures of all zeros show no misleading number', async () => {
   await mountPage(conceptBoard({ agentMs: 0, tokens: 0, costUsd: 0 }, undefined));
   await openItem(CONCEPT);

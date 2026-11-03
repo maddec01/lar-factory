@@ -98,7 +98,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
             </span>
             {(pr || (figures && hasFigures(figures))) && <>
               {pr && <span data-col="pr" className={`${LINK_COLUMN} truncate`}><span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 shrink-0 text-(--st-done)" />{prLabel(pr)}</span></span>}
-              <span data-col="figures" className={FIGURES_COLUMN}><Figures s={figures} /></span>
+              <span data-col="figures" className={FIGURES_COLUMN}><Figures s={figures} item={item} /></span>
             </>}
           </span>
           <span className="flex min-w-0 items-center gap-1.5 overflow-hidden" data-col="state">

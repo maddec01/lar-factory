@@ -46,6 +46,11 @@ jobs:
         working-directory: packages/ui
         run: pnpm run typecheck
 
+      - name: Work-records typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: packages/work-records
+        run: pnpm run typecheck
+
       - name: Server typecheck
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: apps/server
@@ -66,7 +71,7 @@ jobs:
         run: pnpm run knip
 
   packages:
-    name: Shared and UI tests
+    name: Shared, UI and work-records tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -90,6 +95,11 @@ jobs:
       - name: UI tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: packages/ui
+        run: pnpm test
+
+      - name: Work-records tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: packages/work-records
         run: pnpm test
 
   shards:

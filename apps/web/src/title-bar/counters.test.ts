@@ -3,7 +3,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, moved, mountPage, sample, settle, text, textBesideIcon } from '../../test/support.ts';
-import type { ItemThread } from '@lar-factory/shared';
+import type { BoardData, ItemThread } from '@lar-factory/shared';
 
 /** The sample with a build limit of 2, which sample mode leaves out. */
 const limited = { ...sample, buildLimit: { limit: 'automatic' as const, automatic: 2 } };
@@ -215,6 +215,24 @@ test('spend does not present partial histories as a complete total', async () =>
   const pop = await openCounter('spend');
   expect(head(pop)).toBe('Agent spendIncomplete');
   expect(text(pop)).toContain('Usage totals are incomplete or unavailable.');
+});
+
+test.each(['failed', 'loading'] as const)('spend reads as incomplete with a %s item, though it shows known figures', async (usageState) => {
+  const data = structuredClone(completeSample);
+  data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 200 }, usageState };
+  await mountPage(data);
+  expect(text(counter('spend'))).toBe('Unavailable');
+  const pop = await openCounter('spend');
+  expect(head(pop)).toBe('Agent spendIncomplete');
+  expect(text(pop)).toContain('$200.00');
+});
+
+test('spend stays complete with figures frozen at merge, or an item with no threads', async () => {
+  const data: BoardData = structuredClone(completeSample);
+  data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 2, frozen: true }, usageState: 'failed' };
+  data.items[1] = { ...data.items[1]!, stats: 'unavailable', threads: [] };
+  await mountPage(data);
+  expect(text(counter('spend'))).not.toBe('Unavailable');
 });
 
 test.each(['pending', 'failed'] as const)('spend remains incomplete when an empty source succeeds and another is %s', async (state) => {

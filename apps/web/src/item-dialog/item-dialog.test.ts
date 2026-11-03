@@ -1227,6 +1227,25 @@ test('an item still loading with all-zero figures says it is loading, never zero
   expect(inDialog('[data-agent-work]')).toBeNull();
 });
 
+test('a concept total with a failed part keeps its known figures and says it is incomplete', async () => {
+  const board = conceptBoard(stats(1), stats(2));
+  await mountPage({ ...board, items: board.items.map((i) => (i.id === 'I_sample10' ? { ...i, usageState: 'failed' as const } : i)), usageRead: { readable: true } });
+  await openItem(CONCEPT);
+  const total = [...document.querySelectorAll<HTMLElement>('[data-meta] [data-agent-work]')].find((p) => text(p).startsWith('Total on the board'))!;
+  expect(text(total)).toContain('$3.00');
+  expect(text(total)).toContain('incomplete');
+  expect(total.title).toContain('usage for part of it is still loading');
+});
+
+test('a concept total with a loading part and no figures for it gives no sum and says it is incomplete', async () => {
+  const board = conceptBoard(stats(1), undefined);
+  await mountPage({ ...board, items: board.items.map((i) => (i.id === 'I_sample10' ? { ...i, usageState: 'loading' as const, threads: [thread('part', 'running')] } : i)), usageRead: { readable: true } });
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-meta]'))).toContain('Own cost: $1.00');
+  expect(text(inDialog('[data-meta]'))).not.toContain('Total on the board');
+  expect(text(inDialog('[data-total-incomplete]'))).toContain('This total is incomplete');
+});
+
 test('figures of all zeros show no misleading number', async () => {
   await mountPage(conceptBoard({ agentMs: 0, tokens: 0, costUsd: 0 }, undefined));
   await openItem(CONCEPT);

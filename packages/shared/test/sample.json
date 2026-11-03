@@ -578,6 +578,7 @@
     },
     {
       "id": "I_sample13",
+      "usageState": "current",
       "revision": 1,
       "status": "Ready",
       "statuses": [

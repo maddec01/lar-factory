@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
-import { activityUnavailable, boardSections, buildsAtWork, formatUsd, limitNumber, plural, itemName, repoKey, shortAgo } from '@lar-factory/shared';
+import { activityUnavailable, boardSections, buildsAtWork, formatUsd, limitNumber, plural, itemName, repoKey, shortAgo, usageIncomplete } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
@@ -118,7 +118,7 @@ export function Counters() {
     .filter((x) => x.cost > 0)
     .sort((a, b) => b.cost - a.cost);
   const incomplete = !data.firstRead.settled || !!data.itemSourceProblems?.length || !!data.error || !!data.localProblem ||
-    data.items.some(item => item.stats === 'unavailable' || (!item.stats && (item.threads === 'unavailable' || !!item.threads?.length)));
+    data.items.some(usageIncomplete);
   const spend = costs.reduce((t, c) => t + c.cost, 0);
   const free = limit === undefined ? undefined : limit - building.length;
   const row = (i: Item, trailing?: ReactNode) => <Row key={i.id} item={i} now={now} trailing={trailing} />;

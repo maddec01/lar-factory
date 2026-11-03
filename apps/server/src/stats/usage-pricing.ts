@@ -175,8 +175,8 @@ function listCost(totals: UsageTokenTotals, rates: TokenRates): number {
  * A record's cost: a user's override first, then the provider's own cost, then the
  * rate table. Reasoning is inside output, so it isn't charged again.
  */
-export function priceUsage(table: RateTable, record: PricedRecord, overrides?: RateTable): { costUsd: number; costSource: CostSource } {
-  const { model, totals, reportedCostUsd } = record;
+export function priceUsage(table: RateTable, record: PricedRecord, overrides?: RateTable, model = record.model): { costUsd: number; costSource: CostSource } {
+  const { totals, reportedCostUsd } = record;
   const override = overrides?.get(model.trim());
   const reported = override === undefined && reportedCostUsd !== null && Number.isFinite(reportedCostUsd) ? reportedCostUsd : null;
   // T3 also splits a priced record's cost by category, which only its usage page shows.
@@ -213,8 +213,7 @@ export function apiCost(records: Iterable<UsageRecord>, pricing: Pricing): numbe
   let total = 0;
   let priced = false;
   for (const record of records) {
-    const model = pricing.aliases.get(record.model) ?? record.model;
-    const { costUsd, costSource } = priceUsage(pricing.rates, { ...record, model }, pricing.overrides);
+    const { costUsd, costSource } = priceUsage(pricing.rates, record, pricing.overrides, pricing.aliases.get(record.model) ?? record.model);
     total += costUsd;
     if (costSource !== 'unpriced') priced = true;
   }

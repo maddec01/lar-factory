@@ -2,11 +2,12 @@
 
 import { existsSync } from 'node:fs';
 import type { Item, ItemStats } from '@lar-factory/shared';
-import { itemStats, transcriptsToRead } from '../stats/item-stats.ts';
-import { warmTranscripts } from '../stats/transcript-usage.ts';
+import { AGGREGATION_WORK_PER_CHUNK, ITEM_WORK, itemStats, threadsKey } from '../stats/item-stats.ts';
 import type { ItemStatsReader, StatsSources } from '../stats/item-stats.ts';
+import { loopTrace } from '../startup/loop-trace.ts';
+import { createReadTrace } from '../stats/read-trace.ts';
+import type { ReadTrace } from '../stats/read-trace.ts';
 import { protocolStatsInputs } from './item-execution.ts';
-import type { StatsInputs } from './item-execution.ts';
 import { readT3Db } from './t3-db.ts';
 
 /** Item stats from execution observations and usage, as the board shows them. */
@@ -23,9 +24,6 @@ export interface T3Reads {
   allObserved: boolean;
 }
 
-/** The same answer for every item. */
-const every = <T>(value: T) => (): T => value;
-
 /** One answer for every item with threads, while an item with none has no stats to lose. */
 const withThreads = (usage: NonNullable<Item['usageState']>): T3Reads['usage'] => (threadIds) => (threadIds.length ? usage : 'current');
 
@@ -33,66 +31,69 @@ const withThreads = (usage: NonNullable<Item['usageState']>): T3Reads['usage'] =
 const failedRead: T3Reads = { stats: (threadIds) => (threadIds.length ? 'unavailable' : undefined), usage: withThreads('failed'), statsUnavailable: true, priced: null, allObserved: false };
 
 /** T3 runs with its thread list not read yet: nothing has failed, and no stats were read. */
-const loadingRead: T3Reads = { stats: every(undefined), usage: withThreads('loading'), statsUnavailable: false, priced: null, allObserved: false };
+const loadingRead: T3Reads = { stats: () => undefined, usage: withThreads('loading'), statsUnavailable: false, priced: null, allObserved: false };
 
-/** The stats and their residual usage pricing; item threads read apart, through protocolItemThreads. */
-export function loadT3Reads(sources: StatsSources, now: number, withStats = true, threadIds?: readonly string[]): T3Reads {
-  if (!withStats) return { stats: every(undefined), usage: every('current'), statsUnavailable: false, priced: null, allObserved: false };
-  return readStats(sources, now, () => protocolStatsInputs(threadIds));
-}
+/** What a stats read reports beyond the board's figures. */
+export type StatsRead = T3Reads & {
+  /** How many transcripts it counted, and how many of those it parsed, as they weren't cached or changed since. */
+  transcripts: number;
+  parsed: number;
+};
 
-function readStats(sources: StatsSources, now: number, statsInputs: () => StatsInputs | null): T3Reads {
-  if (!existsSync(sources.db)) return failedRead;
-  try {
-    return readT3Db(sources.db, (db) => {
-      const inputs = statsInputs();
-      if (!inputs) return loadingRead;
-      let stats: ItemStatsReader;
-      try { stats = itemStats(db, inputs.rows, sources, now, inputs.sessions); }
-      catch { return failedRead; }
-      const usage: T3Reads['usage'] = (ids) => {
-        const reads = inputs.familyReads(ids);
-        return reads.includes('failed') ? 'failed' : reads.includes('never') ? 'loading' : 'current';
-      };
-      return {
-        stats: (ids) => {
-          const state = usage(ids);
-          return state === 'failed' ? 'unavailable' : state === 'loading' ? undefined : stats(ids) ?? undefined;
-        },
-        usage, statsUnavailable: false, priced: stats.priced, allObserved: inputs.allObserved,
-      };
-    });
-  } catch {
-    return failedRead;
-  }
-}
+const nothingRead = (reads: T3Reads): StatsRead => ({ ...reads, transcripts: 0, parsed: 0 });
 
-/** A warm of the transcripts one stats read needs. */
-export interface WarmedStats {
-  /** How many transcripts the warm read. */
-  files: number;
-  /** The longest one transcript's parsing held the board's thread, in milliseconds. */
-  longestMs: number;
-  /** The stats read over the threads' reads as they stood when the warm started, so it finds their transcripts read. */
-  read(now: number): T3Reads;
+/** Whose stats a read works out, and at what time. */
+export interface StatsReadOptions {
+  now: number;
+  /** The threads of the items on the board. Undefined reads all of T3's. */
+  threadIds?: readonly string[];
+  /** Each item's thread IDs, whose answers the read works out in chunks. */
+  items?: readonly (readonly string[])[];
+  trace?: ReadTrace;
 }
 
 /**
- * Reads the transcripts of T3's threads that the stats read would read afresh, without blocking: the first stats read reads
- * every transcript, seconds of work the board shouldn't stop for. A database that can't be read leaves its read to say so.
+ * The one stats read: T3's threads as they stand when it starts, and each transcript's records as they stand when it
+ * reaches them, none read synchronously, with every answer from that one pass. So a thread or transcript that changes
+ * while it yields waits for the next read. It reports a database that can't be read, and leaves thread lists unread as loading.
  */
-export async function warmT3Stats(sources: StatsSources, threadIds?: readonly string[]): Promise<WarmedStats> {
-  if (!existsSync(sources.db)) return { files: 0, longestMs: 0, read: () => failedRead };
-  let inputs: StatsInputs | null;
-  let files;
+export async function readT3Stats(sources: StatsSources, { now, threadIds, items = [], trace = createReadTrace() }: StatsReadOptions): Promise<StatsRead> {
+  if (!existsSync(sources.db)) return nothingRead(failedRead);
   try {
-    inputs = protocolStatsInputs(threadIds);
-    if (!inputs) return { files: 0, longestMs: 0, read: () => loadingRead };
-    const { sessions } = inputs;
-    files = readT3Db(sources.db, (db) => transcriptsToRead(db, sources, sessions));
+    loopTrace.span('t3 db check', () => readT3Db(sources.db, () => {}));
+    trace.step('inputs');
+    const inputs = await protocolStatsInputs(threadIds, trace.pause);
+    if (!inputs) return nothingRead(loadingRead);
+    let stats: ItemStatsReader;
+    try { stats = await itemStats(sources, inputs.rows, now, { sessions: inputs.sessions, items, trace }); }
+    catch { return nothingRead(failedRead); }
+    const states = new Map<string, NonNullable<Item['usageState']>>();
+    const usage: T3Reads['usage'] = (ids) => {
+      const key = threadsKey(ids);
+      let state = states.get(key);
+      if (!state) {
+        const reads = inputs.familyReads(ids);
+        state = reads.includes('failed') ? 'failed' : reads.includes('never') ? 'loading' : 'current';
+        states.set(key, state);
+      }
+      return state;
+    };
+    let counted = 0;
+    for (const ids of items) {
+      usage(ids);
+      if (++counted * ITEM_WORK >= AGGREGATION_WORK_PER_CHUNK) {
+        counted = 0;
+        await trace.pause();
+      }
+    }
+    return {
+      stats: (ids) => {
+        const state = usage(ids);
+        return state === 'failed' ? 'unavailable' : state === 'loading' ? undefined : stats(ids) ?? undefined;
+      },
+      usage, statsUnavailable: false, priced: stats.priced, allObserved: inputs.allObserved, transcripts: stats.transcripts, parsed: stats.parsed,
+    };
   } catch {
-    return { files: 0, longestMs: 0, read: () => failedRead };
+    return nothingRead(failedRead);
   }
-  const longestMs = await warmTranscripts(files);
-  return { files: files.length, longestMs, read: (now) => readStats(sources, now, () => inputs) };
 }

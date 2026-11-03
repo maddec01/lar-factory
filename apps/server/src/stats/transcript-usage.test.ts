@@ -1,12 +1,17 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { renameSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, renameSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  claudeSessionRecords, codexSessionRecords, firstCopies, parseClaudeLine, scanTranscripts, totalTokens, transcriptMisses, warmTranscripts,
-} from './transcript-usage.ts';
+import { claudeSessions, codexSessions, firstCopies, parseClaudeLine, totalTokens, warmTranscripts } from './transcript-usage.ts';
+import type { SessionTranscripts } from './transcript-usage.ts';
 import type { UsageRecord } from './usage-record.ts';
 import { assistant, claudeHome, codexHome, codexSession, codexTokens } from '../../test/stats-db.ts';
+
+/** A session's records, as a read of that session alone counts them. */
+async function recordsOf(transcripts: SessionTranscripts, session: string): Promise<UsageRecord[]> {
+  const pinned = await warmTranscripts(transcripts.files(session));
+  return transcripts.records(session, pinned).flat();
+}
 
 // Ported from T3 Code's apps/server/src/provider/Drivers/claudeUsage.test.ts
 // (pingdotgg/t3code main at f054d1b8018721bd997d99cbb918a7b17bf098a4).
@@ -85,7 +90,7 @@ test('total tokens leave reasoning out, since it is inside output', () => {
   assert.equal(totalTokens([]), 0);
 });
 
-test('a session\'s records come from its own transcript and its subagents\' transcripts', (t) => {
+test('a session\'s records come from its own transcript and its subagents\' transcripts', async (t) => {
   const home = claudeHome(t, {
     'session-a': {
       main: [{ type: 'user', message: { role: 'user', content: 'Review the branch' } }, assistant('msg-1', 2, 1000, 5000, 40)],
@@ -93,60 +98,89 @@ test('a session\'s records come from its own transcript and its subagents\' tran
     },
     'session-b': { subagents: { b1: [assistant('msg-4', 3, 0, 0, 3)] } },
   });
-  const read = claudeSessionRecords(home);
-  assert.deepEqual(read('session-a').map((r) => r.dedupeKey), ['msg-1:req-msg-1', 'msg-2:req-msg-2', 'msg-3:req-msg-3']);
-  assert.deepEqual(read('session-b').map((r) => r.dedupeKey), ['msg-4:req-msg-4']);
-  assert.deepEqual(read('session-none'), []);
-  assert.deepEqual(read('../escape'), []);
-  assert.deepEqual(claudeSessionRecords(`${home}/missing`)('session-a'), []);
+  const read = await claudeSessions(home);
+  assert.deepEqual((await recordsOf(read, 'session-a')).map((r) => r.dedupeKey), ['msg-1:req-msg-1', 'msg-2:req-msg-2', 'msg-3:req-msg-3']);
+  assert.deepEqual((await recordsOf(read, 'session-b')).map((r) => r.dedupeKey), ['msg-4:req-msg-4']);
+  assert.deepEqual(await recordsOf(read, 'session-none'), []);
+  assert.deepEqual(await recordsOf(read, '../escape'), []);
+  assert.deepEqual(await recordsOf(await claudeSessions(`${home}/missing`), 'session-a'), []);
 });
 
-test('a scan drops the cached records of transcripts it no longer reads, so the cache doesn\'t keep deleted files', (t) => {
+test('a read drops the cached records of transcripts it no longer names, so the cache doesn\'t keep deleted files', async (t) => {
   const home = claudeHome(t, { 'session-a': { main: [assistant('msg-1', 1, 0, 0, 1)] } });
   const path = join(home, 'projects', '-Users-me--t3-worktrees-lar-factory-feat-60', 'session-a.jsonl');
-  const ids = () => scanTranscripts(() => claudeSessionRecords(home)('session-a')).map((r) => r.dedupeKey);
+  const ids = async () => (await recordsOf(await claudeSessions(home), 'session-a')).map((r) => r.dedupeKey);
   const at = 1_760_000_000;
   utimesSync(path, at, at);
-  assert.deepEqual(ids(), ['msg-1:req-msg-1']);
+  assert.deepEqual(await ids(), ['msg-1:req-msg-1']);
   const { size } = statSync(path);
   renameSync(path, `${path}.gone`);
-  assert.deepEqual(ids(), []);
+  assert.deepEqual(await ids(), []);
   // The same name, time and size again, but other records: only a dropped entry reads them.
   writeFileSync(path, JSON.stringify(assistant('msg-2', 1, 0, 0, 1)) + '\n');
   utimesSync(path, at, at);
   assert.equal(statSync(path).size, size);
-  assert.deepEqual(ids(), ['msg-2:req-msg-2']);
+  assert.deepEqual(await ids(), ['msg-2:req-msg-2']);
 });
 
-test('a warm reads the transcripts a scan would read afresh, so the scan after it reads none', async (t) => {
+test('a warm parses only what isn\'t cached or changed since, and pins what it read against later changes', async (t) => {
   const home = claudeHome(t, {
     'session-a': { main: [assistant('msg-1', 1, 0, 0, 1)], subagents: { a1: [assistant('msg-2', 1, 0, 0, 1)] } },
     'session-b': { main: [assistant('msg-3', 1, 0, 0, 1)] },
   });
-  const read = claudeSessionRecords(home);
-  const scan = () => read('session-a');
-  const misses = transcriptMisses(scan);
-  assert.deepEqual(misses.map((file) => file.path.split('/').at(-1)), ['session-a.jsonl', 'agent-a1.jsonl'], 'only the sessions the scan reads');
-  await warmTranscripts(misses);
-  assert.deepEqual(transcriptMisses(scan), []);
-  assert.deepEqual(scan().map((r) => r.dedupeKey), ['msg-1:req-msg-1', 'msg-2:req-msg-2']);
+  const read = await claudeSessions(home);
+  const files = read.files('session-a');
+  assert.deepEqual(files.map((file) => file.path.split('/').at(-1)), ['session-a.jsonl', 'agent-a1.jsonl'], 'only the session asked for');
+  const first = await warmTranscripts(files);
+  assert.equal(first.parsed, 2);
+  assert.equal((await warmTranscripts(files)).parsed, 0);
+  appendFileSync(files[0]!.path, JSON.stringify(assistant('msg-9', 1, 0, 0, 1)) + '\n');
+  assert.deepEqual(read.records('session-a', first).flat().map((r) => r.dedupeKey), ['msg-1:req-msg-1', 'msg-2:req-msg-2'], 'the first read stands as it was');
+  const changed = await warmTranscripts(files);
+  assert.equal(changed.parsed, 1, 'only the changed file parses again');
+  assert.deepEqual(read.records('session-a', changed).flat().map((r) => r.dedupeKey), ['msg-1:req-msg-1', 'msg-9:req-msg-9', 'msg-2:req-msg-2']);
 });
 
-test('a warm lets the event loop run between files', async (t) => {
-  const sessions = Object.fromEntries(Array.from({ length: 5 }, (_, i) => [`session-${i}`, { main: [assistant(`msg-${i}`, 0, 0, 0, 1)] }]));
-  const read = claudeSessionRecords(claudeHome(t, sessions));
-  const files = transcriptMisses(() => Object.keys(sessions).flatMap(read));
-  assert.equal(files.length, 5);
+test('a warm lets the event loop run while it parses one transcript', async (t) => {
+  const lines = Array.from({ length: 4_000 }, (_, i) => assistant(`msg-${i}`, 0, 0, 0, 1));
+  const padded = lines.map((line) => JSON.stringify({ ...line, padding: 'x'.repeat(500) }));
+  const read = await claudeSessions(claudeHome(t, { 'session-a': { main: padded } }));
   let turns = 0;
   let running = true;
   const turn = () => { turns++; if (running) setImmediate(turn); };
   setImmediate(turn);
-  await warmTranscripts(files);
+  const pinned = await warmTranscripts(read.files('session-a'));
   running = false;
-  assert.ok(turns >= 5, `the loop turned ${turns} times`);
+  assert.equal(pinned.parsed, 1);
+  assert.ok(turns >= 5, `the loop turned ${turns} times during one file`);
+  assert.equal(read.records('session-a', pinned).flat().length, 4_000);
 });
 
-test('a Codex session\'s records come from its rollout, found by the session ID in its file name', (t) => {
+test('the stream keeps every usage record across its chunks: a line far longer than a chunk, multi-byte text at chunk edges, and a last line with no newline', async (t) => {
+  const long = { ...assistant('long', 1, 0, 0, 2), padding: 'é'.repeat(400_000) };
+  const quoted = { type: 'user', text: 'a "usage" mention', message: { usage: { input_tokens: 1 } } };
+  const home = claudeHome(t, { 'session-a': { main: [assistant('first', 1, 0, 0, 1), long, quoted, 'not json with "usage" in it', { ...assistant('tail', 1, 0, 0, 1), padding: '€'.repeat(100_000) }] } });
+  const read = await claudeSessions(home);
+  const { path } = read.files('session-a')[0]!;
+  writeFileSync(path, readFileSync(path, 'utf8').trimEnd());
+  const records = await recordsOf(read, 'session-a');
+  assert.deepEqual(records.map((r) => r.dedupeKey), ['first:req-first', 'long:req-long', 'tail:req-tail']);
+  assert.equal(totalTokens(records), 2 + 3 + 2);
+});
+
+test('the prefilter skips only lines no rule counts: a usage line counts whatever else it holds, and dedup still takes the first copy', async (t) => {
+  const copied = assistant('shared', 0, 0, 0, 5);
+  const home = claudeHome(t, {
+    'session-a': { main: [{ type: 'user', message: { content: 'x' } }, copied, { type: 'assistant', message: { model: 'm' } }] },
+    'session-b': { main: [copied, assistant('own', 0, 0, 0, 7)] },
+  });
+  const read = await claudeSessions(home);
+  const keep = firstCopies();
+  const kept = [...await recordsOf(read, 'session-a'), ...await recordsOf(read, 'session-b')].filter(keep);
+  assert.deepEqual(kept.map((r) => r.dedupeKey), ['shared:req-shared', 'own:req-own']);
+});
+
+test('a Codex session\'s records come from its rollout, found by the session ID in its file name', async (t) => {
   const own = '01a13627-9790-70d0-8342-58f71022e222';
   const fork = '01a13628-c84a-7f33-9a04-c55eb4c75845';
   const home = codexHome(t, {
@@ -156,19 +190,19 @@ test('a Codex session\'s records come from its rollout, found by the session ID 
     [fork]: [...codexSession(fork, 'gpt-5.6-sol', own), codexTokens('2026-10-20T09:00:00.000Z', 1000, 400, 50, [1000, 400, 50]),
       codexTokens('2026-10-20T09:05:00.000Z', 300, 0, 9, [1300, 400, 59])],
   });
-  const read = codexSessionRecords(home);
-  assert.deepEqual(read(own).map((r) => [r.sessionId, r.model, totalTokens([r])]), [[own, 'gpt-5.6-sol', 1050], [own, 'gpt-5.6-sol', 2070]]);
-  assert.deepEqual(read(fork).map((r) => totalTokens([r])), [309]);
-  assert.deepEqual(read('01a13629-0000-7000-8000-000000000000'), []);
-  assert.deepEqual(codexSessionRecords(join(home, 'missing'))(own), []);
+  const read = await codexSessions(home);
+  assert.deepEqual((await recordsOf(read, own)).map((r) => [r.sessionId, r.model, totalTokens([r])]), [[own, 'gpt-5.6-sol', 1050], [own, 'gpt-5.6-sol', 2070]]);
+  assert.deepEqual((await recordsOf(read, fork)).map((r) => totalTokens([r])), [309]);
+  assert.deepEqual(await recordsOf(read, '01a13629-0000-7000-8000-000000000000'), []);
+  assert.deepEqual(await recordsOf(await codexSessions(join(home, 'missing')), own), []);
 });
 
-test('a Codex session copied into a second rollout counts once, as T3 keys sessions found in several files', (t) => {
+test('a Codex session copied into a second rollout counts once, as T3 keys sessions found in several files', async (t) => {
   const id = '01a13627-9790-70d0-8342-58f71022e222';
   const lines = [...codexSession(id), codexTokens('2026-10-20T09:01:00.000Z', 100, 0, 5), codexTokens('2026-10-20T09:01:00.000Z', 200, 0, 5)];
   const home = codexHome(t, { [id]: lines });
   writeFileSync(join(home, 'sessions', '2026', '10', '20', `rollout-2026-10-20T10-00-00-${id}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n'));
-  const records = codexSessionRecords(home)(id);
+  const records = await recordsOf(await codexSessions(home), id);
   assert.equal(records.length, 4);
   assert.equal(totalTokens(records.filter(firstCopies())), 105 + 205);
 });

@@ -294,7 +294,7 @@ export function threadCleanupState(threadId: string): ThreadCleanupState {
 export type ThreadUsageRead = 'current' | 'pending' | 'never' | 'failed' | 'gone';
 
 /** The rows the stats read can count, and how far each thread's read lets them answer. */
-export type StatsInputs = ReturnType<typeof executionStats> & {
+export type StatsInputs = Awaited<ReturnType<typeof executionStats>> & {
   /** The read of each thread in these threads' family: the threads and their lineage descendants, as `agentTime` counts them. */
   familyReads(threadIds: readonly string[]): ThreadUsageRead[];
   /** Whether every requested thread and descendant was read successfully at least once, or is gone. */
@@ -360,8 +360,8 @@ export function protocolThreadReads(threadIds: readonly string[]): ThreadReads |
  * read, and a failed one from its retained observation, so it still takes part in deduplication. Null while T3 runs with its
  * thread list not yet read. Throws while T3 is stopped or its list can't be read.
  */
-export function protocolStatsInputs(threadIds?: readonly string[]): StatsInputs | null {
-  if (threadIds?.length === 0) return { ...executionStats([]), familyReads: () => [], allObserved: true };
+export async function protocolStatsInputs(threadIds?: readonly string[], pause?: () => Promise<void>): Promise<StatsInputs | null> {
+  if (threadIds?.length === 0) return { ...await executionStats([]), familyReads: () => [], allObserved: true };
   protocolItemThreads(threadIds ?? []);
   if (current && !current.available && !current.shell) return null;
   if (!current?.available || !current.reads) throw Error('T3 execution unavailable');
@@ -372,8 +372,9 @@ export function protocolStatsInputs(threadIds?: readonly string[]): StatsInputs 
   const observation = (id: string) => current!.reads!.get(id)?.observation;
   // A warm reads these inputs' transcripts before the stats read that uses them, so a read landing in between waits for the next inputs.
   const reads = new Map([...wanted ?? requested.map(shell => String(shell.id))].map(id => [id, threadUsageRead(id)]));
+  const projections = requested.flatMap(shell => observation(String(shell.id))?.projection ?? []);
   return {
-    ...executionStats(requested.flatMap(shell => observation(String(shell.id))?.projection ?? [])),
+    ...await executionStats(projections, pause),
     familyReads: ids => [...threadFamily(ids, shells)].map(id => reads.get(id) ?? 'never'),
     allObserved: [...reads].every(([id, read]) => read !== 'never' && (read !== 'failed' || !!observation(id))),
   };

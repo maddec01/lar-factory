@@ -240,9 +240,11 @@ export function parseCodexLine(line: string, state: CodexScanState): UsageRecord
 // T3 only parses Codex lines holding one of these: the rest carry no usage or state.
 const CODEX_MARKERS = /"token_count"|"turn_context"|"thread_settings_applied"|"session_meta"/;
 
-/** A Codex rollout's records, read top to bottom with one scan state. */
-export function codexRecords(lines: string[]): UsageRecord[] {
-  const state = initialCodexScanState();
-  return lines.flatMap((line) => (CODEX_MARKERS.test(line) ? (parseCodexLine(line, state) ?? []) : []));
-}
+/** A transcript line's usage record, or null for a line with none. */
+export type LineParser = (line: string) => UsageRecord | null;
 
+/** Reads a Codex rollout's lines top to bottom, with one scan state. */
+export function codexLineParser(): LineParser {
+  const state = initialCodexScanState();
+  return (line) => (CODEX_MARKERS.test(line) ? parseCodexLine(line, state) : null);
+}

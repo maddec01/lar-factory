@@ -28,6 +28,8 @@ export interface TrackerCache {
   trackerSaved(workId: string, sequence: number, localDigest: string, remoteDigest: string): void;
   trackerFailed(workId: string, error: string, conflict?: boolean, expectedDigest?: string): void;
   trackerState(workId: string): Item['sync'];
+  /** trackerState for many records at once, as one refresh shows them: it reads the records once, so use it within one synchronous pass. */
+  trackerStates(): (workId: string) => Item['sync'];
 }
 const hasTrackerStructure = (snapshot: TrackerSnapshot): boolean => {
   const repositories=new Set(snapshot.nodes.map(node=>node.repository.toLowerCase()));
@@ -39,12 +41,16 @@ const publicMap = (map: string) => map.replace(/^## Domain docs\s*\n[\s\S]*?(?=^
 
 export function trackerCache(database: Database): TrackerCache {
   const { db } = database;
-  const sourceKey = (id: string) => String(db.prepare('SELECT source_key FROM tracker_identities WHERE work_id = ?').get(id)?.source_key ?? id);
-  const graph = () => {
+  const sourceKeyRow = db.prepare('SELECT source_key FROM tracker_identities WHERE work_id = ?');
+  const parentRow = db.prepare('SELECT parent_id FROM work_records WHERE work_id = ?');
+  const sourceKey = (id: string) => String(sourceKeyRow.get(id)?.source_key ?? id);
+  const readGraph = () => {
     const all=db.prepare("SELECT * FROM work_records WHERE kind <> 'slice' ORDER BY work_id").all() as Row[];
     const blockers=db.prepare('SELECT * FROM blockers ORDER BY work_id,blocker_id').all() as Row[];
+    const dependencies=db.prepare('SELECT * FROM dependencies ORDER BY dependency_id').all() as Row[];
     const edges=[...blockers];const dependencyTargets=new Set<string>();
-    for(const dependency of db.prepare('SELECT work_id,ticket,need FROM dependencies WHERE ticket IS NOT NULL ORDER BY dependency_id').all()){
+    for(const dependency of dependencies){
+      if(dependency.ticket===null)continue;
       const ticket=String(dependency.ticket);let target=all.find(row=>String(row.ticket).toLowerCase()===ticket.toLowerCase());
       if(!target){
         const hex=createHash('sha256').update(`dependency-ticket:${ticket.toLowerCase()}`).digest('hex').slice(0,32);
@@ -53,62 +59,62 @@ export function trackerCache(database: Database): TrackerCache {
       }
       dependencyTargets.add(String(target.work_id));edges.push({work_id:String(dependency.work_id),blocker_id:String(target.work_id)});
     }
-    return {all,edges,blockers,dependencyTargets};
+    const byId=new Map<string,Row>(all.map(row=>[String(row.work_id),row]));
+    const neighbours=new Map<string,string[]>();
+    const adjacent=(a:string,b:string)=>{const found=neighbours.get(a);if(found)found.push(b);else neighbours.set(a,[b]);};
+    const link=(a:string,b:string)=>{adjacent(a,b);adjacent(b,a);};
+    for(const row of all)if(row.parent_id)link(String(row.work_id),String(row.parent_id));
+    for(const edge of edges)link(String(edge.work_id),String(edge.blocker_id));
+    const blockersOf=new Map<string,string[]>();
+    for(const edge of blockers){const id=String(edge.work_id);const found=blockersOf.get(id);if(found)found.push(String(edge.blocker_id));else blockersOf.set(id,[String(edge.blocker_id)]);}
+    return {byId,neighbours,blockersOf,dependencies,dependencyTargets};
   };
+  type Graph = ReturnType<typeof readGraph>;
 
-  const rootOf = (workId: string) => {
+  /** The records connected to `start` by parents, blockers and Dependencies, with `start`. */
+  const connected = (start: string, {byId,neighbours}: Graph) => {
+    const ids = new Set([start]);
+    for (const id of ids) for (const next of neighbours.get(id) ?? []) if (byId.has(next)) ids.add(next);
+    return ids;
+  };
+  const rowsOf = (ids: Set<string>, {byId}: Graph): Row[] => [...ids].map(id => byId.get(id)).filter(row => row !== undefined);
+  /** The top of the record's parent chain. */
+  const topOf = (workId: string) => {
     const seen = new Set<string>();
     let root = workId;
     for (;;) {
       if (seen.has(root)) invalid('The saved issue has a parent cycle.');
       seen.add(root);
-      const row = db.prepare('SELECT parent_id FROM work_records WHERE work_id = ?').get(root);
+      const row = parentRow.get(root);
       if (!row) throw new WorkRecordError('not-found', 'The saved issue has no work record.');
-      if (!row.parent_id) break;
+      if (!row.parent_id) return root;
       root = String(row.parent_id);
     }
-    const {all,edges,dependencyTargets}=graph();
-    const ids=new Set([root]);
-    for(let changed=true;changed;){
-      changed=false;
-      const add=(id:string)=>{if(!ids.has(id)&&all.some(row=>row.work_id===id)){ids.add(id);changed=true;}};
-      for(const row of all){if(row.parent_id&&ids.has(String(row.parent_id)))add(String(row.work_id));if(ids.has(String(row.work_id))&&row.parent_id)add(String(row.parent_id));}
-      for(const edge of edges){if(ids.has(String(edge.work_id)))add(String(edge.blocker_id));if(ids.has(String(edge.blocker_id)))add(String(edge.work_id));}
-    }
-    const roots=all.filter(row=>ids.has(String(row.work_id))&&!row.parent_id);
-    const owners=roots.filter(row=>!dependencyTargets.has(String(row.work_id)));
-    const candidates=(owners.length?owners:roots).sort((a,b)=>Number(b.kind==='concept')-Number(a.kind==='concept')||sourceKey(String(a.work_id)).localeCompare(sourceKey(String(b.work_id))));
-    return candidates.length ? String(candidates[0]!.work_id) : root;
   };
-  const snapshot = (workId: string): TrackerSnapshot => {
-    const root = rootOf(workId);
-    const {all,edges,blockers}=graph();
-    const ids = new Set([root]);
-    for (let changed = true; changed;) {
-      changed = false;
-      const add = (id: string) => { if (!ids.has(id) && all.some(row => row.work_id === id)) { ids.add(id); changed = true; } };
-      for (const row of all) {
-        if (row.parent_id && ids.has(String(row.parent_id))) add(String(row.work_id));
-        if (ids.has(String(row.work_id)) && row.parent_id) add(String(row.parent_id));
-      }
-      for (const row of edges) {
-        if (ids.has(String(row.work_id))) add(String(row.blocker_id));
-        if (ids.has(String(row.blocker_id))) add(String(row.work_id));
-      }
-    }
-    const nodes = all.filter(row => ids.has(String(row.work_id))).map((row): StructureNode => {
+  /** The structure's root, among those connected to a parent chain's `top`, with those records. */
+  const structureOf = (top: string, graph: Graph) => {
+    const ids=connected(top,graph);
+    const roots=rowsOf(ids,graph).filter(row=>!row.parent_id);
+    const owners=roots.filter(row=>!graph.dependencyTargets.has(String(row.work_id)));
+    const candidates=(owners.length?owners:roots).sort((a,b)=>Number(b.kind==='concept')-Number(a.kind==='concept')||sourceKey(String(a.work_id)).localeCompare(sourceKey(String(b.work_id))));
+    return { root: candidates.length ? String(candidates[0]!.work_id) : top, ids };
+  };
+  const rootOf = (workId: string) => structureOf(topOf(workId), readGraph()).root;
+  const snapshotOfRoot = (root: string, graph: Graph): TrackerSnapshot => {
+    const ids = connected(root, graph);
+    const nodes = rowsOf(ids, graph).map((row): StructureNode => {
       const id = String(row.work_id);
       const map = row.kind === 'concept' ? db.prepare("SELECT markdown FROM bodies WHERE work_id = ? AND body = 'map'").get(id)?.markdown : undefined;
       return { key: sourceKey(id), repository: String(row.repository), kind: row.kind as Kind, title: String(row.title), ticket: row.ticket as string | null,
         parent: row.parent_id ? sourceKey(String(row.parent_id)) : null,
-        blockers: blockers.filter(edge => edge.work_id === id && ids.has(String(edge.blocker_id))).map(edge => sourceKey(String(edge.blocker_id))).sort(),
+        blockers: (graph.blockersOf.get(id) ?? []).filter(blocker => ids.has(blocker)).map(sourceKey).sort(),
         ...(map !== undefined ? { map: publicMap(String(map)) } : {}) };
     });
     const referenceUrl = (reference: string, pr=false) => {
       const split=reference.lastIndexOf('#');const repo=reference.slice(0,split);const number=Number(reference.slice(split+1));
       return pr ? trackerPullRequestUrl(repo,number) : trackerIssueUrl(repo,number);
     };
-    const dependencies = (db.prepare('SELECT * FROM dependencies ORDER BY dependency_id').all() as Row[]).filter(row => ids.has(String(row.work_id))).map((row): StructureDependency => ({
+    const dependencies = graph.dependencies.filter(row => ids.has(String(row.work_id))).map((row): StructureDependency => ({
       key: String(row.dependency_id), work: sourceKey(String(row.work_id)), need: String(row.need), owner: String(row.owner),
       contract: String(row.contract), evidence: String(row.evidence), handover: String(row.handover),
       ...(row.ticket ? { ticket: referenceUrl(String(row.ticket)) } : {}),
@@ -117,10 +123,22 @@ export function trackerCache(database: Database): TrackerCache {
     }));
     return { version: 1, root: sourceKey(root), nodes: nodes.sort((a, b) => a.key.localeCompare(b.key)), dependencies };
   };
-  const checkpoint = (workId: string): TrackerCheckpoint => {
-    const row = db.prepare('SELECT * FROM tracker_sync WHERE work_id = ?').get(sourceKey(rootOf(workId)));
+  const snapshot = (workId: string): TrackerSnapshot => {
+    const graph = readGraph();
+    return snapshotOfRoot(structureOf(topOf(workId), graph).root, graph);
+  };
+  const checkpointOfRoot = (root: string): TrackerCheckpoint => {
+    const row = db.prepare('SELECT * FROM tracker_sync WHERE work_id = ?').get(sourceKey(root));
     return { localDigest: row?.local_digest as string | null ?? null, remoteDigest: row?.remote_digest as string | null ?? null,
       error: row?.error as string | null ?? null, conflict: row?.conflict === 1 };
+  };
+  const checkpoint = (workId: string) => checkpointOfRoot(rootOf(workId));
+  const stateOfRoot = (root: string, graph: Graph): Item['sync'] => {
+    const state = checkpointOfRoot(root);
+    if (state.error) return { state: state.conflict ? 'conflict' : 'error', message: state.error };
+    const snap = snapshotOfRoot(root, graph);
+    if (!hasTrackerStructure(snap)) return undefined;
+    return { state: trackerDigest(snap) === state.localDigest ? 'saved' : 'pending' };
   };
   const pending = () => db.prepare('SELECT work_id, sequence FROM tracker_outbox ORDER BY sequence').all()
     .map(row => ({ workId: String(row.work_id), sequence: Number(row.sequence) }));
@@ -162,12 +180,28 @@ export function trackerCache(database: Database): TrackerCache {
         ON CONFLICT(work_id) DO UPDATE SET error=excluded.error, conflict=excluded.conflict`).run(sourceKey(rootOf(workId)), error, Number(conflict));
     }),
     trackerState: workId => database.read(() => {
-      const state = checkpoint(workId);
-      if (state.error) return { state: state.conflict ? 'conflict' : 'error', message: state.error };
-      const snap = snapshot(workId);
-      if (!hasTrackerStructure(snap)) return undefined;
-      return { state: trackerDigest(snap) === state.localDigest ? 'saved' : 'pending' };
+      const graph = readGraph();
+      return stateOfRoot(structureOf(topOf(workId), graph).root, graph);
     }),
+    trackerStates: () => {
+      let graph: Graph | undefined;
+      const roots = new Map<string, string>();
+      const states = new Map<string, Item['sync']>();
+      return workId => database.read(() => {
+        const top = topOf(workId);
+        graph ??= readGraph();
+        let root = roots.get(top);
+        if (root === undefined) {
+          const structure = structureOf(top, graph);
+          root = structure.root;
+          roots.set(top, root);
+          // A chain's top that isn't a board record, as a slice, connects records that aren't connected without it.
+          if (graph.byId.has(top)) for (const id of structure.ids) roots.set(id, root);
+        }
+        if (!states.has(root)) states.set(root, stateOfRoot(root, graph));
+        return states.get(root);
+      });
+    },
     trackerRestore: (input, remoteDigest, sourceContexts = {}) => database.write(() => {
       const value = validateTrackerSnapshot(input);
       // Importing a newly discovered part must never clear another part's pending local structural edits.

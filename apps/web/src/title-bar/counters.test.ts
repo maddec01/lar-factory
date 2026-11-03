@@ -115,6 +115,18 @@ test('queued lists the queued items and how many wait in List', async () => {
   expect(foot(pop)).toBe('4 items more in List, not yet queued.');
 });
 
+test('while a Queue start launches, the queued count, its list and the Queue rail agree, and the row is in Shaping', async () => {
+  await mountPage();
+  const rail = () => $$('.queue ol > li').map((row) => row.dataset.item);
+  expect([text(counter('queued')), rail()]).toEqual(['3', ['I_sample05', 'I_sample06', 'I_sample21']]);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, startProgress: { I_sample05: { shape: { phase: 'starting' } } } }));
+  expect([text(counter('queued')), rail()]).toEqual(['2', ['I_sample06', 'I_sample21']]);
+  expect($('[data-stage="shaping"] li[data-item="I_sample05"]')).not.toBeNull();
+  await openCounter('queued');
+  expect(rows()).toHaveLength(2);
+});
+
 test('shipped lists this week\'s done items, newest first', async () => {
   await mountPage();
   const pop = await openCounter('shipped');

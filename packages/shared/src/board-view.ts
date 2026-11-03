@@ -126,6 +126,7 @@ export function placementOf(item: Item, { starts, unavailable, all }: PlacementF
 export function boardSections(data: BoardData, now: number, clientError?: string | null): BoardSections {
   const unavailable = activityUnavailable(data, now, clientError);
   const items = [...data.items].sort(byFlowOrder);
+  const inSection = (section: BoardSection) => items.filter((item) => placementOf(item, { starts: data.startProgress?.[item.id], unavailable, all: data.items }).sections.includes(section));
   const inStatus = (...s: Status[]) => items.filter((i) => s.includes(i.status));
   const list = inStatus('List');
   const repos = data.repos.map((r) => r.repo);
@@ -134,9 +135,9 @@ export function boardSections(data: BoardData, now: number, clientError?: string
     .map((repo) => ({ repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)) }))
     .sort((a, b) => b.items.length - a.items.length);
   return {
-    needsYou: items.filter((item) => placementOf(item, { starts: data.startProgress?.[item.id], unavailable, all: data.items }).sections.includes('desk')),
+    needsYou: inSection('desk'),
     concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
-    queued: inStatus('Queued'),
+    queued: inSection('queue'),
     list,
     listGroups,
     done: items

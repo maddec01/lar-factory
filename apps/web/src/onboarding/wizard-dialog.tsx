@@ -13,6 +13,7 @@ import { StepBody } from './steps.tsx';
 import { STEP_TITLES, type StepId } from './wizard-choices.ts';
 import { type Run, pickedProject, runSteps, stepReady, useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
+import { ProjectChoiceIcon, ProjectIcon } from '../repositories/project-icon.tsx';
 import { useSettingsStore } from '../settings/settings-store.ts';
 
 const STEP_HELP: Record<StepId, string> = {
@@ -79,15 +80,19 @@ function WizardModal({ run }: { run: Run }) {
   const at = steps.indexOf(run.step);
   const doneCount = finished ? steps.length : at;
   const done = finished ? 'Ready' : `Step ${at + 1} of ${steps.length}`;
+  const picked = pickedProject(run, projects);
   return (
     <Modal onClose={close}>
       {/* ninna-ui's Modal drops the description from aria-describedby, so the step's place names itself. */}
       <Modal.Content ref={dialog} data-onboarding-dialog title={finished ? 'Repository added' : STEP_TITLES[run.step]} aria-describedby="onboarding-place"
         description={finished ? undefined : STEP_HELP[run.step]} focusFirstField={false}>
         <div className="grid shrink-0 gap-2 px-5 pb-4 sm:px-6">
-          <Text id="onboarding-place" tone="muted">
-            Set up {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'}.
-          </Text>
+          <div className="flex min-w-0 items-center gap-2">
+            {picked ? <ProjectChoiceIcon project={picked} size="row" /> : run.repo && <ProjectIcon repo={run.repo} size="row" />}
+            <Text id="onboarding-place" tone="muted">
+              Set up {picked?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'}.
+            </Text>
+          </div>
           <Progress value={doneCount} max={steps.length} caption={done} aria-label={done} />
         </div>
         <Modal.Body><StepBody run={run} /></Modal.Body>

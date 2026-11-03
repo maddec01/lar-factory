@@ -301,3 +301,32 @@ test('a run kept on the old vocabulary step resumes on the first step with its d
   await settle(() => button('Next').click());
   expect(kindRow('bug').querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('triage');
 });
+
+const placeIcon = () => dialog()!.querySelector('#onboarding-place')!.parentElement!.querySelector<HTMLElement>('[data-project-icon]');
+
+test('the heading shows no icon until a project is picked, then its favicon, and focus stays on the step title', async () => {
+  await openOnboarding([project('lar-web', { icon: { kind: 'favicon', projectId: 'lar-web', revision: 'abc' } })], { '/api/onboarding/detect': { detection: detection() } });
+  expect(placeIcon()).toBeNull();
+  expect(text(dialog()!.querySelector('#onboarding-place'))).toBe('Set up a repository.');
+  await pick();
+  expect(placeIcon()!.querySelector('img')!.getAttribute('src')).toBe('/api/project-icon/lar-web?v=abc');
+  expect(text(dialog()!.querySelector('#onboarding-place')), "the dialog's description leaves the icon out").toBe('Set up lar-web.');
+  expect(document.activeElement).toBe(dialog()!.querySelector('[data-slot="modal-header"] h2'));
+});
+
+test('the heading shows a chosen icon, or the initial for a project with none', async () => {
+  await openOnboarding([project('rocket', { icon: { kind: 'emoji', emoji: '🚀' } }), project('plain')], { '/api/onboarding/detect': { detection: detection() } });
+  await settle(() => dialog()!.querySelector<HTMLElement>('[data-choice="rocket"] [role="radio"]')!.click());
+  expect(text(placeIcon())).toBe('🚀');
+  await settle(() => dialog()!.querySelector<HTMLElement>('[data-choice="plain"] [role="radio"]')!.click());
+  expect(text(placeIcon())).toBe('P');
+});
+
+test("a resumed repository whose project can't be read takes its icon from the board", async () => {
+  const repo = 'team/app';
+  const data = { ...empty, projectIcons: { [repo]: { kind: 'emoji', emoji: '🚀' } as const }, onboarding: [{ repo, progress: { step: 'project', done: [], answers: { projectId: 'app' } } }] };
+  serve(data, { error: 'T3 is down.' });
+  await mountPage(data);
+  await settle(() => $<HTMLButtonElement>(`[data-onboarding-card="${repo}"] [data-resume]`)!.click());
+  expect(text(placeIcon())).toBe('🚀');
+});

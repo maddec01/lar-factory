@@ -13,6 +13,7 @@ import { kind } from '../buttons/button-kinds.tsx';
 import { Choice, Field, Group } from './setup-fields.tsx';
 import { KindMapping } from './kind-mapping.tsx';
 import { IssueDefaults } from '../repositories/issue-defaults.tsx';
+import { ProjectChoiceIcon } from '../repositories/project-icon.tsx';
 import { answersOf, connectionOptions, connectionsOf, found, repositoryDocs, skillOptions, sourceOptions } from './wizard-choices.ts';
 import { detectedOf, unpickable, useWizardStore, type Run } from './wizard-store.ts';
 
@@ -50,11 +51,11 @@ function ProjectStep({ run }: { run: Run }) {
   </ProjectSection></>;
 }
 
-/** A project on one line: its icon's spot, name and badge, then its path, which gives way first. */
+/** A project on one line: its icon, name and badge, then its path, which gives way first. */
 function ProjectLine({ project, badge }: { project: ProjectChoice; badge: string | null }) {
   return <span className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-    <span data-project-icon aria-hidden className="size-4 shrink-0" />
-    <span title={project.name} className="max-w-1/2 shrink-0 truncate font-medium">{project.name}</span>
+    <ProjectChoiceIcon project={project} size="row" />
+    <span title={project.name} className="max-w-[30%] shrink-0 truncate font-medium sm:max-w-1/2">{project.name}</span>
     {badge && <span className="shrink-0 whitespace-nowrap"><Badge>{badge}</Badge></span>}
     <span data-project-path aria-hidden title={project.folder} className="min-w-0 flex-1 truncate text-xs text-base-700">{project.shownFolder}</span>
     <span className="sr-only">{project.folder}</span>

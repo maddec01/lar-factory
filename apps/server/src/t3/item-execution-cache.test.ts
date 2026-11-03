@@ -3,9 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vite-plus/test';
 import type { ExecutionRead, ShellRead, ThreadFamilyRead } from './execution-protocol.ts';
 
 const fixture = vi.hoisted(() => ({ changed: undefined as ((read: ShellRead) => void) | undefined,
-  read: vi.fn<(id: string) => Promise<ExecutionRead>>(), archived: vi.fn<() => Promise<ThreadFamilyRead>>() }));
-vi.mock('../json-file.ts', () => ({ readJsonRecord: () => ({ origin: 'http://localhost:3773', serverVersion: 'fixture', pid: 1 }) }));
-vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture', t3Running: () => true }));
+  read: vi.fn<(id: string) => Promise<ExecutionRead>>(), archived: vi.fn<() => Promise<ThreadFamilyRead>>(), runtimeReads: { count: 0 }, running: vi.fn(() => true) }));
+vi.mock('../json-file.ts', () => ({ readJsonRecord: () => { fixture.runtimeReads.count++; return { origin: 'http://localhost:3773', serverVersion: 'fixture', pid: 1 }; } }));
+vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture', t3Running: fixture.running }));
 vi.mock('./board-projects.ts', () => ({ boardProjects: () => ({}) }));
 vi.mock('./execution-protocol.ts', () => ({
   subscribeExecutionShell: (_origin: unknown, _version: unknown, _protocol: unknown, changed: typeof fixture.changed) => { fixture.changed = changed; return () => {}; },
@@ -15,6 +15,32 @@ vi.mock('./execution-protocol.ts', () => ({
 const archivedRead = (threads: object[]): ThreadFamilyRead => ({ availability: 'available', observation: { threads: threads as Record<string, unknown>[], snapshotSequence: 1, observedAt: '2026-10-31T12:00:00Z' } });
 beforeEach(() => { fixture.archived.mockResolvedValue(archivedRead([])); });
 afterEach(() => { vi.useRealTimers(); vi.resetModules(); fixture.read.mockReset(); fixture.archived.mockReset(); });
+it('reads T3\'s runtime file once per synchronous pass, however many items ask, and again on the next', async () => {
+  const { protocolItemThreads } = await import('./item-execution.ts');
+  await Promise.resolve();
+  fixture.runtimeReads.count = 0;
+  for (let i = 0; i < 100; i++) protocolItemThreads([`thread-${i}`]);
+  expect(fixture.runtimeReads.count).toBe(1);
+  await Promise.resolve();
+  protocolItemThreads(['thread']);
+  expect(fixture.runtimeReads.count).toBe(2);
+});
+it('asks whether T3\'s process lives only while no subscription to it shows that it does', async () => {
+  const { protocolItemThreads } = await import('./item-execution.ts');
+  protocolItemThreads(['thread']);
+  await Promise.resolve();
+  fixture.changed!({ availability: 'available', observation: { observedAt: '2026-10-31T12:00:00Z', snapshot: { threads: [], archivedThreads: [] } } });
+  fixture.running.mockClear();
+  for (let pass = 0; pass < 3; pass++) {
+    protocolItemThreads(['thread']);
+    await Promise.resolve();
+  }
+  expect(fixture.running).not.toHaveBeenCalled();
+  fixture.changed!({ availability: 'unavailable' });
+  protocolItemThreads(['thread']);
+  await Promise.resolve();
+  expect(fixture.running).toHaveBeenCalledTimes(1);
+});
 it('loads history once, refreshes changed threads and keeps timestamped last observations through an outage', async () => {
   const { protocolItemThreads, protocolThreadById } = await import('./item-execution.ts');
   const observedAt = '2026-10-31T12:00:00Z';

@@ -14,6 +14,7 @@ import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
 import { createBoardState } from './board/board-state.ts';
+import { coalesced } from './board/coalesced.ts';
 import { readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { observePr } from './config/pr-host.ts';
 import { changeRepositoryLabels } from './config/repository-labels.ts';
@@ -331,12 +332,20 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
 
 function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
   const now = Date.now();
+  // Each item and slice asks several times below, and the records can't change during this synchronous pass.
+  const rows = new Map<string, ReturnType<WorkRecords['threads']>>();
+  const recorded = (workId: string) => {
+    let found = rows.get(workId);
+    if (!found) { found = records!.threads(workId); rows.set(workId, found); }
+    return found;
+  };
+  const liveIds = (workId: string | undefined) => (workId && records ? recorded(workId).filter((t) => !t.deletedAt).map((t) => t.threadId) : []);
   const threads = (workId: string | undefined) => {
-    const ids = liveThreadIds(workId);
+    const ids = liveIds(workId);
     // Work whose every thread was deleted still reads as an empty list, which its deleted-thread notice needs.
-    const observed = protocolItemThreads(ids.length || !workId || !records ? ids : records.threads(workId).map((t) => t.threadId));
+    const observed = protocolItemThreads(ids.length || !workId || !records ? ids : recorded(workId).map((t) => t.threadId));
     if (!Array.isArray(observed) || !workId || !records) return observed;
-    const purposes = new Map(records.threads(workId).map(thread => [thread.threadId, thread.purpose]));
+    const purposes = new Map(recorded(workId).map(thread => [thread.threadId, thread.purpose]));
     return observed.map(thread => ({ ...thread, purpose: purposes.get(thread.id) }));
   };
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
@@ -345,11 +354,11 @@ function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
   pruneShownStats(new Set(items.map((item) => item.id)));
   return items.map((item) => {
     if (item.recorded === false) return item;
-    const ids = liveThreadIds(item.id);
+    const ids = liveIds(item.id);
     const shown = { ...item, stats: shownStats(item, previousStats.get(item.id), withStats), usageState: ids.length ? previousUsage.get(item.id) : undefined, threads: threads(item.id) };
     shown.slices = item.slices.map((slice): typeof slice => {
       if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
-      const ids = slice.workId && records ? records.threads(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];
+      const ids = slice.workId && records ? recorded(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];
       const observed = protocolItemThreads(ids);
       const current = Array.isArray(observed) ? observed.filter(t => !t.observedAt) : [];
       const progress = !ids.length ? 'waiting'
@@ -798,6 +807,10 @@ function knownTicket(repo: string, number: number): TicketObservation | undefine
   return { state: 'open', ...assignee && { assignee } };
 }
 
+/** How far apart a pass of observations shows the records, whose every read lands with changes to show. */
+const OBSERVED_SHOW_MS = 500;
+const showObserved = coalesced(() => runLocal(() => showRecords()), OBSERVED_SHOW_MS);
+
 /** When the records' tickets and PRs were last observed, which runs at the idle pace as each record takes a call or two. */
 let observedAt = -Infinity;
 let observing = false;
@@ -830,7 +843,7 @@ async function observeProviders(): Promise<void> {
       known: (repo, number) => knownTicket(repo, number),
       waits: (repo) => quotaLow && !onAzure(repo),
       agreedKind: (record) => agreedKind(record, ticketsByRef, board.snapshot().repos.find((r) => sameRepo(r.repo, record.repository))?.setup?.vocabulary),
-    }, retention.hidden(), showRecords);
+    }, retention.hidden(), showObserved);
     // After the PR reads, so a concept whose last build merged finishes in the same pass.
     finishCompleted(records, repos);
     // The timed delete, once Settings turned it on, runs at the same idle pace.

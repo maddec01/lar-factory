@@ -80,7 +80,8 @@ beforeEach(() => {
     })]);
   }));
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); vi.clearAllMocks(); });
+// A test that fails before it stops leaves its listener, which later tests' project changes would call.
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); vi.clearAllMocks(); t3.listeners.clear(); });
 
 it('publishes a favicon outside the checkout and a checkout favicon with no T3 path, URL or token on the board', async () => {
   t3.read = listed(fact('factory', { faviconPath: '../shared/logo.svg' }), fact('apple'));
@@ -139,6 +140,8 @@ it('refreshes on its own timer every 4 minutes and when the repositories change,
   board.update({ repos: [repo('lar-factory')] } as Partial<BoardData>);
   board.push();
   await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeDefined());
+  // The change came during the first read, so a second read follows it; a file replaced before that one ends would show early.
+  await icons.refresh();
   const first = board.snapshot().projectIcons;
 
   assets = { factory: png('new') };

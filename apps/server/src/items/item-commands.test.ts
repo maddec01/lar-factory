@@ -700,6 +700,27 @@ test("Start build moves the build's concept record to In progress and writes no 
   assert.ok(log.every((line) => !line.startsWith('status')), log.join('; '));
 });
 
+test("Start build and Abandon write at the revision the board's own observations reached, which they show first", async () => {
+  const records = await openRecords();
+  const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Shaping', ticket: `${WEB}#40` });
+  const made = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  const build = records.setParent(made.workId, made.revision, concept.workId);
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', ticket: `${WEB}#41` });
+  let showObservations = () => {};
+  // An observation pass commits while the build starts, and the board shows it some turns later.
+  const observe = (workId: string) => records.observe(workId, records.read(workId).revision, { of: 'ticket', state: 'open' });
+  const { commands, reread } = commandsOn([], undefined, records, [], undefined, undefined, {}, {
+    showObservations: () => showObservations(), checkSkills: async () => { observe(concept.workId); return { refusal: null }; } });
+  showObservations = reread;
+  const started = await commands.startBuild(build.workId, undefined);
+  assert.equal(started.status, 200, JSON.stringify(started.body));
+  assert.equal(records.read(concept.workId).status, 'In progress');
+  observe(work.workId);
+  const abandoned = await commands.abandon(work.workId);
+  assert.equal(abandoned.status, 200, JSON.stringify(abandoned.body));
+  assert.ok(records.read(work.workId).setAside);
+});
+
 /**
  * Commands on the board of `records`, where each item shows the threads `shown` gives for its recorded thread IDs, as
  * T3 shows them. Starts record their messages in `started`, and `recover` plays T3's answer to a reconciliation.

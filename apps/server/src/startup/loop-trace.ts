@@ -225,5 +225,8 @@ export function createLoopTrace({ write: given, now = () => performance.now(), d
   return trace;
 }
 
+/** Lets the event loop turn once, so the work after it runs in a macrotask of its own. */
+export const nextTurn = () => new Promise<void>((resolve) => { setImmediate(resolve); });
+
 /** The board's one trace. */
 export const loopTrace = createLoopTrace();

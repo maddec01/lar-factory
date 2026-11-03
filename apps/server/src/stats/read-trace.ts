@@ -2,7 +2,7 @@
 // trace, so the time between two awaits is one synchronous block, which the board's log names by its step.
 
 import { performance } from 'node:perf_hooks';
-import { loopTrace } from '../startup/loop-trace.ts';
+import { loopTrace, nextTurn } from '../startup/loop-trace.ts';
 
 type StatsStep = 'inputs' | 'discovery' | 'warm' | 'dedup' | 'aggregation' | 'publish';
 
@@ -31,8 +31,6 @@ export interface ReadTrace {
   /** The longest block of the read and its step. */
   longestBlock(): { ms: number; step: StatsStep };
 }
-
-const nextTurn = () => new Promise<void>((resolve) => { setImmediate(resolve); });
 
 const cpuMs = (used: NodeJS.CpuUsage) => (used.user + used.system) / 1000;
 

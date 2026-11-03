@@ -59,6 +59,8 @@ export interface StatsReadOptions {
  */
 export async function readT3Stats(sources: StatsSources, { now, threadIds, items = [], trace = createReadTrace() }: StatsReadOptions): Promise<StatsRead> {
   if (!existsSync(sources.db)) return nothingRead(failedRead);
+  // The inputs take a turn of their own, apart from the thread reads that started this read.
+  await trace.pause();
   try {
     loopTrace.span('t3 db check', () => readT3Db(sources.db, () => {}));
     trace.step('inputs');

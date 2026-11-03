@@ -15,6 +15,7 @@ import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
 import { createBoardState } from './board/board-state.ts';
 import { coalesced } from './board/coalesced.ts';
+import { oneAtATime } from './board/one-at-a-time.ts';
 import { showInTurns } from './board/show-in-turns.ts';
 import { readBoardSettings, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { observePr } from './config/pr-host.ts';
@@ -33,7 +34,7 @@ import { createLimitSettings } from './items/limit-setting.ts';
 import { createAutoBuild } from './auto-build/auto-build.ts';
 import { createAutoBuildSetting } from './auto-build/auto-build-setting.ts';
 import { createShapingThreadCleanup, createShapingThreadSweep, shapingThreadCleanupProblems } from './items/shaping-thread-cleanup.ts';
-import { agreedKind, archivedItems, recordItems, recordItemsInTurns, ticketsByReference } from './items/record-items.ts';
+import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './items/record-items.ts';
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
@@ -90,6 +91,8 @@ const board = createBoardState({
  * the database can't be opened, which `recordsProblem` names as the board's error until it restarts.
  */
 let records: WorkRecords | null = null;
+/** Reads the records in turns on a second connection, which only reads, each read in one snapshot as the board's own writes go on. */
+let readRecordsInTurns: ReturnType<typeof recordItemsReader> | null = null;
 let recordsProblem: string | null = null;
 let localUpdatesBlocked = false;
 let localFailureCode: string | undefined;
@@ -116,7 +119,11 @@ function runLocal(work: () => unknown): void {
   catch (error) { localFailure(error); }
 }
 if (!fixture) {
-  try { records = await openWorkRecords(); }
+  try {
+    const opened = await openWorkRecords();
+    readRecordsInTurns = recordItemsReader(await openWorkRecords());
+    records = opened;
+  }
   catch (err) {
     recordsProblem = `Can't open the work records: ${(err as Error).message}`;
     log(recordsProblem);
@@ -158,10 +165,17 @@ function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tic
   return args ? loopTrace.span('records', () => recordItems(...args)) : [];
 }
 
-/** recordedItems, mapping the records in turns of the event loop. */
-async function recordedItemsInTurns(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tickets, waiting: unread }): Promise<Item[]> {
-  const args = recordArgs(read);
-  return args ? recordItemsInTurns(...args, nextTurn) : [];
+/** Reads of the records in turns, which would each map records in the same turns if they overlapped. */
+const mapInTurns = oneAtATime();
+
+/** recordedItems, mapping the records in turns of the event loop once the read running now ends; with no `read`, the tickets read last by then. */
+function recordedItemsInTurns(read?: Pick<ItemsRead, 'items' | 'waiting'>): Promise<Item[]> {
+  return mapInTurns(async () => {
+    const args = recordArgs(read ?? { items: tickets, waiting: unread });
+    if (!args || !readRecordsInTurns) return [];
+    const [, ...mapped] = args;
+    return readRecordsInTurns(...mapped, nextTurn);
+  });
 }
 
 /** Keeps `read`'s tickets for later and gives what recordItems reads the records with, or null with no records. */

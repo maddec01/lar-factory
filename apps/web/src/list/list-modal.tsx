@@ -18,8 +18,9 @@ import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-syst
 import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemKind, LabelChips, StructureSync, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemKind, LabelChips, StructureSync } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
+import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { ItemFilterBar } from '../filters/item-filter-bar.tsx';
 import { filtering, rowFilter, useItemFilters } from '../filters/item-filters.ts';
@@ -47,15 +48,6 @@ function GroupItem({ label, count, icon, active, onPick }: { label: string; coun
   );
 }
 
-function RepoAvatar({ repo, name }: { repo: string; name: string }) {
-  const repos = useBoardStore((state) => state.data.repos);
-  return (
-    <span className={`${repoTone(repo, repos)} grid size-5 shrink-0 place-items-center rounded-md bg-[var(--k,var(--color-base-600))] text-[10px] font-bold text-white`} aria-hidden="true">
-      {name[0]!.toUpperCase()}
-    </span>
-  );
-}
-
 function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; showRepo: boolean; onOpen: () => void }) {
   const repos = useBoardStore((state) => state.data.repos);
   return (
@@ -67,8 +59,9 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
           {item.number ? <span className="font-normal text-base-700">{ref(item)} </span> : null}{item.title}
         </span>
         <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-          <span className="me-1 min-w-0 truncate text-[11px] leading-4 tabular-nums text-base-700">
-            {showRepo && `${repoName(repoKey(item), repos)} · `}{shortAgo(item.updatedAt, now)}
+          <span className="me-1 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-base-700">
+            {showRepo && <ProjectIcon repo={repoKey(item)} size="small" />}
+            <span className="min-w-0 truncate tabular-nums">{showRepo && `${repoName(repoKey(item), repos)} · `}{shortAgo(item.updatedAt, now)}</span>
           </span>
           <ItemKind item={item} onRow />
           <LabelChips item={item} />
@@ -150,7 +143,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
           <SidebarPane label="Repositories">
             <GroupItem label="All repositories" count={groups.reduce((n, group) => n + group.items.length, 0)} icon={<Inbox />} active={active === null} onPick={() => setPick(null)} />
             <SidebarNavigationGroup label="Repositories">
-              {groups.map((group) => groupItem(group, <RepoAvatar repo={group.repo} name={group.name} />))}
+              {groups.map((group) => groupItem(group, <ProjectIcon repo={group.repo} size="medium" />))}
             </SidebarNavigationGroup>
           </SidebarPane>
         }>

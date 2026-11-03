@@ -9,7 +9,7 @@ writes nothing, so read it again and redo the change.
 
 Work records are the source of truth for factory progress, including queue,
 Status and build progress. Tickets hold created issues, gated Specs and the
-separate structural projection. They are not a backup of local work records.
+historical structural projections. They are not a backup of local work records.
 
 ## Picking
 
@@ -55,7 +55,7 @@ usable; Azure still needs a readable team backlog type or creation fails.
 Vocabulary mapping is optional in onboarding and Settings. It maps bug, feature
 and improvement to existing labels and type, suggests same-name labels and allows
 none. A typed label is created only when saved. Skipping this step creates no
-labels. Structure sync separately creates `linked-work`, as onboarding explains.
+labels. Suspended structural publication creates no labels.
 
 A successful submission creates a ticket and a List record whose initial context
 is the submitted description. An unticked checkbox saves local work. Failure
@@ -85,8 +85,7 @@ When a ticket-backed ordinary record passes its gate and Write the refined spec
 to the issue is ON, the whole brief becomes the ticket's main description, the
 Spec. The ticket's prior text remains in a collapsed Original section. This
 covers other people's tickets in onboarded repositories too. Concept maps,
-decisions, slices and Dependency tickets never use this write path. Structural
-sync has its own setting and protocol.
+decisions, slices and Dependency tickets never use this write path. Legacy structural publication is suspended.
 
 From the first synced Spec, the ticket is the source of truth. The record keeps
 a copy for gate evidence and the builder. `lar-work gate <work ID>` rereads the
@@ -200,31 +199,28 @@ Completion comes from the records. `lar-work completion <work ID>` prints
 whether work is complete and why not; `lar-work waiting-on <work ID>` prints its
 blockers that aren't complete. A build is complete once its recorded PR merges.
 A decision is complete once its answer and domain drafts are recorded and its
-concept's map is written after them. A concept is complete once its Fog is
+concept's map is written after them. Concept delivery is complete once its Fog is
 recorded gone (`lar-work set-fog`) and every decision and build it owns is
 complete. A Status, a closed ticket or an ended thread completes nothing, and no
 step changes Azure State to record local completion. A delivery PR uses the
 provider's closing relationship independently of local completion.
 
-## Tracker structure sync
+An unfinished concept with zero active builds reports `No delivery planned.`
+Refinement alone neither starts retention nor releases blockers. Previously
+finished concepts preserve their finished history.
 
-Follow [Tracker structure sync](publication.md) for concepts and multi-repository
-work. The ON-by-default local `structureSync` option saves kind, map diagram,
-parts, Connections, Dependencies and issue grouping, with only the shaping
-results needed to explain them. Local changes enter the structural outbox
-automatically.
-`lar-work sync-structure <work ID>` requests a drain explicitly. Queue, Status,
-decision records, slices and per-item progress stay local. Whole gated briefs
-use [Ticket Specs](#ticket-specs), independently of structure sync.
-Shaping and starting a build remain independent choices.
+`lar-work refinement <work ID>` separately checks a concept's nonempty map,
+Fog recorded gone and settled active decisions. Its reasons identify an empty
+map, remaining Fog or an unsettled decision. Set-aside decisions do not count.
+Proposed builds need not pass gates or merge for refinement. The board displays
+refinement and delivery separately; shaping consults refinement.
 
-On a new machine, add the repository, then add its saved work from List to
-reconstruct the structure and cross-repository links. Restored items start in
-List. Structural recovery restores no ordinary brief, decision record, slice or
-progress history. A ticket Spec preserves its text, but adding it on another
-machine restores no local brief or gate history. Conflicting structural versions
-stop sync with both copies retained. Follow the protocol's recovery rules rather
-than assuming a merge or conflict resolution UI exists.
+## Structural publication suspended
+
+Keep structural edits local, including exploration, attachment and work across
+repositories. See [publication](publication.md) for the suspension and retained
+historical recovery data. Settings cannot resume structural writes.
+Explicit issue creation and ordinary non-concept Ticket Specs remain available.
 
 Opening a build's PR follows [PR delivery](publication-pr.md), including
 work without a ticket.

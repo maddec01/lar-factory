@@ -34,6 +34,6 @@ Never merge or push to the repository's default branch. Follow its commit rules 
 5. Read [Start a build later](start-build.md) only when the user asks to implement.
 
 For concept or multi-repository structural changes, follow
-[Tracker structure sync](shared/issue-tracker/publication.md). Ordinary progress
-stays local. Whole gated briefs use [Ticket Specs](shared/issue-tracker/work-records.md#ticket-specs),
-independently of structural sync. Honor saved settings without a publish prompt.
+[Structural publication suspended](shared/issue-tracker/publication.md).
+Ordinary non-concept gated briefs still use
+[Ticket Specs](shared/issue-tracker/work-records.md#ticket-specs).

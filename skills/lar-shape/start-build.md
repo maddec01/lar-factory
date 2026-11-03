@@ -5,8 +5,8 @@ Reshape keeps the brief text and requires a new passing gate before Ready.
 Shaping marks Ready after a passing gate and commits the user to no
 implementation. A later agent edit to the local brief needs a fresh gate.
 Trusted tracker edits keep Status; a details Save records the user's approval
-of that exact Spec. Tracker structure sync is independent of readiness and
-never starts a build.
+of that exact Spec. Concept refinement is independent of delivery. Each child can start when its
+own gate and blockers permit it, regardless of the parent's refinement result.
 
 The board's **Start build** on a Ready build is the user's Go. A build blocked by
 other work starts only once that work is complete

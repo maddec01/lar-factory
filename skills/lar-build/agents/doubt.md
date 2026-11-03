@@ -8,7 +8,10 @@ where available, and the code the brief's **Notes for the builder** names.
 
 By default, run no test suite, build, typecheck or lint. You may run the
 smallest command that settles a specific uncertainty reading cannot settle.
-Name that uncertainty in your report.
+Name that uncertainty in your report. Run each heavy command (a whole test
+suite, a production build, a performance measurement, or anything expected to
+take over about a minute) on its own as `lar-work heavy -- <command>`, in the
+background or with your tool's longest timeout.
 
 Assume the author is overconfident. Hunt for:
 

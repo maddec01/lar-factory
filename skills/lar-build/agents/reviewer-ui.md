@@ -21,7 +21,9 @@ as you found it. These Overrides replace parts of those Copies:
 
 Run the app once from the worktree on a spare port or instance. Use existing
 project instructions or infer the start command from package scripts and manifests. Build only what starting the
-changed screens needs, and run no test suites. Open web in T3's browser preview
+changed screens needs, and run no test suites. Your only heavy commands are
+production builds. Run each on its own as `lar-work heavy -- <command>`,
+in the background or with your tool's longest timeout. Open web in T3's browser preview
 (`preview_open`), native apps with T3's device tools (`device_open`,
 `device_screenshot`). In round 2 you also get round 1's app report: reuse the
 app it names while its processes still run and it reloads the worktree's files

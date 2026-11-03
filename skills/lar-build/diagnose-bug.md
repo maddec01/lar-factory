@@ -43,6 +43,8 @@ Treat the loop as a product. Once you have _a_ loop, **tighten** it:
 
 A 30-second flaky loop is barely better than no loop; a 2-second deterministic one is tight, a debugging superpower.
 
+Run each heavy command (a whole test suite, a production build, a performance measurement, or anything expected to take over about a minute) on its own as `lar-work heavy -- <command>`, in the background or with your tool's longest timeout.
+
 ### Non-deterministic bugs
 
 The goal is not a clean repro but a **higher reproduction rate**. Loop the trigger 100×, parallelise, add stress, narrow timing windows, inject sleeps. A 50%-flake bug is debuggable; 1% is not, so keep raising the rate until it's debuggable.

@@ -28,6 +28,10 @@ Run no project-wide typecheck, lint, unused-code check or test suite, even when
 project instructions ask for them on changes. Build only what starting the
 prototype needs. Then drive the interaction its question depends on, including
 every variant or walkthrough once. Fix what fails or name it in your report.
+Run each heavy command (a whole test suite, a production build, a performance
+measurement, or anything expected to take over about a minute) on its own as
+`lar-work heavy -- <command>`, in the background or with your tool's longest
+timeout.
 
 ## Show the variants inside T3
 

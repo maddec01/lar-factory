@@ -43,6 +43,26 @@ runs a build as a check, except a project check that is itself a build still
 runs at the full check step, in the approver's checks and when rerunning a failed
 check.
 
+### Heavy commands
+
+A **heavy command** is a whole test suite (one package's or the root's), a
+production build, a performance measurement, or anything you expect to take
+over about a minute. Focused tests on named files, typecheck and lint count
+only when you expect them to take that long. Servers and watchers never count.
+The machine runs a limited number of heavy commands at once, across all builds
+and worktrees.
+
+`run-check` waits for a free slot itself. Run every other heavy command as
+`lar-work heavy -- <command>`, which waits for a free slot and then runs it.
+The wrapper runs the command's words without a shell, so a compound command
+goes through `sh -c`. Give each independent heavy command its own wrapper; one
+wrapper starts one job. A heavy command started inside a wrapped one runs
+without waiting, and that covers only the wrapped command's own children.
+
+Run heavy commands, `run-check` included, in the background, or with the
+longest timeout your tool allows where it has no background mode. Time spent
+waiting for a slot counts toward a foreground tool's timeout.
+
 ## Base branch
 
 Resolve the build's base branch before creating its worktree. Use an existing

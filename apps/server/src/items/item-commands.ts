@@ -699,10 +699,14 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
         board.update({ startCheckFailures: warnings });
         board.push();
       }
-      // One read of the unresolved intents for every item, which a read per item would repeat hundreds of times a refresh.
+      // One read of the unresolved intents and one of the recorded threads for every item, which a read per item would repeat hundreds of times a refresh.
       const unresolved = new Map<string, LaunchIntent[]>();
       try { for (const intent of records?.launchIntents({ unresolved: true }) ?? []) unresolved.set(intent.workId, [...unresolved.get(intent.workId) ?? [], intent]); }
       catch { /* Intents unread this refresh settle on the next. */ }
+      let threadsOf = new Map<string, ReturnType<WorkRecords['threads']>>();
+      try { threadsOf = records?.threadsByWork() ?? threadsOf; }
+      catch { /* Threads unread this refresh are checked on the next. */ }
+      const recordedNow = (workId: string) => threadsOf.get(workId) ?? [];
       const runsOf = { started: starts, startedBuilds: buildStarts };
       // Each thread a start opened this board run or the record holds, which an available read may lack.
       const missing = currentItems.flatMap((item) => {
@@ -714,7 +718,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           const threadId = run && finishedStarts.get(run);
           if (threadId) ids.set(threadId, record);
         }
-        for (const { threadId, purpose } of recordedThreads(item.id)) {
+        for (const { threadId, purpose } of recordedNow(item.id)) {
           if (!ids.has(threadId) && !deleted.has(threadId)) ids.set(threadId, purpose === PURPOSES.startedBuilds ? 'startedBuilds' : 'started');
         }
         return [...ids].map(([threadId, record]) => ({ item, threadId, record, shown: shown.some((thread) => thread.id === threadId) }));
@@ -734,7 +738,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
         checks.set(threadId, { pending: true, retryAt: Infinity });
         let answer: Awaited<ReturnType<typeof lookupThread>>;
         // A deletion the record holds needs no lookup, which could only raise a warning while the CLI is unavailable.
-        try { answer = recordedThreads(id).some(thread => thread.threadId === threadId && thread.deletedAt) ? 'deleted' : await showThread(threadId); }
+        try { answer = recordedNow(id).some(thread => thread.threadId === threadId && thread.deletedAt) ? 'deleted' : await showThread(threadId); }
         catch { answer = 'unknown'; }
         checks.set(threadId, { pending: false, retryAt: answer === 'unknown' ? Date.now() + 30_000 : Infinity });
         if (!board.find(id)) return;

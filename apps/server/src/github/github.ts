@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { LABEL_LIMIT, mapConcurrent, STRUCTURE_LABEL, DONE_WINDOW_MS, buildSubIssueSearches, readTrackerStructure, trackerKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey } from '@lar-factory/shared';
 import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
 import { AccessLost, NotFound, type TicketObservation } from '../items/item-source.ts';
+import { loopTrace } from '../startup/loop-trace.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -178,7 +179,8 @@ export async function graphql<T>(query: string, vars: Record<string, string | nu
     if (Array.isArray(value)) args.push(...value.flatMap((v) => ['-f', `${key}[]=${v}`]));
     else args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`);
   }
-  return JSON.parse(await run(args)) as T;
+  const out = await run(args);
+  return loopTrace.span('gh parse', () => JSON.parse(out)) as T;
 }
 
 /** How far before its `since` a change check looks, so a clock behind GitHub's misses no change. */
@@ -206,7 +208,7 @@ export async function getIfChanged<T>(path: string, etag: string | undefined, ru
   }
   const split = /\r?\n\r?\n/.exec(out);
   const head = split ? out.slice(0, split.index) : '';
-  return { etag: /^etag:\s*(.+?)\s*$/im.exec(head)?.[1], body: JSON.parse(split ? out.slice(split.index + split[0].length) : out) as T };
+  return { etag: /^etag:\s*(.+?)\s*$/im.exec(head)?.[1], body: loopTrace.span('gh parse', () => JSON.parse(split ? out.slice(split.index + split[0].length) : out)) as T };
 }
 
 /** Check list access without loading issue bodies, history or PR evidence. */

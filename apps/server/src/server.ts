@@ -171,7 +171,7 @@ const mapInTurns = oneAtATime();
 /** recordedItems, mapping the records in turns of the event loop once the read running now ends; with no `read`, the tickets read last by then. */
 function recordedItemsInTurns(read?: Pick<ItemsRead, 'items' | 'waiting'>): Promise<Item[]> {
   return mapInTurns(async () => {
-    const args = recordArgs(read ?? { items: tickets, waiting: unread });
+    const args = loopTrace.span('records setup', () => recordArgs(read ?? { items: tickets, waiting: unread }));
     if (!args || !readRecordsInTurns) return [];
     const [, ...mapped] = args;
     return readRecordsInTurns(...mapped, nextTurn);
@@ -359,13 +359,9 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
 
 function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
   const now = Date.now();
-  // Each item and slice asks several times below, and the records can't change during this synchronous pass.
-  const rows = new Map<string, ReturnType<WorkRecords['threads']>>();
-  const recorded = (workId: string) => {
-    let found = rows.get(workId);
-    if (!found) { found = records!.threads(workId); rows.set(workId, found); }
-    return found;
-  };
+  // Each item and slice asks several times below, and the records can't change during this synchronous pass, so one read serves them all.
+  const rows = loopTrace.span('thread rows', () => records?.threadsByWork());
+  const recorded = (workId: string) => rows?.get(workId) ?? [];
   const liveIds = (workId: string | undefined) => (workId && records ? recorded(workId).filter((t) => !t.deletedAt).map((t) => t.threadId) : []);
   const threads = (workId: string | undefined) => {
     const ids = liveIds(workId);
@@ -377,7 +373,7 @@ function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
   };
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
   const previousUsage = new Map(board.snapshot().items.map((item) => [item.id, item.usageState]));
-  const cleanupProblems = records && shapingThreadCleanupProblems(records);
+  const cleanupProblems = records && loopTrace.span('thread cleanup', () => shapingThreadCleanupProblems(records!));
   pruneShownStats(new Set(items.map((item) => item.id)));
   return items.map((item) => {
     if (item.recorded === false) return item;
@@ -398,7 +394,7 @@ function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
     const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
     if (running(shown.threads) || item.slices.some((slice) => running(threads(slice.workId)))) lastRunning.set(item.id, now);
     if (records) {
-      const notice = deletedThreadNotice(records, shown);
+      const notice = deletedThreadNotice(records, shown, recorded(item.id));
       if (notice) shown.needsYou = notice;
       shown.shapingCleanupProblem = cleanupProblems?.get(item.id);
     }
@@ -522,7 +518,7 @@ function refreshLocal(recordsChanged = false): void {
 
 async function refreshLocalNow(recordsChanged: boolean): Promise<void> {
   if (refreshing && !recordsChanged) return;
-  void t3Availability().then(source => {
+  void loopTrace.span('t3 availability', t3Availability).then(source => {
     board.update({ t3Availability: source });
     board.push();
   });
@@ -540,13 +536,13 @@ function afterLocalRefresh(before: Item[], recordsChanged: boolean): void {
   // A run can finish between stats reads. Read its final turn before writing the settled PR block.
   const finished = after.some((item) => running(before.find((b) => b.id === item.id) ?? item) && !running(item));
   if (finished) askForStats(true);
-  runLocal(() => commands.reconcileStarts(after));
-  runLocal(() => sweepShapingThreads?.());
+  runLocal(() => loopTrace.span('reconcile starts', () => commands.reconcileStarts(after)));
+  runLocal(() => loopTrace.span('shaping sweep', () => sweepShapingThreads?.()));
   // Before the return below, so a build that finished, or a hold that passed, starts the next build with nothing else changed.
-  runLocal(() => autoBuildRun.pass());
-  if (!recordsChanged && JSON.stringify(after) === JSON.stringify(before)) return;
+  runLocal(() => loopTrace.span('auto build', () => autoBuildRun.pass()));
+  if (!recordsChanged && loopTrace.span('local compare', () => JSON.stringify(after) === JSON.stringify(before))) return;
   board.push();
-  void syncPrStats(after);
+  void loopTrace.span('pr stats', () => syncPrStats(after));
   // A blocker completes from local facts, as a decision's answer the shaping session records, without any ticket read.
   runLocal(() => startAfter.startUnblocked());
 }
@@ -585,10 +581,10 @@ function showRecords(withStats = false): void {
 /** showRecords for the board's own refreshes, in turns of the event loop, which a command's change needn't wait for. */
 async function showRecordsInTurns(): Promise<void> {
   const seen = observations;
-  await showInTurns(board, () => recordedItemsInTurns(), null, (read) => {
+  await showInTurns(board, () => recordedItemsInTurns(), null, (read) => loopTrace.span('records apply', () => {
     board.applyRead(read, board.revision(), (shown) => withT3Reads(shown));
     shownObservations = seen;
-  });
+  }));
   if (board.snapshot().items.length > 0) moveFirstRead({ ready: true });
   recordsShown();
 }
@@ -769,13 +765,13 @@ async function refresh(): Promise<void> {
     }
     if (!items.due(pace)) return;
     loopTrace.span('read start', () => {
-      offerModelChoices();
+      loopTrace.span('model choices', offerModelChoices);
       // The app installs after the board server starts, so each read picks up the latest install's state.
-      board.update({ bundledSkills: bundledSkills() });
+      board.update({ bundledSkills: loopTrace.span('skill install state', bundledSkills) });
     });
     const { error, fetchedAt } = board.snapshot();
     // During the first read, each source's read shows its repositories' items as it lands, though another still reads.
-    const landed = (partial: ItemsRead) => {
+    const landed = (partial: ItemsRead) => loopTrace.span('read landed', () => {
       if (board.snapshot().firstRead.settled) return;
       // A read so far confirms no change the board made, as the source of one may not have read yet, and isn't the
       // whole read fetchedAt times.
@@ -785,7 +781,7 @@ async function refresh(): Promise<void> {
       const successful = items.repos().some(repo =>
         !partial.waiting?.includes(repo.repo) && !partial.problems?.some(problem => problem.repo === repo.repo));
       moveFirstRead({ waiting: partial.waiting, ...(successful || board.snapshot().items.length > 0 ? { ready: true } : {}) });
-    };
+    });
     const snapshot = await items.read({ ...firstReadProgress, landed }, pace);
     const repos = items.repos();
     // Before the first whole read, every source waited for its tool's check or was blocked by it, so nothing read: the
@@ -799,7 +795,7 @@ async function refresh(): Promise<void> {
       specWorkIds = records.list({}).filter(record => record.ticket && refs.has(record.ticket.toLowerCase())).map(record => record.workId);
     }
     await showInTurns(board, () => recordedItemsInTurns(snapshot), () => recordedItems(snapshot),
-      (read) => board.applyRead(read, readRevision, (shown) => withT3Reads(shown), items.readAfresh));
+      (read) => loopTrace.span('records apply', () => board.applyRead(read, readRevision, (shown) => withT3Reads(shown), items.readAfresh)));
     recordsShown();
     askForStats();
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting, ready: true });
@@ -1004,8 +1000,8 @@ const localTimer = setInterval(() => {
     loopTrace.span('local tick', () => runLocal(() => {
       refreshLocal();
       runLocal(() => usageCatchUp?.advance());
-      runLocal(() => prObserver?.poll());
-      if (records?.specPending().length) runLocal(() => syncSpecs(records));
+      runLocal(() => loopTrace.span('pr poll', () => prObserver?.poll()));
+      if (loopTrace.span('spec check', () => records?.specPending().length)) runLocal(() => loopTrace.span('spec sync', () => syncSpecs(records!)));
     }));
   }
 }, LOCAL_REFRESH_MS);

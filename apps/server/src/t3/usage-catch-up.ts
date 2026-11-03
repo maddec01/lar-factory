@@ -2,7 +2,7 @@
 // and again whenever threads join, and after that runs the reads the board asks for. Only one read runs at a time, and it
 // yields to the board's thread throughout, so the figures it shows come from a read that may have started a while ago.
 
-import { nextTurn } from '../startup/loop-trace.ts';
+import { loopTrace, nextTurn } from '../startup/loop-trace.ts';
 import { createReadTrace } from '../stats/read-trace.ts';
 import type { ReadTrace } from '../stats/read-trace.ts';
 import type { StatsSources } from '../stats/item-stats.ts';
@@ -182,13 +182,13 @@ export function createUsageCatchUp({ sources, threadIds, itemThreads, generation
 
   // Each ask advances in a turn of its own, apart from the refresh that asked; an urgent ask is owed at once.
   return {
-    advance: () => nextTurn().then(() => advance()),
+    advance: () => nextTurn().then(() => loopTrace.span('usage catch-up', () => advance())),
     want(urgently = false) {
       if (!finished) return Promise.resolve();
       wanted = true;
       urgent ||= urgently;
       quietUntil = 0;
-      return nextTurn().then(() => advance());
+      return nextTurn().then(() => loopTrace.span('usage catch-up', () => advance()));
     },
     reading: () => warming,
     owed: () => urgent || urgentRunning,

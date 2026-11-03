@@ -25,6 +25,7 @@ export { automaticHeavyCommandLimit, heavyCommandLimitSetting, readHeavyCommandL
 export { buildLimitSetting } from './build-limit.ts';
 export type { LimitSetting } from './limit-setting.ts';
 export { readAutoBuild, writeAutoBuild } from './auto-build.ts';
+export { acquireOwnerLock, type OwnerLease } from './owner-file.ts';
 
 /** The board's kinds, plus a build's slice. */
 export const WORK_KINDS = ['bug', 'feature', 'improvement', 'concept', 'decision', 'build', 'slice', 'issue'] as const;

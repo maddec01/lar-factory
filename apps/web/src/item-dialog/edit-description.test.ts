@@ -320,3 +320,22 @@ test.each([false, true])('Queue identity replacement preserves description edits
   await press(buttonIn(prompt()!, 'Discard'));
   expect(await isOpen()).toBe(false);
 });
+
+test('opening a concept part with unsaved changes asks first: Keep editing stays, Discard opens the part', async () => {
+  const concept: BoardData = { ...editing, items: editing.items.map((i) => (i.id === github ? { ...i, kind: 'concept' as const } : i.id === 'I_sample14' ? { ...i, parentId: github } : i)) };
+  serve(concept, { [github]: details('Old text.'), I_sample14: details('The part.') });
+  await mountPage(concept);
+  await openItem(github);
+  await press(editButton());
+  await typeAtEnd(' More.');
+  const part = () => inDialog<HTMLButtonElement>('[data-concept-part="I_sample14"] button')!;
+  await press(part());
+  expect(prompt(), 'the prompt asks first').toBeDefined();
+  await press(buttonIn(prompt()!, 'Keep editing'));
+  expect(text(editorArea())).toBe('Old text. More.');
+  await press(part());
+  await press(buttonIn(prompt()!, 'Discard'));
+  expect(prompt()).toBeUndefined();
+  expect(inDialog('[data-concept-part]')).toBeNull();
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toContain(concept.items.find((i) => i.id === 'I_sample14')!.title);
+});

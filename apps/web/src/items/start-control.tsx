@@ -94,10 +94,11 @@ export const opensOnChecked = {
 
 /**
  * Start, a Start button named `label`, or the tag that took its place; `main` makes it its area's Main action, and
- * `naming` adds the item's name to the button, for an item whose row a filter hides.
+ * `naming` adds the item's name to the button, for an item whose row a filter hides. `linkedBeside` names a thread
+ * Open thread already links beside it, so a finished or stopped run doesn't link it again.
  */
-export function StartControl({ item, data, label = 'Start', main, kind = 'refine', naming }: {
-  item: Item; data: BoardData; label?: string; main?: boolean; kind?: StartKind; naming?: boolean;
+export function StartControl({ item, data, label = 'Start', main, kind = 'refine', naming, linkedBeside }: {
+  item: Item; data: BoardData; label?: string; main?: boolean; kind?: StartKind; naming?: boolean; linkedBeside?: string | undefined;
 }) {
   const { pending, uncertain, error } = useShownStart(item, data, kind);
   const closed = useStart(item.id, kind)?.phase === 'closed';
@@ -112,7 +113,7 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
     : thread ? recorded : kind === 'refine' ? threads.find((t) => t.id !== data.startedBuilds?.[item.id]?.threadId) : undefined;
   const stopped = observed?.state === 'stopped';
   if (thread && observed?.state === 'done') {
-    return <span className="start-group"><span className="basis-full">{delegatedWorkRunning(item) || observed.hasRunningChildren ? 'Working. Parent run finished.' : 'Run finished.'}</span><OpenThread item={item} data={data} threadId={observed.id} /></span>;
+    return <span className="start-group"><span className="basis-full">{delegatedWorkRunning(item) || observed.hasRunningChildren ? 'Working. Parent run finished.' : 'Run finished.'}</span>{observed.id !== linkedBeside && <OpenThread item={item} data={data} threadId={observed.id} />}</span>;
   }
   // The toast announces a start; the tag only keeps Start from running twice.
   if (thread && !stopped && !pending) return <span className="start-group"><Badge tone="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
@@ -132,8 +133,8 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
   };
   return (
     <span className="start-group">
-      {retry ? <OpenThread item={item} data={data} iconOnly threadId={currentBuildThread(item)?.id} />
-        : stopped && <><span className="basis-full">Run stopped.</span><OpenThread item={item} data={data} threadId={observed.id} /></>}
+      {retry ? currentBuildThread(item)?.id !== linkedBeside && <OpenThread item={item} data={data} iconOnly threadId={currentBuildThread(item)?.id} />
+        : stopped && <><span className="basis-full">Run stopped.</span>{observed.id !== linkedBeside && <OpenThread item={item} data={data} threadId={observed.id} />}</>}
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
           <Button {...buttonKind(main ? 'main' : 'start')} aria-busy={pending || undefined} leftIcon={pending ? <LoaderCircle className="animate-spin" /> : !main && !retry && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}

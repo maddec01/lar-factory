@@ -11,7 +11,7 @@ import { AzureFields, ItemTitle, SliceBar, useShownStatus } from '../items/item-
 import { OpenThread } from '../items/open-thread.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partWaves, shownThread, upstreamOf, waitText } from './dossier-parts.ts';
+import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partLabel, partWaves, shownThread, threadsOf, upstreamOf, waitText } from './dossier-parts.ts';
 import type { Part, PartKind } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
 
@@ -92,15 +92,17 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
   if (complete) action = null;
   else if (item.status === 'Needs you') action = <OpenThread item={item} data={data} label="Answer in T3" />;
   else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} label="Start" />;
-  else if (open.length) action = <span className="text-[11px] text-(--muted-foreground)">Waiting on {waitText(item, open)}</span>;
-  else if (thread?.state === 'running') action = <span className="text-[11px] text-(--muted-foreground)">thread working · {shortAgo(thread.updated, now)}</span>;
+  else if (open.length) action = <span className="min-w-0 truncate text-[11px] text-(--muted-foreground)">Waiting on {waitText(item, open)}</span>;
+  else if (thread?.state === 'running') action = <span className="min-w-0 truncate text-[11px] text-(--muted-foreground)">thread working · {shortAgo(thread.updated, now)}</span>;
+  // Open thread joins anything but the card's own Start or answer, as an icon when it has to share the row.
+  const opensThread = threadsOf(item).length > 0 && (complete || !(item.status === 'Needs you' || item.status === 'Ready' || item.status === 'Queued'));
   return (
     <div style={{ width, height: NODE_H }} data-map-part={item.id}
       className={`relative flex flex-col gap-1 rounded-lg border bg-(--card) px-2.5 py-2 text-left shadow-xs ${tone} ${pickedRing(isPicked)}`}>
       <button type="button" aria-label={`Open ${ref(item)}`} onClick={() => useItemDialogStore.getState().open(item.id)} className="absolute inset-0 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_60%,transparent)]" />
       <SourceIcon item={item} corner className="pointer-events-none" />
       <span className="pointer-events-none relative flex items-center gap-1.5 pr-5 text-[11px] text-(--muted-foreground)">
-        <Icon className="size-3.5 shrink-0" /><span className="capitalize">{part.kind}</span>
+        <Icon className="size-3.5 shrink-0" />{partLabel(part.kind)}
         <span className="ml-auto inline-flex items-center gap-1" title={thread ? `T3 thread: ${thread.title} (${thread.archived ? 'archived' : thread.state})` : 'No T3 thread'}>
           {thread ? <><StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />thread</> : 'no thread'}
         </span>
@@ -112,7 +114,12 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
         <StatusGlyph status={complete ? 'Done' : shown.glyph} className="size-3" />{complete ? 'Complete' : shown.word}
         {thread && <span className="truncate text-(--muted-foreground)">· {thread.state}</span>}
       </span>
-      {action && <span className="relative flex min-h-6 min-w-0 items-center">{action}</span>}
+      {(action || opensThread) && (
+        <span className="relative flex min-h-6 min-w-0 items-center gap-1.5">
+          {action}
+          {opensThread && <span className="ml-auto shrink-0"><OpenThread item={item} data={data} threadId={thread?.id} iconOnly={Boolean(action)} /></span>}
+        </span>
+      )}
     </div>
   );
 }

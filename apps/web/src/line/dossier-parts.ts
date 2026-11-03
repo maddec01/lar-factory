@@ -2,7 +2,7 @@
 // in the order they run. Each part's kind comes from its local record, what it waits on from its blockers, and its
 // thread is its newest item thread.
 
-import { blockerRef, currentBuildThread, decisionType, openBlockers, refKey } from '@lar-factory/shared';
+import { blockerRef, currentBuildThread, decisionType, methodName, openBlockers, refKey } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'decision', 'build'] as const;
@@ -47,6 +47,9 @@ export function partKind(item: Item): PartKind {
   if (item.recorded === true) return 'build';
   return DECISION_KINDS.find(kind => kind === decision) ?? 'build';
 }
+
+/** How a part names its kind: a decision by its method, or No method when it names no valid one. */
+export const partLabel = (kind: PartKind): string => (kind === 'build' ? 'Build' : methodName(kind));
 
 /** The parts each part waits on: a recorded blocker by its work ID, a ticket's blocker by its ticket, since ticketless parts share number 0. */
 export function upstreamOf(parts: readonly Part[]): (part: Part) => Part[] {

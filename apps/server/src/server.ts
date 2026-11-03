@@ -308,6 +308,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
   if (fresh) {
     statsReadAt = now;
     statsUnavailable(unreadable);
+    board.update({ usageRead: unreadable ? { readable: false, readAt: board.snapshot().usageRead?.readAt } : { readable: true, readAt: new Date(now).toISOString() } });
     if (priced !== null) pricingUnavailable(!priced);
   }
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));

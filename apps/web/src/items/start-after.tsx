@@ -94,10 +94,10 @@ export const showsStartAfter = (item: Item, data: BoardData): boolean =>
  * disabled, its title giving the hold's reason; an armed start would fail then, so none is offered, but one armed
  * before the hold still shows while a blocker is open, so it can be disarmed.
  */
-export function StartOrAfter({ item, data, label = 'Start', kind = 'refine' }: { item: Item; data: BoardData; label?: string; kind?: StartKind }) {
+export function StartOrAfter({ item, data, label = 'Start', kind = 'refine', linkedBeside }: { item: Item; data: BoardData; label?: string; kind?: StartKind; linkedBeside?: string | undefined }) {
   if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} />;
   const hold = startHold(data, item.repo);
-  if (!hold) return <StartControl item={item} data={data} label={label} kind={kind} />;
+  if (!hold) return <StartControl item={item} data={data} label={label} kind={kind} linkedBeside={linkedBeside} />;
   // Pointer events stay on while it's disabled, so its title says why.
   return (
     <Button {...buttonKind('start')} leftIcon={ICON.play} className="disabled:pointer-events-auto" data-start={item.id} disabled title={hold}>

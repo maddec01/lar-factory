@@ -215,8 +215,14 @@ test('shaping questions target the older question and leave the desk on a board 
   expect(nextLine('I_sample12')).toBe('Answer in T3');
   expect(card('I_sample12').querySelector('a')?.getAttribute('href')).toBe('t3code://threads/sample-environment/question');
   await settle(() => card('I_sample12').click());
-  expect(dialog()!.querySelector('[data-open-thread]')?.getAttribute('href')).toBe('t3code://threads/sample-environment/question');
+  expect([...dialog()!.querySelectorAll('[data-slot="modal-footer"] [data-open-thread]')].map((a) => [text(a), a.getAttribute('href')])).toEqual([
+    ['Open thread', 't3code://threads/sample-environment/newer'], ['Answer in T3', 't3code://threads/sample-environment/question']]);
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...data, items: data.items.map(item => item.id === 'I_sample12' ? { ...item, threads: [] } : item) }));
   expect(card('I_sample12')).toBeNull();
+});
+
+test.each([['prototype', 'Prototype'], [null, 'No method']] as const)('a decision\'s card with method %s names %s', async (decisionMethod, name) => {
+  await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample12' ? { ...i, kind: 'decision' as const, decisionMethod } : i)) });
+  expect(text($('[data-item="I_sample12"] .desk-meta'))).toContain(`· ${name} ·`);
 });

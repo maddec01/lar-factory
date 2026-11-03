@@ -4,7 +4,7 @@
 // step track; and the actions, the card's action on the left and Open thread as an icon in the right corner. Only a
 // Ready card's start message or Start after error, under its actions, makes one card taller than the rest.
 
-import { needsAnswer, openQuestionThread, HINTS, itemPr, openBlockerRefs, itemName, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
+import { decisionMethodName, needsAnswer, openQuestionThread, HINTS, itemPr, openBlockerRefs, itemName, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -69,6 +69,12 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
   );
 }
 
+/** The status's neighbours on one line, which may truncate, so its tooltip keeps them whole. */
+function DeskFacts({ facts }: { facts: (string | null)[] }) {
+  const text = facts.filter(Boolean).join(' · ');
+  return <span className="truncate text-(--muted-foreground)" title={text}>· {text}</span>;
+}
+
 function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: number }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   // The card takes the click; its summary is a button too, so the keyboard can open the dialog.
@@ -79,7 +85,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
       <button type="button" className="grid min-w-0 gap-2 text-left">
         <span className="desk-meta flex h-4 min-w-0 items-center gap-2 pr-4 text-xs">
           <StatusGlyph status={item.status} /><span className="shrink-0 font-semibold text-(--warning-foreground)">{item.status}</span>
-          <span className="truncate text-(--muted-foreground)">· {repoName(repoKey(item), data.repos)} · {shortAgo(item.updatedAt, now)}</span>
+          <DeskFacts facts={[decisionMethodName(item), repoName(repoKey(item), data.repos), shortAgo(item.updatedAt, now)]} />
         </span>
         {/* Two lines tall whatever the title's length, so the rows under it start at the same height on every card. */}
         <span className="desk-title line-clamp-2 h-10 text-sm/5 font-medium" title={`${itemName(item)}`}><ItemTitle item={item} /></span>

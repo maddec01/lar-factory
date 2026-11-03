@@ -1,6 +1,6 @@
 import { expect, test } from 'vite-plus/test';
 import { fetchMock, sample, settle } from '../../test/support.ts';
-import { detection, posted, project, serve } from './onboarding-support.ts';
+import { detection, empty, posted, project, serve } from './onboarding-support.ts';
 import type { SetupDetection } from '@lar-factory/shared';
 
 async function start(found: SetupDetection = detection()) {
@@ -13,6 +13,33 @@ async function start(found: SetupDetection = detection()) {
   await settle(() => useWizardStore.getState().next());
   return { wizard: useWizardStore, ready: () => { const { run, projects, detection: read } = useWizardStore.getState(); return stepReady(run!, projects, read); } };
 }
+
+const noRepo = { repo: null, provider: null };
+
+test('each project that can\'t be picked gets its own reason', async () => {
+  const { unpickable } = await import('./wizard-store.ts');
+  const run = { step: 'project', projectId: null, repo: null, provider: null, savedAs: null, choices: {} } as const;
+  const repo = 'maddec01/lar-web';
+  const onBoard = project('lar-web', { onBoard: true });
+  expect(unpickable(project('lar-web'), run, empty)).toBeNull();
+  expect(unpickable(project('app', { ...noRepo, blocked: 'linked-worktree' }), run, empty)).toBe('This folder is a git worktree. Add its main checkout instead.');
+  expect(unpickable(project('app', { ...noRepo, blocked: 'no-provider-origin' }), run, empty)).toBe('This folder has no GitHub or Azure DevOps origin.');
+  expect(unpickable(onBoard, run, empty)).toBe('This repository is already on the board.');
+  expect(unpickable(onBoard, run, { onboarding: [{ repo, progress: { step: 'work', done: [], answers: { projectId: 'lar-web' } } }] })).toBe('Setup is already in progress. Close this window and choose Resume.');
+  expect(unpickable(onBoard, { ...run, savedAs: repo }, empty)).toBeNull();
+});
+
+test('adding a folder T3 lists as a worktree shows the same reason and picks nothing', async () => {
+  const added = project('app', { ...noRepo, blocked: 'linked-worktree' });
+  serve(sample, [], { error: null }, 200, { '/api/onboarding/projects': (body) => 'folder' in body ? { projects: [added], projectId: 'app' } : { projects: [] } });
+  const { useWizardStore } = await import('./wizard-store.ts');
+  await settle(() => useWizardStore.getState().start());
+  useWizardStore.getState().chooseNew();
+  useWizardStore.getState().setFolder('~/app');
+  await settle(() => useWizardStore.getState().createProject());
+  expect(useWizardStore.getState().creating?.error).toBe("T3 Code added the project, but it can't be picked: This folder is a git worktree. Add its main checkout instead.");
+  expect(useWizardStore.getState().run?.projectId).toBeNull();
+});
 
 test('onboarding chooses a source without importing individual tickets or changing repository files', async () => {
   const { wizard, ready } = await start();

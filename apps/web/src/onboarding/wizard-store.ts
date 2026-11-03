@@ -46,7 +46,7 @@ export function unpickable(project: ProjectChoice, run: Run, data: Pick<BoardDat
   if (project.onBoard && !(project.repo && run.savedAs && sameRepo(project.repo, run.savedAs))) {
     return isOnboarding(data, project.repo) ? 'Setup is already in progress. Close this window and choose Resume.' : 'This repository is already on the board.';
   }
-  if (!project.repo) return 'Choose a repository folder connected to GitHub or Azure DevOps.';
+  if (!project.repo) return project.blocked === 'linked-worktree' ? 'This folder is a git worktree. Add its main checkout instead.' : 'This folder has no GitHub or Azure DevOps origin.';
   return null;
 }
 

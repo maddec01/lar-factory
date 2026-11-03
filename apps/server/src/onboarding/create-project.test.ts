@@ -16,7 +16,7 @@ function home(t: TestContext): string {
 }
 
 const choice = (id: string, folder: string): ProjectChoice =>
-  ({ id, name: id, folder, repo: `maddec01/${id}`, provider: 'GitHub', onBoard: false });
+  ({ id, name: id, folder, shownFolder: folder, repo: `maddec01/${id}`, provider: 'GitHub', blocked: null, onBoard: false });
 
 test('adds the folder to T3 and answers with T3\'s projects and the new one\'s id', async (t) => {
   const dir = home(t);
@@ -33,6 +33,13 @@ test('finds the new project when T3 keeps the folder by another path to it', asy
   symlinkSync(join(dir, 'lar-web'), join(dir, 'link'));
   const projects = [choice('lar-web', join(dir, 'lar-web'))];
   const answer = await createProject({ folder: join(dir, 'link') }, async () => projects, { HOME: dir }, async () => null);
+  assert.deepEqual(answer, { projects, projectId: 'lar-web' });
+});
+
+test('a project that can\'t be picked comes back with why', async (t) => {
+  const dir = home(t);
+  const projects = [{ ...choice('lar-web', join(dir, 'lar-web')), repo: null, provider: null, blocked: 'linked-worktree' as const }];
+  const answer = await createProject({ folder: join(dir, 'lar-web') }, async () => projects, { HOME: dir }, async () => null);
   assert.deepEqual(answer, { projects, projectId: 'lar-web' });
 });
 

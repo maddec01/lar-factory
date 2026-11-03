@@ -343,6 +343,8 @@ export interface WorkRecords extends ValidationRecords, TrackerCache, Publicatio
   addThread(workId: string, revision: number, threadId: string, purpose: string): WorkRecord;
   /** Its recorded threads, oldest first. */
   threads(workId: string): RecordedThread[];
+  /** Every record's recorded threads, oldest first, by work ID, in one read; a record with none is left out. */
+  threadsByWork(): Map<string, RecordedThread[]>;
   /** Records that the board is about to ask T3 for a thread, before it asks. */
   recordLaunchIntent(workId: string, revision: number, purpose: string, recovery?: { branch: string; reset: boolean; message?: string }, shapingThreadCleanup?: SavedShapingThreadCleanup): { record: WorkRecord; intent: LaunchIntent };
   /** The matching intents in the order they were recorded. */
@@ -715,6 +717,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
   const resolveIntent = db.prepare('UPDATE launch_intents SET thread_id = ?, failure = ?, resolved_at = ? WHERE intent_id = ?');
   const threadHolder = db.prepare('SELECT work_id FROM threads WHERE thread_id = ?');
   const threadRows = db.prepare('SELECT * FROM threads WHERE work_id = ? ORDER BY rowid');
+  const allThreadRows = db.prepare('SELECT * FROM threads ORDER BY rowid');
+  const fromThreadRow = (row: Record<string, unknown>): RecordedThread =>
+    ({ threadId: String(row.thread_id), purpose: String(row.purpose), recordedAt: String(row.recorded_at), deletedAt: row.deleted_at as string | null });
   const addThreadRow = db.prepare('INSERT INTO threads (thread_id, work_id, purpose, recorded_at) VALUES (?, ?, ?, ?)');
   const intent = (intentId: string) => fromIntentRow(database.read(() => selectIntent.get(intentId)) as unknown as IntentRow);
   const insertThread = (workId: string, threadId: string, purpose: string) => {
@@ -1167,8 +1172,17 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     },
     threads: (workId) => database.read(() => {
       find(workId);
-      return threadRows.all(workId)
-        .map((row) => ({ threadId: String(row.thread_id), purpose: String(row.purpose), recordedAt: String(row.recorded_at), deletedAt: row.deleted_at as string | null }));
+      return threadRows.all(workId).map(fromThreadRow);
+    }),
+    threadsByWork: () => database.read(() => {
+      const byWork = new Map<string, RecordedThread[]>();
+      for (const row of allThreadRows.all()) {
+        const workId = String(row.work_id);
+        const threads = byWork.get(workId);
+        if (threads) threads.push(fromThreadRow(row));
+        else byWork.set(workId, [fromThreadRow(row)]);
+      }
+      return byWork;
     }),
     recordLaunchIntent: (workId, revision, purpose, recovery, shapingThreadCleanup) => {
       const checked = checkPurpose(purpose);

@@ -45,6 +45,25 @@ test("an item's threads are its record's thread IDs and their children, whatever
   assert.deepEqual(time(['a', 'a'])?.threads, ['a'], 'a thread recorded twice counts once');
 });
 
+test("a shaping thread's figures take in its subagents, its delegated tasks and their children, as a build's do", () => {
+  const time = agentTime(rows({
+    threads: [
+      { id: 'shape', title: 'shape', deletedAt: null, root: 'shape', parent: null, text: '$lar-shape maddec01/lar-factory#7' },
+      { id: 'subagent', title: 'subagent', deletedAt: null, root: 'shape', parent: 'shape', text: null },
+      { id: 'delegated', title: 'delegated', deletedAt: null, root: 'shape', parent: 'shape', text: null },
+      { id: 'delegated-child', title: 'delegated-child', deletedAt: null, root: 'shape', parent: 'delegated', text: null },
+    ],
+    turns: [
+      { id: 't1', thread: 'shape', providerThread: 'p1', status: 'completed', startedAt: at(0), completedAt: at(10) },
+      { id: 't2', thread: 'subagent', providerThread: 'p2', status: 'completed', startedAt: at(10), completedAt: at(15) },
+      { id: 't3', thread: 'delegated', providerThread: 'p3', status: 'completed', startedAt: at(20), completedAt: at(30) },
+      { id: 't4', thread: 'delegated-child', providerThread: 'p4', status: 'completed', startedAt: at(30), completedAt: at(32) },
+    ],
+  }), Date.parse(at(60)));
+  // The record holds only the shape thread; its family comes through the lineage root.
+  assert.deepEqual(time(['shape']), { agentMs: 27 * MIN, wallMs: 27 * MIN, threads: ['shape', 'subagent', 'delegated', 'delegated-child'] });
+});
+
 test('an open turn on an active provider thread runs up to now; on an idle one it stops at the thread\'s last activity', () => {
   const now = Date.parse(at(30));
   const threads = [{ id: 'root', title: 'root', deletedAt: null, root: 'root', parent: null, text: 'Build x/y#1' }];

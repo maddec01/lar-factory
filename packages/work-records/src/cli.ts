@@ -4,6 +4,7 @@
 // and each error as one line on stderr.
 
 import { checkCommand } from './check-runner.ts';
+import { heavyCommand } from './heavy-command.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -38,6 +39,29 @@ Validation records, local only and requiring no revision
                                     Save {"tests":["test name"],"diagnosis":"cause"}.
   resolve-failure <check-id> --reason X
                                     Close a failure with its cause or fix. A pass never closes it.
+
+Heavy commands, needing no work ID or board
+  heavy [--data-dir D] -- <command>
+                                    Wait for a free slot, then run the command and
+                                    exit with its status. Slots live in the data
+                                    folder and are shared by every build, project
+                                    and worktree on this machine. The heavy command
+                                    limit, set in the board's Settings, is the
+                                    number of slots. The command's words run
+                                    without a shell, so use sh -c for a compound
+                                    command. It gets no stdin. A heavy command
+                                    inside one holding a slot runs at once. If the
+                                    slots can't be used, it runs anyway after a
+                                    warning. A termination signal reaches only the
+                                    command's process group, which is killed if it
+                                    is still running a few seconds later. Exits 2
+                                    with no command, 127 when the command isn't
+                                    found, 126 when it can't start otherwise, and
+                                    128 plus N when signal N kills it.
+                                    The limit applies only to commands wrapped this
+                                    way. It doesn't cap a command's own workers,
+                                    control other applications, or guarantee free
+                                    CPU or memory.
 
 Identifiers
   A work ID names one work record for its whole life. create and import print it.
@@ -626,6 +650,7 @@ async function run(records: WorkRecords, command: string, workId: string | undef
 
 async function main(args: string[]): Promise<number> {
   if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
+  if (args[0] === 'heavy') return heavyCommand(args);
   let parsed;
   try {
     parsed = parseArgs({ args, options: OPTIONS, allowPositionals: true });

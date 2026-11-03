@@ -142,7 +142,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
           <RepoTag repo={repoKey(item)} repos={data.repos} />
           <StatusGlyph status={shown.glyph} /> <span className="font-medium text-base-content">{shown.word}</span>
           <span className="min-w-0 truncate @max-[30rem]:hidden">· updated {shortAgo(item.updatedAt, now)}</span>
-          {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)" title={blockedText(item) ?? undefined}>blocked by {openBlockers(item).length}<span className="sr-only">. {blockedText(item)}</span></span>}
+          {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)" >{blockedText(item)}</span>}
         </div>
         {item.parent && <p className="m-0 min-w-0 wrap-anywhere" data-item-parent>Part of {item.parent.url
           ? <a href={item.parent.url} target="_blank" rel="noopener" className="underline">{itemName(item.parent)}</a> : itemName(item.parent)}</p>}

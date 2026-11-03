@@ -23,8 +23,15 @@ test.each<[string, Partial<Item>, string]>([
   expect(source?.getAttribute('aria-label')).toBe(label);
   expect(source?.getAttribute('title')).toBe(label);
   expect(source?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
-  expect(source?.className.split(' ')).toEqual(expect.arrayContaining(['absolute', 'top-0', 'right-0', 'size-6']));
+  expect(source?.className.split(' ')).toEqual(expect.arrayContaining(['size-5', 'border']));
   expect(card.querySelector('[role="img"][tabindex]')).toBeNull();
+});
+
+test('planning saved only on this Mac is a note in the source icon\'s tooltip, not a line on the card', async () => {
+  await mountPage(board({ ...local, number: 17, sync: { state: 'pending', message: 'Waiting on GitHub' } } as Item));
+  const source = $('.desk-card [role="img"]')!;
+  expect(source.getAttribute('title')).toBe('GitHub issue. Saved on GitHub. Planning is saved on this Mac.');
+  expect($('.desk-card')!.querySelector('[data-structure-sync]')).toBeNull();
 });
 
 test.each(['map', 'list'])('dossier parts identify their own source in the %s view', async view => {

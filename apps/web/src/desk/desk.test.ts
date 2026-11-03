@@ -29,7 +29,7 @@ test('the desk shows what only you can move, counted, as cards in one row that s
 test('a desk card shows its status, repository and age, numbered title, then its next step beside its action', async () => {
   await mountPage();
   const rows = [...card('I_sample16').querySelector('button')!.children];
-  expect(rows.map(text)).toEqual(['Verify· lar-apple · 1h ago', '#31 New artwork grid layout']);
+  expect(rows.map(text)).toEqual(['Verify🍎lar-appleFeature1h ago', '#31 New artwork grid layout']);
   expect(nextLine('I_sample16')).toBe('can merge · 1 passed');
   expect(card('I_sample16').querySelector('ol'), 'no status track').toBeNull();
 });
@@ -210,5 +210,5 @@ test('shaping questions target the older question and leave the desk on a board 
 
 test.each([['prototype', 'Prototype'], [null, 'No method']] as const)('a decision\'s card with method %s names %s', async (decisionMethod, name) => {
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample12' ? { ...i, kind: 'decision' as const, decisionMethod } : i)) });
-  expect(text($('[data-item="I_sample12"] .desk-meta'))).toContain(`· ${name} ·`);
+  expect(text($('[data-item="I_sample12"] .desk-meta'))).toContain(name);
 });

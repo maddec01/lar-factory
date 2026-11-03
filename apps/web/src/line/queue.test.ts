@@ -43,7 +43,7 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample05', 'I_sample06', 'I_sample21']);
   expect(text(queue().querySelector('#queue-h'))).toBe('Queue 3');
   expect(rows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
-  expect(text(row('I_sample05').querySelector('.queue-title'))).toBe(`#129 ${sample05.title}`);
+  expect(text(row('I_sample05').querySelector('[data-title]'))).toBe(`#129 ${sample05.title}`);
   expect(text(row('I_sample05').querySelector('[data-repo-cell]'))).toBe('Llar-server');
   expect(text(row('I_sample05').querySelector('.queue-age'))).toBe('2h ago');
   expect(text(row('I_sample21').querySelector('.queue-age'))).toBe('24h ago');
@@ -96,9 +96,9 @@ test('an empty Queue says where items come from, and has no Start next', async (
 
 test('a row opens the item dialog and stays marked while it shows', async () => {
   await mountPage();
-  await settle(() => row('I_sample06').querySelector<HTMLButtonElement>('.queue-title')!.click());
+  await settle(() => row('I_sample06').querySelector<HTMLButtonElement>('[data-row-open]')!.click());
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`);
-  expect(row('I_sample06').className).toContain('ring-2');
+  expect(row('I_sample06').innerHTML).toContain('ring-2');
 });
 
 test('a Queued item blocked by an open issue shows only Start after, a Start, and Start next passes over it', async () => {
@@ -107,7 +107,8 @@ test('a Queued item blocked by an open issue shows only Start after, a Start, an
   await mountPage(blocked);
   expect(row('I_sample05').querySelector('[data-start]'), 'no disabled Start beside it').toBeNull();
   const after = row('I_sample05').querySelector<HTMLElement>('[data-start-after]')!;
-  expect([text(after), after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual(['Start after #202 ▾', 'start', true]);
+  expect([text(after), after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual(['Start after ▾', 'start', true]);
+  expect(text(row('I_sample05').querySelector('[data-blocked]'))).toBe('Blocked by #202 until it completes');
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 

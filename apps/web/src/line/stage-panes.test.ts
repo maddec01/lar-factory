@@ -78,6 +78,35 @@ test("Build's header counts the factory's builds against the limit, one bar per 
   expect(text($('.build-slots'))).toBe('1/2 building');
 });
 
+test('a row\'s controls are their own focus stops, none nested in the button that opens details', async () => {
+  await mountPage(loose);
+  for (const id of ['I_sample13', 'I_sample14']) {
+    const open = opener(id);
+    expect([open.tagName, open.type, open.tabIndex, open.querySelector('a, button, [tabindex]')]).toEqual(['BUTTON', 'button', 0, null]);
+    open.focus();
+    expect(document.activeElement).toBe(open);
+    const others = [...row(id).querySelectorAll<HTMLElement>('a, button')].filter((el) => el !== open);
+    expect(others.length, 'its slice count and action').toBeGreaterThan(0);
+    for (const other of others) expect(open.contains(other)).toBe(false);
+    open.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  }
+  expect(opener('I_sample14').className, 'a visible focus ring').toContain('focus-visible:outline-2');
+});
+
+test('a run known to be running with no progress details says Working, and the missing telemetry stays out of the row', async () => {
+  await mountPage(withItem('I_sample14', { status: 'In progress', buildPhase: null, threads: [thread('t1', 'running')] }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() }));
+  expect(text(state('I_sample14'))).toBe('Working');
+  expect(text(row('I_sample14')), 'no telemetry note').not.toContain('unavailable');
+});
+
+test('rows share their columns down all four sections', async () => {
+  await mountPage(withItem('I_sample13', { blockers: [] }));
+  const grid = (el: Element) => el.querySelector('[data-row-open]')!.className.split(' ').filter((c) => c.includes('grid-cols')).join(' ');
+  const inEach = ['.queue', '[data-stage="shaping"] [data-scroll]', '[data-ready]', '[data-stage="build"]'].map((section) => $(`${section} li[data-item]`)!);
+  expect(new Set(inEach.map(grid)).size).toBe(1);
+  expect(inEach.every((li) => li.querySelector('[data-repo-cell]') && li.querySelector('[data-col="state"]') && li.querySelector('[data-col="side"]'))).toBe(true);
+});
+
 test('a part names its concept on its stage row', async () => {
   await mountPage();
   expect(text(row2('I_sample13').querySelector('[data-concept]'))).toBe('Concept: lar cloud: website sign-in and relay');
@@ -115,7 +144,7 @@ test("scoped to a repository whose items haven't landed yet, the main area says 
   expect([$('[data-reading]'), $('[data-stage="build"]') !== null]).toEqual([null, true]);
 });
 
-test('a row shows the status glyph, the numbered title and one line of meta: source, repository, status, PR and a red badge while blocked', async () => {
+test('a row is one line: the status glyph, source and repository, kind, the numbered title, status, PR and a red note while blocked', async () => {
   await mountPage(loose);
   const title = row('I_sample13').querySelector('[data-title]')!;
   expect([text(title), title.getAttribute('title')]).toEqual(['#140 Owner accounts', '#140 Owner accounts']);
@@ -126,9 +155,10 @@ test('a row shows the status glyph, the numbered title and one line of meta: sou
   expect(cell.previousElementSibling!.getAttribute('aria-label'), 'the source icon sits beside it').toBe('GitHub issue. Saved on GitHub.');
   expect(text(meta('I_sample14').querySelector('[data-state]'))).toBe('In progress');
   expect(text(meta('I_sample14'))).toContain('PR #33 (draft)');
-  const badge = meta('I_sample13').querySelector<HTMLElement>('.sr-only')!;
-  expect(text(badge), 'what blocks it is read out, not only a hover title').toBe('. Blocked by #202 until it completes');
-  expect(badge.parentElement!.outerHTML).toContain('danger');
+  const blocked = meta('I_sample13').querySelector<HTMLElement>('[data-blocked]')!;
+  expect([text(blocked), blocked.title], 'what blocks it reads once, in full on hover').toEqual(['Blocked by #202 until it completes', 'Blocked by #202 until it completes']);
+  expect(blocked.outerHTML).toContain('danger');
+  expect(text(row('I_sample13')).match(/Blocked by/gi), 'no second copy for a screen reader').toHaveLength(1);
   expect(row('I_sample14').querySelector('[data-row-open] [data-open-thread]'), 'the action is no part of the button that opens details').toBeNull();
 });
 
@@ -137,14 +167,14 @@ test('no row has a coloured repository dot', async () => {
   expect($('[data-stage="build"] [class*="repo-tone"]:not([data-project-icon])')).toBeNull();
 });
 
-test('the badge counts the blocked-by issues still open', async () => {
+test('the note names the blocked-by issues still open', async () => {
   await mountPage(withItem('I_sample13', { blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
   ] }, loose));
-  expect(text(meta('I_sample13'))).toContain('blocked by 1');
+  expect(text(meta('I_sample13'))).toContain('Blocked by #202 until it completes');
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
     .receive(withItem('I_sample13', { blockers: [] }, loose)));
-  expect(meta('I_sample13').textContent, 'with no open issue listed, nothing blocks').not.toContain('blocked by');
+  expect(meta('I_sample13').textContent, 'with no open issue listed, nothing blocks').not.toContain('Blocked by');
   expect(text(side('I_sample13'))).toBe('Open thread');
 });
 
@@ -154,12 +184,11 @@ test('a Dependency holds the badge until it is marked met, whatever its ticket s
       met: met ? { by: 'pedro', at: '2026-10-21T08:00:00Z' } : null, needsReview: false,
       observation: { subject: 'maddec01/lar-server#40', kind: 'closed' as const, detail: null, observedAt: '2026-10-21T09:00:00Z', lastGood: null } } });
   await mountPage(withItem('I_sample13', { blockers: [dependency(false)] }, loose));
-  const badge = [...meta('I_sample13').children].find((el) => text(el).startsWith('blocked by 1')) as HTMLElement;
-  expect(badge.title).toBe('Blocked by the Dependency on server team until you mark it met');
-  expect(text(badge.querySelector('.sr-only'))).toBe('. Blocked by the Dependency on server team until you mark it met');
+  const note = meta('I_sample13').querySelector<HTMLElement>('[data-blocked]')!;
+  expect([text(note), note.title]).toEqual(['Blocked by the Dependency on server team until you mark it met', 'Blocked by the Dependency on server team until you mark it met']);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
     .receive(withItem('I_sample13', { blockers: [dependency(true)] }, loose)));
-  expect(meta('I_sample13').textContent).not.toContain('blocked by');
+  expect(meta('I_sample13').textContent).not.toContain('Blocked by');
 });
 
 test('the figures show agent time, tokens and cost on one line, or nothing before any thread worked on it', async () => {
@@ -208,19 +237,21 @@ test('Start after on a blocked Ready row arms its start on the picked model, the
   await press(entries()[1]!);
   expect(posted()).toEqual([['/api/arm', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   await answer({ error: null, board: { ...blocked, armed: { I_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } } });
-  expect([text(after()), after().getAttribute('aria-pressed')]).toEqual(['Starts after #202 ✓', 'true']);
+  expect([text(after()), after().getAttribute('aria-pressed')]).toEqual(['Starts after ✓', 'true']);
+  expect(after().title).toBe('Starts by itself once #202 completes. Pressing it again disarms it');
   await press(after());
   expect(posted().at(-1)).toEqual(['/api/disarm', { session: 's1', itemId: 'I_sample13' }]);
   await answer({ error: null, board: { ...blocked, armed: {} } });
-  expect(text(after())).toBe('Start after #202 ▾');
+  expect(text(after()), 'the row already says what blocks it').toBe('Start after ▾');
+  expect(after().title, 'nothing starts by itself until it is armed').toBe('Pick a model to start it once #202 completes');
 });
 
-test("Start after names the last open blocker, another repository's without its owner, and its title and label name it in full", async () => {
+test("Start after leaves the blocker to the row's note, and its title and label name it in full", async () => {
   await mountPage(withItem('I_sample13', { status: 'Ready', blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 12, repo: 'maddec01/lar-apple', state: 'open' },
   ] }, loose));
   const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
-  expect([text(after), after.title]).toEqual(['Start after lar-apple#12 ▾', 'Starts by itself once #202, maddec01/lar-apple#12 complete']);
+  expect([text(after), after.title]).toEqual(['Start after ▾', 'Pick a model to start it once #202, maddec01/lar-apple#12 complete']);
   expect(after.getAttribute('aria-label')).toBe('Start #140 Owner accounts after maddec01/lar-apple#12');
 });
 
@@ -245,7 +276,7 @@ test('a start armed before its repository lost its T3 project still shows Starts
   await mountPage(armed);
   expect(startBuild(), 'a blocker holds it too, so Start after stands alone').toBeNull();
   const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
-  expect([text(after), after.getAttribute('aria-pressed')]).toEqual(['Starts after #202 ✓', 'true']);
+  expect([text(after), after.getAttribute('aria-pressed')]).toEqual(['Starts after ✓', 'true']);
   await press(after);
   expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'I_sample13' }]]);
   await answer({ error: null, board: { ...armed, armed: {} } });
@@ -397,7 +428,7 @@ test('a moved build whose thread stopped before a phase offers Retry start, with
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive(moved({ startProgress: { I_sample13: { build: { phase: 'starting' } } } })));
   expect(text(startBuild())).toBe('Starting…');
-  expect(text(state('I_sample13'))).toBe('In progress · Starting');
+  expect(text(state('I_sample13')), 'Start build already says Starting').toBe('In progress');
 });
 
 test('a thread Start refining opened this board run is not taken for the build\'s', async () => {

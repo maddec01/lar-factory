@@ -45,8 +45,8 @@ export function threadText(item: Item, working: boolean): string {
 export const lastSeen = (thread: ItemThread): string => (thread.observedAt ? `, last seen ${clock(thread.observedAt, undefined)}` : '');
 
 /** Where to act on an item that waits on you. */
-export function OnYourDesk({ status }: { status: Status }) {
-  return <span className="inline-flex items-center gap-1 text-(--warning-foreground)"><StatusGlyph status={status} className="size-3" />on your desk</span>;
+export function OnYourDesk() {
+  return <span className="text-(--warning-foreground)">on your desk</span>;
 }
 
 export const statsOf = (item: Item): ItemStats | null => (item.stats && item.stats !== 'unavailable' ? item.stats : null);

@@ -1,16 +1,20 @@
-// The layout of onboarding's questions: Choice, Field and Group lay out every question onboarding asks, one to a row with
-// its label and one line of help.
+// The layout of onboarding's questions: Choice, Field and Group lay out every question onboarding asks, one to a row.
 
 import { useId, type ReactNode } from 'react';
 import { Field as LabelledField } from '@lar-factory/ui/design-system/Field';
 import { RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 
-/** One choice of a radio group: its title, then a line of detail. */
-export function Choice({ value, title, children, disabled }: { value: string; title: ReactNode; children?: ReactNode; disabled?: boolean }) {
+/**
+ * One choice of a radio group, on one line. The copied item's own label can't shrink, so a long title wouldn't truncate;
+ * this label sits beside the bare radio instead.
+ */
+export function Choice({ value, children }: { value: string; children: ReactNode }) {
+  const id = useId();
   return (
-    <div data-choice={value} className={`rounded-lg border border-base-300 px-3 py-2.5 has-data-[state=checked]:border-primary/60 has-data-[state=checked]:bg-primary/8 ${disabled ? 'opacity-60' : ''}`}>
-      <RadioGroupItem value={value} disabled={disabled} label={title} description={children} />
+    <div data-choice={value} className="flex items-center gap-2 rounded-lg border border-base-300 px-3 py-1.5 has-data-[state=checked]:border-primary/60 has-data-[state=checked]:bg-primary/8">
+      <RadioGroupItem id={id} value={value} />
+      <label htmlFor={id} className="flex min-w-0 flex-1 cursor-pointer text-sm">{children}</label>
     </div>
   );
 }
@@ -42,7 +46,7 @@ export function Field({ name, label, hint, problem, invalid = false, children }:
 /** A group of choices on its own row: its legend, one line of help, then the choices. */
 export function Group({ legend, hint, children }: { legend: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <Fieldset unstyled className="grid gap-2">
+    <Fieldset unstyled className="grid min-w-0 gap-2">
       <FieldsetLegend>{legend}</FieldsetLegend>
       {hint && <p className="m-0 -mt-1 text-xs text-base-700">{hint}</p>}
       {children}

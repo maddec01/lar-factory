@@ -650,6 +650,8 @@ export interface BoardData {
   heavyCommandLimit?: HeavyCommandLimitState;
   /** This machine's build limit and the number Automatic gives here, the heavy command limit. Absent in sample mode. */
   buildLimit?: BuildLimitState;
+  /** This machine's Auto-build switch and model. Absent in sample mode. */
+  autoBuild?: AutoBuildState;
 }
 
 /** What the board does to an item's shaping threads once Start build records a build thread. */
@@ -664,6 +666,11 @@ export interface HeavyCommandLimitState { limit: HeavyCommandLimit; automatic: n
 /** How many builds may work at once on this machine: Automatic, which follows the heavy command limit, or a whole number from 1. */
 export type BuildLimit = HeavyCommandLimit;
 export type BuildLimitState = HeavyCommandLimitState;
+
+/** This machine's Auto-build: whether the board starts eligible Ready builds by itself, and on which model; none leaves it to T3 ("T3 default"). */
+export interface AutoBuild { on: boolean; model?: ModelChoice }
+/** The saved Auto-build, and why a file that couldn't be read or held an invalid value counts as off. */
+export type AutoBuildState = AutoBuild & { problem?: string };
 
 /** The number a limit allows: the saved number, or the one Automatic gives. */
 export const limitNumber = ({ limit, automatic }: HeavyCommandLimitState): number => (limit === 'automatic' ? automatic : limit);

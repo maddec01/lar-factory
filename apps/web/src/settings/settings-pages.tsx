@@ -11,6 +11,7 @@ import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
+import { AutoBuildModelSetting } from './auto-build-model.tsx';
 import { LimitSetting } from './limit-setting.tsx';
 import { ShapingThreadCleanupSetting } from './shaping-thread-cleanup.tsx';
 import { TargetProgress } from './target-progress.tsx';
@@ -262,6 +263,11 @@ export function pages(input: PagesInput): Page[] {
         id: 'build-limit', title: 'Builds at once',
         description: 'How many builds may work at once on this Mac, across all repositories. Automatic follows the heavy command limit. Start build and Start after always go ahead, even past this limit.',
         control: custom(() => null), below: <LimitSetting name="build-limit" label="Builds at once" field="Build limit" state={data.buildLimit} />,
+      }] },
+      { title: 'Auto-build', rows: [{
+        id: 'auto-build-model', title: 'Auto-build model',
+        description: 'The model of the build threads Auto-build starts. T3 default leaves it to T3. Turn Auto-build on in the Shaping header.',
+        control: custom(() => null), below: <AutoBuildModelSetting state={data.autoBuild} groups={data.modelChoices} />,
       }] },
       { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },
     ] },

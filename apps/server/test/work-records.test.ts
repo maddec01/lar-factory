@@ -7,7 +7,7 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { BoardData, Item, ItemDetails } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
-import { LAR_WORK, larWork, startBoard, until } from './server-support.ts';
+import { LAR_WORK, larWork, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
 
 test('the board lists the records lar-work writes while it runs, and their next change', { timeout: 30_000 }, async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')], recorded: false });
@@ -152,12 +152,34 @@ test('the build limit reads Automatic at the heavy command limit, follows it, sa
   assert.deepEqual((await saved.json() as { board: BoardData }).board.buildLimit, { limit: 1, automatic: 5 });
 });
 
-test('in sample mode both limits are absent and saving them is refused', async (t) => {
+test('Auto-build reads off on T3 default on a fresh machine, saves its switch and an offered model, and refuses anything else', { timeout: 30_000 }, async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-board-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  const board = await startBoard(t, { recorded: false }, false, false, { HOME: home, ...SAMPLE_MODELS });
+  const fresh = await until(board, (d) => d.fetchedAt !== null);
+  assert.deepEqual(fresh.autoBuild, { on: false });
+  const [group] = fresh.modelChoices;
+  const model = { instanceId: group!.instanceId, model: group!.models[0]!.slug };
+
+  const on = await board.postSession({ on: true }, '/api/auto-build');
+  assert.equal(on.status, 200);
+  assert.deepEqual((await on.json() as { board: BoardData }).board.autoBuild, { on: true });
+  const chosen = await board.postSession({ model }, '/api/auto-build');
+  assert.deepEqual((await chosen.json() as { board: BoardData }).board.autoBuild, { on: true, model });
+  const gone = await board.postSession({ model: { instanceId: group!.instanceId, model: 'no-such-model' } }, '/api/auto-build');
+  assert.equal(gone.status, 422);
+  const refused = await board.postSession({ on: 'yes' }, '/api/auto-build');
+  assert.equal(refused.status, 400);
+  assert.deepEqual((await refused.json() as { board: BoardData }).board.autoBuild, { on: true, model });
+  assert.deepEqual(JSON.parse(readFileSync(join(board.dataDir, 'auto-build.json'), 'utf8')), { on: true, model });
+});
+
+test('in sample mode both limits and Auto-build are absent and saving them is refused', async (t) => {
   const sample = await startBoard(t, {}, true);
   const data = await sample.board();
-  assert.deepEqual(['heavyCommandLimit' in data, 'buildLimit' in data], [false, false]);
-  for (const path of ['/api/heavy-command-limit', '/api/build-limit']) {
-    const refused = await sample.postSession({ limit: 2 }, path);
+  assert.deepEqual(['heavyCommandLimit' in data, 'buildLimit' in data, 'autoBuild' in data], [false, false, false]);
+  for (const [path, input] of [['/api/heavy-command-limit', { limit: 2 }], ['/api/build-limit', { limit: 2 }], ['/api/auto-build', { on: true }]] as const) {
+    const refused = await sample.postSession(input, path);
     assert.equal(refused.status, 403, path);
     assert.match((await refused.json() as { error: string }).error, /disabled in sample mode/);
   }

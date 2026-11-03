@@ -377,4 +377,11 @@ export const MIGRATIONS: readonly Migration[] = [
     CREATE INDEX shaping_thread_cleanups_by_work_id ON shaping_thread_cleanups (work_id);
   `),
   (db) => db.exec('ALTER TABLE work_records ADD COLUMN needs_you_causes TEXT'),
+  (db) => db.exec(`
+    CREATE TABLE check_lists(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
+    CREATE TABLE check_runs(check_id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
+    CREATE INDEX check_runs_owner ON check_runs(work_id);
+    CREATE TABLE check_reuses(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, check_id TEXT NOT NULL REFERENCES check_runs(check_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
+    CREATE INDEX check_reuses_owner ON check_reuses(work_id);
+  `),
 ];

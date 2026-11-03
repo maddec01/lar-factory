@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
-import { activityUnavailable, boardSections, buildsAtWork, formatUsd, limitNumber, plural, itemName, repoKey, shortAgo, usageIncomplete } from '@lar-factory/shared';
+import { activityUnavailable, boardSections, buildsAtWork, formatUsd, limitNumber, plural, itemName, readingScope, repoKey, shortAgo, usageFailed, usageIncomplete } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
@@ -18,6 +18,7 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, useShownStatus } from '../items/item-parts.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
+import { Loader } from '../loading/loader.tsx';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? item.stats.costUsd ?? 0 : 0);
@@ -108,6 +109,8 @@ function LimitBars({ used, limit }: { used: number; limit: number }) {
   );
 }
 
+const USAGE_LOADING = 'Usage totals are still loading.';
+
 export function Counters() {
   const { data, now, clientError } = useBoardStore();
   const s = boardSections(data, now, clientError);
@@ -117,8 +120,10 @@ export function Counters() {
     .map((item) => ({ item, cost: costOf(item) }))
     .filter((x) => x.cost > 0)
     .sort((a, b) => b.cost - a.cost);
-  const incomplete = !data.firstRead.settled || !!data.itemSourceProblems?.length || !!data.error || !!data.localProblem ||
-    data.items.some(usageIncomplete);
+  const unavailable = !!data.itemSourceProblems?.length || !!data.error || !!data.localProblem || data.usageRead?.readable === false || data.items.some(usageFailed);
+  const usageStillLoading = !unavailable && (!data.firstRead.settled || data.items.some(usageIncomplete));
+  const incomplete = unavailable || usageStillLoading;
+  const reading = readingScope(data);
   const spend = costs.reduce((t, c) => t + c.cost, 0);
   const free = limit === undefined ? undefined : limit - building.length;
   const row = (i: Item, trailing?: ReactNode) => <Row key={i.id} item={i} now={now} trailing={trailing} />;
@@ -128,7 +133,7 @@ export function Counters() {
     <div className="counters flex shrink-0">
       <div className="flex items-center gap-0.5 whitespace-nowrap">
         <Counter label="need you" value={s.needsYou.length} icon={glyph('Needs you')}
-          hint={s.needsYou.length ? `${plural(s.needsYou.length, 'item')} waiting on your answer, verification or merge` : 'Nothing waits on you'}>
+          hint={s.needsYou.length ? `${plural(s.needsYou.length, 'item')} waiting on your answer, verification or merge` : reading ? 'Still loading projects' : 'Nothing waits on you'}>
           <PopHead icon={glyph('Needs you')} title="Needs you" sub={s.needsYou.length} />
           {s.needsYou.length ? (
             <div className="grid gap-1 py-1">
@@ -142,7 +147,7 @@ export function Counters() {
                 );
               })}
             </div>
-          ) : <Empty>Nothing waits on you.</Empty>}
+          ) : <Empty>{reading ? <Loader label="Loading projects…" /> : 'Nothing waits on you.'}</Empty>}
         </Counter>
 
         <Counter label="building" icon={glyph('In progress')} hideBelow="hidden @min-[40rem]:inline-flex"
@@ -156,10 +161,10 @@ export function Counters() {
         </Counter>
 
         <Counter label="queued" value={s.queued.length} icon={glyph('Queued')} hideBelow="hidden @min-[54rem]:inline-flex"
-          hint={`${s.queued.length ? `${plural(s.queued.length, 'item')} ready to shape` : 'Nothing queued'}, ${s.list.length} more in List`}>
+          hint={!s.queued.length && reading ? 'Still loading projects' : `${s.queued.length ? `${plural(s.queued.length, 'item')} ready to shape` : 'Nothing queued'}, ${s.list.length} more in List`}>
           <PopHead icon={glyph('Queued')} title="Queued" sub={s.queued.length} />
-          {s.queued.length ? <List items={s.queued}>{(i) => row(i)}</List> : <Empty>Nothing queued.</Empty>}
-          <PopFoot>{s.list.length ? `${plural(s.list.length, 'item')} more in List, not yet queued.` : 'List is empty.'}</PopFoot>
+          {s.queued.length ? <List items={s.queued}>{(i) => row(i)}</List> : <Empty>{reading ? <Loader label="Loading projects…" /> : 'Nothing queued.'}</Empty>}
+          {(s.list.length > 0 || !reading) && <PopFoot>{s.list.length ? `${plural(s.list.length, 'item')} more in List, not yet queued.` : 'List is empty.'}</PopFoot>}
         </Counter>
 
         <Counter label="shipped" value={s.done.length} icon={glyph('Done')} hideBelow="hidden @min-[54rem]:inline-flex" hint="Done in the last 7 days">
@@ -169,10 +174,10 @@ export function Counters() {
 
         <span aria-hidden="true" className="mx-1 hidden h-4 w-px shrink-0 bg-(--border) @min-[66rem]:block" />
 
-        <Counter label="spend" value={incomplete ? 'Unavailable' : formatUsd(spend)} hideBelow="hidden @min-[66rem]:inline-flex" hint={incomplete ? 'Usage totals are incomplete or unavailable.' : 'Agent cost on open and recent items, an API estimate'}
+        <Counter label="spend" value={unavailable ? 'Unavailable' : usageStillLoading ? <Loader title={USAGE_LOADING} /> : formatUsd(spend)} hideBelow="hidden @min-[66rem]:inline-flex" hint={usageStillLoading ? USAGE_LOADING : unavailable ? 'Usage totals are incomplete or unavailable.' : 'Agent cost on open and recent items, an API estimate'}
           icon={<CircleDollarSign className="size-4 shrink-0" strokeWidth={2.25} />}>
-          <PopHead icon={<CircleDollarSign className="size-3.5 shrink-0 text-(--muted-foreground)" strokeWidth={2.25} />} title="Agent spend" sub={incomplete ? 'Incomplete' : formatUsd(spend)} />
-          {incomplete && <PopFoot>Usage totals are incomplete or unavailable. Figures below cover available items.</PopFoot>}
+          <PopHead icon={<CircleDollarSign className="size-3.5 shrink-0 text-(--muted-foreground)" strokeWidth={2.25} />} title="Agent spend" sub={usageStillLoading ? 'Loading' : unavailable ? 'Incomplete' : formatUsd(spend)} />
+          {incomplete && <PopFoot>{usageStillLoading ? USAGE_LOADING : 'Usage totals are incomplete or unavailable.'} Figures below cover available items.</PopFoot>}
           {costs.length
             ? <List items={costs.map((c) => c.item)} max={5}>{(i) => row(i, <span className="font-medium text-(--foreground)">{formatUsd(costOf(i))}</span>)}</List>
             : <Empty>No priced agent work yet.</Empty>}

@@ -39,6 +39,16 @@ test('the title bar\'s List button counts the List and opens the List modal', as
   expect(text($('[data-list-modal] h2'))).toBe('List');
 });
 
+test('the List button shows a loading cue, not 0, while the first read could add items', async () => {
+  const empty = { ...sample, items: [] };
+  await mountPage({ ...empty, firstRead: { step: 'items' as const, running: [], settled: false } });
+  expect(text(listButton())).toBe('ListLoading projects…');
+  expect(listButton().querySelector('[data-loader]')).not.toBeNull();
+  await push({ ...empty, firstRead: { step: 'finishing', running: [], settled: true } });
+  expect(text(listButton())).toBe('List0');
+  expect(listButton().querySelector('[data-loader]')).toBeNull();
+});
+
 test('choosing a repository in the left pane shows only its items on the right', async () => {
   await mountPage();
   await open();
@@ -100,6 +110,29 @@ test('a repository whose items have not landed yet says it is reading, not that 
   expect(rows()).toEqual(['I_sample03']);
   expect(counts().find(([name]) => name === 'lar-apple')).toEqual(['lar-apple', '1']);
   expect(header()).toBe('lar-apple1Scope boardRecently updated');
+});
+
+test('All repositories keeps a loading cue and no count under the rows that landed until the first read settles', async () => {
+  const reading = { ...sample, items: sample.items.filter((i) => i.repo !== 'maddec01/lar-apple'),
+    firstRead: { step: 'items' as const, running: ['lar-apple'], waiting: ['maddec01/lar-apple'], settled: false } };
+  await mountPage(reading);
+  await open();
+  const header = () => text($('[data-list-modal] span.font-semibold')!.parentElement);
+  expect(rows().length).toBeGreaterThan(0);
+  expect(text($('[data-list-modal] [data-reading]'))).toBe('Loading more projects…');
+  expect($('[data-list-modal] [data-reading] [data-loader]')).not.toBeNull();
+  expect(header(), 'no final-looking count').not.toMatch(/All repositories\d/);
+  expect(counts().find(([name]) => name === 'All repositories'), 'none in the left pane either').toEqual(['All repositories', '']);
+  await push({ ...sample, firstRead: { step: 'finishing', running: [], settled: true } });
+  expect($('[data-list-modal] [data-reading]')).toBeNull();
+  expect(header()).toMatch(/All repositories\d/);
+  expect(counts()[0]).toEqual(['All repositories', '4']);
+});
+
+test('before any repository has landed, no group in the left pane shows a count', async () => {
+  await mountPage({ ...sample, firstRead: { step: 'items' as const, running: [], settled: false } });
+  await open();
+  expect(counts()).toEqual([['All repositories', ''], ['lar-server', ''], ['lar-apple', '']]);
 });
 
 test('the search filters the right pane and the counts on the left follow it', async () => {

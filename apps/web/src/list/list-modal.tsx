@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Inbox, SquarePen } from 'lucide-react';
-import { boardSections, ref, repoKey, repoName, shortAgo, stillReading } from '@lar-factory/shared';
+import { boardSections, readingScope, ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { Item, ListGroup } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
@@ -24,6 +24,7 @@ import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { ItemFilterBar } from '../filters/item-filter-bar.tsx';
 import { filtering, rowFilter, useItemFilters } from '../filters/item-filters.ts';
+import { Loader } from '../loading/loader.tsx';
 import { matchesSearch } from './list-search.ts';
 import { EXPANDED, ExpandButton, useExpand, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -131,17 +132,17 @@ function ListModal({ onClose }: { onClose: () => void }) {
   const effectiveSort = sort ?? (unsorted.some((item) => item.azure) ? 'priority' : 'updated');
   const items = unsorted.sort(SORTS[effectiveSort].compare);
   const scoped = picked !== undefined && scope === picked.repo;
-  // A repository whose items haven't landed yet isn't empty, so it shows no count.
-  const reading = picked !== undefined && stillReading(data, picked.repo);
+  // A scope the first read may still add to isn't empty, nor its count final: one repository until its items land, All repositories until the read settles.
+  const reading = readingScope(data, picked?.repo);
   const groupItem = ({ repo, name, items: hits }: ListGroup, icon: React.ReactNode) => (
-    <GroupItem key={repo} label={name} count={stillReading(data, repo) ? undefined : hits.length} icon={icon} active={active === repo} onPick={() => setPick(repo)} />
+    <GroupItem key={repo} label={name} count={readingScope(data, repo) ? undefined : hits.length} icon={icon} active={active === repo} onPick={() => setPick(repo)} />
   );
   return (
     <Modal onClose={onClose}>
       <Modal.Content data-list-modal data-expanded={expanded} style={expanded ? EXPANDED : undefined} headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />} title="List" focusFirstField
         sidebar={
           <SidebarPane label="Repositories">
-            <GroupItem label="All repositories" count={groups.reduce((n, group) => n + group.items.length, 0)} icon={<Inbox />} active={active === null} onPick={() => setPick(null)} />
+            <GroupItem label="All repositories" count={readingScope(data) ? undefined : groups.reduce((n, group) => n + group.items.length, 0)} icon={<Inbox />} active={active === null} onPick={() => setPick(null)} />
             <SidebarNavigationGroup label="Repositories">
               {groups.map((group) => groupItem(group, <ProjectIcon repo={group.repo} size="medium" />))}
             </SidebarNavigationGroup>
@@ -166,21 +167,23 @@ function ListModal({ onClose }: { onClose: () => void }) {
         </div>
         <Modal.Body>
           {items.map((item) => <ItemRow key={item.id} item={item} now={now} showRepo={!picked} onOpen={() => useItemDialogStore.getState().open(item.id, true)} />)}
-          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q || filtering(filters) ? 'Nothing here matches.' : reading ? 'Loading projects…' : 'Nothing in List.'}</p>}
+          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q || filtering(filters) ? 'Nothing here matches.' : reading ? <Loader label="Loading projects…" /> : 'Nothing in List.'}</p>}
+          {items.length > 0 && reading && <p className="m-0 p-4 text-sm text-base-700" data-reading><Loader label="Loading more projects…" /></p>}
         </Modal.Body>
       </Modal.Content>
     </Modal>
   );
 }
 
-/** "List <count>", the count being the items in List; it opens the List modal. */
+/** "List <count>", the count being the items in List, or a loading cue for none while the first read could add some; it opens the List modal. */
 export function ListButton() {
   const count = useBoardStore((state) => boardSections(state.data, state.now).list.length);
+  const reading = useBoardStore((state) => readingScope(state.data));
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button {...kind('control')} className="list-button px-2" leftIcon={<Inbox />} title="List" onClick={() => setOpen(true)}>
-        <span className="@max-[70rem]:sr-only">List</span><Badge>{count}</Badge>
+        <span className="@max-[70rem]:sr-only">List</span>{count || !reading ? <Badge>{count}</Badge> : <Loader title="Loading projects…" />}
       </Button>
       {open && <ListModal onClose={() => setOpen(false)} />}
     </>

@@ -19,7 +19,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { dependenciesOf } from '../items/dependencies.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { KeepClicks } from '../items/keep-clicks.tsx';
-import { AzureFields, ItemTitle, RepoCell, SliceBar, StructureSync, shownStatus, useActivityUnavailable, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, RepoCell, SliceBar, StructureSync, shownStatus, useActivityUnavailable, usageLoading, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
@@ -242,7 +242,7 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
         {repoKey(item) !== home && <RepoCell item={item} />}
         <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} label={shown.word} waiting={waits.length > 0} /></span>
         <span>{isDone(item) ? 'Complete' : shown.word}</span>
-        {s ? <Figures s={s} item={item} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
+        {s || usageLoading(item) ? <Figures s={s} item={item} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
         <AzureFields azure={item.azure} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
         <span className="min-w-0 empty:hidden"><ThreadLine part={part} /></span>

@@ -2,14 +2,17 @@
 // scrolls sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the
 // same four rows at the same heights, so they line up across cards: source, repository, kind and age, in a stage
 // row's order; the title; the status and next step; and the card's action in the right corner, with Open thread as an
-// icon beside it. An empty desk is one small line, which while the board is disconnected only speaks for the last read.
+// icon beside it. An empty desk is one small line, which while the board is disconnected only speaks for the last read,
+// and during a first read that may still add items is the loader.
 
-import { needsAnswer, openQuestionThread, HINTS, itemPr, itemName, shortAgo } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, HINTS, itemPr, itemName, readingScope, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
+import { useScopeStore } from '../board/scope-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
+import { Loader } from '../loading/loader.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
@@ -79,10 +82,11 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
 /** `items` are the desk's items in the main area's scope. */
 export function Desk({ items }: { items: Item[] }) {
   const { data, now, clientError } = useBoardStore();
+  const scope = useScopeStore((state) => state.scope);
   if (!items.length) return (
     <section className="desk flex shrink-0 items-baseline gap-2 text-xs text-(--muted-foreground)" aria-labelledby="desk-h">
       <h2 id="desk-h" className="m-0 text-[13px] font-medium text-(--foreground)">Your desk</h2>
-      <p className="m-0">{clientError ? 'Nothing waited on you at the last read.' : 'Nothing waits on you.'}</p>
+      <p className="m-0">{clientError ? 'Nothing waited on you at the last read.' : readingScope(data, scope ?? undefined) ? <Loader label="Loading projects…" /> : 'Nothing waits on you.'}</p>
     </section>
   );
   return (

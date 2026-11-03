@@ -751,3 +751,39 @@ test('live child tasks replace the slice summary and clear on completion or lost
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().fail('Disconnected'));
   expect(text(col('I_sample13', 'next'))).not.toContain('Fix startup');
 });
+
+test("a row whose usage hasn't landed shows a still-when-reduced loader with a label in the figures column, in its 48px row", async () => {
+  await mountPage(withItem('I_sample13', { stats: undefined, usageState: 'loading' }, loose));
+  const figures = col('I_sample13', 'figures');
+  expect(text(figures)).toBe('Loading usage');
+  const icon = figures.querySelector('[data-loader] svg')!;
+  expect(icon.getAttribute('class')!.split(' '), 'spins only without reduced motion').toEqual(expect.arrayContaining(['motion-safe:animate-spin']));
+  expect(icon.getAttribute('class')!.split(' ')).not.toContain('animate-spin');
+  expect(opener('I_sample13').className.split(' ')).toContain('h-12');
+});
+
+test("a Shaping item's figures stay through its move to Ready, with an updating cue while usage loads, in the same column", async () => {
+  const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
+  const figures = () => col('I_sample07', 'figures');
+  await mountPage(withItem('I_sample07', { usageState: 'current' }));
+  expect(shapingRows()).toContain(130);
+  const shown = text(figures());
+  expect(shown).toBe('19m · 1.20M · $1.92');
+  const figuresText = () => text(figures().querySelector('[title] > .truncate'));
+  await receive(withItem('I_sample07', { status: 'Ready', usageState: 'loading' }));
+  expect(readyRows()).toContain(130);
+  expect([figuresText(), figures().querySelector('[data-loader]') !== null]).toEqual([shown, true]);
+  expect(figures().querySelector('[title]')!.getAttribute('title')).toContain('Updating usage');
+  await receive(withItem('I_sample07', { status: 'Ready', usageState: 'current' }));
+  expect([text(figures()), figures().querySelector('[data-loader]')]).toEqual([shown, null]);
+  expect(opener('I_sample07').className.split(' ')).toContain('h-12');
+});
+
+test('a section says it is loading, not empty, while the first read is still running', async () => {
+  const unsettled = { ...sample, items: sample.items.filter((i) => i.status !== 'Shaping' && i.status !== 'Needs you'), firstRead: { step: 'items' as const, running: ['lar-apple'], settled: false } };
+  await mountPage(unsettled);
+  const empty = () => $('[data-stage="shaping"] [data-pane-empty]')!;
+  expect([text(empty()), empty().querySelector('[data-loader]') !== null]).toEqual(['Loading projects…', true]);
+  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive({ ...unsettled, firstRead: { step: 'finishing', running: [], settled: true } }));
+  expect([text(empty()), empty().querySelector('[data-loader]')]).toEqual(['Nothing in shaping.', null]);
+});

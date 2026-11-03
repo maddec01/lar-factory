@@ -1,10 +1,14 @@
 import { executionStats } from '../src/t3/execution-stats.ts';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { executionItemThreads } from '../src/t3/item-execution.ts';
 import type { ThreadReads, ThreadUsageRead } from '../src/t3/item-execution.ts';
 import type { FixtureRequest, FixtureThread } from './stats-db.ts';
 
+/** Spawned boards hold T3's first answer back while the fixture has this file beside it. */
+export const protocolAwaitingFirstShell = (): boolean => existsSync(process.env.T3_STATE_DB + '.pending');
+
 export function protocolItemThreads(threadIds: readonly string[]) {
+  if (protocolAwaitingFirstShell()) return threadIds.length ? 'unavailable' as const : undefined;
   try {
     const threads: (FixtureThread & { retainedAt?: string })[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
     const requests: FixtureRequest[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.requests.json', 'utf8'));
@@ -67,7 +71,8 @@ const threadUsage = (threads: FixtureThread[]) => (id: string): ThreadUsageRead 
 };
 
 /** Spawned boards read each fixture thread as its `read` says; with no fixture, T3 can't answer for any of them. */
-export function protocolThreadReads(threadIds: readonly string[]): ThreadReads {
+export function protocolThreadReads(threadIds: readonly string[]): ThreadReads | null {
+  if (protocolAwaitingFirstShell()) return null;
   let threads: FixtureThread[];
   try {
     if (process.env.FAKE_EXECUTION_STATS_UNAVAILABLE === '1') throw Error('Usage unavailable');

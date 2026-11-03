@@ -124,6 +124,9 @@ function readRuntime() {
   return runtimeNow;
 }
 
+/** Whether T3 runs and its first thread list hasn't answered yet, which is no failure. */
+export const protocolAwaitingFirstShell = (): boolean => !!current && !current.available && !current.shell;
+
 /**
  * The recorded threads as T3 shows them now. While T3 can't be read, each thread's last observation with when the board
  * saw it, or 'unavailable' once one was never seen. Failures never become empty success.
@@ -388,7 +391,7 @@ export function protocolThreadReads(threadIds: readonly string[]): ThreadReads |
 function threadReadsNow(threadIds: readonly string[]): ThreadReads | null {
   if (!threadIds.length) return { reads: new Map(), observed: new Set(), demand() {} };
   protocolItemThreads(threadIds);
-  if (current && !current.available && !current.shell) return null;
+  if (protocolAwaitingFirstShell()) return null;
   if (!current?.available || !current.reads) return { reads: new Map(threadIds.map(id => [id, 'failed'])), observed: new Set(), demand() {} };
   const state = current;
   const shells = (state.shownShells ?? []).filter(shell => !shell.deletedAt);

@@ -1,6 +1,7 @@
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -132,6 +133,29 @@ test('a successful empty repository permits access while another source still re
   assert.deepEqual(early.items, []);
   assert.deepEqual(early.firstRead.waiting, ['maddec01/lar-server', 'maddec01/lar-factory']);
   assert.equal(early.fetchedAt, null);
+});
+
+test('an item with recorded threads reads as loading from its first snapshot while T3 has not answered yet, and one with none stays quiet', async (t) => {
+  const thread = { id: 'a', turns: [{ id: 'turn-a', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }] };
+  const db = statsDb(t, [thread]);
+  writeFileSync(`${db}.pending`, '');
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'] }, items: [boardIssue(12, 'Review'), boardIssue(13, 'Review')] }, false, true, { T3_STATE_DB: db });
+  const early = await until(board, (d) => d.items.length === 2);
+  const item = (d: BoardData, number: number) => d.items.find((i) => i.number === number);
+  assert.equal(item(early, 12)?.threads, 'unavailable');
+  assert.equal(item(early, 12)?.usageState, 'loading');
+  assert.equal(item(early, 13)?.usageState, undefined);
+  assert.equal(early.usageRead, undefined, 'T3 not read yet is no failed read');
+  await rm(`${db}.pending`);
+  await until(board, (d) => item(d, 12)?.usageState === 'current');
+});
+
+test('a stopped T3 is no loading usage: no snapshot says so', async (t) => {
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'] }, items: [boardIssue(12, 'Review')] }, false, true);
+  const shown = await until(board, (d) => d.items.length === 1);
+  assert.notEqual(shown.items[0]?.usageState, 'loading');
+  const failed = await until(board, (d) => d.usageRead?.readable === false);
+  assert.equal(failed.items[0]?.usageState, 'failed');
 });
 
 test('an item with recorded threads shows figures while another repository still reads, and a ticketed record there stays hidden', async (t) => {

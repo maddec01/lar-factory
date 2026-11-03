@@ -2,8 +2,12 @@
 // small and the page scrolls past them all.
 
 import type { ReactNode } from 'react';
+import { readingScope } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
+import { useBoardStore } from '../board/board-store.ts';
+import { useScopeStore } from '../board/scope-store.ts';
 import { StatusGlyph } from '../items/status-glyph.tsx';
+import { Loader } from '../loading/loader.tsx';
 
 export function Pane({ id, title, status, count, right, className = '', children }: {
   id: string; title: string; status?: Status; count: number; right?: ReactNode; className?: string; children: ReactNode;
@@ -20,7 +24,9 @@ export function Pane({ id, title, status, count, right, className = '', children
   );
 }
 
-/** What a section says with no row: `filtered` while a filter hides every row it has. */
+/** What a section says with no row: that it's loading while the first read may still add rows to the scope, else `children` while a filter hides every row it has. */
 export function PaneEmpty({ filtered, none, children }: { filtered: boolean; none: string; children: string }) {
-  return <p className="m-0 px-3 py-3 text-[12px] text-(--muted-foreground)">{filtered ? children : none}</p>;
+  const scope = useScopeStore((state) => state.scope);
+  const reading = useBoardStore((state) => readingScope(state.data, scope ?? undefined));
+  return <p data-pane-empty className="m-0 px-3 py-3 text-[12px] text-(--muted-foreground)">{reading ? <Loader label="Loading projects…" /> : filtered ? children : none}</p>;
 }

@@ -10,7 +10,7 @@ import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ActivityFeedback, AzureFields, ItemTitle, KindMarker, SliceBar, SliceList, hasFigures, useActivityFeedback, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
+import { ActivityFeedback, AzureFields, ItemTitle, KindMarker, SliceBar, SliceList, hasFigures, usageLoading, useActivityFeedback, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
@@ -96,7 +96,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
               <span className="min-w-0 truncate text-[13px] font-medium text-(--foreground)" title={itemName(item)} data-title><ItemTitle item={item} /></span>
               {concept && <PartOf concept={concept} />}
             </span>
-            {(pr || (figures && hasFigures(figures))) && <>
+            {(pr || (figures && hasFigures(figures)) || usageLoading(item)) && <>
               {pr && <span data-col="pr" className={`${LINK_COLUMN} truncate`}><span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 shrink-0 text-(--st-done)" />{prLabel(pr)}</span></span>}
               <span data-col="figures" className={FIGURES_COLUMN}><Figures s={figures} item={item} /></span>
             </>}

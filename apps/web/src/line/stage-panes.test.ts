@@ -102,9 +102,24 @@ test('a run known to be running with no progress details says Working, and the m
 test('rows share their columns down all four sections', async () => {
   await mountPage(withItem('I_sample13', { blockers: [] }));
   const grid = (el: Element) => el.querySelector('[data-row-open]')!.className.split(' ').filter((c) => c.includes('grid-cols')).join(' ');
-  const inEach = ['.queue', '[data-stage="shaping"] [data-scroll]', '[data-ready]', '[data-stage="build"]'].map((section) => $(`${section} li[data-item]`)!);
+  const inEach = ['queue', 'shaping', 'ready', 'build'].map((section) => $(`[data-stage="${section}"] li[data-item]`)!);
   expect(new Set(inEach.map(grid)).size).toBe(1);
   expect(inEach.every((li) => li.querySelector('[data-repo-cell]') && li.querySelector('[data-col="state"]') && li.querySelector('[data-col="side"]'))).toBe(true);
+});
+
+test('only a row with slices or a run at work has a progress line, with a long bar and readable text, and nothing of it sits in the base row', async () => {
+  await mountPage(withItem('I_sample14', { status: 'In progress', buildPhase: 'implement', slices: [], threads: [{ ...thread('t1', 'running'), purpose: 'build', currentRunning: true }] }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() }));
+  const progress = (id: string) => row(id).querySelector<HTMLElement>('[data-progress]');
+  expect(text(state('I_sample14')), 'the phase says it once, on the progress line').toBe('In progress');
+  expect(text(progress('I_sample14'))).toBe('Implementing');
+  expect(meta('I_sample14').querySelector('[data-col="bar"], [role="img"][aria-label="Implementing"]')).toBeNull();
+  expect(progress('I_sample14')!.querySelector('[data-col="bar"] .activity-sweep')).not.toBeNull();
+  expect(progress('I_sample13')!.querySelector('[data-col="bar"] ol')).not.toBeNull();
+  expect(text(progress('I_sample13')!.querySelector('[data-col="count"]'))).toBe('1/3 slices');
+  expect(text(progress('I_sample13')!.querySelector('[data-col="next"]'))).toBe('active Sign-in sessions');
+  const queue = $('[data-stage="queue"] li[data-item]')!;
+  expect(queue.querySelector('[data-progress]'), 'a Queue row is one line').toBeNull();
+  expect(queue.querySelector('[data-row-open]')!.parentElement!.contains(queue.querySelector('[data-col="side"]')), 'its action sits beside its title').toBe(true);
 });
 
 test('a part names its concept on its stage row', async () => {
@@ -209,8 +224,8 @@ test('a row opens the item dialog and stays marked while it shows', async () => 
   await mountPage(loose);
   await press(opener('I_sample14'));
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('#30 Chapter markers in the scrubber');
-  expect(row('I_sample14').innerHTML).toContain('ring-(--primary)');
-  expect(row('I_sample15').innerHTML).not.toContain('ring-(--primary)');
+  expect(row('I_sample14').className).toContain('ring-(--primary)');
+  expect(row('I_sample15').className).not.toContain('ring-(--primary)');
 });
 
 test('the side says where the item waits on you, or shows its next action', async () => {
@@ -468,7 +483,7 @@ test('a build shows its slice bar and its count, naming the first blocked slice 
   await mountPage(boardOf([raw], { active: [66, 67, 69], blocked: [67, 69] }));
   expect(slices()).toEqual({
     segments: ['var(--st-done)', 'var(--st-now)', 'var(--st-review)', 'var(--soft)', 'var(--st-review)'],
-    count: '1/5', next: 'blocked Issue 67 +2 more',
+    count: '1/5 slices', next: 'blocked Issue 67 +2 more',
   });
   expect(col('I_59', 'next').firstElementChild!.className, 'blocked reads in its colour').toContain('text-(--st-review)');
   expect(col('I_59', 'next').getAttribute('title'), 'the rest are named on hover').toBe('blocked #67 Issue 67\nblocked #69 Issue 69\nactive #66 Issue 66');
@@ -484,9 +499,9 @@ test('with none blocked, a build names its first active slice, and no more when 
     subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
   });
   await mountPage(boardOf([raw], { active: [66, 67] }));
-  expect([slices().count, slices().next]).toEqual(['1/3', 'active Issue 66 +1 more']);
+  expect([slices().count, slices().next]).toEqual(['1/3 slices', 'active Issue 66 +1 more']);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(boardOf([raw], { active: [67] })));
-  expect([slices().count, slices().next]).toEqual(['1/3', 'active Issue 67']);
+  expect([slices().count, slices().next]).toEqual(['1/3 slices', 'active Issue 67']);
 });
 
 test('a build\'s count leaves out slices closed as not planned, and names none while none is active or blocked', async () => {
@@ -495,7 +510,7 @@ test('a build\'s count leaves out slices closed as not planned, and names none w
     subIssues: { nodes: [sliceRef(65, 'CLOSED'), { ...sliceRef(66, 'CLOSED'), stateReason: 'NOT_PLANNED' }, sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
   });
   await mountPage(boardOf([raw]));
-  expect(slices()).toEqual({ segments: ['var(--st-done)', 'var(--soft)', 'var(--soft)'], count: '1/3', next: '' });
+  expect(slices()).toEqual({ segments: ['var(--st-done)', 'var(--soft)', 'var(--soft)'], count: '1/3 slices', next: '' });
 });
 
 test('an open slice the project auto-added is no row of its own', async () => {
@@ -604,7 +619,7 @@ test('live slice transitions update the bar, expanded list and count without a r
     const data = { ...initial, items: initial.items.map(item => ({ ...item, slices: item.slices.map((slice, index) => index === 1 ? { ...slice, progress } : slice) })) };
     await settle(() => useBoardStore.getState().receive(data));
     expect(text(list())).toContain(progress);
-    expect(text(count())).toBe(progress === 'done' ? '2/3' : '1/3');
+    expect(text(count())).toBe(progress === 'done' ? '2/3 slices' : '1/3 slices');
     const segment = col('I_59', 'bar').querySelectorAll('ol > li')[1]!;
     expect(segment.classList.contains('status-pulse')).toBe(progress === 'active');
     if (progress === 'unknown') {

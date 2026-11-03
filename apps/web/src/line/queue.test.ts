@@ -98,7 +98,7 @@ test('a row opens the item dialog and stays marked while it shows', async () => 
   await mountPage();
   await settle(() => row('I_sample06').querySelector<HTMLButtonElement>('[data-row-open]')!.click());
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`);
-  expect(row('I_sample06').innerHTML).toContain('ring-2');
+  expect(row('I_sample06').className).toContain('ring-2');
 });
 
 test('a Queued item blocked by an open issue shows only Start after, a Start, and Start next passes over it', async () => {

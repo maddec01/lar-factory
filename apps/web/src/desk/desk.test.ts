@@ -26,11 +26,12 @@ test('the desk shows what only you can move, counted, as cards in one row that s
   expect(row).toEqual(expect.arrayContaining(['-mx-6', 'px-6', 'overflow-x-auto', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden']));
 });
 
-test('a desk card shows its status, repository and age, numbered title, then its next step beside its action', async () => {
+test('a desk card shows its repository, kind and age, numbered title, then its status and next step beside its action', async () => {
   await mountPage();
   const rows = [...card('I_sample16').querySelector('button')!.children];
-  expect(rows.map(text)).toEqual(['Verify🍎lar-appleFeature1h ago', '#31 New artwork grid layout']);
+  expect(rows.map(text)).toEqual(['🍎lar-appleFeature1h ago', '#31 New artwork grid layout']);
   expect(nextLine('I_sample16')).toBe('can merge · 1 passed');
+  expect(text(card('I_sample16'))).toContain('Verify');
   expect(card('I_sample16').querySelector('ol'), 'no status track').toBeNull();
 });
 
@@ -109,6 +110,7 @@ test('a Verify card reads the PR Open PR opens, its first linked one', async () 
   const linkedPrs = (id: string) => sample.items.find((i) => i.id === id)!.linkedPrs;
   await mountPage(withItem('I_sample16', { linkedPrs: [...linkedPrs('I_sample16'), { ...linkedPrs('I_sample27')[0]!, number: 99 }] }));
   expect(nextLine('I_sample16')).toBe('can merge · 1 passed');
+  expect(text(card('I_sample16'))).toContain('Verify');
 });
 
 test("clicks on a card's buttons open no item dialog", async () => {

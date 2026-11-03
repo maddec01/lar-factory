@@ -772,11 +772,26 @@ test("a Shaping item's figures stay through its move to Ready, with an updating 
   const figuresText = () => text(figures().querySelector('[title] > .truncate'));
   await receive(withItem('I_sample07', { status: 'Ready', usageState: 'loading' }));
   expect(readyRows()).toContain(130);
-  expect([figuresText(), figures().querySelector('[data-loader]') !== null]).toEqual([shown, true]);
-  expect(figures().querySelector('[title]')!.getAttribute('title')).toContain('Updating usage');
+  expect([figuresText(), figures().querySelector('[data-loader]') !== null], 'the spinner takes the tokens\' room, so the cost stays').toEqual(['19m · $1.92', true]);
+  const tooltip = figures().querySelector('[title]')!.getAttribute('title');
+  expect(tooltip).toContain('Updating usage');
+  expect(tooltip, 'the tooltip keeps every value').toContain(shown);
   await receive(withItem('I_sample07', { status: 'Ready', usageState: 'current' }));
   expect([text(figures()), figures().querySelector('[data-loader]')]).toEqual([shown, null]);
   expect(opener('I_sample07').className.split(' ')).toContain('h-12');
+});
+
+test('provisional figures spin only while a read can still replace them', async () => {
+  const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
+  const loader = () => col('I_sample07', 'figures').querySelector('[data-loader]');
+  const provisional = { stats: { agentMs: 60_000, tokens: 1000, costUsd: 2, provisional: true as const }, usageState: 'current' as const };
+  const nothingPending = withItem('I_sample07', provisional);
+  await mountPage(nothingPending);
+  expect(loader(), 'a thread that keeps failing leaves figures provisional with nothing to wait for').toBeNull();
+  await receive(withItem('I_sample13', { usageState: 'loading' }, nothingPending));
+  expect(loader(), 'another thread is still to be read').not.toBeNull();
+  await receive({ ...nothingPending, firstRead: { step: 'items', running: [], settled: false } });
+  expect(loader(), 'the first read is unsettled').not.toBeNull();
 });
 
 test('a section says it is loading, not empty, while the first read is still running', async () => {
@@ -786,4 +801,15 @@ test('a section says it is loading, not empty, while the first read is still run
   expect([text(empty()), empty().querySelector('[data-loader]') !== null]).toEqual(['Loading projects…', true]);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive({ ...unsettled, firstRead: { step: 'finishing', running: [], settled: true } }));
   expect([text(empty()), empty().querySelector('[data-loader]')]).toEqual(['Nothing in shaping.', null]);
+});
+
+test('a child task titled with the phase word and a colon shows its title alone', async () => {
+  const at = (titles: string[]) => withItem('I_sample13', {
+    status: 'In progress', blockers: [], buildPhase: 'review', slices: [],
+    threads: [{ ...thread('build', 'done'), purpose: 'build', hasRunningChildren: true, childActivity: { titles, count: 4 } }],
+  }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() });
+  await mountPage(at(['Review: code', 'Review: security']));
+  expect(text(col('I_sample13', 'next'))).toBe('Review: code +3 more');
+  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(at(['Reviewer: code'])));
+  expect(text(col('I_sample13', 'next'))).toBe('Review · Reviewer: code +3 more');
 });

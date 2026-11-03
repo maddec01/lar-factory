@@ -253,14 +253,8 @@ export function usageIncomplete(item: Item): boolean {
 export const usageFailed = (item: Item): boolean => usageIncomplete(item)
   && (item.stats === 'unavailable' || item.usageState === 'failed' || item.threads === 'unavailable' && item.usageState !== 'loading');
 
-/**
- * An item's stats plus the item total of each of its sub-issues among `items`, each
- * item counted once. Wall time only when every figure has it; frozen only when all
- * are. Null when the sub-issues add nothing, so the total equals the item stats. A
- * member whose usage is incomplete marks the total incomplete, and makes it
- * 'unavailable' when it has no figures to add.
- */
-export function itemTotal(item: Item, items: readonly Item[]): ItemStats | 'unavailable' | null {
+/** The item's sub-issues among `items`, and theirs, each once. */
+export function itemMembers(item: Item, items: readonly Item[]): Item[] {
   const seen = new Set<string>([item.id]);
   const members: Item[] = [];
   const add = (parent: Item) => {
@@ -272,6 +266,18 @@ export function itemTotal(item: Item, items: readonly Item[]): ItemStats | 'unav
     }
   };
   add(item);
+  return members;
+}
+
+/**
+ * An item's stats plus the item total of each of its sub-issues among `items`, each
+ * item counted once. Wall time only when every figure has it; frozen only when all
+ * are. Null when the sub-issues add nothing, so the total equals the item stats. A
+ * member whose usage is incomplete marks the total incomplete, and makes it
+ * 'unavailable' when it has no figures to add.
+ */
+export function itemTotal(item: Item, items: readonly Item[]): ItemStats | 'unavailable' | null {
+  const members = itemMembers(item, items);
   if (!members.length) return null;
   members.push(item);
   const incomplete = members.filter(usageIncomplete);

@@ -78,7 +78,8 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
   // Fresh T3 tasks need not wait for unrelated repositories to finish their first read.
   const childActivity = !disconnected && !isStale(data, now) && !item.paused && !item.archived
     ? currentBuildThread(item)?.childActivity : undefined;
-  const phase = feedback.running && feedback.label !== state ? feedback.label : null;
+  // A child task already titled with the phase word and a colon names the phase itself.
+  const phase = feedback.running && feedback.label !== state && !childActivity?.titles[0]?.startsWith(`${feedback.label}:`) ? feedback.label : null;
   const figures = figuresOf(item, data);
   const pr = item.linkedPrs[0];
   return (
@@ -96,7 +97,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
               <span className="min-w-0 truncate text-[13px] font-medium text-(--foreground)" title={itemName(item)} data-title><ItemTitle item={item} /></span>
               {concept && <PartOf concept={concept} />}
             </span>
-            {(pr || (figures && hasFigures(figures)) || usageLoading(item)) && <>
+            {(pr || (figures && hasFigures(figures)) || usageLoading(item, data)) && <>
               {pr && <span data-col="pr" className={`${LINK_COLUMN} truncate`}><span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 shrink-0 text-(--st-done)" />{prLabel(pr)}</span></span>}
               <span data-col="figures" className={FIGURES_COLUMN}><Figures s={figures} item={item} /></span>
             </>}

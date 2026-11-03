@@ -1024,18 +1024,26 @@ test('a failed family marks its own known figures last known while the board rea
 
 const dossierTotal = () => dossier().querySelector<HTMLElement>('[data-col="figures"] [title]')!;
 
-test('a Dossier total marks a sum with a failed part partial and says why', async () => {
+test('a Dossier total marks a sum with a failed part partial with a + after its cost, and says why', async () => {
   const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
   await mountPage(withItem('I_sample10', { stats: usage, usageState: 'failed' }, withItem('I_sample12', { stats: usage, usageState: 'current' })));
-  expect(text(dossierTotal())).toContain('$');
-  expect(text(dossierTotal())).toContain('· partial');
+  expect(text(dossierTotal())).toBe('24m · 1.41M · $6.05+ partial');
+  expect([text(dossierTotal().querySelector('[data-partial]')), dossierTotal().querySelector('[data-partial] .sr-only') !== null], 'a + on screen, partial for a screen reader').toEqual(['+ partial', true]);
   expect(dossierTotal().title).toContain('This total is incomplete');
 });
 
-test('a Dossier total with a loading part and no figures for it gives no sum and says incomplete', async () => {
+test('a Dossier total with a loading part and no figures for it gives no sum and shows the loader', async () => {
   await mountPage(withItem('I_sample10', { stats: undefined, usageState: 'loading', threads: [partThread] }));
-  expect(text(dossierTotal())).toBe('Incomplete');
+  const total = dossier().querySelector('[data-col="figures"]')!;
+  expect(text(total)).toBe('Loading usage');
+  expect(total.querySelector('[data-loader]')).not.toBeNull();
+});
+
+test('a Dossier total with a failed part and no figures for it gives no sum and says its usage is incomplete', async () => {
+  await mountPage(withItem('I_sample10', { stats: undefined, usageState: 'failed', threads: [partThread] }));
+  expect(text(dossierTotal())).toBe('Usage incomplete');
   expect(dossierTotal().title).toBe("This total is incomplete: usage for part of it is still loading or can't be read.");
+  expect(dossier().querySelector('[data-col="figures"] [data-loader]')).toBeNull();
 });
 
 test('a part with no figures yet says its usage can\'t be read', async () => {

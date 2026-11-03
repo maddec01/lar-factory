@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
 import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, itemRepoNames, prLabel, ref, labelsOnRow, repoKey, repoName } from '@lar-factory/shared';
-import type { AzureWorkItem, Checks, Item, ItemStats, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
+import type { AzureWorkItem, BoardData, Checks, Item, ItemStats, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { isDone } from '../line/dossier-parts.ts';
@@ -155,12 +155,14 @@ export function AgentWork({ item, stats: s = item.stats, label, className = '' }
 }
 
 /**
- * Whether the item's figures are still to come: its usage is loading, its figures are provisional, or no stats read has
- * reached its threads yet. Figures frozen at merge are final, and a settled read with nothing, or no thread, is known empty.
+ * Whether the item's figures are still to come: its usage is loading, a read can still replace its provisional figures, or
+ * no stats read has reached its threads yet. Figures frozen at merge are final, and a settled read with nothing, or no thread,
+ * is known empty. Figures stay provisional while a never-observed thread keeps failing, which no coming read answers.
  */
-export const usageLoading = ({ stats, usageState, threads }: Item): boolean => {
+export const usageLoading = ({ stats, usageState, threads }: Item, { firstRead, items }: Pick<BoardData, 'firstRead' | 'items'>): boolean => {
   if (typeof stats === 'object' && stats.frozen) return false;
-  if (usageState === 'loading' || typeof stats === 'object' && stats.provisional) return true;
+  if (usageState === 'loading') return true;
+  if (typeof stats === 'object' && stats.provisional) return !firstRead.settled || items.some((other) => other.usageState === 'loading');
   return !usageState && stats === undefined && Array.isArray(threads) && threads.length > 0;
 };
 

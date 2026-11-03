@@ -884,14 +884,14 @@ test('a recorded thread T3 confirms deleted releases Start, and one T3 cannot be
   assert.equal(deleted.started.length, 1);
 });
 
-test('a finished T3 turn moves no Status', async () => {
+test('a finished T3 turn leaves the successfully started item in Shaping', async () => {
   const records = await openRecords();
   const work = records.create({ title: 'Work', repository: WEB, kind: 'feature', status: 'Queued' });
   const { commands, board } = recordedCommands(records, { shown: (ids) => ids.map((id) => ({ id, title: 't', state: 'done', updated: '2026-10-31T00:00:00Z' })) });
   await commands.start(work.workId, undefined);
   await commands.reconcileStarts(board.snapshot().items);
-  assert.equal(records.read(work.workId).status, 'Queued');
-  assert.equal(board.find(work.workId)?.status, 'Queued');
+  assert.equal(records.read(work.workId).status, 'Shaping');
+  assert.equal(board.find(work.workId)?.status, 'Shaping');
 });
 
 test('stopped shaping resumes in one new thread without changing its gate or starting a build', async () => {
@@ -905,7 +905,8 @@ test('stopped shaping resumes in one new thread without changing its gate or sta
   assert.equal(started.length, 1);
   assert.equal(records.read(work.workId).status, 'Shaping');
   assert.deepEqual(records.threads(work.workId).map(thread => thread.purpose), ['shape', 'shape']);
-  assert.equal((await commands.start(work.workId, undefined)).status, 409, 'a running resumed thread is not a second resume');
+  assert.equal((await commands.start(work.workId, undefined)).status, 200, 'a repeated request returns the running resumed thread');
+  assert.equal(started.length, 1, 'a repeated request never starts another thread');
 });
 
 for (const state of ['running', 'needs you', 'done', 'unavailable', 'live child', 'stale'] as const) test(`shaping cannot resume from ${state} thread evidence`, async () => {

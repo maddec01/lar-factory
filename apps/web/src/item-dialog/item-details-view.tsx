@@ -187,7 +187,7 @@ function ItemLabels({ item }: { item: Item }) {
   const edit = useLabelEdit(item);
   const [open, setOpen] = useState(false);
   const { heading, noun } = trackerCapabilities(item.repo);
-  if (!item.number) return <p data-local-labels className="m-0 text-xs text-(--muted-foreground)">Local work has no ticket, so it has a kind alone. Create a ticket to add {noun}s.</p>;
+  if (!item.number) return null;
   const linked = item.labels.some((l) => l.toLowerCase() === STRUCTURE_LABEL);
   const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
   const openChange = (next: boolean) => {

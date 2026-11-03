@@ -42,6 +42,8 @@ export interface RecordDetails {
   bodyKind: 'map' | 'decision' | 'brief';
   /** That body's markdown; empty while none is written. */
   body: string;
+  /** The saved decision outcome; absent for other records or before an answer is recorded. */
+  answer?: string;
   /** The markdown the work began with, such as the picked ticket's text then; empty when it began with none. */
   context: string;
   /** Where its build stands, as lar-build names the phase, or null before it starts. */

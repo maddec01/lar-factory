@@ -84,11 +84,11 @@ export const install = (input: InstallInput): InstallOutcome => {
   return { kind: "installed", path };
 };
 
-/** In a packaged app, installs the launcher and logs what it found. Never fails. */
+/** Installs the launcher in a packaged app or an explicitly opted-in dev run. Never fails. */
 export const onLaunch = Effect.fn("LarWorkLauncher.onLaunch")(function* (
-  input: InstallInput & { readonly isPackaged: boolean },
+  input: InstallInput & { readonly isPackaged: boolean; readonly installInDevelopment?: boolean },
 ) {
-  if (!input.isPackaged) return;
+  if (!input.isPackaged && !input.installInDevelopment) return;
   yield* Effect.try(() => install(input)).pipe(
     Effect.flatMap((outcome) => {
       switch (outcome.kind) {

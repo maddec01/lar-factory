@@ -40,7 +40,8 @@ export function exportMarkdown(records: WorkRecords, workId: string, destination
   for (const dependency of records.dependencies(workId)) bodies.push({ body: 'dependency', workId: dependency.dependencyId, markdown: dependencyMarkdown(dependency) });
   if (record.kind === 'concept') {
     for (const child of records.children(workId)) {
-      if (child.kind === 'decision') bodies.push({ body: 'decision', workId: child.workId, markdown: records.body(child.workId, 'decision') });
+      if (child.kind !== 'decision') continue;
+      for (const body of ['decision', 'answer'] as const) bodies.push({ body, workId: child.workId, markdown: records.body(child.workId, body) });
     }
   }
   const files = bodies.filter((entry): entry is typeof entry & { markdown: string } => entry.markdown !== null);

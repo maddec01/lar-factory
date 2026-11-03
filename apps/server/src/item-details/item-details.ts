@@ -101,6 +101,7 @@ function recordDetails(records: WorkRecords, workId: string): RecordDetails | un
   return {
     bodyKind,
     body: records.body(workId, bodyKind) ?? '',
+    ...(bodyKind === 'decision' ? { answer: records.body(workId, 'answer') ?? '' } : {}),
     context: records.initialContext(workId),
     buildPhase: record.buildPhase,
     reviewRounds: records.reviewRounds(workId).map(({ round, recordedAt, reviewers }) => ({ round, recordedAt,

@@ -25,7 +25,6 @@ import type { Part } from './dossier-parts.ts';
 import { PartStart, startable } from './part-start.tsx';
 import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
 import { OnYourDesk, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
-import { Diagram } from '../diagrams/markdown-diagrams.tsx';
 import { WorkMap } from './work-map.tsx';
 
 const open = (item: Item) => useItemDialogStore.getState().open(item.id);
@@ -55,8 +54,8 @@ function ThreadLine({ part }: { part: Part }) {
   const thread = shownThread(part, useShownStatus(part.item).working);
   if (!thread) {
     const { work, dependencies } = blockerGroups(part.item, openWaits(part));
-    const waits = [...work ? [`${work.names} ${work.many ? 'are' : 'is'} done`] : [], ...dependencies ? [`you mark ${dependencies.names} met`] : []];
-    return waits.length ? <span>Thread starts when {waits.join(' and ')}</span> : null;
+    const waits = [...work ? [work.names] : [], ...dependencies ? [`you to mark ${dependencies.names} met`] : []];
+    return waits.length ? <span>Waiting on {waits.join(' and ')}</span> : null;
   }
   return (
     <span className="flex min-w-0 items-center gap-1.5" title={thread.title}>
@@ -183,7 +182,7 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
   if (working) return <span onClick={stop}><OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} /></span>;
   if (YOURS.includes(status)) return <OnYourDesk status={status} />;
   if (status === 'Ready' || status === 'Queued') return <span onClick={stop}><PartStart part={part} data={data} label="Start" /></span>;
-  if (openWaits(part).length) return <span>{waitsOn(part)}</span>;
+  if (openWaits(part).length) return <span className="max-w-48 truncate" title={waitsOn(part)}>{waitsOn(part)}</span>;
   if (['Shaping', 'In progress', 'Review'].includes(status)) return <span onClick={stop}><OpenThread item={part.item} data={data} /></span>;
   return null;
 }
@@ -204,6 +203,7 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
         <Action part={part} data={data} />
       </span>
       <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
+        {DECISION_KINDS.includes(part.kind) && <span className="capitalize">{part.kind}</span>}
         <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} label={shown.word} waiting={waits.length > 0} /></span>
         <span>{isDone(item) ? 'Complete' : shown.word}</span>
         {s && <Figures s={s} />}
@@ -399,7 +399,6 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
             {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
           </p>}
           <StructureSync item={parent} />
-          {parent.map?.diagram && <Diagram source={parent.map.diagram} />}
           <Attention parent={parent} parts={parts} data={data} find={find} />
           <div className="grid gap-3">
             <ViewToggle view={view} onView={setView} />

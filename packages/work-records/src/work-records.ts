@@ -692,7 +692,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
       const touched: string[] = [];
       const patch = apply(row, touched);
       if (patch === null) return fromRow(row);
-      const next = { ...row, ...patch, revision: row.revision + 1, updated_at: new Date().toISOString() };
+      const next = { ...row, ...patch, revision: row.revision + 1, updated_at: patch.updated_at ?? new Date().toISOString() };
       updateRow.run(next.kind, next.status, next.queue_order, next.ticket, next.parent_id, next.build_phase, next.pull_request, next.set_aside_at,
         next.fog_gone_at, next.needs_you, next.needs_you_causes, next.skills, next.finished_at, next.agreed_ticket_kind, next.kind_answer, next.revision, next.updated_at, workId, expected);
       for (const id of touched) bump.run(next.updated_at, id);
@@ -1017,14 +1017,22 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
       const who = assignee === undefined ? null : checkFilled(assignee, 'assignee');
       return change(workId, revision, (row) => {
         const now = new Date().toISOString();
-        writeObservation.run(workId, of, subject(row, of), state, who, now);
-        return state === 'merged' && !row.finished_at ? { finished_at: now } : {};
+        const reference = subject(row, of);
+        const previous = observationRows.all(workId).find((entry) => entry.observed === of);
+        const unchanged = previous?.subject === reference && previous.state === state && previous.assignee === who;
+        writeObservation.run(workId, of, reference, state, who, now);
+        // Refresh observation freshness without making unchanged work look newly edited on every poll.
+        return state === 'merged' && !row.finished_at ? { finished_at: now } : unchanged ? { updated_at: row.updated_at } : {};
       });
     },
     recordReadFailure: (workId, revision, of, failure) => {
       const observed = checkOneOf(OBSERVED, of, 'observed thing');
       const reason = checkFilled(failure, 'read failure');
-      return change(workId, revision, (row) => (writeReadFailure.run(workId, observed, subject(row, observed), new Date().toISOString(), reason), {}));
+      return change(workId, revision, (row) => {
+        const reference = subject(row, observed);
+        writeReadFailure.run(workId, observed, reference, new Date().toISOString(), reason);
+        return { updated_at: row.updated_at };
+      });
     },
     observations: (workId) => database.read(() => {
       find(workId);
@@ -1181,6 +1189,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
           db.prepare('UPDATE work_records SET build_branch = ? WHERE work_id = ?').run(recovery.branch, workId);
           return { ...(recovery.reset ? { build_phase: null } : {}), needs_you: null, needs_you_causes: null };
         }
+        // The board owns the launch transition; the agent may take time to read its instructions.
+        if (threadId && row.purpose === 'shape' && work.status === 'Queued') return { status: 'Shaping', queue_order: null };
         return {};
       });
       return { record, intent: intent(intentId) };

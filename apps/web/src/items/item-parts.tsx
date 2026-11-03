@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, activityUnavailable, buildActivity, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
+import { UNREADABLE, activityUnavailable, buildActivity, workingAgain, checkState, decisionType, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -195,7 +195,9 @@ export function LabelChips({ item }: { item: LabelledItem }) {
 /** Kind and relationships remain visible before an issue is queued. `onRow` leaves out the word for work with no kind badge. */
 export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean }) {
   const words: string[] = [];
-  if (!onRow && !KIND_BADGES[item.kind]) words.push(item.kind === 'decision' ? 'Decision' : 'Work');
+  const method = item.kind === 'decision' ? decisionType(item) : null;
+  if (method) words.push(`${method.charAt(0).toUpperCase()}${method.slice(1)}`);
+  else if (!onRow && !KIND_BADGES[item.kind]) words.push(item.kind === 'decision' ? 'Decision' : 'Work');
   const parentKind = useBoardStore((state) => state.data.items.find((parent) => Boolean(item.parentId && parent.id === item.parentId || item.parent?.url && parent.url === item.parent.url))?.kind);
   const parentIsConcept = item.tracker?.parent?.kind === 'concept' || parentKind === 'concept';
   if (parentIsConcept) words.push('Part of a concept');
@@ -209,7 +211,7 @@ export function StructureSync({ item }: { item: Item }) {
   return <>
     {item.specSync && <span data-spec-sync role="status" className="text-xs text-base-700">{item.specSync.warning ?? item.specSync.error ?? 'Spec waiting to save to tracker'}</span>}
     {item.sync && item.sync.state !== 'saved' && <span data-structure-sync title={item.sync.message} role={item.sync.state === 'error' || item.sync.state === 'conflict' ? 'status' : undefined}
-    className="text-xs text-base-700">Legacy structural publication is suspended. Pending content is retained on this machine.</span>}
+    className="text-xs text-base-700">Planning is saved on this Mac.</span>}
   </>;
 }
 

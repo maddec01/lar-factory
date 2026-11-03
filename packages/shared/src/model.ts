@@ -296,6 +296,8 @@ export interface Item {
   statuses: Status[];
   /** Its work record's kind, or on an item source's read the kind its labels give. */
   kind: Kind;
+  /** The method in a local decision's body; null when no recognized method is written. */
+  decisionMethod?: 'grill' | 'prototype' | 'research' | 'task' | null;
   /** A ticket is a repository issue or an Azure work item. */
   content: 'ticket';
   /** Its ticket's number, or 0 for work with no ticket. */
@@ -745,8 +747,15 @@ export type Kind =
   | 'issue';
 
 export function decisionType(item: Item): string | null {
+  if (item.decisionMethod !== undefined) return item.decisionMethod;
   const label = item.labels.find((l) => l.startsWith('decision-'));
   return label ? label.slice('decision-'.length) : null;
+}
+
+/** A decision records its method on the first line, independently of tracker labels. */
+export function parseDecisionMethod(body: string): Item['decisionMethod'] {
+  const method = /^Method:\s*(grill|prototype|research|task)\s*$/i.exec(body.split('\n')[0]?.trim() ?? '')?.[1]?.toLowerCase();
+  return method as Item['decisionMethod'] ?? null;
 }
 
 /** The kind a ticket's labels give it. */

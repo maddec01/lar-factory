@@ -363,6 +363,7 @@ const program = Effect.gen(function* () {
   // Threads run lar-work through a launcher on the PATH that follows this copy of the app.
   yield* LarWorkLauncher.onLaunch({
     isPackaged: Electron.app.isPackaged,
+    installInDevelopment: process.argv.includes(SkillInstall.INSTALL_FLAG),
     home: SkillInstall.installHome(NodeOS.homedir(), process.env),
     executablePath: process.execPath,
     commandFile: LarWorkLauncher.locateCommand(Electron.app.getAppPath(), Electron.app.isPackaged),

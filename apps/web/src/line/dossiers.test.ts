@@ -353,8 +353,8 @@ test('each part shows what it asks next, then its stage track, status, figures a
   await mountPage(withItem('I_sample13', { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' },
     linkedPrs: [{ ...sample.items.flatMap((i) => i.linkedPrs)[0]!, number: 145, state: 'open', isDraft: false }] }));
   const lines = (id: string) => [...step(id).children].map(text);
-  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'Open thread', 'Shaping28m · 1.87M · $2.71T3 · Grill: relay broker only or full TURN· running']);
-  expect(lines('I_sample12')).toEqual(['#202 Sign-in screen', 'on your desk', 'Needs you41m · 2.95M · $4.35T3 · Prototype: sign-in screen· needs you']);
+  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'Open thread', 'grillShaping28m · 1.87M · $2.71T3 · Grill: relay broker only or full TURN· running']);
+  expect(lines('I_sample12')).toEqual(['#202 Sign-in screen', 'on your desk', 'prototypeNeeds you41m · 2.95M · $4.35T3 · Prototype: sign-in screen· needs you']);
   expect(lines('I_sample13').slice(0, 3)).toEqual(['#140 Owner accounts', '1/3Start after #202 ▾', 'ReadyFeature · Active · AnaPR #145T3 · Shape: owner accounts· done']);
   expect(step('I_sample13').querySelector('[data-part-meta] ol')!.getAttribute('title'), "the stage track, dashed while it waits").toBe('Ready, waiting');
   expect(step('I_sample10').querySelector('[data-part-meta] ol')!.getAttribute('title')).toBe('Shaping');
@@ -366,23 +366,24 @@ test('each part shows what it asks next, then its stage track, status, figures a
 test('a part waiting on another, with no Start of its own, says what it waits on', async () => {
   await mountPage(withItem('I_sample10', { blockers: [{ number: 140, repo: 'maddec01/lar-server', state: 'open' }] }));
   expect(text(step('I_sample10').children[1])).toBe('waits on #140');
+  expect(step('I_sample10').children[1]!.querySelector('[title]')?.className).toContain('truncate');
   expect([...step('I_sample10').children[1]!.querySelectorAll('button, svg')], 'plain text: no chip, no status icon').toEqual([]);
   const side = dossier().querySelector('[data-attention-row="waiting"] dd > div > span:last-child')!;
   expect([text(side), side.children.length], 'the Waiting row says it the same way').toEqual(['waits on #202', 0]);
 });
 
-test('a part with no thread yet says when its thread starts', async () => {
+test('a part with no thread yet says what it is waiting on', async () => {
   await mountPage(withItem('I_sample13', { threads: [] }));
-  expect(text(step('I_sample13').querySelector('[data-part-meta]')!.lastElementChild)).toBe('Thread starts when #202 is done');
+  expect(text(step('I_sample13').querySelector('[data-part-meta]')!.lastElementChild)).toBe('Waiting on #202');
 });
 
-test('a part held by a Dependency says its thread starts once you mark the Dependency met', async () => {
+test('a part held by a Dependency says what it is waiting on', async () => {
   const dependency: DependencyHold = { dependencyId: 'dep-1', revision: 1, owner: 'server team', need: 'An export endpoint', ticket: null, named: [], evidence: '',
     met: null, needsReview: false, observation: null };
   await mountPage(withItem('I_sample13', { threads: [], blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' },
     { number: 0, repo: 'server team', state: 'open', title: dependency.need, dependency }] }));
   expect(text(step('I_sample13').querySelector('[data-part-meta]')!.lastElementChild))
-    .toBe('Thread starts when #202 is done and you mark the Dependency on server team met');
+    .toBe('Waiting on #202 and you to mark the Dependency on server team met');
 });
 
 test('a Ready part with completed prerequisites offers Start without blocking wording', async () => {
@@ -437,18 +438,18 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
   expect(text(step('I_d204').querySelector('[data-start-after]'))).toBe('Starts after #140 ✓');
 });
 
-test('in the map, a part waiting on something that is neither Ready nor Queued starts by itself after it', async () => {
+test('the map names unfinished dependencies without promising an automatic start', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'open' }] }));
   await press(button(dossier(), 'Work map'));
-  expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('starts by itself after #203');
+  expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('Waiting on #203');
 });
 
 test("in the map, a part waiting on another repository's issue names it without its owner", async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage(withItem('I_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'open' }] }));
   await press(button(dossier(), 'Work map'));
-  expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('starts by itself after lar-apple#12');
+  expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('Waiting on lar-apple#12');
 });
 
 test('Open thread takes Start\'s place while a part has a live thread', async () => {
@@ -480,7 +481,7 @@ test('a Map lane named owner/name shows it once', async () => {
   await mountPage({ ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork', labels: [] }] });
   await press(button(dossier(), 'Work map'));
   const lanes = [...dossier().querySelectorAll('[data-work-map] .sticky')];
-  expect(lanes.map(text)).toEqual(['Decisionsgrill, prototype, research', 'maddec01/lar-server']);
+  expect(lanes.map(text)).toEqual(['Decisions', 'maddec01/lar-server']);
 });
 
 test('the Map view draws a lane per repository and Decisions, its parts by wave, and arrows for what waits on what', async () => {
@@ -491,7 +492,7 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   expect([toggle.getAttribute('aria-pressed'), button(dossier(), 'Parts list').getAttribute('aria-pressed')]).toEqual(['true', 'false']);
   const map = dossier().querySelector('[data-work-map]')!;
   expect(dossier().querySelector('[data-parts-list]'), "the map takes the parts list's place").toBeNull();
-  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research', 'lar-servermaddec01/lar-server']);
+  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisions', 'lar-servermaddec01/lar-server']);
   const subtitle = map.querySelectorAll('.sticky')[1]!.lastElementChild!;
   expect([subtitle.className.split(' ').includes('truncate'), subtitle.getAttribute('title')], 'owner/name stays on one line').toEqual([true, 'maddec01/lar-server']);
   expect([...map.querySelectorAll('.h-7\\.5')].map(text)).toEqual(['Wave 1· 2 in parallel', 'Wave 2· 2 in parallel', 'Check']);
@@ -571,7 +572,7 @@ test('unlabelled local decision parts show the decision lane and completed answe
   expect(text(line(2).children[1])).toBe('1/2 parts');
   await press(button(dossier(),'Work map'));
   const map=dossier().querySelector('[data-work-map]')!;
-  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research']);
+  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisions']);
   const doneNode=map.querySelector(`[data-map-part="${complete.id}"]`)!;
   const pendingNode=map.querySelector(`[data-map-part="${pending.id}"]`)!;
   expect(text(doneNode)).toContain('decision');expect(text(doneNode)).toContain('Complete');expect(text(doneNode)).not.toContain('Shaping');expect(text(doneNode)).not.toContain('build');

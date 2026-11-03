@@ -18,6 +18,13 @@ async function reads(board: Board, n: number): Promise<void> {
   while (await count() < target) await new Promise((r) => setTimeout(r, 20));
 }
 
+/** Waits until a provider pass that began after this call has finished, as the next pass starts only once the last is done. */
+async function providerPass(board: Board): Promise<void> {
+  const count = async () => (await board.calls()).filter((args) => args[0] === 'issue' && args[1] === 'view' && args.includes('state,assignees')).length;
+  const target = await count() + 2;
+  while (await count() < target) await new Promise((r) => setTimeout(r, 20));
+}
+
 test('Abandon sets the item aside and the board drops it at once, and only Close ticket closes the issue as not planned', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List'), boardIssue(13, 'List')] });
   await until(board, (d) => d.items.length === 2);
@@ -116,7 +123,8 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
 });
 
 test('a local build whose ticket and unmerged PR closed explains both, offers no Clear, stays on Cancel and goes to Archive on Abandon', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(12, 'In progress')], builds: [{ number: 12, repository: { nameWithOwner: 'maddec01/lar-factory' } }] }, false, true);
+  const board = await startBoard(t, { items: [boardIssue(12, 'In progress')], builds: [{ number: 12, repository: { nameWithOwner: 'maddec01/lar-factory' } }],
+    prs: { 'https://github.com/maddec01/lar-factory/pull/40': 'CLOSED' }, ticketObservations: { 'maddec01/lar-factory#12': { state: 'CLOSED', assignees: [] } } }, false, true);
   const id = board.id(12);
   const data = await changeRecords(board, (records) => {
     let record = records.setPullRequest(id, records.read(id).revision, 'maddec01/lar-factory#40');
@@ -131,7 +139,9 @@ test('a local build whose ticket and unmerged PR closed explains both, offers no
   assert.ok(notice.offers.includes('set-aside'));
   assert.ok(!(notice.offers as string[]).includes('clear'));
   // Opening the confirmation only inspects, and Cancel sends nothing more.
-  await board.postSession({ itemId: id }, '/api/inspect-owned-cleanup');
+  const inspected = await board.postSession({ itemId: id }, '/api/inspect-owned-cleanup');
+  assert.equal(inspected.status, 200, await inspected.text());
+  await providerPass(board);
   const cancelled = (await board.board() as BoardData).items.find((i) => i.id === id);
   assert.deepEqual(cancelled?.needsYou, notice);
   assert.equal((await abandon(board, id)).status, 200);

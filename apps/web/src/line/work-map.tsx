@@ -92,7 +92,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
   if (complete) action = null;
   else if (item.status === 'Needs you') action = <OpenThread item={item} data={data} label="Answer in T3" />;
   else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} label="Start" />;
-  else if (open.length) action = <span className="text-[11px] text-(--muted-foreground)">starts by itself after {waitText(item, open)}</span>;
+  else if (open.length) action = <span className="text-[11px] text-(--muted-foreground)">Waiting on {waitText(item, open)}</span>;
   else if (thread?.state === 'running') action = <span className="text-[11px] text-(--muted-foreground)">thread working · {shortAgo(thread.updated, now)}</span>;
   return (
     <div style={{ width, height: NODE_H }} data-map-part={item.id}
@@ -100,7 +100,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
       <button type="button" aria-label={`Open ${ref(item)}`} onClick={() => useItemDialogStore.getState().open(item.id)} className="absolute inset-0 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_60%,transparent)]" />
       <SourceIcon item={item} corner className="pointer-events-none" />
       <span className="pointer-events-none relative flex items-center gap-1.5 pr-5 text-[11px] text-(--muted-foreground)">
-        <Icon className="size-3.5 shrink-0" />{part.kind}
+        <Icon className="size-3.5 shrink-0" /><span className="capitalize">{part.kind}</span>
         <span className="ml-auto inline-flex items-center gap-1" title={thread ? `T3 thread: ${thread.title} (${thread.archived ? 'archived' : thread.state})` : 'No T3 thread'}>
           {thread ? <><StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />thread</> : 'no thread'}
         </span>
@@ -147,9 +147,7 @@ export function WorkMap({ parts, check, data, now }: { parts: Part[]; check: End
               <span className="flex items-center gap-1.5 text-xs font-medium">
                 {b.lane === DECISIONS && <Lightbulb className="size-3.5 text-(--muted-foreground)" />}{b.lane === DECISIONS ? b.lane : repoName(b.lane, data.repos)}
               </span>
-              {b.lane === DECISIONS
-                ? <span className="text-[11px] text-(--muted-foreground)">grill, prototype, research</span>
-                : repoName(b.lane, data.repos) !== b.lane && <span className="truncate text-[11px] text-(--muted-foreground)" title={b.lane}>{b.lane}</span>}
+              {b.lane !== DECISIONS && repoName(b.lane, data.repos) !== b.lane && <span className="truncate text-[11px] text-(--muted-foreground)" title={b.lane}>{b.lane}</span>}
             </div>
           </div>
         ))}

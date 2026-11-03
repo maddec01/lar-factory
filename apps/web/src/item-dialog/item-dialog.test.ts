@@ -3,7 +3,7 @@
 // requests in a sidebar, and its footer carries GitHub and the action the item's status asks for.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, answer, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, NOW, answer, detailsRead, fetchMock, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
 import type { Blocker, BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
@@ -1245,4 +1245,57 @@ test('during a usage outage, work known to have no thread doesn\'t claim lost us
   const meta = text(inDialog('[data-meta]'));
   expect(meta).not.toContain('Usage details are unavailable.');
   expect(meta).not.toContain('No T3 thread');
+});
+
+const ID = (n: number) => `${n}${n}${n}${n}${n}${n}${n}${n}-1111-4111-8111-111111111111`;
+const conceptWith = (change: Partial<Item>): BoardData => ({ ...sample, items: sample.items.map((i) => (i.id === CONCEPT ? { ...i, kind: 'concept' as const, ...change } : i)) });
+
+test('a concept\'s Delivery counts its unfinished parts without work IDs, and keeps its other reasons in words', async () => {
+  const board = conceptWith({ completion: { complete: false, reasons: [
+    "Its Fog isn't gone.", `Its build ${ID(1)} isn't Done.`, `Its build ${ID(2)} isn't Done.`, `Its decision ${ID(3)} isn't settled.`, 'No delivery planned.', `Its Dependency ${ID(4)} on server team isn't met.`,
+  ] } });
+  await mountPage({ ...board, items: board.items.map((i) => (i.id === 'I_sample13' ? { ...i, id: ID(1), title: 'Owner accounts' } : i)) });
+  await openItem(CONCEPT);
+  const meta = text(inDialog('[data-meta]'));
+  expect(meta).toContain("2 builds remaining. 1 decision unsettled. Its Fog isn't gone. No delivery planned. Dependency on server team isn't met.");
+  expect(meta).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/);
+  expect($$<HTMLElement>('[data-item-dialog] [data-meta] span[title]').some((el) => el.title === 'Owner accounts')).toBe(true);
+});
+
+test('a concept\'s Refinement says what it needs without work IDs', async () => {
+  await mountPage(conceptWith({ refinement: { complete: false, reasons: ['Its map is empty.', `Its decision ${ID(5)} isn't settled.`] } }));
+  await openItem(CONCEPT);
+  const meta = text(inDialog('[data-meta]'));
+  expect(meta).toContain('1 decision unsettled. Its map is empty.');
+  expect(meta).not.toContain(ID(5));
+});
+
+test('a concept shows its parts done from its records, with no status ladder', async () => {
+  await mountPage(conceptWith({ status: 'In progress', subIssues: { total: 9, completed: 5 } }));
+  await openItem(CONCEPT);
+  expect(text(inDialog('[data-parts-progress]'))).toBe('Parts · 5/9 done');
+  expect(inDialog('[data-parts-progress] [aria-hidden] > div')!.style.width).toBe(`${5 / 9 * 100}%`);
+  expect(inDialog('[data-steps]')).toBeNull();
+  expect(text(inDialog('[data-progress]'))).not.toContain('5/8');
+});
+
+test('a concept with no parts shows no parts progress', async () => {
+  await mountPage(conceptWith({ status: 'Done', subIssues: { total: 0, completed: 0 } }));
+  await openItem(CONCEPT);
+  expect(inDialog('[data-parts-progress]')).toBeNull();
+});
+
+test('a build keeps its status ladder', async () => {
+  await mountPage();
+  await openItem('I_sample14');
+  expect(inDialog('[data-steps]')).not.toBeNull();
+  expect(inDialog('[data-parts-progress]')).toBeNull();
+});
+
+test.each([[true, 0], [false, 1]])('with details loading, a concept recorded %s draws %i legacy diagrams', async (recorded, diagrams) => {
+  const board = conceptWith({ recorded, map: { destination: '', decisions: [], fog: [], diagram: 'graph TD; A-->B' } });
+  fetchMock.mockImplementation((url: string) => (detailsRead(url) ? new Promise<Response>(() => {}) : Promise.resolve(new Response(JSON.stringify(board)))));
+  await mountPage(board);
+  await openItem(CONCEPT);
+  expect(dialog()!.querySelectorAll('[data-map-diagram]')).toHaveLength(diagrams);
 });

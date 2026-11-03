@@ -1,7 +1,7 @@
 // The item dialog's progress at the top of its panel: active steps as a bar, the past slim, the upcoming faint, and the
 // current one widest, named, with its step number. While a build is In progress or in Review its segment divides into
 // one mini segment per slice; at any other status the slices get a small bar of their own. A chip for each slice
-// follows, so what the bar shows is also readable.
+// follows, so what the bar shows is also readable. A concept has no step of its own to show: it shows its parts done.
 
 import { itemName } from '@lar-factory/shared';
 import type { Item, Slice, Status } from '@lar-factory/shared';
@@ -24,16 +24,30 @@ function SliceChip({ slice }: { slice: Slice }) {
   );
 }
 
+/** A concept's parts done out of its parts, as the records count them, including any retention took off the board. */
+function PartsProgress({ item }: { item: Item }) {
+  const { completed, total } = item.subIssues;
+  return (
+    <div className="grid gap-1" data-parts-progress>
+      <p className="m-0 text-xs text-(--muted-foreground)"><span className="font-medium text-(--foreground)">Parts</span> · {completed}/{total} done</p>
+      <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-(--soft)"><div className="h-full rounded-full bg-(--st-done)" style={{ width: `${completed / total * 100}%` }} /></div>
+    </div>
+  );
+}
+
 export function ItemProgress({ item }: { item: Item }) {
   const feedback = useActivityFeedback(item);
   const shown = useShownStatus(item);
   const at = WORKFLOW_STEPS.indexOf(item.status);
   const split = item.slices.length > 0 && SPLIT_STATUSES.includes(item.status);
   const done = item.slices.filter((s) => s.progress === 'done').length;
-  if (at < 0 && !item.slices.length) return null;
+  const concept = item.kind === 'concept';
+  const parts = concept && item.subIssues.total > 0;
+  if (at < 0 && !item.slices.length && !parts) return null;
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-progress>
-      {at >= 0 && <ol className="m-0 flex list-none items-end gap-[3px] p-0" data-steps>
+      {parts && <PartsProgress item={item} />}
+      {at >= 0 && !concept && <ol className="m-0 flex list-none items-end gap-[3px] p-0" data-steps>
         {WORKFLOW_STEPS.map((s, i) => {
           const name = i === at ? shown.word : s;
           const label = `Step ${i + 1} of ${WORKFLOW_STEPS.length}: ${name}`;
@@ -54,7 +68,7 @@ export function ItemProgress({ item }: { item: Item }) {
           );
         })}
       </ol>}
-      {!item.slices.length && <div className="grid gap-1"><ActivityFeedback feedback={feedback} /><ActivityFeedback feedback={feedback} labelOnly /></div>}
+      {at >= 0 && !item.slices.length && <div className="grid gap-1"><ActivityFeedback feedback={feedback} /><ActivityFeedback feedback={feedback} labelOnly /></div>}
       {item.slices.length > 0 && (
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-slices>
           <p className="m-0 text-xs text-(--muted-foreground)"><span className="font-medium text-(--foreground)">Slices</span> · {done}/{item.slices.length} done</p>

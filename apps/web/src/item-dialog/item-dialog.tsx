@@ -154,7 +154,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
         {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
         <div className={`@container gap-3 pt-2 ${fill ? 'flex min-h-0 flex-1 flex-col' : 'grid grid-cols-[minmax(0,1fr)]'}`} data-item-body>
           <ItemProgress item={item} />
-          {item.map?.diagram && (!record || record.bodyKind !== 'map') && <Diagram source={item.map.diagram} />}
+          {item.map?.diagram && (!record || record.bodyKind !== 'map') && !(item.recorded && read.state === 'loading') && <Diagram source={item.map.diagram} />}
           {hint && (
             <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
               <StatusGlyph status={item.status} className="size-4" />

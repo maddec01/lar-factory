@@ -1,5 +1,5 @@
 import { test, type TestContext } from 'vite-plus/test';
-import { createServer } from 'node:net';
+import { connect, createServer, type Socket } from 'node:net';
 import { get } from 'node:http';
 import assert from 'node:assert/strict';
 import { changeRecords, onboarded, readsRepositoryConfig, startBoard, until } from './server-support.ts';
@@ -364,16 +364,44 @@ test('PR edits run beside the refreshes without holding them up, and never two s
     'refreshes during the edit started no second sync');
 });
 
-/** Holds `port` for the test; a port something else already holds is taken all the same. */
-async function hold(t: TestContext, port: number): Promise<number> {
+/** Takes `port` if free. `release` closes only this listener and the connections it accepted, as close alone waits for them. */
+async function take(port: number): Promise<{ bound: number; accepted: Promise<unknown>; release: () => Promise<void> }> {
   const server = createServer();
+  const sockets = new Set<Socket>();
+  const accepted = new Promise((resolve) => server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.once('close', () => sockets.delete(socket));
+    resolve(socket);
+  }));
   const bound = await new Promise<number>((resolve, reject) => {
     server.once('error', (error: NodeJS.ErrnoException) => error.code === 'EADDRINUSE' && port !== 0 ? resolve(port) : reject(error));
     server.listen(port, '127.0.0.1', () => resolve((server.address() as { port: number }).port));
   });
-  t.onTestFinished(() => new Promise<void>((resolve) => server.listening ? server.close(() => resolve()) : resolve()));
+  return { bound, accepted, release: () => new Promise<void>((resolve) => {
+    if (!server.listening) { resolve(); return; }
+    server.close(() => resolve());
+    for (const socket of sockets) socket.destroy();
+  }) };
+}
+
+/** Holds `port` for the test; a port something else already holds is taken all the same. */
+async function hold(t: TestContext, port: number): Promise<number> {
+  const { bound, release } = await take(port);
+  t.onTestFinished(release);
   return bound;
 }
+
+test('hold releases its port with a connection still open, on a port the system assigns', async () => {
+  const { bound, accepted, release } = await take(0);
+  const client = connect(bound, '127.0.0.1');
+  // Destroying the accepted socket can reset this end, which is the release working.
+  client.on('error', () => {});
+  await accepted;
+  const closed = new Promise((resolve) => client.once('close', resolve));
+  await release();
+  await closed;
+  assert.equal(client.destroyed, true);
+});
 
 test('without BOARD_PORT the board skips a taken 4317, binds the next free port and logs it', async (t) => {
   await hold(t, 4317);

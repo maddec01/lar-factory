@@ -71,7 +71,7 @@ test('Start runs the thread on the picked model choice, still in the repository 
   const response = await start(board, board.id(12), board.url, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
   assert.equal(response.status, 200);
   assert.deepEqual(await board.t3Calls(), [
-    ['thread', 'start', 'project-factory', message(board), '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5', '--json'],
+    ['launch', 'project-factory', message(board), { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' }, { type: 'root' }, 'full-access'],
   ]);
 });
 

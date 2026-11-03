@@ -1,7 +1,9 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { threadRows, liveProjects, readT3Db, threadByTitle, threadSessions } from './t3-db.ts';
-import { projectThreadsDb, projectsDb, statsDb } from '../../test/stats-db.ts';
+import { DatabaseSync } from 'node:sqlite';
+import { join } from 'node:path';
+import { projectDefaultSelection, threadRows, liveProjects, readT3Db, threadByTitle, threadSessions } from './t3-db.ts';
+import { projectThreadsDb, projectsDb, statsDb, tempDir } from '../../test/stats-db.ts';
 
 test('threads come back in one query, each with its title, lineage and deletion time and, for a root, its first user message', (t) => {
   const db = statsDb(t, [
@@ -38,4 +40,16 @@ test("a project's thread found by its title gives its id and latest assistant me
   assert.deepEqual(threadByTitle(db, 'web', 'Look for Clashes (run a1)'), { threadId: 'run', latest: 'Reading AGENTS.md' });
   assert.deepEqual(threadByTitle(db, 'api', 'Look for Clashes (run a1)'), { threadId: 'other', latest: null });
   assert.equal(threadByTitle(db, 'web', 'Look for Clashes (run b2)'), null);
+});
+
+test("a project's row gives its default model selection, leaving deleted projects and empty ones out", (t) => {
+  const path = join(tempDir(t, 't3-db-'), 'state.sqlite');
+  const db = new DatabaseSync(path);
+  db.exec(`CREATE TABLE projection_projects (project_id TEXT, default_model_selection_json TEXT, deleted_at TEXT);
+    INSERT INTO projection_projects VALUES ('a', '{"instanceId":"codex","model":"gpt"}', NULL), ('b', NULL, NULL), ('c', '{"instanceId":"codex","model":"gone"}', '2026-10-20');`);
+  db.close();
+  const read = (id: string) => readT3Db(path, (open) => projectDefaultSelection(open, id));
+  assert.deepEqual(read('a'), { instanceId: 'codex', model: 'gpt' });
+  assert.equal(read('b'), null);
+  assert.equal(read('c'), null);
 });

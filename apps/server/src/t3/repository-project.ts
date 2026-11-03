@@ -9,7 +9,9 @@ import { join } from 'node:path';
 import { runTool } from '../tools/run-tool.ts';
 import type { ProjectObservation } from './project-protocol.ts';
 import { repositoryProjects } from './repository-project-discovery.ts';
-import type { RepoConfig } from '@lar-factory/shared';
+import { projectDefaults } from './model-choices.ts';
+import { statsDbPath, t3SettingsPath } from './t3-settings.ts';
+import type { ModelSelection, RepoConfig } from '@lar-factory/shared';
 
 const MAX_DOT_GIT_BYTES = 8 * 1024;
 
@@ -24,11 +26,20 @@ export async function repositoryProject(repo: string, repos: readonly { repo: st
   return (await projectFinder(env))(repo);
 }
 
-/** Each configured repository's project hint: null when Start finds its repository project, else why not. */
-export async function repositoryProjectHints(repos: readonly RepoConfig[],
-  env: NodeJS.ProcessEnv = process.env): Promise<Record<string, string | null>> {
+/**
+ * For each configured repository, from one read of T3's projects: its project hint, null when Start finds its repository
+ * project, else why not; and its effective T3 default, which one whose project or default can't be read doesn't have.
+ */
+export async function repositoryProjectReads(repos: readonly RepoConfig[], env: NodeJS.ProcessEnv = process.env): Promise<{ repositoryProjects: Record<string, string | null>; t3Defaults: Record<string, ModelSelection> }> {
   const find = await projectFinder(env);
-  return Object.fromEntries(repos.map(({ repo }) => [repo, find(repo).error ?? null]));
+  const found = repos.map(({ repo }) => [repo, find(repo)] as const);
+  return {
+    repositoryProjects: Object.fromEntries(found.map(([repo, project]) => [repo, project.error ?? null])),
+    t3Defaults: Object.fromEntries(found.flatMap(([repo, project]) => {
+      const selection = project.error === undefined ? projectDefaults(project.projectId, t3SettingsPath(env), statsDbPath(env))?.selection : null;
+      return selection ? [[repo, selection]] : [];
+    })),
+  };
 }
 
 /** Whether a listed repository's checkout has its origin on Azure DevOps; false when T3's projects can't be read. */

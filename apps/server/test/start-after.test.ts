@@ -115,10 +115,11 @@ test('a refresh with a blocker incomplete starts nothing; once the last complete
   assert.deepEqual(started.armed, {});
   assert.deepEqual(armedFile(env.HOME!), {});
   await read(board);
-  assert.deepEqual((await board.t3Calls()).map((args) => args.slice(0, 3).concat(args.slice(4, 8))), [
-    ['thread', 'start', 'project-factory', '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5'],
+  const calls = await board.t3Calls() as unknown as unknown[][];
+  assert.deepEqual(calls.map(([kind, project, , selection]) => [kind, project, selection]), [
+    ['launch', 'project-factory', { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' }],
   ]);
-  assert.ok((await board.t3Calls())[0]!.includes('--worktree'), 'a build starts in its own worktree');
+  assert.equal((calls[0]![4] as { type: string }).type, 'worktree', 'a build starts in its own worktree');
 });
 
 /** Records a Dependency on the server team holding the board's build #12, its ticket read as closed; returns its ID. */

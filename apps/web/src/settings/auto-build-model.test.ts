@@ -47,6 +47,17 @@ test('a saved model shows as picked', async () => {
   expect(text(document.activeElement)).toBe('Opus 5.5');
 });
 
+test('the T3 default entry shows what T3 will use on its own line when every repository shares it', async () => {
+  const repos = [{ repo: 'o/a' }, { repo: 'o/b' }] as BoardData['repos'];
+  const opus = { ...OPUS, options: [{ id: 'effort', value: 'medium' }] };
+  await openGeneral({ ...withAutoBuild({ on: false }), repos, t3Defaults: { 'o/a': opus, 'o/b': opus } });
+  await pressMenu(trigger());
+  const entry = entries()[0]!;
+  expect(entry.querySelector('.text-xs')?.textContent).toBe('Claude Opus 5.5, medium');
+  expect(text(entry)).toContain('T3 default');
+  expect(entry.title).toBe('Claude Opus 5.5, medium');
+});
+
 test('picking a model saves it, and picking T3 default saves none', async () => {
   await openGeneral(withAutoBuild({ on: false }));
   fetchMock.mockImplementation((async () => new Response(JSON.stringify({ error: null, board: withAutoBuild({ on: false, model: OPUS }) }))) as never);

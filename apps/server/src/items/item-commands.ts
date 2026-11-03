@@ -22,7 +22,6 @@ import { readRepositorySetups } from '../config/repository-settings.ts';
 import { installHome } from '../skills/bundled-skills.ts';
 import { readJsonRecord } from '../json-file.ts';
 import { log } from '../log.ts';
-import { serverRuntimePath } from '../t3/t3-settings.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
 import { checkouts, repositoryProject } from '../t3/repository-project.ts';
@@ -918,7 +917,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
             const branch = continuing ? inspection.branch : buildBranch(item) + '-recovery-' + randomUUID().slice(0, 8);
             const message = buildMessage(!continuing ? { ...item, slices: [] } : item, larBuild(), factoryContext);
             const workspace = continuing && inspection.worktreePath
-              ? { type: 'existing_worktree' as const, worktreePath: inspection.worktreePath, branch, origin: String(readJsonRecord(serverRuntimePath(process.env))?.origin ?? ''), commandId: randomUUID() }
+              ? { type: 'existing_worktree' as const, worktreePath: inspection.worktreePath, branch }
               : { base: continuing ? branch : base, branch };
             const cleanupBranches = continuing ? [] : await cleanupSliceBranches(item);
             const result = await launch(item, 'startedBuilds', project.projectId, message, () => startIn(project.projectId, message, choice, workspace), () => {

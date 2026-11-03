@@ -491,6 +491,43 @@ export interface ModelChoice {
   model: string;
 }
 
+/** One model option as T3 stores it, such as `effort: medium`. Options belong to one model. */
+export interface ModelSelectionOption {
+  id: string;
+  value: string | boolean;
+}
+
+/** T3's full selection: a model choice with its options. Saved choices stay plain, so the board resolves options at launch. */
+export interface ModelSelection extends ModelChoice {
+  options?: ModelSelectionOption[];
+}
+
+/**
+ * The T3 default entry's second line: the model and effort T3 will use, or nothing when that can't be read. T3 stores no
+ * option for a value equal to the model's default, so T3 then uses that default, such as medium on Opus 5.5. The board
+ * can't read it, so the line names the model alone. No effort here never means low.
+ */
+export function t3DefaultDetail(groups: readonly ModelGroup[], selection: ModelSelection | undefined): string | undefined {
+  if (!selection) return undefined;
+  const group = groups.find((g) => g.instanceId === selection.instanceId);
+  const model = group?.models.find((m) => m.slug === selection.model)?.label ?? selection.model;
+  const effort = selection.options?.find((o) => o.id === 'effort' || o.id === 'reasoningEffort')?.value;
+  const name = `${group?.name ?? selection.instanceId} ${model}`;
+  return typeof effort === 'string' ? `${name}, ${effort}` : name;
+}
+
+/** The T3 default of the item's repository, whatever the case. */
+export function repositoryT3Default(data: Pick<BoardData, 't3Defaults'>, repo: string): ModelSelection | undefined {
+  return Object.entries(data.t3Defaults ?? {}).find(([r]) => sameRepo(r, repo))?.[1];
+}
+
+/** The T3 default every repository shares, for a menu that spans them; none when they differ or one can't be read. */
+export function sharedT3Default(data: Pick<BoardData, 't3Defaults' | 'repos'>): ModelSelection | undefined {
+  const defaults = data.repos.map((r) => repositoryT3Default(data, r.repo));
+  const [first] = defaults;
+  return first && defaults.every((d) => JSON.stringify(d) === JSON.stringify(first)) ? first : undefined;
+}
+
 /** A blocked part's start, armed by Start after: the board starts it on this model choice once every issue it's blocked by closes. */
 export interface ArmedStart {
   /** None leaves it to T3 ("T3 default"). */
@@ -616,6 +653,8 @@ export interface BoardData {
   firstRead: FirstRead;
   /** The model choices Start offers besides "T3 default"; empty when T3's settings or model list can't be read. */
   modelChoices: ModelGroup[];
+  /** Each repository's effective T3 default, for the T3 default entry; a repository whose default can't be read has none. Absent in sample mode. */
+  t3Defaults?: Record<string, ModelSelection>;
   /** Build threads this board run started, by hand or through Start after, by item id; kept apart from `started`'s refining threads. */
   startCheckFailures?: Record<string, string>;
   startedBuilds?: Record<string, StartedThread>;

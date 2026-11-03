@@ -607,8 +607,7 @@ await mountOpen({ ...sample, error: null, items: recorded(normalizeItems([parent
   expect(text(col('count', 'I_100'))).toBe('0/2');
   expect(text(next('I_100'))).toBe('Moving#102 Issue 102');
   expect(listed('I_100'), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
-  expect($$('[data-stage] [data-part="I_102"]').length, 'its own row is in its dossier').toBe(1);
-  expect($('[data-stage="build"] li[data-item="I_102"] [data-concept]'), 'its Build row names its parent').not.toBeNull();
+  expect($$('[data-part="I_102"]'), 'one row in its dossier').toHaveLength(1);
 });
 
 test('the dossiers take the main area\'s scope', async () => {

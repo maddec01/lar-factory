@@ -398,7 +398,7 @@ function DossierLine({ parent, parts, data, lead, tools, onClick, className = ''
       className={`grid ${DOCK_COLUMNS} h-8 items-center gap-x-2 pl-1.5 pr-2 ${className} ${picked(isPicked)}`}>
       {lead}
       <RowSource item={parent} />
-      <span className="flex min-w-0" data-kind>{parent.kind === 'concept' ? <RowKind item={parent} /> : <Badge tone="neutral">Coupled work</Badge>}</span>
+      <span className="flex min-w-0 items-center" data-kind>{parent.kind === 'concept' ? <RowKind item={parent} /> : <Badge tone="neutral">Coupled work</Badge>}</span>
       <span className="flex min-w-0 items-center gap-1.5" data-line="1">
         <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
           className={`min-w-0 truncate rounded text-left text-[13px] font-medium hover:underline ${ROW_OPENS}`}><ItemTitle item={parent} /></button>
@@ -408,7 +408,6 @@ function DossierLine({ parent, parts, data, lead, tools, onClick, className = ''
       </span>
       <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
       <span data-col="bar"><PartsBar m={m} /></span>
-      <span />
       <span data-col="figures" className="hidden min-w-0 @6xl:grid"><Figures s={figuresOf(parent, data, true)} /></span>
       <span data-col="count" className="text-right text-[11px] tabular-nums text-(--muted-foreground)" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count}</span>
       <span data-col="repos" className="truncate text-right text-[11px] text-(--muted-foreground)" title={otherRepos(parent, m, data)}>{otherRepos(parent, m, data)}</span>

@@ -1,7 +1,7 @@
 // Your desk: the items awaiting your action, including shaping and concept questions, as small cards in one row that
 // scrolls sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the
-// same three rows at the same heights, so they line up across cards: status, source, repository, kind and age; the
-// title; and the next step beside the card's action, with Open thread as an icon in the right corner. An empty desk is
+// same three rows at the same heights, so they line up across cards: source, repository, kind and age, in a stage
+// row's order; the title; and the status and next step beside the card's action, with Open thread as an icon in the right corner. An empty desk is
 // one small line, which while the board is disconnected only speaks for the last read.
 
 import { needsAnswer, openQuestionThread, HINTS, itemPr, itemName, shortAgo } from '@lar-factory/shared';
@@ -57,10 +57,9 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
   // The card takes the click; its summary is a button too, so the keyboard can open the dialog.
   return (
     <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
-      className={`desk-card relative grid w-80 shrink-0 cursor-pointer content-start gap-1 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) py-2 pl-3.5 pr-2.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
+      className={`desk-card relative grid w-88 shrink-0 cursor-pointer content-start gap-1 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) py-2 pl-3.5 pr-2.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
       <button type="button" className={`grid min-w-0 gap-0.5 rounded text-left ${ROW_OPENS}`}>
         <span className="desk-meta flex h-4 min-w-0 items-center gap-1.5 text-[11px]">
-          <StatusGlyph status={item.status} className="size-3" /><span className="shrink-0 font-semibold text-(--warning-foreground)">{item.status}</span>
           <RowSource item={item} />
           <RowKind item={item} />
           <span className="ml-auto shrink-0 text-(--muted-foreground)">{shortAgo(item.updatedAt, now)}</span>
@@ -69,6 +68,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
         <AzureFields azure={item.azure} />
       </button>
       <span className="flex min-w-0 items-center gap-2">
+        <span className="flex shrink-0 items-center gap-1.5 text-[11px]"><StatusGlyph status={item.status} className="size-3" /><span className="font-semibold text-(--warning-foreground)">{item.status}</span></span>
         <span className="desk-next flex h-4 min-w-0 flex-1 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums"><NextStep item={item} /></span>
         <Actions item={item} data={data} />
       </span>

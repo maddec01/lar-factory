@@ -1,15 +1,15 @@
 // The agent figures on one line, shared by the stage rows and the dock's rows, and the columns they keep so they line up
-// down the whole board: glyph, source and repository, kind, title, state, progress, pull request and figures, which drop
-// on a narrow row. A stage row's slice count and action follow in the row's own 3rem and 10rem; a dock row's count and
-// other repositories take those places.
+// down the whole board: glyph, source and repository, kind, title, state, pull request and figures, which drop on a
+// narrow row. A stage row's action follows in the row's own 10rem. A dock row has its part bar in the pull request's
+// column, and its count and other repositories in the action's.
 
 import { duration, formatTokens, formatUsd, itemTotal } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats } from '@lar-factory/shared';
 import { hasFigures, useLastKnown } from '../items/item-parts.tsx';
 import { statsOf } from './stage-track.tsx';
 
-export const ROW_COLUMNS = 'grid-cols-[1.5rem_8.5rem_5.5rem_minmax(0,1.6fr)_minmax(13rem,1fr)_3.5rem_5.5rem] @6xl:grid-cols-[1.5rem_8.5rem_5.5rem_minmax(0,1.6fr)_minmax(13rem,1fr)_3.5rem_5.5rem_8rem]';
-export const DOCK_COLUMNS = 'grid-cols-[1.5rem_8.5rem_5.5rem_minmax(0,1.6fr)_minmax(13rem,1fr)_3.5rem_5.5rem_3rem_10rem] @6xl:grid-cols-[1.5rem_8.5rem_5.5rem_minmax(0,1.6fr)_minmax(13rem,1fr)_3.5rem_5.5rem_8rem_3rem_10rem]';
+export const ROW_COLUMNS = 'grid-cols-[1.5rem_8.5rem_6.75rem_minmax(0,1.4fr)_minmax(13rem,1fr)_7rem] @6xl:grid-cols-[1.5rem_8.5rem_6.75rem_minmax(0,1.4fr)_minmax(13rem,1fr)_7rem_9.5rem]';
+export const DOCK_COLUMNS = 'grid-cols-[1.5rem_8.5rem_6.75rem_minmax(0,1.4fr)_minmax(13rem,1fr)_7rem_3rem_6.5rem] @6xl:grid-cols-[1.5rem_8.5rem_6.75rem_minmax(0,1.4fr)_minmax(13rem,1fr)_7rem_9.5rem_3rem_6.5rem]';
 
 /** The agent figures: a Dossier's total (parent plus parts), else the item's own; null when there are none. */
 export const figuresOf = (item: Item, data: BoardData, total?: boolean): ItemStats | null => {

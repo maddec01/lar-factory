@@ -3,7 +3,8 @@ import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { shapePrompt, NOT_LANDED, SAMPLE_MODELS, changeRecords, recordBlockers, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { setTimeout } from 'node:timers/promises';
+import { shapePrompt, NOT_LANDED, SAMPLE_MODELS, changeRecords, recordBlockers, settleDecisions, startableEnv, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import { rawIssue } from '@lar-factory/shared/test/raw-items';
@@ -59,6 +60,48 @@ test('armed starts survive a board restart', async (t) => {
   await board.stop();
   const { board: again } = await armableBoard(t, [build], {}, env);
   assert.deepEqual((await again.board() as BoardData).armed, { [board.id(12)]: {} });
+});
+
+/** A ticketless Ready build in maddec01/lar-factory, blocked by a decision off the board and armed; the board has stopped. */
+async function armedTicketlessBuild(t: TestContext) {
+  const { board, env } = await armableBoard(t, [build]);
+  let workId = '';
+  const records = await openWorkRecords(workRecordsPath(board.dataDir));
+  try {
+    const decision = records.create({ title: 'Decision', repository: 'maddec01/off-the-board', kind: 'decision', status: 'Shaping' });
+    const made = records.create({ title: 'Ticketless build', repository: 'maddec01/lar-factory', kind: 'build', status: 'Ready' });
+    workId = made.workId;
+    records.addBlocker(workId, made.revision, decision.workId);
+    // Every recorded PR is due for a read as soon as the board restarts, and its answer refreshes the board.
+    const delivering = records.create({ title: 'Delivering', repository: 'maddec01/lar-factory', kind: 'build', status: 'Review' });
+    records.setPullRequest(delivering.workId, delivering.revision, 'maddec01/lar-factory#77');
+  } finally { records.close(); }
+  await until(board, (d) => d.items.some((i) => i.id === workId && i.blockers.length === 1));
+  assert.equal((await arm(board, workId, OPUS)).status, 200);
+  await board.stop();
+  return { env, workId, dataDir: board.dataDir };
+}
+
+test('a restart keeps a ticketless armed start while a recorded PR refreshes a board with no items yet', async (t) => {
+  const { env, workId, dataDir } = await armedTicketlessBuild(t);
+  const again = await startBoard(t, { items: [build], readDelay: 1_500, delayedRepos: ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec01/lar-factory'] }, false, true, env);
+  assert.equal(again.dataDir, dataDir);
+  for (let n = 0; n < 10; n += 1) {
+    await setTimeout(120);
+    assert.deepEqual((await again.board() as BoardData).armed, { [workId]: { model: OPUS } }, `during the first read, step ${n}`);
+  }
+  const settled = await until(again, (d) => d.firstRead.settled && d.items.some((i) => i.id === workId));
+  assert.deepEqual(settled.armed, { [workId]: { model: OPUS } });
+  assert.deepEqual(armedFile(env.HOME!), { [workId]: { model: OPUS } });
+  assert.equal(await again.t3Calls().then((calls) => calls.filter((args) => args[1] === 'start').length), 0);
+});
+
+test('a restart drops an armed start once its repository really left the onboarded list', async (t) => {
+  const { env, workId } = await armedTicketlessBuild(t);
+  writeRepositoryList(env.HOME!, ['maddec01/lar-server']);
+  const again = await startBoard(t, { items: [] }, false, true, env);
+  await until(again, (d) => d.firstRead.settled && !d.armed?.[workId]);
+  assert.deepEqual(armedFile(env.HOME!), {});
 });
 
 test('a refresh with a blocker incomplete starts nothing; once the last completes, the board starts the build once, on its armed model', async (t) => {

@@ -42,7 +42,7 @@ import { recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
 import { parentSkillCheck } from './skills/skill-check.ts';
-import { createStartAfter } from './start-after/start-after.ts';
+import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectHints } from './t3/repository-project.ts';
@@ -785,7 +785,7 @@ const reread = () => {
 const commands = createItemCommands({ clearedFailuresFile: fixture ? null : join(boardDataDir(), 'cleared-start-failures.json'), board, items, records, reread, archive, offerModelChoices, checkSkills: parentSkillCheck() });
 const adding = createCapture({ board, items, records, reread, repos: () => board.snapshot().repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
-const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
+const startAfter = createStartAfter({ board, commands, offerModelChoices, gone: armedWorkGone(records, readRepositoryList), file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
   board, commands, capture: adding, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   reauthorizeT3: async () => {

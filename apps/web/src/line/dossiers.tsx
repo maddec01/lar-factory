@@ -406,8 +406,9 @@ function DossierLine({ parent, parts, data, lead, tools, onClick, className = ''
         {tools && <span onClick={stop} className="ml-auto flex shrink-0 items-center gap-1.5 pl-1" data-dossier-tools>{tools}</span>}
       </span>
       <span className="flex min-w-0 items-center gap-1.5" data-col="state">
-        <span onClick={stop} className="flex shrink-0 gap-1 empty:hidden" data-chips><Refined parent={parent} /><Counts m={m} /></span>
-        <span data-col="next" className="min-w-0 flex-1" data-next><Next m={m} data={data} parent={parent} /></span>
+        {/* The next step keeps its room: chips give way first, each one that no longer fits wrapping out of the one-chip-high box. */}
+        <span onClick={stop} className="flex h-5 min-w-0 shrink-[1000] flex-wrap gap-1 overflow-hidden empty:hidden" data-chips><Refined parent={parent} /><Counts m={m} /></span>
+        <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} parent={parent} /></span>
       </span>
       <span data-col="bar"><PartsBar m={m} /></span>
       <span data-col="figures" className="hidden min-w-0 @6xl:grid"><Figures s={figuresOf(parent, data, true)} /></span>

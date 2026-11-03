@@ -35,6 +35,7 @@ test.each(['map', 'list'])('dossier parts identify their own source in the %s vi
     { ...local, id: 'local-part', parentId: parent.id },
   ];
   localStorage.setItem('lar-board:dossier-view:source-concept', view);
+  localStorage.removeItem('lar-board:dossier-open:source-concept');
   await mountPage({ ...board(parent), items: [parent, ...children] });
   await settle(() => $<HTMLButtonElement>('[data-dossier-open]')!.click());
   const row = view === 'map' ? 'data-map-part' : 'data-part';

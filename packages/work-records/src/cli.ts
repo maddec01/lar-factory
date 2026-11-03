@@ -3,6 +3,7 @@
 // use it from any folder while the board app is closed. It prints each result as JSON on stdout, a body as its markdown,
 // and each error as one line on stderr.
 
+import { checkCommand } from './check-runner.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -26,6 +27,10 @@ Reads and changes the factory's work records in the work-record database, which
 it opens directly. It works from any folder, with or without the board app.
 
 Validation records, local only and requiring no revision
+  run-check <work-id> --role R [--live] [--reason X] -- <command>
+                                    Run and record a check, preserving its exit status.
+  reuse-check <work-id> --check ID --role R --reason X
+                                    Reuse an eligible non-live pass on the current tree.
   set-check-list <work-id> --file F Save [{"command":["pnpm","test"],"folder":"."}].
                                     Commands and folders match exactly. Slices use their build.
   checks <work-id>                 Print the list, runs, reuses and failure states as JSON.
@@ -620,6 +625,7 @@ async function run(records: WorkRecords, command: string, workId: string | undef
 }
 
 async function main(args: string[]): Promise<number> {
+  if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
   let parsed;
   try {
     parsed = parseArgs({ args, options: OPTIONS, allowPositionals: true });

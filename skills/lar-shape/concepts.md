@@ -22,11 +22,9 @@ file and save it with `lar-work set-body <work ID> --revision N --body map --fil
 - <each glossary entry and ADR draft settled so far, with its decision's title>, or "none"
 
 ## Map
-<Mermaid flowchart of the concept's decisions, builds and Dependencies by
-title, with edges for structural dependencies. Omit Status, progress labels and
-completion styling from this map. The board displays local progress separately.
-Redraw it whenever the structure changes. Below it, list Dependencies and the
-parts they affect. The board reads their local completion separately.>
+<List Dependencies and the parts they affect. The board draws the live Work map
+from the decision and build records, their blockers and these Dependencies. A
+Mermaid flowchart is optional context, for a reader of this text only.>
 - <need>, from <owner>, blocks <build title>
 ```
 
@@ -78,8 +76,8 @@ timeout. Then, in this order, so completion reads it as complete:
    and set a build Ready when preparing it for implementation.
 3. Save the concept's map. Put only results needed to explain parts or
    relationships in Decisions so far; keep the full answer in the decision
-   record. Copy its drafts into Domain docs, remove cleared fog and redraw the
-   Map. Once no Fog is left, record it with
+   record. Copy its drafts into Domain docs, remove cleared fog and update the
+   Map's Dependencies. Once no Fog is left, record it with
    `lar-work set-fog <concept work ID> --revision N --fog gone`.
 
 Start each new research decision at once, as in step 3; every other new

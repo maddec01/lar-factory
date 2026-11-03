@@ -395,7 +395,7 @@ function DossierLine({ parent, parts, data, lead, tools, onClick, className = ''
   const threads = [parent, ...parts.map((p) => p.item)].flatMap(threadsOf);
   return (
     <div onClick={onClick} data-item={parent.id} title={threadCounts(threads) || undefined}
-      className={`grid ${DOCK_COLUMNS} h-8 items-center gap-x-2 pl-1.5 pr-2 ${className} ${picked(isPicked)}`}>
+      className={`grid ${DOCK_COLUMNS} h-10 items-center gap-x-2 pl-1.5 pr-2 ${className} ${picked(isPicked)}`}>
       {lead}
       <RowSource item={parent} />
       <span className="flex min-w-0 items-center" data-kind>{parent.kind === 'concept' ? <RowKind item={parent} /> : <Badge tone="neutral">Coupled work</Badge>}</span>

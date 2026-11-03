@@ -252,7 +252,7 @@ test('the line holds the kind, the title and chips that hide at zero, with its T
 test('a dossier stays on one line: nothing wraps, the title and Azure fields give up their room to an ellipsis, and the chips keep theirs', async () => {
   await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
   const classes = (el: Element) => el.className.split(' ');
-  expect(classes(header())).toContain('h-8');
+  expect(classes(header())).toContain('h-10');
   expect(classes(line())).not.toContain('flex-wrap');
   expect(classes(header().querySelector('[data-title]')!)).toContain('truncate');
   const azure = header().querySelector('[data-azure]')!;

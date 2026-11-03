@@ -175,16 +175,13 @@ test('repository setup and per-ticket import write routes are absent', async (t)
   }
 });
 
-test('a fine-grained read-only token cannot enable concept sync for a push-capable user', async (t) => {
+test('a fine-grained read-only token permits local setup without enabling concept sync', async (t) => {
   const board = await startBoard(t, { repositories: [], oauthScopes: null });
   const detected = await board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web' }, board.url, '/api/onboarding/detect');
   const { detection } = await detected.json() as { detection: SetupDetection };
   assert.ok(Object.values(detection.access).every((value) => value === 'unverified'));
   const saved = await board.post({ repo: 'maddec01/lar-web', ...ANSWERS, structureSync: true }, board.url, '/api/onboarding/setup');
-  assert.equal(saved.status, 403);
-  const error = (await saved.json() as { error: string }).error;
-  assert.match(error, /Issues: Read and write/);
-  assert.match(error, /cannot verify fine-grained token permissions/);
-  assert.deepEqual((await board.board()).repos, []);
+  assert.equal(saved.status, 200);
+  assert.deepEqual((await saved.json() as { board: BoardData }).board.onboarding, []);
   assert.deepEqual((await board.calls()).filter(writesRepository), []);
 });

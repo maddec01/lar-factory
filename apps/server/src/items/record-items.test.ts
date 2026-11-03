@@ -460,7 +460,7 @@ test('disabled legacy settings retain pending concept content in board details',
   const concept = records.create({ repository: REPO, title: 'Retained concept', kind: 'concept' });
   records.setBody(concept.workId, concept.revision, 'map', 'Pending local map');
   const pending = records.trackerPending();
-  const item = recordItems(records, [], [REPO], [{ repo: REPO, structureSync: false }]).find(item => item.id === concept.workId);
+  const item = recordItems(records, [], [REPO], [], new Set(), [{ repo: REPO, structureSync: false }]).find(item => item.id === concept.workId);
   assert.equal(item?.sync?.state, 'pending');
   assert.deepEqual(records.trackerPending(), pending);
 });

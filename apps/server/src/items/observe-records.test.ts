@@ -282,7 +282,7 @@ test('set-aside work and work in repositories off the board read nothing', async
   assert.deepEqual(asked, []);
 });
 
-test('a decision whose answer and domain drafts are recorded, and a concept whose Fog is gone, become Done and finished', async () => {
+test('a settled decision finishes while a concept without delivery stays unfinished', async () => {
   const records = await open();
   let decision = records.create({ title: 'Which store', repository: REPO, kind: 'decision', status: 'Shaping' });
   decision = records.setBody(decision.workId, decision.revision, 'answer', 'SQLite.');
@@ -292,11 +292,13 @@ test('a decision whose answer and domain drafts are recorded, and a concept whos
   records.setBody(decision.workId, decision.revision, 'domain-drafts', 'None.');
   concept = records.setFogGone(concept.workId, concept.revision, true);
   finishCompleted(records, [REPO]);
-  for (const { workId } of [decision, concept]) {
+  for (const { workId } of [decision]) {
     const record = records.read(workId);
     assert.equal(record.status, 'Done');
     assert.ok(record.finishedAt);
   }
+  assert.equal(records.read(concept.workId).status, 'Shaping');
+  assert.equal(records.read(concept.workId).finishedAt, null);
 });
 
 test('the provider reads at most six records at once', async () => {

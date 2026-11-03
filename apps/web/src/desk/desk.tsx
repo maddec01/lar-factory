@@ -2,7 +2,7 @@
 // scrolls sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the
 // same three rows at the same heights, so they line up across cards: status, source, repository, kind and age; the
 // title; and the next step beside the card's action, with Open thread as an icon in the right corner. An empty desk is
-// one small line.
+// one small line, which while the board is disconnected only speaks for the last read.
 
 import { needsAnswer, openQuestionThread, HINTS, itemPr, itemName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
@@ -78,11 +78,11 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
 
 /** `items` are the desk's items in the main area's scope. */
 export function Desk({ items }: { items: Item[] }) {
-  const { data, now } = useBoardStore();
+  const { data, now, clientError } = useBoardStore();
   if (!items.length) return (
     <section className="desk flex shrink-0 items-baseline gap-2 text-xs text-(--muted-foreground)" aria-labelledby="desk-h">
       <h2 id="desk-h" className="m-0 text-[13px] font-medium text-(--foreground)">Your desk</h2>
-      <p className="m-0">Nothing waits on you.</p>
+      <p className="m-0">{clientError ? 'Nothing waited on you at the last read.' : 'Nothing waits on you.'}</p>
     </section>
   );
   return (

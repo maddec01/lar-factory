@@ -8,7 +8,7 @@ export function Warning({ dismissKey, title, what = title, action, children }: {
 }) {
   const dismissed = useDismissed(dismissKey);
   if (dismissed) return null;
-  return <div data-slot="notice" className="relative border-t py-3 pr-8 text-xs">
+  return <div data-slot="notice" className="relative border-t py-3 pr-8 text-xs first:border-t-0 first:py-1">
     <div data-warning={dismissKey}>
       <DismissButton what={`: ${what}`} onClick={(event) => closeKeepingFocus(event.currentTarget.closest('[data-slot="notice"]'), () => useDismissStore.getState().dismiss(dismissKey))} />
       <div data-slot="title" className="font-medium">{title}</div>

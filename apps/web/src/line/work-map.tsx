@@ -201,12 +201,12 @@ function PartNode({ part, data, width, home }: { part: Part; data: BoardData; wi
 function HistoryRow({ part, after, data, home }: { part: Part; after: Part[]; data: BoardData; home: string }) {
   const { item } = part;
   return (
-    <li className="flex min-h-10 min-w-0 items-center gap-2 rounded-md px-1.5 text-[13px] hover:bg-(--soft)" data-history-part={item.id}>
+    <li className="flex min-h-12 min-w-0 items-center gap-3 rounded-md px-3 text-[13px] hover:bg-(--soft)" data-history-part={item.id}>
       <StatusGlyph status="Done" className="size-3 shrink-0" />
       <span className="w-22 shrink-0"><PartKindLabel kind={part.kind} /></span>
       <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} title={itemName(item)} className="min-w-0 truncate rounded text-left hover:underline focus-visible:outline-2 focus-visible:outline-(--primary)"><ItemTitle item={item} /></button>
       {after.length > 0 && <span className="min-w-0 shrink-[1000] truncate text-[11px] text-(--muted-foreground)" title={`after ${after.map((u) => itemName(u.item)).join(', ')}`}>after {after.map((u) => ref(u.item)).join(', ')}</span>}
-      <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px] text-(--muted-foreground)">
+      <span className="row-action ml-auto flex shrink-0 items-center gap-2 text-[11px] text-(--muted-foreground)">
         {repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />}
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
         {threadsOf(item).length > 0 && <OpenThread item={item} data={data} iconOnly />}
@@ -333,7 +333,7 @@ export function WorkMap({ parts, check, data, home }: { parts: Part[]; check: En
         )}
       </div>
       {showHistory && (
-        <ol className="m-0 grid list-none gap-x-4 gap-y-0.5 px-3 pb-2 grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))]" style={{ width: m.width }} data-map-history-parts>
+        <ol className="m-0 grid list-none gap-x-4 gap-y-1 px-3 pb-3 grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))]" style={{ width: m.width }} data-map-history-parts>
           {history.map((p) => <HistoryRow key={keyOf(p)} part={p} after={ups(p).filter(isHistory)} data={data} home={home} />)}
         </ol>
       )}

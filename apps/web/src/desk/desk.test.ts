@@ -46,7 +46,7 @@ test('every desk card has the same rows at the same heights', async () => {
   await mountPage();
   const heights = (c: HTMLElement) => [c.querySelector('.desk-meta'), c.querySelector('.desk-title'), c.querySelector('.desk-next'), c.querySelector('.desk-actions')]
     .map((row) => row?.className.split(' ').find((name) => /^h-\d+$/.test(name)));
-  for (const c of cards()) expect(heights(c)).toEqual(['h-4', 'h-5', 'h-4', 'h-7']);
+  for (const c of cards()) expect(heights(c)).toEqual(['h-6', 'h-5', 'h-5', 'h-8']);
 });
 
 test('a desk card opens the item dialog and stays marked while it shows', async () => {

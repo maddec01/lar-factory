@@ -10,13 +10,13 @@ import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ActivityFeedback, AzureFields, ItemTitle, KindMarker, SliceBar, SliceList, useActivityFeedback, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
+import { ActivityFeedback, AzureFields, ItemTitle, KindMarker, SliceBar, SliceList, hasFigures, useActivityFeedback, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
-import { Figures, ROW_COLUMNS, figuresOf } from './columns.tsx';
+import { FIGURES_COLUMN, Figures, LINK_COLUMN, ROW_ACTION, ROW_COLUMNS, figuresOf } from './columns.tsx';
 import { threadAtWork, threadsOf } from './dossier-parts.ts';
 import { RowKind, RowSource } from './row-identity.tsx';
 import { OnYourDesk, YOURS, ROW_OPENS, picked, threadText } from './stage-track.tsx';
@@ -73,19 +73,27 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
   const state = shown.working ? 'Working' : stateText(item, shown.word, feedback, runKnown);
   const working = feedback.running || state === 'Working';
   const phase = feedback.running && feedback.label !== state ? feedback.label : null;
+  const figures = figuresOf(item, data);
+  const pr = item.linkedPrs[0];
   return (
     <li data-item={item.id} className={`@container border-b border-(--border) last:border-b-0 hover:bg-(--accent) ${picked(isPicked)}`}>
-      <div className="flex items-center gap-2 pr-2">
+      <div className="flex items-center gap-3 pr-3">
         <button type="button" data-row-open data-meta onClick={() => useItemDialogStore.getState().open(item.id)}
-          className={`grid h-10 min-w-0 flex-1 ${ROW_COLUMNS} items-center gap-x-2 pl-1.5 text-left text-[11px] text-(--muted-foreground) ${ROW_OPENS}`}>
+          className={`grid h-12 min-w-0 flex-1 ${ROW_COLUMNS} items-center gap-x-3 pl-3 text-left text-[11px] text-(--muted-foreground) ${ROW_OPENS}`}>
           {n === undefined
             ? <span className="grid size-6 place-items-center" data-glyph><StatusGlyph status={shown.glyph} /></span>
             : <span className="queue-n text-center font-medium tabular-nums">{n + 1}</span>}
           <RowSource item={item} />
           <span className="flex min-w-0 items-center" data-kind><RowKind item={item} /></span>
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 truncate text-[13px] font-medium text-(--foreground)" title={itemName(item)} data-title><ItemTitle item={item} /></span>
-            {concept && <PartOf concept={concept} />}
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="min-w-0 truncate text-[13px] font-medium text-(--foreground)" title={itemName(item)} data-title><ItemTitle item={item} /></span>
+              {concept && <PartOf concept={concept} />}
+            </span>
+            {(pr || (figures && hasFigures(figures))) && <>
+              {pr && <span data-col="pr" className={`${LINK_COLUMN} truncate`}><span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 shrink-0 text-(--st-done)" />{prLabel(pr)}</span></span>}
+              <span data-col="figures" className={FIGURES_COLUMN}><Figures s={figures} /></span>
+            </>}
           </span>
           <span className="flex min-w-0 items-center gap-1.5 overflow-hidden" data-col="state">
             {n === undefined
@@ -95,13 +103,11 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
             <KindMarker item={item} />
             <AzureFields azure={item.azure} />
           </span>
-          <span data-col="pr" className="min-w-0 truncate">{item.linkedPrs[0] && <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 shrink-0 text-(--st-done)" />{prLabel(item.linkedPrs[0])}</span>}</span>
-          <span data-col="figures" className="hidden min-w-0 @6xl:grid"><Figures s={figuresOf(item, data)} /></span>
         </button>
-        <span data-col="side" className="flex w-40 shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 py-0.5 text-right text-[11px] text-(--muted-foreground)"><Side item={item} data={data} /></span>
+        <span data-col="side" className={`${ROW_ACTION} w-40 shrink-0`}><Side item={item} data={data} /></span>
       </div>
       {(item.slices.length > 0 || working) && (
-        <div data-progress className="grid grid-cols-[20rem_auto_minmax(0,1fr)] items-center gap-x-3 pb-1.5 pl-[2.375rem] pr-2 text-[12px] text-(--muted-foreground)">
+        <div data-progress className="grid grid-cols-[20rem_auto_minmax(0,1fr)] items-center gap-x-3 pb-2.5 pl-12 pr-3 text-[12px] text-(--muted-foreground)">
           <span data-col="bar">{item.slices.length > 0 ? <SliceBar item={item} /> : <ActivityFeedback feedback={{ ...feedback, running: true }} />}</span>
           {item.slices.length > 0
             ? <button type="button" aria-expanded={slices} aria-label={slices ? 'Hide slices' : 'Show slices'} onClick={() => setSlices(!slices)} data-col="count"
@@ -115,8 +121,8 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
           </span>
         </div>
       )}
-      {['Queued', 'Ready', 'In progress'].includes(item.status) && <div className="pb-2 pl-9 pr-2 empty:hidden"><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /></div>}
-      {slices && <div className="pb-2 pl-7 pr-2" data-slices><SliceList item={item} /></div>}
+      {['Queued', 'Ready', 'In progress'].includes(item.status) && <div className="pb-2.5 pl-12 pr-3 empty:hidden"><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /></div>}
+      {slices && <div className="pb-2.5 pl-10 pr-3" data-slices><SliceList item={item} /></div>}
     </li>
   );
 }

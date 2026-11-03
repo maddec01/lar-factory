@@ -1,8 +1,8 @@
 // Your desk: the items awaiting your action, including shaping and concept questions, as small cards in one row that
 // scrolls sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the
-// same three rows at the same heights, so they line up across cards: source, repository, kind and age, in a stage
-// row's order; the title; and the status and next step beside the card's action, with Open thread as an icon in the right corner. An empty desk is
-// one small line, which while the board is disconnected only speaks for the last read.
+// same four rows at the same heights, so they line up across cards: source, repository, kind and age, in a stage
+// row's order; the title; the status and next step; and the card's action in the right corner, with Open thread as an
+// icon beside it. An empty desk is one small line, which while the board is disconnected only speaks for the last read.
 
 import { needsAnswer, openQuestionThread, HINTS, itemPr, itemName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
@@ -44,7 +44,7 @@ function NextStep({ item }: { item: Item }) {
 function Actions({ item, data }: { item: Item; data: BoardData }) {
   return (
     // A click beside the buttons opens the item dialog, as anywhere else on the card.
-    <KeepClicks className="desk-actions flex h-7 shrink-0 items-center justify-end gap-1.5" passEmpty>
+    <KeepClicks className="desk-actions row-action flex h-8 shrink-0 items-center justify-end gap-1.5" passEmpty>
       {needsAnswer(item)
         ? <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />
         : <><PrLink item={item} label="Open PR" /><OpenThread item={item} data={data} iconOnly /></>}
@@ -57,9 +57,9 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
   // The card takes the click; its summary is a button too, so the keyboard can open the dialog.
   return (
     <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
-      className={`desk-card relative grid w-88 shrink-0 cursor-pointer content-start gap-1 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) py-2 pl-3.5 pr-2.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
-      <button type="button" className={`grid min-w-0 gap-0.5 rounded text-left ${ROW_OPENS}`}>
-        <span className="desk-meta flex h-4 min-w-0 items-center gap-1.5 text-[11px]">
+      className={`desk-card relative grid w-88 shrink-0 cursor-pointer content-start gap-2 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) py-3 pl-4 pr-3 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
+      <button type="button" className={`grid min-w-0 gap-2 rounded text-left ${ROW_OPENS}`}>
+        <span className="desk-meta flex h-6 min-w-0 items-center gap-2 text-[11px]">
           <RowSource item={item} />
           <RowKind item={item} />
           <span className="ml-auto shrink-0 text-(--muted-foreground)">{shortAgo(item.updatedAt, now)}</span>
@@ -69,9 +69,9 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
       </button>
       <span className="flex min-w-0 items-center gap-2">
         <span className="flex shrink-0 items-center gap-1.5 text-[11px]"><StatusGlyph status={item.status} className="size-3" /><span className="font-semibold text-(--warning-foreground)">{item.status}</span></span>
-        <span className="desk-next flex h-4 min-w-0 flex-1 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums"><NextStep item={item} /></span>
-        <Actions item={item} data={data} />
+        <span className="desk-next flex h-5 min-w-0 flex-1 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums"><NextStep item={item} /></span>
       </span>
+      <Actions item={item} data={data} />
     </div>
   );
 }

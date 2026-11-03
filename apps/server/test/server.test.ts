@@ -11,7 +11,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { itemTotal } from '@lar-factory/shared';
-import type { Item } from '@lar-factory/shared';
+import type { BoardData, Item, ItemStats } from '@lar-factory/shared';
 
 const draft = { createIssue: false, repo: 'maddec01/lar-factory', kind: 'feature', title: 'Capture an item', description: '' };
 
@@ -116,6 +116,74 @@ test('a failed usage read stays unreadable through the refreshes that read no us
   const later = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(later.items.find((i) => i.number === 12)?.stats, 'unavailable');
   assert.equal(later.items.find((i) => i.number === 13)?.stats, undefined, 'work with no thread has no usage to report missing');
+});
+
+test('one failed thread fails only the item whose family holds it: its known figures stay, and a success brings it back', async (t) => {
+  const thread = (id: string, read?: 'failed') => ({ id, ...read && { read }, turns: [{ id: `turn-${id}`, startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }] });
+  const db = statsDb(t, [thread('a'), thread('b')]);
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'], 'maddec01/lar-factory#13': ['b'] }, items: [boardIssue(12, 'Review'), boardIssue(13, 'Review'), boardIssue(14, 'Review')] }, false, true, { T3_STATE_DB: db });
+  const item = (data: BoardData, number: number) => data.items.find((i) => i.number === number);
+  const known = (await until(board, (d) => typeof item(d, 12)?.stats === 'object' && typeof item(d, 13)?.stats === 'object'));
+  assert.equal(item(known, 12)?.usageState, 'current');
+  assert.equal(item(known, 14)?.usageState, undefined, 'work with no thread has no usage to wait for');
+  writeFileSync(`${db}.execution.json`, JSON.stringify([thread('a', 'failed'), thread('b')]));
+  const failed = await until(board, (d) => item(d, 12)?.usageState === 'failed');
+  assert.deepEqual(item(failed, 12)?.stats, item(known, 12)?.stats);
+  assert.equal(item(failed, 13)?.usageState, 'current');
+  assert.equal(failed.usageRead?.readable, true);
+  // The thread refreshes between usage reads rewrite the items, every 100 ms here.
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(item(await board.board(), 12)?.usageState, 'failed');
+  writeFileSync(`${db}.execution.json`, JSON.stringify([thread('a'), thread('b')]));
+  await until(board, (d) => item(d, 12)?.usageState === 'current');
+});
+
+test('a record shared with an unread thread of another item shows provisionally, then falls, and never reaches a PR block', async (t) => {
+  const home = claudeHome(t, { 'session-b': { main: [assistant('shared', 0, 0, 0, 1000)] }, 'session-a': { main: [assistant('shared', 0, 0, 0, 1000), assistant('own', 0, 0, 0, 7)] } });
+  const thread = (id: string, createdAt: string, read?: 'never') => ({ id, ...read && { read }, sessions: [{ session: `session-${id}`, instance: 'claudeAgent_personal', createdAt }],
+    turns: [{ id: `turn-${id}`, startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }] });
+  const a = thread('a', '2026-10-20T09:10:00Z');
+  const b = (read?: 'never') => thread('b', '2026-10-20T09:00:00Z', read);
+  const db = statsDb(t, [a, b('never')]);
+  const raw = rawBuild(12, 'Review');
+  const open = { number: 40, url: 'https://github.com/maddec01/lar-factory/pull/40', state: 'OPEN', isDraft: false, body: 'PR 40' };
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'], 'maddec01/lar-factory#13': ['b'] },
+    items: [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [open] } } }, boardIssue(13, 'Review')] }, false, true, { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) });
+  const item = (data: BoardData, number: number) => data.items.find((i) => i.number === number);
+  const inflated = await until(board, (d) => typeof item(d, 12)?.stats === 'object');
+  assert.deepEqual(item(inflated, 12)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 1007, provisional: true });
+  assert.equal(item(inflated, 13)?.usageState, 'loading');
+  assert.equal(item(inflated, 13)?.stats, undefined, 'a family with a thread never read shows no figures');
+  await new Promise((r) => setTimeout(r, 500));
+  const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
+  assert.deepEqual(await edits(), [], 'no provisional figure reaches a PR block');
+  writeFileSync(`${db}.execution.json`, JSON.stringify([a, b()]));
+  const settled = await until(board, (d) => !(item(d, 12)?.stats as ItemStats | undefined)?.provisional && item(d, 13)?.usageState === 'current');
+  assert.deepEqual(item(settled, 12)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 7 }, 'the inflated figure was never retained');
+  assert.equal((item(settled, 13)?.stats as ItemStats).tokens, 1000);
+  await board.untilLogged('updated item stats in https://github.com/maddec01/lar-factory/pull/40');
+  assert.ok((await edits()).every((args) => !String(args[5]).includes('1,007') && !String(args[5]).includes('1.0K')));
+  assert.ok(String((await edits())[0]![5]).includes('"tokens":7'));
+});
+
+test('a provisional figure never raises merged figures, and the first read past it does', async (t) => {
+  const home = claudeHome(t, { 'session-b': { main: [assistant('shared', 0, 0, 0, 1000)] }, 'session-a': { main: [assistant('shared', 0, 0, 0, 1000), assistant('own', 0, 0, 0, 7)] } });
+  const thread = (id: string, createdAt: string, read?: 'never') => ({ id, ...read && { read }, sessions: [{ session: `session-${id}`, instance: 'claudeAgent_personal', createdAt }], turns: [{ id: `turn-${id}`, startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:01:00Z' }] });
+  const a = thread('a', '2026-10-20T09:10:00Z');
+  const db = statsDb(t, [a, thread('b', '2026-10-20T09:00:00Z', 'never')]);
+  const raw = rawBuild(12, 'Done');
+  const block = '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 5\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":5} -->\n<!-- /lar-stats -->';
+  const merged = { number: 40, url: 'https://github.com/maddec01/lar-factory/pull/40', state: 'MERGED', mergedAt: '2026-10-20T10:00:00Z', isDraft: false, body: block };
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'], 'maddec01/lar-factory#13': ['b'] },
+    items: [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [merged] } } }, boardIssue(13, 'Review')] }, false, true, { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) });
+  const stats = (data: BoardData) => data.items.find((i) => i.number === 12)?.stats as ItemStats | undefined;
+  await until(board, (d) => d.items.find((i) => i.number === 12)?.usageState === 'current');
+  await new Promise((r) => setTimeout(r, 300));
+  const held = await board.board();
+  assert.equal(stats(held)?.tokens, 5);
+  assert.equal(stats(held)?.frozen, true);
+  writeFileSync(`${db}.execution.json`, JSON.stringify([a, thread('b', '2026-10-20T09:00:00Z')]));
+  assert.equal(stats(await until(board, (d) => stats(d)?.tokens !== 5))?.tokens, 7);
 });
 
 test("a build's slices show their records' progress, and its build sub-issue stays a board item", async (t) => {

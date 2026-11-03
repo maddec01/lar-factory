@@ -47,6 +47,8 @@ export interface FixtureThread {
   turns?: FixtureTurn[];
   /** The thread's provider threads by native session. */
   sessions?: (string | FixtureSession)[];
+  /** How its latest read stands when not current: never read leaves it out of the count; a failed one counts from its retained observation. */
+  read?: 'never' | 'failed';
 }
 
 /** A subagent run; a running one has no completion time. */

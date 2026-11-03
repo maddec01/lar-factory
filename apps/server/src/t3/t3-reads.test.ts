@@ -37,6 +37,7 @@ test("one read of the database gives each item its record's threads' stats, and 
 
 test('a missing or unreadable usage database reports unavailable stats', (t) => {
   const missing = loadT3Reads({ db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite'), ...NOWHERE }, NOW);
+  assert.deepEqual([missing.usage(['a']), missing.usage([])], ['failed', 'current']);
   assert.deepEqual([missing.stats(['a']), missing.statsUnavailable, missing.priced], ['unavailable', true, null]);
   assert.equal(missing.stats([]), undefined, 'an item with no threads has nothing a failed read lost');
   const changed = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`] }]);
@@ -56,6 +57,54 @@ test('a stats read that fails reports unavailable stats', (t) => {
   const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
   assert.equal(reads.stats(['a']), 'unavailable');
   assert.equal(reads.statsUnavailable, true);
+});
+
+test('a failed thread fails only the items whose family holds it, and an item with no threads is never unavailable', (t) => {
+  const db = statsDb(t, [
+    { id: 'a', messages: [`$lar-work ${REPO}#1`], turns: [turn] },
+    { id: 'b', read: 'failed', messages: [`$lar-work ${REPO}#2`], turns: [{ ...turn, id: 'b1' }] },
+    { id: 'b-child', rootThreadId: 'b', turns: [] },
+    { id: 'c', read: 'failed', rootThreadId: 'd', turns: [] },
+    { id: 'd', messages: [`$lar-work ${REPO}#3`], turns: [{ ...turn, id: 'd1' }] },
+  ]);
+  vi.stubEnv('T3_STATE_DB', db);
+  t.onTestFinished(() => { vi.unstubAllEnvs(); });
+  const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
+  assert.equal(found(reads.stats(['a'])).agentMs, 10 * 60_000);
+  assert.equal(reads.usage(['a']), 'current');
+  for (const family of ['b', 'd']) {
+    assert.equal(reads.stats([family]), 'unavailable');
+    assert.equal(reads.usage([family]), 'failed');
+  }
+  assert.equal(reads.stats([]), undefined);
+  assert.equal(reads.usage([]), 'current');
+  assert.equal(reads.statsUnavailable, false, 'the reader works, so usageRead stays readable');
+  assert.equal(reads.allObserved, true, 'each failed thread has a retained observation');
+});
+
+test('an item with a thread never read loads with no figures, and the board stays provisional', (t) => {
+  const db = statsDb(t, [
+    { id: 'a', messages: [`$lar-work ${REPO}#1`], turns: [turn] },
+    { id: 'b', messages: [`$lar-work ${REPO}#2`], turns: [{ ...turn, id: 'b1' }] },
+    { id: 'b-child', read: 'never', rootThreadId: 'b', turns: [] },
+  ]);
+  vi.stubEnv('T3_STATE_DB', db);
+  t.onTestFinished(() => { vi.unstubAllEnvs(); });
+  const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
+  assert.equal(reads.usage(['b']), 'loading');
+  assert.equal(reads.stats(['b']), undefined, 'never figures from part of a family');
+  assert.equal(reads.usage(['a']), 'current');
+  assert.equal(found(reads.stats(['a'])).agentMs, 10 * 60_000);
+  assert.equal(reads.allObserved, false);
+});
+
+test('T3 running with its thread list unread is loading, with no read reported', (t) => {
+  const db = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`], turns: [turn] }]);
+  const unread = vi.spyOn(execution, 'protocolStatsInputs').mockImplementationOnce(() => null);
+  t.onTestFinished(() => { unread.mockImplementation(() => fixtureInputs()); });
+  const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
+  assert.deepEqual([reads.usage(['a']), reads.stats(['a']), reads.statsUnavailable, reads.priced, reads.allObserved], ['loading', undefined, false, null, false]);
+  assert.equal(reads.usage([]), 'current');
 });
 
 test("a warm reads the transcripts of T3's threads not read yet, so the stats read after it reads none", async (t) => {

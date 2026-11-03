@@ -1,5 +1,5 @@
 // The build slots: the builds in progress, against a limit the board shows but doesn't enforce. The title bar's
-// building counter and the Queue's header both count them. A concept in progress isn't a build in a slot.
+// building counter and the Build pane's header both count them. A concept in progress isn't a build in a slot.
 
 import type { Item } from '@lar-factory/shared';
 

@@ -1,4 +1,4 @@
-// The line's stages: the five-stage track a dossier's parts show, and what the line says of an item's thread and of an
+// The board's stages: the five-stage track a dossier's parts show, and what a row says of an item's thread and of an
 // item that waits on you.
 
 import { clock, currentBuildThread, delegatedWorkRunning } from '@lar-factory/shared';
@@ -15,9 +15,11 @@ const STAGES: { name: string; statuses: Status[] }[] = [
 /** Done follows the active stages; List and Queued sit before them. */
 export const stageOf = (s: Status) => s === 'Done' ? STAGES.length : STAGES.findIndex((st) => st.statuses.includes(s));
 export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
+/** A row's own buttons draw their focus ring inside the pane that clips them. */
+export const ROW_OPENS = 'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--primary)';
 const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
-/** The desk's statuses the line takes no action on. */
+/** The desk's statuses a row takes no action on. */
 export const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
 
 /** Activity comes from T3, never from the item's workflow status. */

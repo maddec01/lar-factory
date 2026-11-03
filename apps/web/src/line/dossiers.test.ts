@@ -1,4 +1,4 @@
-// The line's dossiers: each open concept, and each open item with sub-issues on the board: its two header lines,
+// The dock's dossiers: each started concept, and each open item with sub-issues on the board: its one header line,
 // collapsed until opened, then what keeps the work moving and its parts as a Work map or a list. Ports the old Board
 // view's concept block tests.
 
@@ -12,8 +12,8 @@ const C200 = 'I_sample09';
 const C180 = 'I_sample23';
 const dossier = (id = C200) => $(`[data-dossier="${id}"]`)!;
 const header = (id = C200) => dossier(id).firstElementChild as HTMLElement;
-const line = (n: 1 | 2, id = C200) => header(id).querySelector<HTMLElement>(`[data-line="${n}"]`)!;
-/** Line 2's "what's next": the part that waits on you, the first part that can start, or the fallback. */
+const line = (id = C200) => header(id).querySelector<HTMLElement>('[data-line="1"]')!;
+/** The row's "what's next": the part that waits on you, the first part that can start, or the fallback. */
 const next = (id = C200) => header(id).querySelector<HTMLElement>('[data-next]')!;
 const chips = (id = C200) => [...header(id).querySelectorAll('[data-chip]')].map(text);
 const toggle = (id = C200) => header(id).querySelector<HTMLButtonElement>('[aria-expanded]')!;
@@ -58,22 +58,27 @@ beforeEach(() => {
   }
 });
 
-test('each open concept and item with sub-issues on the board is a dossier, in board order, between the Queue and the rest of the line', async () => {
+test('each started concept and item with sub-issues on the board is a dossier in the dock, in board order; with none the dock takes no height', async () => {
   await mountPage();
-  expect([...$('.line > div')!.children].map((el) => el.className.split(' ')[0])).toEqual(['queue', 'grid', 'overflow-hidden']);
-  const list = $('[data-dossiers]')!;
-  expect([[...list.children].map((el) => el.getAttribute('data-dossier')), list.className.split(' ')], 'the dossiers sit 8 px apart')
-    .toEqual([[C200, C180], expect.arrayContaining(['gap-2'])]);
+  expect(text($('#dock-h'))).toBe('Concepts and linked work 2');
+  expect([...$('[data-dossiers]')!.children].map((el) => el.getAttribute('data-dossier'))).toEqual([C200, C180]);
+  expect($('[data-stage="dock"]')!.className.split(' '), 'it takes at most a third of the main area').toEqual(expect.arrayContaining(['max-h-[33%]', 'shrink-0']));
   await receive({ ...sample, items: sample.items.filter((i) => !i.labels.includes('concept') && i.parent?.number !== 180) });
-  expect([$$('[data-dossier]'), $('[data-dossiers]')], 'none without a concept or a parent').toEqual([[], null]);
+  expect([$$('[data-dossier]'), $('[data-stage="dock"]')], 'none without a concept or a parent').toEqual([[], null]);
 });
 
-test('a dossier starts collapsed to its two header lines, and the browser remembers it opened across a reload', async () => {
+test('a Queued concept stays out of the dock until it starts', async () => {
+  const concept = { ...sample.items.find((i) => i.id === C200)!, id: 'I_queued', number: 777, status: 'Queued' as const, statuses: ['Queued' as const], threads: [] };
+  await mountPage({ ...sample, items: [...sample.items, concept] });
+  expect([$('[data-dossier="I_queued"]'), $('.queue li[data-item="I_queued"]') !== null]).toEqual([null, true]);
+});
+
+test('a dossier starts collapsed to its one line, and the browser remembers it opened across a reload', async () => {
   localStorage.clear();
   await mountPage();
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   expect([toggle().getAttribute('aria-expanded'), dossier().children.length, dossier().querySelector('[data-work-map]')]).toEqual(['false', 1, null]);
-  await press(line(2));
+  await press(header());
   expect([toggle().getAttribute('aria-expanded'), localStorage.getItem(OPEN_KEY + C200)]).toEqual(['true', '1']);
   expect(dossier().querySelector('[data-work-map]'), 'opened, it shows its body').not.toBeNull();
   vi.resetModules();
@@ -89,7 +94,7 @@ test('only the title opens the item; anywhere else on the header but the chips o
   await press(header().querySelector('[data-title]')!);
   expect([dialogTitle(), toggle().getAttribute('aria-expanded')]).toEqual(['#200 lar cloud: website sign-in and relay', 'false']);
   await press($('[data-item-dialog] [aria-label="Close"]') ?? document.body);
-  for (const el of [line(1), line(2)]) {
+  for (const el of [line(), header().querySelector<HTMLElement>('[data-col="bar"]')!]) {
     const was = toggle().getAttribute('aria-expanded');
     await press(el);
     expect(toggle().getAttribute('aria-expanded'), el.outerHTML.slice(0, 40)).not.toBe(was);
@@ -116,11 +121,11 @@ const select = (el: Element) => {
 test('letting go of a drag that selected text in the header leaves the dossier as it was', async () => {
   localStorage.clear();
   await mountPage();
-  select(line(2));
-  await clickWith(line(2), 1);
+  select(header());
+  await clickWith(header(), 1);
   expect(toggle().getAttribute('aria-expanded')).toBe('false');
   window.getSelection()!.removeAllRanges();
-  await clickWith(line(2), 1);
+  await clickWith(header(), 1);
   expect(toggle().getAttribute('aria-expanded')).toBe('true');
 });
 
@@ -128,47 +133,39 @@ test('a selection elsewhere never stops the dossier toggling, nor does one in th
   localStorage.clear();
   await mountPage();
   select(header(C180));
-  await clickWith(line(2), 1);
+  await clickWith(header(), 1);
   expect(toggle().getAttribute('aria-expanded'), 'a click, with text selected in another dossier').toBe('true');
-  select(line(2));
+  select(header());
   await clickWith(toggle(), 0);
   expect(toggle().getAttribute('aria-expanded'), 'Enter or Space on Collapse, with text selected in the header').toBe('false');
   window.getSelection()!.removeAllRanges();
 });
 
-test('line 1 holds the kind, the full title, its T3 threads, and chips that hide at zero', async () => {
+test('the line holds the kind, the title and chips that hide at zero, with its T3 threads in its tooltip', async () => {
   await mountPage();
   const title = header().querySelector('[data-title]')!;
-  expect(text(line(1))).toContain('Concept#200 lar cloud: website sign-in and relay');
+  expect(text(line())).toContain('Concept#200 lar cloud: website sign-in and relay');
   expect(text(title)).toBe('#200 lar cloud: website sign-in and relay');
-  expect(title.className.split(' '), 'the title wraps, never truncates').not.toContain('truncate');
-  expect(text(header().querySelector('[data-threads]'))).toBe('4 T3 threads · 1 running · 1 awaiting your reply');
+  expect(title.getAttribute('title'), 'its cut-off title reads in full in a tooltip').toBe('lar cloud: website sign-in and relay');
+  expect(header().getAttribute('title')).toBe('4 T3 threads · 1 running · 1 awaiting your reply');
   expect(chips(), 'parts in Needs you, open decisions and the fog left').toEqual(['1 need you', '2 decisions', '2 fog']);
-  expect(text(line(1, C180))).toContain('Coupled work');
+  expect(text(line(C180))).toContain('Coupled work');
   expect(chips(C180)).toEqual([]);
-  expect(text(header(C180).querySelector('[data-threads]')), 'a zero count is left out').toBe('3 T3 threads · 1 running');
+  expect(header(C180).getAttribute('title'), 'a zero count is left out').toBe('3 T3 threads · 1 running');
   await receive({ ...sample, items: sample.items.map((i) => ({ ...i, threads: [] })) });
-  const none = header().querySelector('[data-threads]')!;
-  expect([none.textContent, none.className.split(' ').includes('empty:hidden'), none.getAttribute('title')], 'with no threads, nothing: never "0 T3 threads"').toEqual(['', true, null]);
+  expect(header().getAttribute('title'), 'with no threads, nothing: never "0 T3 threads"').toBeNull();
 });
 
-test('line 1 stays one row: its threads and Azure fields give up their room to an ellipsis, the title keeps its own and the chips theirs', async () => {
+test('a dossier stays on one line: nothing wraps, the title and Azure fields give up their room to an ellipsis, and the chips keep theirs', async () => {
   await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
-  const [meta, chipsEl] = [...line(1).children] as HTMLElement[];
   const classes = (el: Element) => el.className.split(' ');
-  expect(classes(meta!), 'nothing on line 1 wraps onto a row of its own').not.toContain('flex-wrap');
-  const [title, threads, azure] = [...meta!.children] as HTMLElement[];
-  expect(classes(title!), 'the badge and title shrink last').not.toContain('shrink-[1000]');
-  expect(header().querySelector('[data-title]')!.className.split(' '), 'the title is only as wide as its text').not.toContain('flex-1');
-  for (const el of [threads!, azure!]) {
-    expect(classes(el)).toEqual(expect.arrayContaining(['shrink-[1000]', 'truncate']));
-    expect(classes(el), 'a stub floor only from lg up, so a narrow line gives the title its room')
-      .toEqual(expect.arrayContaining(['min-w-0', 'lg:min-w-10']));
-    expect(classes(el)).not.toContain('min-w-10');
-  }
-  expect([threads!.title, azure!.querySelector('[data-azure]')!.getAttribute('title')], 'each keeps its full text in a tooltip')
-    .toEqual(['4 T3 threads · 1 running · 1 awaiting your reply', 'Feature · Active · Ana']);
-  expect(classes(chipsEl!)).toContain('shrink-0');
+  expect(classes(header())).toContain('h-9');
+  expect(classes(line())).not.toContain('flex-wrap');
+  expect(classes(header().querySelector('[data-title]')!)).toContain('truncate');
+  const azure = header().querySelector('[data-azure]')!;
+  expect(classes(azure.parentElement!)).toEqual(expect.arrayContaining(['shrink-[1000]', 'truncate']));
+  expect(azure.getAttribute('title')).toBe('Feature · Active · Ana');
+  expect(classes(header().querySelector('[data-chips]')!)).toContain('shrink-0');
 });
 
 test('the blocked chip counts the blocked slices of unfinished parts', async () => {
@@ -177,28 +174,25 @@ test('the blocked chip counts the blocked slices of unfinished parts', async () 
   expect(chips()).toContain('2 blocked');
 });
 
-const col = (name: string, id = C200) => line(2, id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
+const col = (name: string, id = C200) => header(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
 
-test("line 2 has the part bar, parts done, what's next, agent figures and repositories in the same fixed columns in every dossier", async () => {
+test("the line's what's next, part bar, parts done, agent figures and repositories sit in the same columns in every dossier", async () => {
   await mountPage();
-  const grid = (id: string) => line(2, id).className.split(' ').filter((c) => c.includes('grid-cols'));
-  expect(grid(C200)).toEqual(['grid-cols-[18rem_8rem_minmax(0,1fr)_9.5rem]', 'lg:grid-cols-[18rem_8rem_minmax(0,1fr)_9.5rem_9rem]']);
+  const grid = (id: string) => header(id).className.split(' ').filter((c) => c.includes('grid-cols'));
   expect(grid(C180)).toEqual(grid(C200));
-  expect([...line(2).children].map(text)).toEqual(['', '2/6 parts', 'Needs you#202 Sign-in screen', '1h 31m · 6.23M · $9.11', 'lar-server']);
+  expect(['next', 'count', 'figures', 'repos'].map((name) => text(col(name)))).toEqual(['Needs you#202 Sign-in screen', '2/6', '1h 31m · 6.23M · $9.11', 'lar-server']);
   expect(col('bar').querySelectorAll('[data-part-bar] li').length, 'a segment per part').toBe(6);
   expect(next().querySelector('[title]')!.className.split(' '), "what's next ends in an ellipsis").toContain('truncate');
-  expect(col('repos').className.split(' '), 'repositories are muted text that drops below 1024 px').toEqual(expect.arrayContaining(['hidden', 'lg:block', 'text-(--muted-foreground)']));
-  expect([text(line(2, C180).children[1]), text(next(C180)), text(col('repos', C180))]).toEqual(['2/2 parts', 'Nothing waits on you', 'lar-server + lar-apple']);
+  expect(col('repos').className.split(' '), 'repositories are muted text that drops when the dock is narrow').toEqual(expect.arrayContaining(['hidden', '@4xl:block', 'text-(--muted-foreground)']));
+  expect([text(col('count', C180)), text(next(C180)), text(col('repos', C180))]).toEqual(['2/2', 'Nothing waits on you', 'lar-server + lar-apple']);
   expect(next(C180).querySelector('[title]')!.getAttribute('title'), 'its cut-off text reads in full in a tooltip').toBe('Nothing waits on you');
 });
 
-test('the header has no stage track and no repository dots; the agent figures sit on one line, and nothing shows without them', async () => {
-  await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
-  expect([header().querySelector('[data-figures]'), header().querySelector('[class*="rounded-full"]:not([data-part-bar] li)')]).toEqual([null, null]);
-  expect(header().children.length, 'the chevron, line 1 and line 2').toBe(3);
+test('the line has no stage track and no repository dots; the agent figures sit on one line, and nothing shows without them', async () => {
+  await mountPage();
+  expect(header().querySelector('[class*="rounded-full"]:not([data-part-bar] li):not([data-chip]):not([data-chip] *)')).toBeNull();
   const figures = col('figures').firstElementChild!;
   expect([figures.children.length, text(figures), figures.className.split(' ')], "#200's parts' figures, one truncating line").toEqual([0, '1h 31m · 6.23M · $9.11', expect.arrayContaining(['truncate'])]);
-  expect(text(line(1).querySelector('[data-azure]'))).toBe('Feature · Active · Ana');
   await receive({ ...sample, items: sample.items.map((i) => ({ ...i, stats: undefined })) });
   expect(text(col('figures')), 'no figures, an empty column').toBe('');
 });
@@ -207,7 +201,7 @@ test('a concept keeps the provider counts when Reset hides an unfinished part', 
   const data = withItem(C180, { subIssues: { total: 2, completed: 1 } });
   await mountPage({ ...data, repos: data.repos.filter((r) => r.repo !== 'maddec01/lar-apple'),
     items: data.items.filter((i) => i.repo !== 'maddec01/lar-apple') });
-  expect(text(line(2, C180).children[1])).toBe('1/2 parts');
+  expect(text(col('count', C180))).toBe('1/2');
   expect(text(dossier(C180))).toContain("1 part the board doesn't read");
   expect(text(next(C180))).not.toContain('Nothing waits on you');
   await press(button(dossier(C180), 'Work map'));
@@ -509,8 +503,9 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
   await mountPage({ ...sample, error: null, items: recorded(normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) })) });
-  expect(text(line(1, 'I_100'))).toContain('Coupled work');
-  expect(text(line(2, 'I_100'))).toBe('0/2 partsMoving#102 Issue 102lar-factory');
+  expect(text(line('I_100'))).toContain('Coupled work');
+  expect(text(col('count', 'I_100'))).toBe('0/2');
+  expect(text(next('I_100'))).toBe('Moving#102 Issue 102');
   expect(listed('I_100'), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
   expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();
 });
@@ -560,7 +555,7 @@ test('unlabelled local decision parts show the decision lane and completed answe
   const pending:Item={...sample.items.find(item=>item.id==='I_sample12')!,recorded:true,kind:'decision',labels:[],status:'Shaping',completion:{complete:false,reasons:['No answer.']},threads:undefined};
   const parent:Item={...c200,subIssues:{total:2,completed:1}};
   await mountPage({...sample,items:[parent,complete,pending]});
-  expect(text(line(2).children[1])).toBe('1/2 parts');
+  expect(text(col('count'))).toBe('1/2');
   await press(button(dossier(),'Work map'));
   const map=dossier().querySelector('[data-work-map]')!;
   expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisions']);
@@ -660,7 +655,7 @@ test('a build whose planner ended while its child and background work run reads 
   const node = map.querySelector('[data-map-part="W_build"]')!;
   expect(text(node.querySelector('[data-map-facts]'))).toBe('In progress · Planning · child work running');
   expect(node.querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/plan');
-  expect(text(line(1).querySelector('[data-threads]')), 'the header counts it as running').toContain('1 running');
+  expect(header().getAttribute('title'), 'the header counts it as running').toContain('1 running');
   await receive(conceptOf([{ ...build, threads: [newest, { ...planner, hasRunningChildren: undefined }] }]));
   expect(text(map.querySelector('[data-map-part="W_build"] [data-map-facts]')), 'once it all ends, it says so').toBe('In progress · Run finished');
 });

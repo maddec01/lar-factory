@@ -1,10 +1,10 @@
-// The bits every view draws for an item: its numbered title, title link, kind badge, label chips, status track and
+// The bits every view draws for an item: its numbered title, title link, kind badge, label chips and
 // slice bar, and the item dialog's repository tag, slices, pull requests, checks, and agent work. The tag is the design system's Badge, with
 // the repository's project icon.
 
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName } from '@lar-factory/shared';
+import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, itemRepoNames, prLabel, ref, labelsOnRow, repoKey, repoName } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, ItemStats, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -13,13 +13,17 @@ import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { PURPOSE, useStart } from './start-store.ts';
 import { tint } from './label-tint.ts';
 import { PrReadiness } from './pr-readiness.tsx';
-import { STATUS_COLOR } from './status-glyph.tsx';
-import { WORKFLOW_STEPS } from './workflow-steps.ts';
 import { SourceIcon } from './source-icon.tsx';
 
 /** The control room's repository badge, with a medium label. */
 export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoConfig[] }) {
   return <Badge className="gap-1.5"><ProjectIcon repo={repo} size="small" />{repoName(repo, repos)}</Badge>;
+}
+
+/** A row's repository: its project icon and name. Where the ticket is saved is SourceIcon's to say, beside it. */
+export function RepoCell({ item }: { item: Item }) {
+  const repos = useBoardStore((state) => state.data.repos);
+  return <span data-repo-cell className="flex min-w-10 items-center gap-1"><ProjectIcon repo={repoKey(item)} size="small" /><span className="truncate">{itemRepoNames(item, repos)}</span></span>;
 }
 
 export function TitleLink({ item, className = 'title' }: { item: Item; className?: string }) {
@@ -39,20 +43,6 @@ export function AzureFields({ azure }: { azure: AzureWorkItem | undefined }) {
   if (!azure) return null;
   const text = [azure.type, azure.state, azure.assignee].filter(Boolean).join(' · ');
   return <span data-azure title={text} className="block min-w-0 truncate text-xs text-(--muted-foreground)">{text}</span>;
-}
-
-/** Active steps as a track; the past filled, the current one in its colour. */
-export function StepTrack({ status }: { status: Status }) {
-  const at = WORKFLOW_STEPS.indexOf(status);
-  if (at < 0) return null;
-  return (
-    <ol className="m-0 flex list-none gap-[3px] p-0">
-      {WORKFLOW_STEPS.map((s, i) => (
-        <li key={s} title={s} className="h-1.5 flex-1 rounded-full"
-          style={{ background: i < at ? 'color-mix(in srgb, var(--foreground) 28%, transparent)' : i === at ? STATUS_COLOR[s] : 'var(--soft)' }} />
-      ))}
-    </ol>
-  );
 }
 
 const SLICE_COLOR: Record<SliceProgress, string> = { done: 'var(--st-done)', active: 'var(--st-now)', blocked: 'var(--st-review)', unknown: 'var(--muted-foreground)', waiting: 'var(--input)' };

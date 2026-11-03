@@ -247,15 +247,11 @@ test('an Azure read-only session leaves the section read-only and states the rea
   expect(buttonIn(rowOf('docs')!, 'Delete docs')!.disabled).toBe(true);
 });
 
-test('a third tracker drives the table and row chips with no change outside its adapter', async () => {
+test('a third tracker drives the table with no change outside its adapter', async () => {
   const items = sample.items.map((item, at) => at === 0 ? { ...item, repo: THIRD, status: 'Queued' as const, labels: ['linked-work', 'shiny'], labelColors: { shiny: '#123456' } } : item);
   const board = boardWith({ repo: THIRD }, items);
   const tracker = serve(board, [{ name: 'shiny', color: '123456', description: 'Not shown' }]);
   await mountPage(board);
-  const chips = $$('[data-label-chip]').filter((chip) => text(chip) === 'shiny');
-  expect(chips.length).toBeGreaterThan(0);
-  expect((chips[0] as HTMLElement).style.backgroundColor).toContain('rgb(18, 52, 86)');
-  expect($$('[data-label-chip]').some((chip) => text(chip) === 'linked-work')).toBe(false);
   await openDialog(board);
   expect(text(section())).toContain('Stickers');
   expect(text(section())).toContain('the whole project');

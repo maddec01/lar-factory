@@ -43,9 +43,9 @@ test('stale data and a failed read show no warning, the title bar carries them',
   expect($('[data-warning="client-error"]')).toBeNull();
 });
 
-test('the page is the control room, with no tabs: the title bar, desk and line', async () => {
+test('the page is the control room, with no tabs: the title bar, desk and stage layout', async () => {
   await mountPage();
-  expect([...$('main')!.querySelectorAll('.title-bar, .desk, .line')].map((el) => el.classList[0])).toEqual(['title-bar', 'desk', 'line']);
+  expect([...$('main')!.querySelectorAll('.title-bar, .desk, .stages')].map((el) => el.classList[0])).toEqual(['title-bar', 'desk', 'stages']);
   expect($$('[role="tablist"], [role="tab"], [role="tabpanel"]')).toEqual([]);
 });
 

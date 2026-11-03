@@ -29,7 +29,6 @@ export interface ListGroup {
 export interface BoardSections {
   /** Your desk: items waiting on the user's answer, verification or merge, including shaping and concept questions. */
   needsYou: Item[];
-  inFlight: Item[];
   concepts: Item[];
   queued: Item[];
   list: Item[];
@@ -134,10 +133,8 @@ export function boardSections(data: BoardData, now: number, clientError?: string
   const listGroups = repos
     .map((repo) => ({ repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)) }))
     .sort((a, b) => b.items.length - a.items.length);
-  const notConcept = (i: Item) => i.kind !== 'concept';
   return {
     needsYou: items.filter((item) => placementOf(item, { starts: data.startProgress?.[item.id], unavailable, all: data.items }).sections.includes('desk')),
-    inFlight: items.filter((item) => notConcept(item) && (['Shaping', 'Ready', 'In progress', 'Review'].includes(item.status) || workingAgain(item, unavailable))),
     concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),
     list,

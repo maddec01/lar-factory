@@ -315,6 +315,14 @@ test('a List row shows its coloured kind badge and label chips', async () => {
   expect(chips[0]!.style.backgroundColor).toContain('color-mix');
 });
 
+test("a third tracker's labels show as chips in its colours, leaving out the factory's own", async () => {
+  await mountPage({ ...sample, items: sample.items.map((item) => (item.id === 'I_sample01' ? { ...item, repo: 'third/tracker', labels: ['linked-work', 'shiny'], labelColors: { shiny: '#123456' } } : item)) });
+  await open();
+  const chips = [...$('[data-list-modal] button[data-item="I_sample01"]')!.querySelectorAll<HTMLElement>('[data-label-chip]')];
+  expect(chips.map(text)).toEqual(['shiny']);
+  expect(chips[0]!.style.backgroundColor).toContain('rgb(18, 52, 86)');
+});
+
 describe('project icons', () => {
   const REPO = 'maddec01/lar-server';
   const favicon = { kind: 'favicon', projectId: 'project:one', revision: 'abc123' } as const;

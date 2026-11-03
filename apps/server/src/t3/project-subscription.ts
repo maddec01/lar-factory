@@ -1,4 +1,5 @@
 import { isRecord } from '@lar-factory/shared';
+import { loopTrace } from '../startup/loop-trace.ts';
 import { ShellRecovery } from './shell-recovery.ts';
 import { type BoardSession, type ProjectProtocol, type ProjectRead } from './project-protocol.ts';
 
@@ -82,16 +83,16 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
       const recovery = new ShellRecovery();
       let lastPong = Date.now();
       const send = (value: unknown) => ws.send(JSON.stringify(value));
-      ws.addEventListener('open', () => {
+      ws.addEventListener('open', () => loopTrace.span('t3 socket open', () => {
         if (stopped) { ws.close(); return; }
         send({ _tag: 'Request', id: '1', tag: execution?.tag ?? 'orchestration.subscribeShell', payload: execution?.payload ?? { requestCompletionMarker: true }, headers: [] });
         send({ _tag: 'Ping' });
-      });
+      }));
       heartbeat = setInterval(() => {
         if (Date.now() - lastPong > 15_000) disconnected(true);
         else if (ws.readyState === WebSocket.OPEN) send({ _tag: 'Ping' });
       }, 5000);
-      ws.addEventListener('message', event => {
+      ws.addEventListener('message', event => loopTrace.span(`t3 ${execution?.tag ?? 'projects'}`, () => {
         if (stopped || socket !== ws) return;
         try {
           const parsed: unknown = JSON.parse(String(event.data));
@@ -113,7 +114,7 @@ export function subscribeProjects(origin: URL, _serverVersion: string, protocol:
             }
           }
         } catch { availability = 'malformed'; disconnected(); }
-      });
+      }));
       ws.addEventListener('close', () => disconnected(true));
       ws.addEventListener('error', () => disconnected(true));
     } catch { disconnected(true); }

@@ -41,6 +41,7 @@ import { projectChoices } from './onboarding/project-choices.ts';
 import { detectSetup } from './onboarding/detect-setup.ts';
 import { saveSetup } from './onboarding/save-setup.ts';
 import { loadBuild } from './page/page.ts';
+import { loopTrace } from './startup/loop-trace.ts';
 import { recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
@@ -65,7 +66,7 @@ const settings = readBoardSettings();
 if (settings.problem) log(`using the default settings: ${settings.problem}`);
 const fixture = process.env.BOARD_DATA_FILE;
 const capture = { session: randomUUID(), enabled: !fixture };
-const bundled = loadBundledSkills();
+const bundled = loopTrace.span('bundled skills', loadBundledSkills);
 if (bundled.error) log(`no bundled skills in Settings: ${bundled.error}`);
 /** The bundled skills with their install state; the Sample board shows none, as it installs nothing. */
 const bundledSkills = () => fixture ? bundled.skills : withInstallState(bundled.skills, installHome());
@@ -159,7 +160,7 @@ function recordedItems(read: Pick<ItemsRead, 'items' | 'waiting'> = { items: tic
   const hidden = retention.hidden();
   board.update({ retention: retention.state(), shapingThreadCleanup: shapingThreadCleanup.state(), heavyCommandLimit: heavyCommandLimit.state(), buildLimit: buildLimit.state(), autoBuild: autoBuild.state() });
   const setups = board.snapshot().repos.flatMap((r) => r.setup ? [r.setup] : []);
-  return recordItems(records, tickets, repos, unread, hidden, setups);
+  return loopTrace.span('records', () => recordItems(records!, tickets, repos, unread, hidden, setups));
 }
 
 /** Archive's work as the records are now, with the last tickets read: set aside, or finished and hidden by retention. */
@@ -289,7 +290,7 @@ let transcriptsRead = false;
 function recordedThreadIds(items: readonly Item[]): string[] {
   if (!records) return [];
   const workIds = items.filter(item => item.recorded !== false).flatMap(item => [item.id, ...item.slices.flatMap(slice => slice.workId ?? [])]);
-  return [...new Set(workIds.flatMap(workId => records.threads(workId).filter(thread => !thread.deletedAt).map(thread => thread.threadId)))];
+  return loopTrace.span('thread ids', () => [...new Set(workIds.flatMap(workId => records!.threads(workId).filter(thread => !thread.deletedAt).map(thread => thread.threadId)))]);
 }
 
 /** A deleted thread never counts, even before T3's shells drop it, and an ID T3 can't show would make a read during an outage unavailable. */
@@ -325,6 +326,10 @@ function showStatsRead(reads: T3Reads): void {
  * show through showStatsRead. The board keeps working without either.
  */
 function withT3Reads(items: Item[], withStats = true): Item[] {
+  return loopTrace.span('threads', () => itemsWithThreads(items, withStats));
+}
+
+function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
   const now = Date.now();
   const threads = (workId: string | undefined) => {
     const ids = liveThreadIds(workId);
@@ -476,7 +481,7 @@ async function checkQuota(): Promise<void> {
  * already copied into its snapshot, even while a provider read runs.
  */
 function refreshLocal(recordsChanged = false): void {
-  runLocal(() => refreshLocalNow(recordsChanged));
+  runLocal(() => loopTrace.span('local refresh', () => refreshLocalNow(recordsChanged)));
 }
 
 function refreshLocalNow(recordsChanged: boolean): void {
@@ -706,9 +711,11 @@ async function refresh(): Promise<void> {
       showRecords();
     }
     if (!items.due(pace)) return;
-    offerModelChoices();
-    // The app installs after the board server starts, so each read picks up the latest install's state.
-    board.update({ bundledSkills: bundledSkills() });
+    loopTrace.span('read start', () => {
+      offerModelChoices();
+      // The app installs after the board server starts, so each read picks up the latest install's state.
+      board.update({ bundledSkills: bundledSkills() });
+    });
     const { error, fetchedAt } = board.snapshot();
     // During the first read, each source's read shows its repositories' items as it lands, though another still reads.
     const landed = (partial: ItemsRead) => {
@@ -854,7 +861,7 @@ function readNow(): void {
 // The page `pnpm run build` wrote, read once at startup. The path is relative to this
 // entry, so it holds both for the source and for the packaged app's bundle in
 // Resources/server/dist/, beside Resources/web/dist/.
-const page = loadBuild(new URL('../../web/dist/', import.meta.url));
+const page = loopTrace.span('page', () => loadBuild(new URL('../../web/dist/', import.meta.url)));
 
 const reread = () => {
   showRecords();
@@ -902,6 +909,7 @@ const port = await listenOnFreePort(server, HOST, ports) ?? await exitWith(ports
   : `ports ${ports[0]} to ${ports.at(-1)} are all taken; stop a board or set BOARD_PORT`);
 listeningAt = performance.now();
 timed('server listening');
+loopTrace.begin(timed, listeningAt);
 log(`board on http://${HOST}:${port}, reading active work every ${ACTIVE_READ_MS / 1000} s and the rest every ${settings.refreshSeconds} s`);
 reportListening(port);
 // status.sh finds live boards by their records; a sample board isn't one to refresh.
@@ -921,16 +929,16 @@ if (fixture) {
 }
 // Each tick only checks whether a source is due; refresh reads nothing when none is.
 const timer = setInterval(() => {
-  if (!fixture) runLocal(() => refresh());
+  if (!fixture) loopTrace.span('read tick', () => runLocal(() => refresh()));
 }, 1_000);
 const localTimer = setInterval(() => {
   if (!fixture) {
-    runLocal(() => {
+    loopTrace.span('local tick', () => runLocal(() => {
       refreshLocal();
       runLocal(() => usageCatchUp?.advance());
       runLocal(() => prObserver?.poll());
       if (records?.specPending().length) runLocal(() => syncSpecs(records));
-    });
+    }));
   }
 }, LOCAL_REFRESH_MS);
 

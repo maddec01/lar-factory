@@ -2,6 +2,7 @@
 // trace, so the time between two awaits is one synchronous block, which the board's log names by its step.
 
 import { performance } from 'node:perf_hooks';
+import { loopTrace } from '../startup/loop-trace.ts';
 
 type StatsStep = 'inputs' | 'discovery' | 'warm' | 'dedup' | 'aggregation' | 'publish';
 
@@ -44,10 +45,15 @@ export function createReadTrace(turn: () => Promise<void> = nextTurn): ReadTrace
   let stepAt = startedAt;
   let stepCpu = startCpu;
   let blockAt = startedAt;
+  let blockCpu = startCpu;
+  let spannedAt = loopTrace.spanned();
 
   const endBlock = () => {
     if (!current) return;
-    steps[current].longestBlockMs = Math.max(steps[current].longestBlockMs, performance.now() - blockAt);
+    const blockMs = performance.now() - blockAt;
+    steps[current].longestBlockMs = Math.max(steps[current].longestBlockMs, blockMs);
+    loopTrace.block(`stats ${current}`, blockMs, spannedAt, cpuMs(process.cpuUsage(blockCpu)));
+    spannedAt = loopTrace.spanned();
   };
   const endStep = () => {
     if (!current) return;
@@ -64,6 +70,8 @@ export function createReadTrace(turn: () => Promise<void> = nextTurn): ReadTrace
       return await work;
     } finally {
       blockAt = performance.now();
+      blockCpu = process.cpuUsage();
+      spannedAt = loopTrace.spanned();
     }
   };
   return {
@@ -73,6 +81,8 @@ export function createReadTrace(turn: () => Promise<void> = nextTurn): ReadTrace
       stepAt = performance.now();
       stepCpu = process.cpuUsage();
       blockAt = stepAt;
+      blockCpu = stepCpu;
+      spannedAt = loopTrace.spanned();
     },
     wait,
     pause() {

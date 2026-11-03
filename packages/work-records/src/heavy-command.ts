@@ -68,7 +68,7 @@ async function readSlots(slots: string, warned: Set<string>): Promise<{ live: { 
  * settles first. A command inside one that holds a slot in the same data folder runs at once, as does one whose slot
  * folder can't be used, after a warning.
  */
-async function waitForHeavySlot(dataDir: string, command: string[], cancelled: Promise<unknown>): Promise<HeavySlot | null> {
+export async function waitForHeavySlot(dataDir: string, command: string[], cancelled: Promise<unknown>): Promise<HeavySlot | null> {
   const dir = resolve(dataDir);
   const unheld: HeavySlot = { env: process.env, async release() {} };
   if (process.env[HOLDER_ENV] === dir) return unheld;

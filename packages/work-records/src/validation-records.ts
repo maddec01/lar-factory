@@ -7,7 +7,8 @@ export interface CheckStart extends CheckEntry { role: string; tree: string | nu
 export interface CheckFinish { tree: string | null; exitStatus: number | null; interrupted: boolean; log: string | null }
 export interface CheckRun extends CheckEntry {
   checkId: string; workId: string; role: string; tree: string | null; endTree: string | null;
-  reason: string | null; live: boolean; startedAt: string; endedAt: string | null;
+  /** startedAt is null while the run waits for a heavy command slot, and tree stays null until then too. */
+  reason: string | null; live: boolean; startedAt: string | null; endedAt: string | null;
   exitStatus: number | null; interrupted: boolean; log: string | null;
   failure: { tests: string[]; diagnosis: string } | null; resolution: string | null;
 }
@@ -18,6 +19,9 @@ export interface CheckReuse { checkId: string; role: string; reason: string; tre
  */
 export interface ValidationRecords {
   startCheck(workId: string, input: CheckStart): CheckRun;
+  /** Records a run waiting for a heavy command slot, with no tree or start time until beginCheck. */
+  waitCheck(workId: string, input: Omit<CheckStart, 'tree'>): CheckRun;
+  beginCheck(checkId: string, input: { tree: string | null }): CheckRun;
   finishCheck(checkId: string, input: CheckFinish): CheckRun;
   setCheckList(workId: string, entries: CheckEntry[]): CheckEntry[];
   checks(workId: string, now?: Date): { workId: string; list: CheckEntry[]; runs: (CheckRun & { outcome: 'unfinished' | 'interrupted' | 'failed' | 'expired' | 'passed'; snapshotState: 'unfinished' | 'missing' | 'changed' | 'stable'; eligible: boolean; failureState: 'open' | 'resolved' | null })[]; reuses: CheckReuse[] };
@@ -56,14 +60,21 @@ export function validationRecords(database: Database, read: (id: string) => Work
     return JSON.parse(String(row.content)) as CheckRun;
   };
   const save = (run: CheckRun): CheckRun => { db.prepare('UPDATE check_runs SET content=? WHERE check_id=?').run(JSON.stringify(run), run.checkId); return run; };
+  const insert = (id: string, input: Omit<CheckStart, 'tree'>, start: { tree: string | null; startedAt: string | null }): CheckRun => database.write(() => {
+    const run: CheckRun = { ...entry(input), workId: owner(id), checkId: randomUUID(), role: filled(input.role), ...start,
+      endTree: null, reason: input.reason === undefined ? null : filled(input.reason), live: input.live ?? false,
+      endedAt: null, exitStatus: null, interrupted: false, log: null, failure: null, resolution: null };
+    if (typeof run.live !== 'boolean') invalid('live must be boolean.');
+    db.prepare('INSERT INTO check_runs(check_id,work_id,content) VALUES (?,?,?)').run(run.checkId, run.workId, JSON.stringify(run));
+    return run;
+  });
   return {
-    startCheck: (id, input) => database.write(() => {
-      const run: CheckRun = { ...entry(input), workId: owner(id), checkId: randomUUID(), role: filled(input.role), tree: tree(input.tree),
-        endTree: null, reason: input.reason === undefined ? null : filled(input.reason), live: input.live ?? false,
-        startedAt: new Date().toISOString(), endedAt: null, exitStatus: null, interrupted: false, log: null, failure: null, resolution: null };
-      if (typeof run.live !== 'boolean') invalid('live must be boolean.');
-      db.prepare('INSERT INTO check_runs(check_id,work_id,content) VALUES (?,?,?)').run(run.checkId, run.workId, JSON.stringify(run));
-      return run;
+    startCheck: (id, input) => insert(id, input, { tree: tree(input.tree), startedAt: new Date().toISOString() }),
+    waitCheck: (id, input) => insert(id, input, { tree: null, startedAt: null }),
+    beginCheck: (id, input) => database.write(() => {
+      const run = get(id);
+      if (run.startedAt || run.endedAt) invalid('The check has already started.');
+      return save({ ...run, tree: tree(input.tree), startedAt: new Date().toISOString() });
     }),
     finishCheck: (id, input) => database.write(() => {
       const run = get(id);

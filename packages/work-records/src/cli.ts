@@ -29,7 +29,10 @@ it opens directly. It works from any folder, with or without the board app.
 
 Validation records, local only and requiring no revision
   run-check <work-id> --role R [--live] [--reason X] -- <command>
-                                    Run and record a check, preserving its exit status.
+                                    Record a check, wait for a heavy command slot as
+                                    heavy does, then run it and exit with its status.
+                                    The tree and start time are recorded once the
+                                    slot is held.
   reuse-check <work-id> --check ID --role R --reason X
                                     Reuse an eligible non-live pass on the current tree.
   set-check-list <work-id> --file F Save [{"command":["pnpm","test"],"folder":"."}].
@@ -58,8 +61,8 @@ Heavy commands, needing no work ID or board
                                     with no command, 127 when the command isn't
                                     found, 126 when it can't start otherwise, and
                                     128 plus N when signal N kills it.
-                                    The limit applies only to commands wrapped this
-                                    way. It doesn't cap a command's own workers,
+                                    The limit applies only to commands run by heavy
+                                    or run-check. It doesn't cap a command's own workers,
                                     control other applications, or guarantee free
                                     CPU or memory.
 

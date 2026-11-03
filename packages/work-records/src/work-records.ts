@@ -389,6 +389,13 @@ export interface WorkRecords extends ValidationRecords, TrackerCache, Publicatio
   setFogGone(workId: string, revision: number, gone: boolean): WorkRecord;
   /** The records that wait on it. */
   dependents(workId: string): WorkRecord[];
+  /**
+   * Runs `read` against one state of the records, though it awaits turns of the event loop: other connections' commits
+   * meanwhile stay out of it. Only for a connection that writes nothing until it ends, as its write would join the read.
+   */
+  snapshot<T>(read: () => Promise<T>): Promise<T>;
+  /** A mark that moves whenever any connection commits to the records, so reads apart can tell whether they saw one state. */
+  changes(): string;
   close(): void;
 }
 
@@ -1322,6 +1329,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     children: (workId) => related(childRows, workId),
     blockers: (workId) => related(blockerRows, workId),
     dependents: (workId) => related(dependentRows, workId),
+    snapshot: (read) => database.snapshot(read),
+    changes: () => database.changes(),
     close: () => database.close(),
   };
 }

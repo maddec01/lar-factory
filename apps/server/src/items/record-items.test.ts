@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { effectiveVocabulary, normalizeItems, type NeedsYouCause, type NeedsYouOffer, type RepositorySetup, type Status, type VocabularyMapping } from '@lar-factory/shared';
+import { effectiveVocabulary, normalizeItems, type Item, type NeedsYouCause, type NeedsYouOffer, type RepositorySetup, type Status, type VocabularyMapping } from '@lar-factory/shared';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { DEFAULT_RETENTION, openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { changeKind } from '@lar-factory/work-records/change-kind';
-import { agreedKind, archivedItems, recordItems, ticketsByReference } from './record-items.ts';
+import { agreedKind, archivedItems, recordItems, recordItemsReader, ticketsByReference } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
 const opened: { records: WorkRecords; dir: string }[] = [];
@@ -19,6 +19,13 @@ afterEach(() => {
 });
 async function open(): Promise<WorkRecords> {
   const dir = mkdtempSync(join(tmpdir(), 'record-items-'));
+  const records = await openWorkRecords(join(dir, 'work-records.db'));
+  opened.push({ records, dir });
+  return records;
+}
+/** A second connection to the records opened last, which reads them in turns as the board's does. */
+async function openReader(): Promise<WorkRecords> {
+  const { dir } = opened.at(-1)!;
   const records = await openWorkRecords(join(dir, 'work-records.db'));
   opened.push({ records, dir });
   return records;
@@ -505,4 +512,47 @@ test('concept projection separates refinement from delivery', async () => {
   assert.deepEqual(item!.refinement, { complete: true, reasons: [] });
   assert.deepEqual(item!.completion, { complete: false, reasons: ['No delivery planned.'] });
   assert.equal(item!.state, 'open');
+});
+
+test('records map fifty a turn into the same items a read in one turn shows', async () => {
+  const records = await open();
+  for (let i = 0; i < 250; i++) records.create({ title: `Work ${i}`, repository: REPO, kind: 'bug' });
+  let turns = 0;
+  const items = await recordItemsReader(await openReader())([], [REPO], [], new Set(), [], async () => { turns++; });
+  assert.equal(turns, 5);
+  assert.deepEqual(items, recordItems(records, [], [REPO]));
+});
+
+test('a read with no commit since the last and the same inputs gives its items again without mapping', async () => {
+  const records = await open();
+  for (let i = 0; i < 60; i++) records.create({ title: `Work ${i}`, repository: REPO, kind: 'bug' });
+  const read = recordItemsReader(await openReader());
+  // The tickets an item source read last, which the board keeps until the next read.
+  const lastRead: Item[] = [];
+  let turns = 0;
+  const turn = async () => { turns++; };
+  const first = await read(lastRead, [REPO], [], new Set(), [], turn);
+  assert.equal(turns, 2);
+  assert.equal(await read(lastRead, [REPO], [], new Set(), [], turn), first);
+  assert.equal(turns, 2, 'no turn and no mapping');
+  const hidden = await read(lastRead, [REPO], [], new Set([first[0]!.id]), [], turn);
+  assert.equal(hidden.length, 59, 'other inputs map again');
+  const work = records.create({ title: 'New', repository: REPO, kind: 'bug' });
+  assert.ok((await read(lastRead, [REPO], [], new Set([first[0]!.id]), [], turn)).some((item) => item.id === work.workId), 'a commit maps again');
+});
+
+test('commits between turns stay out of the read, which shows one state of the records in one pass', async () => {
+  const records = await open();
+  const first = records.create({ title: 'First', repository: REPO, kind: 'bug' });
+  for (let i = 0; i < 60; i++) records.create({ title: `Work ${i}`, repository: REPO, kind: 'bug' });
+  const before = recordItems(records, [], [REPO]);
+  let turns = 0;
+  const items = await recordItemsReader(await openReader())([], [REPO], [], new Set(), [], async () => {
+    // Between the two halves of the read, the first record, already mapped, changes, and an observation adds one.
+    if (++turns === 2) records.update(first.workId, first.revision, { status: 'Queued' });
+    records.create({ title: `Observed ${turns}`, repository: REPO, kind: 'bug' });
+  });
+  assert.equal(turns, 2, 'commits that keep landing never make it read again');
+  assert.deepEqual(items, before);
+  assert.equal(recordItems(records, [], [REPO]).find((item) => item.id === first.workId)?.status, 'Queued', 'the next read shows them');
 });

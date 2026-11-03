@@ -41,6 +41,48 @@ describe('openDatabase', () => {
     }
   });
 
+  it('moves its change mark on a commit of its own or of another connection, and not on a read', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const database = await openDatabase(path, { migrations: [NOTES] });
+    const other = new DatabaseSync(path);
+    try {
+      const start = database.changes();
+      database.read(() => noteTexts(database.db));
+      expect(database.changes()).toBe(start);
+      database.write(() => database.db.prepare('INSERT INTO notes VALUES (?)').run('own'));
+      const afterOwn = database.changes();
+      expect(afterOwn).not.toBe(start);
+      other.prepare('INSERT INTO notes VALUES (?)').run('other');
+      expect(database.changes()).not.toBe(afterOwn);
+    } finally {
+      other.close();
+      database.close();
+    }
+  });
+
+  it("reads one state through a snapshot across turns of the event loop, while another connection commits", async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const database = await openDatabase(path, { migrations: [NOTES] });
+    const other = new DatabaseSync(path);
+    try {
+      other.prepare('INSERT INTO notes VALUES (?)').run('before');
+      const reads = await database.snapshot(async () => {
+        const first = database.read(() => noteTexts(database.db));
+        await new Promise((resolve) => setImmediate(resolve));
+        other.prepare('INSERT INTO notes VALUES (?)').run('during');
+        await new Promise((resolve) => setImmediate(resolve));
+        return [first, database.read(() => noteTexts(database.db))];
+      });
+      expect(reads).toEqual([['before'], ['before']]);
+      expect(database.read(() => noteTexts(database.db))).toEqual(['before', 'during']);
+      await expect(database.snapshot(async () => { throw new Error('no'); })).rejects.toThrow('no');
+      expect(database.db.isTransaction).toBe(false);
+    } finally {
+      other.close();
+      database.close();
+    }
+  });
+
   it('keeps the database and its WAL files readable by their owner only', async () => {
     const dir = tempDir();
     const path = join(dir, 'work-records.db');

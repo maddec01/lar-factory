@@ -7,6 +7,7 @@ import type { Blocker, DependencyHold, EffectiveVocabulary, IssueRef, Item, Link
 import type { Dependency, WorkRecord, WorkRecords } from '@lar-factory/work-records';
 import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
+import { loopTrace } from '../startup/loop-trace.ts';
 import { needsYouNotice } from './needs-you-causes.ts';
 
 type RecordSetup = { repo: string; structureSync?: boolean; writeRefinedSpec?: boolean; vocabulary?: EffectiveVocabulary };
@@ -153,6 +154,18 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
 /** Whether the record is work the board lists: not a slice, in one of `repos`. */
 const listed = (record: WorkRecord, repos: readonly string[]) => record.kind !== 'slice' && repos.some((repo) => sameRepo(repo, record.repository));
 
+/** The records `recordItems` shows, how it maps each, and the open tickets no record holds, which show in List. */
+function boardRecords(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[],
+  hidden: ReadonlySet<string>, setups: readonly RecordSetup[]) {
+  const { ticketOf, toItem } = itemMapper(records, tickets, setups);
+  const waits = (record: WorkRecord) => record.ticket !== null && !ticketOf(record) && unread.some((repo) => sameRepo(repo, record.repository));
+  const all = records.list({});
+  const held = new Set(all.flatMap(record => record.ticket ? [record.ticket.toLowerCase()] : []));
+  const unpicked = tickets.filter(ticket => repos.some(repo=>sameRepo(repo,ticket.repo)) && ticket.state === 'open' && !held.has(refKey(ticket.repo, ticket.number).toLowerCase()))
+    .map((ticket): Item => ({...ticket, recorded: false, status: 'List', statuses: [], slices: []}));
+  return { shown: all.filter((r) => !r.setAside && !hidden.has(r.workId) && listed(r, repos) && !waits(r)), toItem, unpicked };
+}
+
 /**
  * Every board item from the records of `repos`, in the records' order, with the ticket items an item source read,
  * less set-aside work and the work IDs in `hidden`, which retention hides. In a repository of `unread`, whose source
@@ -160,13 +173,45 @@ const listed = (record: WorkRecord, repos: readonly string[]) => record.kind !==
  */
 export function recordItems(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[] = [],
   hidden: ReadonlySet<string> = new Set(), setups: readonly RecordSetup[] = []): Item[] {
-  const { ticketOf, toItem } = itemMapper(records, tickets, setups);
-  const waits = (record: WorkRecord) => record.ticket !== null && !ticketOf(record) && unread.some((repo) => sameRepo(repo, record.repository));
-  const all = records.list({});
-  const held = new Set(all.flatMap(record => record.ticket ? [record.ticket.toLowerCase()] : []));
-  const unpicked = tickets.filter(ticket => repos.some(repo=>sameRepo(repo,ticket.repo)) && ticket.state === 'open' && !held.has(refKey(ticket.repo, ticket.number).toLowerCase()))
-    .map((ticket): Item => ({...ticket, recorded: false, status: 'List', statuses: [], slices: []}));
-  return [...all.filter((r) => !r.setAside && !hidden.has(r.workId) && listed(r, repos) && !waits(r)).map(toItem), ...unpicked];
+  const { shown, toItem, unpicked } = boardRecords(records, tickets, repos, unread, hidden, setups);
+  return [...shown.map(toItem), ...unpicked];
+}
+
+/** How many records one turn maps: each takes a dozen queries, about 0.15 ms on a 340-item board. */
+const RECORDS_PER_TURN = 50;
+/**
+ * recordItems, mapping RECORDS_PER_TURN records a turn so the event loop turns between them, all in one snapshot of the
+ * records: commits between the turns, as an observation pass writes, wait for the next read. `records` must be a
+ * connection that writes nothing meanwhile.
+ */
+function recordItemsInTurns(records: WorkRecords, tickets: readonly Item[], repos: readonly string[], unread: readonly string[],
+  hidden: ReadonlySet<string>, setups: readonly RecordSetup[], turn: () => Promise<void>): Promise<Item[]> {
+  return records.snapshot(async () => {
+    const { shown, toItem, unpicked } = loopTrace.span('records', () => boardRecords(records, tickets, repos, unread, hidden, setups));
+    const items: Item[] = [];
+    for (let at = 0; at < shown.length; at += RECORDS_PER_TURN) {
+      await turn();
+      items.push(...loopTrace.span('records', () => shown.slice(at, at + RECORDS_PER_TURN).map(toItem)));
+    }
+    return [...items, ...unpicked];
+  });
+}
+
+/**
+ * recordItemsInTurns on `records`, a connection of its own, which gives the last items again, in no turn, when no commit
+ * landed since that read and it maps the same tickets and settings.
+ */
+export function recordItemsReader(records: WorkRecords) {
+  let mapped: { from: unknown[]; items: Item[] } | null = null;
+  return async (tickets: readonly Item[], repos: readonly string[], unread: readonly string[], hidden: ReadonlySet<string>,
+    setups: readonly RecordSetup[], turn: () => Promise<void>): Promise<Item[]> => {
+    // Marked before the snapshot starts, so a commit during the read only makes the next read map again.
+    const from = [records.changes(), tickets, JSON.stringify([repos, unread, [...hidden], setups])];
+    if (mapped?.from.every((input, i) => input === from[i])) return mapped.items;
+    const items = await recordItemsInTurns(records, tickets, repos, unread, hidden, setups, turn);
+    mapped = { from, items };
+    return items;
+  };
 }
 
 /** Archive's items: the set-aside work of `repos` and the work in `hidden`, in the records' order, each with its `archived` facts. */

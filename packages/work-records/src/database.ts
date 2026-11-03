@@ -46,6 +46,13 @@ export interface Database {
   write<T>(change: () => T): T;
   /** Runs `query` after checking the schema is still the one this process knows. */
   read<T>(query: () => T): T;
+  /**
+   * Runs `read` against one state of the database, though it awaits turns of the event loop: other connections' commits
+   * meanwhile stay out of it. Only for a connection that writes nothing until it ends, as its write would join the read.
+   */
+  snapshot<T>(read: () => Promise<T>): Promise<T>;
+  /** A mark that moves whenever a connection, this one included, commits, so reads apart can tell whether they saw one state. */
+  changes(): string;
   close(): void;
 }
 
@@ -192,11 +199,16 @@ export async function openDatabase(path = workRecordsPath(), { migrations = MIGR
     if (version !== migrations.length) throw tooNew(version, migrations.length, path);
     return run();
   };
+  // data_version moves only when another connection commits.
+  const dataVersionRow = db.prepare('PRAGMA data_version');
+  let committed = 0;
   return {
     db,
     write: (change) => {
       try {
-        return transaction(db, () => checked(change));
+        const result = transaction(db, () => checked(change));
+        committed++;
+        return result;
       } catch (error) {
         throw sqliteError(error, path);
       }
@@ -208,6 +220,19 @@ export async function openDatabase(path = workRecordsPath(), { migrations = MIGR
         throw sqliteError(error, path);
       }
     },
+    snapshot: async (read) => {
+      db.exec('BEGIN');
+      try {
+        // A deferred transaction takes its snapshot at its first read.
+        checked(() => versionRow.get());
+        return await read();
+      } catch (error) {
+        throw sqliteError(error, path);
+      } finally {
+        db.exec('COMMIT');
+      }
+    },
+    changes: () => `${Number(dataVersionRow.get()?.data_version ?? 0)}:${committed}`,
     close: () => db.close(),
   };
 }

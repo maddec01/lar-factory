@@ -34,9 +34,16 @@ Resolve and carry `base_branch` per `project-rules.md` before the commands below
    - **Code**: fix it test-first where a test can catch it, as a
      `git commit --fixup <sha>` (never `--no-verify`) on the commit that caused it, then fold it in
      with `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/$base_branch`.
-3. Follow Checks in `project-rules.md`. Rerun only the failed check after
-   fixing it. After a merge conflict, run focused tests on the conflicted code.
-   These must pass. Then `git push --force-with-lease`.
+3. Follow Checks and Validation record in `project-rules.md`. Name failing tests and diagnose
+   recorded failures before retries. Use focused tests for the change and rerun
+   the failed check through `run-check`, even when broad. Do not repeat unrelated
+   broad suites because their files or layers changed. After a merge conflict,
+   run focused tests on the conflicted code. All checks must pass.
+   Then `git push --force-with-lease` and report any final-tree change to the
+   builder for Approver reassessment of every listed check.
+4. After the builder supplies that assessment, update the PR's `## Checks`
+   section from `lar-work checks`: each listed check as run or reused with its
+   reason, and every open failure by test name. Include no local or log paths.
 
 Return:
 

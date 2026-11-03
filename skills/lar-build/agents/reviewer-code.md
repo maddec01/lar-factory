@@ -31,6 +31,9 @@ leave the worktree as you found it. These Overrides replace parts of that Copy:
   its axis (`Standards:` or `Spec:`), and keep each axis's findings in its own
   order.
 
+Follow `project-rules.md#reviewer-checks` for validation-record reads and
+permitted broad checks.
+
 Return:
 
 ```

@@ -16,7 +16,8 @@ fixup or `--no-verify`. Work another repository needs is never a commit
 here: report it as `needs <owner/repo>: <the work>`. Cite other-repo work
 per `../shared/cross-repo-citations.md`.
 
-Follow Checks in `<lar-build>/project-rules.md` while implementing. Then rebase
+Follow Checks in `<lar-build>/project-rules.md` while implementing, and
+`project-rules.md#validation-record` for broad runs and failures. Then rebase
 onto the build branch tip.
 
 Report your absolute worktree path and slice branch, or that the slice is

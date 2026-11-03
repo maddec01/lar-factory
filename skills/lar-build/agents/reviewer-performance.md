@@ -22,6 +22,9 @@ Overrides replace parts of that Copy:
 - **Measurement Commands**: measure only with commands that write nothing into
   the checkout. A measurement you can't run goes under `not checked`.
 
+Follow `project-rules.md#reviewer-checks` for validation-record reads and
+permitted broad checks.
+
 Return:
 
 ```

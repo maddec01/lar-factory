@@ -25,7 +25,12 @@ so leave the worktree as you found it. These Overrides replace parts of it:
   report a `should` finding only when a listed change lacks authorization in
   the current session. Existing authorization needs no repeated permission prompt.
 - **Verification**: check each item against the diff with read-only commands.
+  Broad checks allowed by `project-rules.md#reviewer-checks` are an exception
+  to this read-only rule. Focused tests are also allowed; restore the worktree.
   An item you can't check goes under `not checked`.
+
+Follow `project-rules.md#reviewer-checks` for validation-record reads and
+permitted broad checks.
 
 Return:
 

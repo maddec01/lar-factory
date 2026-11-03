@@ -40,6 +40,20 @@ it('ties gate evidence to the exact brief across execution metadata changes', as
   expect(() => records.recordGate(work.workId, work.revision, { briefDigest: digest, approvedBy: 'reviewer', evidence: 'passed' })).toThrow(/brief changed/);
 });
 
+it('names the latest gate that passed the current brief and was not invalidated since', async () => {
+  const records = await open();
+  let work = records.create({ title: 'Search', repository: 'team/app', kind: 'build', status: 'Ready' });
+  work = records.setBody(work.workId, work.revision, 'brief', 'Find a saved search.');
+  const digest = records.gate(work.workId).briefDigest!;
+  records.recordGate(work.workId, work.revision, { briefDigest: digest, approvedBy: 'reviewer', evidence: 'First.' });
+  const second = records.recordGate(work.workId, records.read(work.workId).revision, { briefDigest: digest, approvedBy: 'reviewer', evidence: 'Second.' });
+  expect(records.gate(work.workId)).toMatchObject({ current: true, passing: second });
+  records.invalidateGate(work.workId, records.read(work.workId).revision);
+  expect(records.gate(work.workId)).toMatchObject({ current: false, passing: null });
+  const third = records.recordGate(work.workId, records.read(work.workId).revision, { briefDigest: digest, approvedBy: 'reviewer', evidence: 'Third.' });
+  expect(records.gate(work.workId)).toMatchObject({ current: true, passing: third });
+});
+
 async function passingBuild(records: WorkRecords) {
   const made = records.create({ title: 'Search', repository: 'team/app', kind: 'build' });
   const work = records.setBody(made.workId, made.revision, 'brief', 'Find a saved search.');

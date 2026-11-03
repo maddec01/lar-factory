@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
@@ -8,7 +8,7 @@ import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState, type BoardState } from '../board/board-state.ts';
 import type { Reply } from '../items/item-commands.ts';
 import { recordItems } from '../items/record-items.ts';
-import { createAutoBuild } from './auto-build.ts';
+import { HOLD_RETRY_MS, createAutoBuild } from './auto-build.ts';
 
 const REPO = 'maddec01/lar-factory';
 const OPUS = { instanceId: 'claudeAgent', model: 'claude-opus-5-5' };
@@ -47,6 +47,10 @@ interface SetUp {
   auto: AutoBuildState;
   limit: number;
   choices: ModelGroup[];
+  /** The clock Auto-build reads. */
+  clock: number;
+  /** Runs inside each Start build, before it answers. */
+  during?: (itemId: string) => void;
   reread(): void;
   pass(): Promise<void>;
   /** Stops this board, as its process exiting would. */
@@ -62,18 +66,19 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
   });
   const board = createBoardState({ items: recordItems(records, [], [REPO]), repos: [], t3Availability: { availability: 'available' } } as unknown as BoardData);
   const s: SetUp = {
-    dir, records, board, started: [], answers: new Map(), auto: { on: true }, limit: 10, choices: OFFERED,
+    dir, records, board, started: [], answers: new Map(), auto: { on: true }, limit: 10, choices: OFFERED, clock: 0,
     reread: () => board.applyRead(recordItems(records, [], [REPO]), board.revision(), (items) => items),
     pass: () => autoBuild.pass(),
     stop: () => autoBuild.release(),
   };
   const autoBuild = createAutoBuild({
-    board, records, dir, setting: () => s.auto, limit: () => s.limit, offerModelChoices: () => s.choices,
+    board, records, dir, now: () => s.clock, setting: () => s.auto, limit: () => s.limit, offerModelChoices: () => s.choices,
     commands: {
       async startBuild(itemId, model, drift, quiet) {
         assert.deepEqual([drift, quiet], [undefined, true]);
         assert.deepEqual(model, s.auto.model);
         s.started.push(itemId);
+        s.during?.(itemId);
         const answer = s.answers.get(itemId) ?? OK;
         if (answer === OK) records.update(itemId, at(records, itemId), { status: 'In progress' });
         // A start T3 may have made leaves its launch intent unresolved.
@@ -159,7 +164,7 @@ test('with the switch off nothing starts, and the tooltip count says how many wo
 });
 
 test('each hold starts nothing, marks nothing on the build, says why, and the next pass retries', async () => {
-  const holds: [string, (s: SetUp, workId: string) => void, string][] = [
+  const holds: [string, (s: SetUp, workId: string) => void, string, boolean?][] = [
     ['T3 unreachable', (s) => s.board.update({ t3Availability: { availability: 'unavailable' } }), "Auto-build waits for T3, which the board can't reach."],
     ['model choices unreadable', (s) => { s.choices = []; }, "Auto-build waits for T3's model choices, which the board can't read."],
     ['saved model no longer offered', (s) => { s.auto = { on: true, model: { instanceId: 'codex', model: 'gpt-5' } }; }, "Auto-build's model isn't offered now. Choose another in Settings."],
@@ -167,9 +172,9 @@ test('each hold starts nothing, marks nothing on the build, says why, and the ne
   // Start build's own temporary refusals, as it marks them.
   for (const error of ['Waits for onboarding to finish', 'Skills drifted from the bundle.', 'A shaping thread is still at work on this item.',
     'Push access is blocked.', 'T3 has no project for this repository.', 'Could not read the repository’s default branch.']) {
-    holds.push([error, (s, workId) => s.answers.set(workId, { status: 409, body: { thread: null, error, hold: true } }), error]);
+    holds.push([error, (s, workId) => s.answers.set(workId, { status: 409, body: { thread: null, error, hold: true } }), error, true]);
   }
-  for (const [name, cause, reason] of holds) {
+  for (const [name, cause, reason, waits] of holds) {
     const s = await setUp();
     const workId = ready(s.records, 'Held');
     s.reread();
@@ -185,6 +190,12 @@ test('each hold starts nothing, marks nothing on the build, says why, and the ne
     s.answers.clear();
     s.started.length = 0;
     await s.pass();
+    if (waits) {
+      // Each try of Start build rereads the Spec, so its hold waits before it retries.
+      assert.deepEqual([s.started, pass(s)?.hold], [[], reason], `${name}: waits`);
+      s.clock += HOLD_RETRY_MS;
+      await s.pass();
+    }
     assert.deepEqual([s.started, pass(s)?.hold], [[workId], undefined], `${name}: retried`);
   }
 });
@@ -215,6 +226,7 @@ test('a failed start pauses only that build, survives a restart, and ends when S
   await restarted.pass();
   assert.deepEqual(restarted.started, [], 'the pause outlasts a restart');
   assert.deepEqual(pass(restarted)?.paused, { [failing]: 'T3 started no thread.' });
+  assert.deepEqual(readdirSync(s.dir).filter((name) => name.endsWith('.tmp')), [], 'the pauses file is replaced whole');
 
   gate(records, failing);
   restarted.reread();
@@ -284,4 +296,73 @@ test('a Ready build a blocker held starts once the blocker completes', async () 
   s.reread();
   await s.pass();
   assert.deepEqual(s.started, [blocked]);
+});
+
+test('a pause stays while its build is set aside, its brief lacks a passing gate or its record can’t be read', async () => {
+  const s = await setUp();
+  const { records } = s;
+  const failing = ready(records, 'Failing');
+  s.answers.set(failing, { status: 502, body: { thread: null, error: 'T3 started no thread.' } });
+  s.reread();
+  await s.pass();
+  const paused = { [failing]: 'T3 started no thread.' };
+  assert.deepEqual(pass(s)?.paused, paused);
+
+  records.setAside(failing, at(records, failing));
+  s.reread();
+  await s.pass();
+  records.restore(failing, at(records, failing));
+  s.reread();
+  await s.pass();
+  assert.deepEqual([s.started, pass(s)?.paused], [[failing], paused], 'setting it aside and back keeps the pause');
+
+  records.setBody(failing, at(records, failing), 'brief', 'A changed brief.');
+  s.reread();
+  await s.pass();
+  assert.deepEqual(pass(s)?.paused, paused, 'an edited brief with no gate yet keeps the pause');
+
+  await s.stop();
+  let unreadable = true;
+  const failingReads = new Proxy(records, {
+    get: (target, key) => key === 'read' ? (workId: string) => {
+      if (unreadable && workId === failing) throw new Error('database is locked');
+      return target.read(workId);
+    } : target[key as keyof WorkRecords],
+  });
+  const restarted = await setUp({ dir: s.dir, records: failingReads });
+  await restarted.pass();
+  assert.deepEqual(pass(restarted)?.paused, paused, 'a read that fails keeps the pause');
+  unreadable = false;
+  gate(records, failing);
+  restarted.reread();
+  await restarted.pass();
+  assert.deepEqual([restarted.started, pass(restarted)?.paused], [[failing], {}], 'a new gate ends it');
+});
+
+test('a build the board shows blocked waits without a pause, even when its record lists no blocker', async () => {
+  const s = await setUp();
+  const { records } = s;
+  const blocked = ready(records, 'Blocked');
+  const blocker = records.create({ title: 'Blocker', repository: REPO, kind: 'build', status: 'In progress' });
+  records.addBlocker(blocked, at(records, blocked), blocker.workId);
+  s.reread();
+  records.removeBlocker(blocked, at(records, blocked), blocker.workId);
+  await s.pass();
+  assert.deepEqual([s.started, pass(s)?.paused], [[], {}]);
+  s.reread();
+  await s.pass();
+  assert.deepEqual(s.started, [blocked]);
+});
+
+test('Auto-build checks each build again just before it starts it', async () => {
+  const s = await setUp();
+  const { records } = s;
+  const first = ready(records, 'First');
+  const second = ready(records, 'Second');
+  s.during = (itemId) => {
+    if (itemId === first) records.setAside(second, at(records, second));
+  };
+  s.reread();
+  await s.pass();
+  assert.deepEqual([s.started, pass(s)?.wouldStart, pass(s)?.paused], [[first], 0, {}]);
 });

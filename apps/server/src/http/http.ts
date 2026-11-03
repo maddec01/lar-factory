@@ -13,6 +13,7 @@ import type { Refused } from '../config/editable-repository.ts';
 import type { Capture } from '../items/capture.ts';
 import type { BoardRetention } from '../items/retention.ts';
 import type { BoardShapingThreadCleanup } from '../items/shaping-thread-cleanup.ts';
+import type { BoardHeavyCommandLimit } from '../items/heavy-command-limit.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { ItemDetailsReader } from '../item-details/item-details.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -28,6 +29,7 @@ export interface HttpDeps {
   startAfter: StartAfter;
   retention: Pick<BoardRetention, 'save'>;
   shapingThreadCleanup: Pick<BoardShapingThreadCleanup, 'save'>;
+  heavyCommandLimit: Pick<BoardHeavyCommandLimit, 'save'>;
   /** Archive's work as the records are now, which Settings › Archive reads from /api/archive when it opens. */
   archive(): Item[];
   page: BuiltPage;
@@ -137,7 +139,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectChoices, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectChoices, keepOnboarding, createProject,
   detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
@@ -259,6 +261,13 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       what: 'the shaping thread cleanup setting', disabled: 'Shaping thread cleanup is disabled in sample mode.',
       async run(input) {
         const saved = shapingThreadCleanup.save(input);
+        return { ...saved, body: { ...saved.body, board: board.snapshot() } };
+      },
+    },
+    '/api/heavy-command-limit': {
+      what: 'the heavy command limit', disabled: 'The heavy command limit is disabled in sample mode.',
+      async run(input) {
+        const saved = heavyCommandLimit.save(input);
         return { ...saved, body: { ...saved.body, board: board.snapshot() } };
       },
     },

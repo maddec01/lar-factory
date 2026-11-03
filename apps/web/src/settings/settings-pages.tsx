@@ -10,6 +10,7 @@ import { ArchiveActions, archivedAs, RetentionSetting } from '../archive/archive
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
+import { HeavyCommandLimitSetting } from './heavy-command-limit.tsx';
 import { ShapingThreadCleanupSetting } from './shaping-thread-cleanup.tsx';
 import { TargetProgress } from './target-progress.tsx';
 import { TargetReaders } from './target-readers.tsx';
@@ -249,6 +250,11 @@ export function pages(input: PagesInput): Page[] {
         id: 'shaping-thread-cleanup', title: 'Shaping threads after Start build',
         description: "What the board does to an item's shaping threads when its build starts. Keep changes nothing. Settle settles them in T3, and Archive archives them there. Item details still links to a settled thread. An archived thread has no link on the board and reopens from T3's Settings, Archived. Delete removes them from T3. Delete can't be undone from the board, and the item's stats no longer count that thread.",
         control: custom(() => null), below: <ShapingThreadCleanupSetting state={data.shapingThreadCleanup} />,
+      }] },
+      { title: 'Commands', rows: [{
+        id: 'heavy-command-limit', title: 'Heavy commands at once',
+        description: "How many heavy commands, such as test suites and builds, may run at once on this Mac, across all builds and worktrees. Automatic allows one for every 4 CPUs or 8 GB of memory, whichever is fewer, and at least one.",
+        control: custom(() => null), below: <HeavyCommandLimitSetting state={data.heavyCommandLimit} />,
       }] },
       { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },
     ] },

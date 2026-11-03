@@ -1,5 +1,5 @@
 import { test, vi, expect } from 'vite-plus/test';
-import { repositoryProjectAccess, repositoryProjects, reauthorizeRepositoryProjects } from './repository-project-discovery.ts';
+import { repositoryProjectAccess, repositoryProjects, reauthorizeRepositoryProjects, subscribeRepositoryProjects } from './repository-project-discovery.ts';
 
 const fixture = vi.hoisted(() => ({ read: { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } } as import('./project-protocol.ts').ProjectRead, renew: vi.fn(async () => {}), stop: vi.fn(), running: true, notify: (_read: import('./project-protocol.ts').ProjectRead) => {} }));
 vi.mock('../json-file.ts', () => ({ readJsonRecord: () => ({ origin: 'http://127.0.0.1:3773', serverVersion: undefined }) }));
@@ -45,4 +45,37 @@ test('access names the T3 origin and the session discovery holds, until T3 stops
   fixture.running = true;
   await repositoryProjects();
   expect(repositoryProjectAccess()).toBeDefined();
+});
+
+test('tells subscribers when project facts or availability change, not when only the observation time does', async () => {
+  const project = { id: 'p', title: 'P', workspaceRoot: '/p', faviconPath: null, projectIcon: null };
+  const shell = (observedAt: string, faviconPath: string | null = null) => ({ availability: 'available' as const, observation: { projects: [{ ...project, faviconPath }], observedAt } });
+  fixture.read = shell('2026-11-03T00:00:00Z');
+  await reauthorizeRepositoryProjects();
+  const changed = vi.fn();
+  const stop = subscribeRepositoryProjects(changed);
+
+  fixture.notify(shell('2026-11-03T00:00:01Z'));
+  expect(changed, 'the first shell data after a read counts, whatever it holds').toHaveBeenCalledTimes(1);
+  fixture.notify(shell('2026-11-03T00:00:02Z'));
+  expect(changed).toHaveBeenCalledTimes(1);
+  fixture.notify(shell('2026-11-03T00:00:03Z', 'logo.png'));
+  expect(changed).toHaveBeenCalledTimes(2);
+  expect((await repositoryProjects()).observation?.projects[0]?.faviconPath, 'the subscriber can read the new data').toBe('logo.png');
+  fixture.notify({ availability: 'unavailable' });
+  expect(changed).toHaveBeenCalledTimes(3);
+  fixture.notify({ availability: 'unavailable' });
+  expect(changed).toHaveBeenCalledTimes(3);
+
+  fixture.running = false;
+  await repositoryProjects();
+  expect(changed).toHaveBeenCalledTimes(3);
+  fixture.running = true;
+  await repositoryProjects();
+  fixture.notify(shell('2026-11-03T00:00:04Z', 'logo.png'));
+  expect(changed).toHaveBeenCalledTimes(4);
+
+  stop();
+  fixture.notify({ availability: 'malformed' });
+  expect(changed).toHaveBeenCalledTimes(4);
 });

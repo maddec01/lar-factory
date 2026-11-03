@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, afterEach, beforeEach, expect, it, vi } from 'vite-plus/test';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import type { BoardData, ChosenProjectIcon } from '@lar-factory/shared';
 import { createBoardState } from '../board/board-state.ts';
 import { checkouts } from '../../test/repo-support.ts';
@@ -12,9 +12,11 @@ const t3 = vi.hoisted(() => ({
   read: { availability: 'unavailable' } as ProjectRead,
   session: vi.fn(async () => ({ token: 'board-token', sessionId: 'board', expiresAt: '2099-01-01' })),
   invalidate: vi.fn(),
+  listeners: new Set<() => void>(),
 }));
 vi.mock('./repository-project-discovery.ts', () => ({
   repositoryProjects: async () => t3.read,
+  subscribeRepositoryProjects(listener: () => void) { t3.listeners.add(listener); return () => t3.listeners.delete(listener); },
   repositoryProjectAccess: () => t3.read.availability === 'available'
     ? { origin: new URL('http://127.0.0.1:3773'), protocol: { subscriptionSession: t3.session, invalidateSession: t3.invalidate } } : undefined,
 }));
@@ -151,6 +153,101 @@ it('refreshes on its own timer every 4 minutes and when the repositories change,
   await vi.advanceTimersByTimeAsync(480_000);
   expect(board.snapshot().projectIcons).toEqual(stopped);
   expect(vi.getTimerCount()).toBe(0);
+});
+
+/** An answer that waits for `release`, so a test can act while a read runs. */
+const held = (answer: () => Response) => {
+  let release = () => {};
+  const waiting = new Promise<void>(resolve => { release = resolve; });
+  return { answer: async () => { await waiting; return answer(); }, release: () => release() };
+};
+const projectsChanged = () => { for (const listener of t3.listeners) listener(); };
+
+describe('with no 4-minute tick', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }); });
+
+  it('reads again when the repositories change during a read, whose owners came too early', async () => {
+    t3.read = listed(fact('factory'));
+    const first = held(png('a'));
+    assets = { factory: first.answer };
+    const board = boardOf();
+    const stop = createProjectIcons(board).start();
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+
+    board.update({ repos: [repo('lar-factory')] } as Partial<BoardData>);
+    board.push();
+    first.release();
+
+    await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeDefined());
+    stop();
+  });
+
+  it('publishes a favicon that later shell data names after a first read found none, until stopped', async () => {
+    t3.read = listed(fact('factory'));
+    assets = { factory: rpcNotFound };
+    const board = boardOf('lar-factory');
+    const stop = createProjectIcons(board).start();
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeUndefined());
+
+    t3.read = listed(fact('factory', { faviconPath: 'logo.png' }));
+    assets = { factory: png('a') };
+    projectsChanged();
+    await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeDefined());
+    expect(requests.at(-1)).toEqual({ _tag: 'project-favicon', cwd: join(home, 'Developer/lar/factory'), path: 'logo.png' });
+
+    stop();
+    expect(t3.listeners.size).toBe(0);
+  });
+
+  it('answers changes during a read with one more read, and nothing after it', async () => {
+    t3.read = listed(fact('factory'));
+    const first = held(png('a'));
+    assets = { factory: first.answer };
+    const stop = createProjectIcons(boardOf('lar-factory')).start();
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+
+    projectsChanged();
+    projectsChanged();
+    projectsChanged();
+    first.release();
+
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(requests).toHaveLength(2);
+    stop();
+  });
+
+  it('reads nothing for a board push that leaves the repositories as they were', async () => {
+    t3.read = listed(fact('factory'));
+    assets = { factory: png('a') };
+    const board = boardOf('lar-factory');
+    const stop = createProjectIcons(board).start();
+    await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeDefined());
+
+    board.update({ items: [] });
+    board.push();
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    expect(requests).toHaveLength(1);
+    stop();
+  });
+
+  it('keeps a good icon when a change reports T3 unavailable', async () => {
+    t3.read = listed(fact('factory'));
+    assets = { factory: png('a') };
+    const board = boardOf('lar-factory');
+    const stop = createProjectIcons(board).start();
+    await vi.waitFor(() => expect(board.snapshot().projectIcons).toBeDefined());
+    const known = board.snapshot().projectIcons;
+
+    t3.read = { ...t3.read, availability: 'unavailable' };
+    projectsChanged();
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    expect(board.snapshot().projectIcons).toEqual(known);
+    stop();
+  });
 });
 
 type Answer = () => Response | Promise<Response>;

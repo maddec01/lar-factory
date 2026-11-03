@@ -8,6 +8,21 @@ import { serverRuntimePath, t3Running } from './t3-settings.ts';
 
 let pending: Promise<ProjectRead> | undefined;
 let current: { key: string; origin: string; read: ProjectRead; stop: () => void; protocol: ReturnType<typeof boardProjects> } | undefined;
+const subscribers = new Set<() => void>();
+let announced: string | undefined;
+
+/** Calls `changed` when T3's project facts or availability differ from the last it announced, until the returned function is called. Thread updates never do. */
+export function subscribeRepositoryProjects(changed: () => void): () => void {
+  subscribers.add(changed);
+  return () => { subscribers.delete(changed); };
+}
+
+function announce({ availability, observation }: ProjectRead) {
+  const next = JSON.stringify([availability, observation?.projects]);
+  if (next === announced) return;
+  announced = next;
+  for (const changed of subscribers) changed();
+}
 
 /** Sanitized discovery state for server callers, including the last successful observation. */
 export function repositoryProjects(env: NodeJS.ProcessEnv = process.env): Promise<ProjectRead> {
@@ -25,7 +40,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
   const runtime = readJsonRecord(path);
   if (!t3Running(path) || typeof runtime?.origin !== 'string') {
     current?.stop();
-    if (current) { current.key = ''; current.read = { ...current.read, availability: 'unavailable' }; }
+    if (current) { current.key = ''; current.read = { ...current.read, availability: 'unavailable' }; announce(current.read); }
     return current?.read ?? { availability: 'unavailable' };
   }
   const key = JSON.stringify([path, runtime.origin, runtime.serverVersion, runtime.pid]);
@@ -37,8 +52,11 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
     const read = await protocol.readProjects();
     const state = { key, origin: runtime.origin, protocol, read: { ...read, observation: read.observation ?? current?.read.observation }, stop: () => {} };
     current = state;
+    // The HTTP read can lack what the shell supplies, so the first shell data always counts as a change.
+    announced = undefined;
     state.stop = subscribeProjects(new URL(runtime.origin), version, protocol, read => {
       state.read = { ...read, observation: read.observation ?? state.read.observation };
+      announce(state.read);
     });
     return state.read;
   } catch {

@@ -14,6 +14,9 @@ export async function repositoryProjects(env: NodeJS.ProcessEnv = process.env): 
 /** Spawned boards have no T3 to ask for favicons. */
 export const repositoryProjectAccess = () => undefined;
 
+/** Spawned boards read projects afresh on each call, so nothing here announces a change. */
+export const subscribeRepositoryProjects = (_changed: () => void): (() => void) => () => {};
+
 export async function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
   return repositoryProjects();
 }

@@ -7,7 +7,7 @@ import type { BoardState } from '../board/board-state.ts';
 import { log } from '../log.ts';
 import type { ProjectFact } from './project-protocol.ts';
 import { checkoutsOf, observedCheckouts } from './repository-project.ts';
-import { repositoryProjectAccess, repositoryProjects } from './repository-project-discovery.ts';
+import { repositoryProjectAccess, repositoryProjects, subscribeRepositoryProjects } from './repository-project-discovery.ts';
 import { subscribeProjects } from './project-subscription.ts';
 
 const REFRESH_MS = 240_000;
@@ -90,7 +90,7 @@ const repositories = (data: BoardData) => [...data.repos, ...data.onboarding ?? 
 export interface ProjectIcons {
   /** Reads T3 once and updates the board when an icon changed. Calls during a refresh share it. */
   refresh(): Promise<void>;
-  /** Refreshes now, on a timer of its own and when the repositories change, until the returned function is called. */
+  /** Refreshes now, on a timer of its own and when the repositories or T3's projects change, until the returned function is called. */
   start(): () => void;
   /** The icon of every project T3 lists, by project ID, once a read started by this call ends or after 2 seconds. */
   byProject(): Promise<ReadonlyMap<string, ProjectIcon>>;
@@ -147,6 +147,8 @@ export function createProjectIcons(board: Pick<BoardState, 'snapshot' | 'update'
     pending ??= read().catch(() => log('reading T3 project icons failed')).finally(() => { pending = undefined; });
     return pending;
   };
+  // A read already running may have started before what this one is for changed. Calls during a read share the one after it.
+  const refreshAfterRunning = () => (pending ?? Promise.resolve()).then(refresh);
 
   return {
     refresh,
@@ -158,18 +160,18 @@ export function createProjectIcons(board: Pick<BoardState, 'snapshot' | 'update'
       const unsubscribe = board.subscribe(() => {
         if (listed() === listedRepositories) return;
         listedRepositories = listed();
-        void refresh();
+        void refreshAfterRunning();
       });
+      const unsubscribeProjects = subscribeRepositoryProjects(() => void refreshAfterRunning());
       return () => {
         clearInterval(timer);
         unsubscribe();
+        unsubscribeProjects();
       };
     },
     async byProject() {
-      // A read already running may have started before the project this list is for was added.
-      const read = (pending ?? Promise.resolve()).then(refresh);
       let timer: NodeJS.Timeout | undefined;
-      await Promise.race([read, new Promise(resolve => { timer = setTimeout(resolve, LIST_WAIT_MS); })]);
+      await Promise.race([refreshAfterRunning(), new Promise(resolve => { timer = setTimeout(resolve, LIST_WAIT_MS); })]);
       clearTimeout(timer);
       return known;
     },

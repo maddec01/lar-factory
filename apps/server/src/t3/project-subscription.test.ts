@@ -75,6 +75,29 @@ it('retains observations across disconnect and requests a fresh snapshot', async
   expect(vi.getTimerCount()).toBe(0);
 });
 
+it('reports no change for thread updates', async () => {
+  vi.useFakeTimers();
+  let socket: EventTarget | undefined;
+  class Socket extends EventTarget {
+    static OPEN = 1;
+    readyState = 1;
+    constructor() { super(); socket = this; }
+    send() {}
+    close() { this.readyState = 3; }
+  }
+  vi.stubGlobal('WebSocket', Socket);
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ticket: 'fixture' })));
+  const changed = vi.fn();
+  const close = subscribeProjects(new URL('http://127.0.0.1:3773'), 'fixture-release', protocol(), changed);
+  await vi.advanceTimersByTimeAsync(0);
+  const chunk = (...values: unknown[]) => socket!.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ _tag: 'Chunk', requestId: '1', values }) }));
+  chunk({ kind: 'snapshot', snapshot: { snapshotSequence: 1, projects: [] } });
+  expect(changed).toHaveBeenCalledTimes(1);
+  chunk({ kind: 'thread.updated', sequence: 2 }, { kind: 'thread.removed', sequence: 3 });
+  expect(changed).toHaveBeenCalledTimes(1);
+  close();
+});
+
 it('calls an execution reject callback once and sends nothing further after a failed exit', async () => {
   vi.useFakeTimers();
   class Socket extends EventTarget {

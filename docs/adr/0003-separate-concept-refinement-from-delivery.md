@@ -1,0 +1,3 @@
+# Separate concept refinement from delivery and retire implicit structural publication
+
+Concept exploration previously shared the delivery completion rule and could create tracker work through a repository-wide default. For [#813](https://github.com/maddec01/lar-factory/issues/813), we expose refinement independently, preserve delivery requirements for concepts with active builds, and keep unfinished concepts without active builds out of Done and retention. We suspend legacy structural publication while retaining pending content and recovery readers, accepting a temporary loss of structural sharing so that legacy defaults cannot become permission to maintain shared content or create tickets under a future sharing model.

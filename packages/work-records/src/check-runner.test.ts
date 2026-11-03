@@ -1,8 +1,11 @@
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { it, expect } from 'vite-plus/test';
+import { describe, it, expect } from 'vite-plus/test';
+import { writeHeavyCommandLimit } from './heavy-command-limit.ts';
+import { openWorkRecords } from './work-records.ts';
 it('passes child arguments and status through even without a database', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'check-runner-'));
   try {
@@ -152,6 +155,7 @@ it('preserves output and the log when the consumer drains output slowly', { time
 
 it('preserves the command status when the database becomes busy at finish', { timeout: 30_000 }, async () => {
   const { spawn } = await import('node:child_process');
+  const { writeFileSync } = await import('node:fs');
   const { DatabaseSync } = await import('node:sqlite');
   const { openWorkRecords } = await import('./work-records.ts');
   const cwd = mkdtempSync(join(tmpdir(), 'check-finish-busy-'));
@@ -159,10 +163,10 @@ it('preserves the command status when the database becomes busy at finish', { ti
   const lock = new DatabaseSync(join(cwd, 'work-records.db'));
   try {
     const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
-    const child = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'run-check', build.workId, '--role', 'test', '--', process.execPath, '-e', 'console.log("ready"); process.stdin.resume(); process.stdin.on("end", () => process.exit(27))'], { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } });
+    const child = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'run-check', build.workId, '--role', 'test', '--', process.execPath, '-e', 'console.log("ready"); setInterval(() => { if (require("fs").existsSync("go")) process.exit(27); }, 20)'], { cwd, env: { ...process.env, LAR_FACTORY_DATA_DIR: cwd } });
     let stderr = '';
     child.stderr.on('data', chunk => { stderr += chunk; });
-    child.stdout.once('data', () => { lock.exec('BEGIN IMMEDIATE'); child.stdin.end(); });
+    child.stdout.once('data', () => { lock.exec('BEGIN IMMEDIATE'); writeFileSync(join(cwd, 'go'), ''); });
     expect(await new Promise(resolve => child.on('close', resolve))).toBe(27);
     expect(stderr).toContain('unrecorded');
     lock.exec('ROLLBACK');
@@ -180,4 +184,63 @@ it('preserves the command status when its record table becomes unavailable at fi
     expect(result.status).toBe(33);
     expect(result.stderr).toContain('unrecorded');
   } finally { records.close(); rmSync(cwd, { recursive: true, force: true }); }
+});
+
+describe('run-check waiting for a heavy command slot', () => {
+  // One slot, held by a heavy command that ends once the gate file exists, and a run-check that waits for it.
+  async function waiting(test: (wait: { child: ChildProcess; status: Promise<number | null>; records: Awaited<ReturnType<typeof openWorkRecords>>; workId: string; ran: string; gate: string }) => Promise<void>) {
+    const cwd = mkdtempSync(join(tmpdir(), 'check-slot-'));
+    const gate = join(cwd, 'gate'), ran = join(cwd, 'ran');
+    const env = { ...process.env, LAR_FACTORY_DATA_DIR: cwd, LAR_WORK_HEAVY_CHECK_MS: '50' };
+    writeHeavyCommandLimit(1, cwd);
+    const records = await openWorkRecords(join(cwd, 'work-records.db'));
+    const holder = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'heavy', '--', process.execPath, '-e', `console.log("held"); setInterval(() => { if (require("fs").existsSync(${JSON.stringify(gate)})) process.exit(0); }, 20)`], { cwd, env });
+    holder.stderr.resume();
+    let child: ChildProcess | undefined;
+    try {
+      await once(holder.stdout, 'data');
+      const { workId } = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
+      child = spawn(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'run-check', workId, '--role', 'test', '--', process.execPath, '-e', `require("fs").writeFileSync(${JSON.stringify(ran)}, "")`], { cwd, env });
+      child.stdout!.resume();
+      const status = once(child, 'close').then(([code]) => code as number | null);
+      let stderr = '';
+      child.stderr!.on('data', chunk => { stderr += chunk; });
+      for (const deadline = Date.now() + 15_000; !stderr.includes('waiting for a heavy command slot');) {
+        if (Date.now() > deadline) throw Error(`run-check never waited: ${stderr}`);
+        await new Promise(done => setTimeout(done, 20));
+      }
+      await test({ child, status, records, workId, ran, gate });
+    } finally {
+      writeFileSync(gate, '');
+      if (child?.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      if (holder.exitCode === null) await once(holder, 'close');
+      records.close();
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  }
+
+  it('records the row without tree or start time while waiting, then both once the slot is held', { timeout: 30_000 }, () => waiting(async ({ status, records, workId, gate }) => {
+    const waited = records.checks(workId).runs[0]!;
+    expect(waited).toMatchObject({ tree: null, startedAt: null, outcome: 'unfinished' });
+    const released = new Date().toISOString();
+    writeFileSync(gate, '');
+    expect(await status).toBe(0);
+    const run = records.checks(workId).runs[0]!;
+    expect(run.outcome).toBe('passed');
+    expect(run.startedAt! >= released).toBe(true);
+  }));
+
+  it('records an interrupted outcome without starting the command when signalled during the wait', { timeout: 30_000 }, () => waiting(async ({ child, status, records, workId, ran }) => {
+    child.kill('SIGTERM');
+    expect(await status).toBe(143);
+    expect(records.checks(workId).runs[0]).toMatchObject({ outcome: 'interrupted', startedAt: null, exitStatus: null });
+    expect(existsSync(ran)).toBe(false);
+  }));
+
+  it('reads as not finished when hard-killed during the wait', { timeout: 30_000 }, () => waiting(async ({ child, status, records, workId, ran }) => {
+    child.kill('SIGKILL');
+    await status;
+    expect(records.checks(workId).runs[0]).toMatchObject({ outcome: 'unfinished', snapshotState: 'unfinished', tree: null, startedAt: null });
+    expect(existsSync(ran)).toBe(false);
+  }));
 });

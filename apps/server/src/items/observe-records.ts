@@ -25,6 +25,8 @@ export interface ObserveReads {
   waits?(repo: string): boolean;
   /** The kind the record and its ticket agree on in the last read, or null when they don't. */
   agreedKind?(record: WorkRecord): WorkRecord['kind'] | null;
+  /** Hears that an observation alone moved the Dependency from revision `from` to `to`, and whether it `changed` the kind it shows. */
+  observed?(dependencyId: string, from: number, to: number, changed: boolean): void;
 }
 
 /** How many records' provider reads run at once. */
@@ -95,7 +97,8 @@ export async function observePullRequest(records: WorkRecords, workId: string, r
 const ENDED: readonly (DependencyObservationKind | undefined)[] = ['closed', 'merged', 'reopened'];
 
 /** Reads the Dependency's ticket or PR `subject` and records what it shows, beside the last read that answered when it fails. */
-async function observeDependency(records: WorkRecords, dependencyId: string, subject: string, read: () => Promise<TicketObservation['state'] | PullRequestState>): Promise<void> {
+async function observeDependency(records: WorkRecords, dependencyId: string, subject: string, read: () => Promise<TicketObservation['state'] | PullRequestState>,
+  observed: ObserveReads['observed']): Promise<void> {
   let kind: DependencyObservationKind;
   let detail: string | undefined;
   try {
@@ -110,7 +113,10 @@ async function observeDependency(records: WorkRecords, dependencyId: string, sub
   if (subject !== dependency.ticket && !dependency.pullRequests.includes(subject)) return;
   const last = dependency.observations.find((o) => o.subject === subject);
   if (kind === 'open' && ENDED.includes(last?.lastGood?.kind ?? last?.kind)) kind = 'reopened';
-  records.observeDependency(dependencyId, dependency.revision, { subject, kind, ...detail && { detail } });
+  const { revision } = records.observeDependency(dependencyId, dependency.revision, { subject, kind, ...detail && { detail } });
+  // A failed read shows the last read that answered, so it changes nothing a mark decides on.
+  const shown = last?.kind === 'read-failed' ? last.lastGood?.kind : last?.kind;
+  observed?.(dependencyId, dependency.revision, revision, kind !== 'read-failed' && kind !== shown);
 }
 
 /** Keeps the kind a record and its ticket last agreed on, which later tells a disagreement's notice which side changed. */
@@ -166,7 +172,7 @@ export async function observeRecords(records: WorkRecords, repos: readonly strin
         for (const subject of [...theirs ? [theirs] : [], ...pullRequests]) {
           const repo = subject.slice(0, subject.lastIndexOf('#'));
           if (reads.waits?.(repo)) continue;
-          await observeDependency(records, dependencyId, subject, () => readSubject(subject, subject === theirs)).finally(changed);
+          await observeDependency(records, dependencyId, subject, () => readSubject(subject, subject === theirs), reads.observed).finally(changed);
         }
       }
     } catch (err) {

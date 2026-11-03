@@ -882,6 +882,7 @@ async function observeProviders(): Promise<void> {
       known: (repo, number) => knownTicket(repo, number),
       waits: (repo) => quotaLow && !onAzure(repo),
       agreedKind: (record) => agreedKind(record, ticketsByRef, board.snapshot().repos.find((r) => sameRepo(r.repo, record.repository))?.setup?.vocabulary),
+      observed: (dependencyId, from, to, changed) => commands.observedDependency(dependencyId, from, to, changed),
     }, retention.hidden(), showObserved);
     // After the PR reads, so a concept whose last build merged finishes in the same pass.
     finishCompleted(records, repos);

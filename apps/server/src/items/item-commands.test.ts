@@ -7,7 +7,7 @@ import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread, NeedsYouCause, OperationAccess, ShapingThreadCleanup, StartResult, Status } from '@lar-factory/shared';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
-import { createItemCommands, type ItemCommandsDeps } from './item-commands.ts';
+import { createItemCommands, type ItemCommands, type ItemCommandsDeps } from './item-commands.ts';
 import { NO_THREAD } from './needs-you-causes.ts';
 import type { ItemSource } from './item-source.ts';
 import { archivedItems, recordItems } from './record-items.ts';
@@ -685,6 +685,74 @@ test('a move on a record a thread changed since the board read it is refused, an
   assert.equal(records.read(work.workId).status, 'List');
   assert.equal(board.find(work.workId)?.kind, 'bug');
   assert.equal((await commands.queue(work.workId)).status, 200, 'the next move names the revision the board read again');
+});
+
+/** A build in the board's records held by a Dependency on `server-team#40`, and the hold the board shows. */
+async function heldBuild() {
+  const records = await openRecords();
+  const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  let dependency = records.addDependency(build.workId, { need: 'An endpoint', owner: 'server team', ticket: 'maddec01/lar-server#40' });
+  dependency = records.addDependencyBlock(dependency.dependencyId, dependency.revision, build.workId);
+  const { board, commands, reread } = commandsOn([], undefined, records);
+  const shown = () => board.find(build.workId)!.blockers[0]!.dependency!;
+  return { records, build, dependency, commands, reread, shown };
+}
+
+/** Records the board's own observation of the Dependency's ticket as `kind`, as an observation pass does, and whether it changed the kind. */
+function observe(records: WorkRecords, commands: ItemCommands, dependencyId: string, kind: 'closed' | 'reopened' = 'closed') {
+  const before = records.dependency(dependencyId);
+  const { revision } = records.observeDependency(dependencyId, before.revision, { subject: 'maddec01/lar-server#40', kind });
+  commands.observedDependency(dependencyId, before.revision, revision, before.observations[0]?.kind !== kind);
+}
+
+test("a met mark against the hold a page shows lands though the board's own observations wrote since", async () => {
+  const { records, build, dependency, commands, reread, shown } = await heldBuild();
+  observe(records, commands, dependency.dependencyId);
+  reread();
+  const { revision } = shown();
+  // Two more observation passes commit; the board shows the first before the mark, and the page still shows neither.
+  observe(records, commands, dependency.dependencyId);
+  reread();
+  observe(records, commands, dependency.dependencyId);
+  const marked = commands.markDependencyMet(build.workId, dependency.dependencyId, revision, true);
+  assert.equal(marked.status, 200, JSON.stringify(marked.body));
+  assert.ok(records.dependency(dependency.dependencyId).met);
+  assert.ok(shown().met, 'the board reads it again');
+  assert.equal(commands.markDependencyMet(build.workId, dependency.dependencyId, revision, false).status, 409, 'the mark is no observation');
+});
+
+test("a met mark is refused once another writer's change came between the board's own observations", async () => {
+  const { records, build, dependency, commands, reread, shown } = await heldBuild();
+  observe(records, commands, dependency.dependencyId);
+  reread();
+  const { revision } = shown();
+  observe(records, commands, dependency.dependencyId);
+  const current = records.dependency(dependency.dependencyId);
+  records.updateDependency(dependency.dependencyId, current.revision, { need: 'Another endpoint' });
+  observe(records, commands, dependency.dependencyId);
+  assert.equal(commands.markDependencyMet(build.workId, dependency.dependencyId, revision, true).status, 409);
+  assert.equal(records.dependency(dependency.dependencyId).met, null);
+});
+
+test("a met mark is refused once the board observed a change of kind the page didn't show", async () => {
+  const { records, build, dependency, commands, reread, shown } = await heldBuild();
+  observe(records, commands, dependency.dependencyId);
+  reread();
+  const { revision } = shown();
+  // The page shows the ticket closed; before the mark lands, the board reads it reopened.
+  observe(records, commands, dependency.dependencyId, 'reopened');
+  assert.equal(commands.markDependencyMet(build.workId, dependency.dependencyId, revision, true).status, 409);
+  assert.equal(records.dependency(dependency.dependencyId).met, null);
+  assert.equal(shown().observation?.kind, 'reopened', 'the board reads it again');
+});
+
+test('a met mark is refused once the Dependency changed in a way the board does not show yet', async () => {
+  const { records, build, dependency, commands, shown } = await heldBuild();
+  const { revision } = shown();
+  records.markDependencyMet(dependency.dependencyId, dependency.revision, 'someone else');
+  assert.equal(commands.markDependencyMet(build.workId, dependency.dependencyId, revision, true).status, 409);
+  assert.equal(records.dependency(dependency.dependencyId).met?.by, 'someone else');
+  assert.equal(shown().met?.by, 'someone else', 'the board reads it again');
 });
 
 test("Start build moves the build's concept record to In progress and writes no ticket's status", async () => {

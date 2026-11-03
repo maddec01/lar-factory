@@ -84,7 +84,6 @@ test("a dossier's parts are left out and show in the dossier; a Queued parent st
   const openDossier = (id: string) => settle(() => $<HTMLButtonElement>(`[data-dossier="${id}"] [data-dossier-open]`)!.click());
   await openDossier('I_sample05');
   expect($('[data-dossier="I_sample05"] [data-part="I_d129"]'), "#129's sub-issue, in its dossier").not.toBeNull();
-  await settle(() => $<HTMLButtonElement>('[data-dossier-back]')!.click());
   await openDossier('I_sample09');
   expect($('[data-dossier="I_sample09"] [data-part="I_d200"]'), "concept #200's decision, in its dossier").not.toBeNull();
 });

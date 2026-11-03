@@ -1,5 +1,5 @@
-// The dock's dossiers: each started concept, and each open item with sub-issues on the board: its one line, and opened in
-// place of the sections, what keeps the work moving and its parts as a Work map or a list. Ports the old Board view's
+// The dock's dossiers: each started concept, and each open item with sub-issues on the board: its one line, and expanded
+// under it, what keeps the work moving and its parts as a Work map or a list. Ports the old Board view's
 // concept block tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
@@ -53,16 +53,15 @@ beforeEach(() => {
   for (const id of [C200, C180, 'I_100', 'I_700']) localStorage.setItem(VIEW_KEY + id, 'list');
 });
 
-/** The page with dossier `id` open. */
+/** Dossier `id`'s body while it is expanded. */
+const body = (id = C200) => dossier(id).querySelector<HTMLElement>('[data-dossier-body]');
+/** The page with dossier `id` expanded, which the browser may remember from before a reload. */
 const mountOpen = async (data: BoardData = sample, id = C200) => {
   await mountPage(data);
-  await press(opener(id));
+  if (!body(id)) await press(opener(id));
 };
-/** Back to the panes, then dossier `id` open. */
-const openInstead = async (id: string) => {
-  await press(backButton());
-  await press(opener(id));
-};
+/** Dossier `id` expanded too. */
+const openInstead = (id: string) => press(opener(id));
 
 test('each started concept and item with sub-issues on the board is a dossier in the dock, in board order; with none the dock takes no height', async () => {
   await mountPage();
@@ -78,82 +77,94 @@ test('a Queued concept stays out of the dock until it starts', async () => {
   expect([$('[data-dossier="I_queued"]'), $('.queue li[data-item="I_queued"]') !== null]).toEqual([null, true]);
 });
 
-const backButton = () => $<HTMLButtonElement>('[data-dossier-back]')!;
 const SECTIONS = ['queue', 'shaping', 'ready', 'build', 'dock'];
 const panes = () => SECTIONS.filter((id) => $(`[data-stage="${id}"]`));
-const escape = (el: Element = document.activeElement ?? document.body) =>
-  settle(() => el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
 
-test('a dock row is one line, and opening it replaces the sections with the dossier at full height, on its Work map', async () => {
+test('a dock row is one line, and its chevron expands the Work map under it, with the desk, filters and every section in place', async () => {
   localStorage.clear();
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage();
-  expect([dossier().querySelector('[data-work-map]'), $('[data-stage="dossier"]'), panes()]).toEqual([null, null, SECTIONS]);
+  expect([dossier().querySelector('[data-work-map]'), panes()]).toEqual([null, SECTIONS]);
   await press(opener());
-  expect([panes(), $$('[data-dossier]').length], 'nothing else shares the room').toEqual([[], 1]);
-  expect(dossier().querySelector('[data-work-map]'), 'opened, it shows its body').not.toBeNull();
-  expect($('[data-stage="dossier"]')!.className.split(' '), 'it fills the page').toContain('flex-1');
-  expect(document.activeElement, 'focus moves to Back').toBe(backButton());
-  expect([$('.queue'), $('.desk'), $('[data-line-filters]')], 'it takes the whole workspace').toEqual([null, null, null]);
+  expect(body()!.querySelector('[data-work-map]'), 'expanded, it shows its map').not.toBeNull();
+  expect([panes(), $('.desk') !== null, $('[data-line-filters]') !== null, $$('[data-dossier]').length], 'the page keeps its place').toEqual([SECTIONS, true, true, 2]);
+  expect(header().compareDocumentPosition(body()!) & Node.DOCUMENT_POSITION_FOLLOWING, 'under its own row').toBeTruthy();
+  expect([$('[data-dossier-back]'), body()!.className.split(' ').filter((c) => /^(flex-1|h-|max-h|overflow)/.test(c))], 'no way back to need, and no cap or forced height').toEqual([null, []]);
+});
+
+test('the chevron is a real button that says whether the row is expanded, and focus stays on it as the row collapses', async () => {
+  await mountPage();
+  const chevron = opener();
+  expect([chevron.tagName, chevron.getAttribute('aria-expanded'), chevron.getAttribute('aria-label')]).toEqual(['BUTTON', 'false', 'Expand #200 lar cloud: website sign-in and relay']);
+  chevron.focus();
+  await clickWith(chevron, 0);
+  expect([chevron.getAttribute('aria-expanded'), chevron.getAttribute('aria-label'), body() !== null]).toEqual(['true', 'Collapse #200 lar cloud: website sign-in and relay', true]);
+  await clickWith(chevron, 0);
+  expect([chevron.getAttribute('aria-expanded'), body(), document.activeElement, opener()]).toEqual(['false', null, chevron, chevron]);
+});
+
+test('clicks on the title, a chip, a nested Start, the view toggle or the body leave the row as it is', async () => {
+  holdPosts(unblocked());
+  await mountPage(withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, unblocked()));
+  await press(startIn(next())!);
+  await press(header().querySelector('[data-chips]')!);
+  expect(body(), 'still collapsed').toBeNull();
+  await press(header().querySelector('[data-title]')!);
+  expect([dialogTitle(), body()], 'the title opens the details dialog alone').toEqual(['#200 lar cloud: website sign-in and relay', null]);
+  await press($('[data-item-dialog] [aria-label="Close"]')!);
+  await press(opener());
+  await press(header().querySelector('[data-title]')!);
+  await press($('[data-item-dialog] [aria-label="Close"]')!);
+  await press(button(dossier(), 'Parts list'));
+  await press(body()!);
+  expect([opener().getAttribute('aria-expanded'), body()!.querySelector('[data-parts-list]') !== null]).toEqual(['true', true]);
+});
+
+test('each dossier expands on its own, and the browser remembers it across a reload', async () => {
+  await mountPage();
+  await press(opener());
+  await press(opener(C180));
+  expect([body() !== null, body(C180) !== null]).toEqual([true, true]);
+  await press(opener());
+  expect([body(), body(C180) !== null]).toEqual([null, true]);
   vi.resetModules();
   await mountPage();
-  expect($('[data-stage="dossier"]'), 'a reload starts on the panes').toBeNull();
+  expect([body(), body(C180) !== null]).toEqual([null, true]);
 });
 
-test('Back and Escape return to the panes, with focus on the row that opened the dossier', async () => {
-  await mountOpen();
-  await press(backButton());
-  expect([panes(), $('[data-stage="dossier"]'), document.activeElement]).toEqual([SECTIONS, null, opener()]);
-  await press(opener(C180));
-  expect(dossier(C180).querySelector('[data-parts-list]')).not.toBeNull();
-  await escape();
-  expect([panes(), document.activeElement]).toEqual([SECTIONS, opener(C180)]);
-  await escape();
-  expect(panes(), 'Escape on the panes does nothing').toEqual(SECTIONS);
-});
-
-test('Escape closes an open item dialog first, then the dossier', async () => {
-  await mountOpen();
-  await press(header().querySelector('[data-title]')!);
-  expect(dialogTitle()).toBe('#200 lar cloud: website sign-in and relay');
-  await escape();
-  expect([dialogTitle(), $('[data-stage="dossier"]') !== null]).toEqual(['', true]);
-  await escape();
-  expect($('[data-stage="dossier"]')).toBeNull();
-});
-
-test('Escape closes an open menu first, then the dossier', async () => {
-  holdPosts(unblocked());
-  await mountOpen(unblocked());
-  await pressMenu(startIn(step('I_sample13'))!);
-  expect(entries().length).toBeGreaterThan(0);
-  await escape();
-  expect([entries().length, $('[data-stage="dossier"]') !== null]).toEqual([0, true]);
-});
-
-test('a dossier that leaves the board returns the panes, and it stays closed if it comes back', async () => {
-  await mountOpen();
-  const without = { ...sample, items: sample.items.filter((i) => i.id !== C200 && i.parentId !== C200) };
-  await receive(without);
-  expect([panes().includes('shaping'), $('[data-stage="dossier"]')]).toEqual([true, null]);
-  await receive(sample);
-  expect([$('[data-stage="dossier"]'), dossier().querySelector('[data-parts-list]')]).toEqual([null, null]);
-});
-
-test('a board push updates the open dossier in place', async () => {
+test('a board push updates an expanded dossier in place, and one that leaves the board comes back as it was', async () => {
   await mountOpen();
   await receive(withItem('I_sample10', { title: 'Relay, renamed' }));
-  expect(text(step('I_sample10'))).toContain('Relay, renamed');
-  expect(panes()).toEqual([]);
+  expect([text(step('I_sample10')).includes('Relay, renamed'), panes()]).toEqual([true, SECTIONS]);
+  await receive({ ...sample, items: sample.items.filter((i) => i.id !== C200 && i.parentId !== C200) });
+  expect($(`[data-dossier="${C200}"]`)).toBeNull();
+  await receive(sample);
+  expect(body()).not.toBeNull();
 });
 
-test('a board push that puts the open dossier outside the filter leaves it open', async () => {
+test('a filter hides an expanded dossier with its row, and it is still expanded once the filter lets it back', async () => {
   localStorage.setItem('lar-board:filters:board', JSON.stringify({ kinds: [c200.kind], labels: [] }));
   await mountOpen();
   await receive(withItem(C200, { kind: 'bug', status: 'Shaping' }));
-  expect($('[data-stage="dossier"]')).not.toBeNull();
-  await press(backButton());
-  expect($('[data-dossier]'), 'on the panes, the filter hides it').toBeNull();
+  expect($(`[data-dossier="${C200}"]`)).toBeNull();
+  await receive(sample);
+  expect(body()).not.toBeNull();
+});
+
+test("the expanded line holds the local planning note, with its detail on focus and hover, and a compact view toggle in place of a body row", async () => {
+  const data = withItem(C200, { sync: { state: 'pending', message: 'Waiting for GitHub.' } });
+  await mountPage(data);
+  expect(header().querySelector('[data-structure-sync]'), 'collapsed, the row stays as it is').toBeNull();
+  await press(opener());
+  const note = header().querySelector<HTMLElement>('[data-structure-sync]')!;
+  expect([text(note), note.tabIndex, note.getAttribute('aria-label')]).toEqual(['On this Mac', 0, 'Planning is saved on this Mac. Waiting for GitHub.']);
+  expect(body()!.querySelector('[data-structure-sync]'), 'no row of its own').toBeNull();
+  expect(text(body()), 'nor its sentence').not.toContain('Planning is saved');
+  const tools = header().querySelector<HTMLElement>('[data-dossier-tools]')!;
+  expect([...tools.querySelectorAll('button')].map((b) => [text(b), b.title])).toEqual([['Work map', 'Work map'], ['Parts list', 'Parts list']]);
+  expect(tools.querySelectorAll('[role="img"]').length, 'no second source or repository icon').toBe(0);
+  await receive(withItem(C200, { sync: { state: 'saved' } }));
+  expect(header().querySelector('[data-structure-sync]'), 'once saved, nothing').toBeNull();
 });
 
 /** A pointer click (`detail` 1) or a key press's click (`detail` 0) on `el`. */
@@ -168,32 +179,28 @@ const select = (el: Element) => {
   window.getSelection()!.addRange(range);
 };
 
-test('only the title opens the item; anywhere else on the row but the chips opens the dossier', async () => {
+test('only the title opens the item; anywhere else on the row but its controls toggles the dossier', async () => {
   await mountPage();
-  await press(header().querySelector('[data-title]')!);
-  expect([dialogTitle(), $('[data-stage="dossier"]')]).toEqual(['#200 lar cloud: website sign-in and relay', null]);
-  await press($('[data-item-dialog] [aria-label="Close"]')!);
-  await press(header().querySelector('[data-chips]')!);
-  expect($('[data-stage="dossier"]'), 'a chip leaves it as it was').toBeNull();
   for (const part of [line, (id?: string) => header(id).querySelector<HTMLElement>('[data-col="bar"]')!, next]) {
     await press(part());
-    expect($('[data-stage="dossier"]')).not.toBeNull();
+    expect(body()).not.toBeNull();
     expect(dialogTitle()).toBe('');
-    await press(backButton());
+    await press(part());
+    expect(body()).toBeNull();
   }
 });
 
-test('letting go of a drag that selected text in the row leaves the panes; a selection elsewhere or a key press still opens it', async () => {
+test('letting go of a drag that selected text in the row leaves it as it was; a selection elsewhere or a key press still toggles it', async () => {
   await mountPage();
   select(header());
   await clickWith(header(), 1);
-  expect($('[data-stage="dossier"]')).toBeNull();
+  expect(body()).toBeNull();
   await clickWith(opener(), 0);
-  expect($('[data-stage="dossier"]'), 'Enter or Space on the row\'s button, with text selected in it').not.toBeNull();
-  await press(backButton());
+  expect(body(), 'Enter or Space on the row\'s button, with text selected in it').not.toBeNull();
+  await press(opener());
   select(header(C180));
   await clickWith(header(), 1);
-  expect($('[data-stage="dossier"]'), 'a click, with text selected in another row').not.toBeNull();
+  expect(body(), 'a click, with text selected in another row').not.toBeNull();
   window.getSelection()!.removeAllRanges();
 });
 
@@ -204,7 +211,7 @@ test('a refined concept leaves Shaping and stays in the dock, where its row says
   expect(text(header().querySelector('[data-refined]'))).toBe('Refined · no delivery planned');
   expect($(`[data-stage="shaping"] [data-item="${C200}"]`)).toBeNull();
   await press(opener());
-  expect(text(header().querySelector('[data-refined]')), 'the open dossier says so too').toBe('Refined · no delivery planned');
+  expect(text(header().querySelector('[data-refined]')), 'an expanded dossier says so too').toBe('Refined · no delivery planned');
 });
 
 test('a refined concept with active builds says Refined alone, and an unrefined one neither', async () => {

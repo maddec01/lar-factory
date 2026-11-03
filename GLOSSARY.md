@@ -104,3 +104,7 @@ _Avoid_: build slot, concurrency setting.
 **Auto-build**:
 This machine's choice to have the board start eligible Ready builds by itself, up to the build limit.
 _Avoid_: auto-start.
+
+**Model choice**:
+The provider instance and model the board starts a thread on, or T3 default. When it names the project's T3 default model, the thread also gets that default's options, such as reasoning effort.
+_Avoid_: model pick, model setting.

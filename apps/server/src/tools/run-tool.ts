@@ -1,6 +1,7 @@
 // Runs a command-line tool and resolves with how it ended; every `execFile` call in the server goes through here.
 
 import { execFile } from 'node:child_process';
+import { loopTrace } from '../startup/loop-trace.ts';
 
 export interface RunOptions {
   env?: NodeJS.ProcessEnv;
@@ -21,12 +22,13 @@ export interface RunResult {
 
 export function runTool(file: string, args: string[], { env, timeout, maxBuffer, input }: RunOptions): Promise<RunResult> {
   return new Promise((resolve) => {
-    const child = execFile(file, args, { env, timeout, ...maxBuffer && { maxBuffer } }, (err, stdout, stderr) => {
+    // Starting a process blocks the thread, though the process then runs beside it.
+    const child = loopTrace.span('tool spawn', () => execFile(file, args, { env, timeout, ...maxBuffer && { maxBuffer } }, (err, stdout, stderr) => {
       if (!err) return resolve({ code: 0, stdout, stderr, detail: '' });
       const code = ((err as NodeJS.ErrnoException).code as number | string | undefined) ?? null;
       const detail = (stderr || stdout || err.message).trim().split('\n').slice(0, 4).join('\n');
       resolve({ code, stdout, stderr, detail });
-    });
+    }));
     if (input !== undefined) {
       // A tool may exit before reading; its exit result still reports the failure.
       child.stdin?.on('error', () => {});

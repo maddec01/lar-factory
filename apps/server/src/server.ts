@@ -712,7 +712,7 @@ async function refresh(): Promise<void> {
   const readRevision = board.revision();
   try {
     await checkQuota();
-    const pace = readPace();
+    const pace = loopTrace.span('read pace', readPace);
     await items.probe(pace);
     if (!board.snapshot().firstRead.settled && board.snapshot().firstRead.waiting === undefined) {
       unread = items.repos().map(repo => repo.repo);
@@ -808,7 +808,7 @@ function knownTicket(repo: string, number: number): TicketObservation | undefine
 }
 
 /** How far apart a pass of observations shows the records, whose every read lands with changes to show. */
-const OBSERVED_SHOW_MS = 500;
+const OBSERVED_SHOW_MS = 1_000;
 const showObserved = coalesced(() => runLocal(() => showRecords()), OBSERVED_SHOW_MS);
 
 /** When the records' tickets and PRs were last observed, which runs at the idle pace as each record takes a call or two. */

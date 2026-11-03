@@ -186,8 +186,9 @@ export async function openDatabase(path = workRecordsPath(), { migrations = MIGR
     throw error;
   }
   // A newer process may update the schema while this one stays open; check before every statement batch.
+  const versionRow = db.prepare('PRAGMA user_version');
   const checked = <T>(run: () => T): T => {
-    const version = userVersion(db);
+    const version = Number(versionRow.get()?.user_version ?? 0);
     if (version !== migrations.length) throw tooNew(version, migrations.length, path);
     return run();
   };

@@ -128,6 +128,9 @@ export function useLastKnown(item: Item): string | null {
   return `Last known figures${at}: T3 Code's usage can't be read now.`;
 }
 
+/** Why a total isn't the whole sum. */
+export const INCOMPLETE_TOTAL = "This total is incomplete: usage for part of it is still loading or can't be read.";
+
 /** Whether figures say anything: all-zero ones say no more than having none. */
 export const hasFigures = (s: ItemStats) => Boolean(s.agentMs || s.wallMs || s.tokens || s.costUsd);
 
@@ -145,8 +148,8 @@ export function AgentWork({ item, stats: s = item.stats, label, className = '' }
   figures.push(['Agent time', duration(s.agentMs), ''], ['Tokens', formatTokens(s.tokens), ' tokens']);
   if (s.wallMs) figures.push(['Wall time', duration(s.wallMs), ' wall']);
   return (
-    <p data-agent-work data-last-known={old ? '' : undefined} title={`${figures.map(([k, v]) => `${k} ${v}`).join(' · ')}${old ? `. ${old}` : ''}`} className={`m-0 text-xs text-(--muted-foreground) tabular-nums ${className}`}>
-      {label && `${label}: `}{figures.map(([, v, unit]) => v + unit).join(' · ')}{old && ' · last known'}
+    <p data-agent-work data-last-known={old ? '' : undefined} title={[figures.map(([k, v]) => `${k} ${v}`).join(' · '), old, s.incomplete && INCOMPLETE_TOTAL].filter(Boolean).join('. ')} className={`m-0 text-xs text-(--muted-foreground) tabular-nums ${className}`}>
+      {label && `${label}: `}{figures.map(([, v, unit]) => v + unit).join(' · ')}{old && ' · last known'}{s.incomplete && ' · incomplete'}
     </p>
   );
 }

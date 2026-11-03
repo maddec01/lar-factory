@@ -231,36 +231,54 @@ export interface ItemStats {
   frozen?: true;
   /** Read before every needed thread was observed, so a shared record may sit on the wrong item. Shown, but never retained, frozen or written to a PR. */
   provisional?: true;
+  /** On a total only: a member is loading or failed, so these are the known figures, not the whole sum. */
+  incomplete?: true;
+}
+
+const hasNoFigures = (s: ItemStats) => !s.agentMs && !s.wallMs && !s.tokens && !s.costUsd;
+
+/**
+ * Whether an item's usage is still to come or failed. Figures frozen at merge are complete, and an item with no threads
+ * has none to wait for.
+ */
+export function usageIncomplete(item: Item): boolean {
+  const { stats, threads, usageState } = item;
+  if (typeof stats === 'object' && stats.frozen) return false;
+  if (Array.isArray(threads) && !threads.length) return false;
+  if (stats === 'unavailable' || usageState === 'loading' || usageState === 'failed') return true;
+  return !usageState && !stats && (threads === 'unavailable' || !!threads?.length);
 }
 
 /**
  * An item's stats plus the item total of each of its sub-issues among `items`, each
  * item counted once. Wall time only when every figure has it; frozen only when all
- * are. Null when the sub-issues add nothing, so the total equals the item stats;
- * 'unavailable' when a figure couldn't be read.
+ * are. Null when the sub-issues add nothing, so the total equals the item stats. A
+ * member whose usage is incomplete marks the total incomplete, and makes it
+ * 'unavailable' when it has no figures to add.
  */
 export function itemTotal(item: Item, items: readonly Item[]): ItemStats | 'unavailable' | null {
   const seen = new Set<string>([item.id]);
-  const figures: (ItemStats | 'unavailable')[] = [];
+  const members: Item[] = [];
   const add = (parent: Item) => {
     for (const child of items) {
       if (seen.has(child.id) || !isSubIssueOf(child, parent)) continue;
       seen.add(child.id);
-      if (child.stats) figures.push(child.stats);
+      members.push(child);
       add(child);
     }
   };
   add(item);
-  if (!figures.length) return null;
-  if (item.stats) figures.push(item.stats);
-  if (figures.includes('unavailable')) return 'unavailable';
-  const all = figures as ItemStats[];
-  const own = item.stats as ItemStats | undefined;
-  if (all.every((s) => s === own || (!s.agentMs && !s.wallMs && !s.tokens && !s.costUsd))) return null;
+  if (!members.length) return null;
+  members.push(item);
+  const incomplete = members.filter(usageIncomplete);
+  if (incomplete.some((m) => !m.stats || m.stats === 'unavailable' || hasNoFigures(m.stats))) return 'unavailable';
+  const all = members.flatMap((m) => (m.stats && m.stats !== 'unavailable' ? [m.stats] : []));
+  if (!incomplete.length && all.every((s) => s === item.stats || hasNoFigures(s))) return null;
   const total: ItemStats = { agentMs: sum(all, (s) => s.agentMs), tokens: sum(all, (s) => s.tokens) };
   if (all.every((s) => s.wallMs !== undefined)) total.wallMs = sum(all, (s) => s.wallMs!);
   if (all.some((s) => s.costUsd !== undefined)) total.costUsd = sum(all, (s) => s.costUsd ?? 0);
   if (all.every((s) => s.frozen)) total.frozen = true;
+  if (incomplete.length) total.incomplete = true;
   return total;
 }
 

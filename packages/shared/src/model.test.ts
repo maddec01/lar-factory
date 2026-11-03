@@ -253,6 +253,28 @@ test('an item total adds each sub-issue on the board once, at any depth, and is 
   assert.equal(itemTotal({ ...parent, stats: 'unavailable' }, [build]), 'unavailable');
 });
 
+test('an item total with a member loading or failed says it is incomplete, or unavailable with no figures to add', () => {
+  const under = { number: 7, title: 't', url: 'https://github.com/maddec01/lar-server/issues/7', repo: 'Maddec01/Lar-Server', state: 'open' as const };
+  const running = [{ threadId: 't' }] as unknown as Item['threads'];
+  const parent = item('In progress', [], { id: 'p', number: 7, stats: { agentMs: 10, tokens: 100, costUsd: 1 } });
+  const part = (extra: Partial<Item>) => item('In progress', [], { id: 'c', number: 8, parent: under, parentId: 'p', threads: running, ...extra });
+  const known = { agentMs: 20, tokens: 200, costUsd: 2 };
+  const partial = { agentMs: 30, tokens: 300, costUsd: 3, incomplete: true };
+  assert.deepEqual(itemTotal(parent, [parent, part({ stats: known, usageState: 'failed' })]), partial, 'a failed member keeps its known figures');
+  assert.deepEqual(itemTotal(parent, [parent, part({ stats: known, usageState: 'loading' })]), partial, 'a loading member counts as a failed one');
+  assert.deepEqual(itemTotal({ ...parent, threads: running, usageState: 'failed' }, [part({ stats: { agentMs: 0, tokens: 0 }, usageState: 'current' })]), { agentMs: 10, tokens: 100, costUsd: 1, incomplete: true },
+    'a failed parent is a member too, though its parts add nothing');
+  assert.equal(itemTotal(parent, [parent, part({ usageState: 'loading' })]), 'unavailable', 'a loading member with nothing to add');
+  assert.equal(itemTotal(parent, [parent, part({})]), 'unavailable', 'a thread with no usage answer yet is still to come');
+  assert.equal(itemTotal(parent, [parent, part({ stats: { agentMs: 0, tokens: 0 }, usageState: 'failed' })]), 'unavailable', 'all zeros are no known figures');
+  assert.deepEqual(itemTotal(parent, [parent, part({ stats: { ...known, frozen: true }, usageState: 'failed' })]), { agentMs: 30, tokens: 300, costUsd: 3 },
+    'figures frozen at merge are complete, whatever the read says');
+  assert.equal(itemTotal(parent, [parent, part({ usageState: 'current' })]), null, 'threads read in full with no usage add nothing');
+  assert.equal(itemTotal(parent, [parent, part({ threads: [], stats: 'unavailable' })]), null, 'an item with no threads is never unavailable');
+  assert.equal(itemTotal(parent, [parent, part({ threads: [] })]), null, 'an item with no threads has nothing to wait for');
+  assert.deepEqual(itemTotal(parent, [parent, part({ stats: known, usageState: 'current' })]), { agentMs: 30, tokens: 300, costUsd: 3 }, 'every member current reads as complete');
+});
+
 const sample = JSON.parse(readFileSync(new URL('../test/sample.json', import.meta.url), 'utf8')) as BoardData;
 
 test('stale when the last read failed or is too old', () => {

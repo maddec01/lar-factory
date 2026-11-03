@@ -5,7 +5,7 @@
 import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
-import { AgentWork, ItemTitle, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
+import { AgentWork, INCOMPLETE_TOTAL, ItemTitle, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
@@ -38,12 +38,12 @@ export function ConceptState({ state }: { state: { complete: boolean; reasons: s
   return <span title={names || undefined}>{state.complete ? 'Complete' : text}</span>;
 }
 
-/** The concept's own figures and its total, each labelled; a total that isn't usable leaves the own figures alone. */
+/** The concept's own figures and its total, each labelled; a total with no figures says it is incomplete, beside the own figures. */
 export function ConceptWork({ item }: { item: Item }) {
   const total = itemTotal(item, useBoardStore((state) => state.data.items));
   return <>
     <AgentWork item={item} label="Own cost" />
-    {total && total !== 'unavailable' && <AgentWork item={item} stats={total} label="Total on the board" />}
+    {total === 'unavailable' ? <p data-total-incomplete className="m-0 text-xs text-(--muted-foreground)">{INCOMPLETE_TOTAL}</p> : total && <AgentWork item={item} stats={total} label="Total on the board" />}
   </>;
 }
 

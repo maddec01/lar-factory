@@ -6,7 +6,7 @@
 
 import { duration, formatTokens, formatUsd, itemTotal } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats } from '@lar-factory/shared';
-import { hasFigures, useLastKnown } from '../items/item-parts.tsx';
+import { hasFigures, INCOMPLETE_TOTAL, useLastKnown } from '../items/item-parts.tsx';
 import { statsOf } from './stage-track.tsx';
 
 /** A stage row's action slot follows these, in the row's own 10rem and gap; a dock row has it as its last column. */
@@ -18,16 +18,22 @@ export const FIGURES_COLUMN = 'hidden w-38 min-w-0 shrink-0 @6xl:grid';
 /** What a row's action slot holds, centred and against its right edge; `.row-action` makes its buttons 32 px. */
 export const ROW_ACTION = 'row-action flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-[11px] text-(--muted-foreground)';
 
-/** The agent figures: a Dossier's total (parent plus parts), else the item's own; null when there are none. */
+/** The agent figures: a Dossier's total (parent plus parts), else the item's own; null when there are none. A total with no figures to show is empty and incomplete. */
 export const figuresOf = (item: Item, data: BoardData, total?: boolean): ItemStats | null => {
   const sum = total ? itemTotal(item, data.items) : null;
-  return sum === null ? statsOf(item) : sum === 'unavailable' ? null : sum;
+  return sum === null ? statsOf(item) : sum === 'unavailable' ? { agentMs: 0, tokens: 0, incomplete: true } : sum;
 };
 
-/** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. Its tooltip says when they are the last ones seen. */
+/** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. An incomplete total says so beside them, and its tooltip says why, as it does when they are the last ones seen. */
 export function Figures({ s, item }: { s: ItemStats | null; item: Item }) {
   const lastKnown = useLastKnown(item);
-  if (!s || !hasFigures(s)) return <span />;
-  const text = [duration(s.agentMs), formatTokens(s.tokens), s.costUsd !== undefined ? formatUsd(s.costUsd) : null].filter(Boolean).join(' · ');
-  return <span className="truncate text-right text-[11px] tabular-nums text-(--muted-foreground)" title={s.frozen ? 'Agent time · tokens · cost, as it stood at merge' : `Agent time · tokens · cost${lastKnown ? `. ${lastKnown}` : ''}`}>{text}</span>;
+  if (!s || !(hasFigures(s) || s.incomplete)) return <span />;
+  const text = hasFigures(s) ? [duration(s.agentMs), formatTokens(s.tokens), s.costUsd !== undefined ? formatUsd(s.costUsd) : null].filter(Boolean).join(' · ') : null;
+  const title = s.frozen ? 'Agent time · tokens · cost, as it stood at merge' : [text && 'Agent time · tokens · cost', text && lastKnown, s.incomplete && INCOMPLETE_TOTAL].filter(Boolean).join('. ');
+  return (
+    <span className="flex min-w-0 justify-end gap-1 text-[11px] tabular-nums text-(--muted-foreground)" title={title}>
+      {text && <span className="truncate">{text}</span>}
+      {s.incomplete && <span className="shrink-0">{text ? '· partial' : 'Incomplete'}</span>}
+    </span>
+  );
 }

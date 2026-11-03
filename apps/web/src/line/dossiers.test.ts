@@ -349,8 +349,8 @@ test('the line has no stage track and no repository dots; the agent figures sit 
   await mountPage();
   expect(header().querySelector('[class*="rounded-full"]:not([data-part-bar] li):not([data-chip]):not([data-chip] *)')).toBeNull();
   const figures = col('figures').firstElementChild!;
-  expect([figures.children.length, text(figures), figures.className.split(' ')], "#200's parts' figures, one truncating line").toEqual([0, '1h 31m · 6.23M · $9.11', expect.arrayContaining(['truncate'])]);
-  await receive({ ...sample, items: sample.items.map((i) => ({ ...i, stats: undefined })) });
+  expect([figures.children.length, text(figures), figures.children[0]!.className.split(' ')], "#200's parts' figures, one truncating line").toEqual([1, '1h 31m · 6.23M · $9.11', expect.arrayContaining(['truncate'])]);
+  await receive({ ...sample, items: sample.items.map((i) => ({ ...i, stats: undefined, threads: [] })) });
   expect(text(col('figures')), 'no figures, an empty column').toBe('');
 });
 
@@ -1020,6 +1020,22 @@ test('a failed family marks its own known figures last known while the board rea
   const figures = (id: string) => step(id).querySelector<HTMLElement>('[data-part-meta] [title^="Agent time"]')!;
   expect(figures('I_sample10').title).toContain("Last known figures: T3 Code's usage can't be read now.");
   expect(figures('I_sample12').title).not.toContain('Last known');
+});
+
+const dossierTotal = () => dossier().querySelector<HTMLElement>('[data-col="figures"] [title]')!;
+
+test('a Dossier total marks a sum with a failed part partial and says why', async () => {
+  const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
+  await mountPage(withItem('I_sample10', { stats: usage, usageState: 'failed' }, withItem('I_sample12', { stats: usage, usageState: 'current' })));
+  expect(text(dossierTotal())).toContain('$');
+  expect(text(dossierTotal())).toContain('· partial');
+  expect(dossierTotal().title).toContain('This total is incomplete');
+});
+
+test('a Dossier total with a loading part and no figures for it gives no sum and says incomplete', async () => {
+  await mountPage(withItem('I_sample10', { stats: undefined, usageState: 'loading', threads: [partThread] }));
+  expect(text(dossierTotal())).toBe('Incomplete');
+  expect(dossierTotal().title).toBe("This total is incomplete: usage for part of it is still loading or can't be read.");
 });
 
 test('a part with no figures yet says its usage can\'t be read', async () => {

@@ -54,6 +54,8 @@ export interface LinkedPr extends Pipeline {
   body?: string;
   /** When the PR merged, to pick the latest merged PR's block; absent or null when not merged or not read. */
   mergedAt?: string | null;
+  /** Known only from the work record, so its checks, merge state and draft flag are placeholders nothing read. */
+  pipelineUnread?: true;
 }
 
 /** Counts over all of a PR's checks, required or not. */
@@ -851,13 +853,14 @@ export function checkState(checks: Checks | null): CheckState | null {
 /** The linked pull request Open PR opens, with its checks and merge state. */
 interface ItemPr {
   url: string;
-  pipeline: Pipeline;
+  /** Null when nothing read the PR's checks and merge state. */
+  pipeline: Pipeline | null;
 }
 
 /** The item's first linked PR; null when it links none. */
 export function itemPr(item: Pick<Item, 'linkedPrs'>): ItemPr | null {
   const pr = item.linkedPrs[0];
-  return pr ? { url: pr.url, pipeline: pr } : null;
+  return pr ? { url: pr.url, pipeline: pr.pipelineUnread ? null : pr } : null;
 }
 
 export function isSlow(checks: Checks, now: number): boolean {

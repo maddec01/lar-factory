@@ -3,7 +3,7 @@
 // PRs and provider fields. Spec sync can update title and brief; it never moves, restructures or blocks work.
 
 import { kindDisagreement, onAzure, parseConceptMap, parseDecisionMethod, refKey, sameRepo, ticketKindOf } from '@lar-factory/shared';
-import type { Blocker, DependencyHold, EffectiveVocabulary, IssueRef, Item, Slice, SliceProgress, SwapKind, TicketKindFacts } from '@lar-factory/shared';
+import type { Blocker, DependencyHold, EffectiveVocabulary, IssueRef, Item, LinkedPr, Slice, SliceProgress, SwapKind, TicketKindFacts } from '@lar-factory/shared';
 import type { Dependency, WorkRecord, WorkRecords } from '@lar-factory/work-records';
 import { workItemUrl } from '../azure/azure-items.ts';
 import { prUrl } from '../config/pr-host.ts';
@@ -32,6 +32,21 @@ function dependencyBlocker(d: Dependency): Blocker {
     evidence: d.evidence, met: d.met, needsReview: d.needsReview, observation };
   return { number: ticketNumber(d.ticket), repo: d.ticket ? d.ticket.slice(0, d.ticket.lastIndexOf('#')) : d.owner, state: d.met ? 'closed' : 'open',
     title: d.need, dependency: hold };
+}
+
+/**
+ * The PRs Open PR and the item dialog link: the recorded PR first, as the one this work delivers, then the ticket's.
+ * The ticket's read of the recorded PR is the richer one when it has it; otherwise the record's last observation gives its state.
+ */
+function linkedPrs(records: WorkRecords, record: WorkRecord, ticket: Item | undefined): LinkedPr[] {
+  const fromTicket = ticket?.linkedPrs ?? [];
+  if (!record.pullRequest) return fromTicket;
+  const url = referenceUrl(record.pullRequest, true);
+  const same = (pr: LinkedPr) => pr.url.toLowerCase() === url.toLowerCase();
+  const observed = records.observations(record.workId).find((o) => o.of === 'pr')?.state as LinkedPr['state'] | undefined;
+  const recorded = fromTicket.find(same) ?? { number: ticketNumber(record.pullRequest), url, state: observed ?? 'open', isDraft: false,
+    checks: null, mergeState: 'checking', pipelineUnread: true };
+  return [recorded, ...fromTicket.filter((pr) => !same(pr))];
 }
 
 const isDone = (record: WorkRecord) => record.status === 'Done';
@@ -93,7 +108,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     const vocabulary = setups.find((setup) => sameRepo(setup.repo, record.repository))?.vocabulary;
     const disagreement = ticket && vocabulary ? kindDisagreement(record, kindFacts(ticket), vocabulary) : null;
     const item: Item = {
-      content: 'ticket', labels: [], linkedPrs: [], ...ticket && { labels: ticket.labels, linkedPrs: ticket.linkedPrs },
+      content: 'ticket', labels: [], linkedPrs: linkedPrs(records, record, ticket), ...ticket && { labels: ticket.labels },
       ...ticket?.labelColors && { labelColors: ticket.labelColors },
       ...ticket?.azure && { azure: ticket.azure }, ...ticket?.sourceOrder !== undefined && { sourceOrder: ticket.sourceOrder },
       ...ticket?.abandonRefusal && { abandonRefusal: ticket.abandonRefusal }, ...ticket?.currentSprint && { currentSprint: ticket.currentSprint },

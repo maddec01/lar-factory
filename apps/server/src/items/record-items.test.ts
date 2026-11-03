@@ -33,6 +33,29 @@ test('ticketless decisions expose their local method as soon as it is written', 
   assert.equal(recordItems(records, [], [REPO])[0]?.decisionMethod, 'prototype');
 });
 
+test("a ticketless build's recorded PR is its linked PR, from the record's last observation, with its pipeline unread", async () => {
+  const records = await open();
+  let build = records.create({ title: 'Ticketless', repository: REPO, kind: 'build' });
+  build = records.setPullRequest(build.workId, build.revision, `${REPO}#835`);
+  const pr = { number: 835, url: `https://github.com/${REPO}/pull/835`, isDraft: false, checks: null, mergeState: 'checking', pipelineUnread: true };
+  assert.deepEqual(recordItems(records, [], [REPO])[0]!.linkedPrs, [{ ...pr, state: 'open' }], 'open until an observation says otherwise');
+  records.observe(build.workId, build.revision, { of: 'pr', state: 'closed' });
+  assert.deepEqual(recordItems(records, [], [REPO])[0]!.linkedPrs, [{ ...pr, state: 'closed' }]);
+});
+
+test("a ticket's linked PRs follow the recorded PR, and the ticket's read of that same PR is the one kept, first", async () => {
+  const records = await open();
+  const linked = (number: number) => ({ number, url: `https://github.com/${REPO}/pull/${number}`, state: 'open' as const, isDraft: false, checks: null, mergeState: 'can merge' as const });
+  const [ticket] = tickets([12, 'Review']);
+  const read = { ...ticket!, linkedPrs: [linked(40), linked(41)] };
+  let work = records.importTicket({ title: 'With a ticket', repository: REPO, kind: 'feature', status: 'Review', ticket: `${REPO}#12` }).record;
+  assert.deepEqual(recordItems(records, [read], [REPO])[0]!.linkedPrs, [linked(40), linked(41)], 'no recorded PR leaves the ticket links alone');
+  work = records.setPullRequest(work.workId, work.revision, `${REPO}#41`);
+  assert.deepEqual(recordItems(records, [read], [REPO])[0]!.linkedPrs, [linked(41), linked(40)]);
+  work = records.setPullRequest(work.workId, work.revision, `${REPO.toUpperCase()}#42`);
+  assert.deepEqual(recordItems(records, [read], [REPO])[0]!.linkedPrs.map((pr) => [pr.number, pr.pipelineUnread]), [[42, true], [40, undefined], [41, undefined]]);
+});
+
 test('recorded work keeps its progress and unpicked tracker issues appear fresh in List', async () => {
   const records = await open();
   const recorded = records.importTicket({ title: 'Recorded', repository: REPO, kind: 'feature', status: 'Queued', ticket: `${REPO}#12` }).record;

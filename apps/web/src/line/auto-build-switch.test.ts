@@ -1,30 +1,31 @@
-// The Shaping header's Auto-build switch: off until the board says it's on, disabled in sample mode, and saved on the
+// The Ready to build header's Auto-build switch: off until the board says it's on, disabled in sample mode, and saved on the
 // board server when pressed.
 
 import { expect, test } from 'vite-plus/test';
 import type { BoardData } from '@lar-factory/shared';
 import { $, answer, holdPosts, mountPage, posted, sample, settle, text, toast } from '../../test/support.ts';
 
-const control = () => $<HTMLButtonElement>('[data-stage="shaping"] header [role="switch"][aria-label="Auto-build"]')!;
+const control = () => $<HTMLButtonElement>('[data-stage="ready"] header [role="switch"][aria-label="Auto-build"]')!;
 const on = () => control().getAttribute('aria-checked') === 'true';
 const live = (autoBuild: BoardData['autoBuild']): BoardData => ({ ...sample, capture: { session: 's1', enabled: true }, autoBuild });
 
-test('the switch sits in the Shaping header, off for a board with Auto-build off', async () => {
+test('the switch sits in the Ready to build header, off for a board with Auto-build off', async () => {
   await mountPage(live({ on: false }));
-  expect(text($('[data-stage="shaping"] header .auto-build'))).toBe('Auto-build');
+  expect(text($('[data-stage="ready"] header .auto-build'))).toBe('Auto-build');
+  expect($('[data-stage="shaping"] header .auto-build')).toBeNull();
   expect([on(), control().disabled]).toEqual([false, false]);
 });
 
 test('the switch is disabled in sample mode, which has no Auto-build', async () => {
   await mountPage(sample);
   expect([on(), control().disabled]).toEqual([false, true]);
-  expect($('[data-stage="shaping"] header .auto-build')!.title).toBe('Disabled in sample mode');
+  expect($('[data-stage="ready"] header .auto-build')!.title).toBe('Disabled in sample mode');
 });
 
 test("a file the board can't use shows the switch off with why", async () => {
   await mountPage(live({ on: false, problem: "The Auto-build setting /data/auto-build.json isn't JSON." }));
   expect(on()).toBe(false);
-  expect($('[data-stage="shaping"] header .auto-build')!.title).toBe("The Auto-build setting /data/auto-build.json isn't JSON. Turning it on replaces the file.");
+  expect($('[data-stage="ready"] header .auto-build')!.title).toBe("The Auto-build setting /data/auto-build.json isn't JSON. Turning it on replaces the file.");
 });
 
 test('pressing the switch saves it and shows the board the server answers with', async () => {
@@ -50,8 +51,8 @@ test("a refused save leaves the switch as the board has it and says why", async 
   expect(text(toast())).toContain("Can't save the Auto-build setting /data/auto-build.json: EACCES.");
 });
 
-const header = () => $('[data-stage="shaping"] header .auto-build')!;
-const holdShown = () => $('[data-stage="shaping"] header [data-auto-build-hold]');
+const header = () => $('[data-stage="ready"] header .auto-build')!;
+const holdShown = () => $('[data-stage="ready"] header [data-auto-build-hold]');
 
 test('the tooltip says how many builds would start now', async () => {
   await mountPage({ ...live({ on: false }), autoBuildPass: { wouldStart: 2, paused: {}, waitsForRefinement: [] } });

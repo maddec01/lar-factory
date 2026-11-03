@@ -1,4 +1,4 @@
-// Auto-build on the board: this machine's switch, from the Shaping header, and the model Settings chose for it.
+// Auto-build on the board: this machine's switch, from the Ready to build header, and the model Settings chose for it.
 
 import type { AutoBuild, AutoBuildState, ModelGroup } from '@lar-factory/shared';
 import { readAutoBuild, writeAutoBuild, WorkRecordError } from '@lar-factory/work-records';

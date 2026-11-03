@@ -1,4 +1,4 @@
-// The Shaping, Ready to build and Build sections. Shaping's header holds the Auto-build switch, and Build's counts the
+// The Shaping, Ready to build and Build sections. Ready to build's header holds the Auto-build switch, and Build's counts the
 // factory's builds at work against the build limit.
 
 import { activityUnavailable, buildsAtWork, limitNumber } from '@lar-factory/shared';
@@ -19,7 +19,7 @@ function Rows({ rows }: { rows: Row[] }) {
 export function Shaping({ shaping, shows }: { shaping: Row[]; shows: Shows }) {
   const rows = shaping.filter(shows);
   return (
-    <Pane id="shaping" title="Shaping" status="Shaping" count={rows.length} right={<AutoBuildSwitch />}>
+    <Pane id="shaping" title="Shaping" status="Shaping" count={rows.length}>
       {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={shaping.length > 0} none="Nothing in shaping.">Nothing in shaping matches.</PaneEmpty>}
     </Pane>
   );
@@ -28,7 +28,7 @@ export function Shaping({ shaping, shows }: { shaping: Row[]; shows: Shows }) {
 export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
   const rows = ready.filter(shows);
   return (
-    <Pane id="ready" title="Ready to build" status="Ready" count={rows.length}>
+    <Pane id="ready" title="Ready to build" status="Ready" count={rows.length} right={<AutoBuildSwitch />}>
       {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={ready.length > 0} none="Nothing ready to build.">Nothing ready to build matches.</PaneEmpty>}
     </Pane>
   );

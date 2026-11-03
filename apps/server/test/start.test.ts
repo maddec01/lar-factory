@@ -242,6 +242,8 @@ test('Start only runs for Queued issues from this board page and session', async
   for (const origin of ['https://evil.example', 'null', '']) assert.equal((await start(board, board.id(14), origin)).status, 403);
   const sample = await startBoard(t, {}, true);
   assert.equal((await start(sample, 'I_sample05')).status, 403);
+  assert.equal((await sample.postSession({ itemId: 'I_sample05', purpose: 'shape' }, '/api/dismiss-start-error')).status, 403);
+  assert.equal((await board.postSession({ itemId: board.id(14), purpose: 'other' }, '/api/dismiss-start-error')).status, 422);
   assert.deepEqual([...await board.t3Calls(), ...await sample.t3Calls()], []);
 });
 

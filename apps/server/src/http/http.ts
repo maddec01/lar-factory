@@ -224,6 +224,10 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),
       run: forItem('Name the build to start.', (itemId, input) => commands.startBuild(itemId, input.model, input.drift)),
     },
+    '/api/dismiss-start-error': {
+      what: 'the start error to dismiss', disabled: 'Starting threads is disabled in sample mode.',
+      run: forItem('Name the item whose start error to dismiss.', async (itemId, input) => commands.dismissStartError(itemId, input.purpose)),
+    },
     '/api/arm': {
       what: 'the item to start after its blockers', disabled: 'Start after is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Start after again.' }),

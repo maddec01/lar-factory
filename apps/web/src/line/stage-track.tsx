@@ -1,7 +1,7 @@
 // The line's stages: the five-stage track a dossier's parts show, and what the line says of an item's thread and of an
 // item that waits on you.
 
-import { clock } from '@lar-factory/shared';
+import { clock, currentBuildThread, delegatedWorkRunning } from '@lar-factory/shared';
 import type { Item, ItemStats, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
 
@@ -25,9 +25,17 @@ const THREAD_TEXT: Record<ThreadState, string> = {
   running: 'Thread running', 'needs you': 'Thread needs you', stopped: 'Run stopped', done: 'Run finished',
 };
 export function threadText(item: Item, working: boolean): string {
+  const latest = Array.isArray(item.threads) ? item.threads[0] : undefined;
+  // A build's own run can end while its slices or children work on, and a shaping run's children too; say both.
+  const parent = (Array.isArray(item.threads) && currentBuildThread(item)) || latest;
+  if (parent && !parent.observedAt && (parent.state === 'done' || parent.state === 'stopped')) {
+    const ended = `parent ${THREAD_TEXT[parent.state].toLowerCase()}`;
+    if (delegatedWorkRunning(item) || parent.hasRunningChildren) return working ? `${ended.charAt(0).toUpperCase()}${ended.slice(1)}` : `Working, ${ended}`;
+    // A live child that isn't running hasn't finished either, though it isn't Working.
+    if (parent.hasLiveChildren) return `${THREAD_TEXT[parent.state]}, child waiting`;
+  }
   if (working) return THREAD_TEXT.running;
   if (item.threads === 'unavailable') return 'Thread unavailable';
-  const latest = item.threads?.[0];
   return latest ? `${THREAD_TEXT[latest.state]}${lastSeen(latest)}` : 'Not started';
 }
 

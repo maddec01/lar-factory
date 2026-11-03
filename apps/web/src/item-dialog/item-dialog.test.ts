@@ -390,7 +390,8 @@ test('Shape issue opens the model menu, and picking a model starts the item and 
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   expect(text(button('start', 'I_sample05'))).toBe('Starting…');
 
-  await answer({ thread: { threadId: 'thread-1', title: 'Other title' }, error: null });
+  const thread = { threadId: 'thread-1', title: 'Other title' };
+  await answer({ thread, error: null, board: { ...withChoices, started: { I_sample05: thread } } });
   const tag = inDialog('[data-start-result="I_sample05"]')!;
   expect(text(tag)).toBe('Started');
   expect(document.activeElement, 'focus moves to the dialog’s tag').toBe(tag);
@@ -425,7 +426,8 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
   await settle(() => vi.advanceTimersByTime(20));
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
   expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13' }]]);
-  await answer({ thread: { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' }, error: null });
+  const thread = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
+  await answer({ thread, error: null, board: { ...readyBuild, startedBuilds: { I_sample13: thread } } });
   expect(text(inDialog('[data-start-result="I_sample13"]'))).toBe('Started');
 });
 

@@ -25,7 +25,7 @@ export type Notice =
   /** The ticket of work Abandon set aside closed. */
   | { verb: 'Closed'; item: Item }
   /** A Queued card's Move to List (`to`), Abandon, or the ticket close after it (`ticket`) failed. */
-  | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; message: string }
+  | { verb: 'Failed'; item: Item; to?: Status; ticket?: true; startError?: true; message: string }
   | { verb: 'Started'; item: Item; thread: StartedThread; kind: StartKind };
 
 /** Notices share one toast: a new one replaces the last. */
@@ -52,10 +52,10 @@ function toastOf(notice: Notice): Toast {
     case 'Failed':
       return {
         slot: SLOT, failed: true, what: `error for ${ref(item)}`,
-        body: <>Couldn't {notice.to ? <>move <TitleLink item={item} /> to {notice.to}</> : notice.ticket ? <>close the ticket of <TitleLink item={item} /></>
+        body: <>Couldn't {notice.startError ? <>clear the start error of <TitleLink item={item} /></> : notice.to ? <>move <TitleLink item={item} /> to {notice.to}</> : notice.ticket ? <>close the ticket of <TitleLink item={item} /></>
           : <>abandon <TitleLink item={item} /></>}. {notice.message}</>,
         // Back to the button that failed.
-        focusAfter: [`[data-${notice.to ? 'back-to-list' : 'abandon'}="${CSS.escape(item.id)}"]`],
+        focusAfter: [`[data-${notice.startError ? 'start' : notice.to ? 'back-to-list' : 'abandon'}="${CSS.escape(item.id)}"]`],
       };
     case 'Started': {
       const environment = useBoardStore.getState().data.t3EnvironmentId;

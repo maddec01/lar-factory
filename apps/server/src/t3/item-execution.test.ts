@@ -41,6 +41,15 @@ describe('recorded thread lookup', () => {
     expect(executionItemThreads([parent, child])(['root'])?.[0]).toMatchObject({ hasRunningChildren: true, hasLiveChildren: true });
     expect(executionItemThreads([parent, { ...child, status: 'waiting' }])(['root'])?.[0]).not.toHaveProperty('hasRunningChildren');
   });
+  it('keeps a finished thread at work while it or a descendant has background tasks, without holding a start', () => {
+    const parent = { ...shell, status: 'completed' };
+    const child = { ...shell, id: 'child', status: 'completed', lineage: { parentThreadId: 'root' }, pendingBackgroundTasks: [{ kind: 'subagent' }] };
+    const [own] = executionItemThreads([{ ...parent, pendingBackgroundTasks: [{ kind: 'shell' }] }])(['root'])!;
+    expect(own).toMatchObject({ state: 'done', hasRunningChildren: true });
+    expect(own).not.toHaveProperty('hasLiveChildren');
+    expect(executionItemThreads([parent, child])(['root'])?.[0]).toMatchObject({ state: 'done', hasRunningChildren: true });
+    for (const noSignal of [[], { kind: 'shell' }, undefined]) expect(executionItemThreads([{ ...parent, pendingBackgroundTasks: noSignal }])(['root'])?.[0]).not.toHaveProperty('hasRunningChildren');
+  });
   it('marks a queued thread, still done, and holds its ancestors as live', () => {
     const parent = { ...shell, status: 'idle' };
     const child = { ...shell, id: 'child', status: 'idle', lineage: { parentThreadId: 'root', rootThreadId: 'root' } };

@@ -858,6 +858,8 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
       const nextKind = kind === undefined ? undefined : checkKind(kind);
       const agreed = agreedTicketKind === undefined ? undefined : checkKind(agreedTicketKind);
       return change(workId, revision, (row) => {
+        // A Status the record already has writes nothing, so an agent's later call is harmless.
+        if ((nextStatus ?? row.status) === row.status && (nextKind ?? row.kind) === row.kind && (agreed ?? row.agreed_ticket_kind) === row.agreed_ticket_kind) return null;
         if (nextKind && nextKind !== row.kind) {
           const child = { work_id: row.work_id, kind: nextKind };
           if (row.parent_id) checkOwns(find(row.parent_id), child);
@@ -1182,16 +1184,17 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         if (threadId) insertThread(workId, threadId, row.purpose);
         if (threadId && row.shaping_thread_cleanup) addCleanupRows(workId, row.shaping_thread_cleanup);
         resolveIntent.run(threadId, failure, new Date().toISOString(), intentId);
+        // The board owns the launch's move, so it doesn't wait for the agent's setup.
+        const launched: Partial<Row> = threadId && row.purpose === 'shape' && work.status === 'Queued' ? { status: 'Shaping', queue_order: null }
+          : threadId && row.purpose === 'build' && work.status === 'Ready' ? { status: 'In progress', queue_order: null } : {};
         const staged = db.prepare('SELECT recovery FROM launch_intents WHERE intent_id = ?').get(intentId)?.recovery;
         if (threadId && staged) {
           const recovery = JSON.parse(String(staged)) as { branch: string; reset: boolean };
           if (recovery.reset) resetOwnedBuild(workId, work, touched);
           db.prepare('UPDATE work_records SET build_branch = ? WHERE work_id = ?').run(recovery.branch, workId);
-          return { ...(recovery.reset ? { build_phase: null } : {}), needs_you: null, needs_you_causes: null };
+          return { ...launched, ...(recovery.reset ? { build_phase: null } : {}), needs_you: null, needs_you_causes: null };
         }
-        // The board owns the launch transition; the agent may take time to read its instructions.
-        if (threadId && row.purpose === 'shape' && work.status === 'Queued') return { status: 'Shaping', queue_order: null };
-        return {};
+        return launched;
       });
       return { record, intent: intent(intentId) };
     },

@@ -4,10 +4,11 @@
 
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, activityUnavailable, buildActivity, workingAgain, checkState, decisionType, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
+import { UNREADABLE, activityUnavailable, buildActivity, startProgressOf, workingAgain, checkState, decisionType, duration, formatTokens, formatUsd, itemName, prLabel, ref, labelsOnRow, repoName, sameRepo } from '@lar-factory/shared';
 import type { AzureWorkItem, Checks, Item, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
+import { PURPOSE, useStart } from './start-store.ts';
 import { tint } from './label-tint.ts';
 import { PrReadiness } from './pr-readiness.tsx';
 import { STATUS_COLOR } from './status-glyph.tsx';
@@ -218,7 +219,12 @@ export function StructureSync({ item }: { item: Item }) {
 export const useActivityUnavailable = () => useBoardStore(({ data, now, clientError }) => activityUnavailable(data, now, clientError));
 
 export function useActivityFeedback(item: Item) {
-  return buildActivity(item, useActivityUnavailable());
+  const data = useBoardStore((state) => state.data);
+  // Shaping work has an activity only while a start runs; Start build's holds every other status.
+  const kind = item.status === 'Shaping' || item.status === 'Queued' ? 'refine' : 'build';
+  const pressed = useStart(item.id, kind)?.phase === 'pending';
+  const unavailable = useActivityUnavailable();
+  return buildActivity(item, unavailable, pressed ? { phase: 'starting' } : startProgressOf(data, item.id, PURPOSE[kind]));
 }
 
 /** How the board names an item now: its recorded Status, or Working while it is at work again. */

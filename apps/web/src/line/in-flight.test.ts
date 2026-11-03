@@ -79,7 +79,7 @@ test('line 1 shows the status glyph, the numbered title and muted meta: status, 
   const title = row('I_sample13').querySelector('[data-title]')!;
   expect([text(title), title.getAttribute('title')]).toEqual(['#140 Owner accounts', 'Owner accounts']);
   expect(row('I_sample13').querySelector('[data-glyph] svg'), 'the status glyph sits in the chevron\'s place').not.toBeNull();
-  expect([...meta('I_sample13').children].map(text)).toEqual(['Review · Run finished · lar-server', 'blocked by 1. Blocked by #202 until it completes']);
+  expect([...meta('I_sample13').children].map(text)).toEqual(['Review · Working, parent run finished · lar-server', 'blocked by 1. Blocked by #202 until it completes']);
   expect(text(meta('I_sample13').querySelector('.sr-only')), 'what blocks it is read out, not only a hover title').toBe('. Blocked by #202 until it completes');
   expect(meta('I_sample13').lastElementChild!.outerHTML).toContain('danger');
   expect([...meta('I_sample14').children].map(text), 'a linked PR follows the repository, then the kind and labels').toEqual(['In progress · Thread running · lar-apple', 'PR #33 (draft)', 'Feature', 'os: macos', 'good first issue']);
@@ -290,7 +290,7 @@ test('Start build sends the build with the chosen model, then shows the thread i
   expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   expect([text(startBuild()), startBuild().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
   const started = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
-  await answer({ thread: started, error: null });
+  await answer({ thread: started, error: null, board: { ...unblocked(), startedBuilds: { I_sample13: started } } });
   const tag = row('I_sample13').querySelector('[data-start-result]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread thread-1']);
   expect(startBuild()).toBeNull();
@@ -319,12 +319,53 @@ test('a Start build that may have run hides Start build; closing its message lea
   await mountPage(unblocked());
   await pressMenu(startBuild());
   await press(entries()[0]!);
-  await answer({ thread: null, uncertain: true, error: 'Check T3.' });
+await answer({ thread: null, uncertain: true, error: 'Check T3.', board: { ...unblocked(), startProgress: { I_sample13: { build: { phase: 'may-have-started', message: 'Check T3.' } } } } });
   expect(startBuild()).toBeNull();
   const message = row('I_sample13').closest('[data-flight], .desk-card')!.querySelector<HTMLElement>('p.start[data-start-result]')!;
   expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
   await press(message.querySelector('button.dismiss')!);
   expect(text(row('I_sample13').querySelector('.started-tag.unsure'))).toBe('May have started');
+});
+
+test('active slices read as Working after the parent run ended, keeping that detail', async () => {
+  const board = unblocked();
+  const slice = (progress: 'active' | 'done') => ({ number: 1, title: 'Slice', url: '', repo: 'maddec01/lar-server', state: 'open' as const, progress });
+  const withSlice = (progress: 'active' | 'done'): BoardData => ({ ...board, items: board.items.map((i) => i.id === 'I_sample13' ? { ...i, status: 'In progress' as const, statuses: ['In progress' as const], buildPhase: 'implement', slices: [slice(progress)], threads: [{ id: 'b1', title: 'Build', state: 'done' as const, purpose: 'build', updated: '2026-10-31T00:00:00Z' }] } : i) });
+  await mountPage(withSlice('active'));
+  expect(text(row('I_sample13').querySelector('[data-meta]'))).toContain('Working, parent run finished');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(withSlice('done')));
+  expect(text(row('I_sample13').querySelector('[data-meta]'))).toContain('Run finished');
+  expect(text(row('I_sample13').querySelector('[data-meta]'))).not.toContain('Working');
+});
+
+test('a descendant holds Run finished back: Working while it runs, and waiting while it is only live', async () => {
+  const board = unblocked();
+  const at = (more: Partial<ItemThread>): BoardData => ({ ...board, items: board.items.map((i) => i.id === 'I_sample13' ? { ...i, status: 'In progress' as const, statuses: ['In progress' as const], buildPhase: 'implement', slices: [], threads: [{ id: 'b1', title: 'Build', state: 'done' as const, purpose: 'build', updated: '2026-10-31T00:00:00Z', ...more }] } : i) });
+  await mountPage(at({ hasRunningChildren: true, hasLiveChildren: true }));
+  expect(text(row('I_sample13').querySelector('[data-meta]'))).toContain('Working, parent run finished');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(at({ hasLiveChildren: true })));
+  expect(text(row('I_sample13').querySelector('[data-meta]'))).toContain('Run finished, child waiting');
+  await settle(() => useBoardStore.getState().receive(at({})));
+  expect(text(row('I_sample13').querySelector('[data-meta]'))).toContain('Run finished ·');
+});
+
+test('a moved build whose thread stopped before a phase offers Retry start, with Starting on its row while it runs', async () => {
+  const moved = (extra: Partial<BoardData> = {}): BoardData => {
+    const board = unblocked();
+    return { ...board, ...extra, items: board.items.map((i) => i.id === 'I_sample13' ? { ...i, status: 'In progress' as const, statuses: ['In progress' as const], buildPhase: null, slices: [], threads: [{ id: 'b1', title: 'Build', state: 'stopped' as const, purpose: 'build', updated: '2026-10-31T00:00:00Z' }] } : i) };
+  };
+  holdPosts(moved());
+  await mountPage(moved());
+  expect(text(startBuild())).toBe('Retry start ▾');
+  const group = row('I_sample13').querySelector('[data-col="side"] .start-group')!;
+  expect(group.textContent, 'no second line says the run stopped').not.toContain('Run stopped');
+  expect(group.querySelector('a, button:not([data-start])'), 'the stopped thread stays one press away').not.toBeNull();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(moved({ startProgress: { I_sample13: { build: { phase: 'starting' } } } })));
+  expect(text(startBuild())).toBe('Starting…');
+  expect(text(row('I_sample13').querySelector('[data-col="count"]'))).toBe('Starting');
 });
 
 test('a thread Start refining opened this board run is not taken for the build\'s', async () => {
@@ -557,16 +598,22 @@ describe.each(['Verify', 'Ready to merge'] as const)('%s with its build thread r
   test('its row says Working with slices too, and with a running child', async () => {
     await mountPage(at(threads('done', { hasRunningChildren: true }), { slices: [{ number: 1, title: 'One', progress: 'done' }] as Slice[] }));
     expect(desk()).toBeNull();
-    expect(text(meta('I_sample13'))).toMatch(/^Working · Thread running · /);
+    expect(text(meta('I_sample13'))).toMatch(/^Working · Parent run finished · /);
   });
 
   test('it returns to the desk with its Status when the thread stops, with no write', async () => {
     await mountPage(at(running));
-    await receive(at(threads('done')));
+    await receive(at(threads('done'), { slices: [] }));
     expect(text(desk())).toContain(status);
     expect(text(desk()!.querySelector('.desk-actions'))).toContain('Open PR');
     expect($('[data-in-flight] [data-item="I_sample13"]')).toBeNull();
     expect(posted()).toEqual([]);
+  });
+
+  test('it stays in flight as Working while a slice runs after the thread stops', async () => {
+    await mountPage(at(threads('done')));
+    expect(desk()).toBeNull();
+    expect(text(meta('I_sample13'))).toMatch(/^Working · Parent run finished · /);
   });
 
   test('it stays on the desk with an open question, even while a child runs', async () => {

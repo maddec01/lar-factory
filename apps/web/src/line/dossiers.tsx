@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, ChevronDown, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { needsAnswer, openQuestionThread, blockerGroups, blockerRef, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
+import { needsAnswer, openQuestionThread, blockerGroups, blockerRef, canRetryBuild, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -22,6 +22,7 @@ import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
 import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, shownThread, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
+import { StartBuild } from '../items/start-build.tsx';
 import { PartStart, startable } from './part-start.tsx';
 import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
 import { OnYourDesk, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
@@ -183,6 +184,7 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
   if (YOURS.includes(status)) return <OnYourDesk status={status} />;
   if (status === 'Ready' || status === 'Queued') return <span onClick={stop}><PartStart part={part} data={data} label="Start" /></span>;
   if (openWaits(part).length) return <span className="max-w-48 truncate" title={waitsOn(part)}>{waitsOn(part)}</span>;
+  if (canRetryBuild(part.item)) return <span onClick={stop}><StartBuild item={part.item} data={data} /></span>;
   if (['Shaping', 'In progress', 'Review'].includes(status)) return <span onClick={stop}><OpenThread item={part.item} data={data} /></span>;
   return null;
 }
@@ -212,8 +214,8 @@ function PartRow({ part, data }: { part: Part; data: BoardData }) {
         <span className="min-w-0 empty:hidden"><ThreadLine part={part} /></span>
       </span>
       {item.slices.length > 0 && <span className="col-span-2 pl-3.5"><SliceBar item={item} /></span>}
-      {!isDone(item) && (item.status === 'Ready' || item.status === 'Queued') && (
-        <span className="col-span-2 pl-5 empty:hidden" onClick={stop}><StartMessage item={item} kind={item.status === 'Ready' ? 'build' : 'refine'} /><StartAfterError item={item} data={data} /></span>
+      {!isDone(item) && ['Ready', 'Queued', 'In progress'].includes(item.status) && (
+        <span className="col-span-2 pl-5 empty:hidden" onClick={stop}><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /></span>
       )}
     </li>
   );

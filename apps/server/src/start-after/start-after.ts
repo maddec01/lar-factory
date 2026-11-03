@@ -26,6 +26,7 @@ export interface StartAfter {
 
 export interface StartAfterDeps {
   board: BoardState;
+  /** Start after passes `quiet`, as it shows a failure itself. */
   commands: Pick<ItemCommands, 'start' | 'startBuild'>;
   /** Reads the model choices T3 offers now into the board data. */
   offerModelChoices(): ModelGroup[];
@@ -75,7 +76,7 @@ export function createStartAfter({ board, commands, offerModelChoices, file }: S
   async function startNow(item: Item, { model }: ArmedStart): Promise<void> {
     const failed = save(without(armed(), item.id), errors());
     if (failed) return log(failed);
-    const { body } = await (item.status === 'Ready' ? commands.startBuild(item.id, model) : commands.start(item.id, model));
+    const { body } = await (item.status === 'Ready' ? commands.startBuild(item.id, model, undefined, true) : commands.start(item.id, model, true));
     const { error } = body as { error?: string | null };
     if (!error) return log(`started #${item.number} after its blockers completed`);
     log(`could not start #${item.number} after its blockers completed: ${error}`);

@@ -69,6 +69,6 @@ for (const { kind, start, finish } of BLOCKERS) {
     finish(records, blocker.workId);
     reread();
     await startAfter.startUnblocked();
-    assert.deepEqual(started, [[work.workId, undefined]]);
+    assert.deepEqual(started, [[work.workId, undefined, true]]);
   });
 }

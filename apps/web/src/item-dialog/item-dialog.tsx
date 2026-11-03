@@ -13,7 +13,7 @@ import { useEditStore } from '../repositories/edit-store.ts';
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { currentBuildThread, needsAnswer, openQuestionThread, writeAccessProblem, HINTS, blockedText, canResumeShaping, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
+import { currentBuildThread, needsAnswer, openQuestionThread, writeAccessProblem, HINTS, blockedText, canResumeShaping, canRetryBuild, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -56,7 +56,8 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
       return <StartOrAfter item={item} data={data} label="Shape issue" />;
     case 'Ready': return <StartBuild item={item} data={data} />;
     case 'Shaping': return canResumeShaping(item) ? <StartOrAfter item={item} data={data} label="Resume shaping" /> : <OpenThread item={item} data={data} />;
-    case 'In progress': case 'Review': return <OpenThread item={item} data={data} />;
+    case 'In progress': if (canRetryBuild(item)) return <StartBuild item={item} data={data} />; return <OpenThread item={item} data={data} />;
+    case 'Review': return <OpenThread item={item} data={data} />;
     case 'Needs you': return <OpenThread item={item} data={data} label="Answer in T3" />;
     case 'Verify': return <PrLink item={item} label="Verify build" />;
     case 'Ready to merge': return <PrLink item={item} label="Merge PR" />;
@@ -160,7 +161,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
             {ticket && <ItemComments itemId={item.id} read={read} now={now} ticketContext={Boolean(record)} className="@min-[45rem]:col-start-1" />}
           </div>
           <ActionError item={item} />
-          <StartMessage item={item} kind={item.status === 'Ready' ? 'build' : 'refine'} />
+          <StartMessage item={item} kind={item.status === 'Ready' || item.status === 'In progress' ? 'build' : 'refine'} />
           <StartAfterError item={item} data={data} />
         </div>
       </Modal.Body>

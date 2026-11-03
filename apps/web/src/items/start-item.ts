@@ -1,14 +1,14 @@
 // Start shaping or building with the chosen model. Existing skill edits stay in place.
 
 import { flushSync } from 'react-dom';
-import { remembersChoice, startRequest } from '@lar-factory/shared';
+import { remembersChoice, startProgressOf, startRequest } from '@lar-factory/shared';
 import type { ModelChoice, StartResult } from '@lar-factory/shared';
 import { useActionStore } from './action-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from './card-actions.ts';
 import { refocus } from '../notices/toasts.tsx';
 import { notify } from '../notices/notices.tsx';
-import { startOf, useStartStore } from './start-store.ts';
+import { PURPOSE, startOf, useStartStore } from './start-store.ts';
 import type { StartKind } from './start-store.ts';
 
 const PATH: Record<StartKind, string> = { refine: '/api/start', build: '/api/start-build' };
@@ -23,8 +23,9 @@ export async function startItem(itemId: string, choice?: ModelChoice, kind: Star
   });
   flushSync(() => {
     receive(result);
-    starts.set(itemId, result.thread ? { phase: 'started', thread: result.thread }
-      : { phase: result.uncertain ? 'uncertain' : 'error', message: result.error ?? 'The thread did not start.' }, kind);
+    // The board says how the start went. This page keeps only an error the board doesn't hold: an unreachable server's, or a restarted one's.
+    const held = result.board && startProgressOf(result.board, itemId, PURPOSE[kind]);
+    starts.set(itemId, !result.error || result.uncertain || held ? undefined : { phase: 'error', message: result.error }, kind);
     // A refused or failed start keeps the previous choice.
     if (remembersChoice(result)) starts.remember(choice);
     const item = useBoardStore.getState().data.items.find((i) => i.id === itemId);

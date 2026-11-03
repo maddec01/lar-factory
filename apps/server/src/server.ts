@@ -326,7 +326,7 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
       const observed = protocolItemThreads(ids);
       const current = Array.isArray(observed) ? observed.filter(t => !t.observedAt) : [];
       const progress = !ids.length ? 'waiting'
-        : current.some(t => t.state === 'running' || t.hasLiveChildren) ? 'active'
+        : current.some(t => t.state === 'running' || t.hasLiveChildren || t.hasRunningChildren) ? 'active'
         : current.some(t => t.state === 'needs you') ? 'blocked'
         : current.length !== ids.length ? 'unknown' : 'waiting';
       return { ...slice, progress };
@@ -782,7 +782,7 @@ const reread = () => {
   showRecords();
   board.push();
 };
-const commands = createItemCommands({ board, items, records, reread, archive, offerModelChoices, checkSkills: parentSkillCheck() });
+const commands = createItemCommands({ clearedFailuresFile: fixture ? null : join(boardDataDir(), 'cleared-start-failures.json'), board, items, records, reread, archive, offerModelChoices, checkSkills: parentSkillCheck() });
 const adding = createCapture({ board, items, records, reread, repos: () => board.snapshot().repos });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });

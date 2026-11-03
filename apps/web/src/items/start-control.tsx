@@ -7,32 +7,46 @@ import { useId, useRef, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import type { SyntheticEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { canResumeShaping, itemName, ref, highlightedChoice, storedChoice } from '@lar-factory/shared';
+import { canResumeShaping, canRetryBuild, currentBuildThread, delegatedWorkRunning, itemName, ref, highlightedChoice, startProgressOf, storedChoice } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ICON, kind as buttonKind } from '../buttons/button-kinds.tsx';
 import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
+import { useBoardStore } from '../board/board-store.ts';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './item-actions.tsx';
 import { OpenThread } from './open-thread.tsx';
 import { startItem } from './start-item.ts';
-import { useStart, useStartStore } from './start-store.ts';
-import type { StartKind, StartState } from './start-store.ts';
+import { postAction, receive } from './card-actions.ts';
+import { PURPOSE, useStart, useStartStore } from './start-store.ts';
+import type { StartKind } from './start-store.ts';
+import { notify } from '../notices/notices.tsx';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 
 /**
  * The T3 thread Start opened for the item, from this page, another one or the board server's Start after. The
  * board data keeps refining threads and build threads apart, so a refined item's shaping thread is no build.
  */
-function startedThread(item: Item, data: BoardData, start: StartState | undefined, kind: StartKind) {
-  return (kind === 'refine' ? data.started : data.startedBuilds)?.[item.id] ?? (start?.phase === 'started' ? start.thread : undefined);
+function startedThread(item: Item, data: BoardData, kind: StartKind) {
+  return (kind === 'refine' ? data.started : data.startedBuilds)?.[item.id];
+}
+
+/** The item's start as the row shows it: this page's press at once, then what the server says. */
+function useShownStart(item: Item, data: BoardData, kind: StartKind) {
+  const local = useStart(item.id, kind);
+  const server = startProgressOf(data, item.id, PURPOSE[kind]);
+  return {
+    pending: local?.phase === 'pending' || server?.phase === 'starting',
+    uncertain: server?.phase === 'may-have-started',
+    error: server?.phase === 'failed' ? server.message : local?.phase === 'error' ? local.message : undefined,
+  };
 }
 
 /** Whether Start is in flight, uncertain or done, which takes Move to List and Abandon away. */
 export function useStartHolds(item: Item, data: BoardData): boolean {
-  const start = useStart(item.id);
-  return Boolean(startedThread(item, data, start, 'refine')) || start?.phase === 'uncertain' || start?.phase === 'pending';
+  const { pending, uncertain } = useShownStart(item, data, 'refine');
+  return Boolean(startedThread(item, data, 'refine')) || uncertain || pending;
 }
 
 /** "T3 default", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
@@ -85,10 +99,11 @@ export const opensOnChecked = {
 export function StartControl({ item, data, label = 'Start', main, kind = 'refine', naming }: {
   item: Item; data: BoardData; label?: string; main?: boolean; kind?: StartKind; naming?: boolean;
 }) {
-  const start = useStart(item.id, kind);
+  const { pending, uncertain, error } = useShownStart(item, data, kind);
+  const closed = useStart(item.id, kind)?.phase === 'closed';
   const action = useItemAction(item.id);
   const [open, setOpen] = useState(false);
-  const thread = startedThread(item, data, start, kind);
+  const thread = startedThread(item, data, kind);
   const threads = Array.isArray(item.threads) ? item.threads : [];
   // An unrecorded shaping thread can explain refining, but never a build that hasn't started.
   const recorded = thread ? threads.find((t) => t.id === thread.threadId) : undefined;
@@ -97,17 +112,18 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
     : thread ? recorded : kind === 'refine' ? threads.find((t) => t.id !== data.startedBuilds?.[item.id]?.threadId) : undefined;
   const stopped = observed?.state === 'stopped';
   if (thread && observed?.state === 'done') {
-    return <span className="start-group"><span className="basis-full">Run finished.</span><OpenThread item={item} data={data} threadId={observed.id} /></span>;
+    return <span className="start-group"><span className="basis-full">{delegatedWorkRunning(item) || observed.hasRunningChildren ? 'Working. Parent run finished.' : 'Run finished.'}</span><OpenThread item={item} data={data} threadId={observed.id} /></span>;
   }
   // The toast announces a start; the tag only keeps Start from running twice.
-  if (thread && !stopped) return <span className="start-group"><Badge tone="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
-  if (start?.phase === 'uncertain') {
+  if (thread && !stopped && !pending) return <span className="start-group"><Badge tone="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
+  if (uncertain) {
     // Once its message is closed, a tag still says why Start is gone.
-    return <span className="start-group">{!start.message && <Badge tone="warning" className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</Badge>}</span>;
+    return <span className="start-group">{closed && <Badge tone="warning" className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</Badge>}</span>;
   }
-  const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : stopped && !resume ? 'Start again' : label;
+  const retry = kind === 'build' && canRetryBuild(item);
+  const verb = pending ? 'Starting…' : error || retry ? 'Retry start' : stopped && !resume ? 'Start again' : label;
   // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
-  const state = data.capture?.enabled === false ? {} : start?.phase === 'pending' ? { 'aria-disabled': true as const } : writeState(data, action);
+  const state = data.capture?.enabled === false ? {} : pending ? { 'aria-disabled': true as const } : writeState(data, action);
   const held = Boolean(state['aria-disabled']);
   const pick = (choice: ModelChoice | undefined) => {
     // Close first, so focus is back on Start before it relabels.
@@ -116,12 +132,13 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
   };
   return (
     <span className="start-group">
-      {stopped && <><span className="basis-full">Run stopped.</span><OpenThread item={item} data={data} threadId={observed.id} /></>}
+      {retry ? <OpenThread item={item} data={data} iconOnly threadId={currentBuildThread(item)?.id} />
+        : stopped && <><span className="basis-full">Run stopped.</span><OpenThread item={item} data={data} threadId={observed.id} /></>}
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
-          <Button {...buttonKind(main ? 'main' : 'start')} aria-busy={start?.phase === 'pending' || undefined} leftIcon={start?.phase === 'pending' ? <LoaderCircle className="animate-spin" /> : !main && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}
+          <Button {...buttonKind(main ? 'main' : 'start')} aria-busy={pending || undefined} leftIcon={pending ? <LoaderCircle className="animate-spin" /> : !main && !retry && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}
             {...naming && { className: 'max-w-96', title: `A filter hides ${itemName(item)}` }}>
-            {naming ? <span className="truncate">{verb}: {itemName(item)}</span> : verb}{start?.phase !== 'pending' && ' ▾'}
+            {naming ? <span className="truncate">{verb}: {itemName(item)}</span> : verb}{!pending && ' ▾'}
           </Button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} with`} {...opensOnChecked}>
@@ -132,17 +149,34 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
   );
 }
 
+/** Clears a failed start on every page, or a failure only this page holds. */
+async function dismissFailure(item: Item, kind: StartKind): Promise<void> {
+  useStartStore.getState().set(item.id, undefined, kind);
+  const session = useBoardStore.getState().data.capture?.session;
+  const result = await postAction('/api/dismiss-start-error', { session, itemId: item.id, purpose: PURPOSE[kind] });
+  flushSync(() => {
+    receive(result);
+    if (result.error) notify({ verb: 'Failed', item, startError: true, message: result.error });
+  });
+}
+
 /** Why Start failed, or that it may have run. Closing it keeps an unconfirmed start's tag. */
 export function StartMessage({ item, kind = 'refine' }: { item: Item; kind?: StartKind }) {
-  const start = useStart(item.id, kind);
+  const data = useBoardStore((state) => state.data);
+  const local = useStart(item.id, kind);
+  const server = startProgressOf(data, item.id, PURPOSE[kind]);
   const el = useRef<HTMLParagraphElement>(null);
-  if ((start?.phase !== 'error' && start?.phase !== 'uncertain') || !start.message) return null;
+  const uncertain = server?.phase === 'may-have-started';
+  const message = server?.phase === 'failed' || uncertain ? local?.phase === 'closed' && uncertain ? undefined : server.message : local?.phase === 'error' ? local.message : undefined;
+  if (!message) return null;
   const id = CSS.escape(item.id);
-  const close = () => closeKeepingFocus(el.current, () => useStartStore.getState().set(item.id, start.phase === 'uncertain' ? { phase: 'uncertain' } : undefined, kind),
-    [`[data-back-to-list="${id}"]`, `[data-start="${id}"]`, `[data-start-result="${id}"]`]);
+  const close = () => closeKeepingFocus(el.current, () => {
+    if (uncertain) useStartStore.getState().set(item.id, { phase: 'closed' }, kind);
+    else void dismissFailure(item, kind);
+  }, [`[data-back-to-list="${id}"]`, `[data-start="${id}"]`, `[data-start-result="${id}"]`]);
   return (
-    <p className="start" ref={el} {...(start.phase === 'uncertain' && { tabIndex: -1, 'data-start-result': item.id })}>
-      <span className="action-error"><span role="alert">{start.message}</span> <DismissButton what={` error for ${ref(item)}`} onClick={close} /></span>
+    <p className="start" ref={el} {...(uncertain && { tabIndex: -1, 'data-start-result': item.id })}>
+      <span className="action-error"><span role="alert">{message}</span> <DismissButton what={` error for ${ref(item)}`} onClick={close} /></span>
     </p>
   );
 }

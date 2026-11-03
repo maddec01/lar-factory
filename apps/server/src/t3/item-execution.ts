@@ -45,6 +45,13 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
     lineages.set(shell.id, shell.lineage as Lineage);
     order.set(shell.id, orderedBy(shell));
   }
+  // A thread's background tasks carry on after its turn ends, so it and its ancestors are still at work.
+  for (const shell of shells) {
+    const thread = byId.get(shell.id as string);
+    if (!thread || !Array.isArray(shell.pendingBackgroundTasks) || !shell.pendingBackgroundTasks.length) continue;
+    thread.hasRunningChildren = true;
+    for (const id of ancestorsOf(thread.id, lineages)) { const ancestor = byId.get(id); if (ancestor) ancestor.hasRunningChildren = true; }
+  }
   for (const thread of byId.values()) {
     if (thread.state !== 'running' && thread.state !== 'needs you' && !thread.queued) continue;
     for (const id of ancestorsOf(thread.id, lineages)) {

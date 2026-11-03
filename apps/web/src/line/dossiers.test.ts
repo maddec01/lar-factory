@@ -246,7 +246,7 @@ test('a part at Verify or Ready to merge counts as moving while its build thread
   expect([part.includes('Working'), part.includes('Ready to merge'), text(step('I_sample13').querySelector('[data-open-thread]'))]).toEqual([true, false, 'Open thread']);
   await receive(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [{ ...build, id: 'shape', title: 'Shape', purpose: 'shape', state: 'done', currentRunning: undefined }, { ...build, state: 'done', currentRunning: undefined, hasRunningChildren: true }] }, clear));
   expect(text(step('I_sample13')), 'it names the running build thread, not the newest one').toContain('T3 · Build· running');
-  await receive(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, clear));
+  await receive(withItem('I_sample13', { status: 'Ready to merge', blockers: [], slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, clear));
   expect(text(next())).toBe('To merge#140 Owner accounts');
   expect(text(step('I_sample13'))).toContain('Ready to merge');
 });

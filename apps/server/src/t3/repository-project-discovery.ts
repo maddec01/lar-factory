@@ -3,16 +3,21 @@
 import { readJsonRecord } from '../json-file.ts';
 import { boardProjects } from './board-projects.ts';
 import { subscribeProjects } from './project-subscription.ts';
-import type { ProjectRead } from './project-protocol.ts';
+import type { ProjectProtocol, ProjectRead } from './project-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 
 let pending: Promise<ProjectRead> | undefined;
-let current: { key: string; read: ProjectRead; stop: () => void; protocol: ReturnType<typeof boardProjects> } | undefined;
+let current: { key: string; origin: string; read: ProjectRead; stop: () => void; protocol: ReturnType<typeof boardProjects> } | undefined;
 
 /** Sanitized discovery state for server callers, including the last successful observation. */
 export function repositoryProjects(env: NodeJS.ProcessEnv = process.env): Promise<ProjectRead> {
   pending ??= discover(env).finally(() => { pending = undefined; });
   return pending;
+}
+
+/** The T3 server discovery last reached and the session it holds, unless T3 has stopped since. */
+export function repositoryProjectAccess(): { origin: URL; protocol: Pick<ProjectProtocol, 'subscriptionSession'> } | undefined {
+  return current?.key ? { origin: new URL(current.origin), protocol: current.protocol } : undefined;
 }
 
 async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
@@ -30,7 +35,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
     const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
     const protocol = boardProjects(runtime.origin, version);
     const read = await protocol.readProjects();
-    const state = { key, protocol, read: { ...read, observation: read.observation ?? current?.read.observation }, stop: () => {} };
+    const state = { key, origin: runtime.origin, protocol, read: { ...read, observation: read.observation ?? current?.read.observation }, stop: () => {} };
     current = state;
     state.stop = subscribeProjects(new URL(runtime.origin), version, protocol, read => {
       state.read = { ...read, observation: read.observation ?? state.read.observation };

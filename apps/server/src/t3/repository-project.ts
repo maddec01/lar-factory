@@ -7,6 +7,7 @@
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { runTool } from '../tools/run-tool.ts';
+import type { ProjectObservation } from './project-protocol.ts';
 import { repositoryProjects } from './repository-project-discovery.ts';
 import type { RepoConfig } from '@lar-factory/shared';
 
@@ -54,9 +55,19 @@ export interface Checkout { id: string; title: string; folder: string; origin: s
 export async function checkouts(env: NodeJS.ProcessEnv): Promise<Checkout[]> {
   const read = await repositoryProjects(env);
   if (read.availability !== 'available' || !read.observation) throw new Error('T3 project discovery unavailable');
-  const projects = read.observation.projects.map(p => ({ id: p.id, title: p.title, folder: p.workspaceRoot }));
+  return observedCheckouts(read.observation);
+}
+
+/** The observation's projects with each one's `origin` URL, which a retained observation has too. */
+export async function observedCheckouts(observation: ProjectObservation): Promise<Checkout[]> {
+  const projects = observation.projects.map(p => ({ id: p.id, title: p.title, folder: p.workspaceRoot }));
   const origins = await Promise.all(projects.map((p) => mainCheckout(p.folder) ? originUrl(p.folder) : null));
   return projects.map((p, i) => ({ ...p, origin: origins[i] ?? null }));
+}
+
+/** The projects among `projects` that are main checkouts of `repo`. */
+export function checkoutsOf(projects: readonly Checkout[], repo: string): Checkout[] {
+  return projects.filter((p) => p.origin !== null && originRepo(p.origin)?.toLowerCase() === repo.toLowerCase());
 }
 
 /** Reads T3's live projects and their checkouts' origins once, and finds a repository's project among them. */
@@ -66,7 +77,7 @@ async function projectFinder(env: NodeJS.ProcessEnv): Promise<(repo: string) => 
   try { projects = await checkouts(env); }
   catch { return () => ({ error: "Can't read T3 Code's projects; reconnect T3 Code before starting" }); }
   return (repo) => {
-    const matches = projects.filter((p) => p.origin !== null && originRepo(p.origin)?.toLowerCase() === repo.toLowerCase());
+    const matches = checkoutsOf(projects, repo);
     if (matches.length === 1) return { projectId: matches[0]!.id };
     if (!matches.length) return { error: `No T3 project is a checkout of ${repo}; add the checkout in T3 Code` };
     const folders = matches.map((p) => tilde(p.folder, home)).sort().join(', ');

@@ -18,6 +18,7 @@ import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { ItemDetailsReader } from '../item-details/item-details.ts';
 import type { BuiltPage } from '../page/page.ts';
 import type { StartAfter } from '../start-after/start-after.ts';
+import type { ProjectImage } from '../t3/project-icons.ts';
 import { log } from '../log.ts';
 import { readAzureReadiness } from '../azure/azure-readiness.ts';
 
@@ -52,6 +53,8 @@ export interface HttpDeps {
   readSoon(url?: string): void;
   /** The startup tool check; requests other than /healthz and assets wait for it. */
   ready(): Promise<void> | undefined;
+  /** A T3 project's favicon, or undefined when T3 hasn't listed the project or it has none. */
+  projectIcon(projectId: string): Promise<ProjectImage | undefined>;
   /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
   projectChoices(): Promise<ProjectChoice[]>;
   /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
@@ -90,6 +93,9 @@ const SECURITY_HEADERS = {
   'Content-Security-Policy':
     "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'",
 };
+
+/** T3's policy for a project's SVG favicon, which blocks the file's scripts even when opened as a page. */
+const SVG_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 
 function send(res: ServerResponse, status: number, type: string, body: string | Buffer): void {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
@@ -139,7 +145,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectChoices, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectIcon, projectChoices, keepOnboarding, createProject,
   detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
@@ -567,6 +573,17 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     sendBoard(board.snapshot());
   }
 
+  /** The page's image of a project's favicon. Its URL carries the content's revision, so it can stay cached. */
+  async function projectIconRequest(path: string, res: ServerResponse): Promise<void> {
+    let projectId = '';
+    try { projectId = decodeURIComponent(path.slice('/api/project-icon/'.length)); } catch { /* A malformed ID lists no project. */ }
+    const image = await projectIcon(projectId);
+    if (!image) return send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
+    res.writeHead(200, { 'Content-Type': image.type, 'Cache-Control': 'max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff',
+      ...(image.type === 'image/svg+xml' ? { 'Content-Security-Policy': SVG_POLICY } : {}) });
+    res.end(image.body);
+  }
+
   /** Only answer requests addressed to this machine, to block DNS rebinding. */
   function allowedHost(req: IncomingMessage): boolean {
     const host = (req.headers.host ?? '').toLowerCase();
@@ -604,6 +621,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     }
     if (path === '/api/events') return openStream(req, res);
     if (path === '/api/onboarding/projects') return projectsRequest(res);
+    if (path.startsWith('/api/project-icon/')) return projectIconRequest(path, res);
     if (path === '/api/item-details' || path === '/api/item-checks') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
     if (path === '/api/item-labels') return itemLabelsRequest(url, res);

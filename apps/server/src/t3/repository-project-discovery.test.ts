@@ -1,9 +1,9 @@
 import { test, vi, expect } from 'vite-plus/test';
-import { repositoryProjects, reauthorizeRepositoryProjects } from './repository-project-discovery.ts';
+import { repositoryProjectAccess, repositoryProjects, reauthorizeRepositoryProjects } from './repository-project-discovery.ts';
 
-const fixture = vi.hoisted(() => ({ read: { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } } as import('./project-protocol.ts').ProjectRead, renew: vi.fn(async () => {}), stop: vi.fn(), notify: (_read: import('./project-protocol.ts').ProjectRead) => {} }));
+const fixture = vi.hoisted(() => ({ read: { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } } as import('./project-protocol.ts').ProjectRead, renew: vi.fn(async () => {}), stop: vi.fn(), running: true, notify: (_read: import('./project-protocol.ts').ProjectRead) => {} }));
 vi.mock('../json-file.ts', () => ({ readJsonRecord: () => ({ origin: 'http://127.0.0.1:3773', serverVersion: undefined }) }));
-vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture/runtime', t3Running: () => true }));
+vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture/runtime', t3Running: () => fixture.running }));
 vi.mock('./board-projects.ts', () => ({ boardProjects: () => ({ readProjects: async () => fixture.read, reauthorize: fixture.renew }) }));
 vi.mock('./project-subscription.ts', () => ({ subscribeProjects: (_origin: URL, _version: string, _protocol: unknown, notify: typeof fixture.notify) => { fixture.notify = notify; return fixture.stop; } }));
 
@@ -33,4 +33,16 @@ test('reauthorization coalesces calls, restarts discovery and retains data on fa
   fixture.renew.mockRejectedValueOnce(new Error('private credential detail'));
   await expect(reauthorizeRepositoryProjects()).rejects.toThrow();
   expect((await repositoryProjects()).observation?.observedAt).toBe('2026-10-31T00:00:00Z');
+});
+
+test('access names the T3 origin and the session discovery holds, until T3 stops', async () => {
+  await repositoryProjects();
+  expect(repositoryProjectAccess()?.origin.href).toBe('http://127.0.0.1:3773/');
+  expect(repositoryProjectAccess()?.protocol).toHaveProperty('readProjects');
+  fixture.running = false;
+  await repositoryProjects();
+  expect(repositoryProjectAccess()).toBeUndefined();
+  fixture.running = true;
+  await repositoryProjects();
+  expect(repositoryProjectAccess()).toBeDefined();
 });

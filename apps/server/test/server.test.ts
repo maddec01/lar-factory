@@ -272,6 +272,31 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   assert.deepEqual((await sample.calls()).filter((args) => args[2] === 'PATCH'), []);
 });
 
+test('a run that finishes reads its final turn apart from the refresh, parsing what changed without a block, and its PR block carries the final figures', async (t) => {
+  const home = claudeHome(t, { 'session-a': { main: [assistant('first', 0, 0, 0, 7)] } });
+  const running = { id: 'a', sessions: [{ session: 'session-a', instance: 'claudeAgent_personal' }], turns: [{ id: 'turn-a', startedAt: '2026-10-20T09:00:00Z' }] };
+  const db = statsDb(t, [running]);
+  const raw = rawBuild(12, 'Review');
+  const open = { number: 40, url: 'https://github.com/maddec01/lar-factory/pull/40', state: 'OPEN', isDraft: false, body: 'PR 40' };
+  const board = await startBoard(t, { threads: { 'maddec01/lar-factory#12': ['a'] }, items: [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [open] } } }] },
+    false, true, { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }), FAST_LOCAL_REFRESH_ONLY: '1' });
+  const tokens = (data: BoardData) => (data.items[0]?.stats as ItemStats | undefined)?.tokens;
+  await until(board, (d) => tokens(d) === 7 && !(d.items[0]?.stats as ItemStats).provisional && d.items[0]?.threads !== undefined);
+  await board.untilLogged('every item settled');
+  // The final turn's usage lands in a transcript large enough to take several reads of the file, and the run ends.
+  const filler = JSON.stringify({ type: 'user', message: { content: 'x'.repeat(2_000) } });
+  const later = Array.from({ length: 4_000 }, () => filler);
+  writeFileSync(join(home, 'projects', '-Users-me--t3-worktrees-lar-factory-feat-60', 'session-a.jsonl'), [...later, JSON.stringify(assistant('first', 0, 0, 0, 7)), JSON.stringify(assistant('last', 0, 0, 0, 5))].join('\n') + '\n');
+  const health = await fetch(`${board.url}/healthz`);
+  assert.equal(health.status, 200);
+  writeFileSync(`${db}.execution.json`, JSON.stringify([{ ...running, turns: [{ ...running.turns[0], completedAt: '2026-10-20T09:30:00Z' }] }]));
+  await until(board, (d) => tokens(d) === 12);
+  // An ordinary read's line has no startup prefix.
+  assert.match(board.logs(), /Z stats read path took \d+ ms elapsed, \d+ ms CPU: inputs \d+ ms, discovery \d+ ms, warm \d+ ms \(parsed 1 of 1 transcripts\)/, 'the read named what it parsed');
+  const final = await board.untilCalled((args) => args[2] === 'PATCH' && String(args[5]).includes('"tokens":12'));
+  assert.equal(final[3], 'repos/maddec01/lar-factory/pulls/40');
+});
+
 test('a merged item retains its PR figures and adds fresh stats without lowering known work', async (t) => {
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
   const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/lar-factory#12'], turns },

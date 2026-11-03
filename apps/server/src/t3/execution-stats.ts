@@ -1,11 +1,14 @@
 import { isRecord } from '@lar-factory/shared';
 import type { ThreadRows, ThreadSession } from './t3-db.ts';
 
+/** How many thread projections a stats read turns into rows between two turns of the event loop. */
+export const PROJECTIONS_PER_CHUNK = 32;
+
 /** T3 97e35bc orchestrationV2.ts provider threads own native transcript references.
  * Provider sessions describe runtime attachment, not transcript identity.
  * Keep the SQL-era row interface so the stats calculations stay unchanged.
  */
-export function executionStats(projections: Record<string, unknown>[]): { rows: ThreadRows; sessions: ThreadSession[] } {
+export async function executionStats(projections: Record<string, unknown>[], pause: () => Promise<void> = async () => {}): Promise<{ rows: ThreadRows; sessions: ThreadSession[] }> {
   const rows: ThreadRows = { threads: [], turns: [], runs: [], waits: [], lastMessages: [], active: new Set() };
   const sessions: (ThreadSession & { createdAt: string })[] = [];
   const facts = (projection: Record<string, unknown>, key: string): Record<string, unknown>[] => {
@@ -23,7 +26,9 @@ export function executionStats(projections: Record<string, unknown>[]): { rows: 
     if (!Number.isFinite(Date.parse(text))) throw Error('Invalid execution stats timestamp');
     return text;
   };
+  let counted = 0;
   for (const projection of projections) {
+    if (++counted % PROJECTIONS_PER_CHUNK === 0) await pause();
     if (!isRecord(projection.thread)) throw Error('Invalid execution stats thread');
     const thread = projection.thread;
     const id = string(thread.id);

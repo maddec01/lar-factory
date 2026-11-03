@@ -89,7 +89,7 @@ it('shows shell status changes immediately while history reads wait, without tre
   publish(shell);
   expect(protocolItemThreads(['one'])).toMatchObject([{ state: 'running' }]);
   expect(protocolThreadById('one').availability).toBe('unavailable');
-  expect(protocolStatsInputs()!.familyReads(['one'])).toEqual(['never']);
+  expect((await protocolStatsInputs())!.familyReads(['one'])).toEqual(['never']);
   expect(() => protocolStartedThread('p', ['Shape issue'], [])).toThrow('unavailable');
 
   publish({ ...shell, pendingRuntimeRequest: { id: 'request' } });
@@ -113,11 +113,11 @@ it('reads stats only for the requested thread family even when unrelated history
       { id: 'unrelated', updatedAt: observedAt }], archivedThreads: [],
   } } });
   await vi.waitFor(() => expect(protocolThreadById('child').availability).toBe('available'));
-  await vi.waitFor(() => expect(protocolStatsInputs(['own'])!.rows.threads.map(thread => thread.id)).toEqual(['own', 'child']));
+  await vi.waitFor(async () => expect((await protocolStatsInputs(['own']))!.rows.threads.map(thread => thread.id)).toEqual(['own', 'child']));
   expect(fixture.read.mock.calls.map(([id]) => id)).toEqual(['child', 'own']);
-  expect(protocolStatsInputs()!.familyReads(['unrelated'])).toEqual(['never']);
-  expect(protocolStatsInputs()!.allObserved).toBe(false);
-  expect(protocolStatsInputs([])!.rows.threads).toEqual([]);
+  expect((await protocolStatsInputs())!.familyReads(['unrelated'])).toEqual(['never']);
+  expect((await protocolStatsInputs())!.allObserved).toBe(false);
+  expect((await protocolStatsInputs([]))!.rows.threads).toEqual([]);
 });
 
 it('does not acquire histories for shell-only consumers', async () => {
@@ -169,8 +169,8 @@ it('stats inputs answer for the reads as they stood, though a read lands after t
   fixture.read.mockImplementation(async id => ({ availability: 'available', observation: { observedAt, projection: { thread: { id }, messages: [], providerSessions: [], providerThreads: [], providerTurns: [], runtimeRequests: [], subagents: [] } } }));
   protocolItemThreads([]);
   fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [{ id: 'late', updatedAt: observedAt }], archivedThreads: [] } } });
-  const inputs = protocolStatsInputs(['late'])!;
-  await vi.waitFor(() => expect(protocolStatsInputs(['late'])!.familyReads(['late'])).toEqual(['current']));
+  const inputs = (await protocolStatsInputs(['late']))!;
+  await vi.waitFor(async () => expect((await protocolStatsInputs(['late']))!.familyReads(['late'])).toEqual(['current']));
   expect(inputs.familyReads(['late']), 'its rows hold no read of it, so it answers for none').toEqual(['never']);
   expect(inputs.allObserved).toBe(false);
 });
@@ -190,14 +190,14 @@ it('coalesces concurrent global demand, bounds reads and includes archived child
   protocolItemThreads([]);
   const shells = Array.from({ length: 20 }, (_, i) => ({ id: String(i), updatedAt: observedAt, ...(i ? { lineage: { rootThreadId: '0' } } : {}) }));
   fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: shells.slice(0, 10), archivedThreads: shells.slice(10) } } });
-  for (let i = 0; i < 3; i++) expect(protocolStatsInputs()!.allObserved).toBe(false);
+  for (let i = 0; i < 3; i++) expect((await protocolStatsInputs())!.allObserved).toBe(false);
   expect(fixture.read).toHaveBeenCalledTimes(8);
   for (let batch = 0; batch < 3; batch++) {
     releases.splice(0).forEach(release => release());
     await new Promise(resolve => setTimeout(resolve, 0));
   }
-  expect(protocolStatsInputs()!.rows.threads).toHaveLength(20);
-  expect(protocolStatsInputs(['0'])!.rows.threads).toHaveLength(20);
+  expect((await protocolStatsInputs())!.rows.threads).toHaveLength(20);
+  expect((await protocolStatsInputs(['0']))!.rows.threads).toHaveLength(20);
   expect(fixture.read).toHaveBeenCalledTimes(20);
   expect(peak).toBe(8);
 });
@@ -453,10 +453,10 @@ it('answers per family: a failed read fails only the family holding that thread,
   fixture.read.mockImplementation(async id => id === 'broken' ? { availability: 'unavailable' } : readOf(id));
   protocolItemThreads([]);
   showActive([shell('own'), shell('broken'), shell('child', { lineage: { rootThreadId: 'broken' } })]);
-  protocolStatsInputs();
-  await vi.waitFor(() => expect(protocolStatsInputs()!.familyReads(['child'])).toEqual(['current']));
-  await vi.waitFor(() => expect(protocolStatsInputs()!.familyReads(['broken'])).toEqual(['failed', 'current']));
-  const inputs = protocolStatsInputs()!;
+  await protocolStatsInputs();
+  await vi.waitFor(async () => expect((await protocolStatsInputs())!.familyReads(['child'])).toEqual(['current']));
+  await vi.waitFor(async () => expect((await protocolStatsInputs())!.familyReads(['broken'])).toEqual(['failed', 'current']));
+  const inputs = (await protocolStatsInputs())!;
   expect(inputs.familyReads(['own'])).toEqual(['current']);
   expect(countedThreads(inputs).sort()).toEqual(['child', 'own']);
   expect(inputs.allObserved, 'a thread never read successfully is not observed').toBe(false);
@@ -467,17 +467,17 @@ it('counts a changed thread from its last read while the next is pending, and a 
   fixture.read.mockImplementation(async id => readOf(id));
   protocolItemThreads([]);
   showActive([shell('one')]);
-  protocolStatsInputs(['one']);
-  await vi.waitFor(() => expect(protocolStatsInputs(['one'])!.familyReads(['one'])).toEqual(['current']));
+  await protocolStatsInputs(['one']);
+  await vi.waitFor(async () => expect((await protocolStatsInputs(['one']))!.familyReads(['one'])).toEqual(['current']));
   fixture.read.mockReturnValue(new Promise<ExecutionRead>(() => {}));
   showActive([shell('one', { status: 'running' })]);
-  const pending = protocolStatsInputs(['one'])!;
+  const pending = (await protocolStatsInputs(['one']))!;
   expect(pending.familyReads(['one'])).toEqual(['pending']);
   expect(countedThreads(pending)).toEqual(['one']);
   expect(pending.allObserved).toBe(true);
   expect(protocolThreadById('one').availability, 'its other callers keep the strict check').toBe('unavailable');
   showActive([shell('one', { deletedAt: observedAt })]);
-  const deleted = protocolStatsInputs(['one'])!;
+  const deleted = (await protocolStatsInputs(['one']))!;
   expect(deleted.familyReads(['one'])).toEqual(['gone']);
   expect(countedThreads(deleted)).toEqual([]);
 });
@@ -489,18 +489,18 @@ it('keeps a thread whose re-read failed in the count for deduplication, and fail
     fixture.read.mockImplementation(async id => readOf(id));
     protocolItemThreads([]);
     showActive([shell('one')]);
-    protocolStatsInputs(['one']);
-    await vi.waitFor(() => expect(protocolStatsInputs(['one'])!.familyReads(['one'])).toEqual(['current']));
+    await protocolStatsInputs(['one']);
+    await vi.waitFor(async () => expect((await protocolStatsInputs(['one']))!.familyReads(['one'])).toEqual(['current']));
     fixture.read.mockResolvedValueOnce({ availability: 'unavailable' });
     showActive([shell('one', { status: 'running' })]);
-    protocolStatsInputs(['one']);
-    await vi.waitFor(() => expect(protocolStatsInputs(['one'])!.familyReads(['one'])).toEqual(['failed']));
-    const failed = protocolStatsInputs(['one'])!;
+    await protocolStatsInputs(['one']);
+    await vi.waitFor(async () => expect((await protocolStatsInputs(['one']))!.familyReads(['one'])).toEqual(['failed']));
+    const failed = (await protocolStatsInputs(['one']))!;
     expect(countedThreads(failed)).toEqual(['one']);
     expect(failed.allObserved).toBe(true);
     now.mockReturnValue(2001);
-    protocolStatsInputs(['one']);
-    await vi.waitFor(() => expect(protocolStatsInputs(['one'])!.familyReads(['one'])).toEqual(['current']));
+    await protocolStatsInputs(['one']);
+    await vi.waitFor(async () => expect((await protocolStatsInputs(['one']))!.familyReads(['one'])).toEqual(['current']));
   } finally { now.mockRestore(); }
 });
 
@@ -511,16 +511,16 @@ it('holds an unlisted thread as never read until both lists are read, and an age
   fixture.archived.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
   protocolItemThreads([]);
   showActive([]);
-  expect(protocolStatsInputs(['lost'])!.familyReads(['lost'])).toEqual(['never']);
-  expect(protocolStatsInputs(['lost'])!.allObserved).toBe(false);
+  expect((await protocolStatsInputs(['lost']))!.familyReads(['lost'])).toEqual(['never']);
+  expect((await protocolStatsInputs(['lost']))!.allObserved).toBe(false);
   answer(archivedRead([]));
-  await vi.waitFor(() => expect(protocolStatsInputs(['lost'])!.familyReads(['lost'])).toEqual(['gone']));
-  expect(protocolStatsInputs(['lost'])!.allObserved).toBe(true);
+  await vi.waitFor(async () => expect((await protocolStatsInputs(['lost']))!.familyReads(['lost'])).toEqual(['gone']));
+  expect((await protocolStatsInputs(['lost']))!.allObserved).toBe(true);
   vi.setSystemTime(Date.now() + 31_000);
   fixture.archived.mockResolvedValue({ availability: 'unavailable' });
-  expect(protocolStatsInputs(['lost'])!.familyReads(['lost'])).toEqual(['gone']);
+  expect((await protocolStatsInputs(['lost']))!.familyReads(['lost'])).toEqual(['gone']);
   await new Promise(resolve => setTimeout(resolve));
-  expect(protocolStatsInputs(['lost'])!.familyReads(['lost'])).toEqual(['gone']);
+  expect((await protocolStatsInputs(['lost']))!.familyReads(['lost'])).toEqual(['gone']);
 });
 
 it('reads a thread found on the archived list like any other, keeping its family current', async () => {
@@ -529,13 +529,13 @@ it('reads a thread found on the archived list like any other, keeping its family
   fixture.archived.mockResolvedValue(archivedRead([shell('put-away', { archivedAt: observedAt })]));
   protocolItemThreads([]);
   showActive([]);
-  protocolStatsInputs(['put-away']);
-  await vi.waitFor(() => expect(protocolStatsInputs(['put-away'])!.familyReads(['put-away'])).toEqual(['current']));
+  await protocolStatsInputs(['put-away']);
+  await vi.waitFor(async () => expect((await protocolStatsInputs(['put-away']))!.familyReads(['put-away'])).toEqual(['current']));
 });
 
 it('reads as loading while T3 runs with its thread list unread, and throws once the list fails or T3 stops', async () => {
   const { protocolStatsInputs } = await import('./item-execution.ts');
-  expect(protocolStatsInputs(['one'])).toBeNull();
+  expect(await protocolStatsInputs(['one'])).toBeNull();
   fixture.changed!({ availability: 'unavailable' });
-  expect(() => protocolStatsInputs(['one'])).toThrow('unavailable');
+  await expect(protocolStatsInputs(['one'])).rejects.toThrow('unavailable');
 });

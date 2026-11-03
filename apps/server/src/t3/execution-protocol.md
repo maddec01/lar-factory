@@ -131,11 +131,10 @@ Real timeout followed by a late launch, deletion and provider mutations were
 not induced by this probe.
 
 Association no longer opens SQLite or requires a usage database. The board
-reads threads through `protocolItemThreads` apart from `loadT3Reads`, so threads
+reads threads through `protocolItemThreads` apart from `readT3Stats`, so threads
 read when stats are disabled or their residual pricing read fails. A missing usage database reports unavailable stats.
 The source audit finds no production project, title, association or timing SQL
-consumer outside the adapter. Legacy SQL helpers remain for parity fixtures;
-`item-stats.ts` retains its optional `threadSessions` default for those fixtures.
+consumer outside the adapter. Legacy SQL helpers remain for parity fixtures.
 Production supplies protocol sessions explicitly. The residual production query
 is `CODEX_TURN_SELECTIONS` described above, not project or thread discovery.
 

@@ -154,4 +154,5 @@ test('an item with recorded threads shows figures while another repository still
   for (const step of ['server listening', 'records shown (1 items)', 'warmup started', 'first item with figures', 'first read settled', 'every item settled']) assert.match(board.logs(), new RegExp(`startup \\d+ ms: ${step.replace(/[()]/g, '\\$&')}`));
   assert.match(board.logs(), /startup \d+ ms: thread reads complete \(read \d+, failed 0, total \d+\)/);
   assert.match(board.logs(), /startup \d+ ms: stats read took \d+ ms elapsed, \d+ ms CPU, after warming \d+ transcripts in \d+ ms, longest \d+ ms/);
+  assert.match(board.logs(), /startup \d+ ms: stats read path took \d+ ms elapsed, \d+ ms CPU: inputs \d+ ms, discovery \d+ ms, warm \d+ ms \(parsed \d+ of \d+ transcripts\), dedup \d+ ms, aggregation \d+ ms, publish \d+ ms; longest block \d+ ms in \w+/);
 });

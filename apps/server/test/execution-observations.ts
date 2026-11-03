@@ -31,10 +31,10 @@ export function threadCleanupState(threadId: string): 'unavailable' | 'absent' {
 export function protocolStartedThread(): never { throw Error("T3 execution unavailable"); }
 
 /** Spawned boards consume the same protocol mapping as production. */
-export function protocolStatsInputs() {
+export async function protocolStatsInputs() {
   if (process.env.FAKE_EXECUTION_STATS_UNAVAILABLE === '1') throw Error('Usage unavailable');
   const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
-  const inputs = executionStats(threads.filter(thread => thread.read !== 'never').map(thread => ({
+  const inputs = await executionStats(threads.filter(thread => thread.read !== 'never').map(thread => ({
     thread: { id: thread.id, title: thread.title ?? thread.id, deletedAt: thread.deletedAt ?? null,
       lineage: { rootThreadId: thread.rootThreadId ?? thread.id, parentThreadId: thread.parentThreadId ?? thread.rootThreadId ?? null, relationshipToParent: thread.rootThreadId ? 'subagent' : null } },
     messages: [...(thread.messages ?? []).map((text, index) => ({ role: 'user', text, createdAt: new Date(Date.parse('2026-10-20T08:00:00Z') + index * 60000).toISOString() })),

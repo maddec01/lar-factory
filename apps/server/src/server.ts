@@ -19,7 +19,7 @@ import { observePr } from './config/pr-host.ts';
 import { changeRepositoryLabels } from './config/repository-labels.ts';
 import { changeRepositorySettings, readOnboardedConfigs } from './config/repository-settings.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, observeIssue, readPrBody } from './github/github.ts';
-import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
+import { prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createCapture } from './items/capture.ts';
 import { createItemCommands } from './items/item-commands.ts';
@@ -47,11 +47,11 @@ import { installHome, loadBundledSkills, withInstallState } from './skills/bundl
 import { parentSkillCheck } from './skills/skill-check.ts';
 import { armedWorkGone, createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
+import { createShownStats } from './stats/shown-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectReads } from './t3/repository-project.ts';
 import { createProjectIcons } from './t3/project-icons.ts';
 import { protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
-import { loadT3Reads } from './t3/t3-reads.ts';
 import type { T3Reads } from './t3/t3-reads.ts';
 import { createUsageCatchUp } from './t3/usage-catch-up.ts';
 import { lookupThread } from './t3/t3.ts';
@@ -131,12 +131,11 @@ const { heavyCommandLimit, buildLimit } = createLimitSettings({ changed: () => {
 const autoBuild = createAutoBuildSetting({ offerModelChoices, changed: () => { reread(); runLocal(() => autoBuildRun.pass()); } });
 /** Work whose retained stats count a shaping thread the sweep deleted, until a fresh read replaces them. */
 const overcountedStats = new Set<string>();
-/** While an item shows provisional figures, the figures retention may keep instead; the first read past that replaces them. */
-const heldStats = new Map<string, Item['stats']>();
-const isProvisional = (stats: Item['stats']): boolean => typeof stats === 'object' && !!stats.provisional;
+const { shown: shownStats, prune: pruneShownStats } = createShownStats(overcountedStats);
 const sweepShapingThreads = records && createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: lookupThread, send: sendThreadCommand,
   deleted: (workId) => {
     overcountedStats.add(workId);
+    statsGeneration++;
     statsReadAt = -Infinity;
   } });
 /** The tickets the item sources read last, which give the records their ticket context. */
@@ -293,66 +292,56 @@ function recordedThreadIds(items: readonly Item[]): string[] {
   return [...new Set(workIds.flatMap(workId => records.threads(workId).filter(thread => !thread.deletedAt).map(thread => thread.threadId)))];
 }
 
+/** A deleted thread never counts, even before T3's shells drop it, and an ID T3 can't show would make a read during an outage unavailable. */
+const liveThreadIds = (workId: string | undefined): string[] => (workId && records ? records.threads(workId).filter((t) => !t.deletedAt).map((t) => t.threadId) : []);
+
 /**
- * Attaches each item's stats and T3 threads, from one read of T3 Code's database, or from `read`, the stats read
- * usageCatchUp warmed for. Stats are those frozen in its latest merged linked PR's block once no linked PR is open, else
- * read afresh from the database and transcripts once those were read; the threads its work record holds are read afresh.
- * The board keeps working without either.
+ * Shows a stats read's figures on the items as they are, as one change, so a page never sees part of a read. Applies no read over
+ * the revision guard, shows no record a read hasn't, and leaves PR writes that wait for a final read to the read itself.
  */
-function withT3Reads(items: Item[], read: boolean | T3Reads = true): Item[] {
+function showStatsRead(reads: T3Reads): void {
+  const { stats, usage, statsUnavailable: unreadable, priced, allObserved } = reads;
   const now = Date.now();
-  const needed = recordedThreadIds(items);
-  const withStats = read !== false;
-  const warmed = typeof read === 'object';
-  const fresh = warmed || read && transcriptsRead && needed.length > 0 && !usageCatchUp?.active(needed);
-  // A deleted thread never counts, even before T3's shells drop it, and an ID T3 can't show would make a read during an outage unavailable.
-  const threadIds = (workId: string | undefined) => (workId && records ? records.threads(workId).filter((t) => !t.deletedAt).map((t) => t.threadId) : []);
+  statsReadAt = now;
+  statsUnavailable(unreadable);
+  // T3's thread list not read yet reads nothing, which says nothing of the last read.
+  if (unreadable || priced !== null) board.update({ usageRead: unreadable ? { readable: false, readAt: board.snapshot().usageRead?.readAt } : { readable: true, readAt: new Date(now).toISOString() } });
+  if (priced !== null) pricingUnavailable(!priced);
+  // A partial set moves shared records between items, and needed covers only the items shown, so figures wait for both.
+  const provisional = !(allObserved && board.snapshot().firstRead.settled);
+  board.update({ items: board.snapshot().items.map((item) => {
+    if (item.recorded === false) return item;
+    const ids = liveThreadIds(item.id);
+    const shown = { ...item, stats: shownStats(item, item.stats, true, { live: stats(ids), provisional }), usageState: ids.length ? usage(ids) : undefined };
+    // An item the board just changed carries its old stats until a read reports the change.
+    if (overcountedStats.has(item.id) && usage(ids) === 'current' && !board.changing(item.id)) overcountedStats.delete(item.id);
+    return shown;
+  }) });
+}
+
+/**
+ * Attaches each item's T3 threads, read afresh from its work record, and the figures it already shows, or those frozen in its
+ * latest merged linked PR's block; `withStats` false leaves figures alone. Stats reads run apart, through usageCatchUp, and
+ * show through showStatsRead. The board keeps working without either.
+ */
+function withT3Reads(items: Item[], withStats = true): Item[] {
+  const now = Date.now();
   const threads = (workId: string | undefined) => {
-    const ids = threadIds(workId);
+    const ids = liveThreadIds(workId);
     // Work whose every thread was deleted still reads as an empty list, which its deleted-thread notice needs.
     const observed = protocolItemThreads(ids.length || !workId || !records ? ids : records.threads(workId).map((t) => t.threadId));
     if (!Array.isArray(observed) || !workId || !records) return observed;
     const purposes = new Map(records.threads(workId).map(thread => [thread.threadId, thread.purpose]));
     return observed.map(thread => ({ ...thread, purpose: purposes.get(thread.id) }));
   };
-  const { stats, usage, statsUnavailable: unreadable, priced, allObserved } = warmed ? read : loadT3Reads(statsSources, now, fresh, needed);
-  // A partial set moves shared records between items, and needed covers only the items shown, so figures wait for both.
-  const provisional = fresh && !(allObserved && board.snapshot().firstRead.settled);
-  if (fresh) {
-    statsReadAt = now;
-    statsUnavailable(unreadable);
-    // T3's thread list not read yet reads nothing, which says nothing of the last read.
-    if (unreadable || priced !== null) board.update({ usageRead: unreadable ? { readable: false, readAt: board.snapshot().usageRead?.readAt } : { readable: true, readAt: new Date(now).toISOString() } });
-    if (priced !== null) pricingUnavailable(!priced);
-  }
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
   const previousUsage = new Map(board.snapshot().items.map((item) => [item.id, item.usageState]));
   const cleanupProblems = records && shapingThreadCleanupProblems(records);
+  pruneShownStats(new Set(items.map((item) => item.id)));
   return items.map((item) => {
     if (item.recorded === false) return item;
-    const overcounted = withStats && overcountedStats.has(item.id);
-    const ids = threadIds(item.id);
-    const before = previousStats.get(item.id);
-    const previous = overcounted ? undefined : isProvisional(before) ? heldStats.get(item.id) : before;
-    const carried = isProvisional(item.stats) ? undefined : item.stats;
-    const known = overcounted ? undefined : retainStats(previous, carried);
-    // Until transcripts are first read, no usage read has failed: the item's figures are still to come.
-    const live = fresh ? stats(ids) : overcounted ? undefined : carried;
-    // An item the board just changed carries its old stats until a read reports the change.
-    if (overcounted && fresh && usage(ids) === 'current' && !board.changing(item.id)) overcountedStats.delete(item.id);
-    // A read that reads no stats says nothing of the figures already showing.
-    const kept = (): Item['stats'] => isProvisional(before) ? before : known ?? previous;
-    const shownStats = (): Item['stats'] => {
-      if (!withStats) return kept();
-      const merged = mergedStats({ ...item, stats: known }, provisional ? undefined : live);
-      if (merged) return merged;
-      if (!fresh) return kept();
-      const figures = retainStats(known, live);
-      return provisional && typeof live === 'object' ? { ...figures as ItemStats, provisional: true } : figures;
-    };
-    const shown = { ...item, stats: shownStats(), usageState: !ids.length ? undefined : fresh ? usage(ids) : previousUsage.get(item.id), threads: threads(item.id) };
-    if (isProvisional(shown.stats)) heldStats.set(item.id, previous);
-    else heldStats.delete(item.id);
+    const ids = liveThreadIds(item.id);
+    const shown = { ...item, stats: shownStats(item, previousStats.get(item.id), withStats), usageState: ids.length ? previousUsage.get(item.id) : undefined, threads: threads(item.id) };
     shown.slices = item.slices.map((slice): typeof slice => {
       if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
       const ids = slice.workId && records ? records.threads(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];
@@ -382,6 +371,8 @@ const TEST_READ_MS = Number(process.env.BOARD_READ_MS) || 0;
 const LOCAL_REFRESH_MS = 2_000;
 const LOCAL_STATS_MS = 30_000;
 let statsReadAt = -Infinity;
+/** Moves when a stats read already running can no longer be shown. */
+let statsGeneration = 0;
 let figuresShown = false;
 /** How often a stats read may run while thread reads land. Tests shorten it with BOARD_CATCH_UP_MS. */
 const CATCH_UP_STATS_MS = Number(process.env.BOARD_CATCH_UP_MS) || 5_000;
@@ -389,20 +380,21 @@ const CATCH_UP_STATS_MS = Number(process.env.BOARD_CATCH_UP_MS) || 5_000;
 const usageCatchUp = fixture ? null : createUsageCatchUp({
   sources: statsSources,
   threadIds: () => recordedThreadIds(board.snapshot().items),
+  itemThreads: () => board.snapshot().items.filter((item) => item.recorded !== false).map((item) => liveThreadIds(item.id)),
+  generation: () => statsGeneration,
   settled: () => board.snapshot().firstRead.settled,
   sinceStatsRead: () => Date.now() - statsReadAt,
   // An unreadable database recovers at the normal pace; only landing reads hurry a stats read.
   paceMs: () => board.snapshot().usageRead?.readable === false ? LOCAL_STATS_MS : CATCH_UP_STATS_MS,
   quietMs: LOCAL_STATS_MS,
-  // Shows the figures on the items as they are, so this path applies no read over the revision guard, shows no record a read
-  // hasn't, and leaves PR writes and armed starts to a local refresh.
   publish: (reads) => {
-    board.update({ items: withT3Reads(board.snapshot().items, reads) });
+    showStatsRead(reads);
     if (!figuresShown && board.snapshot().items.some((item) => typeof item.stats === 'object' && !item.stats.frozen)) {
       figuresShown = true;
       timed('first item with figures');
     }
     board.push();
+    void syncPrStats(board.snapshot().items);
   },
   caughtUp: () => {
     transcriptsRead = true;
@@ -411,6 +403,7 @@ const usageCatchUp = fixture ? null : createUsageCatchUp({
     void syncPrStats(board.snapshot().items);
   },
   timed,
+  log,
 });
 /** How long an item stays active after its thread stops running or it closes, so a source reads what the agent wrote last. */
 const SETTLE_MS = 5 * 60_000;
@@ -493,12 +486,13 @@ function refreshLocalNow(recordsChanged: boolean): void {
     board.push();
   });
   const before = board.snapshot().items;
-  if (board.snapshot().fetchedAt !== null || before.length) showRecords(Date.now() - statsReadAt >= LOCAL_STATS_MS);
-  let after = board.snapshot().items;
+  if (board.snapshot().fetchedAt !== null || before.length) showRecords();
+  if (Date.now() - statsReadAt >= LOCAL_STATS_MS && !usageCatchUp?.reading()) askForStats();
+  const after = board.snapshot().items;
   const running = (item: Item) => Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running');
   // A run can finish between stats reads. Read its final turn before writing the settled PR block.
   const finished = after.some((item) => running(before.find((b) => b.id === item.id) ?? item) && !running(item));
-  if (finished) board.update({ items: after = withT3Reads(after) });
+  if (finished) askForStats(true);
   runLocal(() => commands.reconcileStarts(after));
   runLocal(() => sweepShapingThreads?.());
   // Before the return below, so a build that finished, or a hold that passed, starts the next build with nothing else changed.
@@ -509,6 +503,9 @@ function refreshLocalNow(recordsChanged: boolean): void {
   // A blocker completes from local facts, as a decision's answer the shaping session records, without any ticket read.
   runLocal(() => startAfter.startUnblocked());
 }
+
+/** Asks for a stats read, which runs apart from what asks; a board that hasn't caught up reads at its own pace. */
+const askForStats = (urgent = false) => runLocal(() => usageCatchUp?.want(urgent));
 
 /** Changes the ticket as last read and shows it, since each refresh of the records goes back to that read. */
 function showLabelChange(item: Item, { label, action }: LabelChange): void {
@@ -550,7 +547,8 @@ function recordsShown(): void {
  * never two at once: a refresh while one runs starts none.
  */
 async function syncPrStats(items: Item[]): Promise<void> {
-  if (syncingPrStats || !transcriptsRead) return;
+  // A run just finished, and the read of its final turn writes the settled block when it lands.
+  if (syncingPrStats || !transcriptsRead || usageCatchUp?.owed()) return;
   syncingPrStats = true;
   try {
     const now = Date.now();
@@ -717,7 +715,7 @@ async function refresh(): Promise<void> {
       if (board.snapshot().firstRead.settled) return;
       // A read so far confirms no change the board made, as the source of one may not have read yet, and isn't the
       // whole read fetchedAt times.
-      board.applyRead(recordedItems(partial), readRevision, withT3Reads, () => false);
+      board.applyRead(recordedItems(partial), readRevision, (shown) => withT3Reads(shown), () => false);
       recordsShown();
       board.update({ itemSourceProblems: partial.problems ?? [] });
       const successful = items.repos().some(repo =>
@@ -736,8 +734,9 @@ async function refresh(): Promise<void> {
       const refs = new Set(ticketsByReference(fresh).keys());
       specWorkIds = records.list({}).filter(record => record.ticket && refs.has(record.ticket.toLowerCase())).map(record => record.workId);
     }
-    board.applyRead(recordedItems(snapshot), readRevision, withT3Reads, items.readAfresh);
+    board.applyRead(recordedItems(snapshot), readRevision, (shown) => withT3Reads(shown), items.readAfresh);
     recordsShown();
+    askForStats();
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting, ready: true });
     board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? recordsProblem, itemSourceProblems: snapshot.problems ?? [],
       t3Availability: await t3Availability(), t3EnvironmentId: readEnvironmentId(environmentIdFile), ...await repositoryProjectReads(repos) });

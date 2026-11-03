@@ -22,9 +22,9 @@ async function openCounter(label: string): Promise<HTMLElement> {
 
 test('the counters show need you, building over the limit of 2, queued, shipped this week and spend, each by its number and named by its label', async () => {
   await mountPage(completeSample);
-  expect(counters().map(text)).toEqual(['8', '3/2', '3', '4', '$190.25']);
+  expect(counters().map(text)).toEqual(['7', '3/2', '3', '4', '$190.25']);
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
-    'need you: 8 items only you can move',
+    'need you: 7 items only you can move',
     'building: 1 over the in-flight limit',
     'queued: 3 items ready to shape, 4 more in List',
     'shipped: Done in the last 7 days',
@@ -72,12 +72,11 @@ test('a counter row shows its repository\'s project icon, not a tone dot', async
 test('need you lists its items by status, each with its status glyph in its colour', async () => {
   await mountPage();
   const pop = await openCounter('need you');
-  expect(head(pop)).toBe('Needs you8');
-  expect([...pop.querySelectorAll('h3')].map(text)).toEqual(['Needs you 2', 'Ready 1', 'Verify 4', 'Ready to merge 1']);
+  expect(head(pop)).toBe('Needs you7');
+  expect([...pop.querySelectorAll('h3')].map(text)).toEqual(['Needs you 2', 'Verify 4', 'Ready to merge 1']);
   expect(rows()).toEqual([
     '#23 Faster library sync on large collections30m ago',
     '#202 Sign-in screen35m ago',
-    '#140 Owner accounts1h ago',
     '#900026 Bump FFmpeg to 7.140m ago',
     '#31 New artwork grid layout1h ago',
     '#34 Swipe between episodes2h ago',
@@ -161,7 +160,7 @@ test('with nothing on the board each popover says so', async () => {
     await settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   }
   expect(empty).toEqual([
-    ['need you', 'Desk clear. The line runs without you.'],
+    ['need you', 'Nothing waits on you.'],
     ['building', 'Nothing building right now.'],
     ['queued', 'Nothing queued.'],
     ['shipped', 'Nothing shipped this week.'],

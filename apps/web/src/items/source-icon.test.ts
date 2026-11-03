@@ -4,7 +4,7 @@ import type { BoardData, Item } from '@lar-factory/shared';
 import { $, mountPage, push, sample, settle } from '../../test/support.ts';
 
 const local: Item = { ...sample.items[0]!, id: 'source-work', repo: 'example/product', number: 0, url: null,
-  title: 'Export a report', kind: 'feature', status: 'Ready', statuses: ['Ready'], parent: null, parentId: null,
+  title: 'Export a report', kind: 'feature', status: 'Verify', statuses: ['Verify'], parent: null, parentId: null,
   subIssues: { total: 0, completed: 0 }, slices: [], blockers: [], linkedPrs: [] };
 const board = (item: Item): BoardData => ({ ...sample, items: [item], repos: [{ repo: item.repo, role: '', labels: [] }] });
 
@@ -91,8 +91,8 @@ test('expanded slice rows and their details keep each slice source', async () =>
 test.each<[Item['status'], string, number, string, string]>([
   ['List', 'example/product', 17, 'https://github.com/example/product/issues/17', 'GitHub issue. Saved on GitHub.'],
   ['List', 'example/project/product', 23, 'https://dev.azure.com/example/project/_workitems/edit/23', 'Azure DevOps work item. Saved in Azure DevOps.'],
-  ['Ready', 'example/product', 17, 'https://github.com/example/product/issues/17', 'GitHub issue. Saved on GitHub.'],
-  ['Ready', 'example/project/product', 23, 'https://dev.azure.com/example/project/_workitems/edit/23', 'Azure DevOps work item. Saved in Azure DevOps.'],
+  ['Verify', 'example/product', 17, 'https://github.com/example/product/issues/17', 'GitHub issue. Saved on GitHub.'],
+  ['Verify', 'example/project/product', 23, 'https://dev.azure.com/example/project/_workitems/edit/23', 'Azure DevOps work item. Saved in Azure DevOps.'],
 ])('conversion in %s updates %s and its open details without a reload', async (status, repo, number, url, label) => {
   const item: Item = { ...local, status, statuses: [status], repo };
   await mountPage(board(item));

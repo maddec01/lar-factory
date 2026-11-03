@@ -1,45 +1,29 @@
 // Your desk: the items awaiting your action, including shaping and concept questions, as cards in one row that scrolls
 // sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the same five
 // rows at the same heights, so they line up across cards: status, repository and age; the title; the next step; the
-// step track; and the actions, the card's action on the left and Open thread as an icon in the right corner. Only a
-// Ready card's start message or Start after error, under its actions, makes one card taller than the rest.
+// step track; and the actions, the card's action on the left and Open thread as an icon in the right corner. An empty
+// desk is one small line.
 
-import { decisionMethodName, needsAnswer, openQuestionThread, HINTS, itemPr, openBlockerRefs, itemName, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
+import { decisionMethodName, needsAnswer, openQuestionThread, HINTS, itemPr, itemName, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, StepTrack } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
-import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
+import { OpenThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
-import { StartAfterError, showsStartAfter } from '../items/start-after.tsx';
-import { StartBuild } from '../items/start-build.tsx';
-import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
-
-/** Whether the card's action is Start build, or Start after in its place: a Ready item no thread works on yet, carrying no other status. */
-const startsBuild = (item: Item) => item.status === 'Ready' && !hasLiveThread(item);
-
-/** What a Ready card waits on: the open blockers Start after names, what holds its repository, or nothing. */
-function readyStep(item: Item, data: BoardData): string {
-  if (!startsBuild(item)) return hasLiveThread(item) ? 'A thread is at work on it' : 'Brief ready';
-  if (showsStartAfter(item, data)) return `Waits on ${openBlockerRefs(item, true).join(', ')}`;
-  return startHold(data, item.repo) ?? 'Brief ready';
-}
-
-/** Whether the card's action is Open PR: a Verify or Ready to merge item. Only that card reads its PR's merge state and checks. */
-const readsPr = (item: Item) => item.status === 'Verify' || item.status === 'Ready to merge';
 
 const MERGE_COLOR: Record<MergeState, string> = { 'can merge': 'var(--st-done)', checking: 'var(--warning)', blocked: 'var(--muted-foreground)', conflicts: 'var(--error)' };
 
 /**
- * The one line under the title: the merge state and checks of the PR Open PR opens, what a Ready card waits on, or the
- * status's hint. The checks leave out a zero count other than passed.
+ * The one line under the title: the merge state and checks of the PR Open PR opens, or the status's hint. The checks
+ * leave out a zero count other than passed.
  */
-function NextStep({ item, data }: { item: Item; data: BoardData }) {
+function NextStep({ item }: { item: Item }) {
   if (needsAnswer(item)) return <span className="truncate">Answer in T3</span>;
-  const pipeline = readsPr(item) ? itemPr(item)?.pipeline : undefined;
+  const pipeline = itemPr(item)?.pipeline;
   if (pipeline) {
     const { checks, mergeState } = pipeline;
     const counts = checks
@@ -52,19 +36,17 @@ function NextStep({ item, data }: { item: Item; data: BoardData }) {
       </>
     );
   }
-  return <span className="truncate">{item.status === 'Ready' ? readyStep(item, data) : item.status === 'Needs you' ? 'Answer in T3' : HINTS[item.status]}</span>;
+  return <span className="truncate">{HINTS[item.status]}</span>;
 }
 
 /** One row: the card's action on the left, and Open thread as a square icon in the right corner unless it is the action. */
 function Actions({ item, data }: { item: Item; data: BoardData }) {
-  const action = needsAnswer(item) ? <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" /> : startsBuild(item) ? <StartBuild item={item} data={data} />
-    : readsPr(item) ? <PrLink item={item} label="Open PR" />
-    : null;
   return (
     // A click beside the buttons opens the item dialog, as anywhere else on the card.
     <KeepClicks className="desk-actions flex h-7 min-w-0 items-center justify-start gap-2" passEmpty>
-      {action ?? <OpenThread item={item} data={data} />}
-      {action && !needsAnswer(item) && <span className="ml-auto flex"><OpenThread item={item} data={data} iconOnly /></span>}
+      {needsAnswer(item)
+        ? <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />
+        : <><PrLink item={item} label="Open PR" /><span className="ml-auto flex"><OpenThread item={item} data={data} iconOnly /></span></>}
     </KeepClicks>
   );
 }
@@ -90,11 +72,10 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
         {/* Two lines tall whatever the title's length, so the rows under it start at the same height on every card. */}
         <span className="desk-title line-clamp-2 h-10 text-sm/5 font-medium" title={`${itemName(item)}`}><ItemTitle item={item} /></span>
         <AzureFields azure={item.azure} />
-        <span className="desk-next flex h-4 min-w-0 items-center gap-1.5 text-xs text-(--muted-foreground) tabular-nums"><NextStep item={item} data={data} /></span>
+        <span className="desk-next flex h-4 min-w-0 items-center gap-1.5 text-xs text-(--muted-foreground) tabular-nums"><NextStep item={item} /></span>
         <span className="pt-1"><StepTrack status={item.status} /></span>
       </button>
       <Actions item={item} data={data} />
-      {item.status === 'Ready' && <KeepClicks className="desk-start cursor-auto empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
     </div>
   );
 }
@@ -102,12 +83,16 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
 /** `items` are the desk's items in the main area's scope. */
 export function Desk({ items }: { items: Item[] }) {
   const { data, now } = useBoardStore();
+  if (!items.length) return (
+    <section className="desk flex items-baseline gap-2 text-xs text-(--muted-foreground)" aria-labelledby="desk-h">
+      <h2 id="desk-h" className="m-0 text-[13px] font-medium text-(--foreground)">Your desk</h2>
+      <p className="m-0">Nothing waits on you.</p>
+    </section>
+  );
   return (
     <section className="desk grid gap-3" aria-labelledby="desk-h">
       <h2 id="desk-h" className="m-0 text-[13px] font-medium">Your desk <span className="text-(--muted-foreground)">{items.length}</span></h2>
-      {items.length
-        ? <div className="-mx-6 flex items-start gap-3 overflow-x-auto px-6 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{items.map((i) => <DeskCard key={i.id} item={i} data={data} now={now} />)}</div>
-        : <p className="m-0 rounded-xl border border-dashed border-(--input) p-6 text-center text-(--muted-foreground)">Desk clear. The line runs without you.</p>}
+      <div className="-mx-6 flex items-start gap-3 overflow-x-auto px-6 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{items.map((i) => <DeskCard key={i.id} item={i} data={data} now={now} />)}</div>
     </section>
   );
 }

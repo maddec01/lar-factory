@@ -2,7 +2,7 @@
 // in the order they run. Each part's kind comes from its local record, what it waits on from its blockers, and its
 // thread is its newest item thread.
 
-import { blockerRef, currentBuildThread, decisionType, methodName, openBlockers, refKey } from '@lar-factory/shared';
+import { blockerRef, currentBuildThread, decisionType, isDossierParent, methodName, openBlockers, refKey } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'decision', 'build'] as const;
@@ -92,8 +92,7 @@ export const waitText = (item: Item, blockers: readonly Blocker[]) => blockers.m
 /** Every open concept and open item with sub-issues on the board, as a dossier, where it or a part is in `items`, the main area's scope. */
 export function dossiersOf(items: readonly Item[], all: readonly Item[]): DossierItems[] {
   const shown = new Set(items.map((i) => i.id));
-  return all.filter((p) => p.status !== 'List' && p.status !== 'Done'
-    && (p.kind === 'concept' || all.some((c) => childOf(c, p))))
+  return all.filter((p) => isDossierParent(p, all))
     .map((parent) => ({ parent, parts: partsOf(parent, all) }))
     .filter(({ parent, parts }) => shown.has(parent.id) || parts.some((p) => shown.has(p.item.id)));
 }

@@ -242,7 +242,7 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
         {repoKey(item) !== home && <RepoCell item={item} />}
         <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} label={shown.word} waiting={waits.length > 0} /></span>
         <span>{isDone(item) ? 'Complete' : shown.word}</span>
-        {s || usageLoading(item) ? <Figures s={s} item={item} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
+        {s || usageLoading(item, data) ? <Figures s={s} item={item} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
         <AzureFields azure={item.azure} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
         <span className="min-w-0 empty:hidden"><ThreadLine part={part} /></span>
@@ -432,7 +432,7 @@ function DossierLine({ parent, parts, data, lead, note, tools, onClick, classNam
           <span data-col="bar" className="min-w-0 flex-1"><PartsBar m={m} /></span>
           <span data-col="count" className="shrink-0 text-right text-[11px] tabular-nums text-(--muted-foreground)" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count}</span>
         </span>
-        <span data-col="figures" className={FIGURES_COLUMN}><Figures s={figuresOf(parent, data, true)} item={parent} /></span>
+        <span data-col="figures" className={FIGURES_COLUMN}><Figures s={figuresOf(parent, data, true)} item={parent} total /></span>
       </span>
       <span className="flex min-w-0 items-center gap-1.5" data-col="state">
         {/* The first chip keeps its full width and the next step truncates; the rest of the chips wait in the tooltip. */}

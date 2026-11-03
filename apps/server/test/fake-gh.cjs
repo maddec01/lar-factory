@@ -198,9 +198,10 @@ const main = async () => {
     // its parent's id and labels.
     if (args.some((a) => a.includes('repository(owner:'))) {
       const readingRepo = ['owner', 'name'].map((key) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1)).join('/');
-      // While the file options.readHold names exists, a read of open issues waits for its removal, between a held and
-      // a released entry in the calls, so a test decides when the read ends instead of guessing how long it takes.
-      if (options.readHold && fs.existsSync(options.readHold) && args.some((a) => a.includes('states: [OPEN]'))) {
+      // While the file options.readHold names exists, a delayed repository's read of open issues waits for its removal,
+      // between a held and a released entry in the calls, so a test decides when the read ends instead of guessing how
+      // long it takes.
+      if (options.readHold && options.delayedRepos.includes(readingRepo) && fs.existsSync(options.readHold) && args.some((a) => a.includes('states: [OPEN]'))) {
         fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', '["held"]\n');
         await new Promise((resolve) => {
           const ready = () => {

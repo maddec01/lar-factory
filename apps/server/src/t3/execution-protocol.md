@@ -47,7 +47,19 @@ first user message no longer associates it. Onboarding title lookup uses the
 same completed observation. While T3 can't be read, each recorded thread shows
 its last observation with that observation's time, or unavailable once one was
 never seen. A recorded thread missing from a completed snapshot is left out
-until the T3 CLI confirms it deleted. Stats use the same completed protocol observation.
+until the T3 CLI confirms it deleted.
+
+Stats use the same protocol observations and answer per item. An item's family is
+its recorded threads and their lineage descendants. `protocolStatsInputs` reports
+each thread as current, pending (its shell changed after an earlier success, so it
+counts from that read), never read, failed (until a read succeeds, counting from any
+retained observation only for deduplication) or gone (deleted, or on neither thread
+list once both were read). A failed thread fails its family, and a thread never read
+makes its family load. T3 stopped or an unreadable thread list still fails every
+item, and T3 running with its list not yet read loads every item. Figures stay
+provisional until the first read settles and every needed thread was observed once:
+they show, but aren't retained, frozen or written to a PR. There is still no
+transcript-session SQL fallback for an unread thread.
 
 T3's `orchestration.subscribeShell` always sends `archivedThreads: []`
 (`buildActiveShellSnapshot` in apps/server/src/orchestration-v2/ShellStream.ts), and

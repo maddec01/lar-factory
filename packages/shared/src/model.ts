@@ -229,6 +229,8 @@ export interface ItemStats {
   costUsd?: number;
   /** Read back from a merged PR's stats block: the figures as they stood at merge, cost in whole dollars (0 for under a dollar). */
   frozen?: true;
+  /** Read before every needed thread was observed, so a shared record may sit on the wrong item. Shown, but never retained, frozen or written to a PR. */
+  provisional?: true;
 }
 
 /**
@@ -349,6 +351,11 @@ export interface Item {
   map?: ConceptMap;
   /** Absent when no T3 thread worked on it or there's no T3 database; 'unavailable' when the database can't be read. */
   stats?: ItemStats | 'unavailable';
+  /**
+   * Whether usage answers for this item's own thread family: current, loading while a thread was never read, or failed
+   * until a read succeeds. Absent for an item with no threads, or before its first usage read.
+   */
+  usageState?: 'current' | 'loading' | 'failed';
   /**
    * The T3 threads its work record holds, newest first; absent when it holds none, 'unavailable' while T3 can't be read
    * and the board never saw one of them.

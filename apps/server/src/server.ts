@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, limitNumber, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, limitNumber, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ItemStats, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
@@ -128,6 +128,9 @@ const { heavyCommandLimit, buildLimit } = createLimitSettings({ changed: () => {
 const autoBuild = createAutoBuildSetting({ offerModelChoices, changed: () => { reread(); runLocal(() => autoBuildRun.pass()); } });
 /** Work whose retained stats count a shaping thread the sweep deleted, until a fresh read replaces them. */
 const overcountedStats = new Set<string>();
+/** While an item shows provisional figures, the figures retention may keep instead; the first read past that replaces them. */
+const heldStats = new Map<string, Item['stats']>();
+const isProvisional = (stats: Item['stats']): boolean => typeof stats === 'object' && !!stats.provisional;
 const sweepShapingThreads = records && createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: lookupThread, send: sendThreadCommand,
   deleted: (workId) => {
     overcountedStats.add(workId);
@@ -309,25 +312,41 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     const purposes = new Map(records.threads(workId).map(thread => [thread.threadId, thread.purpose]));
     return observed.map(thread => ({ ...thread, purpose: purposes.get(thread.id) }));
   };
-  const { stats, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, fresh, needed);
+  const { stats, usage, statsUnavailable: unreadable, priced, allObserved } = loadT3Reads(statsSources, now, fresh, needed);
+  // A partial set moves shared records between items, and needed covers only the items shown, so figures wait for both.
+  const provisional = fresh && !(allObserved && board.snapshot().firstRead.settled);
   if (fresh) {
     statsReadAt = now;
     statsUnavailable(unreadable);
-    board.update({ usageRead: unreadable ? { readable: false, readAt: board.snapshot().usageRead?.readAt } : { readable: true, readAt: new Date(now).toISOString() } });
+    // T3's thread list not read yet reads nothing, which says nothing of the last read.
+    if (unreadable || priced !== null) board.update({ usageRead: unreadable ? { readable: false, readAt: board.snapshot().usageRead?.readAt } : { readable: true, readAt: new Date(now).toISOString() } });
     if (priced !== null) pricingUnavailable(!priced);
   }
   const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
+  const previousUsage = new Map(board.snapshot().items.map((item) => [item.id, item.usageState]));
   const cleanupProblems = records && shapingThreadCleanupProblems(records);
   return items.map((item) => {
     if (item.recorded === false) return item;
     const overcounted = withStats && overcountedStats.has(item.id);
-    const previous = overcounted ? undefined : previousStats.get(item.id);
-    const known = overcounted ? undefined : retainStats(previous, item.stats);
+    const ids = threadIds(item.id);
+    const before = previousStats.get(item.id);
+    const previous = overcounted ? undefined : isProvisional(before) ? heldStats.get(item.id) : before;
+    const carried = isProvisional(item.stats) ? undefined : item.stats;
+    const known = overcounted ? undefined : retainStats(previous, carried);
     // Until transcripts are first read, no usage read has failed: the item's figures are still to come.
-    const live = fresh ? stats(threadIds(item.id)) : overcounted ? undefined : item.stats;
+    const live = fresh ? stats(ids) : overcounted ? undefined : carried;
     // An item the board just changed carries its old stats until a read reports the change.
-    if (overcounted && fresh && live !== 'unavailable' && !board.changing(item.id)) overcountedStats.delete(item.id);
-    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : known ?? previous, threads: threads(item.id) };
+    if (overcounted && fresh && usage(ids) === 'current' && !board.changing(item.id)) overcountedStats.delete(item.id);
+    const shownStats = (): Item['stats'] => {
+      if (!withStats) return isProvisional(before) ? before : known ?? previous;
+      const merged = mergedStats({ ...item, stats: known }, provisional ? undefined : live);
+      if (merged) return merged;
+      const figures = retainStats(known, live);
+      return provisional && typeof live === 'object' ? { ...figures as ItemStats, provisional: true } : figures;
+    };
+    const shown = { ...item, stats: shownStats(), usageState: !ids.length ? undefined : fresh ? usage(ids) : previousUsage.get(item.id), threads: threads(item.id) };
+    if (isProvisional(shown.stats)) heldStats.set(item.id, previous);
+    else heldStats.delete(item.id);
     shown.slices = item.slices.map((slice): typeof slice => {
       if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
       const ids = slice.workId && records ? records.threads(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];

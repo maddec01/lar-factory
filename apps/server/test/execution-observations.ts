@@ -1,6 +1,7 @@
 import { executionStats } from '../src/t3/execution-stats.ts';
 import { readFileSync } from 'node:fs';
 import { executionItemThreads } from '../src/t3/item-execution.ts';
+import type { ThreadUsageRead } from '../src/t3/item-execution.ts';
 import type { FixtureRequest, FixtureThread } from './stats-db.ts';
 
 export function protocolItemThreads(threadIds: readonly string[]) {
@@ -33,7 +34,7 @@ export function protocolStartedThread(): never { throw Error("T3 execution unava
 export function protocolStatsInputs() {
   if (process.env.FAKE_EXECUTION_STATS_UNAVAILABLE === '1') throw Error('Usage unavailable');
   const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
-  return executionStats(threads.map(thread => ({
+  const inputs = executionStats(threads.filter(thread => thread.read !== 'never').map(thread => ({
     thread: { id: thread.id, title: thread.title ?? thread.id, deletedAt: thread.deletedAt ?? null,
       lineage: { rootThreadId: thread.rootThreadId ?? thread.id, parentThreadId: thread.parentThreadId ?? thread.rootThreadId ?? null, relationshipToParent: thread.rootThreadId ? 'subagent' : null } },
     messages: [...(thread.messages ?? []).map((text, index) => ({ role: 'user', text, createdAt: new Date(Date.parse('2026-10-20T08:00:00Z') + index * 60000).toISOString() })),
@@ -50,6 +51,14 @@ export function protocolStatsInputs() {
     subagents: threads.flatMap(child => child.rootThreadId === thread.id || child.parentThreadId === thread.id
       ? [child.subagent ?? []].flat().map(run => ({ ...run, childThreadId: child.id, completedAt: run.completedAt ?? null })) : []),
   })));
+  return { ...inputs, allObserved: threads.every(thread => thread.read !== 'never'), familyReads(threadIds: readonly string[]): ThreadUsageRead[] {
+    const family = new Set(threadIds);
+    for (const _ of threads) for (const { id, rootThreadId, parentThreadId } of threads) if (family.has(rootThreadId ?? '') || family.has(parentThreadId ?? '')) family.add(id);
+    return [...family].map((id): ThreadUsageRead => {
+      const thread = threads.find(candidate => candidate.id === id);
+      return !thread || thread.deletedAt ? 'gone' : thread.read ?? 'current';
+    });
+  } };
 }
 
 export function liveWorktreePaths(): string[] | undefined {

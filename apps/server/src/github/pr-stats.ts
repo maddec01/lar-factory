@@ -145,8 +145,8 @@ export interface PrBodyEdit {
 /**
  * Open PRs whose block is missing or out of date, and the merged PR whose final
  * figures grew. A build's PR carries its stats; other items linked to it, such
- * as a parent the PR also closes, write nothing. Builds without stats, and PRs whose
- * body wasn't read, are left alone; a PR is edited once even if two builds link it.
+ * as a parent the PR also closes, write nothing. Builds without stats or with provisional
+ * ones, and PRs whose body wasn't read, are left alone; a PR is edited once even if two builds link it.
  * Only PRs in a repo with items on the board are edited: an issue can be closed by
  * a PR in a repo the board doesn't follow.
  */
@@ -156,7 +156,7 @@ export function prStatsEdits(items: readonly Item[]): PrBodyEdit[] {
   const edits: PrBodyEdit[] = [];
   for (const item of items) {
     const stats = item.stats;
-    if (!isBuild(item) || !stats || stats === 'unavailable') continue;
+    if (!isBuild(item) || !stats || stats === 'unavailable' || stats.provisional) continue;
     const finalPr = stats.frozen ? mergedPrs(item).find((pr) => pr.body !== undefined && blockStats(pr.body)) : undefined;
     for (const pr of item.linkedPrs) {
       if (pr.state === 'closed' || pr.body === undefined || seen.has(pr.url)) continue;

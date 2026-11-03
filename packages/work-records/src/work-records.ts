@@ -21,6 +21,7 @@ export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './da
 export { DEPENDENCY_OBSERVATION_KINDS, type Dependency, type DependencyChange, type DependencyObservationKind, type NewDependency } from './dependencies.ts';
 export { DEFAULT_RETENTION, readRetention, retentionPath, writeRetention, type Retention } from './retention.ts';
 export { readShapingThreadCleanup, writeShapingThreadCleanup } from './shaping-thread-cleanup.ts';
+export { automaticHeavyCommandLimit, readHeavyCommandLimit, writeHeavyCommandLimit, type SavedHeavyCommandLimit } from './heavy-command-limit.ts';
 
 /** The board's kinds, plus a build's slice. */
 export const WORK_KINDS = ['bug', 'feature', 'improvement', 'concept', 'decision', 'build', 'slice', 'issue'] as const;

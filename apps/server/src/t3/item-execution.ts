@@ -28,52 +28,71 @@ const isSettled = (shell: Record<string, unknown>): boolean => !!shell.settledAt
 const orderedBy = (shell: Record<string, unknown>): string =>
   isSettled(shell) ? String(shell.latestRunCompletedAt ?? shell.latestRunStartedAt ?? shell.latestRunRequestedAt ?? '') : String(shell.updatedAt);
 
-/** Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out. */
+const RUNNING = new Set(['preparing', 'starting', 'running', 'waiting']);
+const ACTIVITY = new Set([...RUNNING, 'queued']);
+
+/** A shell's status, where a newer queued or cancelled message can hide an older run that is still at work. */
+const statusOf = (shell: Record<string, unknown>): string =>
+  ACTIVITY.has(String(shell.activityRunStatus)) ? String(shell.activityRunStatus) : String(shell.status);
+
+/**
+ * Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out. One pass checks
+ * every shell and finds the threads at work; a thread itself is built when a lookup first asks for it, as a board asks for
+ * a few hundred of several thousand shells.
+ */
 export function executionItemThreads(shells: Record<string, unknown>[]) {
-  const byId = new Map<string, ItemThread>();
+  const shellsById = new Map<string, Record<string, unknown>>();
   const lineages = new Map<unknown, Lineage>();
-  const order = new Map<string, string>();
+  const working: Record<string, unknown>[] = [];
   for (const shell of shells) {
     if (typeof shell.id !== 'string' || shell.deletedAt) continue;
     if (typeof shell.updatedAt !== 'string' || !Number.isFinite(Date.parse(shell.updatedAt))) throw Error('Invalid execution timestamp');
-    // A newer queued or cancelled message can hide an older run that is still at work.
-    const status = ['preparing', 'starting', 'running', 'waiting', 'queued'].includes(String(shell.activityRunStatus))
-      ? String(shell.activityRunStatus) : String(shell.status);
-    const state: ItemThread['state'] = shell.pendingRuntimeRequest ? 'needs you'
-      : ['preparing', 'starting', 'running', 'waiting'].includes(status) ? 'running'
-      : ['failed', 'interrupted', 'cancelled'].includes(status) ? 'stopped' : 'done';
-    byId.set(shell.id, { id: shell.id, title: typeof shell.title === 'string' ? shell.title : shell.id, state, ...(!shell.pendingRuntimeRequest && status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && status === 'queued' ? { queued: true as const } : {}), ...(shell.archivedAt ? { archived: true as const } : {}), updated: shell.updatedAt });
+    shellsById.set(shell.id, shell);
     lineages.set(shell.id, shell.lineage as Lineage);
-    order.set(shell.id, orderedBy(shell));
+    if (shell.pendingRuntimeRequest || ACTIVITY.has(statusOf(shell)) || Array.isArray(shell.pendingBackgroundTasks) && shell.pendingBackgroundTasks.length) working.push(shell);
   }
-  // A thread's background tasks carry on after its turn ends, so it and its ancestors are still at work.
-  const background = new Set<string>();
-  for (const shell of shells) {
-    const thread = byId.get(shell.id as string);
-    if (!thread || !Array.isArray(shell.pendingBackgroundTasks) || !shell.pendingBackgroundTasks.length) continue;
-    thread.hasRunningChildren = true;
-    background.add(thread.id);
-    for (const id of ancestorsOf(thread.id, lineages)) { const ancestor = byId.get(id); if (ancestor) ancestor.hasRunningChildren = true; }
-  }
-  for (const thread of byId.values()) {
-    const live = thread.state === 'running' || thread.state === 'needs you' || thread.queued;
-    const working = thread.currentRunning || background.has(thread.id);
-    if (!live && !working) continue;
-    for (const id of ancestorsOf(thread.id, lineages)) {
-      const ancestor = byId.get(id);
-      if (!ancestor) continue;
-      if (live) ancestor.hasLiveChildren = true;
-      if (thread.currentRunning) ancestor.hasRunningChildren = true;
-      if (working) {
-        const activity = ancestor.childActivity ??= { titles: [], count: 0 };
+  const liveChildren = new Set<string>();
+  const runningChildren = new Set<string>();
+  const childActivity = new Map<string, NonNullable<ItemThread['childActivity']>>();
+  for (const shell of working) {
+    const id = shell.id as string;
+    if (shellsById.get(id) !== shell) continue;
+    const status = statusOf(shell);
+    const live = !!shell.pendingRuntimeRequest || ACTIVITY.has(status);
+    // A thread's background tasks carry on after its turn ends, so it and its ancestors are still at work.
+    const background = Array.isArray(shell.pendingBackgroundTasks) && shell.pendingBackgroundTasks.length > 0;
+    if (background) runningChildren.add(id);
+    const running = !shell.pendingRuntimeRequest && status === 'running';
+    const title = typeof shell.title === 'string' ? shell.title : id;
+    for (const ancestor of ancestorsOf(id, lineages)) {
+      if (live) liveChildren.add(ancestor);
+      if (background || running) {
+        runningChildren.add(ancestor);
+        const activity = childActivity.get(ancestor) ?? { titles: [], count: 0 };
+        childActivity.set(ancestor, activity);
         activity.count++;
-        if (activity.titles.length < 3) activity.titles.push(thread.title);
+        if (activity.titles.length < 3) activity.titles.push(title);
       }
     }
   }
+  const threads = new Map<string, ItemThread>();
+  const threadOf = (id: string): ItemThread | undefined => {
+    const found = threads.get(id);
+    if (found) return found;
+    const shell = shellsById.get(id);
+    if (!shell) return undefined;
+    const status = statusOf(shell);
+    const state: ItemThread['state'] = shell.pendingRuntimeRequest ? 'needs you'
+      : RUNNING.has(status) ? 'running'
+      : ['failed', 'interrupted', 'cancelled'].includes(status) ? 'stopped' : 'done';
+    const thread: ItemThread = { id, title: typeof shell.title === 'string' ? shell.title : id, state, ...(!shell.pendingRuntimeRequest && status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && status === 'queued' ? { queued: true as const } : {}), ...(shell.archivedAt ? { archived: true as const } : {}), updated: shell.updatedAt as string,
+      ...(runningChildren.has(id) ? { hasRunningChildren: true } : {}), ...(liveChildren.has(id) ? { hasLiveChildren: true } : {}), ...(childActivity.has(id) ? { childActivity: childActivity.get(id) } : {}) };
+    threads.set(id, thread);
+    return thread;
+  };
   /** The recorded threads T3 shows, newest first by `orderedBy` and archived ones last, since archiving updates a thread; undefined for work with no recorded thread. */
   return (threadIds: readonly string[]): ItemThread[] | undefined => threadIds.length
-    ? threadIds.flatMap((id) => byId.get(id) ?? []).sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || order.get(b.id)!.localeCompare(order.get(a.id)!)) : undefined;
+    ? threadIds.flatMap((id) => threadOf(id) ?? []).sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || orderedBy(shellsById.get(b.id)!).localeCompare(orderedBy(shellsById.get(a.id)!))) : undefined;
 }
 
 /** The last lookup the board read while T3 could be read, kept through an outage, and when it read it. */
@@ -173,7 +192,8 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
       const showShells = () => {
         state.shownShells = [...state.shells!, ...lastArchived.filter(shell => !state.shellIds!.has(shell.id))];
         // The first shell with an ID wins, as a search of the list finds it.
-        state.shownById = new Map([...state.shownShells].reverse().map(shell => [shell.id, shell]));
+        state.shownById = new Map();
+        for (const shell of state.shownShells) if (!state.shownById.has(shell.id)) state.shownById.set(shell.id, shell);
         state.lookup = executionItemThreads(state.shownShells);
         lastSeen = { lookup: state.lookup, observedAt: state.observedAt! };
       };

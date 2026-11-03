@@ -4,8 +4,9 @@
 // Start for a Queued item. A part whose repository is still onboarding waits for onboarding to finish.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { isOnboarding, isRecord, openBlockers, startHold } from '@lar-factory/shared';
+import { isOnboarding, isRecord, openBlockers, sameRepo, startHold } from '@lar-factory/shared';
 import type { ArmedStart, Item, ModelGroup } from '@lar-factory/shared';
+import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import { readJsonRecord } from '../json-file.ts';
@@ -32,12 +33,30 @@ export interface StartAfterDeps {
   offerModelChoices(): ModelGroup[];
   /** The file armed starts live in; null in sample mode, which keeps none. */
   file: string | null;
+  /** Whether an armed item the board doesn't show has nothing left to start, as `armedWorkGone` answers. */
+  gone(itemId: string): boolean;
 }
 
 const ARMABLE = ['Ready', 'Queued'];
 const GONE = 'That item is no longer on the board.';
 
 const isOpen = (item: Item) => openBlockers(item).length > 0;
+
+/**
+ * Whether armed work has nothing left to start, from the sources that can say so: its record is gone, set aside or past
+ * Ready and Queued, or its repository left the onboarded list. The board can't: its items stay empty or partial during
+ * the first read and while the records can't be read. A source that can't be read proves nothing, so the start stays armed.
+ */
+export const armedWorkGone = (records: WorkRecords | null, repositories: () => readonly { repo: string }[]) => (itemId: string): boolean => {
+  if (!records) return false;
+  try {
+    const record = records.read(itemId);
+    if (record.setAside || !ARMABLE.includes(record.status)) return true;
+    return !repositories().some(({ repo }) => sameRepo(repo, record.repository));
+  } catch (err) {
+    return err instanceof WorkRecordError && err.code === 'not-found';
+  }
+};
 
 /** The armed starts in `file`, leaving out any entry that isn't one. */
 function readArmed(file: string | null): Record<string, ArmedStart> {
@@ -51,7 +70,7 @@ function readArmed(file: string | null): Record<string, ArmedStart> {
   return Object.fromEntries(entries);
 }
 
-export function createStartAfter({ board, commands, offerModelChoices, file }: StartAfterDeps): StartAfter {
+export function createStartAfter({ board, commands, offerModelChoices, file, gone }: StartAfterDeps): StartAfter {
   if (file) board.update({ armed: readArmed(file), armedErrors: {} });
   const armed = () => board.snapshot().armed ?? {};
   const errors = () => board.snapshot().armedErrors ?? {};
@@ -113,12 +132,15 @@ export function createStartAfter({ board, commands, offerModelChoices, file }: S
     async startUnblocked() {
       const runs = Object.entries(armed()).flatMap(([itemId, entry]) => {
         const item = board.find(itemId);
-        // A part that left the board, or moved on from Ready or Queued, has nothing left to start.
-        if (!item || !ARMABLE.includes(item.status)) {
+        // A part that moved on from Ready or Queued, or is gone from what the board reads, has nothing left to start.
+        if (item ? !ARMABLE.includes(item.status) : gone(itemId)) {
+          log(`disarmed ${itemId}: it has nothing left to start`);
           const error = save(without(armed(), itemId), errors());
           if (error) log(error);
           return [];
         }
+        // The board doesn't show it yet, so its first read may still.
+        if (!item) return [];
         // A part whose repository is still onboarding stays armed until onboarding finishes.
         return isOpen(item) || isOnboarding(board.snapshot(), item.repo) ? [] : [startNow(item, entry)];
       });

@@ -1293,10 +1293,10 @@ test('a build keeps its status ladder', async () => {
   expect(inDialog('[data-parts-progress]')).toBeNull();
 });
 
-test.each([[true, 0], [false, 1]])('with details loading, a concept recorded %s draws %i legacy diagrams', async (recorded, diagrams) => {
-  const board = conceptWith({ recorded, map: { destination: '', decisions: [], fog: [], diagram: 'graph TD; A-->B' } });
+test.each([true, false])('a concept recorded %s draws no diagram from its map, even with details loading', async (recorded) => {
+  const board = conceptWith({ recorded, map: { destination: '', decisions: [], fog: [] } });
   fetchMock.mockImplementation((url: string) => (detailsRead(url) ? new Promise<Response>(() => {}) : Promise.resolve(new Response(JSON.stringify(board)))));
   await mountPage(board);
   await openItem(CONCEPT);
-  expect(dialog()!.querySelectorAll('[data-map-diagram]')).toHaveLength(diagrams);
+  expect(dialog()!.querySelectorAll('[data-map-diagram]')).toHaveLength(0);
 });

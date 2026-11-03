@@ -116,3 +116,30 @@ test('in sample mode the shaping thread cleanup setting is absent and saving it 
   assert.equal(refused.status, 403);
   assert.match((await refused.json() as { error: string }).error, /disabled in sample mode/);
 });
+
+test('the heavy command limit reads Automatic on a fresh machine, saves a whole number, and refuses anything else', { timeout: 30_000 }, async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-board-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  const board = await startBoard(t, { recorded: false }, false, false, { HOME: home });
+  const fresh = (await until(board, (d) => d.fetchedAt !== null)).heavyCommandLimit;
+  assert.equal(fresh?.limit, 'automatic');
+  assert.ok(Number.isSafeInteger(fresh?.automatic) && fresh!.automatic >= 1);
+
+  for (const limit of [0, 2.5, 'many']) {
+    const refused = await board.postSession({ limit }, '/api/heavy-command-limit');
+    assert.equal(refused.status, 400, String(limit));
+    assert.equal((await refused.json() as { board: BoardData }).board.heavyCommandLimit?.limit, 'automatic');
+  }
+
+  const saved = await board.postSession({ limit: 3 }, '/api/heavy-command-limit');
+  assert.equal(saved.status, 200);
+  assert.deepEqual((await saved.json() as { board: BoardData }).board.heavyCommandLimit, { limit: 3, automatic: fresh!.automatic });
+});
+
+test('in sample mode the heavy command limit is absent and saving it is refused', async (t) => {
+  const sample = await startBoard(t, {}, true);
+  assert.equal('heavyCommandLimit' in await sample.board(), false);
+  const refused = await sample.postSession({ limit: 2 }, '/api/heavy-command-limit');
+  assert.equal(refused.status, 403);
+  assert.match((await refused.json() as { error: string }).error, /disabled in sample mode/);
+});

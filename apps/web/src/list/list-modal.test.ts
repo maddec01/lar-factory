@@ -1,7 +1,7 @@
 // The List modal: the title bar's List button opens it, the left pane picks All, a repository, the right
 // pane shows that group's items with search, Add item, Scope board and the sort menu.
 
-import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, moved, mountPage, push, sample, settle, text } from '../../test/support.ts';
 import type { KindDisagreement } from '@lar-factory/shared';
 afterEach(() => {
@@ -313,4 +313,69 @@ test('a List row shows its coloured kind badge and label chips', async () => {
   const chips = [...row('I_sample01').querySelectorAll<HTMLElement>('[data-label-chip]')];
   expect(chips.map(text)).toEqual(['area: server', 'area: web']);
   expect(chips[0]!.style.backgroundColor).toContain('color-mix');
+});
+
+describe('project icons', () => {
+  const REPO = 'maddec01/lar-server';
+  const favicon = { kind: 'favicon', projectId: 'project:one', revision: 'abc123' } as const;
+  const icon = (name: string) => group(name).querySelector<HTMLElement>('[data-project-icon]')!;
+  const image = (name: string) => icon(name).querySelector('img');
+  const fire = (el: Element, type: string) => settle(() => el.dispatchEvent(new Event(type)));
+
+  test('a favicon from the board\'s endpoint shows over the toned initial once it loads, in a square that keeps its size', async () => {
+    await mountPage({ ...sample, projectIcons: { [REPO]: favicon } });
+    await open();
+    const square = icon('lar-server');
+    const classes = square.className;
+    expect(text(square)).toBe('L');
+    expect(classes).toContain('size-5');
+    expect(square.getAttribute('aria-hidden')).toBe('true');
+    const img = image('lar-server')!;
+    expect(img.getAttribute('src')).toBe('/api/project-icon/project%3Aone?v=abc123');
+    expect(img.alt).toBe('');
+    expect(img.hidden, 'held back until it loads').toBe(true);
+    await fire(img, 'load');
+    expect(img.hidden).toBe(false);
+    expect(img.className).toContain('absolute');
+    expect(icon('lar-server').className, 'the image is out of flow, so the square does not move').toBe(classes);
+    expect(text(icon('lar-server'))).toBe('L');
+  });
+
+  test('an image the browser can\'t decode is dropped, leaving the toned initial', async () => {
+    await mountPage({ ...sample, projectIcons: { [REPO]: favicon } });
+    await open();
+    await fire(image('lar-server')!, 'error');
+    expect(image('lar-server')).toBeNull();
+    expect(text(icon('lar-server'))).toBe('L');
+  });
+
+  test('a new revision tries the image again', async () => {
+    await mountPage({ ...sample, projectIcons: { [REPO]: favicon } });
+    await open();
+    await fire(image('lar-server')!, 'error');
+    await push({ ...sample, projectIcons: { [REPO]: { ...favicon, revision: 'def456' } } });
+    expect(image('lar-server')!.getAttribute('src')).toBe('/api/project-icon/project%3Aone?v=def456');
+    expect(image('lar-server')!.hidden).toBe(true);
+  });
+
+  test('a repository with no icon, or a chosen one, shows the toned initial', async () => {
+    await mountPage({ ...sample, projectIcons: { [REPO]: { kind: 'emoji', emoji: '🚀' } } });
+    await open();
+    for (const name of ['lar-server', 'lar-apple']) {
+      expect(image(name)).toBeNull();
+      expect(text(icon(name))).toBe('L');
+      expect(icon(name).className).toMatch(/repo-tone-\d/);
+    }
+  });
+
+  test('an item row that names its repository shows its icon, whatever the case of its key', async () => {
+    await mountPage({ ...sample, projectIcons: { [REPO.toUpperCase()]: favicon } });
+    await open();
+    const row = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').find((b) => b.textContent.includes('lar-server'))!;
+    const small = row().querySelector<HTMLElement>('[data-project-icon]')!;
+    expect(small.className).toContain('size-3.5');
+    expect(small.querySelector('img')!.getAttribute('src')).toBe('/api/project-icon/project%3Aone?v=abc123');
+    await settle(() => group('lar-server').click());
+    expect($$('[data-list-modal] button[data-item] [data-project-icon]'), 'a picked repository\'s rows name no repository').toEqual([]);
+  });
 });

@@ -1,11 +1,11 @@
 import { liveProjects } from './t3-db.ts';
 import { vi, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
-import { anyOnAzureDevOps, azureRepo, onAzureDevOps, repositoryProjectHints } from './repository-project.ts';
+import { anyOnAzureDevOps, azureRepo, linkedWorktree, onAzureDevOps, repositoryProjectHints } from './repository-project.ts';
 import { checkouts } from '../../test/repo-support.ts';
 import { projectsDb } from '../../test/stats-db.ts';
 
@@ -16,6 +16,23 @@ const AZURE = [
   'contoso@vs-ssh.visualstudio.com:v3/contoso/Fabrikam/lar-api',
 ];
 const GITHUB = ['https://github.com/maddec01/lar-factory.git', 'git@github.com:maddec01/lar-factory.git', 'ssh://git@github.com/maddec01/lar-factory'];
+
+test('only a small regular .git file can name a linked worktree', (t) => {
+  const folder = mkdtempSync(join(tmpdir(), 'lar-dot-git-'));
+  t.onTestFinished(() => rmSync(folder, { recursive: true, force: true }));
+  const dotGit = join(folder, '.git');
+  const named = 'gitdir: /Users/me/app/.git/worktrees/one';
+  writeFileSync(dotGit, `${named}\n`);
+  assert.equal(linkedWorktree(folder), true);
+  writeFileSync(dotGit, named + ' '.repeat(8 * 1024));
+  assert.equal(linkedWorktree(folder), false, 'over the limit, even with a matching start');
+  rmSync(dotGit);
+  symlinkSync('/dev/null', dotGit);
+  assert.equal(linkedWorktree(folder), false, 'a link to a device');
+  rmSync(dotGit);
+  mkdirSync(dotGit);
+  assert.equal(linkedWorktree(folder), false, 'a main checkout');
+});
 
 test('an origin on dev.azure.com or *.visualstudio.com is on Azure DevOps, and a GitHub one is not', () => {
   for (const url of AZURE) assert.equal(onAzureDevOps(url), true, url);

@@ -4,12 +4,14 @@
 // one. The same checkouts tell whether a listed repository is on Azure DevOps, which only
 // then needs az. An Azure DevOps repository is named `organization/project/repository`.
 
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { runTool } from '../tools/run-tool.ts';
 import type { ProjectObservation } from './project-protocol.ts';
 import { repositoryProjects } from './repository-project-discovery.ts';
 import type { RepoConfig } from '@lar-factory/shared';
+
+const MAX_DOT_GIT_BYTES = 8 * 1024;
 
 export type RepositoryProject = { projectId: string; error?: undefined } | { error: string };
 
@@ -90,6 +92,16 @@ function mainCheckout(folder: string): boolean {
   return statSync(join(folder, '.git'), { throwIfNoEntry: false })?.isDirectory() ?? false;
 }
 
+/** Whether `folder` is a linked git worktree: its `.git` file names a `worktrees/<name>` git dir, where a submodule's names `modules/<name>`.
+ *  Only a small regular file is read, as a FIFO or a link to a device would block the server. */
+export function linkedWorktree(folder: string): boolean {
+  const dotGit = join(folder, '.git');
+  try {
+    const stat = statSync(dotGit);
+    return stat.isFile() && stat.size <= MAX_DOT_GIT_BYTES && /^gitdir: .*\/worktrees\/[^/]+\/?\s*$/.test(readFileSync(dotGit, 'utf8'));
+  } catch { return false; }
+}
+
 /** The checkout's `origin` URL, or null when it has none. */
 async function originUrl(folder: string): Promise<string | null> {
   const { code, stdout } = await runTool('git', ['-C', folder, 'remote', 'get-url', 'origin'], { timeout: 10_000 });
@@ -128,6 +140,6 @@ function originRepo(url: string): string | null {
 }
 
 /** `folder` with the home folder shown as `~`. */
-function tilde(folder: string, home: string): string {
+export function tilde(folder: string, home: string): string {
   return home && folder.startsWith(`${home}/`) ? `~${folder.slice(home.length)}` : folder;
 }

@@ -1,6 +1,6 @@
 import type { ProjectChoice, Provider } from '@lar-factory/shared';
 import type { OnboardedRepository } from '../config/repository-config.ts';
-import { azureRepo, checkouts, githubRepo, onAzureDevOps, originHost } from '../t3/repository-project.ts';
+import { azureRepo, checkouts, githubRepo, linkedWorktree, onAzureDevOps, originHost, tilde } from '../t3/repository-project.ts';
 
 /** The provider an origin URL is on, or null for any other host. */
 function providerOf(origin: string): Provider | null {
@@ -20,6 +20,7 @@ export async function projectChoices(list: readonly OnboardedRepository[], env: 
     const provider = origin ? providerOf(origin) : null;
     const repo = provider === 'GitHub' ? githubRepo(origin) : provider === 'Azure DevOps' ? azureRepo(origin!) : null;
     const entry = repo ? listed.get(repo.toLowerCase()) : undefined;
-    return { id, name: title, folder, repo, provider: repo ? provider : null, onBoard: !!entry };
+    const blocked = repo ? null : linkedWorktree(folder) ? 'linked-worktree' : 'no-provider-origin';
+    return { id, name: title, folder, shownFolder: tilde(folder, env.HOME ?? ''), repo, provider: repo ? provider : null, blocked, onBoard: !!entry };
   }));
 }

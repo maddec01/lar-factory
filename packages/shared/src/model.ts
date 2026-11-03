@@ -1160,9 +1160,13 @@ export interface ProjectChoice {
   /** The T3 project's title. */
   name: string;
   folder: string;
+  /** `folder` as the step shows it, with the home folder as `~`, which the browser can't work out. */
+  shownFolder: string;
   /** `owner/name` from the folder's origin; null when the folder isn't a main checkout with an origin on a provider. */
   repo: string | null;
   provider: Provider | null;
+  /** Why `repo` is null; null when it isn't. */
+  blocked: 'linked-worktree' | 'no-provider-origin' | null;
   /** Whether the repository is already on the board or is onboarding. Unusable settings can start fresh. */
   onBoard: boolean;
 }

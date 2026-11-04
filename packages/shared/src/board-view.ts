@@ -129,15 +129,20 @@ const inSection = (items: Item[], data: Pick<BoardData, 'items' | 'startProgress
 /** The items that wait on you, in flow order. The clock moves them only through `unavailable`. */
 export const deskItems = (data: Pick<BoardData, 'items' | 'startProgress'>, unavailable: boolean): Item[] => inSection([...data.items].sort(byFlowOrder), data, unavailable, 'desk');
 
+/** The repositories List groups and the Scope menu offers: the board's, then any other a List item names, in `data`'s order. */
+export function listRepos(data: Pick<BoardData, 'repos' | 'items'>): string[] {
+  const repos = data.repos.map((r) => r.repo);
+  for (const i of data.items) if (i.status === 'List' && !repos.some((r) => sameRepo(r, repoKey(i)))) repos.push(repoKey(i));
+  return repos;
+}
+
 /** `clientError` is the page's own failed read; the placement of Verify and Ready to merge items depends on it. */
 export function boardSections(data: BoardData, now: number, clientError?: string | null): BoardSections {
   const unavailable = activityUnavailable(data, now, clientError);
   const items = [...data.items].sort(byFlowOrder);
   const inStatus = (...s: Status[]) => items.filter((i) => s.includes(i.status));
   const list = inStatus('List');
-  const repos = data.repos.map((r) => r.repo);
-  for (const i of list) if (!repos.some((r) => sameRepo(r, repoKey(i)))) repos.push(repoKey(i));
-  const listGroups = repos
+  const listGroups = listRepos({ repos: data.repos, items: list })
     .map((repo) => ({ repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)) }))
     .sort((a, b) => b.items.length - a.items.length);
   return {

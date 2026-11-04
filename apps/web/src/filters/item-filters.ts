@@ -1,4 +1,4 @@
-// The Kind and Labels filters List and the board each keep on this machine. A filter only hides rows: it writes nothing
+// The Kind and Labels filters, which List and the board each keep on this machine. A filter only hides rows: it writes nothing
 // to the tracker and matches what a row shows, so a managed label or one mapped to the row's kind never matches.
 
 import { useState } from 'react';
@@ -15,14 +15,12 @@ export interface ItemFilters {
   labels: string[];
 }
 
-type FilterSurface = 'list' | 'board';
-
 const isKindFilter = (value: unknown): value is KindFilter => KIND_FILTERS.includes(value as KindFilter);
-const storageKey = (surface: FilterSurface) => `lar-board:filters:${surface}`;
+const LIST_FILTERS_KEY = 'lar-board:filters:list';
 
-function readFilters(surface: FilterSurface): ItemFilters {
+export function readFilters(key: string): ItemFilters {
   try {
-    const { kinds, labels } = JSON.parse(localStorage.getItem(storageKey(surface)) ?? '{}') as { kinds?: unknown; labels?: unknown };
+    const { kinds, labels } = JSON.parse(localStorage.getItem(key) ?? '{}') as { kinds?: unknown; labels?: unknown };
     return {
       kinds: Array.isArray(kinds) ? kinds.filter(isKindFilter) : [],
       labels: Array.isArray(labels) ? labels.filter((label): label is string => typeof label === 'string') : [],
@@ -32,11 +30,11 @@ function readFilters(surface: FilterSurface): ItemFilters {
   }
 }
 
-/** One surface's filters, stored in this browser until cleared. */
-export function useItemFilters(surface: FilterSurface): [ItemFilters, (filters: ItemFilters) => void] {
-  const [filters, setFilters] = useState(() => readFilters(surface));
+/** List's filters, stored in this browser until cleared. */
+export function useItemFilters(): [ItemFilters, (filters: ItemFilters) => void] {
+  const [filters, setFilters] = useState(() => readFilters(LIST_FILTERS_KEY));
   return [filters, (next) => {
-    localStorage.setItem(storageKey(surface), JSON.stringify(next));
+    localStorage.setItem(LIST_FILTERS_KEY, JSON.stringify(next));
     setFilters(next);
   }];
 }

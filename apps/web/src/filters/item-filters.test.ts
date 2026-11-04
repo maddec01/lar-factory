@@ -1,7 +1,7 @@
 // The Kind and Labels filters on List and the board: what each row matches, what the Labels filter offers, how each
 // surface keeps its own choices, and that Queue numbers and Start next ignore them.
 
-import { beforeEach, expect, test } from 'vite-plus/test';
+import { expect, test } from 'vite-plus/test';
 import { $, $$, mountPage, sample, settle, text } from '../../test/support.ts';
 import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
@@ -24,8 +24,6 @@ const chips = (root?: string) => [...bar(root).querySelectorAll('[data-filter-ch
 const removeChip = (name: string, root?: string) => settle(() => bar(root).querySelector<HTMLButtonElement>(`[aria-label="Remove ${name}"]`)!.click());
 const clear = (root?: string) => settle(() => bar(root).querySelector<HTMLButtonElement>('[data-filter-clear]')!.click());
 const withItems = (items: Item[], rest: Partial<BoardData> = {}): BoardData => ({ ...sample, ...rest, items });
-
-beforeEach(() => localStorage.clear());
 
 test('choices within a filter match any, and the two filters must both match', () => {
   const bug = item('b', { kind: 'bug', labels: ['area: web'] });

@@ -22,7 +22,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-sy
 import { AddItem } from '../add-item/add-item.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
-import { useScopeStore } from '../board/scope-store.ts';
+import { useScopeStore, useShownScope } from '../board/scope-store.ts';
 import { ListButton } from '../list/list-modal.tsx';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { SettingsButton } from '../settings/settings.tsx';
@@ -56,7 +56,8 @@ const CENTRED_SCOPE = '@min-[72rem]:max-w-[calc(50cqw-23rem)] [.title-bar:has(.u
 function Scope() {
   const data = useBoardStore((state) => state.data);
   const now = useBoardStore((state) => state.now);
-  const { scope, setScope } = useScopeStore();
+  const scope = useShownScope();
+  const setScope = useScopeStore((state) => state.setScope);
   const groups = boardSections(data, now).listGroups;
   const shown = scope ? repoName(scope, data.repos) : 'All repositories';
   return (

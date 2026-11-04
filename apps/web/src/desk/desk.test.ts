@@ -1,7 +1,7 @@
 // Your desk: Needs you, Verify and Ready to merge items and open questions as cards in one sideways row, each opening the item dialog
-// and carrying the buttons for its next action; and the line's heading below it.
+// and carrying the buttons for its next action, narrowed by the board's Scope, Kind and Labels; and the line's heading below it.
 
-import { expect, test } from 'vite-plus/test';
+import { describe, expect, test } from 'vite-plus/test';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { $, $$, mountPage, sample, settle, text } from '../../test/support.ts';
 
@@ -141,6 +141,74 @@ test('an empty desk during the first read shows the loader, as the read may stil
   await mountPage({ ...sample, items: noWaiting, firstRead: { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] } });
   expect(text($('.desk'))).toBe('Your deskLoading projects…');
   expect($('.desk [data-loader]')).not.toBeNull();
+});
+
+const feature = (item: Item) => ({ ...item, kind: 'feature' as const });
+const FILTERED = 'Your deskNothing on your desk matches the filters.';
+const NOTHING = 'Your deskNothing waits on you.';
+const seedFilters = (kinds: string[], labels: string[] = []) => localStorage.setItem('lar-board:filters:board', JSON.stringify({ kinds, labels }));
+
+describe('narrowed by Scope, Kind and Labels', () => {
+  test('Kind and Labels narrow the cards, and the heading counts what stays while the title bar counts the whole factory', async () => {
+    const data: BoardData = { ...sample, items: sample.items.map((i) => (i.id === 'I_sample16' ? { ...i, kind: 'bug' as const, labels: ['area: web'] } : i.kind === 'bug' ? feature(i) : i)) };
+    seedFilters(['bug'], ['area: web']);
+    await mountPage(data);
+    expect(cards().map((c) => c.dataset.item)).toEqual(['I_sample16']);
+    expect(text($('#desk-h'))).toBe('Your desk 1');
+    expect(text($('.counters button[aria-haspopup]'))).toBe('7');
+  });
+
+  test('Scope narrows the cards, and the heading counts them', async () => {
+    localStorage.setItem('lar-board:scope', 'maddec01/lar-apple');
+    await mountPage();
+    expect(cards().length).toBeGreaterThan(0);
+    expect(cards().length).toBeLessThan(7);
+    expect(cards().every((c) => sample.items.find((i) => i.id === c.dataset.item)!.repo === 'maddec01/lar-apple')).toBe(true);
+    expect(text($('#desk-h'))).toBe(`Your desk ${cards().length}`);
+    expect(text($('.counters button[aria-haspopup]'))).toBe('7');
+  });
+
+  test('filters that hide every card say so on the same one line', async () => {
+    seedFilters([], ['no such label']);
+    await mountPage();
+    expect(cards()).toHaveLength(0);
+    expect(text($('.desk'))).toBe(FILTERED);
+    expect($('.desk')!.className.split(' ')).toEqual(expect.arrayContaining(['flex', 'items-baseline']));
+  });
+
+  test('a Scope with nothing on the desk says the filters hide it while another repository has cards', async () => {
+    const data: BoardData = { ...sample, items: sample.items.filter((i) => i.repo !== 'maddec01/lar-apple' || !['Needs you', 'Verify', 'Ready to merge'].includes(i.status)) };
+    localStorage.setItem('lar-board:scope', 'maddec01/lar-apple');
+    await mountPage(data);
+    expect(text($('.desk'))).toBe(FILTERED);
+  });
+
+  test('an empty desk with filters on still says nothing waits on you', async () => {
+    seedFilters(['bug']);
+    await mountPage({ ...sample, items: noWaiting });
+    expect(text($('.desk'))).toBe(NOTHING);
+  });
+
+  test('clearing the filters brings the cards back', async () => {
+    seedFilters([], ['no such label']);
+    await mountPage();
+    await settle(() => $<HTMLButtonElement>('[data-line-filters] [data-filter-clear]')!.click());
+    expect(cards()).toHaveLength(7);
+  });
+
+  test('the disconnected message comes before the filtered one', async () => {
+    seedFilters([], ['no such label']);
+    await mountPage();
+    const { useBoardStore } = await import('../board/board-store.ts');
+    await settle(() => useBoardStore.getState().fail('down'));
+    expect(text($('.desk'))).toBe('Your deskNothing waited on you at the last read.');
+  });
+
+  test('the loader comes before the filtered message', async () => {
+    seedFilters([], ['no such label']);
+    await mountPage({ ...sample, firstRead: { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] } });
+    expect(text($('.desk'))).toBe('Your deskLoading projects…');
+  });
 });
 
 test('a desk with cards stays as it is during the first read', async () => {

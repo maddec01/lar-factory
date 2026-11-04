@@ -4,8 +4,9 @@
 
 import type { ReactNode } from 'react';
 import { useBoardStore } from '../board/board-store.ts';
+import { useScopeStore } from '../board/scope-store.ts';
 import { ItemFilterBar } from '../filters/item-filter-bar.tsx';
-import { rowFilter, useItemFilters } from '../filters/item-filters.ts';
+import { rowFilter } from '../filters/item-filters.ts';
 import { useActivityUnavailable } from '../items/item-parts.tsx';
 import type { Item } from '@lar-factory/shared';
 import { Dossiers } from './dossiers.tsx';
@@ -17,7 +18,8 @@ import { stageRows } from './stage-rows.ts';
 export function StageLayout({ items, desk }: { items: Item[]; desk: ReactNode }) {
   const data = useBoardStore((state) => state.data);
   const unavailable = useActivityUnavailable();
-  const [filters, setFilters] = useItemFilters('board');
+  const filters = useScopeStore((state) => state.filters);
+  const setFilters = useScopeStore((state) => state.setFilters);
   const shows = rowFilter(filters, data.repos);
   const showsRow = ({ item }: { item: Item }) => shows(item);
   const { queue, shaping, ready, build, dock } = stageRows(items, data, unavailable);

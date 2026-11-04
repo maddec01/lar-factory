@@ -5,8 +5,10 @@
 import { isLiveThread, needsAnswer, openQuestionThread, threadLink } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { LinkButton } from './link-button.tsx';
+import { useOnRow } from './row-actions.tsx';
 
 /** A child question may belong to its nearest concept's thread before it has a thread of its own. */
 function conceptQuestionThread(item: Item, data: BoardData): ItemThread | undefined {
@@ -45,18 +47,24 @@ export const hasLiveThread = (item: Item): boolean =>
 
 /**
  * Opens the latest thread, or the phase's recorded `threadId`, in T3 Code: the board app hands the link to T3, a browser asks to open it. `iconOnly` draws
- * it as a square icon button, its label in its tooltip, as a desk card's corner does.
+ * it as a square icon button, its label in its title, as a desk card's corner does. On a row, Open thread is always that
+ * icon, with a tooltip on hover and keyboard focus that says its label or why it can't open; other labels stay as text.
  */
-export function OpenThread({ item, data, label = 'Open thread', iconOnly = false, threadId }: { item: Item; data: BoardData; label?: string; iconOnly?: boolean; threadId?: string }) {
+export function OpenThread({ item, data, label = 'Open thread', iconOnly: given = false, threadId }: { item: Item; data: BoardData; label?: string; iconOnly?: boolean; threadId?: string }) {
   const thread = latestThread(item, data, threadId);
   const actionLabel = 'link' in thread && thread.conceptQuestion ? 'Answer in concept thread' : label;
+  const onRow = useOnRow();
+  const iconOnly = given || (onRow && actionLabel === 'Open thread');
+  const tooltip = onRow && iconOnly;
   // A square Open, the thread icon alone, named by its label.
   const named = iconOnly ? { 'aria-label': actionLabel, 'data-icon-only': '' } : {};
   const shown = iconOnly ? null : actionLabel;
-  // Pointer events stay on while it's disabled, so its title says why.
-  return 'link' in thread
-    ? <LinkButton kind="open" leftIcon={ICON.thread} data-open-thread={item.id} href={thread.link} title={iconOnly ? actionLabel : undefined} {...named}>{shown}</LinkButton>
-    : <Button {...kind('open')} leftIcon={ICON.thread} className="disabled:pointer-events-auto" data-open-thread={item.id} disabled title={thread.reason} {...named}>{shown}</Button>;
+  // Pointer events stay on while it's disabled, so its title says why; TooltipTrigger gives a disabled one its own focusable hover target.
+  const button = 'link' in thread
+    ? <LinkButton kind="open" leftIcon={ICON.thread} data-open-thread={item.id} href={thread.link} title={iconOnly && !tooltip ? actionLabel : undefined} {...named}>{shown}</LinkButton>
+    : <Button {...kind('open')} leftIcon={ICON.thread} className={tooltip ? '' : 'disabled:pointer-events-auto'} data-open-thread={item.id} disabled title={tooltip ? undefined : thread.reason} {...named}>{shown}</Button>;
+  if (!tooltip) return button;
+  return <Tooltip><TooltipTrigger asChild>{button}</TooltipTrigger><TooltipPopup>{'link' in thread ? actionLabel : thread.reason}</TooltipPopup></Tooltip>;
 }
 
 /**

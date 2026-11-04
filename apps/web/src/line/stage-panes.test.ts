@@ -756,7 +756,7 @@ test("a row whose usage hasn't landed shows a still-when-reduced loader with a l
   await mountPage(withItem('I_sample13', { stats: undefined, usageState: 'loading' }, loose));
   const figures = col('I_sample13', 'figures');
   expect(text(figures)).toBe('Loading usage');
-  const icon = figures.querySelector('[data-loader] svg')!;
+  const icon = figures.querySelector('[data-loader] svg')!.parentElement!;
   expect(icon.getAttribute('class')!.split(' '), 'spins only without reduced motion').toEqual(expect.arrayContaining(['motion-safe:animate-spin']));
   expect(icon.getAttribute('class')!.split(' ')).not.toContain('animate-spin');
   expect(opener('I_sample13').className.split(' ')).toContain('h-12');
@@ -818,11 +818,11 @@ test('Build and its row animate for current execution, stop together, and shapin
   const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, slices: [], threads: [] })) };
   const data = withItem('I_sample14', { slices: [], threads: [build] }, fresh);
-  const buildGlyph = () => $('[data-stage="build"] header > svg')!;
+  const buildGlyph = () => $('[data-stage="build"] header svg')!;
   const rowGlyph = () => row('I_sample14').querySelector('[data-glyph] svg')!;
   await mountPage(data);
   expect(buildGlyph().classList.contains('lucide-loader-circle')).toBe(true);
-  expect(rowGlyph().classList.contains('status-spin')).toBe(true);
+  expect(rowGlyph().closest('.status-spin')).not.toBeNull();
   const { useBoardStore } = await import('../board/board-store.ts');
   const stopped = withItem('I_sample14', { slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, fresh);
   await settle(() => useBoardStore.getState().receive(stopped));
@@ -841,7 +841,7 @@ test('status icons require current execution and suppress unavailable, cached, h
   const data = withItem('I_sample14', { threads: [build] }, withItem('I_sample02', { status: 'Shaping', threads: [{ ...build, purpose: 'shape' }] }, fresh));
   await mountPage(data);
   const { useBoardStore } = await import('../board/board-store.ts');
-  const motion = () => $$('[data-stage] [data-glyph] svg.status-spin, [data-stage] [data-glyph] svg.status-pulse');
+  const motion = () => $$('[data-stage] [data-glyph] .status-spin, [data-stage] [data-glyph] svg.status-pulse');
   expect(motion()).toHaveLength(2);
   const cases: [string, BoardData][] = [
     ['stale', { ...data, fetchedAt: '2020-01-01T00:00:00Z' }],
@@ -863,8 +863,8 @@ test('status icons require current execution and suppress unavailable, cached, h
   for (const [label, next] of cases) {
     await settle(() => useBoardStore.getState().receive(next));
     expect(motion(), label).toHaveLength(0);
-    expect($('[data-stage="build"] header svg.status-spin'), label).toBeNull();
-    expect($('.counters button[aria-label^="building:"] svg.status-spin'), label).toBeNull();
+    expect($('[data-stage="build"] header .status-spin'), label).toBeNull();
+    expect($('.counters button[aria-label^="building:"] .status-spin'), label).toBeNull();
   }
   await settle(() => useBoardStore.getState().receive(data));
   await settle(() => useBoardStore.getState().fail('Disconnected'));
@@ -897,11 +897,11 @@ test('status icons include delegated execution and active slices after the paren
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
   await mountPage(withItem('I_sample14', { slices: [], threads: [build] }, fresh));
   const glyph = () => row('I_sample14').querySelector('[data-glyph] svg')!;
-  expect(glyph().classList.contains('status-spin')).toBe(true);
+  expect(glyph().closest('.status-spin')).not.toBeNull();
   const { useBoardStore } = await import('../board/board-store.ts');
   const slice = { number: 100, repo: 'maddec01/lar-server', title: 'Slice', url: '', state: 'open' as const, progress: 'active' as const };
   await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { slices: [slice], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh)));
-  expect(glyph().classList.contains('status-spin')).toBe(true);
+  expect(glyph().closest('.status-spin')).not.toBeNull();
   await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { slices: [{ ...slice, progress: 'done' }], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh)));
   expect(glyph().classList.contains('lucide-circle')).toBe(true);
 });

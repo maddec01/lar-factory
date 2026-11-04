@@ -4,7 +4,6 @@
 // Once a thread starts or may have started, a tag takes Start's place.
 
 import { useRef, useState } from 'react';
-import { LoaderCircle } from 'lucide-react';
 import { flushSync } from 'react-dom';
 import { canResumeShaping, canRetryBuild, currentBuildThread, delegatedWorkRunning, itemName, ref, highlightedChoice, repositoryT3Default, startProgressOf } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
@@ -21,6 +20,7 @@ import { startItem } from './start-item.ts';
 import { postAction, receive } from './card-actions.ts';
 import { PURPOSE, useStart, useStartStore } from './start-store.ts';
 import type { StartKind } from './start-store.ts';
+import { Spinner } from '../loading/loader.tsx';
 import { notify } from '../notices/notices.tsx';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 
@@ -102,7 +102,7 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
         : stopped && <><span className="basis-full">Run stopped.</span>{observed.id !== linkedBeside && <OpenThread item={item} data={data} threadId={observed.id} />}</>}
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
-          <Button {...buttonKind(main ? 'main' : 'start')} aria-busy={pending || undefined} leftIcon={pending ? <LoaderCircle className="animate-spin" /> : !main && !retry && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}
+          <Button {...buttonKind(main ? 'main' : 'start')} aria-busy={pending || undefined} leftIcon={pending ? <Spinner spin="animate-spin" className="size-4" /> : !main && !retry && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}
             {...naming && { className: 'max-w-96', title: `A filter hides ${itemName(item)}` }}>
             {naming ? <span className="truncate">{verb}: {itemName(item)}</span> : verb}{!pending && ' ▾'}
           </Button>

@@ -1,5 +1,5 @@
 // Onboarding screens built from the board's existing controls.
-import { FolderPlus, LoaderCircle, Check, Minus } from 'lucide-react';
+import { FolderPlus, Check, Minus } from 'lucide-react';
 import { effectiveIssueSettings, isOnboarding, shownRepo, trackerCapabilities, type OperationAccess, type ProjectChoice, type SetupDetection } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
@@ -10,6 +10,7 @@ import { RadioGroup } from '@lar-factory/ui/design-system/RadioGroup';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
+import { Spinner } from '../loading/loader.tsx';
 import { Choice, Field, Group } from './setup-fields.tsx';
 import { KindMapping } from './kind-mapping.tsx';
 import { IssueDefaults } from '../repositories/issue-defaults.tsx';
@@ -71,7 +72,7 @@ function ProjectSection({ name, title, count, children }: { name: string; title:
 }
 
 function Pending({ children }: { children: React.ReactNode }) {
-  return <p role="status" className="m-0 flex items-center gap-2 py-4 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" />{children}</p>;
+  return <p role="status" className="m-0 flex items-center gap-2 py-4 text-sm text-base-700"><Spinner spin="animate-spin" className="size-4" />{children}</p>;
 }
 
 function DetectionPending() {

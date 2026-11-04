@@ -140,7 +140,8 @@ test('picking an entry starts the item with that model, shows the thread, and re
   expect(menu()).toBeNull();
   expect([text(start()), start().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
   expect(start().getAttribute('aria-busy')).toBe('true');
-  expect(start().querySelector('svg.animate-spin')).not.toBeNull();
+  expect(start().querySelector('.animate-spin > svg')).not.toBeNull();
+  expect([...start().querySelector('[data-slot="icon"] > .animate-spin')!.classList], 'a block box, not a text line that sits it high and grows the icon box').toEqual(expect.arrayContaining(['flex', 'w-fit']));
   expect(document.activeElement, 'focus is back on Start').toBe(start());
   expect(footer(), 'no Move to List or Abandon while Start is pending').toBeNull();
   await pressMenu(start());

@@ -25,6 +25,11 @@ test.each([
   expect(html).toContain(motion);
 });
 
+test('In progress spins a box around its icon, so the compositor runs it at any device scale', () => {
+  const html = renderToStaticMarkup(createElement(StatusGlyph, { status: 'In progress', running: true }));
+  expect(html).toMatch(/^<span class="[^"]*status-spin[^"]*"><svg /);
+});
+
 test.each(['List', 'Queued', 'Ready', 'Needs you', 'Done'] as const)('%s stays still even with running activity', status => {
   expect(renderToStaticMarkup(createElement(StatusGlyph, { status, running: true }))).not.toMatch(/status-pulse|status-spin/);
 });

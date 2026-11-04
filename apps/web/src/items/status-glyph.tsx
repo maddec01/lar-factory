@@ -2,7 +2,7 @@
 
 import { Check, Circle, CircleArrowRight, CircleDashed, CircleDot, Clock3, Eye, GitMerge, List } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
-import { activityUnavailable, buildActivity } from '@lar-factory/shared';
+import { activityUnavailable, buildActivity, itemActivityLine, itemActivityThread } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { Spinner } from '../loading/loader.tsx';
@@ -44,6 +44,9 @@ export function useStatusActivity() {
   const builds = useStartStore((state) => state.builds);
   return (item: Item): boolean => {
     if (unavailable || item.paused || item.archived || item.needsYou || item.threads === 'unavailable') return false;
+    // A thread waiting on the user, stopped, or whose activity T3 couldn't give isn't known to be moving.
+    const line = itemActivityLine(item, 0)?.state;
+    if (line === 'waiting' || line === 'stopped' || itemActivityThread(item)?.activity?.available === false) return false;
     if (starts[item.id]?.phase === 'pending' || builds[item.id]?.phase === 'pending' || starting.includes(item.id)) return false;
     if (item.status === 'Shaping') {
       return !!item.threads?.some(thread => thread.purpose !== 'build' && !thread.observedAt && !thread.archived

@@ -32,7 +32,8 @@
   padding: 0 var(--row-inset) 0 calc(var(--row-inset) + var(--row-glyph) + var(--row-gap));
   font-size: var(--text-xs); line-height: --spacing(4); color: var(--muted-foreground);
 }
-.row-second [data-blocked] { flex-shrink: 0; max-width: 100%; height: 16px; }
+.row-second [data-blocked] { flex-shrink: 0; max-width: 100%; height: --spacing(4); }
+.row-second [data-activity-badge] { height: --spacing(4); }
 /* Figures keep their whole text, reaching into the PR's cell's spare room when they're long. */
 .row-second > [data-col="figures"] { display: flex; justify-content: flex-end; justify-self: end; white-space: nowrap; }
 :is(.row-cols, .row-second) :is([data-row-identity], [data-kind-marker]) { font-size: inherit; }

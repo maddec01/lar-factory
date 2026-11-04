@@ -1,11 +1,11 @@
 // The board's one work row, in Queue, Shaping, Ready to build and Build alike: a first line in columns that line up down
 // the whole board, one button that opens the item's details with the row's action beside it. A row with anything more adds
 // a second line under it, with a bar and the slice count, which unfolds its slices, as its own focus stop, then any blocked
-// sentence and the current delegated task or first blocked or active slice, then its pull request and figures.
+// sentence and what its thread is doing or its first blocked or active slice, then its pull request and figures.
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { blockedText, canRetryBuild, currentBuildThread, isStale, itemName } from '@lar-factory/shared';
+import { ACTIVITY_WORD, blockedText, canRetryBuild, currentBuildThread, itemActivityStill, itemName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -16,6 +16,7 @@ import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
+import { ActivityLine, useActivityState } from './activity-line.tsx';
 import { AutoBuildNote } from './auto-build-note.tsx';
 import { Figures, ROW_ACTION, ROW_RULE, RowSecondLine, figuresOf, opensItem } from './columns.tsx';
 import { threadAtWork, threadsOf } from './dossier-parts.ts';
@@ -63,7 +64,7 @@ function stateText(item: Item, word: string, { label, running }: { label: string
 export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: BoardData; n?: number }) {
   const feedback = useActivityFeedback(item);
   const shown = useShownStatus(item);
-  const stale = useBoardStore((state) => isStale(state.data, state.now));
+  const activity = useActivityState(item);
   const disconnected = useBoardStore((state) => !!state.clientError);
   const unavailable = useActivityUnavailable();
   const [slices, setSlices] = useState(false);
@@ -72,15 +73,14 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
   const implemented = item.slices.length > 0 && done === item.slices.length;
   const note = sliceNote(item);
   const blocked = blockedText(item);
-  const runKnown = !unavailable && threadsOf(item).some(threadAtWork);
-  const state = shown.working ? 'Working' : stateText(item, shown.word, feedback, runKnown);
-  const working = feedback.running || state === 'Working';
-  // Fresh T3 tasks need not wait for unrelated repositories to finish their first read.
-  const childActivity = !disconnected && !stale && !item.paused && !item.archived
-    ? currentBuildThread(item)?.childActivity : undefined;
+  const runKnown = (!unavailable || activity === 'working') && threadsOf(item).some(threadAtWork);
+  const state = (activity && ACTIVITY_WORD[activity]) ?? (shown.working ? 'Working' : stateText(item, shown.word, feedback, runKnown));
+  const still = itemActivityStill(item, disconnected);
+  const working = !still && (feedback.running || state === 'Working');
+  const showsActivity = n === undefined && activity;
   const figures = figuresOf(item, data);
   const prs = item.linkedPrs.slice(0, 1);
-  const hasSecondLine = item.slices.length > 0 || working || childActivity || prs.length > 0 || (figures && hasFigures(figures)) || usageLoading(item, data) || blocked;
+  const hasSecondLine = item.slices.length > 0 || working || showsActivity || prs.length > 0 || (figures && hasFigures(figures)) || usageLoading(item, data) || blocked;
   return (
     <li data-item={item.id} className={`@container py-2 ${ROW_RULE} hover:bg-(--accent) ${picked(isPicked)}`}>
       <div className="row-first">
@@ -106,7 +106,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
       </div>
       {hasSecondLine && (
         <RowSecondLine onClick={opensItem(item)} prs={prs} figures={<Figures s={figures} item={item} />}
-          bar={item.slices.length > 0 ? <SliceBar item={item} /> : working && <ActivityFeedback feedback={{ ...feedback, running: true }} />}
+          bar={item.slices.length > 0 ? <SliceBar item={item} still={still} /> : working && <ActivityFeedback feedback={{ ...feedback, running: true }} />}
           count={item.slices.length > 0 && (
             <button type="button" aria-expanded={slices} aria-label={slices ? 'Hide slices' : 'Show slices'} onClick={() => setSlices(!slices)} data-col="count"
               className={`flex h-4 items-center gap-1 justify-self-start rounded tabular-nums hover:text-(--foreground) ${ROW_OPENS}`}>
@@ -114,16 +114,16 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
             </button>
           )}>
           {blocked && <Badge tone="danger" className="min-w-0" title={blocked} data-blocked><span className="truncate">{blocked}</span></Badge>}
-          {(childActivity || note[0] || implemented) && <span data-note className="min-w-0 truncate" title={childActivity?.titles.join('\n') || note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n') || undefined}>
-            {childActivity
-              ? <span data-child-activity className="text-(--foreground)">{childActivity.titles[0]}{childActivity.count > 1 && ` +${childActivity.count - 1} more`}</span>
-              : <>{note[0] && <><span className={`font-medium ${note[0].tone}`}>{note[0].word}</span> <span className="text-(--foreground)">{note[0].s.title}</span>{note.length > 1 && ` +${note.length - 1} more`}</>}
-                {implemented && <span>All slices implemented</span>}</>}
-          </span>}
+          {showsActivity
+            ? <ActivityLine item={item} />
+            : (note[0] || implemented) && <span data-note className="min-w-0 truncate" title={note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n') || undefined}>
+              {note[0] && <><span className={`font-medium ${note[0].tone}`}>{note[0].word}</span> <span className="text-(--foreground)">{note[0].s.title}</span>{note.length > 1 && ` +${note.length - 1} more`}</>}
+              {implemented && <span>All slices implemented</span>}
+            </span>}
         </RowSecondLine>
       )}
       {['Queued', 'Ready', 'In progress'].includes(item.status) && <div className="pt-1 pl-12 pr-3 empty:hidden"><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /><AutoBuildNote item={item} data={data} /></div>}
-      {slices && <div className="pt-1 pl-10 pr-3" data-slices><SliceList item={item} /></div>}
+      {slices && <div className="pt-1 pl-10 pr-3" data-slices><SliceList item={item} still={still} /></div>}
     </li>
   );
 }

@@ -388,7 +388,7 @@ test('an open dossier has no About section; what keeps the work moving is in lab
 });
 
 test('a part at Verify or Ready to merge counts as moving while its build thread runs, and back on your desk when it stops', async () => {
-  const build = { id: 'build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated: '2026-10-21T09:00:00.000Z' } as ItemThread;
+  const build = { id: 'build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated: '2026-10-21T09:00:00.000Z', activity: { available: true, action: 'Read a.ts', actionAt: new Date(NOW).toISOString(), toolRunning: false, agents: [] } } as ItemThread;
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
   const clear = withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, fresh));
   await mountOpen(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [build] }, clear));
@@ -397,7 +397,7 @@ test('a part at Verify or Ready to merge counts as moving while its build thread
   const part = text(step('I_sample13'));
   expect([part.includes('Working'), part.includes('Ready to merge'), step('I_sample13').querySelector('[data-open-thread]')!.getAttribute('aria-label')]).toEqual([true, false, 'Open thread']);
   await receive(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [{ ...build, id: 'shape', title: 'Shape', purpose: 'shape', state: 'done', currentRunning: undefined }, { ...build, state: 'done', currentRunning: undefined, hasRunningChildren: true }] }, clear));
-  expect(text(step('I_sample13')), 'it names the running build thread, not the newest one').toContain('T3 · Build· running');
+  expect(text(step('I_sample13')), 'it says what the running build thread does, not the newest one').toContain('Read a.ts· 0s');
   await receive(withItem('I_sample13', { status: 'Ready to merge', blockers: [], slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, clear));
   expect(text(next())).toBe('To merge#140 Owner accounts');
   expect(text(step('I_sample13'))).toContain('Ready to merge');
@@ -507,12 +507,12 @@ test('each part shows what it asks next, then its stage track, status, figures a
   await mountOpen(withItem('I_sample13', { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' },
     linkedPrs: [{ ...sample.items.flatMap((i) => i.linkedPrs)[0]!, number: 145, state: 'open', isDraft: false }] }));
   const lines = (id: string) => [step(id).querySelector('[data-row-open] > :first-child'), step(id).querySelector('[data-part-meta]'), step(id).querySelector('.row-second'), step(id).querySelector('[data-part-action]')].map(text);
-  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'GrillShaping', 'T3 · Grill: relay broker only or full TURN· running28m · 1.87M · $2.71', '']);
-  expect(lines('I_sample12')).toEqual(['#202 Sign-in screen', 'PrototypeNeeds you', 'T3 · Prototype: sign-in screen· needs you41m · 2.95M · $4.35', 'on your desk']);
+  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'GrillQuiet', 'No action for 12m28m · 1.87M · $2.71', '']);
+  expect(lines('I_sample12')).toEqual(['#202 Sign-in screen', 'PrototypeWaiting on you', 'Waiting on you· 3m· 1 agent41m · 2.95M · $4.35', 'on your desk']);
   expect(lines('I_sample13')).toEqual(['#140 Owner accounts', 'BuildReadyFeature · Active · Ana', '1/3 slicesT3 · Shape: owner accounts· donePR #145', 'Start after #202 ▾']);
   expect(step('I_sample13').querySelector('[data-row-open] :is(button, a)'), 'the action is no part of the button that opens details').toBeNull();
   expect(step('I_sample13').querySelector('[data-part-meta] ol')!.getAttribute('title'), "the stage track, dashed while it waits").toBe('Ready, waiting');
-  expect(step('I_sample10').querySelector('[data-part-meta] ol')!.getAttribute('title')).toBe('Shaping');
+  expect(step('I_sample10').querySelector('[data-part-meta] ol')!.getAttribute('title')).toBe('Quiet');
   expect(step('I_sample13').querySelector('[data-row-open] > :last-child ol'), 'its slice bar under the row').not.toBeNull();
   await press(step('I_sample10').querySelector('[data-row-open]')!);
   expect(dialogTitle(), 'a part opens its item').toBe('#201 Relay: broker only or full TURN?');
@@ -1016,7 +1016,7 @@ test('a failed family marks its own known figures last known while the board rea
   const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
   await mountOpen({ ...withItem('I_sample10', { stats: usage, usageState: 'failed' }, withItem('I_sample12', { stats: usage, usageState: 'current' })), usageRead: { readable: true, readAt: '2026-11-03T10:00:00.000Z' } });
   await press(button(dossier(), 'Parts list'));
-  const figures = (id: string) => step(id).querySelector<HTMLElement>('[data-part-meta] [title^="Agent time"]')!;
+  const figures = (id: string) => step(id).querySelector<HTMLElement>('.row-second [title^="Agent time"]')!;
   expect(figures('I_sample10').title).toContain("Last known figures: T3 Code's usage can't be read now.");
   expect(figures('I_sample12').title).not.toContain('Last known');
 });
@@ -1051,21 +1051,21 @@ test('a part with no figures yet says its usage can\'t be read', async () => {
   expect(text(step('I_sample10').querySelector('.row-second'))).toContain('Usage details are unavailable.');
 });
 
-test.each(['Verify', 'Ready to merge'] as const)('%s keeps its pulsing icon in names, Track and running thread lines while its part bar keeps building', async status => {
-  const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
+test.each(['Verify', 'Ready to merge'] as const)('%s keeps its pulsing icon in names and Track, with the activity line for the thread, while its part bar keeps building', async status => {
+  const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true, activity: { available: true, toolRunning: true, agents: [] } };
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
   const data = withItem('I_sample13', { status, blockers: [], slices: [], threads: [build] }, fresh);
   await mountOpen(data);
   const icon = status === 'Verify' ? 'lucide-circle-dot' : 'lucide-git-merge';
   const glyphs = () => step('I_sample13').querySelectorAll(`svg.${icon}.status-pulse`);
-  expect(glyphs(), 'the name, Track and thread line agree').toHaveLength(3);
+  expect(glyphs(), 'the name and Track agree').toHaveLength(2);
   expect(text(step('I_sample13'))).toContain('Working');
   const bar = () => [...dossier().querySelectorAll('[data-part-bar] li')].find(li => li.getAttribute('title')?.startsWith('#140')) as HTMLElement;
   expect(bar().classList.contains('status-pulse')).toBe(true);
   expect(bar().style.background).toBe('var(--st-now)');
   await receive(withItem('I_sample13', { status, blockers: [], slices: [], threads: [{ ...build, observedAt: build.updated }] }, fresh));
   expect(step('I_sample13').querySelector('svg.status-pulse')).toBeNull();
-  expect(text(step('I_sample13'))).toContain('last seen');
+  expect(text(step('I_sample13'))).toContain('Activity unavailable');
   await receive(withItem('I_sample13', { status, blockers: [], slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, fresh));
   expect(glyphs()).toHaveLength(0);
   expect(bar().classList.contains('status-pulse')).toBe(false);
@@ -1076,13 +1076,13 @@ test.each([
   ['Shaping', 'shape', 'svg.lucide-circle-dashed.status-pulse'],
   ['In progress', 'build', '.status-spin > svg.lucide-loader-circle'],
   ['Review', 'build', 'svg.lucide-eye.status-pulse'],
-] as const)('%s uses the item icon on its running dossier thread line and Track', async (status, purpose, icon) => {
+] as const)('%s uses the item icon on its running dossier part name and Track', async (status, purpose, icon) => {
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
   await mountOpen(withItem('I_sample13', { status, slices: [], blockers: [], threads: [{ ...thread('own', 'running'), purpose, currentRunning: true }] }, fresh));
-  expect(step('I_sample13').querySelectorAll(icon)).toHaveLength(3);
+  expect(step('I_sample13').querySelectorAll(icon)).toHaveLength(2);
   expect(step('I_sample13').querySelector('[data-part-kind] svg.lucide-hammer')).not.toBeNull();
   await receive(withItem('I_sample13', { status, slices: [], blockers: [], threads: [{ ...thread('own', 'done'), purpose, hasRunningChildren: true }] }, fresh));
-  expect(step('I_sample13').querySelectorAll(icon), 'delegated work continues after the parent turn').toHaveLength(3);
+  expect(step('I_sample13').querySelectorAll(icon), 'delegated work continues after the parent turn').toHaveLength(2);
 });
 
 test('work map nodes keep resumed Verify icons and the Builds lane keeps Hammer', async () => {

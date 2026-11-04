@@ -3,7 +3,7 @@
 
 import type { MouseEvent, ReactNode } from 'react';
 import { GitPullRequest } from 'lucide-react';
-import { duration, formatTokens, formatUsd, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
+import { duration, formatTokens, formatUsd, itemActivityStill, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats, LinkedPr } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { hasFigures, INCOMPLETE_TOTAL, useLastKnown, usageLoading } from '../items/item-parts.tsx';
@@ -41,19 +41,20 @@ export const figuresOf = (item: Item, data: BoardData, total?: boolean): ItemSta
   return sum === null ? statsOf(item) : sum === 'unavailable' ? { agentMs: 0, tokens: 0, incomplete: true } : sum;
 };
 
-/** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. An incomplete total ends in a +, and its tooltip says why, as it does when they are the last ones seen. While usage loads, known figures stay with a spinner in the tokens' room, the tooltip giving them all, and none known yet give a spinner and its label. A `total` loads while any of its members does. */
+/** The agent figures on one line, time · tokens · cost, from the same fields AgentCell reads; nothing when there are none. An incomplete total ends in a +, and its tooltip says why, as it does when they are the last ones seen. While usage loads, known figures stay with a spinner in the tokens' room, the tooltip giving them all, and none known yet give a spinner and its label. A `total` loads while any of its members does. A row that stops animating stops its spinner. */
 export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; total?: boolean }) {
   const lastKnown = useLastKnown(item);
   const data = useBoardStore((state) => state.data);
+  const still = itemActivityStill(item, useBoardStore((state) => !!state.clientError));
   const loading = usageLoading(item, data) || !!total && itemMembers(item, data.items).some((member) => usageLoading(member, data));
-  if (!s || !hasFigures(s) && (loading || !s.incomplete)) return loading ? <Loader label="Loading usage" /> : <span />;
+  if (!s || !hasFigures(s) && (loading || !s.incomplete)) return loading ? <Loader label="Loading usage" still={still} /> : <span />;
   const cost = s.costUsd !== undefined ? formatUsd(s.costUsd) : null;
   const all = hasFigures(s) ? [duration(s.agentMs), formatTokens(s.tokens), cost].filter(Boolean).join(' · ') : null;
   const text = all && loading ? [duration(s.agentMs), cost].filter(Boolean).join(' · ') : all;
   const title = s.frozen ? 'Agent time · tokens · cost, as it stood at merge' : [all && `Agent time · tokens · cost${loading ? `: ${all}` : ''}`, all && lastKnown, s.incomplete && INCOMPLETE_TOTAL, loading && UPDATING].filter(Boolean).join('. ');
   return (
     <span className="flex min-w-0 items-center justify-end gap-1 tabular-nums text-(--muted-foreground)" title={title}>
-      {loading && <Loader title={UPDATING} />}
+      {loading && <Loader title={UPDATING} still={still} />}
       {text && <span className="truncate">{text}</span>}
       {s.incomplete && (text
         ? <span className="-ml-1 shrink-0" data-partial>+<span className="sr-only"> partial</span></span>

@@ -56,18 +56,18 @@ test('a tick that changes nothing renders no glyph, and the ages on the desk and
   expect(deskAge()).toContain('2h ago');
 });
 
-test('the tick that makes the read stale stops the spinner and child tasks and puts work at Verify back on the desk', async () => {
-  const titles = { childActivity: { count: 1, titles: ['Run the tests'] } };
+test('the tick that makes the read stale stops the spinner, keeps T3\'s activity and puts work at Verify back on the desk', async () => {
+  const titles = { state: 'running', updated: FRESH, activity: { available: true, action: 'Run the tests', actionAt: FRESH, toolRunning: true, agents: [] } };
   const { tickAt } = await mounted(boardOf([running('I_build', 'In progress', titles), running('I_verify', 'Verify')], 60));
   const onDesk = () => $$('.desk-card').map((card) => card.getAttribute('data-item'));
   expect($('.status-spin')).not.toBeNull();
-  expect(text($('[data-child-activity]'))).toBe('Run the tests');
+  expect(text($('[data-activity="working"] [data-action]'))).toBe('Run the tests');
   expect(onDesk()).toEqual([]);
 
   await tickAt(NOW + 180_001);
   expect(glyphRenders).toBeGreaterThan(0);
   expect($('.status-spin')).toBeNull();
-  expect($('[data-child-activity]')).toBeNull();
+  expect(text($('[data-activity="working"] [data-action]')), 'a stale provider read says nothing of T3').toBe('Run the tests');
   expect(onDesk()).toEqual(['I_verify']);
 });
 

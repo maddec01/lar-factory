@@ -57,7 +57,7 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
   }
   const liveChildren = new Set<string>();
   const runningChildren = new Set<string>();
-  const childActivity = new Map<string, NonNullable<ItemThread['childActivity']>>();
+  const needsYouChildren = new Set<string>();
   for (const shell of working) {
     const id = shell.id as string;
     if (shellsById.get(id) !== shell) continue;
@@ -67,16 +67,10 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
     const background = Array.isArray(shell.pendingBackgroundTasks) && shell.pendingBackgroundTasks.length > 0;
     if (background) runningChildren.add(id);
     const running = !shell.pendingRuntimeRequest && status === 'running';
-    const title = typeof shell.title === 'string' ? shell.title : id;
     for (const ancestor of ancestorsOf(id, lineages)) {
       if (live) liveChildren.add(ancestor);
-      if (background || running) {
-        runningChildren.add(ancestor);
-        const activity = childActivity.get(ancestor) ?? { titles: [], count: 0 };
-        childActivity.set(ancestor, activity);
-        activity.count++;
-        if (activity.titles.length < 3) activity.titles.push(title);
-      }
+      if (background || running) runningChildren.add(ancestor);
+      if (shell.pendingRuntimeRequest) needsYouChildren.add(ancestor);
     }
   }
   const threads = new Map<string, ItemThread>();
@@ -90,7 +84,7 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
       : RUNNING.has(status) ? 'running'
       : ['failed', 'interrupted', 'cancelled'].includes(status) ? 'stopped' : 'done';
     const thread: ItemThread = { id, title: typeof shell.title === 'string' ? shell.title : id, state, ...(!shell.pendingRuntimeRequest && status === 'running' ? { currentRunning: true as const } : {}), ...(!shell.pendingRuntimeRequest && status === 'queued' ? { queued: true as const } : {}), ...(shell.archivedAt ? { archived: true as const } : {}), updated: shell.updatedAt as string,
-      ...(runningChildren.has(id) ? { hasRunningChildren: true } : {}), ...(liveChildren.has(id) ? { hasLiveChildren: true } : {}), ...(childActivity.has(id) ? { childActivity: childActivity.get(id) } : {}) };
+      ...(runningChildren.has(id) ? { hasRunningChildren: true } : {}), ...(liveChildren.has(id) ? { hasLiveChildren: true } : {}), ...(needsYouChildren.has(id) ? { childNeedsYou: true } : {}) };
     threads.set(id, thread);
     return thread;
   };

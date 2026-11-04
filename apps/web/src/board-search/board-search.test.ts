@@ -1,9 +1,21 @@
-// The board search as the page shows it: the field and its shortcut, and the dialog that sets Scope, Kind and Labels.
+// The board search as the page shows it: the field and its shortcut, and the dialog that sets Scope, Kind and Labels,
+// runs actions, and opens Settings and tickets.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item, RepositorySetup } from '@lar-factory/shared';
-import { $, $$, mountPage, sample, settle, text, toolChecks } from '../../test/support.ts';
+import { $, $$, NOW, mountPage, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
+
+// Counts the board work that doesn't depend on the query, which a keystroke must not repeat.
+const calls = vi.hoisted(() => ({ stageRows: 0, pages: 0 }));
+vi.mock('../line/stage-rows.ts', async (actual) => {
+  const real = await actual<typeof import('../line/stage-rows.ts')>();
+  return { ...real, stageRows: (...args: Parameters<typeof real.stageRows>) => { calls.stageRows++; return real.stageRows(...args); } };
+});
+vi.mock('../settings/settings-pages.tsx', async (actual) => {
+  const real = await actual<typeof import('../settings/settings-pages.tsx')>();
+  return { ...real, pages: (...args: Parameters<typeof real.pages>) => { calls.pages++; return real.pages(...args); } };
+});
 
 const FILTERS_KEY = 'lar-board:filters:board';
 const SCOPE_KEY = 'lar-board:scope';
@@ -23,9 +35,9 @@ const type = (value: string) => settle(() => {
   input().dispatchEvent(new Event('input', { bubbles: true }));
 });
 const groups = () => $$('[data-search-dialog] [role="group"]').map((group) => [
-  text(group.querySelector('span')), [...group.querySelectorAll('[role="option"] .truncate')].map((name) => text(name)),
+  text(group.querySelector('span')), [...group.querySelectorAll('[role="option"] .flex-1')].map((name) => text(name)),
 ]);
-const option = (name: string) => $$<HTMLElement>('[data-search-dialog] [role="option"]').find((o) => text(o.querySelector('.truncate')) === name)!;
+const option = (name: string) => $$<HTMLElement>('[data-search-dialog] [role="option"]').find((o) => text(o.querySelector('.flex-1')) === name)!;
 const choose = (name: string) => settle(() => option(name).click());
 const removes = () => $$('[data-search-dialog] li button').map((button) => button.getAttribute('aria-label'));
 const clear = () => settle(() => $<HTMLButtonElement>('[data-search-clear]')!.click());
@@ -177,6 +189,7 @@ test('the dialog lists repositories with All repositories first, in List order, 
   await mountPage(withItems([item('Q1', { number: 1, labels: ['docs', 'area: web'] })]));
   await openDialog();
   expect(groups()).toEqual([
+    ['Actions', ['Add item', 'List', 'Settings']],
     ['Repositories', ['All repositories', 'lar-server', 'lar-apple']],
     ['Kinds', ['Bug', 'Feature', 'Improvement', 'Concept', 'No kind']],
     ['Labels', ['area: web', 'docs']],
@@ -221,9 +234,10 @@ test('choosing a repository swaps Scope and All repositories clears it, with the
 test('the arrow keys and Enter choose an option, and Esc closes', async () => {
   await mountPage();
   await openDialog();
+  await type('lar');
   await press('ArrowDown');
   await press('Enter');
-  expect(removes()).toEqual(['Remove lar-server']);
+  expect(removes()).toEqual(['Remove lar-apple']);
   await press('Escape');
   expect(dialog()).toBeNull();
 });
@@ -281,6 +295,17 @@ test('Clear removes every token, Scope included, and leaves the focus in the fie
   expect($('[data-search-clear]')).toBeNull();
   expect(document.activeElement).toBe(input());
   expect(field().getAttribute('aria-label')).toBe('Search');
+});
+
+test('typing repeats none of the work the query does not change', async () => {
+  await mountPage();
+  await openDialog();
+  await type('a');
+  calls.stageRows = 0;
+  calls.pages = 0;
+  await type('ab');
+  await type('abc');
+  expect(calls).toEqual({ stageRows: 0, pages: 0 });
 });
 
 test('every query word must match, and an empty list says nothing matches', async () => {
@@ -344,4 +369,182 @@ test('a saved Scope missing from the board shows no token, and returns with its 
   await settle(() => useBoardStore.getState().receive({ ...sample, repos: [...sample.repos, { ...sample.repos[0]!, repo: 'maddec01/lar-gone' }] }));
   expect(removes()).toEqual(['Remove lar-gone']);
   expect((await scopes()).savedScope).toBe('maddec01/lar-gone');
+});
+
+const stores = async () => ({
+  addItem: (await import('../add-item/add-item-store.ts')).useAddItemStore.getState,
+  settings: (await import('../settings/settings-store.ts')).useSettingsStore.getState,
+  itemDialog: (await import('../item-dialog/item-dialog-store.ts')).useItemDialogStore.getState,
+  list: (await import('../list/list-store.ts')).useListStore.getState,
+});
+/** Lets a closed dialog's return of the focus run, which Radix leaves to the next task. */
+const returnFocus = () => settle(() => vi.advanceTimersByTime(0));
+
+test.each([
+  ['Add item', '', '[data-pane]'],
+  ['List', '', '[data-list-modal]'],
+  ['Settings', '', '.settings-nav'],
+  ['Add item from a ticket', 'ticket', '[data-pane]'],
+  ['Archive', 'archive', '.settings-nav'],
+] as const)('choosing %s closes the dialog, opens its own, and returns the focus to the field when that closes', async (name, query, opened) => {
+  await mountPage();
+  await openDialog();
+  await type(query);
+  await choose(name);
+  expect(dialog()).toBeNull();
+  await returnFocus();
+  expect($(opened)).not.toBeNull();
+  expect($('[role="dialog"]')!.contains(document.activeElement), 'the focus is in the new dialog').toBe(true);
+  await press('Escape');
+  await returnFocus();
+  expect($('[role="dialog"]')).toBeNull();
+  expect(document.activeElement).toBe(field());
+});
+
+test('each action does what it says', async () => {
+  await mountPage();
+  const { addItem, settings, list } = await stores();
+  await openDialog();
+  await choose('List');
+  expect(list().open).toBe(true);
+  await settle(() => list().setOpen(false));
+  await openDialog();
+  await type('from a ticket');
+  await choose('Add item from a ticket');
+  expect(addItem()).toMatchObject({ open: true, pane: 'pick' });
+  await settle(() => addItem().setOpen(false));
+  await openDialog();
+  await choose('Add item');
+  expect(addItem()).toMatchObject({ open: true, pane: 'new' });
+  await settle(() => addItem().setOpen(false));
+  await openDialog();
+  await type('archive');
+  await choose('Archive');
+  expect(settings()).toMatchObject({ open: true, section: 'archive' });
+});
+
+test('choosing a Settings section or a single setting opens Settings on the section that holds it', async () => {
+  await mountPage();
+  const { settings } = await stores();
+  await openDialog();
+  await type('diagnostics');
+  await choose('Diagnostics');
+  expect(settings()).toMatchObject({ open: true, section: 'diagnostics' });
+  expect(text($('.settings-body'))).toContain('Board server');
+  await settle(() => settings().setOpen(false));
+  await openDialog();
+  await type('full refresh');
+  await choose('Full refresh');
+  expect(settings()).toMatchObject({ open: true, section: 'general' });
+  expect(text($('.settings-body'))).toContain('Full refresh');
+});
+
+const UPDATE = { ...updatesOff, enabled: true, status: 'available', availableVersion: '9.9.9', message: null } as const;
+
+test('Update is offered only while it has a step to run, and runs the step the pill does', async () => {
+  const downloadUpdate = vi.fn(async () => ({ accepted: true, completed: false, state: UPDATE }));
+  stubApp({ getUpdateState: async () => UPDATE, onUpdateState: () => () => {}, downloadUpdate });
+  await mountPage();
+  await openDialog();
+  expect(groups()[0]).toEqual(['Actions', ['Add item', 'List', 'Settings', 'Download the update']]);
+  await choose('Download the update');
+  expect(dialog()).toBeNull();
+  expect(downloadUpdate).toHaveBeenCalledOnce();
+  const { useUpdateStore } = await import('../updates/update-store.ts');
+  await settle(() => useUpdateStore.setState({ state: { ...UPDATE, status: 'downloading' } }));
+  await openDialog();
+  expect(groups()[0]).toEqual(['Actions', ['Add item', 'List', 'Settings']]);
+});
+
+const WIDE: BoardData = withItems([
+  item('K1', { number: 1, title: 'Match kept', kind: 'bug' }),
+  item('H1', { number: 2, title: 'Match hidden', kind: 'feature' }),
+]);
+const tickets = () => groups().find(([label]) => label === 'Tickets')?.[1];
+
+test('choosing a ticket closes the dialog and opens its item dialog, which returns the focus to the field', async () => {
+  await mountPage(WIDE);
+  const { itemDialog } = await stores();
+  await openDialog();
+  await type('#2');
+  await choose('Match hidden');
+  expect(dialog()).toBeNull();
+  expect(itemDialog().itemId).toBe('H1');
+  await returnFocus();
+  expect($('[data-item-dialog]')!.contains(document.activeElement)).toBe(true);
+  await press('Escape');
+  await returnFocus();
+  expect(document.activeElement).toBe(field());
+});
+
+test('tokens narrow tickets only, and Search all tickets lists the rest until the query changes, leaving the filters', async () => {
+  seed(['bug']);
+  await mountPage(WIDE);
+  await openDialog();
+  await type('match');
+  expect(tickets()).toEqual(['Match kept', 'Search all tickets']);
+  expect(groups().find(([label]) => label === 'Settings')?.[1]).toContain('Match list size when opening an item');
+  await settle(() => option('Search all tickets').click());
+  expect(tickets()).toEqual(['Match kept', 'Match hidden']);
+  expect(saved()).toEqual({ kinds: ['bug'], labels: [] });
+  expect(removes()).toEqual(['Remove Bug']);
+  await type('match ');
+  expect(tickets(), 'any change to the query narrows them again').toEqual(['Match kept', 'Search all tickets']);
+});
+
+test('closing the dialog forgets Search all tickets', async () => {
+  seed(['bug']);
+  await mountPage(WIDE);
+  await openDialog();
+  await type('match');
+  await choose('Search all tickets');
+  await press('Escape');
+  await openDialog();
+  await type('match');
+  expect(tickets()).toEqual(['Match kept', 'Search all tickets']);
+});
+
+test('after Search all tickets the highlight is on the first ticket it added', async () => {
+  seed(['bug']);
+  await mountPage(WIDE);
+  await openDialog();
+  await type('#');
+  await press('ArrowUp');
+  await press('Enter');
+  expect(document.getElementById(input().getAttribute('aria-activedescendant')!)).toBe(option('Match hidden'));
+});
+
+test('Clear filters is offered once typing and while a filter is on; it clears them with the dialog open', async () => {
+  seed(['bug']);
+  await mountPage();
+  await openDialog();
+  expect(groups()[0]![1]).not.toContain('Clear filters');
+  await type('clear');
+  await choose('Clear filters');
+  expect(removes()).toEqual([]);
+  expect(saved()).toEqual({ kinds: [], labels: [] });
+  expect(dialog()).not.toBeNull();
+  expect(groups()).toEqual([]);
+});
+
+test('a Done ticket older than the board\'s 7-day window is not listed', async () => {
+  const closed = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
+  await mountPage(withItems([
+    item('D1', { number: 1, title: 'Shipped long ago', status: 'Done', closedAt: closed(8) }),
+    item('D2', { number: 2, title: 'Shipped lately', status: 'Done', closedAt: closed(6) }),
+  ]));
+  await openDialog();
+  await type('shipped');
+  expect(tickets()).toEqual(['Shipped lately']);
+});
+
+test('while the first read is unfinished the dialog shows the loading cue, not that nothing matches', async () => {
+  await mountPage({ ...sample, items: [], firstRead: { step: 'items', running: [], settled: false } });
+  await openDialog();
+  const status = () => text($('[data-search-dialog] [role="status"]'));
+  expect(status(), 'no tickets are on offer before typing').toBe('');
+  await type('zzz');
+  expect(groups()).toEqual([]);
+  expect(status()).toBe('Loading projects…');
+  expect($('[data-search-dialog] [data-loader]')).not.toBeNull();
 });

@@ -50,9 +50,12 @@ export const headingOf = (rows: readonly Item[]): string => {
   return headings.size === 1 ? [...headings][0]! : 'Labels';
 };
 
-/** Whether a row stays: it matches any chosen kind and any chosen label. An item with no kind badge counts as No kind. */
+/** The kind filter a row counts under. An item with no kind badge counts as No kind. */
+export const kindFilterOf = (item: Pick<Item, 'kind'>): KindFilter => (isKindFilter(item.kind) ? item.kind : 'no-kind');
+
+/** Whether a row stays: it matches any chosen kind and any chosen label. */
 export const rowFilter = ({ kinds, labels }: ItemFilters, repos: readonly RepoConfig[]) => (item: Item): boolean =>
-  (!kinds.length || kinds.includes(isKindFilter(item.kind) ? item.kind : 'no-kind'))
+  (!kinds.length || kinds.includes(kindFilterOf(item)))
   && (!labels.length || labelsOnRow(item, repos).some((shown) => labels.some((label) => sameLabel(label, shown))));
 
 /** What the Labels filter offers for `rows`: the names they show, once each without case, in order, in a colour one of them has. */

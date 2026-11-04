@@ -15,7 +15,7 @@ import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
-import { StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { AutoBuildNote } from './auto-build-note.tsx';
 import { FIGURES_COLUMN, Figures, LINK_COLUMN, ROW_ACTION, ROW_COLUMNS, figuresOf } from './columns.tsx';
 import { threadAtWork, threadsOf } from './dossier-parts.ts';
@@ -88,7 +88,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
         <button type="button" data-row-open data-meta onClick={() => useItemDialogStore.getState().open(item.id)}
           className={`grid h-12 min-w-0 flex-1 ${ROW_COLUMNS} items-center gap-x-3 pl-3 text-left text-[11px] text-(--muted-foreground) ${ROW_OPENS}`}>
           {n === undefined
-            ? <span className="grid size-6 place-items-center" data-glyph><StatusGlyph status={shown.glyph} /></span>
+            ? <span className="grid size-6 place-items-center" data-glyph><ItemStatusGlyph item={item} /></span>
             : <span className="queue-n text-center font-medium tabular-nums">{n + 1}</span>}
           <RowSource item={item} />
           <span className="flex min-w-0 items-center" data-kind><RowKind item={item} /></span>

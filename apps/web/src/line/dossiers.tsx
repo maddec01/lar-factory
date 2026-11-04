@@ -24,7 +24,7 @@ import { SourceIcon } from '../items/source-icon.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
-import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph, StatusGlyph, STATUS_COLOR, useStatusActivity } from '../items/status-glyph.tsx';
 import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partLabel, shownThread, threadAtWork, threadsOf } from './dossier-parts.ts';
 import type { DossierItems, Part } from './dossier-parts.ts';
 import { StartBuild } from '../items/start-build.tsx';
@@ -60,6 +60,7 @@ const waitsOn = (part: Part) => `waits on ${openWaits(part).map((b) => blockerRe
 /** A part's thread, its title and state; before it has one, what its start waits on. */
 function ThreadLine({ part }: { part: Part }) {
   const thread = shownThread(part, useShownStatus(part.item).working);
+  const running = useStatusActivity();
   if (!thread) {
     const { work, dependencies } = blockerGroups(part.item, openWaits(part));
     const waits = [...work ? [work.names] : [], ...dependencies ? [`you to mark ${dependencies.names} met`] : []];
@@ -67,7 +68,7 @@ function ThreadLine({ part }: { part: Part }) {
   }
   return (
     <span className="flex min-w-0 items-center gap-1.5" title={thread.title}>
-      <StatusGlyph status={THREAD_GLYPH[thread.state]} className="size-3" />
+      <StatusGlyph status={thread.state === 'running' ? part.item.status : THREAD_GLYPH[thread.state]} running={!thread.observedAt && running(part.item)} className="size-3" />
       <span className="truncate">T3 · {thread.title}</span>
       <span className="shrink-0">· {thread.archived ? 'archived' : thread.state}{lastSeen(thread)}</span>
     </span>
@@ -117,11 +118,10 @@ function LocalPlanning({ item }: { item: Item }) {
 
 /** A part's source, status and title, up to two lines. */
 function PartName({ part }: { part: Part }) {
-  const { glyph } = useShownStatus(part.item);
   return (
     <span className="flex min-w-0 items-start gap-1.5 text-[13px]">
       <SourceIcon item={part.item} />
-      <span className="mt-0.5 inline-flex"><StatusGlyph status={glyph} className="size-3.5" /></span>
+      <span className="mt-0.5 inline-flex"><ItemStatusGlyph item={part.item} className="size-3.5" /></span>
       <span className="line-clamp-2"><ItemTitle item={part.item} /></span>
     </span>
   );
@@ -232,6 +232,7 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
   const isPicked = usePicked(item);
   const waits = openWaits(part);
   const shown = useShownStatus(item);
+  const running = useStatusActivity();
   const s = figuresOf(item, data);
   return (
     <li data-part={item.id} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-3 py-2.5 hover:bg-(--accent) ${picked(isPicked)}`}>
@@ -240,7 +241,7 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
         <PartKindLabel kind={part.kind} />
         {repoKey(item) !== home && <RepoCell item={item} />}
-        <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} label={shown.word} waiting={waits.length > 0} /></span>
+        <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} running={running(item)} label={shown.word} waiting={waits.length > 0} /></span>
         <span>{isDone(item) ? 'Complete' : shown.word}</span>
         {s || usageLoading(item, data) ? <Figures s={s} item={item} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
         <AzureFields azure={item.azure} />

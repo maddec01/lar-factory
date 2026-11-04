@@ -303,3 +303,60 @@ test('spend remains incomplete when an empty source succeeds and another failed'
   expect(text(counter('spend'))).toBe('Unavailable');
   expect(head(await openCounter('spend'))).toBe('Agent spendIncomplete');
 });
+
+test('building animates across the whole factory while the Build heading follows scope and filters', async () => {
+  const fresh = { ...limited, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, slices: [], threads: [] })) };
+  const running = { ...fresh, items: fresh.items.map(item => item.id === 'I_sample14' ? { ...item, kind: 'bug' as const,
+    threads: [{ id: 'b', title: 'Build', purpose: 'build', state: 'running' as const, currentRunning: true as const, updated: fresh.fetchedAt }],
+  } : item) };
+  await mountPage(running);
+  const heading = () => $('[data-stage="build"] header > svg')!;
+  const counterIcon = () => counter('building').querySelector('svg')!;
+  expect(heading().classList.contains('status-spin')).toBe(true);
+  expect(counterIcon().classList.contains('status-spin')).toBe(true);
+  let pop = await openCounter('building');
+  const members = () => [...popup()!.querySelectorAll('[data-item]')].map(el => el.getAttribute('data-item'));
+  const originalMembers = members();
+  expect(pop.querySelector('.h-10 > .status-spin')).not.toBeNull();
+  expect(pop.querySelector('[data-item="I_sample14"] svg.status-spin')).not.toBeNull();
+  const close = () => settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await close();
+  const { useScopeStore } = await import('../board/scope-store.ts');
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-server'));
+  expect(heading().classList.contains('lucide-circle')).toBe(true);
+  expect(counterIcon().classList.contains('status-spin')).toBe(true);
+  expect(text(counter('building'))).toBe('4/2');
+  await openCounter('building');
+  expect(members()).toEqual(originalMembers);
+  await close();
+  await settle(() => useScopeStore.getState().setScope(null));
+  await settle(() => $<HTMLButtonElement>('[data-line-filters] [data-filter="kind"]')!.click());
+  await settle(() => $$<HTMLLabelElement>('[data-filter-choice]').find(label => text(label) === 'Feature')!.querySelector('input')!.click());
+  await close();
+  expect(heading().classList.contains('lucide-circle')).toBe(true);
+  expect(counterIcon().classList.contains('status-spin')).toBe(true);
+  pop = await openCounter('building');
+  expect(members()).toEqual(originalMembers);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(fresh));
+  expect(counterIcon().classList.contains('lucide-circle')).toBe(true);
+  expect(pop.querySelector('.h-10 > .lucide-circle')).not.toBeNull();
+  expect(text(counter('building'))).toBe('4/2');
+  expect(members()).toEqual(originalMembers);
+});
+
+test('starting and idle builds keep their count and membership while shaping alone leaves the building icons still', async () => {
+  const fresh = { ...limited, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, slices: [], threads: item.id === 'I_sample02'
+    ? [{ id: 's', title: 'Shape', purpose: 'shape', state: 'running' as const, currentRunning: true as const, updated: item.updatedAt }] : [] })),
+    startProgress: { I_sample13: { build: { phase: 'starting' as const } } } };
+  await mountPage(fresh);
+  expect(text(counter('building'))).toBe('5/2');
+  expect(counter('building').querySelector('svg.lucide-circle')).not.toBeNull();
+  expect(counter('need you').querySelector('svg.status-pulse')).toBeNull();
+  expect(counter('need you').querySelector<SVGElement>('svg')!.style.color).toBe('var(--st-amber)');
+  const pop = await openCounter('building');
+  expect(pop.querySelector('.h-10 > svg.lucide-circle')).not.toBeNull();
+  expect(pop.querySelectorAll('[data-item]')).toHaveLength(5);
+  expect(pop.querySelector('[data-item="I_sample13"] svg.lucide-circle-arrow-right')).not.toBeNull();
+  expect(pop.querySelector('svg.status-pulse, svg.status-spin')).toBeNull();
+});

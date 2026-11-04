@@ -9,11 +9,13 @@
   --st-done: var(--build);
   --st-idle: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
 }
-/* A status or slice that's waiting on you or working now. */
+/* Status icons animate during agent work. Slice and part bars keep their own activity rules. */
+@keyframes status-spin { to { transform: rotate(360deg); } }
+.status-spin { animation: status-spin 2.4s linear infinite; }
 @keyframes status-pulse { 50% { opacity: 0.35; } }
 .status-pulse { animation: status-pulse 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .status-pulse { animation: none; }
+  .status-spin, .status-pulse { animation: none; }
 }
 
 .title { font-weight: 500; text-decoration: none; line-height: 1.35; }

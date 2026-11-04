@@ -228,6 +228,8 @@ test.each(['Verify', 'Ready to merge'] as const)('%s with its build thread runni
   const open = statusAction() as HTMLAnchorElement;
   expect([text(open), open.getAttribute('href')]).toEqual(['Open thread', 't3code://threads/sample-environment/build']);
   expect(text(inDialog('[data-item-summary]'))).toContain('Working');
+  const icon = status === 'Verify' ? 'lucide-circle-dot' : 'lucide-git-merge';
+  expect(inDialog(`[data-item-summary] svg.${icon}.status-pulse`)).not.toBeNull();
   expect(text(inDialog('[data-item-summary]'))).not.toContain(status);
   expect(text(inDialog('[data-steps] [aria-current="step"]'))).toContain('Working');
   expect(inDialog('[data-steps] [aria-current="step"]')!.getAttribute('aria-label')).toMatch(status === 'Verify' ? /^Step 7 of 8: Working/ : /^Step 8 of 8: Working/);
@@ -236,6 +238,8 @@ test.each(['Verify', 'Ready to merge'] as const)('%s with its build thread runni
   await settle(() => useBoardStore.getState().receive(change([{ ...thread('build', 'done'), purpose: 'build' }])));
   expect(text(statusAction())).toBe(status === 'Verify' ? 'Verify build' : 'Merge PR');
   expect(text(inDialog('[data-item-summary]'))).toContain(status);
+  expect(inDialog(`[data-item-summary] svg.${icon}:not(.status-pulse)`)).not.toBeNull();
+  expect(inDialog(`[data-item-body] svg.${icon}:not(.status-pulse)`), 'the hint keeps the stopped icon').not.toBeNull();
 });
 
 test.each([
@@ -1353,4 +1357,20 @@ test.each([true, false])('a concept recorded %s draws no diagram from its map, e
   await mountPage(board);
   await openItem(CONCEPT);
   expect(dialog()!.querySelectorAll('[data-map-diagram]')).toHaveLength(0);
+});
+
+test('concept parts retain their own status icons while work resumes and stops', async () => {
+  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
+  const data = (currentRunning?: true): BoardData => ({ ...fresh, items: fresh.items.map(item => item.id === 'I_sample13' ? { ...item, status: 'Verify', slices: [],
+    threads: [{ ...thread('build', currentRunning ? 'running' : 'done'), purpose: 'build', currentRunning }],
+  } : item) });
+  await mountPage(data(true));
+  await openItem(CONCEPT);
+  const row = () => inDialog('[data-concept-part="I_sample13"]')!;
+  expect(row().querySelector('svg.lucide-circle-dot.status-pulse')).not.toBeNull();
+  expect(text(row())).toContain('Working');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(data()));
+  expect(row().querySelector('svg.lucide-circle-dot:not(.status-pulse)')).not.toBeNull();
+  expect(text(row())).toContain('Verify');
 });

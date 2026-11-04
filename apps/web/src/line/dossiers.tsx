@@ -29,7 +29,7 @@ import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partLabel, shownThread
 import type { DossierItems, Part } from './dossier-parts.ts';
 import { StartBuild } from '../items/start-build.tsx';
 import { PartStart, startable } from './part-start.tsx';
-import { ActivityLine, useActivityState } from './activity-line.tsx';
+import { ActivityLine, useActivityState, useActivityStill } from './activity-line.tsx';
 import { Figures, ROW_ACTION, ROW_RULE, RowSecondLine, figuresOf, opensItem } from './columns.tsx';
 import { Pane } from './pane.tsx';
 import { OnYourDesk, ROW_OPENS, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
@@ -236,8 +236,7 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
   const running = useStatusActivity();
   const s = figuresOf(item, data);
   const activity = useActivityState(item);
-  const disconnected = useBoardStore((state) => !!state.clientError);
-  const still = itemActivityStill(item, disconnected);
+  const still = useActivityStill(item);
   const word = (activity && ACTIVITY_WORD[activity]) ?? shown.word;
   const slices = item.slices.length;
   const hasThreadLine = !!activity || !!shownThread(part, shown.working) || waits.length > 0;
@@ -325,7 +324,7 @@ function PartsBar({ m }: { m: Moving }) {
       {order.map((p) => {
         const { word, glyph } = shownStatus(p.item, unavailable);
         return (
-          <li key={p.item.id} title={`${itemName(p.item)}: ${isDone(p.item) ? 'Complete' : word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${glyph === 'In progress' && !itemActivityStill(p.item, disconnected) ? 'status-pulse' : ''}`}
+          <li key={p.item.id} title={`${itemName(p.item)}: ${isDone(p.item) ? 'Complete' : word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${glyph === 'In progress' && !itemActivityStill(p.item, Date.now(), disconnected) ? 'status-pulse' : ''}`}
             style={{ background: isDone(p.item) ? 'var(--st-done)' : glyph === 'Queued' || glyph === 'List' ? 'var(--soft)' : STATUS_COLOR[glyph] }} />
         );
       })}

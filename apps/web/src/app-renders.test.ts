@@ -57,7 +57,7 @@ test('a tick that changes nothing renders no glyph, and the ages on the desk and
 });
 
 test('the tick that makes the read stale stops the spinner, keeps T3\'s activity and puts work at Verify back on the desk', async () => {
-  const titles = { state: 'running', updated: FRESH, activity: { available: true, action: 'Run the tests', actionAt: FRESH, toolRunning: true, agents: [] } };
+  const titles = { state: 'running', updated: FRESH, activity: { available: true, readAt: new Date(NOW + 180_001).toISOString(), action: 'Run the tests', actionAt: FRESH, toolRunning: true, agents: [] } };
   const { tickAt } = await mounted(boardOf([running('I_build', 'In progress', titles), running('I_verify', 'Verify')], 60));
   const onDesk = () => $$('.desk-card').map((card) => card.getAttribute('data-item'));
   expect($('.status-spin')).not.toBeNull();

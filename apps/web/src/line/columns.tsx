@@ -3,9 +3,10 @@
 
 import type { MouseEvent, ReactNode } from 'react';
 import { GitPullRequest } from 'lucide-react';
-import { duration, formatTokens, formatUsd, itemActivityStill, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
+import { duration, formatTokens, formatUsd, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats, LinkedPr } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
+import { useActivityStill } from './activity-line.tsx';
 import { hasFigures, INCOMPLETE_TOTAL, useLastKnown, usageLoading } from '../items/item-parts.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { Loader } from '../loading/loader.tsx';
@@ -45,7 +46,7 @@ export const figuresOf = (item: Item, data: BoardData, total?: boolean): ItemSta
 export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; total?: boolean }) {
   const lastKnown = useLastKnown(item);
   const data = useBoardStore((state) => state.data);
-  const still = itemActivityStill(item, useBoardStore((state) => !!state.clientError));
+  const still = useActivityStill(item);
   const loading = usageLoading(item, data) || !!total && itemMembers(item, data.items).some((member) => usageLoading(member, data));
   if (!s || !hasFigures(s) && (loading || !s.incomplete)) return loading ? <Loader label="Loading usage" still={still} /> : <span />;
   const cost = s.costUsd !== undefined ? formatUsd(s.costUsd) : null;

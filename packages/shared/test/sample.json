@@ -506,6 +506,7 @@
           "updated": "2026-10-21T09:48:00.000Z",
           "activity": {
             "available": true,
+            "readAt": "2100-01-01T00:00:00.000Z",
             "action": "Read relay-costs.md",
             "actionAt": "2026-10-21T09:48:00.000Z",
             "toolRunning": false,
@@ -605,6 +606,7 @@
           "updated": "2026-10-21T09:57:00.000Z",
           "activity": {
             "available": true,
+            "readAt": "2100-01-01T00:00:00.000Z",
             "action": "AskUserQuestion",
             "actionAt": "2026-10-21T09:57:00.000Z",
             "toolRunning": false,
@@ -858,6 +860,7 @@
           "updated": "2026-10-21T09:59:00.000Z",
           "activity": {
             "available": true,
+            "readAt": "2100-01-01T00:00:00.000Z",
             "action": "Read relay-broker.ts",
             "actionAt": "2026-10-21T09:57:00.000Z",
             "toolRunning": true,
@@ -949,6 +952,7 @@
           "updated": "2026-10-21T09:59:00.000Z",
           "activity": {
             "available": true,
+            "readAt": "2100-01-01T00:00:00.000Z",
             "action": "Edit scrubber.tsx",
             "actionAt": "2026-10-21T09:59:00.000Z",
             "toolRunning": true,
@@ -1091,6 +1095,7 @@
           "updated": "2026-10-21T09:40:00.000Z",
           "activity": {
             "available": true,
+            "readAt": "2100-01-01T00:00:00.000Z",
             "action": "Edit transcoder-cancel.ts",
             "actionAt": "2026-10-21T09:40:00.000Z",
             "toolRunning": false,

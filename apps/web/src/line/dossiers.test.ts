@@ -388,7 +388,7 @@ test('an open dossier has no About section; what keeps the work moving is in lab
 });
 
 test('a part at Verify or Ready to merge counts as moving while its build thread runs, and back on your desk when it stops', async () => {
-  const build = { id: 'build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated: '2026-10-21T09:00:00.000Z', activity: { available: true, action: 'Read a.ts', actionAt: new Date(NOW).toISOString(), toolRunning: false, agents: [] } } as ItemThread;
+  const build = { id: 'build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated: '2026-10-21T09:00:00.000Z', activity: { available: true, readAt: new Date(NOW).toISOString(), action: 'Read a.ts', actionAt: new Date(NOW).toISOString(), toolRunning: false, agents: [] } } as ItemThread;
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
   const clear = withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, fresh));
   await mountOpen(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [build] }, clear));
@@ -1052,7 +1052,7 @@ test('a part with no figures yet says its usage can\'t be read', async () => {
 });
 
 test.each(['Verify', 'Ready to merge'] as const)('%s keeps its pulsing icon in names and Track, with the activity line for the thread, while its part bar keeps building', async status => {
-  const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true, activity: { available: true, toolRunning: true, agents: [] } };
+  const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true, activity: { available: true, readAt: new Date(NOW).toISOString(), toolRunning: true, agents: [] } };
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
   const data = withItem('I_sample13', { status, blockers: [], slices: [], threads: [build] }, fresh);
   await mountOpen(data);

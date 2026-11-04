@@ -2,7 +2,7 @@
 // a meta area of labels under the title, a progress bar with the slices as an overview, then sub-tickets and pull
 // requests in a sidebar, and its footer carries GitHub and the action the item's status asks for.
 
-import { expect, test, vi } from 'vite-plus/test';
+import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, answer, detailsRead, fetchMock, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, textBesideIcon, toast } from '../../test/support.ts';
 import type { Blocker, BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 
@@ -1373,4 +1373,65 @@ test('concept parts retain their own status icons while work resumes and stops',
   await settle(() => useBoardStore.getState().receive(data()));
   expect(row().querySelector('svg.lucide-circle-dot:not(.status-pulse)')).not.toBeNull();
   expect(text(row())).toContain('Verify');
+});
+
+describe('the working agents', () => {
+  const at = new Date(NOW - 3_000).toISOString();
+  const working: ItemThread = { id: 'build', title: 'Build', state: 'running', updated: at, activity: {
+    available: true, readAt: at, action: 'Edit stage-row.tsx', actionAt: at, toolRunning: false,
+    agents: [{ title: 'Review', model: 'Opus 5.5', action: 'pnpm test', actionAt: new Date(NOW - 60_000).toISOString() }, { title: 'Subagent' }],
+  } };
+  const board = (change: Partial<Item>, data: BoardData = sample): BoardData => ({ ...data, error: null, fetchedAt: new Date(NOW).toISOString(), items: data.items.map((i) => (i.id === 'I_sample13' ? { ...i, status: 'In progress', threads: [working], ...change } : i)) });
+  const section = () => inDialog('[data-working-agents]');
+  const agents = () => [...section()!.querySelectorAll('li')].map((agent) => text(agent).replace(/\s+/g, ' '));
+
+  test('details lists each agent with its model and action age, leaving out what it doesn\'t have', async () => {
+    await mountPage(board({}));
+    await openItem('I_sample13');
+    expect(agents()).toEqual(['Lead thread3sEdit stage-row.tsx', 'Review· Opus 5.51mpnpm test', 'Subagent']);
+  });
+
+  test('details shows no list for a paused or archived item, or with no thread at work', async () => {
+    const stopped: ItemThread = { id: 'build', title: 'Build', state: 'stopped', updated: at };
+    for (const change of [{ paused: 'Paused' }, { archived: true }, { threads: [] }, { threads: [{ ...stopped, state: 'done' as const }] }, { threads: [stopped] }] as Partial<Item>[]) {
+      await mountPage(board(change));
+      await openItem('I_sample13');
+      expect(section()).toBeNull();
+    }
+  });
+
+  test('details says activity is unavailable rather than an old action', async () => {
+    await mountPage(board({ threads: [{ ...working, activity: { available: false } }] }));
+    await openItem('I_sample13');
+    expect(text(section())).toBe('Activity unavailable');
+    expect(section()!.querySelector('li')).toBeNull();
+  });
+
+  test('details follows a read going old with no new data', async () => {
+    const { ACTIVITY_STALE_MS } = await import('@lar-factory/shared');
+    await mountPage(board({ threads: [working] }));
+    await openItem('I_sample13');
+    expect(section()!.querySelector('li')).not.toBeNull();
+    // The system time alone moves, as the page's poll would bring the sample back.
+    vi.setSystemTime(NOW + ACTIVITY_STALE_MS);
+    await settle(() => vi.advanceTimersByTime(1_000));
+    expect(text(section())).toBe('Activity unavailable');
+    expect(section()!.querySelector('li')).toBeNull();
+  });
+
+  test('ages tick live and render nothing else in the dialog', async () => {
+    let glyphRenders = 0;
+    vi.doMock('../items/status-glyph.tsx', async (original) => {
+      const real = await original<typeof import('../items/status-glyph.tsx')>();
+      return { ...real, StatusGlyph: (props: Parameters<typeof real.StatusGlyph>[0]) => { glyphRenders += 1; return real.StatusGlyph(props); } };
+    });
+    await mountPage(board({}));
+    await openItem('I_sample13');
+    expect(agents()[0]).toBe('Lead thread3sEdit stage-row.tsx');
+    glyphRenders = 0;
+    await settle(() => vi.advanceTimersByTime(2_000));
+    expect(agents()[0]).toBe('Lead thread5sEdit stage-row.tsx');
+    expect(glyphRenders).toBe(0);
+    vi.doUnmock('../items/status-glyph.tsx');
+  });
 });

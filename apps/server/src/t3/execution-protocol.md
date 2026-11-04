@@ -146,7 +146,10 @@ and `orchestration_v2_projection_subagents`. A subagent record's `run_id` names 
 that started it, and child tasks outlive that run, so an agent with runs of its own goes
 by them. A native subagent has none and goes by that run or its thread's
 `pendingBackgroundTasks`. While T3 can't be read or the read fails, a thread at work carries
-`activity: { available: false }`.
+`activity: { available: false }`. Each read carries its own `readAt`, and a page treats one
+older than `ACTIVITY_STALE_MS` as unavailable, so a long whole read, which holds back the local
+refresh, can't leave an old action reading as current. The refresh sends pages new read times
+at least every 10 seconds, even when nothing else changed.
 
 ## Thread commands
 

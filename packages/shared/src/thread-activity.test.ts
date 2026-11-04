@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vite-plus/test';
 import type { BoardData, Item, ItemThread } from './model.ts';
-import { itemActivityLine, itemActivityStill, sampleActivityFrom, threadActivityLine, type ThreadActivity } from './thread-activity.ts';
+import { ACTIVITY_STALE_MS, itemActivityAgents, itemActivityLine, itemActivityStill, sampleActivityFrom, threadActivityLine, type ThreadActivity } from './thread-activity.ts';
 
 const NOW = Date.parse('2026-11-04T12:00:00Z');
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
-const activity = (over: Partial<Extract<ThreadActivity, { available: true }>> = {}): ThreadActivity => ({ available: true, toolRunning: false, agents: [], ...over });
+const activity = (over: Partial<Extract<ThreadActivity, { available: true }>> = {}): ThreadActivity => ({ available: true, readAt: ago(0), toolRunning: false, agents: [], ...over });
 const thread = (over: Partial<ItemThread> = {}): ItemThread => ({ id: 't', title: 'Build', state: 'running', updated: ago(1), ...over });
 
 test('a working thread shows its newest action, its age and its agents', () => {
@@ -57,6 +57,16 @@ test('a failed or stale read says unavailable, never an old action', () => {
   expect(threadActivityLine(thread(), NOW), 'a thread at work the server read nothing for').toEqual(unavailable);
 });
 
+test('an old read says unavailable, while a fresh one keeps quiet, ages and running tools', () => {
+  const unavailable = { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
+  const stamped = (ms: number, over: Parameters<typeof activity>[0] = {}) => thread({ activity: activity({ action: 'Read a.ts', actionAt: ago(1), readAt: new Date(NOW - ms).toISOString(), ...over }) });
+  expect(threadActivityLine(stamped(ACTIVITY_STALE_MS), NOW)).toEqual({ state: 'working', action: 'Read a.ts', ageMs: 60_000, agents: 0 });
+  expect(threadActivityLine(stamped(ACTIVITY_STALE_MS + 1), NOW)).toEqual(unavailable);
+  expect(threadActivityLine(stamped(0, { actionAt: ago(6) }), NOW)?.state).toBe('quiet');
+  expect(threadActivityLine(stamped(ACTIVITY_STALE_MS + 1, { actionAt: ago(6) }), NOW), 'an old read cannot say quiet').toEqual(unavailable);
+  expect(threadActivityLine(stamped(0, { actionAt: ago(30), toolRunning: true }), NOW)).toMatchObject({ state: 'working', ageMs: 30 * 60_000 });
+});
+
 test('a thread that finished with nothing at work shows nothing', () => {
   expect(threadActivityLine(thread({ state: 'done' }), NOW)).toBeUndefined();
 });
@@ -95,12 +105,16 @@ test('a row says unavailable when T3 or the page can\'t be read, and only for wo
 });
 
 test('only a thread that waits, stopped or can\'t be read holds a row still', () => {
-  expect(itemActivityStill(item([thread({ state: 'stopped' })]))).toBe(true);
-  expect(itemActivityStill(item([thread({ state: 'needs you', activity: activity() })]))).toBe(true);
-  expect(itemActivityStill(item([thread({ activity: { available: false } })]))).toBe(true);
-  expect(itemActivityStill(item([thread({ activity: activity({ actionAt: ago(60) }) })])), 'quiet is still at work').toBe(false);
-  expect(itemActivityStill(item([working('t', 'Read a.ts')]))).toBe(false);
-  expect(itemActivityStill(item([]))).toBe(false);
+  expect(itemActivityStill(item([thread({ state: 'stopped' })]), NOW)).toBe(true);
+  expect(itemActivityStill(item([thread({ state: 'needs you', activity: activity() })]), NOW)).toBe(true);
+  expect(itemActivityStill(item([thread({ activity: { available: false } })]), NOW)).toBe(true);
+  expect(itemActivityStill(item([thread({ activity: activity({ actionAt: ago(60) }) })]), NOW), 'quiet is still at work').toBe(false);
+  expect(itemActivityStill(item([working('t', 'Read a.ts')]), NOW)).toBe(false);
+  expect(itemActivityStill(item([]), NOW)).toBe(false);
+  const old = thread({ activity: activity({ readAt: new Date(NOW - ACTIVITY_STALE_MS - 1).toISOString() }) });
+  expect(itemActivityStill(item([old]), NOW), 'an old read').toBe(true);
+  expect(itemActivityAgents(item([old]), NOW)).toBe('unavailable');
+  expect(itemActivityAgents(item([working('t', 'Read a.ts')]), NOW)).toEqual([{ title: 'Lead thread', action: 'Read a.ts', actionAt: ago(1) }]);
 });
 
 test('the sample has a row for each state, whenever the sample board runs', () => {
@@ -114,4 +128,7 @@ test('the sample has a row for each state, whenever the sample board runs', () =
     ['waiting', 'Waiting on you', 1],
     ['stopped', 'Stopped', 0],
   ]));
+  const later = NOW + 60 * 60_000;
+  expect(sampleActivityFrom(sample, NOW).items.flatMap((item) => (Array.isArray(item.threads) ? item.threads : []))
+    .filter((t) => t.activity?.available).map((t) => threadActivityLine(t, later)!.state), 'an hour on, the sample has read nothing and its reads still count').not.toContain('unavailable');
 });

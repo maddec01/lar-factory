@@ -34,6 +34,7 @@ import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
+import { ItemAgents } from '../line/activity-line.tsx';
 import { ConceptParts } from './concept-parts.tsx';
 import { ItemComments, ItemDescription, ItemMeta, ItemRelations } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
@@ -153,6 +154,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
         {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
         <div className={`@container gap-3 pt-2 ${fill ? 'flex min-h-0 flex-1 flex-col' : 'grid grid-cols-[minmax(0,1fr)]'}`} data-item-body>
           <ItemProgress item={item} />
+          <ItemAgents item={item} />
           {hint && (
             <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
               <ItemStatusGlyph item={item} className="size-4" />

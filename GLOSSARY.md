@@ -110,5 +110,5 @@ This machine's choice to have the board start eligible Ready builds by itself, u
 _Avoid_: auto-start.
 
 **Model choice**:
-The provider instance and model the board starts a thread on, or T3 default. When it names the project's T3 default model, the thread also gets that default's options, such as reasoning effort.
-_Avoid_: model pick, model setting.
+The provider instance and model the board starts a thread on, or T3 Project default. When it names the project's default model, the thread also gets that default's options, such as reasoning effort.
+_Avoid_: model pick, model setting, T3 default.

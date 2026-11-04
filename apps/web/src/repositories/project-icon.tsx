@@ -6,6 +6,7 @@
 import { lazy, Suspense, useState, type ComponentProps, type ComponentType } from 'react';
 import type { DynamicIcon, IconName } from 'lucide-react/dynamic';
 import { repoName, repositoryProjectIcon, sameRepo, type ProjectChoice, type ProjectIcon as Icon, type ProjectIconColor, type RepoConfig } from '@lar-factory/shared';
+import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../board/board-store.ts';
 
 const REPO_TONES = 8;
@@ -80,13 +81,15 @@ function IconSquare({ icon, name, tone, size }: { icon: Icon | null | undefined;
 
 /** The icon of a repository the board knows. */
 export function ProjectIcon({ repo, size }: { repo: string; size: keyof typeof SIZES }) {
-  const repos = useBoardStore((state) => state.data.repos);
-  const icon = useBoardStore((state) => repositoryProjectIcon(state.data, repo));
-  return <IconSquare icon={icon} name={repoName(repo, repos)} tone={repoTone(repo, repos)} size={size} />;
+  // A push makes new repos and icons, so this selects what they say here, not those objects.
+  const name = useBoardStore((state) => repoName(repo, state.data.repos));
+  const tone = useBoardStore((state) => repoTone(repo, state.data.repos));
+  const icon = useBoardStore(useShallow((state) => repositoryProjectIcon(state.data, repo)));
+  return <IconSquare icon={icon} name={name} tone={tone} size={size} />;
 }
 
 /** The icon of a T3 project, which the board may not know: most of onboarding's projects aren't on it. */
 export function ProjectChoiceIcon({ project, size }: { project: ProjectChoice; size: keyof typeof SIZES }) {
-  const repos = useBoardStore((state) => state.data.repos);
-  return <IconSquare icon={project.icon} name={project.name} tone={project.repo ? repoTone(project.repo, repos) : 'repo-tone-none'} size={size} />;
+  const tone = useBoardStore((state) => project.repo ? repoTone(project.repo, state.data.repos) : 'repo-tone-none');
+  return <IconSquare icon={project.icon} name={project.name} tone={tone} size={size} />;
 }

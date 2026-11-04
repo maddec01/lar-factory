@@ -3,7 +3,7 @@
 // on top of the sections and focused by /, keeps the sections whose name or a row matches, or says none does. Closing it
 // returns to the board as it was, since the board stays rendered under it.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { boardApp } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Input } from '@lar-factory/ui/design-system/Input';
@@ -15,7 +15,7 @@ import { useArchiveStore } from '../archive/archive-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
-import { type Group, type Page, pages } from './settings-pages.tsx';
+import { type Group, type Page, pages, settingsData, type SettingsData } from './settings-pages.tsx';
 import { useSettingsStore } from './settings-store.ts';
 
 /** The section list's groups, by section id. */
@@ -68,7 +68,9 @@ function GroupView({ group }: { group: Group }) {
 }
 
 function SettingsModal() {
-  const data = useBoardStore((state) => state.data);
+  // Each push parses into new objects, so only the text can tell that nothing Settings shows changed.
+  const shown = useBoardStore((state) => JSON.stringify(settingsData(state.data)));
+  const data = useMemo(() => JSON.parse(shown) as SettingsData, [shown]);
   const targets = useSettingsStore((state) => state.targets);
   const version = useUpdateStore((state) => state.state?.currentVersion ?? null);
   const { section, setSection, setOpen } = useSettingsStore();

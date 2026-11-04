@@ -61,6 +61,18 @@ _Avoid_: missing thread, lost thread.
 A work record's T3 threads and their lineage descendants. An item's usage is complete only when its whole thread family has been read.
 _Avoid_: thread tree, thread group.
 
+**Thread activity**:
+What a thread and its agents are doing now, as T3 reports it: the newest action, its age and the working agents.
+_Avoid_: live status, thread progress.
+
+**Agent**:
+A native subagent or child task working for a thread.
+_Avoid_: worker.
+
+**Quiet thread**:
+A thread at work with no new action for 5 minutes and no command or other tool still running. It may be stuck, and the board cannot tell.
+_Avoid_: stale thread, stuck thread.
+
 **Start again**:
 Opening a new thread for work whose thread was deleted, keeping the work ID.
 _Avoid_: restart, retry.

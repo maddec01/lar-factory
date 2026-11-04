@@ -12,9 +12,9 @@ Read and change it with `lar-work` per
 `bash <lar-build>/shared/scripts/status.sh <work ID> "<Status>"`. Factory
 progress stays in the record. Whole gated Specs and structural sync follow the
 saved settings per [work records](../shared/issue-tracker/work-records.md).
-Call the tools named here. Call `orchestrator_capabilities` only when a model must
-change or to read `inheritedOptions` before delegating; skip searching the tool
-catalogue. Read each file or skill a step names only when that step runs.
+Call the tools named here. Skip browsing the tool catalogue; load a named tool's
+schema by its exact name when needed. Read each file or skill a step names only
+when that step runs.
 
 Record each phase as you reach it with
 `lar-work set-phase <work ID> --revision N --phase <phase>`: `plan`,

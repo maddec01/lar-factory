@@ -10,14 +10,15 @@ A **child task** is `delegate_task` work this thread owns and tracks by its
 `taskId`. Start one when any of these holds; otherwise use a native subagent:
 
 - the agent needs its own worktree (`isolation:"worktree"`);
-- model options are requested for it;
-- `orchestrator_capabilities` shows non-empty `inheritedOptions` for the same
-  provider instance and model.
+- model options are requested for it.
 
 Put options in `target.options`. Check the returned provider, model and
 options against the request; report a capability mismatch, never downgrade.
 
 ## Running a child task
+
+Call `orchestrator_capabilities` once per thread, before the first child task.
+A thread that starts no child task makes no call.
 
 - Track it by `taskId` with `task_status` and `task_cancel`. More work for it
   is a new `delegate_task` carrying the earlier brief and findings; its

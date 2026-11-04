@@ -5,12 +5,12 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, GitPullRequest } from 'lucide-react';
-import { blockedText, canRetryBuild, currentBuildThread, isStale, itemName, prLabel, shortAgo } from '@lar-factory/shared';
+import { blockedText, canRetryBuild, currentBuildThread, isStale, itemName, prLabel } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ActivityFeedback, AzureFields, ItemTitle, KindMarker, SliceBar, SliceList, hasFigures, usageLoading, useActivityFeedback, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
+import { ActivityFeedback, Age, AzureFields, ItemTitle, KindMarker, SliceBar, SliceList, hasFigures, usageLoading, useActivityFeedback, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
@@ -63,7 +63,7 @@ function stateText(item: Item, word: string, { label, running }: { label: string
 export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: BoardData; n?: number }) {
   const feedback = useActivityFeedback(item);
   const shown = useShownStatus(item);
-  const now = useBoardStore((state) => state.now);
+  const stale = useBoardStore((state) => isStale(state.data, state.now));
   const disconnected = useBoardStore((state) => !!state.clientError);
   const unavailable = useActivityUnavailable();
   const [slices, setSlices] = useState(false);
@@ -76,7 +76,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
   const state = shown.working ? 'Working' : stateText(item, shown.word, feedback, runKnown);
   const working = feedback.running || state === 'Working';
   // Fresh T3 tasks need not wait for unrelated repositories to finish their first read.
-  const childActivity = !disconnected && !isStale(data, now) && !item.paused && !item.archived
+  const childActivity = !disconnected && !stale && !item.paused && !item.archived
     ? currentBuildThread(item)?.childActivity : undefined;
   // A child task already titled with the phase word and a colon names the phase itself.
   const phase = feedback.running && feedback.label !== state && !childActivity?.titles[0]?.startsWith(`${feedback.label}:`) ? feedback.label : null;
@@ -105,7 +105,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
           <span className="flex min-w-0 items-center gap-1.5 overflow-hidden" data-col="state">
             {n === undefined
               ? <span className="shrink-0" title={threadText(item, shown.working)} data-state>{state}</span>
-              : <span className="queue-age shrink-0" data-state>{shortAgo(item.updatedAt, now)}</span>}
+              : <span className="queue-age shrink-0" data-state><Age at={item.updatedAt} /></span>}
             {blocked && <Badge tone="danger" className="min-w-0" title={blocked} data-blocked><span className="truncate">{blocked}</span></Badge>}
             <KindMarker item={item} />
             <AzureFields azure={item.azure} />

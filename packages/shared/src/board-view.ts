@@ -122,11 +122,17 @@ export function placementOf(item: Item, { starts, unavailable, all }: PlacementF
   return part && stage ? { sections, concept: parent } : { sections };
 }
 
+/** `items` in their order, keeping those placed in `section`. */
+const inSection = (items: Item[], data: Pick<BoardData, 'items' | 'startProgress'>, unavailable: boolean, section: BoardSection): Item[] => items
+  .filter((item) => placementOf(item, { starts: data.startProgress?.[item.id], unavailable, all: data.items }).sections.includes(section));
+
+/** The items that wait on you, in flow order. The clock moves them only through `unavailable`. */
+export const deskItems = (data: Pick<BoardData, 'items' | 'startProgress'>, unavailable: boolean): Item[] => inSection([...data.items].sort(byFlowOrder), data, unavailable, 'desk');
+
 /** `clientError` is the page's own failed read; the placement of Verify and Ready to merge items depends on it. */
 export function boardSections(data: BoardData, now: number, clientError?: string | null): BoardSections {
   const unavailable = activityUnavailable(data, now, clientError);
   const items = [...data.items].sort(byFlowOrder);
-  const inSection = (section: BoardSection) => items.filter((item) => placementOf(item, { starts: data.startProgress?.[item.id], unavailable, all: data.items }).sections.includes(section));
   const inStatus = (...s: Status[]) => items.filter((i) => s.includes(i.status));
   const list = inStatus('List');
   const repos = data.repos.map((r) => r.repo);
@@ -135,9 +141,9 @@ export function boardSections(data: BoardData, now: number, clientError?: string
     .map((repo) => ({ repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)) }))
     .sort((a, b) => b.items.length - a.items.length);
   return {
-    needsYou: inSection('desk'),
+    needsYou: inSection(items, data, unavailable, 'desk'),
     concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
-    queued: inSection('queue'),
+    queued: inSection(items, data, unavailable, 'queue'),
     list,
     listGroups,
     done: items

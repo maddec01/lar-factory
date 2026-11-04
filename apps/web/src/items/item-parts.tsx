@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, itemRepoNames, prLabel, ref, labelsOnRow, repoKey, repoName } from '@lar-factory/shared';
+import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, itemRepoNames, prLabel, ref, labelsOnRow, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { AzureWorkItem, BoardData, Checks, Item, ItemStats, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -243,6 +243,9 @@ export function StructureSync({ item }: { item: Item }) {
     className="text-xs text-base-700">Planning is saved on this Mac.</span>}
   </>;
 }
+
+/** How long ago `at` was. It alone follows the clock, so a tick renders nothing around it. */
+export const Age = ({ at }: { at: string }) => <>{useBoardStore((state) => shortAgo(at, state.now))}</>;
 
 export const useActivityUnavailable = () => useBoardStore(({ data, now, clientError }) => activityUnavailable(data, now, clientError));
 

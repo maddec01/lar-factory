@@ -5,12 +5,12 @@
 // icon beside it. An empty desk is one small line, which while the board is disconnected only speaks for the last read,
 // and during a first read that may still add items is the loader.
 
-import { needsAnswer, openQuestionThread, HINTS, itemPr, itemName, readingScope, shortAgo } from '@lar-factory/shared';
+import { deskItems, needsAnswer, openQuestionThread, HINTS, itemPr, itemName, readingScope } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useScopeStore } from '../board/scope-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemTitle } from '../items/item-parts.tsx';
+import { Age, AzureFields, ItemTitle, useActivityUnavailable } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
 import { Loader } from '../loading/loader.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
@@ -55,7 +55,7 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
   );
 }
 
-function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: number }) {
+function DeskCard({ item, data }: { item: Item; data: BoardData }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   // The card takes the click; its summary is a button too, so the keyboard can open the dialog.
   return (
@@ -65,7 +65,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
         <span className="desk-meta flex h-6 min-w-0 items-center gap-2 text-[11px]">
           <RowSource item={item} />
           <RowKind item={item} />
-          <span className="ml-auto shrink-0 text-(--muted-foreground)">{shortAgo(item.updatedAt, now)}</span>
+          <span className="ml-auto shrink-0 text-(--muted-foreground)"><Age at={item.updatedAt} /></span>
         </span>
         <span className="desk-title h-5 truncate text-[13px]/5 font-medium" title={`${itemName(item)}`}><ItemTitle item={item} /></span>
         <AzureFields azure={item.azure} />
@@ -79,9 +79,11 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
   );
 }
 
-/** `items` are the desk's items in the main area's scope. */
-export function Desk({ items }: { items: Item[] }) {
-  const { data, now, clientError } = useBoardStore();
+/** `inScope` are the items in the main area's scope. */
+export function Desk({ items: inScope }: { items: Item[] }) {
+  const data = useBoardStore((state) => state.data);
+  const clientError = useBoardStore((state) => state.clientError);
+  const items = deskItems({ ...data, items: inScope }, useActivityUnavailable());
   const scope = useScopeStore((state) => state.scope);
   if (!items.length) return (
     <section className="desk flex shrink-0 items-baseline gap-2 text-xs text-(--muted-foreground)" aria-labelledby="desk-h">
@@ -92,7 +94,7 @@ export function Desk({ items }: { items: Item[] }) {
   return (
     <section className="desk grid shrink-0 gap-2" aria-labelledby="desk-h">
       <h2 id="desk-h" className="m-0 text-[13px] font-medium">Your desk <span className="text-(--muted-foreground)">{items.length}</span></h2>
-      <div className="-mx-6 flex items-start gap-3 overflow-x-auto px-6 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{items.map((i) => <DeskCard key={i.id} item={i} data={data} now={now} />)}</div>
+      <div className="-mx-6 flex items-start gap-3 overflow-x-auto px-6 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{items.map((i) => <DeskCard key={i.id} item={i} data={data} />)}</div>
     </section>
   );
 }

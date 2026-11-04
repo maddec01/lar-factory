@@ -237,7 +237,7 @@ test('desk status icons stay still and Needs you keeps its amber colour even wit
   })) };
   await mountPage(data);
   expect(cards()).toHaveLength(7);
-  expect($('.desk-card svg.status-pulse, .desk-card svg.status-spin')).toBeNull();
+  expect($('.desk-card svg.status-pulse, .desk-card .status-spin')).toBeNull();
   const needsYou = data.items.find(item => item.status === 'Needs you')!;
   expect(card(needsYou.id).querySelector<SVGElement>('svg.lucide-circle-dot')!.style.color).toBe('var(--st-amber)');
 });

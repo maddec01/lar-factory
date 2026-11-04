@@ -1074,16 +1074,16 @@ test.each(['Verify', 'Ready to merge'] as const)('%s keeps its pulsing icon in n
 });
 
 test.each([
-  ['Shaping', 'shape', 'lucide-circle-dashed', 'status-pulse'],
-  ['In progress', 'build', 'lucide-loader-circle', 'status-spin'],
-  ['Review', 'build', 'lucide-eye', 'status-pulse'],
-] as const)('%s uses the item icon on its running dossier thread line and Track', async (status, purpose, icon, motion) => {
+  ['Shaping', 'shape', 'svg.lucide-circle-dashed.status-pulse'],
+  ['In progress', 'build', '.status-spin > svg.lucide-loader-circle'],
+  ['Review', 'build', 'svg.lucide-eye.status-pulse'],
+] as const)('%s uses the item icon on its running dossier thread line and Track', async (status, purpose, icon) => {
   const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
   await mountOpen(withItem('I_sample13', { status, slices: [], blockers: [], threads: [{ ...thread('own', 'running'), purpose, currentRunning: true }] }, fresh));
-  expect(step('I_sample13').querySelectorAll(`svg.${icon}.${motion}`)).toHaveLength(3);
+  expect(step('I_sample13').querySelectorAll(icon)).toHaveLength(3);
   expect(step('I_sample13').querySelector('[data-part-kind] svg.lucide-hammer')).not.toBeNull();
   await receive(withItem('I_sample13', { status, slices: [], blockers: [], threads: [{ ...thread('own', 'done'), purpose, hasRunningChildren: true }] }, fresh));
-  expect(step('I_sample13').querySelectorAll(`svg.${icon}.${motion}`), 'delegated work continues after the parent turn').toHaveLength(3);
+  expect(step('I_sample13').querySelectorAll(icon), 'delegated work continues after the parent turn').toHaveLength(3);
 });
 
 test('work map nodes keep resumed Verify icons and the Builds lane keeps Hammer', async () => {

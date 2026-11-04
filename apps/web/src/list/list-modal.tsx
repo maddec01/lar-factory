@@ -26,6 +26,7 @@ import { ItemFilterBar } from '../filters/item-filter-bar.tsx';
 import { filtering, rowFilter, useItemFilters } from '../filters/item-filters.ts';
 import { Loader } from '../loading/loader.tsx';
 import { matchesSearch } from './list-search.ts';
+import { useListStore } from './list-store.ts';
 import { EXPANDED, ExpandButton, useExpand, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
@@ -180,7 +181,8 @@ function ListModal({ onClose }: { onClose: () => void }) {
 export function ListButton() {
   const count = useBoardStore((state) => boardSections(state.data, state.now).list.length);
   const reading = useBoardStore((state) => readingScope(state.data));
-  const [open, setOpen] = useState(false);
+  const open = useListStore((state) => state.open);
+  const setOpen = useListStore((state) => state.setOpen);
   return (
     <>
       <Button {...kind('control')} className="list-button px-2" leftIcon={<Inbox />} title="List" onClick={() => setOpen(true)}>

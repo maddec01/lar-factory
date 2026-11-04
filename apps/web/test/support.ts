@@ -91,6 +91,8 @@ beforeEach(() => {
   // nor does it watch sizes, which lar-server's Modal does for its scroll fade.
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   history.replaceState(null, '', '/');
+  // The board saves its Scope and filters, and a test's choices are not the next test's.
+  localStorage.clear();
 });
 
 afterEach(() => {

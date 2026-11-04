@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { readingScope } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
-import { useScopeStore } from '../board/scope-store.ts';
+import { useShownScope } from '../board/scope-store.ts';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { Loader } from '../loading/loader.tsx';
 
@@ -26,7 +26,7 @@ export function Pane({ id, title, status, running, count, right, className = '',
 
 /** What a section says with no row: that it's loading while the first read may still add rows to the scope, else `children` while a filter hides every row it has. */
 export function PaneEmpty({ filtered, none, children }: { filtered: boolean; none: string; children: string }) {
-  const scope = useScopeStore((state) => state.scope);
+  const scope = useShownScope();
   const reading = useBoardStore((state) => readingScope(state.data, scope ?? undefined));
   return <p data-pane-empty className="m-0 px-3 py-3 text-[12px] text-(--muted-foreground)">{reading ? <Loader label="Loading projects…" /> : filtered ? children : none}</p>;
 }

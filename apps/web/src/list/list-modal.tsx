@@ -21,7 +21,7 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemKind, LabelChips, StructureSync } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
-import { useScopeStore } from '../board/scope-store.ts';
+import { useScopeStore, useShownScope } from '../board/scope-store.ts';
 import { ItemFilterBar } from '../filters/item-filter-bar.tsx';
 import { filtering, rowFilter, useItemFilters } from '../filters/item-filters.ts';
 import { Loader } from '../loading/loader.tsx';
@@ -112,14 +112,15 @@ function ListModal({ onClose }: { onClose: () => void }) {
   const [expanded, toggleExpanded] = useExpand(childOpen || addOpen, dialogPreference('openList'));
   const data = useBoardStore((state) => state.data);
   const now = useBoardStore((state) => state.now);
-  const { scope, setScope } = useScopeStore();
+  const scope = useShownScope();
+  const setScope = useScopeStore((state) => state.setScope);
   const [query, setQuery] = useState('');
   // The chosen group's repository, or `null` for All repositories.
   const [pick, setPick] = useState<string | null>(scope);
   const [sort, setSort] = useState<Sort | null>(null);
   const searchField = useRef<HTMLInputElement>(null);
   useFocusSearchWhenOpenerGoes(searchField);
-  const [filters, setFilters] = useItemFilters('list');
+  const [filters, setFilters] = useItemFilters();
   const q = query.trim().toLowerCase();
   const shows = rowFilter(filters, data.repos);
   // In boardSections' order, which counts items before the search so the rows stay put while typing.

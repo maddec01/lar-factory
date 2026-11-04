@@ -2,13 +2,15 @@
 // scrolls sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the
 // same four rows at the same heights, so they line up across cards: source, repository, kind and age, in a stage
 // row's order; the title; the status and next step; and the card's action in the right corner, with Open thread as an
-// icon beside it. An empty desk is one small line, which while the board is disconnected only speaks for the last read,
-// and during a first read that may still add items is the loader.
+// icon beside it. Scope, Kind and Labels narrow the cards. An empty desk is one small line, which while the board is
+// disconnected only speaks for the last read, during a first read that may still add items is the loader, and says so
+// when Scope, Kind and Labels hide every card.
 
 import { deskItems, needsAnswer, openQuestionThread, HINTS, itemPr, itemName, readingScope } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
-import { useScopeStore } from '../board/scope-store.ts';
+import { useScopeStore, useShownScope } from '../board/scope-store.ts';
+import { rowFilter } from '../filters/item-filters.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { Age, AzureFields, ItemTitle, useActivityUnavailable } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
@@ -83,12 +85,14 @@ function DeskCard({ item, data }: { item: Item; data: BoardData }) {
 export function Desk({ items: inScope }: { items: Item[] }) {
   const data = useBoardStore((state) => state.data);
   const clientError = useBoardStore((state) => state.clientError);
-  const items = deskItems({ ...data, items: inScope }, useActivityUnavailable());
-  const scope = useScopeStore((state) => state.scope);
+  const unavailable = useActivityUnavailable();
+  const filters = useScopeStore((state) => state.filters);
+  const items = deskItems({ ...data, items: inScope }, unavailable).filter(rowFilter(filters, data.repos));
+  const scope = useShownScope();
   if (!items.length) return (
     <section className="desk flex shrink-0 items-baseline gap-2 text-xs text-(--muted-foreground)" aria-labelledby="desk-h">
       <h2 id="desk-h" className="m-0 text-[13px] font-medium text-(--foreground)">Your desk</h2>
-      <p className="m-0">{clientError ? 'Nothing waited on you at the last read.' : readingScope(data, scope ?? undefined) ? <Loader label="Loading projects…" /> : 'Nothing waits on you.'}</p>
+      <p className="m-0">{clientError ? 'Nothing waited on you at the last read.' : readingScope(data, scope ?? undefined) ? <Loader label="Loading projects…" /> : deskItems(data, unavailable).length ? 'Nothing on your desk matches the filters.' : 'Nothing waits on you.'}</p>
     </section>
   );
   return (

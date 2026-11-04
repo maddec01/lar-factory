@@ -8,7 +8,7 @@
 import { failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
 import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
-import { useScopeStore } from './board/scope-store.ts';
+import { useShownScope } from './board/scope-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
@@ -29,7 +29,7 @@ import { TitleBar } from './title-bar/title-bar.tsx';
 function Content() {
   const data = useBoardStore((state) => state.data);
   const loaded = useBoardStore((state) => state.loaded);
-  const scope = useScopeStore((state) => state.scope);
+  const scope = useShownScope();
   const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
   return (
     // Everything under the title bar scrolls as one page, and nothing in it shrinks to fit.

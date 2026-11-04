@@ -5,7 +5,7 @@
 // it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
 // settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
 
-import { boardSections, failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
+import { failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
 import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
 import { useScopeStore } from './board/scope-store.ts';
@@ -27,7 +27,8 @@ import { SettingsDialog } from './settings/settings.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
 
 function Content() {
-  const { data, now, loaded, clientError } = useBoardStore();
+  const data = useBoardStore((state) => state.data);
+  const loaded = useBoardStore((state) => state.loaded);
   const scope = useScopeStore((state) => state.scope);
   const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
   return (
@@ -36,7 +37,7 @@ function Content() {
       <OnboardingCards />
       {scope && !loaded && stillReading(data, scope)
         ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><Loader label="Loading projects…" className="size-4" /></p>
-        : <StageLayout items={items} desk={<Desk items={boardSections({ ...data, items }, now, clientError).needsYou} />} />}
+        : <StageLayout items={items} desk={<Desk items={items} />} />}
     </div>
   );
 }

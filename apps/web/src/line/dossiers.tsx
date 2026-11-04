@@ -505,7 +505,7 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
 
 /** The dossiers the filters leave; a dossier follows its parent's row. With none, the dock takes no height. */
 export function Dossiers({ dossiers }: { dossiers: DossierItems[] }) {
-  const { data } = useBoardStore();
+  const data = useBoardStore((state) => state.data);
   if (!dossiers.length) return null;
   return (
     <Pane id="dock" title="Concepts and linked work" count={dossiers.length}>

@@ -1,6 +1,7 @@
 // One glyph per status, the way T3 marks a thread working, waiting or done, in the status's colour.
 
 import { Check, Circle, CircleArrowRight, CircleDashed, CircleDot, Clock3, Eye, GitMerge, List } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { activityUnavailable, buildActivity } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -32,15 +33,18 @@ export function StatusGlyph({ status, running = false, className = 'size-3.5' }:
 
 /** Current execution for status icons, including delegated work after its parent turn ends. */
 export function useStatusActivity() {
-  const { data, now, clientError } = useBoardStore();
-  const { starts, builds } = useStartStore();
-  const unavailable = activityUnavailable(data, now, clientError) || !!data.localProblem
+  const unavailable = useBoardStore(({ data, now, clientError }) => activityUnavailable(data, now, clientError) || !!data.localProblem
     || !!data.tools?.t3 && data.tools.t3.result !== 'ok'
-    || !!data.t3Availability && (data.t3Availability.availability !== 'available' || !!data.t3Availability.observedAt);
+    || !!data.t3Availability && (data.t3Availability.availability !== 'available' || !!data.t3Availability.observedAt));
+  // A push makes a new startProgress each time, so this selects the ids of the items with a start in flight.
+  const starting = useBoardStore(useShallow((state) => Object.entries(state.data.startProgress ?? {})
+    .filter(([, starts]) => Object.values(starts).some((start) => start.phase === 'starting' || start.phase === 'may-have-started'))
+    .map(([id]) => id)));
+  const starts = useStartStore((state) => state.starts);
+  const builds = useStartStore((state) => state.builds);
   return (item: Item): boolean => {
     if (unavailable || item.paused || item.archived || item.needsYou || item.threads === 'unavailable') return false;
-    if (starts[item.id]?.phase === 'pending' || builds[item.id]?.phase === 'pending'
-      || Object.values(data.startProgress?.[item.id] ?? {}).some(start => start.phase === 'starting' || start.phase === 'may-have-started')) return false;
+    if (starts[item.id]?.phase === 'pending' || builds[item.id]?.phase === 'pending' || starting.includes(item.id)) return false;
     if (item.status === 'Shaping') {
       return !!item.threads?.some(thread => thread.purpose !== 'build' && !thread.observedAt && !thread.archived
         && (thread.currentRunning || thread.hasRunningChildren));

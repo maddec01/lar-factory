@@ -390,7 +390,7 @@ test('Shape issue opens the model menu, and picking a model starts the item and 
   await openItem('I_sample05');
   await pressMenu(button('start', 'I_sample05'));
   await settle(() => vi.advanceTimersByTime(20));
-  expect($$('[role="menu"] [role="menuitemradio"]').map(text)).toEqual(['T3 default', 'GPT-5.5']);
+  expect($$('[role="menu"] [role="menuitemradio"]').map(text)).toEqual(['T3 Project default', 'GPT-5.5']);
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[1]!.click());
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   expect(text(button('start', 'I_sample05'))).toBe('Starting…');

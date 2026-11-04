@@ -1,7 +1,7 @@
-// Settings uses the same provider groups and keyboard navigation as Start, with its saved model checked.
+// Settings uses the same provider groups and keyboard navigation as Start, with its saved model checked, and names the model each repository's builds use on T3 Project default.
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
-import type { AutoBuildState, ModelChoice, ModelGroup, ModelSelection } from '@lar-factory/shared';
+import { repositoryT3Default, shownRepo, t3DefaultDetail, type BoardData, type ModelChoice, type ModelGroup } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -9,14 +9,26 @@ import { ModelEntries, opensOnChecked } from '../items/model-entries.tsx';
 import { postAction, receive } from '../items/card-actions.ts';
 
 function modelLabel(groups: ModelGroup[], selected: ModelChoice | undefined): string {
-  if (!selected) return 'T3 default';
+  if (!selected) return 'T3 Project default';
   const group = groups.find((g) => g.instanceId === selected.instanceId);
   const model = group?.models.find((m) => m.slug === selected.model);
   return model ? `${group!.name} ${model.label}` : `${selected.instanceId} ${selected.model} (not offered)`;
 }
 
+/** Each repository's default model, once the board has read the setting and T3's defaults, which it never does in sample mode. */
+function RepositoryDefaults({ data }: { data: BoardData }) {
+  if (!data.autoBuild || data.autoBuild.model || !data.t3Defaults || !data.repos.length) return null;
+  return <ul className="m-0 grid list-none gap-1 p-0 text-xs" aria-label="Default model by repository">
+    {data.repos.map(({ repo }) => <li key={repo} className="flex flex-wrap justify-between gap-x-3">
+      <span className="[overflow-wrap:anywhere]">{shownRepo(repo)}</span>{' '}
+      <span className="text-(--muted-foreground) [overflow-wrap:anywhere]">{t3DefaultDetail(data.modelChoices, repositoryT3Default(data, repo)) ?? 'Default model unknown'}</span>
+    </li>)}
+  </ul>;
+}
+
 /** Disabled until the board has read the setting, which it never does in sample mode. */
-export function AutoBuildModelSetting({ state, groups, t3Default }: { state: AutoBuildState | undefined; groups: ModelGroup[]; t3Default?: ModelSelection | undefined }) {
+export function AutoBuildModelSetting({ data }: { data: BoardData }) {
+  const { autoBuild: state, modelChoices: groups } = data;
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +45,7 @@ export function AutoBuildModelSetting({ state, groups, t3Default }: { state: Aut
       setError(result.error);
     });
   };
-  return <div className="grid max-w-80 gap-2" data-auto-build-model>
+  return <div className="grid gap-3" data-auto-build-model><div className="grid max-w-80 gap-2">
     <DropdownMenu open={open && !saving} onOpenChange={(next) => setOpen(next && !saving)} modal={false}>
       <DropdownMenu.Trigger asChild>
         <Button {...kind('other')} aria-label="Auto-build model" disabled={!state} aria-busy={saving || undefined}
@@ -42,9 +54,9 @@ export function AutoBuildModelSetting({ state, groups, t3Default }: { state: Aut
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" aria-label="Auto-build model" {...opensOnChecked}>
-        <ModelEntries groups={groups} t3Default={t3Default} selected={state?.model} heading="Build with" onPick={(model) => void save(model)} />
+        <ModelEntries groups={groups} selected={state?.model} heading="Build with" onPick={(model) => void save(model)} />
       </DropdownMenu.Content>
     </DropdownMenu>
     {error && <p className="m-0 text-xs text-(--error-foreground)" role="alert">{error}</p>}
-  </div>;
+  </div><RepositoryDefaults data={data} /></div>;
 }

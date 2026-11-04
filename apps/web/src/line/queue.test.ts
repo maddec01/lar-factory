@@ -158,7 +158,7 @@ test("Shape issue opens its menu without opening the dialog, and starts its row'
   holdPosts(withChoices);
   await mountPage(withChoices);
   await pressMenu(start('I_sample06'));
-  expect(entries().map(text)).toEqual(['T3 default', 'GPT-5.5', 'Opus 5.5']);
+  expect(entries().map(text)).toEqual(['T3 Project default', 'GPT-5.5', 'Opus 5.5']);
   await press(entries()[2]!);
   expect(dialog(), 'neither the button nor the menu opens the dialog').toBeNull();
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample06', model: { instanceId: 'claudeAgent', model: 'claude-opus-5-5' } }]]);

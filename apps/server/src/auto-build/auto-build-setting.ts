@@ -8,7 +8,7 @@ import { findModelChoice } from '../t3/model-choices.ts';
 export interface BoardAutoBuild {
   /** The saved switch and model, or off with why the file can't be used. */
   state(): AutoBuildState;
-  /** Saves the switch `on`, or the `model` choice (null for T3 default), keeping the other; it also replaces a file the board can't use. */
+  /** Saves the switch `on`, or the `model` choice (null for T3 Project default), keeping the other; it also replaces a file the board can't use. */
   save(input: Record<string, unknown>): Reply;
 }
 
@@ -29,7 +29,7 @@ export function createAutoBuildSetting({ dir, offerModelChoices, changed = () =>
         return { status: 400, body: { error: 'Send the Auto-build switch as true or false, or its model choice.' } };
       }
       const saved = readAutoBuild(dir);
-      // A file the board can't use reads as off on T3 default, and this save replaces it.
+      // A file the board can't use reads as off on T3 Project default, and this save replaces it.
       let next: AutoBuild = { on: saved.on, ...saved.model && { model: saved.model } };
       if (on !== undefined) next = { ...next, on: on as boolean };
       if (model === null) next = { on: next.on };

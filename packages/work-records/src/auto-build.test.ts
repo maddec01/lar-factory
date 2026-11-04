@@ -17,7 +17,7 @@ afterEach(() => {
 
 const MODEL = { instanceId: 'claudeAgent', model: 'claude-opus-5-5' };
 
-it('is off on T3 default while no file is saved, and keeps a saved switch and model in its own file', () => {
+it('is off on T3 Project default while no file is saved, and keeps a saved switch and model in its own file', () => {
   const dir = tempDir();
   expect(readAutoBuild(dir)).toEqual({ on: false });
   expect(writeAutoBuild({ on: true, model: MODEL }, dir)).toEqual({ on: true, model: MODEL });

@@ -36,7 +36,7 @@ interface Instance {
 }
 
 /**
- * "T3 default" aside, the choices Start offers: each enabled provider instance with its
+ * "T3 Project default" aside, the choices Start offers: each enabled provider instance with its
  * driver's current models in manifest order, then its custom models. Empty when the
  * settings or the model list can't be read.
  */

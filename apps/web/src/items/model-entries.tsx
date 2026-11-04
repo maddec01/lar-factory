@@ -1,4 +1,4 @@
-// The model menu shared by Start, Start after and Settings: T3 default first, then models grouped by provider instance.
+// The model menu shared by Start, Start after and Settings: T3 Project default first, then models grouped by provider instance.
 import { useId } from 'react';
 import { offers, storedChoice, t3DefaultDetail, type ModelChoice, type ModelGroup, type ModelSelection } from '@lar-factory/shared';
 import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
@@ -20,7 +20,7 @@ export function ModelEntries({ groups, t3Default, selected, heading, held, defau
   };
   return <DropdownMenu.RadioGroup value={checked} aria-labelledby={`${headings}-with`}>
     <DropdownMenu.Label id={`${headings}-with`}>{heading}</DropdownMenu.Label>
-    {entry('T3 default', undefined, undefined, t3DefaultDetail(groups, t3Default))}
+    {entry('T3 Project default', undefined, undefined, t3DefaultDetail(groups, t3Default))}
     {groups.map((group, i) => <DropdownMenu.Group key={group.instanceId} aria-labelledby={`${headings}-${i}`}>
       <DropdownMenu.Label id={`${headings}-${i}`}>{group.name}</DropdownMenu.Label>
       {group.models.map((model) => entry(model.label, { instanceId: group.instanceId, model: model.slug }))}

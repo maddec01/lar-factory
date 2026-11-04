@@ -3,7 +3,7 @@
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
 import { Archive, ExternalLink, FolderGit2, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, sharedT3Default, shownRepo, type BoardData, type BundledSkill, type Item, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
+import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type Item, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ArchiveActions, archivedAs, RetentionSetting } from '../archive/archive.tsx';
@@ -266,8 +266,8 @@ export function pages(input: PagesInput): Page[] {
       }] },
       { title: 'Auto-build', rows: [{
         id: 'auto-build-model', title: 'Auto-build model',
-        description: 'The model of the build threads Auto-build starts. T3 default leaves it to T3. Turn Auto-build on in the Ready to build header.',
-        control: custom(() => null), below: <AutoBuildModelSetting state={data.autoBuild} groups={data.modelChoices} t3Default={sharedT3Default(data)} />,
+        description: "The model of the build threads Auto-build starts. With T3 Project default, each build uses the default model of its repository's T3 project. Turn Auto-build on in the Ready to build header.",
+        control: custom(() => null), below: <AutoBuildModelSetting data={data} />,
       }] },
       { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },
     ] },

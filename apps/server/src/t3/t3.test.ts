@@ -92,7 +92,7 @@ test('a thread whose long first line T3 cut short is still found by its whole fi
   assert.equal(titledFrom('Build w1.', message), false, 'a title with no ellipsis must be the whole line');
 });
 
-/** Stubs a project's T3 defaults and a launch that opens a thread, keeping what each launch sent. */
+/** Stubs a project's defaults in T3 and a launch that opens a thread, keeping what each launch sent. */
 function launches(selection: ModelSelection | null, runtimeMode = 'full-access') {
   const sent: { project: string; selection: ModelSelection; workspace: LaunchWorkspace; runtimeMode: string }[] = [];
   const launch: LaunchThread = async (project, _text, chosen, workspace, mode) => {
@@ -105,7 +105,7 @@ function launches(selection: ModelSelection | null, runtimeMode = 'full-access')
 const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 const MEDIUM = [{ id: 'effort', value: 'medium' }];
 
-test('a choice equal to the T3 default launches with its options, in each workspace', async () => {
+test('a choice equal to the T3 Project default launches with its options, in each workspace', async () => {
   const { startThread } = await import('./t3.ts');
   const { sent, launch, defaults } = launches({ ...OPUS, options: MEDIUM });
   const { run, calls } = t3With({});
@@ -118,7 +118,7 @@ test('a choice equal to the T3 default launches with its options, in each worksp
   assert.equal(calls.length, 0, 'an explicit choice never goes through the CLI');
 });
 
-test('a T3 default stored with no options launches with none, leaving T3 to use the model\'s default effort', async () => {
+test('a T3 Project default stored with no options launches with none, leaving T3 to use the model\'s default effort', async () => {
   const { startThread } = await import('./t3.ts');
   const { sent, launch, defaults } = launches(OPUS);
   await startThread('p', 'T\\nm', OPUS, undefined, t3With({}).run, defaults, launch);
@@ -143,7 +143,7 @@ test('new launches keep the project runtime mode the CLI gives; the existing wor
   assert.deepEqual(sent.map((s) => s.runtimeMode), ['auto-accept-edits', 'approval-required']);
 });
 
-test('T3 default sends no model through the CLI, and an existing worktree refuses it', async () => {
+test('T3 Project default sends no model through the CLI, and an existing worktree refuses it', async () => {
   const { startThread } = await import('./t3.ts');
   const { sent, launch, defaults } = launches({ ...OPUS, options: MEDIUM });
   const { run, calls } = t3With({ stdout: '{"threadId":"t","title":"T"}' });

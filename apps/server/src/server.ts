@@ -306,7 +306,7 @@ function flipLog(whenSet: string, whenCleared: string): (set: boolean) => void {
 
 const statsUnavailable = flipLog('usage totals are waiting for T3 details', 'usage totals are current');
 const pricingUnavailable = flipLog(`API cost unavailable: can't read rates from ${statsSources.rates}`, `API cost readable again from ${statsSources.rates}`);
-const modelsUnavailable = flipLog(`only T3 default offered: no models read from ${statsSources.settings} and ${modelManifest}`, 'model choices readable again');
+const modelsUnavailable = flipLog(`only T3 Project default offered: no models read from ${statsSources.settings} and ${modelManifest}`, 'model choices readable again');
 
 /**
  * Whether usage caught up once since the board started: every thread of the settled first read's items was read or failed,

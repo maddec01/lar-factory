@@ -30,7 +30,7 @@ export async function repositoryProject(repo: string, repos: readonly { repo: st
 
 /**
  * For each configured repository, from one read of T3's projects: its project hint, null when Start finds its repository
- * project, else why not; and its effective T3 default, which one whose project or default can't be read doesn't have.
+ * project, else why not; and its effective T3 Project default, which one whose project or default can't be read doesn't have.
  */
 export async function repositoryProjectReads(repos: readonly RepoConfig[], env: NodeJS.ProcessEnv = process.env): Promise<{ repositoryProjects: Record<string, string | null>; t3Defaults: Record<string, ModelSelection> }> {
   const find = await projectFinder(env);

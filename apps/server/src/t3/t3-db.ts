@@ -8,13 +8,16 @@ import { expandHome } from './t3-settings.ts';
 
 /** Runs `read` on T3's database at `path`, opened read-only; throws when it is missing or can't be read. */
 export function readT3Db<T>(path: string, read: (db: DatabaseSync) => T): T {
-  const db = new DatabaseSync(path, { readOnly: true });
+  const db = openT3Db(path);
   try {
     return read(db);
   } finally {
     db.close();
   }
 }
+
+/** T3's database at `path`, opened read-only, for a caller making several reads; it closes it. */
+export const openT3Db = (path: string): DatabaseSync => new DatabaseSync(path, { readOnly: true });
 
 // Each thread with its title, lineage and deletion time, and a root thread's first user message.
 const THREADS = `
@@ -222,6 +225,70 @@ export function threadByTitle(db: string, projectId: string, title: string): { t
   const row = readT3Db(db, (open) => open.prepare(THREAD_BY_TITLE).get(projectId, title)) as { id: unknown; latest: unknown } | undefined;
   if (typeof row?.id !== 'string') return null;
   return { threadId: row.id, latest: typeof row.latest === 'string' ? row.latest : null };
+}
+
+// A run with work under way.
+const LIVE_RUN = `('preparing', 'starting', 'running', 'waiting')`;
+const TOOL_ITEMS = `('command_execution', 'dynamic_tool', 'file_change', 'web_search')`;
+
+// A thread's turn items, which can be many and large: every read walks its index
+// on (thread_id, ordinal, turn_item_id) or its partial one on unfinished items and
+// stops at a limit, and reads only the fields it names from each row it returns.
+const ACTIVITY_ITEM = `
+SELECT i.type, i.status, (SELECT r.status IN ${LIVE_RUN} FROM orchestration_v2_projection_runs r WHERE r.run_id = i.run_id) AS runLive,
+  json_extract(i.payload_json, '$.title') AS title, substr(json_extract(i.payload_json, '$.input'), 1, 2000) AS input,
+  json_extract(i.payload_json, '$.toolName') AS toolName, json_extract(i.payload_json, '$.fileName') AS fileName,
+  json_extract(i.payload_json, '$.streaming') AS streaming, json_extract(i.payload_json, '$.startedAt') AS startedAt,
+  json_extract(i.payload_json, '$.completedAt') AS completedAt, json_extract(i.payload_json, '$.updatedAt') AS updatedAt
+FROM orchestration_v2_projection_turn_items i`;
+const NEWEST_TOOL = `${ACTIVITY_ITEM} WHERE i.thread_id = ? AND i.type IN ${TOOL_ITEMS} ORDER BY i.ordinal DESC, i.turn_item_id DESC LIMIT 1`;
+const NEWEST_TEXT = `${ACTIVITY_ITEM} WHERE i.thread_id = ? AND i.type IN ('reasoning', 'assistant_message') ORDER BY i.ordinal DESC, i.turn_item_id DESC LIMIT 1`;
+const UNFINISHED_TOOLS = `${ACTIVITY_ITEM} WHERE i.thread_id = ? AND i.status IN ('pending', 'running', 'waiting') AND i.type IN ${TOOL_ITEMS} ORDER BY i.ordinal DESC, i.turn_item_id DESC LIMIT 20`;
+
+/** A turn item as thread activity reads it. `runLive` is 1 or 0 by the item's run, and null for an item with no run, as a native subagent's are. */
+export interface ActivityItemRow {
+  type: string;
+  status: string;
+  runLive: number | null;
+  title: string | null;
+  input: string | null;
+  toolName: string | null;
+  fileName: string | null;
+  streaming: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+}
+
+/** A thread's newest tool, its newest text and every tool that still reads unfinished, however old. */
+export function activityItems(db: DatabaseSync, threadId: string): ActivityItemRow[] {
+  return [NEWEST_TOOL, NEWEST_TEXT, UNFINISHED_TOOLS].flatMap((query) => db.prepare(query).all(threadId) as unknown as ActivityItemRow[]);
+}
+
+// A thread's subagent records that have not finished, with the state of the run
+// that started each and of the child thread's own runs. Claude's and Codex's native
+// subagents have no runs of their own, and a child task's outlive the run that started it.
+const WORKING_AGENTS = `
+SELECT s.child_thread_id AS child, json_extract(s.payload_json, '$.title') AS title, json_extract(s.payload_json, '$.model') AS model,
+  s.started_at AS startedAt, (SELECT r.status IN ${LIVE_RUN} FROM orchestration_v2_projection_runs r WHERE r.run_id = s.run_id) AS runLive,
+  (SELECT max(r.status IN ${LIVE_RUN}) FROM orchestration_v2_projection_runs r WHERE r.thread_id = s.child_thread_id) AS childRunLive
+FROM orchestration_v2_projection_subagents s
+WHERE s.thread_id = ? AND s.child_thread_id IS NOT NULL AND s.status NOT IN ('completed', 'failed', 'cancelled', 'interrupted')
+ORDER BY s.started_at, s.subagent_id`;
+
+/** An unfinished subagent record. `runLive` and `childRunLive` are 1 or 0, or null with no such run. */
+export interface ActivityAgentRow {
+  child: string;
+  title: string | null;
+  model: string | null;
+  startedAt: string | null;
+  runLive: number | null;
+  childRunLive: number | null;
+}
+
+/** The subagent records of `threadId` that have not finished, oldest first. */
+export function unfinishedAgents(db: DatabaseSync, threadId: string): ActivityAgentRow[] {
+  return db.prepare(WORKING_AGENTS).all(threadId) as unknown as ActivityAgentRow[];
 }
 
 /** A folder with `~` expanded and no trailing slash. */

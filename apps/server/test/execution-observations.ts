@@ -32,6 +32,9 @@ export function threadCleanupState(threadId: string): 'unavailable' | 'absent' {
   return threads.some(thread => thread.id === threadId) ? 'unavailable' : 'absent';
 }
 /** Spawned boards find started threads through the fake t3 CLI alone. */
+/** Tests with threads at work read no activity, as when T3 can't be read. */
+export function protocolActivityFamilies(): undefined { return undefined; }
+
 export function protocolStartedThread(): never { throw Error("T3 execution unavailable"); }
 
 /** Spawned boards consume the same protocol mapping as production. */

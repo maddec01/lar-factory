@@ -9,7 +9,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, limitNumber, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ItemStats, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, limitNumber, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ItemStats, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress, sampleActivityFrom } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
@@ -55,9 +55,11 @@ import { createShownStats } from './stats/shown-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectReads } from './t3/repository-project.ts';
 import { createProjectIcons } from './t3/project-icons.ts';
-import { protocolAwaitingFirstShell, protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
+import { protocolActivityFamilies, protocolAwaitingFirstShell, protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
 import type { T3Reads } from './t3/t3-reads.ts';
 import { createUsageCatchUp } from './t3/usage-catch-up.ts';
+import { openT3Db } from './t3/t3-db.ts';
+import { activityReads } from './t3/thread-activity.ts';
 import { lookupThread } from './t3/t3.ts';
 import { sendThreadCommand } from './t3/thread-commands.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
@@ -375,34 +377,41 @@ function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
   const previousUsage = new Map(board.snapshot().items.map((item) => [item.id, item.usageState]));
   const cleanupProblems = records && loopTrace.span('thread cleanup', () => shapingThreadCleanupProblems(records!));
   pruneShownStats(new Set(items.map((item) => item.id)));
-  return items.map((item) => {
-    if (item.recorded === false) return item;
-    const ids = liveIds(item.id);
-    const observed = threads(item.id);
-    // Until a stats read answers, recorded threads are still to come, unless T3 stopped and so has nothing coming.
-    const usageState = ids.length ? previousUsage.get(item.id) ?? (observed !== 'unavailable' || protocolAwaitingFirstShell() ? 'loading' : undefined) : undefined;
-    const shown = { ...item, stats: shownStats(item, previousStats.get(item.id), withStats), usageState, threads: observed };
-    shown.slices = item.slices.map((slice): typeof slice => {
-      if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
-      const ids = slice.workId && records ? recorded(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];
-      const observed = protocolItemThreads(ids);
-      const current = Array.isArray(observed) ? observed.filter(t => !t.observedAt) : [];
-      const progress = !ids.length ? 'waiting'
-        : current.some(t => t.state === 'running' || t.hasLiveChildren || t.hasRunningChildren) ? 'active'
-        : current.some(t => t.state === 'needs you') ? 'blocked'
-        : current.length !== ids.length ? 'unknown' : 'waiting';
-      return { ...slice, progress };
+  // One open database and one read per thread however many times this pass asks for a thread.
+  const activity = activityReads(() => openT3Db(statsSources.db), protocolActivityFamilies);
+  const withActivity = (found: ReturnType<typeof threads>) => (Array.isArray(found) ? found.map(activity.read) : found);
+  try {
+    return items.map((item) => {
+      if (item.recorded === false) return item;
+      const ids = liveIds(item.id);
+      const observed = threads(item.id);
+      // Until a stats read answers, recorded threads are still to come, unless T3 stopped and so has nothing coming.
+      const usageState = ids.length ? previousUsage.get(item.id) ?? (observed !== 'unavailable' || protocolAwaitingFirstShell() ? 'loading' : undefined) : undefined;
+      const shown = { ...item, stats: shownStats(item, previousStats.get(item.id), withStats), usageState, threads: withActivity(observed) };
+      shown.slices = item.slices.map((slice): typeof slice => {
+        if (slice.progress === 'done' || slice.progress === 'blocked') return slice;
+        const ids = slice.workId && records ? recorded(slice.workId).filter(t => t.purpose === 'implement').map(t => t.threadId) : [];
+        const observed = protocolItemThreads(ids);
+        const current = Array.isArray(observed) ? observed.filter(t => !t.observedAt) : [];
+        const progress = !ids.length ? 'waiting'
+          : current.some(t => t.state === 'running' || t.hasLiveChildren || t.hasRunningChildren) ? 'active'
+          : current.some(t => t.state === 'needs you') ? 'blocked'
+          : current.length !== ids.length ? 'unknown' : 'waiting';
+        return { ...slice, progress };
+      });
+      // A slice records its implementer thread, so a build is running while a thread runs for it or any slice.
+      const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
+      if (running(shown.threads) || item.slices.some((slice) => running(threads(slice.workId)))) lastRunning.set(item.id, now);
+      if (records) {
+        const notice = deletedThreadNotice(records, shown, recorded(item.id));
+        if (notice) shown.needsYou = notice;
+        shown.shapingCleanupProblem = cleanupProblems?.get(item.id);
+      }
+      return shown;
     });
-    // A slice records its implementer thread, so a build is running while a thread runs for it or any slice.
-    const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
-    if (running(shown.threads) || item.slices.some((slice) => running(threads(slice.workId)))) lastRunning.set(item.id, now);
-    if (records) {
-      const notice = deletedThreadNotice(records, shown, recorded(item.id));
-      if (notice) shown.needsYou = notice;
-      shown.shapingCleanupProblem = cleanupProblems?.get(item.id);
-    }
-    return shown;
-  });
+  } finally {
+    activity.close();
+  }
 }
 
 /** Tests read every source this often, whatever its work; unset, sources read at their pace. */
@@ -990,7 +999,7 @@ const stopProjectIcons = projectIcons?.start();
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).
 if (fixture) {
-  board.update({ ...JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, capture, firstRead: SETTLED_FIRST_READ });
+  board.update({ ...sampleActivityFrom(JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, Date.now()), capture, firstRead: SETTLED_FIRST_READ });
   offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
 }

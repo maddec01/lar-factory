@@ -28,8 +28,15 @@
     }
   ],
   "projectIcons": {
-    "maddec01/lar-server": { "kind": "lucide", "name": "server", "color": "sky" },
-    "maddec01/lar-apple": { "kind": "emoji", "emoji": "🍎" }
+    "maddec01/lar-server": {
+      "kind": "lucide",
+      "name": "server",
+      "color": "sky"
+    },
+    "maddec01/lar-apple": {
+      "kind": "emoji",
+      "emoji": "🍎"
+    }
   },
   "refreshSeconds": 45,
   "fetchedAt": "2026-10-21T09:40:00.000Z",
@@ -44,7 +51,18 @@
   "items": [
     {
       "id": "I_sample01",
-      "kindDisagreement": { "ticketKind": "improvement", "changed": "ticket", "kept": false, "swap": { "add": [], "remove": ["improvement"], "type": null } },
+      "kindDisagreement": {
+        "ticketKind": "improvement",
+        "changed": "ticket",
+        "kept": false,
+        "swap": {
+          "add": [],
+          "remove": [
+            "improvement"
+          ],
+          "type": null
+        }
+      },
       "revision": 1,
       "status": "List",
       "statuses": [
@@ -219,7 +237,18 @@
     },
     {
       "id": "I_sample06",
-      "kindDisagreement": { "ticketKind": "bug", "changed": "item", "kept": false, "swap": { "add": [], "remove": ["bug"], "type": null } },
+      "kindDisagreement": {
+        "ticketKind": "bug",
+        "changed": "item",
+        "kept": false,
+        "swap": {
+          "add": [],
+          "remove": [
+            "bug"
+          ],
+          "type": null
+        }
+      },
       "revision": 1,
       "status": "Queued",
       "statuses": [
@@ -474,7 +503,14 @@
           "id": "sample-thread-201",
           "title": "Grill: relay broker only or full TURN",
           "state": "running",
-          "updated": "2026-10-24T08:40:00.000Z"
+          "updated": "2026-10-21T09:48:00.000Z",
+          "activity": {
+            "available": true,
+            "action": "Read relay-costs.md",
+            "actionAt": "2026-10-21T09:48:00.000Z",
+            "toolRunning": false,
+            "agents": []
+          }
         }
       ],
       "stats": {
@@ -566,7 +602,20 @@
           "id": "sample-thread-202",
           "title": "Prototype: sign-in screen",
           "state": "needs you",
-          "updated": "2026-10-21T16:20:00.000Z"
+          "updated": "2026-10-21T09:57:00.000Z",
+          "activity": {
+            "available": true,
+            "action": "AskUserQuestion",
+            "actionAt": "2026-10-21T09:57:00.000Z",
+            "toolRunning": false,
+            "agents": [
+              {
+                "title": "Subagent",
+                "action": "Read sign-in.tsx",
+                "actionAt": "2026-10-21T09:56:00.000Z"
+              }
+            ]
+          }
         }
       ],
       "stats": {
@@ -806,7 +855,32 @@
           "id": "sample-thread-150",
           "title": "Build: relay for streaming away from home",
           "state": "running",
-          "updated": "2026-10-21T09:40:00.000Z"
+          "updated": "2026-10-21T09:59:00.000Z",
+          "activity": {
+            "available": true,
+            "action": "Read relay-broker.ts",
+            "actionAt": "2026-10-21T09:57:00.000Z",
+            "toolRunning": true,
+            "agents": [
+              {
+                "title": "Slice: relay broker",
+                "model": "claude-opus-5-5",
+                "action": "pnpm test",
+                "actionAt": "2026-10-21T10:00:00.000Z"
+              },
+              {
+                "title": "Explore",
+                "model": "claude-haiku-5-5",
+                "action": "Read turn-server.ts",
+                "actionAt": "2026-10-21T09:59:00.000Z"
+              },
+              {
+                "title": "approver",
+                "action": "Thinking",
+                "actionAt": "2026-10-21T09:59:00.000Z"
+              }
+            ]
+          }
         }
       ]
     },
@@ -872,7 +946,14 @@
           "id": "sample-thread-30",
           "title": "Build: chapter markers in the scrubber",
           "state": "running",
-          "updated": "2026-10-21T09:35:00.000Z"
+          "updated": "2026-10-21T09:59:00.000Z",
+          "activity": {
+            "available": true,
+            "action": "Edit scrubber.tsx",
+            "actionAt": "2026-10-21T09:59:00.000Z",
+            "toolRunning": true,
+            "agents": []
+          }
         }
       ]
     },
@@ -1006,8 +1087,15 @@
         {
           "id": "sample-thread-141",
           "title": "Build: transcoder file handle leak on cancel",
-          "state": "running",
-          "updated": "2026-10-21T09:05:00.000Z"
+          "state": "stopped",
+          "updated": "2026-10-21T09:40:00.000Z",
+          "activity": {
+            "available": true,
+            "action": "Edit transcoder-cancel.ts",
+            "actionAt": "2026-10-21T09:40:00.000Z",
+            "toolRunning": false,
+            "agents": []
+          }
         }
       ]
     },

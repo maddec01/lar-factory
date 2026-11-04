@@ -87,7 +87,7 @@ test('a dock row is one line, and its chevron expands the Work map under it, wit
   expect([dossier().querySelector('[data-work-map]'), panes()]).toEqual([null, SECTIONS]);
   await press(opener());
   expect(body()!.querySelector('[data-work-map]'), 'expanded, it shows its map').not.toBeNull();
-  expect([panes(), $('.desk') !== null, $('[data-line-filters]') !== null, $$('[data-dossier]').length], 'the page keeps its place').toEqual([SECTIONS, true, true, 2]);
+  expect([panes(), $('.desk') !== null, $$('[data-dossier]').length], 'the page keeps its place').toEqual([SECTIONS, true, 2]);
   expect(header().compareDocumentPosition(body()!) & Node.DOCUMENT_POSITION_FOLLOWING, 'under its own row').toBeTruthy();
   expect([$('[data-dossier-back]'), body()!.className.split(' ').filter((c) => /^(flex-1|h-|max-h|overflow)/.test(c))], 'no way back to need, and no cap or forced height').toEqual([null, []]);
 });

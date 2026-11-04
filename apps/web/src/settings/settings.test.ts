@@ -136,7 +136,7 @@ test('Close returns to the board as it was, and Settings opens again on the same
   await settle(() => vi.advanceTimersByTime(50));
   expect(modal()).toBeNull();
   expect($('.settings-body')).toBeNull();
-  expect(text($('.title-bar .scope'))).toBe('lar-apple');
+  expect($('[data-search-field]')!.getAttribute('aria-label')).toBe('Search, filtered by lar-apple');
   await settle(() => settingsButton()!.click());
   expect(section('Diagnostics').getAttribute('aria-current')).toBe('page');
 });

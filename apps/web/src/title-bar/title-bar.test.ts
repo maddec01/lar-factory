@@ -1,21 +1,20 @@
 // The board's title bar, in the board app and in a browser, past the traffic lights: on the left the brand and the
-// scope menu; in the middle the status strip, the Refreshed time and the counters; on the right List, Add item, a
-// divider, Update while there's an update, and Settings. Above the missing-t3 notice only the brand and Settings.
+// status strip, the Refreshed time and the counters; beside the actions the board search's field; on the right List,
+// Add item, a divider, Update while there's an update, and Settings. Above the missing-t3 notice only the brand and
+// Settings.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { clock, type InstallSnapshot } from '@lar-factory/shared';
-import { $, $$, NOW, fullScreen, mountPage, pressMenu, push, sample, settle, stubApp, text, textBesideIcon, toolChecks, updatesOff } from '../../test/support.ts';
+import { $, $$, NOW, fullScreen, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
 
 // jsdom has no ResizeObserver, which the copied Modal's scroll fade observes with.
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
 
 const titleBar = () => $<HTMLElement>('.title-bar')!;
-const trigger = () => titleBar().querySelector<HTMLButtonElement>('button.scope')!;
+const field = () => titleBar().querySelector<HTMLButtonElement>('[data-search-field]')!;
 const refreshed = () => titleBar().querySelector<HTMLElement>('.refreshed')!;
 const dot = () => refreshed().querySelector<HTMLElement>('[data-dot]')!;
 const ping = () => refreshed().querySelector('[data-ping]');
-const menu = () => $('[role="menu"]');
-const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const fresh = (ago = 0) => ({ ...sample, error: null, fetchedAt: new Date(NOW - ago).toISOString() });
 const isAmber = (el: Element) => el.classList.contains('bg-amber-500');
 const isGreen = (el: Element) => el.classList.contains('bg-success');
@@ -28,17 +27,17 @@ const tooltip = async () => {
 
 /** The title bar's controls, left to right, by name. */
 const CONTROLS = {
-  brand: '.brand', scope: 'button.scope', refreshed: '.refreshed', counters: '.counters', list: '.list-button',
+  brand: '.brand', refreshed: '.refreshed', counters: '.counters', search: '[data-search-field]', list: '.list-button',
   'add item': '.add-item', divider: '.app-divider', update: '.update-button', settings: '.open-settings',
 } as const;
 const controls = () => [...titleBar().querySelectorAll(Object.values(CONTROLS).join(', '))]
   .map((el) => Object.entries(CONTROLS).find(([, selector]) => el.matches(selector))![0]);
 const inset = () => titleBar().className.split(' ').includes('pl-[74px]');
 
-test('the title bar holds the brand and Scope, the status strip, then List, Add item, a divider, Update and Settings', async () => {
+test('the title bar holds the brand, the status strip, the search field, then List, Add item, a divider, Update and Settings', async () => {
   stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'available' as const, availableVersion: '1.1.0', message: null })) });
   await mountPage();
-  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 'divider', 'update', 'settings']);
+  expect(controls()).toEqual(['brand', 'refreshed', 'counters', 'search', 'list', 'add item', 'divider', 'update', 'settings']);
   const header = titleBar().querySelector('header')!;
   const [, , middle, right] = [...header.children];
   const strip = middle!.querySelector('.status-strip')!;
@@ -49,32 +48,17 @@ test('the title bar holds the brand and Scope, the status strip, then List, Add 
   expect(header.className.split(' ')).toContain('h-13');
 });
 
-// jsdom lays nothing out, so this checks the classes: the copied TitleBar's header is the container, and from 72rem the
-// strip is centred in it. Below that it sits in flow right after Scope, with no auto margin, and the title zone's
-// flex-1 keeps List and the rest at the right edge.
-test('the status strip is centred in the bar while the bar is 72rem wide, and follows Scope below that', async () => {
+// jsdom lays nothing out, so this checks the classes: the strip keeps its width right after the brand, and the field's
+// wrapper takes the room up to 26rem at the far end of the title zone, beside the actions.
+test('the counters sit after the brand, and the field takes up to 26rem beside the actions', async () => {
   await mountPage();
   const strip = titleBar().querySelector('.status-strip')!;
-  expect(titleBar().querySelector('header')!.className.split(' ')).toContain('@container');
-  const classes = strip.className.split(' ');
-  expect(classes).toEqual(expect.arrayContaining(['@min-[72rem]:absolute', '@min-[72rem]:left-1/2', '@min-[72rem]:-translate-x-1/2']));
-  expect(classes.filter((c) => c.includes('ml-auto')), 'nothing pushes the strip toward List').toEqual([]);
-  expect(strip.previousElementSibling!.matches('button.scope'), 'the strip comes right after Scope').toBe(true);
+  expect(strip.className.split(' ').filter((c) => /absolute|translate/.test(c)), 'the strip is not centred').toEqual([]);
+  expect(strip.previousElementSibling, 'the strip opens the title zone').toBeNull();
   expect(strip.parentElement!.className.split(' '), 'the title zone fills the room up to List').toContain('flex-1');
-});
-
-// Measured in Chrome with a 150 px Update: centred from 72rem, the strip runs under List until the bar is about 76rem.
-test('while Update shows, the strip stays after Scope up to 80rem, so it never runs under List', async () => {
-  await mountPage();
-  const classes = titleBar().querySelector('.status-strip')!.className.split(' ');
-  expect(classes).toEqual(expect.arrayContaining(['[.title-bar:has(.update-button)_&]:@max-[80rem]:static', '[.title-bar:has(.update-button)_&]:@max-[80rem]:translate-x-0']));
-});
-
-test('while the strip is centred, Scope is capped short of it and truncates its label', async () => {
-  await mountPage();
-  const scope = titleBar().querySelector('button.scope')!;
-  expect(scope.className.split(' ')).toEqual(expect.arrayContaining(['@min-[72rem]:max-w-[calc(50cqw-23rem)]', '[.title-bar:has(.update-button)_&]:@max-[80rem]:max-w-none']));
-  expect(scope.querySelector('span')!.className.split(' ')).toContain('truncate');
+  const wrapper = field().parentElement!;
+  expect(strip.nextElementSibling).toBe(wrapper);
+  expect(wrapper.className.split(' ')).toEqual(expect.arrayContaining(['ml-auto', 'flex-1', 'min-w-0', 'max-w-[26rem]']));
 });
 
 // The kinds' sheet sizes each to 28 px (buttons/button-kinds.css); inside the strip the title bar's sheet makes them 24.
@@ -83,7 +67,7 @@ test('Add item is the bar\'s Main action and every other control an App control;
   await mountPage();
   const kindOf = (selector: string) => titleBar().querySelector(selector)!.getAttribute('data-kind');
   expect(kindOf('.add-item')).toBe('main');
-  for (const selector of ['button.scope', '.list-button', '.update-button', '.open-settings']) expect(kindOf(selector), selector).toBe('control');
+  for (const selector of ['.list-button', '.update-button', '.open-settings']) expect(kindOf(selector), selector).toBe('control');
   expect([...titleBar().querySelectorAll('.counters button')].map((b) => b.getAttribute('data-kind'))).toEqual(Array(5).fill('control'));
   const settings = titleBar().querySelector('.open-settings')!;
   expect([settings.getAttribute('data-icon-only'), settings.getAttribute('aria-label'), text(settings)]).toEqual(['large', 'Settings', '']);
@@ -93,7 +77,7 @@ test('Add item is the bar\'s Main action and every other control an App control;
 
 test('in a browser, where nothing updates, there\'s no update pill', async () => {
   await mountPage();
-  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 'divider', 'settings']);
+  expect(controls()).toEqual(['brand', 'refreshed', 'counters', 'search', 'list', 'add item', 'divider', 'settings']);
 });
 
 test('the brand reads "Lar Factory": the copied BrandMark, then Factory on its baseline', async () => {
@@ -181,50 +165,9 @@ test('screen readers skip the brand; the page keeps one h1, for screen readers o
   expect($$('h1').map((h) => [h.className, text(h)])).toEqual([['sr-only', 'Lar Factory']]);
 });
 
-test('the title bar shows All repositories and when the data was last read', async () => {
+test('the title bar shows when the data was last read', async () => {
   await mountPage();
-  expect(text(trigger())).toBe('All repositories');
-  expect(trigger().querySelector('svg')).not.toBeNull();
-  expect(trigger().getAttribute('aria-label')).toBe('Scope: All repositories');
   expect(text(refreshed())).toBe('Stale · 20m ago');
-});
-
-test('the scope menu is headed Show, then All repositories, a separator and a repository per List group, checked at the scope', async () => {
-  await mountPage();
-  expect(menu()).toBeNull();
-  await pressMenu(trigger());
-  expect(text($('[role="menu"] [role="menuitemradio"]')!.parentElement!.previousElementSibling)).toBe('Show');
-  expect(entries().map(textBesideIcon)).toEqual(['All repositories', 'lar-server', 'lar-apple']);
-  expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
-  expect($('[role="menu"] [role="separator"]')).not.toBeNull();
-  expect(text(entries()[1]!.querySelector('[data-project-icon].repo-tone-0'))).toBe('L');
-  expect(text(entries()[2]!.querySelector('[data-project-icon]'))).toBe('🍎');
-  expect(entries()[1]!.querySelector('.rounded-full'), 'no tone dot').toBeNull();
-  expect(entries()[0]!.querySelector('[data-project-icon]'), 'All repositories has no icon').toBeNull();
-  // theme.css hides the radio indicator only beside a sibling element, so bare text would sit under it.
-  expect(entries().every((e) => e.querySelector(':scope > span:first-child:not(:only-child)')), 'no row shows the indicator').toBe(true);
-});
-
-test('the scope menu shows a repository\'s chosen icon, and typing its name still finds it', async () => {
-  await mountPage({ ...sample, projectIcons: { 'maddec01/lar-server': { kind: 'emoji', emoji: '🚀' } } });
-  await pressMenu(trigger());
-  expect(text(entries()[1]!.querySelector('[data-project-icon]'))).toBe('🚀');
-  await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'l', bubbles: true })));
-  await settle(() => vi.advanceTimersByTime(0));
-  expect(document.activeElement).toBe(entries()[1]);
-});
-
-test('picking a repository sets the scope and closes the menu; All repositories clears it', async () => {
-  await mountPage();
-  await pressMenu(trigger());
-  await settle(() => entries()[2]!.click());
-  expect(text(trigger())).toBe('lar-apple');
-  expect(menu()).toBeNull();
-  await pressMenu(trigger());
-  expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true']);
-  await settle(() => entries()[0]!.click());
-  expect(text(trigger())).toBe('All repositories');
-  expect(menu()).toBeNull();
 });
 
 test('the List modal\'s Scope board scopes the title bar too', async () => {
@@ -232,16 +175,7 @@ test('the List modal\'s Scope board scopes the title bar too', async () => {
   await settle(() => $<HTMLButtonElement>('.title-bar .list-button')!.click());
   await settle(() => $$<HTMLButtonElement>('[data-list-modal] nav button').find((b) => b.querySelector('.name')?.textContent === 'lar-apple')!.click());
   await settle(() => $<HTMLButtonElement>('[data-list-modal] .scope-board')!.click());
-  expect(text(trigger())).toBe('lar-apple');
-});
-
-test('the menu works from the keyboard', async () => {
-  await mountPage();
-  trigger().focus();
-  await settle(() => trigger().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
-  expect(entries()).toHaveLength(3);
-  await settle(() => entries()[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-  expect(text(trigger())).toBe('lar-server');
+  expect(field().getAttribute('aria-label')).toBe('Search, filtered by lar-apple');
 });
 
 test('the time shows a focus ring on keyboard focus', async () => {
@@ -362,7 +296,5 @@ test('the bar folds by its own width instead of squeezing: the counters keep the
     expect(classes(span ?? null), `${label}'s label stays for screen readers`).toContain('@max-[70rem]:sr-only');
   }
   expect(text(counters), 'the counters show no labels').not.toMatch(/need you|building|queued|shipped|spend/);
-  expect(classes(trigger())).toContain('min-w-0');
-  expect(classes(trigger().querySelector('.truncate')), 'Scope truncates').toContain('min-w-0');
   expect(classes(refreshed().querySelector('time')!.parentElement)).toContain('@max-[48rem]:sr-only');
 });

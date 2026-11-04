@@ -42,7 +42,7 @@ test('the counts are the whole factory\'s with a repository scoped', async () =>
   await settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
-  expect(text($('.title-bar .scope'))).toBe('lar-apple');
+  expect($('[data-search-field]')!.getAttribute('aria-label')).toBe('Search, filtered by lar-apple');
   expect(counters().map(text)).toEqual(before);
   await openCounter('need you');
   expect(rows()).toEqual(items);
@@ -330,9 +330,7 @@ test('building animates across the whole factory while the Build heading follows
   expect(members()).toEqual(originalMembers);
   await close();
   await settle(() => useScopeStore.getState().setScope(null));
-  await settle(() => $<HTMLButtonElement>('[data-line-filters] [data-filter="kind"]')!.click());
-  await settle(() => $$<HTMLLabelElement>('[data-filter-choice]').find(label => text(label) === 'Feature')!.querySelector('input')!.click());
-  await close();
+  await settle(() => useScopeStore.getState().setFilters({ kinds: ['feature'], labels: [] }));
   expect(heading().classList.contains('lucide-circle')).toBe(true);
   expect(counterIcon().closest('.status-spin')).not.toBeNull();
   pop = await openCounter('building');

@@ -13,6 +13,7 @@
 @source "./add-item";
 @source "./archive";
 @source "./app.tsx";
+@source "./board-search";
 @source "./copy/copy-button.tsx";
 @source "./description-editor";
 @source "./desk";

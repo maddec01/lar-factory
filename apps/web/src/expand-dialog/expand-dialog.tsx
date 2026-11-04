@@ -20,7 +20,7 @@ function childOpeningSize(): boolean {
   return dialogPreference('matchList') && document.querySelector('[data-list-modal]')?.getAttribute('data-expanded') === 'true';
 }
 
-const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+export const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 const SHORTCUT = MAC ? '⌘⇧E' : 'Ctrl+Shift+E';
 
 /** The expanded dialog's size, inline so it wins over the Modal Copy's own size classes. */

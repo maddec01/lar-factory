@@ -24,6 +24,5 @@
   .title-bar .browser-window-controls { display: none; }
   .title-bar header { height: auto; min-height: --spacing(13); flex-wrap: wrap; padding-block: --spacing(2); }
   .title-bar .status-strip { display: none; }
-  .title-bar .scope { max-width: 100%; flex-shrink: 1; }
   .title-bar header > div:last-child { flex-basis: 100%; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
 }

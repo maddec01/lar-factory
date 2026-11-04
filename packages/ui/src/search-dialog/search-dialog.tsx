@@ -27,7 +27,7 @@ export interface SearchDialogProps {
   onQueryChange: (query: string) => void;
   tokens?: readonly SearchDialogToken[];
   onBackspaceEmpty?: () => void;
-  /** A control beside the tokens. */
+  /** A control beside the tokens. A press on it leaves the focus in the field, as it may take itself away. */
   trailing?: ReactNode;
   /** The options' values in list order, for the arrow keys and Enter. */
   options: readonly string[];
@@ -133,7 +133,7 @@ export function SearchDialog({ label, description, placeholder, query, onQueryCh
               }}
             />
           </div>
-          {trailing && <div className="flex min-h-8 shrink-0 items-center">{trailing}</div>}
+          {trailing && <div className="flex min-h-8 shrink-0 items-center" onClick={() => input.current?.focus()}>{trailing}</div>}
           <span className="flex sm:hidden">
             <IconButton aria-label={labels.close} icon={<CloseIcon />} onClick={onClose} variant="header" className="pointer-coarse:size-11" />
           </span>

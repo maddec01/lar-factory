@@ -2,7 +2,7 @@
 // to the tracker and matches what a row shows, so a managed label or one mapped to the row's kind never matches.
 
 import { useState } from 'react';
-import { labelsOnRow, sameLabel } from '@lar-factory/shared';
+import { labelsOnRow, sameLabel, trackerCapabilities } from '@lar-factory/shared';
 import type { Item, RepoConfig } from '@lar-factory/shared';
 import type { LabelChoice } from '../labels/label-picker.tsx';
 
@@ -41,6 +41,14 @@ export function useItemFilters(): [ItemFilters, (filters: ItemFilters) => void] 
 
 export const filtering = ({ kinds, labels }: ItemFilters): boolean => kinds.length + labels.length > 0;
 
+export const toggled = <T,>(list: readonly T[], value: T, same: (a: T, b: T) => boolean = Object.is): T[] =>
+  (list.some((v) => same(v, value)) ? list.filter((v) => !same(v, value)) : [...list, value]);
+
+/** With every row on one tracker, its word for labels; rows across trackers say Labels. */
+export const headingOf = (rows: readonly Item[]): string => {
+  const headings = new Set(rows.map((row) => trackerCapabilities(row.repo).heading));
+  return headings.size === 1 ? [...headings][0]! : 'Labels';
+};
 
 /** Whether a row stays: it matches any chosen kind and any chosen label. An item with no kind badge counts as No kind. */
 export const rowFilter = ({ kinds, labels }: ItemFilters, repos: readonly RepoConfig[]) => (item: Item): boolean =>

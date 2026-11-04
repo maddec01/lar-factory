@@ -222,3 +222,13 @@ test('the footer holds the key hints', async () => {
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Arrow keys to move');
   expect(document.querySelector('[role="listbox"]')?.textContent).not.toContain('Arrow keys to move');
 });
+
+test('a press on the trailing control leaves the focus in the field', async () => {
+  await show(element({ trailing: createElement('button', { id: 'clear' }, 'Clear') }));
+  const clear = document.querySelector<HTMLButtonElement>('#clear')!;
+  await act(async () => {
+    clear.focus();
+    clear.click();
+  });
+  expect(document.activeElement).toBe(input());
+});

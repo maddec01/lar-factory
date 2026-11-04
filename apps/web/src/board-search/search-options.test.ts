@@ -21,3 +21,8 @@ test('a group with no result goes, and the group name does not match', () => {
   expect(matchingGroups(groups, 'bug').map(({ label }) => label)).toEqual(['Kinds']);
   expect(names('kinds')).toEqual([]);
 });
+
+test('a hint counts as part of the result', () => {
+  const hinted = [{ label: 'Settings', options: [{ ...option('Full refresh'), hint: 'General' }] }];
+  expect(matchingGroups(hinted, 'general refresh')).toHaveLength(1);
+});

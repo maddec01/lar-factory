@@ -22,7 +22,7 @@ export interface FilterToken extends SearchDialogToken {
   hue?: number;
 }
 
-function KindIcon({ choice }: { choice: KindFilter }) {
+export function KindIcon({ choice }: { choice: KindFilter }) {
   const Icon = choice === 'no-kind' ? CircleDashed : KIND_BADGES[choice]!.icon;
   return <Icon aria-hidden="true" className="size-3.5" />;
 }

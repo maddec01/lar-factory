@@ -37,6 +37,8 @@ interface Row {
   control: Control;
   /** Shown under the title and the control, across the row's whole width. */
   below?: ReactNode;
+  /** It only says something, with nothing to set or read, so the board search doesn't offer it as a setting. */
+  noteOnly?: true;
 }
 export interface Group { title: string; description?: string; rows: Row[]; footer?: ReactNode; note?: ReactNode }
 export interface Page { id: string; label: string; icon: ReactNode; description: string; groups: Group[] }
@@ -219,13 +221,13 @@ function bundledGroup({ data, version }: PagesInput): Group {
       <InstallState status={skill.status} />
       <a className="inline-flex items-center gap-1 text-xs font-medium text-(--foreground) underline-offset-2 hover:underline [&_svg]:size-3.5" aria-label={`${skill.name} source`} href={skill.source} target="_blank" rel="noopener"><ExternalLink /> Source</a>
     </span>),
-  })) : [{ id: 'bundled-unread', title: "Couldn't read the bundled skills", description: "The board server couldn't read the app's bundle, so it can't credit them here.", control: custom(() => null) }];
+  })) : [{ id: 'bundled-unread', title: "Couldn't read the bundled skills", noteOnly: true, description: "The board server couldn't read the app's bundle, so it can't credit them here.", control: custom(() => null) }];
   return { title: 'Bundled skills', description: 'The skills and checklists the app installs, and who wrote them.', rows };
 }
 
 function updateRows({ app, version }: PagesInput): Row[] {
   const channel = { id: 'channel', title: 'Update channel', description: 'Nightly offers each Nightly Release; Latest only Stable Releases.' };
-  if (!app) return [{ id: 'updates-app-only', title: ONLY_APP_UPDATES, control: custom(() => null) }];
+  if (!app) return [{ id: 'updates-app-only', title: ONLY_APP_UPDATES, noteOnly: true, control: custom(() => null) }];
   return [
     { ...channel, control: custom(() => <ChannelChoice />) },
     { id: 'version', title: version ? `Lar Factory ${version}` : 'Lar Factory', description: <UpdateStatus />, control: custom(() => <UpdateAction />) },

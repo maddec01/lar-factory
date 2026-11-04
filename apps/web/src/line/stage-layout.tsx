@@ -7,6 +7,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { useScopeStore } from '../board/scope-store.ts';
 import { rowFilter } from '../filters/item-filters.ts';
 import { useActivityUnavailable } from '../items/item-parts.tsx';
+import { RowActions } from '../items/row-actions.tsx';
 import type { Item } from '@lar-factory/shared';
 import { Dossiers } from './dossiers.tsx';
 import { Queue } from './queue.tsx';
@@ -24,11 +25,13 @@ export function StageLayout({ items, desk }: { items: Item[]; desk: ReactNode })
   return <>
     {desk}
     <section className="stages flex flex-col gap-3" aria-label="Work by stage">
-      <Queue rows={queue} shows={showsRow} />
-      <Shaping shaping={shaping} shows={showsRow} />
-      <ReadyToBuild ready={ready} shows={showsRow} />
-      <Build build={build} shows={showsRow} />
-      <Dossiers dossiers={dock.filter(({ parent }) => shows(parent))} />
+      <RowActions>
+        <Queue rows={queue} shows={showsRow} />
+        <Shaping shaping={shaping} shows={showsRow} />
+        <ReadyToBuild ready={ready} shows={showsRow} />
+        <Build build={build} shows={showsRow} />
+        <Dossiers dossiers={dock.filter(({ parent }) => shows(parent))} />
+      </RowActions>
     </section>
   </>;
 }

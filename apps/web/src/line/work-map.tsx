@@ -206,7 +206,7 @@ function HistoryRow({ part, after, data, home }: { part: Part; after: Part[]; da
       <span className="w-22 shrink-0"><PartKindLabel kind={part.kind} /></span>
       <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} title={itemName(item)} className="min-w-0 truncate rounded text-left hover:underline focus-visible:outline-2 focus-visible:outline-(--primary)"><ItemTitle item={item} /></button>
       {after.length > 0 && <span className="min-w-0 shrink-[1000] truncate text-[11px] text-(--muted-foreground)" title={`after ${after.map((u) => itemName(u.item)).join(', ')}`}>after {after.map((u) => ref(u.item)).join(', ')}</span>}
-      <span className="row-action ml-auto flex shrink-0 items-center gap-2 text-[11px] text-(--muted-foreground)">
+      <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px] text-(--muted-foreground)">
         {repoKey(item) !== home && <RepoIdentity repo={repoKey(item)} data={data} />}
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
         {threadsOf(item).length > 0 && <OpenThread item={item} data={data} iconOnly />}

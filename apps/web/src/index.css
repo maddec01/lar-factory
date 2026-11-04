@@ -4,6 +4,7 @@
 @import "@lar-factory/ui/styles.css";
 @import "./buttons/button-kinds.css";
 @import "./items/items.css";
+@import "./line/rows.css";
 @import "./loading/loading-screen.css";
 @import "./notices/notices.css";
 @import "./settings/settings.css";

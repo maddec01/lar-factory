@@ -7,10 +7,13 @@ import { buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-fa
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { OpenThread, hasLiveThread } from './open-thread.tsx';
+import { useOnRow } from './row-actions.tsx';
 import { StartOrAfter } from './start-after.tsx';
 
-/** A dossier names it `label`. */
-export function StartBuild({ item, data, label = 'Start build', linkedBeside, namesBlocker }: { item: Item; data: BoardData; label?: string; linkedBeside?: string | undefined; namesBlocker?: boolean }) {
+/** A dossier names it `label`; a row calls it Start. */
+export function StartBuild({ item, data, label: given, linkedBeside, namesBlocker }: { item: Item; data: BoardData; label?: string; linkedBeside?: string | undefined; namesBlocker?: boolean }) {
+  const short = useOnRow();
+  const label = given ?? (short ? 'Start' : 'Start build');
   // A thread already at work on the item would get a second one.
   if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
   const setup = data.repos.find(repo => sameRepo(repo.repo, item.repo))?.setup;

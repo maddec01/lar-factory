@@ -115,14 +115,14 @@ test('a Queued item blocked by an open issue shows only Start after, a Start, an
 test("a Queued item whose repository has no T3 project has its Shape issue disabled with the project's hint, and Start next passes over it", async () => {
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   await mountPage({ ...withChoices, repositoryProjects: { 'maddec01/lar-server': hint } });
-  expect([text(start()), start().disabled, start().title]).toEqual(['Shape issue', true, hint]);
+  expect([text(start()), start().disabled, start().title]).toEqual(['Shape', true, hint]);
   expect(row('I_sample05').querySelector('[data-start-after]'), 'nothing blocks it, so no Start after').toBeNull();
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
 test("a Queued item whose repository is still onboarding has its Shape issue disabled until onboarding's PR merges, and Start next passes over it", async () => {
   await mountPage({ ...withChoices, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
-  expect([text(start()), start().disabled, start().title]).toEqual(['Shape issue', true, "Waits for onboarding to finish"]);
+  expect([text(start()), start().disabled, start().title]).toEqual(['Shape', true, "Waits for onboarding to finish"]);
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
@@ -148,7 +148,7 @@ test('Shape issue sits on Queued issues, one Start on every row, and Start next 
   await mountPage();
   expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['I_sample05', 'I_sample06', 'I_sample21']);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-label')])
-    .toEqual(['Shape issue ▾', 'menu', `Shape issue #129 ${sample05.title}`]);
+    .toEqual(['Shape ▾', 'menu', `Shape #129 ${sample05.title}`]);
   expect([start(), start('I_sample06')].map((b) => [b.dataset.kind, Boolean(b.querySelector('[data-slot="icon"] svg'))]), 'every row the same Start, with its icon')
     .toEqual([['start', true], ['start', true]]);
   expect(startNext().dataset.kind, "Start next is the Queue's Main action").toBe('main');
@@ -189,7 +189,7 @@ test('while an item has a running or needs-you thread, its row has Open thread i
   await mountPage({ ...sample, items, t3EnvironmentId: 'env-1' });
   expect(row('I_sample05').querySelector('[data-start]')).toBeNull();
   const open = row('I_sample05').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
-  expect([text(open), open.getAttribute('href')]).toEqual(['Open thread', expect.stringContaining('t1')]);
+  expect([open.getAttribute('aria-label'), open.getAttribute('href')]).toEqual(['Open thread', expect.stringContaining('t1')]);
   expect(row('I_sample06').querySelector('[data-open-thread]')).not.toBeNull();
 });
 
@@ -204,7 +204,7 @@ test("a failed Start shows on its row with Retry start; closing the error doesn'
   await press(row('I_sample05').querySelector<HTMLButtonElement>('p.start button.dismiss')!);
   expect(row('I_sample05').querySelector('p.start')).toBeNull();
   expect(dialog()).toBeNull();
-  expect(text(start())).toBe('Shape issue ▾');
+  expect(text(start())).toBe('Shape ▾');
 });
 
 test('a Start that may have run hides Shape issue; closing its message leaves a tag', async () => {

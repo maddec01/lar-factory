@@ -1,7 +1,7 @@
-// The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board, as one
-// line: its source, repository, kind and title with any other repositories, its part bar, parts done and agent figures,
-// then its most important chip (parts that need you, open decisions, blocked slices, whether it is refined, fog) and
-// what's next in a stage row's state column, and its Start and an expanded row's view controls in the action slot, in the
+// The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board, as a row:
+// its source, repository, kind and title with any other repositories, its most important chip (parts that need you, open
+// decisions, blocked slices, whether it is refined, fog) in a stage row's state column, and its Start and an expanded row's
+// view controls in the action slot, then a second line of its part bar, parts done, what's next and agent figures, in the
 // columns the board's stage rows keep. Its chevron expands it in place under that same line, in the page's scroll, on its Work map,
 // with the concept's own question above and its Dependencies and fog below. Its parts list instead lists what keeps the
 // work moving (parts that need you, parts to verify or merge, open decisions, blocked slices, waiting parts, parts ready to
@@ -29,7 +29,7 @@ import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partLabel, shownThread
 import type { DossierItems, Part } from './dossier-parts.ts';
 import { StartBuild } from '../items/start-build.tsx';
 import { PartStart, startable } from './part-start.tsx';
-import { DOCK_COLUMNS, FIGURES_COLUMN, Figures, LINK_COLUMN, ROW_ACTION, figuresOf } from './columns.tsx';
+import { Figures, ROW_ACTION, ROW_RULE, RowSecondLine, figuresOf, opensItem } from './columns.tsx';
 import { Pane } from './pane.tsx';
 import { OnYourDesk, ROW_OPENS, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
 import { RowKind, RowSource } from './row-identity.tsx';
@@ -92,11 +92,11 @@ function useStored<T>({ name, read, write }: Stored<T>, parent: Item): [T, (v: T
   }];
 }
 
-/** Work map or parts list: one dossier's way of drawing its parts, as two small icon buttons named for assistive technology. */
+/** Work map or parts list: one dossier's way of drawing its parts, as two small icon buttons named for assistive technology, in a group as tall as the row's line. */
 function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void }) {
   const one = (v: View, icon: ReactNode, label: string) => (
     <button type="button" onClick={() => onView(v)} aria-pressed={view === v} title={label}
-      className={`grid size-7 place-items-center rounded-md focus-visible:outline-2 focus-visible:outline-(--primary) ${view === v ? 'bg-(--card) text-(--foreground) shadow-xs' : 'text-(--muted-foreground) hover:text-(--foreground)'}`}>{icon}<span className="sr-only">{label}</span></button>
+      className={`grid size-6 place-items-center rounded-md focus-visible:outline-2 focus-visible:outline-(--primary) ${view === v ? 'bg-(--card) text-(--foreground) shadow-xs' : 'text-(--muted-foreground) hover:text-(--foreground)'}`}>{icon}<span className="sr-only">{label}</span></button>
   );
   return <div className="inline-flex rounded-lg bg-(--muted) p-0.5">{one('map', <MapIcon className="size-3.5" />, 'Work map')}{one('list', <ListChecks className="size-3.5" />, 'Parts list')}</div>;
 }
@@ -109,7 +109,7 @@ function LocalPlanning({ item }: { item: Item }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <span tabIndex={0} role={item.sync.state === 'error' || item.sync.state === 'conflict' ? 'status' : 'note'} aria-label={note} data-structure-sync
-          className="whitespace-nowrap rounded text-[11px] text-(--muted-foreground) focus-visible:outline-2 focus-visible:outline-(--primary)">On this Mac</span>
+          className="whitespace-nowrap rounded text-(--muted-foreground) focus-visible:outline-2 focus-visible:outline-(--primary)">On this Mac</span>
       </TooltipTrigger>
       <TooltipPopup side="bottom">{note}</TooltipPopup>
     </Tooltip>
@@ -119,7 +119,7 @@ function LocalPlanning({ item }: { item: Item }) {
 /** A part's source, status and title, up to two lines. */
 function PartName({ part }: { part: Part }) {
   return (
-    <span className="flex min-w-0 items-start gap-1.5 text-[13px]">
+    <span className="flex min-w-0 items-start gap-1.5 text-sm">
       <SourceIcon item={part.item} />
       <span className="mt-0.5 inline-flex"><ItemStatusGlyph item={part.item} className="size-3.5" /></span>
       <span className="line-clamp-2"><ItemTitle item={part.item} /></span>
@@ -141,7 +141,7 @@ function Entry({ main, side }: { main: ReactNode; side?: ReactNode }) {
   return (
     <div className="flex min-h-9 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md px-2 py-1.5 hover:bg-(--soft)">
       <span className="min-w-0 flex-1 basis-64">{main}</span>
-      {side && <span className="row-action ml-auto shrink-0 text-[11px] text-(--muted-foreground)">{side}</span>}
+      {side && <span className="ml-auto shrink-0 text-xs text-(--muted-foreground)">{side}</span>}
     </div>
   );
 }
@@ -224,9 +224,9 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
   </>;
 }
 
-/** One part of the parts list: one button opens its details from its title, stage track, status, agent figures, Azure
- *  fields, PR, thread and slice bar; what it asks next sits beside that button, and its start's message or error under
- *  it. `home` is the dossier's own repository, which needs no naming. */
+/** One part of the parts list: one button opens its details from its title, stage track, status and Azure fields; what
+ *  it asks next sits beside that button, then a second line of its slice bar and count, thread, PR and agent figures, and
+ *  its start's message or error under that. `home` is the dossier's own repository, which needs no naming. */
 function PartRow({ part, data, home }: { part: Part; data: BoardData; home: string }) {
   const { item } = part;
   const isPicked = usePicked(item);
@@ -234,28 +234,32 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
   const shown = useShownStatus(item);
   const running = useStatusActivity();
   const s = figuresOf(item, data);
+  const slices = item.slices.length;
+  const hasThreadLine = !!shownThread(part, shown.working) || waits.length > 0;
   return (
-    <li data-part={item.id} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-3 py-2.5 hover:bg-(--accent) ${picked(isPicked)}`}>
-      <button type="button" data-row-open onClick={() => open(item)} title={itemName(item)} className={`grid min-w-0 gap-y-1.5 rounded text-left ${ROW_OPENS}`}>
-        <PartName part={part} />
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-[11px] text-(--muted-foreground)" data-part-meta>
-        <PartKindLabel kind={part.kind} />
-        {repoKey(item) !== home && <RepoCell item={item} />}
-        <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} running={running(item)} label={shown.word} waiting={waits.length > 0} /></span>
-        <span>{isDone(item) ? 'Complete' : shown.word}</span>
-        {s || usageLoading(item, data) ? <Figures s={s} item={item} /> : usageUnreadable(item) && <span>{UNREADABLE}</span>}
-        <AzureFields azure={item.azure} />
-        {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
-        <span className="min-w-0 empty:hidden"><ThreadLine part={part} /></span>
-        </span>
-        {item.slices.length > 0 && <span className="pl-5"><SliceBar item={item} /></span>}
-      </button>
-      <span className="row-action flex items-center justify-end gap-2 text-[11px] text-(--muted-foreground)">
-        {item.slices.length > 0 && <span className="tabular-nums">{item.slices.filter((x) => x.progress === 'done').length}/{item.slices.length}</span>}
-        <Action part={part} data={data} />
-      </span>
+    <li data-part={item.id} className={`@container rounded-md px-3 py-2 hover:bg-(--accent) ${picked(isPicked)}`}>
+      <div className="flex items-start gap-x-3">
+        <button type="button" data-row-open onClick={() => open(item)} title={itemName(item)} className={`grid min-w-0 flex-1 gap-y-1 rounded text-left ${ROW_OPENS}`}>
+          <PartName part={part} />
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-xs text-(--muted-foreground)" data-part-meta>
+            <PartKindLabel kind={part.kind} />
+            {repoKey(item) !== home && <RepoCell item={item} />}
+            <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} running={running(item)} label={shown.word} waiting={waits.length > 0} /></span>
+            <span>{isDone(item) ? 'Complete' : shown.word}</span>
+            <AzureFields azure={item.azure} />
+          </span>
+        </button>
+        <span data-part-action className="flex min-h-7 shrink-0 items-center justify-end gap-2 text-xs text-(--muted-foreground)"><Action part={part} data={data} /></span>
+      </div>
+      {(slices > 0 || item.linkedPrs.length > 0 || s || usageLoading(item, data) || usageUnreadable(item) || hasThreadLine) && (
+        <RowSecondLine onClick={opensItem(item)} prs={item.linkedPrs} figures={s || usageLoading(item, data) ? <Figures s={s} item={item} /> : usageUnreadable(item) && UNREADABLE}
+          bar={slices > 0 && <SliceBar item={item} />}
+          count={slices > 0 && <span data-col="count" className="tabular-nums">{item.slices.filter((x) => x.progress === 'done').length}/{slices} slices</span>}>
+          {hasThreadLine && <ThreadLine part={part} />}
+        </RowSecondLine>
+      )}
       {!isDone(item) && ['Ready', 'Queued', 'In progress'].includes(item.status) && (
-        <span className="col-span-2 pl-5 empty:hidden"><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /></span>
+        <span className="block pt-1 pl-5 empty:hidden"><StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} /><StartAfterError item={item} data={data} /></span>
       )}
     </li>
   );
@@ -377,7 +381,7 @@ function Chips({ chips }: { chips: Chip[] }) {
   return (
     <span onClick={stop} className="flex shrink-0 items-center gap-1" data-chips>
       <Badge tone={first.tone} className="tabular-nums whitespace-nowrap" data-chip data-refined={first.refined || undefined}>{first.icon}{first.words}</Badge>
-      {rest.length > 0 && <span className="text-[11px] tabular-nums text-(--muted-foreground)" data-chips-more>
+      {rest.length > 0 && <span className="tabular-nums text-(--muted-foreground)" data-chips-more>
         <span aria-hidden="true">+{rest.length}</span><span className="sr-only">{rest.map((c) => c.words).join(', ')}</span>
       </span>}
     </span>
@@ -395,7 +399,7 @@ function Next({ n, badged }: { n: ReturnType<typeof nextOf>; badged: boolean }) 
   const word = { you: yours, start: 'Next', moving: 'Moving', none: '' }[n.tone];
   const unseen = n.tone === 'start' || (badged && word === 'Needs you');
   return (
-    <span className="flex min-w-0 items-center gap-2 text-[12px]">
+    <span className="flex min-w-0 items-center gap-2">
       {/* Start sits in the action slot labelled "Start", and a "need you" badge says Needs you, so those words are screen-reader text and leave their room to the title. */}
       {word && <span className={`shrink-0 font-medium ${n.tone === 'you' ? 'text-(--warning-foreground)' : 'text-(--muted-foreground)'} ${unseen ? 'sr-only' : ''}`}>{word}</span>}
       <span className="min-w-0 truncate" title={n.text}>{n.text}</span>
@@ -416,37 +420,34 @@ function DossierLine({ parent, parts, data, lead, note, tools, onClick, classNam
   const n = nextOf(m, parent);
   const repos = otherRepos(parent, m, data);
   return (
-    <div onClick={onClick} data-item={parent.id} title={rowTooltip(chips, threads)}
-      className={`grid ${DOCK_COLUMNS} h-12 items-center gap-x-3 px-3 ${className} ${picked(isPicked)}`}>
-      {lead}
-      <RowSource item={parent} />
-      <span className="flex min-w-0 items-center" data-kind>{parent.kind === 'concept' ? <RowKind item={parent} /> : <Badge tone="neutral">Coupled work</Badge>}</span>
-      <span className="flex min-w-0 items-center gap-3" data-line="1">
-        <span className="flex min-w-0 flex-1 items-center gap-1.5">
-        <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
-          className={`min-w-0 truncate rounded text-left text-[13px] font-medium hover:underline ${ROW_OPENS}`}><ItemTitle item={parent} /></button>
-        <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
-        <span onClick={stop} className="flex shrink-0 items-center pl-1 empty:hidden">{note}</span>
-        <span data-col="repos" className="min-w-16 shrink-[100] truncate text-[11px] text-(--muted-foreground) empty:hidden" title={repos || undefined}>{repos}</span>
+    <div onClick={onClick} data-item={parent.id} title={rowTooltip(chips, threads)} className={`py-2 ${className} ${picked(isPicked)}`}>
+      <div className="row-first">
+        <div className="row-cols">
+          {lead}
+          <RowSource item={parent} />
+          <span className="flex min-w-0 items-center" data-kind>{parent.kind === 'concept' ? <RowKind item={parent} /> : <Badge tone="neutral">Coupled work</Badge>}</span>
+          <span className="flex min-w-0 items-center gap-1.5" data-line="1" data-title-cell>
+            <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
+              className={`min-w-0 truncate rounded text-left text-sm leading-7 font-medium text-(--foreground) hover:underline ${ROW_OPENS}`}><ItemTitle item={parent} /></button>
+            <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
+            <span onClick={stop} className="flex shrink-0 items-center pl-1 empty:hidden">{note}</span>
+            <span data-col="repos" className="min-w-16 shrink-[100] truncate text-(--muted-foreground) empty:hidden" title={repos || undefined}>{repos}</span>
+          </span>
+          {/* The first chip keeps its full width; the rest of the chips wait in the tooltip. */}
+          <span className="flex min-w-0 items-center gap-1.5" data-col="state"><Chips chips={chips} /></span>
+        </div>
+        <span data-col="side" className="row-side">
+          {/* A click beside the controls toggles the row, as anywhere else on it. */}
+          <KeepClicks as="span" passEmpty className={ROW_ACTION}>
+            {tools && <span className="flex shrink-0 items-center" data-dossier-tools>{tools}</span>}
+            {n.part && n.tone === 'start' && <PartStart part={n.part} data={data} label="Start" />}
+          </KeepClicks>
         </span>
-        <span className={`${LINK_COLUMN} flex items-center gap-2`}>
-          <span data-col="bar" className="min-w-0 flex-1"><PartsBar m={m} /></span>
-          <span data-col="count" className="shrink-0 text-right text-[11px] tabular-nums text-(--muted-foreground)" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count}</span>
-        </span>
-        <span data-col="figures" className={FIGURES_COLUMN}><Figures s={figuresOf(parent, data, true)} item={parent} total /></span>
-      </span>
-      <span className="flex min-w-0 items-center gap-1.5" data-col="state">
-        {/* The first chip keeps its full width and the next step truncates; the rest of the chips wait in the tooltip. */}
-        <Chips chips={chips} />
-        <span data-col="next" className="min-w-0" data-next><Next n={n} badged={m.needsYou.length > 0} /></span>
-      </span>
-      <span data-col="side" className="min-w-0">
-        {/* A click beside the controls toggles the row, as anywhere else on it. */}
-        <KeepClicks as="span" passEmpty className={ROW_ACTION}>
-          {tools && <span className="flex shrink-0 items-center" data-dossier-tools>{tools}</span>}
-          {n.part && n.tone === 'start' && <PartStart part={n.part} data={data} label="Start" />}
-        </KeepClicks>
-      </span>
+      </div>
+      <RowSecondLine bar={<PartsBar m={m} />} figures={<Figures s={figuresOf(parent, data, true)} item={parent} total />}
+        count={<span data-col="count" className="tabular-nums" title={`${m.done}/${m.count} parts done`}>{m.done}/{m.count} parts</span>}>
+        <span className="min-w-0" data-next><Next n={n} badged={m.needsYou.length > 0} /></span>
+      </RowSecondLine>
     </div>
   );
 }
@@ -495,7 +496,7 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
     </button>
   );
   return (
-    <article className="@container border-b border-(--border) last:border-b-0" data-dossier={parent.id} aria-label={itemName(parent)}>
+    <article className={`@container ${ROW_RULE}`} data-dossier={parent.id} aria-label={itemName(parent)}>
       <DossierLine parent={parent} parts={parts} data={data} lead={lead} onClick={toggle} className="cursor-pointer hover:bg-(--accent)"
         note={on && <LocalPlanning item={parent} />} tools={on && <ViewToggle view={view} onView={setView} />} />
       {on && <DossierBody parent={parent} parts={parts} data={data} view={view} />}

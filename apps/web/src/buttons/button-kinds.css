@@ -5,7 +5,7 @@
    size. `:where` keeps the selector as specific as [data-kind], so the title bar's strip still sizes its counters. */
 [data-kind]:where(:not([data-toggle])) { height: --spacing(7); font-size: var(--text-xs); }
 
-/* A row's right action slot and a desk card's actions: 32 px, icon-only buttons square. */
+/* A section header's action and a desk card's actions: 32 px, icon-only buttons square. */
 .row-action [data-kind]:where(:not([data-toggle])) { height: --spacing(8); }
 .row-action [data-kind][data-icon-only] { width: --spacing(8); }
 

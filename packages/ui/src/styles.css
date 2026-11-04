@@ -10,6 +10,7 @@
 @source "./form";
 @source "./progress";
 @source "./rich-text";
+@source "./search-dialog";
 @source "../node_modules/@ninna-ui/feedback/dist";
 @source "../node_modules/@ninna-ui/forms/dist";
 @source "../node_modules/@ninna-ui/overlays/dist";
@@ -72,4 +73,14 @@
 [data-slot="modal-overlay"],
 [data-slot="modal-content"] {
   -webkit-app-region: no-drag;
+}
+
+/* The search dialog fills a phone's screen, so it drops the frame theme.css gives every modal. That rule is outside
+   Tailwind's layers, so utilities can't override it. */
+@media (width < 40rem) {
+  [data-slot="modal-content"][data-search-dialog] {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }

@@ -1,4 +1,4 @@
-import type { BoardData, ItemThread } from './model.ts';
+import { isLiveThread, type BoardData, type Item, type ItemThread } from './model.ts';
 
 /** A native subagent or child task working for a thread. */
 export interface ThreadAgent {
@@ -34,20 +34,25 @@ export interface ThreadActivityLine {
   agents: number;
 }
 
+/** What a row's state column says instead of its phase, while one of these holds. */
+export const ACTIVITY_WORD: Partial<Record<ThreadActivityState, string>> = { quiet: 'Quiet', waiting: 'Waiting on you', stopped: 'Stopped' };
+
 /** How long a thread at work can go with no new action and no tool running before it reads as quiet. */
 const QUIET_MS = 5 * 60_000;
+
+const UNAVAILABLE: ThreadActivityLine = { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
 
 const ageOf = (at: string, now: number): number => Math.max(0, now - Date.parse(at));
 
 /** What a row shows for `thread` at `now`; undefined for a thread that finished with nothing at work. */
 export function threadActivityLine(thread: ItemThread, now: number): ThreadActivityLine | undefined {
   const { activity } = thread;
-  if (thread.observedAt || activity?.available === false) return { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
+  if (thread.observedAt || activity?.available === false) return UNAVAILABLE;
   const agents = activity?.agents ?? [];
-  if (thread.state === 'needs you') return { state: 'waiting', action: 'Waiting on you', ageMs: ageOf(thread.updated, now), agents: agents.length };
+  if (thread.state === 'needs you' || thread.childNeedsYou) return { state: 'waiting', action: 'Waiting on you', ageMs: ageOf(thread.updated, now), agents: agents.length };
   if (thread.state === 'stopped' && !agents.length) return { state: 'stopped', action: 'Stopped', ageMs: ageOf(thread.updated, now), agents: 0 };
   if (!activity) return thread.state === 'running' || thread.queued || thread.hasLiveChildren || thread.hasRunningChildren
-    ? { state: 'unavailable', action: 'Activity unavailable', agents: 0 } : undefined;
+    ? UNAVAILABLE : undefined;
   if (thread.queued && !agents.length) return { state: 'working', action: 'Queued', ageMs: ageOf(thread.updated, now), agents: 0 };
   const newest = [{ action: activity.action, actionAt: activity.actionAt ?? thread.updated }, ...agents.flatMap(({ action, actionAt }) => (actionAt ? [{ action, actionAt }] : []))]
     .reduce((best, next) => (Date.parse(next.actionAt) > Date.parse(best.actionAt) ? next : best));
@@ -56,6 +61,32 @@ export function threadActivityLine(thread: ItemThread, now: number): ThreadActiv
   // A thread that has just started may be newer than an agent's last action, and has no words of its own.
   const action = newest.action ?? activity.action ?? agents.find((agent) => agent.action)?.action ?? 'Starting';
   return { state: 'working', action, ageMs, agents: agents.length };
+}
+
+/** Statuses whose work may be under way, so a stopped thread or a T3 that can't be read matters to the row. */
+const UNDER_WAY: readonly Item['status'][] = ['Shaping', 'In progress', 'Review'];
+
+/** The thread a row follows: the newest at work, else the newest if it stopped work still under way. Threads come newest first. */
+export function itemActivityThread(item: Item): ItemThread | undefined {
+  if (item.paused || item.archived || !Array.isArray(item.threads)) return undefined;
+  const threads = item.threads.filter((thread) => !thread.archived);
+  const atWork = threads.find((thread) => isLiveThread(thread) || thread.hasRunningChildren);
+  return atWork ?? (threads[0]?.state === 'stopped' && UNDER_WAY.includes(item.status) ? threads[0] : undefined);
+}
+
+/** What `item`'s row shows at `now`; undefined when it shows no line. `unreadable` is a page that lost the server, whose threads may be out of date. */
+export function itemActivityLine(item: Item, now: number, unreadable = false): ThreadActivityLine | undefined {
+  if (item.paused || item.archived) return undefined;
+  if (item.threads === 'unavailable') return UNDER_WAY.includes(item.status) ? UNAVAILABLE : undefined;
+  const thread = itemActivityThread(item);
+  if (!thread) return undefined;
+  return unreadable ? UNAVAILABLE : threadActivityLine(thread, now);
+}
+
+/** Whether `item`'s row stops animating: its thread waits, stopped or can't be read. None of these depend on the time. */
+export function itemActivityStill(item: Item, unreadable = false): boolean {
+  const state = itemActivityLine(item, 0, unreadable)?.state;
+  return state === 'waiting' || state === 'stopped' || state === 'unavailable';
 }
 
 /** The moment the sample's times count from, so its ages read the same whenever the sample board runs. */

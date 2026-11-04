@@ -11,7 +11,7 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, Check, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { UNREADABLE, needsAnswer, openQuestionThread, blockerGroups, blockerRef, canRetryBuild, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
+import { ACTIVITY_WORD, UNREADABLE, itemActivityStill, needsAnswer, openQuestionThread, blockerGroups, blockerRef, canRetryBuild, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
@@ -29,6 +29,7 @@ import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partLabel, shownThread
 import type { DossierItems, Part } from './dossier-parts.ts';
 import { StartBuild } from '../items/start-build.tsx';
 import { PartStart, startable } from './part-start.tsx';
+import { ActivityLine, useActivityState } from './activity-line.tsx';
 import { Figures, ROW_ACTION, ROW_RULE, RowSecondLine, figuresOf, opensItem } from './columns.tsx';
 import { Pane } from './pane.tsx';
 import { OnYourDesk, ROW_OPENS, Track, lastSeen, stageOf, YOURS, picked } from './stage-track.tsx';
@@ -234,8 +235,12 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
   const shown = useShownStatus(item);
   const running = useStatusActivity();
   const s = figuresOf(item, data);
+  const activity = useActivityState(item);
+  const disconnected = useBoardStore((state) => !!state.clientError);
+  const still = itemActivityStill(item, disconnected);
+  const word = (activity && ACTIVITY_WORD[activity]) ?? shown.word;
   const slices = item.slices.length;
-  const hasThreadLine = !!shownThread(part, shown.working) || waits.length > 0;
+  const hasThreadLine = !!activity || !!shownThread(part, shown.working) || waits.length > 0;
   return (
     <li data-part={item.id} className={`@container rounded-md px-3 py-2 hover:bg-(--accent) ${picked(isPicked)}`}>
       <div className="flex items-start gap-x-3">
@@ -244,8 +249,8 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-xs text-(--muted-foreground)" data-part-meta>
             <PartKindLabel kind={part.kind} />
             {repoKey(item) !== home && <RepoCell item={item} />}
-            <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} running={running(item)} label={shown.word} waiting={waits.length > 0} /></span>
-            <span>{isDone(item) ? 'Complete' : shown.word}</span>
+            <span className="w-28 shrink-0"><Track status={isDone(item) ? 'Done' : item.status} running={running(item)} label={word} waiting={waits.length > 0} /></span>
+            <span>{isDone(item) ? 'Complete' : word}</span>
             <AzureFields azure={item.azure} />
           </span>
         </button>
@@ -253,9 +258,9 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
       </div>
       {(slices > 0 || item.linkedPrs.length > 0 || s || usageLoading(item, data) || usageUnreadable(item) || hasThreadLine) && (
         <RowSecondLine onClick={opensItem(item)} prs={item.linkedPrs} figures={s || usageLoading(item, data) ? <Figures s={s} item={item} /> : usageUnreadable(item) && UNREADABLE}
-          bar={slices > 0 && <SliceBar item={item} />}
+          bar={slices > 0 && <SliceBar item={item} still={still} />}
           count={slices > 0 && <span data-col="count" className="tabular-nums">{item.slices.filter((x) => x.progress === 'done').length}/{slices} slices</span>}>
-          {hasThreadLine && <ThreadLine part={part} />}
+          {activity ? <ActivityLine item={item} /> : hasThreadLine && <ThreadLine part={part} />}
         </RowSecondLine>
       )}
       {!isDone(item) && ['Ready', 'Queued', 'In progress'].includes(item.status) && (
@@ -314,12 +319,13 @@ function PartsBar({ m }: { m: Moving }) {
   const order = [...m.parts].sort((a, b) => Number(isDone(b.item)) - Number(isDone(a.item)) || stageOf(b.item.status) - stageOf(a.item.status));
   const unread = m.count - m.parts.length;
   const unavailable = useActivityUnavailable();
+  const disconnected = useBoardStore((state) => !!state.clientError);
   return (
     <ol className="m-0 flex min-w-0 list-none gap-[2px] overflow-hidden p-0" title={`${m.done}/${m.count} parts done`} data-part-bar>
       {order.map((p) => {
         const { word, glyph } = shownStatus(p.item, unavailable);
         return (
-          <li key={p.item.id} title={`${itemName(p.item)}: ${isDone(p.item) ? 'Complete' : word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${glyph === 'In progress' ? 'status-pulse' : ''}`}
+          <li key={p.item.id} title={`${itemName(p.item)}: ${isDone(p.item) ? 'Complete' : word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${glyph === 'In progress' && !itemActivityStill(p.item, disconnected) ? 'status-pulse' : ''}`}
             style={{ background: isDone(p.item) ? 'var(--st-done)' : glyph === 'Queued' || glyph === 'List' ? 'var(--soft)' : STATUS_COLOR[glyph] }} />
         );
       })}

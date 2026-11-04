@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vite-plus/test';
-import type { BoardData, ItemThread } from './model.ts';
-import { sampleActivityFrom, threadActivityLine, type ThreadActivity } from './thread-activity.ts';
+import type { BoardData, Item, ItemThread } from './model.ts';
+import { itemActivityLine, itemActivityStill, sampleActivityFrom, threadActivityLine, type ThreadActivity } from './thread-activity.ts';
 
 const NOW = Date.parse('2026-11-04T12:00:00Z');
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
@@ -44,6 +44,11 @@ test('a thread waiting on the user or stopped says so, and agents still at work 
     .toMatchObject({ state: 'working', action: 'Grep', agents: 1 });
 });
 
+test('an agent waiting on the user makes its thread wait on you', () => {
+  expect(threadActivityLine(thread({ state: 'done', hasLiveChildren: true, childNeedsYou: true, updated: ago(3), activity: activity() }), NOW))
+    .toEqual({ state: 'waiting', action: 'Waiting on you', ageMs: 180_000, agents: 0 });
+});
+
 test('a failed or stale read says unavailable, never an old action', () => {
   const unavailable = { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
   expect(threadActivityLine(thread({ activity: { available: false } }), NOW)).toEqual(unavailable);
@@ -54,6 +59,48 @@ test('a failed or stale read says unavailable, never an old action', () => {
 
 test('a thread that finished with nothing at work shows nothing', () => {
   expect(threadActivityLine(thread({ state: 'done' }), NOW)).toBeUndefined();
+});
+
+const item = (threads: Item['threads'], over: Partial<Item> = {}) => ({ status: 'In progress', threads, ...over }) as Item;
+const working = (id: string, action: string) => thread({ id, activity: activity({ action, actionAt: ago(1) }) });
+
+test('a row follows its newest thread at work, skipping finished and archived ones', () => {
+  expect(itemActivityLine(item([thread({ id: 'new', state: 'done' }), working('older', 'Read a.ts'), working('oldest', 'Read b.ts')]), NOW)?.action).toBe('Read a.ts');
+  expect(itemActivityLine(item([{ ...working('new', 'Read a.ts'), archived: true }, working('older', 'Read b.ts')]), NOW)?.action).toBe('Read b.ts');
+  expect(itemActivityLine(item([thread({ state: 'done' })]), NOW)).toBeUndefined();
+  expect(itemActivityLine(item([]), NOW)).toBeUndefined();
+  expect(itemActivityLine(item(undefined), NOW)).toBeUndefined();
+});
+
+test('a paused or archived item shows no line', () => {
+  expect(itemActivityLine(item([working('t', 'Read a.ts')], { paused: 'Paused' }), NOW)).toBeUndefined();
+  expect(itemActivityLine(item([working('t', 'Read a.ts')], { archived: { setAside: true, hidden: false, ticketOpen: true } }), NOW)).toBeUndefined();
+});
+
+test('a stopped thread counts only as the newest thread of work still under way', () => {
+  const stopped = thread({ state: 'stopped' });
+  expect(itemActivityLine(item([stopped]), NOW)?.state).toBe('stopped');
+  expect(itemActivityLine(item([stopped], { status: 'Shaping' }), NOW)?.state).toBe('stopped');
+  expect(itemActivityLine(item([thread({ state: 'done' }), stopped]), NOW), 'a later run finished').toBeUndefined();
+  expect(itemActivityLine(item([stopped], { status: 'Done' }), NOW)).toBeUndefined();
+});
+
+test('a row says unavailable when T3 or the page can\'t be read, and only for work that may be under way', () => {
+  const line = { state: 'unavailable', action: 'Activity unavailable', agents: 0 };
+  expect(itemActivityLine(item('unavailable'), NOW)).toEqual(line);
+  expect(itemActivityLine(item('unavailable', { status: 'Done' }), NOW)).toBeUndefined();
+  expect(itemActivityLine(item([working('t', 'Read a.ts')]), NOW, true)).toEqual(line);
+  expect(itemActivityLine(item([thread({ state: 'done' })]), NOW, true)).toBeUndefined();
+  expect(itemActivityLine(item([thread({ state: 'done', observedAt: ago(1) })]), NOW)).toBeUndefined();
+});
+
+test('only a thread that waits, stopped or can\'t be read holds a row still', () => {
+  expect(itemActivityStill(item([thread({ state: 'stopped' })]))).toBe(true);
+  expect(itemActivityStill(item([thread({ state: 'needs you', activity: activity() })]))).toBe(true);
+  expect(itemActivityStill(item([thread({ activity: { available: false } })]))).toBe(true);
+  expect(itemActivityStill(item([thread({ activity: activity({ actionAt: ago(60) }) })])), 'quiet is still at work').toBe(false);
+  expect(itemActivityStill(item([working('t', 'Read a.ts')]))).toBe(false);
+  expect(itemActivityStill(item([]))).toBe(false);
 });
 
 test('the sample has a row for each state, whenever the sample board runs', () => {

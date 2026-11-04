@@ -440,8 +440,8 @@ export interface ItemThread {
   archived?: true;
   /** A descendant is running, or this thread or a descendant has background tasks pending, so its work goes on after its turn ended. */
   hasRunningChildren?: true;
-  /** Current descendant tasks: at most three titles, with the total count. Absent once they stop. */
-  childActivity?: { titles: string[]; count: number };
+  /** A descendant waits on the user. */
+  childNeedsYou?: true;
   /** What the thread and its agents are doing now, read for a thread at work. */
   activity?: ThreadActivity;
   /** The work record's thread role, when recorded by the factory. */

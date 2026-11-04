@@ -31,6 +31,7 @@
 @source "./items/status-glyph.tsx";
 @source "./items/source-icon.tsx";
 @source "./line";
+@source "./loading/loader.tsx";
 @source "./list";
 @source "./onboarding";
 @source "./repositories";
@@ -65,3 +66,12 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   .activity-sweep { animation: none; }
 }
+
+/* Each loop behind an open blurred overlay stops repainting that blur. Ninna-ui portals every overlay as a child of
+   body in opening order, so this covers the board and lower modals and leaves the topmost modal and anything opened
+   from it. The toaster mounts earlier but sits above every dialog. Named animations only: a one-shot entrance starts
+   at opacity 0, so pausing it would hide what it enters. The title bar's refreshed ping is the one one-shot here: it
+   starts visible at opacity 0.6 and repaints the blur for 1.2 s on each landed read, and it finishes once the modal
+   closes. */
+body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) :is(.status-spin, .status-pulse, .activity-sweep, .animate-spin, .motion-safe\:animate-spin, .animate-pulse, [data-ping]) { animation-play-state: paused; }
+body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) .lar-skeleton::before { animation-play-state: paused; }

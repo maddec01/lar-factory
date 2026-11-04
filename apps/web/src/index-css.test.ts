@@ -33,3 +33,10 @@ const utilityFiles = folders
 test.each(utilityFiles)('Tailwind scans %s, a file in a folder with no sheet of its own', (path) => {
   expect(sources.some((source) => source === path || source === path.split('/')[0])).toBe(true);
 });
+
+test('reduced motion stops both status spin and pulse without hiding their icons', () => {
+  const reduced = rules('items/items.css').match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+  expect(reduced).toMatch(/\.status-spin[^}]*animation: none/);
+  expect(reduced).toMatch(/\.status-pulse[^}]*animation: none/);
+  expect(reduced).not.toMatch(/display:|visibility:|opacity:/);
+});

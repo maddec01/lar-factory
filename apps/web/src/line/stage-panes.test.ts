@@ -813,3 +813,95 @@ test('a child task titled with the phase word and a colon shows its title alone'
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(at(['Reviewer: code'])));
   expect(text(col('I_sample13', 'next'))).toBe('Review · Reviewer: code +3 more');
 });
+
+test('Build and its row animate for current execution, stop together, and shaping alone never spins Build', async () => {
+  const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
+  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, slices: [], threads: [] })) };
+  const data = withItem('I_sample14', { slices: [], threads: [build] }, fresh);
+  const buildGlyph = () => $('[data-stage="build"] header > svg')!;
+  const rowGlyph = () => row('I_sample14').querySelector('[data-glyph] svg')!;
+  await mountPage(data);
+  expect(buildGlyph().classList.contains('lucide-loader-circle')).toBe(true);
+  expect(rowGlyph().classList.contains('status-spin')).toBe(true);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const stopped = withItem('I_sample14', { slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, fresh);
+  await settle(() => useBoardStore.getState().receive(stopped));
+  expect(buildGlyph().classList.contains('lucide-circle')).toBe(true);
+  expect(rowGlyph().classList.contains('lucide-circle')).toBe(true);
+  await settle(() => useBoardStore.getState().receive(withItem('I_sample02', { status: 'Shaping', threads: [{ ...build, purpose: 'shape' }] }, stopped)));
+  expect(buildGlyph().classList.contains('lucide-circle')).toBe(true);
+  expect(row('I_sample02').querySelector('[data-glyph] .status-pulse')).not.toBeNull();
+  expect($('[data-stage="shaping"] header .status-pulse')).toBeNull();
+  expect($('[data-stage="ready"] header svg.lucide-circle-arrow-right')).not.toBeNull();
+});
+
+test('status icons require current execution and suppress unavailable, cached, held and starting work', async () => {
+  const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
+  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, threads: [], slices: [] })) };
+  const data = withItem('I_sample14', { threads: [build] }, withItem('I_sample02', { status: 'Shaping', threads: [{ ...build, purpose: 'shape' }] }, fresh));
+  await mountPage(data);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const motion = () => $$('[data-stage] [data-glyph] svg.status-spin, [data-stage] [data-glyph] svg.status-pulse');
+  expect(motion()).toHaveLength(2);
+  const cases: [string, BoardData][] = [
+    ['stale', { ...data, fetchedAt: '2020-01-01T00:00:00Z' }],
+    ['failed read', { ...data, error: 'Read failed' }],
+    ['first read', { ...data, firstRead: { ...data.firstRead, settled: false, ready: true } }],
+    ['T3 unavailable', { ...data, t3Availability: { availability: 'unavailable' } }],
+    ['T3 not running', { ...data, tools: { t3: { result: 'not-running' } } }],
+    ['cached T3 read', { ...data, t3Availability: { availability: 'available', observedAt: build.updated } }],
+    ['local read failure', { ...data, localProblem: 'Local records unavailable' }],
+    ...(['paused', 'archived', 'needsYou', 'threads'] as const).map(key => [key, { ...data, items: data.items.map(item => ({ ...item,
+      ...(key === 'paused' ? { paused: 'Settings changed' } : key === 'archived' ? { archived: { setAside: true, hidden: false, ticketOpen: true } }
+        : key === 'needsYou' ? { needsYou: { reason: 'Help', offers: [], causes: [], ticketOpen: true } } : { threads: 'unavailable' as const }),
+    })) }] as [string, BoardData]),
+    ...(['starting', 'may-have-started'] as const).map(phase => [phase, { ...data, startProgress: {
+      I_sample14: { build: phase === 'starting' ? { phase } : { phase, message: 'Check T3' } },
+      I_sample02: { shape: phase === 'starting' ? { phase } : { phase, message: 'Check T3' } },
+    } }] as [string, BoardData]),
+  ];
+  for (const [label, next] of cases) {
+    await settle(() => useBoardStore.getState().receive(next));
+    expect(motion(), label).toHaveLength(0);
+    expect($('[data-stage="build"] header svg.status-spin'), label).toBeNull();
+    expect($('.counters button[aria-label^="building:"] svg.status-spin'), label).toBeNull();
+  }
+  await settle(() => useBoardStore.getState().receive(data));
+  await settle(() => useBoardStore.getState().fail('Disconnected'));
+  expect(motion(), 'client read failed').toHaveLength(0);
+  await settle(() => useBoardStore.getState().receive(data));
+  const { useStartStore } = await import('../items/start-store.ts');
+  await settle(() => {
+    useStartStore.getState().set('I_sample14', { phase: 'pending' }, 'build');
+    useStartStore.getState().set('I_sample02', { phase: 'pending' }, 'refine');
+  });
+  expect(motion(), 'local launches still pending').toHaveLength(0);
+  await settle(() => {
+    useStartStore.getState().set('I_sample14', undefined, 'build');
+    useStartStore.getState().set('I_sample02', undefined, 'refine');
+  });
+  for (const evidence of [
+    { state: 'running' as const, currentRunning: undefined },
+    { state: 'done' as const, currentRunning: undefined, queued: true as const, hasLiveChildren: true as const },
+    { observedAt: build.updated, hasRunningChildren: true as const },
+  ]) {
+    await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { threads: [{ ...build, ...evidence }] }, withItem('I_sample02', {
+      status: 'Shaping', threads: [{ ...build, purpose: 'shape', ...evidence }],
+    }, fresh))));
+    expect(motion(), JSON.stringify(evidence)).toHaveLength(0);
+  }
+});
+
+test('status icons include delegated execution and active slices after the parent turn ends', async () => {
+  const build: ItemThread = { ...thread('build', 'done'), purpose: 'build', hasRunningChildren: true };
+  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
+  await mountPage(withItem('I_sample14', { slices: [], threads: [build] }, fresh));
+  const glyph = () => row('I_sample14').querySelector('[data-glyph] svg')!;
+  expect(glyph().classList.contains('status-spin')).toBe(true);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const slice = { number: 100, repo: 'maddec01/lar-server', title: 'Slice', url: '', state: 'open' as const, progress: 'active' as const };
+  await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { slices: [slice], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh)));
+  expect(glyph().classList.contains('status-spin')).toBe(true);
+  await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { slices: [{ ...slice, progress: 'done' }], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh)));
+  expect(glyph().classList.contains('lucide-circle')).toBe(true);
+});

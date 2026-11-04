@@ -15,8 +15,8 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-sy
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ItemTitle, useShownStatus } from '../items/item-parts.tsx';
-import { StatusGlyph, STATUS_COLOR } from '../items/status-glyph.tsx';
+import { ItemTitle } from '../items/item-parts.tsx';
+import { ItemStatusGlyph, StatusGlyph, STATUS_COLOR, useStatusActivity } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { Loader } from '../loading/loader.tsx';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
@@ -66,13 +66,12 @@ function Empty({ children }: { children: ReactNode }) {
 
 /** One item: its status glyph, its number and title, then its repository's icon and age (or a trailing figure). Picking it opens the item dialog. */
 function Row({ item, now, trailing }: { item: Item; now: number; trailing?: ReactNode }) {
-  const shown = useShownStatus(item);
   return (
     <li>
       <Popover.Close asChild aria-label={`${itemName(item)}`}>
         <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
           className="flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left text-[13px] text-base-content outline-none hover:bg-base-200 focus-visible:bg-base-200">
-          <StatusGlyph status={shown.glyph} />
+          <ItemStatusGlyph item={item} />
           <SourceIcon item={item} />
           <span className="min-w-0 flex-1 truncate"><ItemTitle item={item} /></span>
           <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums">
@@ -127,7 +126,8 @@ export function Counters() {
   const spend = costs.reduce((t, c) => t + c.cost, 0);
   const free = limit === undefined ? undefined : limit - building.length;
   const row = (i: Item, trailing?: ReactNode) => <Row key={i.id} item={i} now={now} trailing={trailing} />;
-  const glyph = (status: Status) => <StatusGlyph status={status} />;
+  const running = useStatusActivity();
+  const glyph = (status: Status) => <StatusGlyph status={status} running={status === 'In progress' && building.some(running)} />;
 
   return (
     <div className="counters flex shrink-0">

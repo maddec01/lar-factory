@@ -8,7 +8,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { AgentWork, INCOMPLETE_TOTAL, ItemTitle, usageUnreadable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
-import { StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { isDone, partsOf } from '../line/dossier-parts.ts';
 
 const WORK_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
@@ -55,7 +55,7 @@ function PartRow({ item, data, openPart }: { item: Item; data: BoardData; openPa
     <li data-concept-part={item.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-1 hover:bg-(--soft)">
       <button type="button" onClick={() => openPart(item.id)} title={item.title} className="flex min-w-0 flex-1 basis-56 items-start gap-1.5 text-left text-[13px] hover:underline">
         <SourceIcon item={item} />
-        <span className="mt-0.5 inline-flex"><StatusGlyph status={complete ? 'Done' : shown.glyph} className="size-3.5" /></span>
+        <span className="mt-0.5 inline-flex"><ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} className="size-3.5" /></span>
         <span className="line-clamp-2"><ItemTitle item={item} /></span>
       </button>
       <span className="shrink-0 text-xs text-(--muted-foreground)">{complete ? 'Complete' : shown.word}</span>

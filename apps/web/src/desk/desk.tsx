@@ -15,7 +15,7 @@ import { KeepClicks } from '../items/keep-clicks.tsx';
 import { Loader } from '../loading/loader.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
-import { StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { RowKind, RowSource } from '../line/row-identity.tsx';
 import { ROW_OPENS } from '../line/stage-track.tsx';
 
@@ -71,7 +71,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
         <AzureFields azure={item.azure} />
       </button>
       <span className="flex min-w-0 items-center gap-2">
-        <span className="flex shrink-0 items-center gap-1.5 text-[11px]"><StatusGlyph status={item.status} className="size-3" /><span className="font-semibold text-(--warning-foreground)">{item.status}</span></span>
+        <span className="flex shrink-0 items-center gap-1.5 text-[11px]"><ItemStatusGlyph item={item} className="size-3" /><span className="font-semibold text-(--warning-foreground)">{item.status}</span></span>
         <span className="desk-next flex h-5 min-w-0 flex-1 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums"><NextStep item={item} /></span>
       </span>
       <Actions item={item} data={data} />

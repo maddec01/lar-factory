@@ -11,7 +11,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-sy
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
-import { StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { DECISION_KINDS, isDone, isHistory, openWaits, partActivity, partLabel, partWaves, threadsOf, upstreamOf, waitText } from './dossier-parts.ts';
@@ -189,7 +189,7 @@ function PartNode({ part, data, width, home }: { part: Part; data: BoardData; wi
       </span>
       <span className="pointer-events-none relative line-clamp-2 text-[13px] font-medium leading-snug"><ItemTitle item={item} /></span>
       <span className="pointer-events-none relative mt-auto flex min-w-0 items-center gap-1.5 text-xs">
-        <StatusGlyph status={complete ? 'Done' : shown.glyph} className="size-3 shrink-0" />
+        <ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} className="size-3 shrink-0" />
         <span className="min-w-0 flex-1 truncate" data-map-facts>{state}</span>
       </span>
       {item.slices.length > 0 && <span className="pointer-events-none absolute inset-x-2.5 bottom-0.5"><SliceBar item={item} /></span>}

@@ -3,7 +3,7 @@
 
 import { activityUnavailable, buildsAtWork, limitNumber } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
-import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { STATUS_COLOR, useStatusActivity } from '../items/status-glyph.tsx';
 import { AutoBuildSwitch } from './auto-build-switch.tsx';
 import { Pane, PaneEmpty } from './pane.tsx';
 import { StageRow } from './stage-row.tsx';
@@ -52,8 +52,9 @@ export function Build({ build, shows }: { build: Row[]; shows: Shows }) {
   const building = useBoardStore((state) => buildsAtWork(state.data, activityUnavailable(state.data, state.now, state.clientError)).length);
   const buildLimit = useBoardStore((state) => state.data.buildLimit);
   const rows = build.filter(shows);
+  const running = useStatusActivity();
   return (
-    <Pane id="build" title="Build" status="In progress" count={rows.length} right={<BuildLimit building={building} limit={buildLimit && limitNumber(buildLimit)} />}>
+    <Pane id="build" title="Build" status="In progress" running={rows.some(row => running(row.item))} count={rows.length} right={<BuildLimit building={building} limit={buildLimit && limitNumber(buildLimit)} />}>
       {rows.length ? <Rows rows={rows} /> : <PaneEmpty filtered={build.length > 0} none="Nothing in build.">Nothing in build matches.</PaneEmpty>}
     </Pane>
   );

@@ -9,13 +9,13 @@ import { useScopeStore } from '../board/scope-store.ts';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { Loader } from '../loading/loader.tsx';
 
-export function Pane({ id, title, status, count, right, className = '', children }: {
-  id: string; title: string; status?: Status; count: number; right?: ReactNode; className?: string; children: ReactNode;
+export function Pane({ id, title, status, running, count, right, className = '', children }: {
+  id: string; title: string; status?: Status; running?: boolean; count: number; right?: ReactNode; className?: string; children: ReactNode;
 }) {
   return (
     <section data-stage={id} aria-labelledby={`${id}-h`} className={`min-w-0 overflow-hidden rounded-xl border border-(--border) bg-(--card) shadow-xs ${className}`}>
       <header className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-(--border) px-3 py-1">
-        {status && <StatusGlyph status={status} />}
+        {status && <StatusGlyph status={status} running={running} />}
         <h3 id={`${id}-h`} className="m-0 whitespace-nowrap text-[13px] font-medium">{title} <span className="font-normal tabular-nums text-(--muted-foreground)">{count}</span></h3>
         {right && <span className="row-action ml-auto flex min-w-0 max-w-full items-center">{right}</span>}
       </header>

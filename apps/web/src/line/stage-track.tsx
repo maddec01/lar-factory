@@ -52,7 +52,7 @@ export function OnYourDesk() {
 export const statsOf = (item: Item): ItemStats | null => (item.stats && item.stats !== 'unavailable' ? item.stats : null);
 
 /** Active stages only; completed parts keep a check instead of a further workflow step. */
-export function Track({ status, label = status, waiting }: { status: Status; label?: string; waiting?: boolean }) {
+export function Track({ status, label = status, waiting, running = false }: { status: Status; label?: string; waiting?: boolean; running?: boolean }) {
   const at = stageOf(status);
   if (status === 'Done') return <span className="flex h-5 items-center" title="Complete"><StatusGlyph status="Done" /></span>;
   if (at < 0) return null;
@@ -65,7 +65,7 @@ export function Track({ status, label = status, waiting }: { status: Status; lab
           {n === at && (
             <>
               <span className={`absolute left-0 right-1/2 h-1.5 ${n === 0 ? 'rounded-l-full' : ''}`} style={{ background: STATUS_COLOR[status], opacity: waiting ? 0.35 : 1 }} />
-              <span className={`relative grid size-5 place-items-center rounded-full bg-(--card) ${waiting ? 'border border-dashed border-(--muted-foreground)' : ''}`}><StatusGlyph status={status} /></span>
+              <span className={`relative grid size-5 place-items-center rounded-full bg-(--card) ${waiting ? 'border border-dashed border-(--muted-foreground)' : ''}`}><StatusGlyph status={status} running={running} /></span>
             </>
           )}
         </li>

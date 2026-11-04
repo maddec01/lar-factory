@@ -230,3 +230,14 @@ test.each([['prototype', 'Prototype'], [null, 'No method']] as const)('a decisio
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample12' ? { ...i, kind: 'decision' as const, decisionMethod } : i)) });
   expect(text($('[data-item="I_sample12"] .desk-meta'))).toContain(name);
 });
+
+test('desk status icons stay still and Needs you keeps its amber colour even with running threads', async () => {
+  const data = { ...sample, error: null, fetchedAt: '2026-10-21T10:00:00Z', items: sample.items.map(item => ({ ...item, paused: 'Settings changed',
+    threads: [{ id: 'b', title: 'Build', purpose: 'build', state: 'running' as const, currentRunning: true as const, updated: item.updatedAt }],
+  })) };
+  await mountPage(data);
+  expect(cards()).toHaveLength(7);
+  expect($('.desk-card svg.status-pulse, .desk-card svg.status-spin')).toBeNull();
+  const needsYou = data.items.find(item => item.status === 'Needs you')!;
+  expect(card(needsYou.id).querySelector<SVGElement>('svg.lucide-circle-dot')!.style.color).toBe('var(--st-amber)');
+});

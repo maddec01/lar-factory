@@ -590,7 +590,7 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
   expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Pick a model to start it once #201, #140 complete']);
   await pressMenu(after);
   await press(entries()[0]!);
-  expect(posted(), 'T3 default arms it with no model').toEqual([['/api/arm', { session: 's1', itemId: 'I_d204' }]]);
+  expect(posted(), 'T3 Project default arms it with no model').toEqual([['/api/arm', { session: 's1', itemId: 'I_d204' }]]);
   await answer({ error: null, board: { ...data, armed: { I_d204: {} } } });
   expect(text(step('I_d204').querySelector('[data-start-after]'))).toBe('Starts after #140 ✓');
 });

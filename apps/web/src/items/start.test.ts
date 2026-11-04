@@ -54,7 +54,7 @@ beforeEach(() => {
   holdPosts(withChoices);
 });
 
-test("Shape issue opens a menu: 'T3 default' first, then each provider instance with its models", async () => {
+test("Shape issue opens a menu: 'T3 Project default' first, then each provider instance with its models", async () => {
   await mountItem(withChoices);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-expanded'), start().getAttribute('aria-label')])
     .toEqual(['Shape issue ▾', 'menu', 'false', `Shape issue #129 ${sample.items.find((i) => i.id === 'I_sample05')!.title}`]);
@@ -63,7 +63,7 @@ test("Shape issue opens a menu: 'T3 default' first, then each provider instance 
   expect(start().getAttribute('aria-expanded')).toBe('true');
   expect(menu()!.getAttribute('aria-label')).toBe('Start #129 with');
   expect(entries().map((e) => [text(e), e.getAttribute('aria-checked'), e.dataset.startPick, e.dataset.instanceId, e.dataset.model])).toEqual([
-    ['T3 default', 'true', 'I_sample05', undefined, undefined],
+    ['T3 Project default', 'true', 'I_sample05', undefined, undefined],
     ['GPT-5.5', 'false', 'I_sample05', 'codex', 'gpt-5.5'],
     ['Opus 5.5', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5'],
     ['claude-opus-5-5[1m]', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5[1m]'],
@@ -75,7 +75,7 @@ test("Shape issue opens a menu: 'T3 default' first, then each provider instance 
   expect(document.activeElement, 'focus is on the highlighted entry').toBe(entries()[0]);
 });
 
-test('the menu highlights the remembered model choice while it is offered, else "T3 default"', async () => {
+test('the menu highlights the remembered model choice while it is offered, else "T3 Project default"', async () => {
   localStorage.setItem(CHOICE_KEY, JSON.stringify({ instanceId: 'claudeAgent', model: 'claude-opus-5-5[1m]' }));
   await mountItem(withChoices);
   await open();
@@ -83,17 +83,17 @@ test('the menu highlights the remembered model choice while it is offered, else 
   expect(document.activeElement).toBe(entries()[3]);
 });
 
-test('a remembered choice no longer offered highlights "T3 default"', async () => {
+test('a remembered choice no longer offered highlights "T3 Project default"', async () => {
   localStorage.setItem(CHOICE_KEY, JSON.stringify({ instanceId: 'claudeAgent', model: 'gpt-5.5' }));
   await mountItem(withChoices);
   await open();
-  expect(checked()).toEqual(['T3 default']);
+  expect(checked()).toEqual(['T3 Project default']);
 });
 
-test('without model choices, the menu offers only "T3 default"', async () => {
+test('without model choices, the menu offers only "T3 Project default"', async () => {
   await mountItem();
   await open();
-  expect(entries().map(text)).toEqual(['T3 default']);
+  expect(entries().map(text)).toEqual(['T3 Project default']);
   expect($$('[role="menu"] [role="group"] [role="group"][aria-labelledby]')).toEqual([]);
 });
 
@@ -169,7 +169,7 @@ test('a renamed thread still gets a short outcome in the toast', async () => {
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05' }]]);
   await answer({ thread: { threadId: 'thread-1', title: 'Renamed' }, error: null });
   expect(text(toast())).toBe('Refining started for #129. Open thread');
-  expect(localStorage.getItem(CHOICE_KEY), '"T3 default" stores as null').toBe('null');
+  expect(localStorage.getItem(CHOICE_KEY), '"T3 Project default" stores as null').toBe('null');
 });
 
 test('a failed Start shows in the dialog, keeps Move to List and the last choice, and offers Retry start', async () => {

@@ -21,7 +21,7 @@ function setUp(dir = mkdtempSync(join(tmpdir(), 'auto-build-setting-'))) {
   return { dir, setting, changes: () => changes };
 }
 
-test('Auto-build starts off on T3 default, and a saved switch and model reach the board and outlast a restart', () => {
+test('Auto-build starts off on T3 Project default, and a saved switch and model reach the board and outlast a restart', () => {
   const { dir, setting, changes } = setUp();
   assert.deepEqual(setting.state(), { on: false });
   assert.deepEqual(setting.save({ on: true }), { status: 200, body: { error: null } });
@@ -31,7 +31,7 @@ test('Auto-build starts off on T3 default, and a saved switch and model reach th
   assert.deepEqual(setting.save({ on: false }), { status: 200, body: { error: null } });
   assert.deepEqual(setting.state(), { on: false, model: OPUS }, 'the switch keeps the model');
   assert.deepEqual(setting.save({ model: null }), { status: 200, body: { error: null } });
-  assert.deepEqual(setting.state(), { on: false }, 'null is T3 default');
+  assert.deepEqual(setting.state(), { on: false }, 'null is T3 Project default');
   assert.equal(changes(), 4);
 });
 

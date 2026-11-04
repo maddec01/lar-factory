@@ -1,4 +1,4 @@
-// Settings › General: the model Auto-build starts builds on, T3 default or one of the model choices Start offers, which
+// Settings › General: the model Auto-build starts builds on, T3 Project default or one of the model choices Start offers, which
 // posts to the board server and shows the board it answers with.
 
 import { expect, test, vi } from 'vite-plus/test';
@@ -28,12 +28,12 @@ async function openGeneral(data: BoardData): Promise<void> {
   await settle(() => vi.advanceTimersByTime(50));
 }
 
-test('General offers T3 default and each model choice, with T3 default picked until another is saved', async () => {
+test('General offers T3 Project default and each model choice, with T3 Project default picked until another is saved', async () => {
   await openGeneral(withAutoBuild({ on: false }));
   expect(text(row().querySelector('.settings-row-title'))).toBe('Auto-build model');
-  expect(text(trigger())).toBe('T3 default ▾');
+  expect(text(trigger())).toBe('T3 Project default ▾');
   await pressMenu(trigger());
-  expect(entries().map(text)).toEqual(['T3 default', 'Opus 5.5', 'GPT-5.5']);
+  expect(entries().map(text)).toEqual(['T3 Project default', 'Opus 5.5', 'GPT-5.5']);
   const groups = $$('[role="menu"] [role="group"] [role="group"][aria-labelledby]');
   expect(groups.map((group) => text(document.getElementById(group.getAttribute('aria-labelledby')!)))).toEqual(['Claude', 'Codex']);
   expect(document.activeElement).toBe(entries()[0]);
@@ -47,26 +47,23 @@ test('a saved model shows as picked', async () => {
   expect(text(document.activeElement)).toBe('Opus 5.5');
 });
 
-test('the T3 default entry shows what T3 will use on its own line when every repository shares it', async () => {
+test('the T3 Project default entry names no model, even when every repository shares it', async () => {
   const repos = [{ repo: 'o/a' }, { repo: 'o/b' }] as BoardData['repos'];
-  const opus = { ...OPUS, options: [{ id: 'effort', value: 'medium' }] };
-  await openGeneral({ ...withAutoBuild({ on: false }), repos, t3Defaults: { 'o/a': opus, 'o/b': opus } });
+  await openGeneral({ ...withAutoBuild({ on: false }), repos, t3Defaults: { 'o/a': OPUS, 'o/b': OPUS } });
   await pressMenu(trigger());
-  const entry = entries()[0]!;
-  expect(entry.querySelector('.text-xs')?.textContent).toBe('Claude Opus 5.5, medium');
-  expect(text(entry)).toContain('T3 default');
-  expect(entry.title).toBe('Claude Opus 5.5, medium');
+  expect(text(entries()[0])).toBe('T3 Project default');
+  expect(entries()[0]!.title).toBe('');
 });
 
-test('picking a model saves it, and picking T3 default saves none', async () => {
+test('picking a model saves it, and picking T3 Project default saves none', async () => {
   await openGeneral(withAutoBuild({ on: false }));
   fetchMock.mockImplementation((async () => new Response(JSON.stringify({ error: null, board: withAutoBuild({ on: false, model: OPUS }) }))) as never);
   await chooseModel('Opus 5.5');
   expect(text(trigger())).toBe('Claude Opus 5.5 ▾');
   fetchMock.mockImplementation((async () => new Response(JSON.stringify({ error: null, board: withAutoBuild({ on: false }) }))) as never);
-  await chooseModel('T3 default');
+  await chooseModel('T3 Project default');
   expect(posted()).toEqual([{ model: OPUS }, { model: null }]);
-  expect(text(trigger())).toBe('T3 default ▾');
+  expect(text(trigger())).toBe('T3 Project default ▾');
 });
 
 test('a saved model the choices no longer offer still shows, and says so', async () => {
@@ -85,10 +82,48 @@ test('a refused save shows why', async () => {
   fetchMock.mockImplementation((async () => new Response(JSON.stringify({ error: "That model choice isn't offered. Pick another one.", board: withAutoBuild({ on: false }) }), { status: 422 })) as never);
   await chooseModel('GPT-5.5');
   expect(text(row().querySelector('[role="alert"]'))).toBe("That model choice isn't offered. Pick another one.");
-  expect(text(trigger())).toBe('T3 default ▾');
+  expect(text(trigger())).toBe('T3 Project default ▾');
 });
 
 test('the choice is disabled in sample mode, which has no Auto-build', async () => {
   await openGeneral(withAutoBuild());
-  expect([text(trigger()), trigger().disabled]).toEqual(['T3 default ▾', true]);
+  expect([text(trigger()), trigger().disabled]).toEqual(['T3 Project default ▾', true]);
+});
+
+const REPOS = [{ repo: 'o/a' }, { repo: 'o/b' }, { repo: 'o/c' }] as BoardData['repos'];
+const listed = () => $$('[data-auto-build-model] [aria-label="Default model by repository"] li').map(text);
+
+test('T3 Project default lists each repository with its default model, its effort when T3 stores one, or that it is unknown', async () => {
+  await openGeneral({ ...withAutoBuild({ on: false }), repos: REPOS, t3Defaults: { 'o/a': { ...OPUS, options: [{ id: 'effort', value: 'medium' }] }, 'o/b': { instanceId: 'codex', model: 'gpt-5.5' } } });
+  expect(listed()).toEqual(['o/a Claude Opus 5.5, medium', 'o/b Codex GPT-5.5', 'o/c Default model unknown']);
+});
+
+test('the list shows repositories that share a default, too', async () => {
+  await openGeneral({ ...withAutoBuild({ on: false }), repos: REPOS.slice(0, 2), t3Defaults: { 'o/a': OPUS, 'o/b': OPUS } });
+  expect(listed()).toEqual(['o/a Claude Opus 5.5', 'o/b Claude Opus 5.5']);
+});
+
+test('a fixed model hides the list', async () => {
+  await openGeneral({ ...withAutoBuild({ on: false, model: OPUS }), repos: REPOS, t3Defaults: { 'o/a': OPUS } });
+  expect(listed()).toEqual([]);
+});
+
+test("the list stays hidden until the board has read T3's defaults", async () => {
+  await openGeneral({ ...withAutoBuild({ on: false }), repos: REPOS });
+  expect(listed()).toEqual([]);
+});
+
+test('the list stays hidden in sample mode', async () => {
+  await openGeneral({ ...withAutoBuild(), repos: REPOS });
+  expect(listed()).toEqual([]);
+});
+
+test("the description says each build uses the default model of its repository's T3 project", async () => {
+  await openGeneral(withAutoBuild({ on: false }));
+  expect(text(row())).toContain("the default model of its repository's T3 project");
+});
+
+test('a board with no repositories has no list', async () => {
+  await openGeneral({ ...withAutoBuild({ on: false }), repos: [], t3Defaults: {} });
+  expect($('[data-auto-build-model] [aria-label="Default model by repository"]')).toBeNull();
 });

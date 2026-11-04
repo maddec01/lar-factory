@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, dependencyNotice, buildBranch, buildMessage, canAbandon, canResumeShaping, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, providerTool, repositoryProjectHint, sameRepo, startHold, sharedT3Default, sliceProgress, statusLabel, t3DefaultDetail, threadLink, usesGh, workMessage, earlierWorkMessage, earlierBuildMessage, usageFailed, usageIncomplete } from './model.ts';
+import { inRepo, itemRepoNames, onAzure, repoTag, shownRepo, blockedText, blockerRef, dependencyNotice, buildBranch, buildMessage, canAbandon, canResumeShaping, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, providerTool, repositoryProjectHint, sameRepo, startHold, sliceProgress, statusLabel, t3DefaultDetail, threadLink, usesGh, workMessage, earlierWorkMessage, earlierBuildMessage, usageFailed, usageIncomplete } from './model.ts';
 import type { BoardData, Blocker, Checks, DependencyHold, DependencyObservationKind, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -526,22 +526,14 @@ test('ticket capture rejects malformed optional fields and multiline titles befo
 
 const MODEL_GROUPS = [{ instanceId: 'claudeAgent_personal', name: 'Personal', models: [{ slug: 'claude-opus-5-5', label: 'Claude Opus 5.5' }] }];
 
-test('the T3 default entry names the model and effort T3 will use', () => {
+test('the T3 Project default entry names the model and effort T3 will use', () => {
   const opus = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
   assert.equal(t3DefaultDetail(MODEL_GROUPS, undefined), undefined);
   assert.equal(t3DefaultDetail(MODEL_GROUPS, { ...opus, options: [{ id: 'effort', value: 'medium' }] }), 'Personal Claude Opus 5.5, medium');
   assert.equal(t3DefaultDetail([], { instanceId: 'codex', model: 'gpt', options: [{ id: 'serviceTier', value: 'default' }, { id: 'reasoningEffort', value: 'high' }] }), 'codex gpt, high');
 });
 
-test('a T3 default stored with no options, as T3 stores a model default such as medium, names the model and no effort', () => {
+test('a T3 Project default stored with no options, as T3 stores a model default such as medium, names the model and no effort', () => {
   assert.equal(t3DefaultDetail(MODEL_GROUPS, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' }), 'Personal Claude Opus 5.5');
 });
 
-test('a menu across repositories names the T3 default only when they share it', () => {
-  const a = { instanceId: 'codex', model: 'gpt' };
-  const repos = [{ repo: 'o/a' }, { repo: 'o/b' }] as BoardData['repos'];
-  assert.deepEqual(sharedT3Default({ repos, t3Defaults: { 'O/A': a, 'o/b': a } }), a);
-  assert.equal(sharedT3Default({ repos, t3Defaults: { 'o/a': a, 'o/b': { ...a, model: 'other' } } }), undefined);
-  assert.equal(sharedT3Default({ repos, t3Defaults: { 'o/a': a } }), undefined);
-  assert.equal(sharedT3Default({ repos: [] }), undefined);
-});

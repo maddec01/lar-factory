@@ -98,7 +98,7 @@ test('Start finds the checkout of a GitHub or an Azure DevOps repository', async
   });
 });
 
-test('each repository gets its project\'s T3 default; one without a project or a readable default gets none', async (t) => {
+test('each repository gets its project\'s T3 Project default; one without a project or a readable default gets none', async (t) => {
   const env = t3Home(t, { 'lar-factory': GITHUB[0]! });
   env.T3_SETTINGS = join(env.HOME!, 't3-settings.json');
   const repo = (name: string) => ({ repo: name, role: 'server', labels: [] });

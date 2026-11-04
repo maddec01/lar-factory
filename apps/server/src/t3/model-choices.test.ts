@@ -79,13 +79,13 @@ for (const [name, settingsValue, manifestValue] of [
   ['an unreadable manifest', { providerInstances: {} }, '{ broken'],
   ['a manifest with no current models', { providerInstances: {} }, { manifest: {} }],
 ] as const) {
-  test(`${name} offer only T3 default`, (t) => {
+  test(`${name} offer only T3 Project default`, (t) => {
     const { settings, manifest } = files(t, settingsValue, manifestValue);
     assert.deepEqual(loadModelChoices(settings, manifest), []);
   });
 }
 
-test('missing files offer only T3 default', (t) => {
+test('missing files offer only T3 Project default', (t) => {
   const dir = tempDir(t, 'lar-model-choices-');
   assert.deepEqual(loadModelChoices(join(dir, 'none.json'), join(dir, 'none.json')), []);
 });
@@ -118,7 +118,7 @@ const OVERRIDE = { instanceId: 'claudeAgent', model: 'claude-opus', options: [{ 
 const LEGACY = { instanceId: 'codex', model: 'gpt-b' };
 const noLegacy = () => { throw Error('folded settings never read the database'); };
 
-test('the T3 default follows the project override when settings are folded, ignoring the project row', () => {
+test('the T3 Project default follows the project override when settings are folded, ignoring the project row', () => {
   const settings = { projectSettingsFolded: true, defaultModelSelection: GLOBAL, projectSettingsOverrides: { p: { defaultModelSelection: OVERRIDE } } };
   assert.deepEqual(effectiveDefaults(settings, 'p', noLegacy).selection, OVERRIDE);
   assert.deepEqual(effectiveDefaults(settings, 'other', noLegacy).selection, GLOBAL);
@@ -131,7 +131,7 @@ test('before folding, the project row applies under its stored override', () => 
   assert.deepEqual(effectiveDefaults({ ...base, projectSettingsOverrides: { p: { defaultModelSelection: OVERRIDE } } }, 'p', () => LEGACY).selection, OVERRIDE);
 });
 
-test('an unread project row leaves the T3 default unknown, so no options are copied', () => {
+test('an unread project row leaves the T3 Project default unknown, so no options are copied', () => {
   const answer = effectiveDefaults({ defaultModelSelection: GLOBAL }, 'p', () => { throw Error('no database'); });
   assert.equal(answer.selection, null);
 });

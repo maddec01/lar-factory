@@ -152,7 +152,7 @@ test('the build limit reads Automatic at the heavy command limit, follows it, sa
   assert.deepEqual((await saved.json() as { board: BoardData }).board.buildLimit, { limit: 1, automatic: 5 });
 });
 
-test('Auto-build reads off on T3 default on a fresh machine, saves its switch and an offered model, and refuses anything else', { timeout: 30_000 }, async (t) => {
+test('Auto-build reads off on T3 Project default on a fresh machine, saves its switch and an offered model, and refuses anything else', { timeout: 30_000 }, async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'lar-board-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
   const board = await startBoard(t, { recorded: false }, false, false, { HOME: home, ...SAMPLE_MODELS });

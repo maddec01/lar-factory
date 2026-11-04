@@ -31,7 +31,8 @@ export interface SearchDialogProps {
   trailing?: ReactNode;
   /** The options' values in list order, for the arrow keys and Enter. */
   options: readonly string[];
-  onSelect: (value: string) => void;
+  /** May return the option the highlight moves to, when choosing changes the list. */
+  onSelect: (value: string) => string | void;
   onClose: () => void;
   listLabel: string;
   /** Shown when nothing is listed and nothing is pending. */
@@ -59,6 +60,10 @@ export function SearchDialog({ label, description, placeholder, query, onQueryCh
   const [chosen, setActiveValue] = useState<string>();
   // The highlight follows the list: when the chosen option leaves it, the first option takes over.
   const activeValue = chosen !== undefined && options.includes(chosen) ? chosen : options[0];
+  const select = (value: string) => {
+    const next = onSelect(value);
+    if (next) setActiveValue(next);
+  };
 
   useEffect(() => {
     if (activeValue !== undefined) document.getElementById(optionId(listId, activeValue))?.scrollIntoView({ block: 'nearest' });
@@ -128,7 +133,7 @@ export function SearchDialog({ label, description, placeholder, query, onQueryCh
                   setActiveValue(options[(index + step + options.length) % options.length]);
                 } else if (event.key === 'Enter' && activeValue !== undefined) {
                   event.preventDefault();
-                  onSelect(activeValue);
+                  select(activeValue);
                 }
               }}
             />
@@ -140,7 +145,7 @@ export function SearchDialog({ label, description, placeholder, query, onQueryCh
         </div>
         <div ref={setViewport} className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 ${className}`}>
           <div ref={setContent} className="flow-root">
-            <OptionContext.Provider value={{ listId, activeValue, setActiveValue, onSelect }}>
+            <OptionContext.Provider value={{ listId, activeValue, setActiveValue, onSelect: select }}>
               <div id={listId} role="listbox" aria-label={listLabel} aria-busy={Boolean(busy)} className="flex flex-col gap-1">
                 {children}
               </div>

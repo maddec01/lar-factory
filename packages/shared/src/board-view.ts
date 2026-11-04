@@ -33,7 +33,7 @@ export interface BoardSections {
   queued: Item[];
   list: Item[];
   /** One per configured repository and any other repository a List item has, the most items in List first (ties in
-   *  configured order); each group's items in board order. The List modal and the title bar's Scope menu
+   *  configured order); each group's items in board order. The List modal and the board search
    *  both show them in this order. */
   listGroups: ListGroup[];
   /** Closed in the last 7 days, most recently closed first. */
@@ -129,7 +129,7 @@ const inSection = (items: Item[], data: Pick<BoardData, 'items' | 'startProgress
 /** The items that wait on you, in flow order. The clock moves them only through `unavailable`. */
 export const deskItems = (data: Pick<BoardData, 'items' | 'startProgress'>, unavailable: boolean): Item[] => inSection([...data.items].sort(byFlowOrder), data, unavailable, 'desk');
 
-/** The repositories List groups and the Scope menu offers: the board's, then any other a List item names, in `data`'s order. */
+/** The repositories List groups and the board search offers: the board's, then any other a List item names, in `data`'s order. */
 export function listRepos(data: Pick<BoardData, 'repos' | 'items'>): string[] {
   const repos = data.repos.map((r) => r.repo);
   for (const i of data.items) if (i.status === 'List' && !repos.some((r) => sameRepo(r, repoKey(i)))) repos.push(repoKey(i));

@@ -154,11 +154,11 @@ test('Scope board scopes the board to the chosen repository, and is only there f
   await settle(() => group('lar-apple').click());
   expect(text(scope())).toBe('Scope board');
   await settle(() => scope()!.click());
-  expect(text($('.title-bar button.scope'))).toBe('lar-apple');
+  expect($('[data-search-field]')!.getAttribute('aria-label')).toBe('Search, filtered by lar-apple');
   expect(scope()!.getAttribute('aria-pressed')).toBe('true');
   expect(text(scope())).toBe('Board scoped');
   await settle(() => scope()!.click());
-  expect(text($('.title-bar button.scope'))).toBe('All repositories');
+  expect($('[data-search-field]')!.getAttribute('aria-label')).toBe('Search');
   expect(text(scope())).toBe('Scope board');
 });
 

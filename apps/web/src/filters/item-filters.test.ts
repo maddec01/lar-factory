@@ -16,13 +16,15 @@ const seed = (key: string, kinds: string[], labels: string[] = []) => localStora
 
 const queueRows = () => $$<HTMLLIElement>('.queue ol > li');
 const startNext = () => $<HTMLButtonElement>('.queue header [data-start]')!;
-const bar = (root = '[data-line-filters]') => $(`${root} [data-item-filters]`)!;
-const open = (which: string, root?: string) => settle(() => bar(root).querySelector<HTMLButtonElement>(`[data-filter="${which}"]`)!.click());
+const bar = () => $('[data-list-modal] [data-item-filters]')!;
+const open = (which: string) => settle(() => bar().querySelector<HTMLButtonElement>(`[data-filter="${which}"]`)!.click());
 const choices = () => $$<HTMLLabelElement>('[data-filter-choice], [data-label-choice]').map((c) => text(c));
 const choose = (name: string) => settle(() => $$<HTMLLabelElement>('[data-filter-choice], [data-label-choice]').find((c) => text(c) === name)!.querySelector('input')!.click());
-const chips = (root?: string) => [...bar(root).querySelectorAll('[data-filter-chip]')].map((c) => c.getAttribute('aria-label'));
-const removeChip = (name: string, root?: string) => settle(() => bar(root).querySelector<HTMLButtonElement>(`[aria-label="Remove ${name}"]`)!.click());
-const clear = (root?: string) => settle(() => bar(root).querySelector<HTMLButtonElement>('[data-filter-clear]')!.click());
+const chips = () => [...bar().querySelectorAll('[data-filter-chip]')].map((c) => c.getAttribute('aria-label'));
+const removeChip = (name: string) => settle(() => bar().querySelector<HTMLButtonElement>(`[aria-label="Remove ${name}"]`)!.click());
+const clear = () => settle(() => bar().querySelector<HTMLButtonElement>('[data-filter-clear]')!.click());
+const search = () => settle(() => $<HTMLButtonElement>('[data-search-field]')!.click());
+const removeToken = (name: string) => settle(() => $<HTMLButtonElement>(`[data-search-dialog] button[aria-label="Remove ${name}"]`)!.click());
 const withItems = (items: Item[], rest: Partial<BoardData> = {}): BoardData => ({ ...sample, ...rest, items });
 
 test('choices within a filter match any, and the two filters must both match', () => {
@@ -81,7 +83,8 @@ test('the board keeps Queue numbers, and Start next starts and names the first s
   expect(text($('#queue-h'))).toBe('Queue 2');
   expect(startNext().dataset.start).toBe('Q1');
   expect(text(startNext())).toContain('Start next: #1 First');
-  await removeChip('Bug');
+  await search();
+  await removeToken('Bug');
   expect(queueRows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
   expect(startNext().dataset.start, 'an unfiltered Queue starts the same item').toBe('Q1');
   expect(text(startNext())).toContain('Start next');
@@ -114,13 +117,13 @@ test('a dossier follows its parent, whatever its part matches; a part past shapi
   expect($('[data-stage="build"] li[data-item="C"]')).not.toBeNull();
 });
 
-test("a dossier stays while its parent matches, and the Labels filter offers what the rows show", async () => {
+test('a dossier stays while its parent matches, and the board search offers the labels its rows show', async () => {
   seed(BOARD_KEY, ['bug']);
   await mountPage(withItems([parent, part]));
   expect($('[data-dossiers]'), 'the parent matches, its part does not').not.toBeNull();
   expect($('[data-stage="build"] li[data-item="C"]')).toBeNull();
-  await open('labels');
-  expect(choices()).toEqual(['area: web', 'only-on-part']);
+  await search();
+  expect($$('[data-search-dialog] [role="group"]').at(-1)!.textContent).toBe('Labelsarea: webonly-on-part');
 });
 
 test('the filters apply to every pane, their counts follow, and each says when nothing matches', async () => {
@@ -134,51 +137,22 @@ test('the filters apply to every pane, their counts follow, and each says when n
   expect(text($('[data-stage="shaping"] p'))).toBe('Nothing in shaping matches.');
   expect(text($('[data-stage="ready"]'))).toContain('Nothing ready to build matches.');
   expect(text($('[data-stage="build"] p'))).toBe('Nothing in build matches.');
-  await removeChip('Bug');
+  await search();
+  await removeToken('Bug');
   expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 1', 'Shaping 1', 'Build 1']);
-});
-
-test('the dropdown checklists change the board, add removable chips and save them; Clear removes them all', async () => {
-  await mountPage(withItems([
-    item('Q1', { number: 1, kind: 'feature', labels: ['docs'] }),
-    item('Q2', { number: 2, kind: 'bug', labels: ['area: web'] }),
-  ]));
-  await open('kind');
-  expect(choices()).toEqual(['Bug', 'Feature', 'Improvement', 'Concept', 'No kind']);
-  await choose('Bug');
-  expect(queueRows().map((r) => r.dataset.item)).toEqual(['Q2']);
-  expect(saved(BOARD_KEY)).toEqual({ kinds: ['bug'], labels: [] });
-  await open('labels');
-  expect(choices(), 'it offers what the surface holds, whatever the filter hides').toEqual(['area: web', 'docs']);
-  await choose('docs');
-  expect(queueRows()).toEqual([]);
-  expect(chips()).toEqual(['Remove Bug', 'Remove docs']);
-  await clear();
-  expect(queueRows().map((r) => r.dataset.item)).toEqual(['Q1', 'Q2']);
-  expect(saved(BOARD_KEY)).toEqual({ kinds: [], labels: [] });
-  expect(chips()).toEqual([]);
-  expect(bar().querySelector('[data-filter-clear]')).toBeNull();
 });
 
 test('removing a chip or clearing moves focus to the Kind menu, which always stays', async () => {
   const kindMenu = () => bar().querySelector<HTMLElement>('[data-filter="kind"]');
-  seed(BOARD_KEY, ['bug'], ['gone']);
+  seed(LIST_KEY, ['bug'], ['gone']);
   await mountPage(withItems([]));
+  await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
   await removeChip('gone');
   expect(document.activeElement).toBe(kindMenu());
   (document.activeElement as HTMLElement).blur();
   await clear();
   expect(bar().querySelector('[data-filter-clear]')).toBeNull();
   expect(document.activeElement).toBe(kindMenu());
-});
-
-test('a saved label no item carries still shows as a removable chip', async () => {
-  seed(BOARD_KEY, [], ['gone']);
-  await mountPage(withItems([item('Q1', { number: 1 })]));
-  expect(chips()).toEqual(['Remove gone']);
-  expect(queueRows()).toEqual([]);
-  await removeChip('gone');
-  expect(queueRows().map((r) => r.dataset.item)).toEqual(['Q1']);
 });
 
 test('a broken save reads as no filters', async () => {
@@ -196,8 +170,8 @@ test('List and the board keep separate filters, and filters write nothing to the
   await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
   const rows = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').map((b) => b.dataset.item);
   expect(rows()).toEqual(['L1']);
-  expect(chips('[data-list-modal]')).toEqual(['Remove Feature']);
-  await clear('[data-list-modal]');
+  expect(chips()).toEqual(['Remove Feature']);
+  await clear();
   expect(rows()).toEqual(expect.arrayContaining(['L1', 'L2']));
   expect(saved(LIST_KEY)).toEqual({ kinds: [], labels: [] });
   expect(saved(BOARD_KEY), 'clearing List leaves the board alone').toEqual({ kinds: ['bug'], labels: [] });
@@ -210,14 +184,13 @@ test('the List counts follow the filters, and its Labels filter holds the chosen
     item('L2', { status: 'List', kind: 'feature', repo: other, labels: ['Docs', 'infra'] }),
   ]));
   await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
-  const root = '[data-list-modal]';
-  await open('labels', root);
+  await open('labels');
   expect(choices(), 'All repositories lists the union, without case').toEqual(['docs', 'infra']);
   await choose('docs');
   const rows = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').map((b) => b.dataset.item).sort();
   expect(rows(), 'matched without case across repositories').toEqual(['L1', 'L2']);
-  await removeChip('docs', root);
+  await removeChip('docs');
   await settle(() => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Repositories"] button').find((b) => b.textContent?.includes('lar-apple'))!.click());
-  await open('labels', root);
+  await open('labels');
   expect(choices(), 'a picked repository offers its own').toEqual(['Docs', 'infra']);
 });

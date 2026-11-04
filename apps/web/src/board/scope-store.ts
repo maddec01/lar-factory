@@ -1,4 +1,4 @@
-// The board's Scope, Kind and Labels, saved on this machine. The title bar and the List modal's Scope board set the
+// The board's Scope, Kind and Labels, saved on this machine. The board search and the List modal's Scope board set the
 // saved Scope; the board reads the shown one, as a saved repository can leave the board and come back.
 
 import { create } from 'zustand';
@@ -49,7 +49,7 @@ export const useScopeStore = create<ScopeState>()((set) => ({
   },
 }));
 
-/** The Scope the board shows: the saved repository as the Scope menu names it. Until the first read settles it may yet land; after that, one the menu doesn't offer shows as all repositories. */
+/** The Scope the board shows: the saved repository as the board search names it. Until the first read settles it may yet land; after that, one the search doesn't offer shows as all repositories. */
 const shownScope = (saved: string | null, data: BoardData): string | null =>
   (!saved || !data.firstRead.settled ? saved : listRepos(data).find((repo) => sameRepo(repo, saved)) ?? null);
 

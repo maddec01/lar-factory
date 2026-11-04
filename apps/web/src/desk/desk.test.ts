@@ -192,7 +192,8 @@ describe('narrowed by Scope, Kind and Labels', () => {
   test('clearing the filters brings the cards back', async () => {
     seedFilters([], ['no such label']);
     await mountPage();
-    await settle(() => $<HTMLButtonElement>('[data-line-filters] [data-filter-clear]')!.click());
+    await settle(() => $<HTMLButtonElement>('[data-search-field]')!.click());
+    await settle(() => $<HTMLButtonElement>('[data-search-clear]')!.click());
     expect(cards()).toHaveLength(7);
   });
 

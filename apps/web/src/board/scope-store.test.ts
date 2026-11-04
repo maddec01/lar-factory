@@ -11,7 +11,9 @@ const GONE = 'maddec01/lar-gone';
 const reading = { step: 'items', running: ['lar-gone'], waiting: [GONE], settled: false } as BoardData['firstRead'];
 const reader = { ...sample, firstRead: reading };
 
-const scopeLabel = () => text($('.title-bar .scope'));
+const scopeLabel = () => $('[data-search-field]')!.getAttribute('aria-label');
+const scoped = (name: string) => `Search, filtered by ${name}`;
+const ALL = 'Search';
 const deskCards = () => $$('.desk-card').length;
 const receive = async (data: BoardData) => {
   const { useBoardStore } = await import('./board-store.ts');
@@ -30,9 +32,8 @@ test('Scope, Kind and Labels survive a reload', async () => {
     (await store()).setFilters({ kinds: ['feature'], labels: ['docs'] });
   });
   await reload();
-  expect(scopeLabel()).toBe('lar-apple');
   expect((await store()).filters).toEqual({ kinds: ['feature'], labels: ['docs'] });
-  expect($$('[data-line-filters] [data-filter-chip]').map((chip) => chip.getAttribute('aria-label'))).toEqual(['Remove Feature', 'Remove docs']);
+  expect(scopeLabel()).toBe(scoped('lar-apple, Feature, docs'));
 });
 
 test('filters saved before this store carry over from the same key', async () => {
@@ -47,7 +48,7 @@ test('choosing All repositories removes the saved Scope, so a reload stays on al
   await settle(async () => (await store()).setScope(null));
   expect(localStorage.getItem(SCOPE_KEY)).toBeNull();
   await reload();
-  expect(scopeLabel()).toBe('All repositories');
+  expect(scopeLabel()).toBe(ALL);
 });
 
 test('a board with storage that throws keeps working for this page', async () => {
@@ -60,21 +61,21 @@ test('a board with storage that throws keeps working for this page', async () =>
     });
   }
   await mountPage();
-  expect(scopeLabel()).toBe('All repositories');
+  expect(scopeLabel()).toBe(ALL);
   await settle(async () => {
     (await store()).setScope('maddec01/lar-apple');
     (await store()).setFilters({ kinds: ['bug'], labels: [] });
   });
-  expect(scopeLabel()).toBe('lar-apple');
+  expect(scopeLabel()).toBe(scoped('lar-apple, Bug'));
   expect((await store()).filters.kinds).toEqual(['bug']);
   await settle(async () => (await store()).setScope(null));
-  expect(scopeLabel()).toBe('All repositories');
+  expect(scopeLabel()).toBe(scoped('Bug'));
 });
 
 test('before the first read settles, a saved repository not on the board still shows, with its reading state', async () => {
   localStorage.setItem(SCOPE_KEY, GONE);
   await mountPage(reader);
-  expect(scopeLabel()).toBe('lar-gone');
+  expect(scopeLabel()).toBe(scoped('lar-gone'));
   expect(text($('[data-reading]'))).toBe('Loading projects…');
 });
 
@@ -82,35 +83,35 @@ test('once the first read settles, a saved repository not on the board shows as 
   localStorage.setItem(SCOPE_KEY, GONE);
   await mountPage(reader);
   await receive(sample);
-  expect(scopeLabel()).toBe('All repositories');
+  expect(scopeLabel()).toBe(ALL);
   expect($('[data-reading]')).toBeNull();
   expect(deskCards(), 'the desk is the whole factory\'s').toBe(7);
   expect(localStorage.getItem(SCOPE_KEY)).toBe(GONE);
   await reload();
-  expect(scopeLabel()).toBe('All repositories');
+  expect(scopeLabel()).toBe(ALL);
   expect(localStorage.getItem(SCOPE_KEY)).toBe(GONE);
 });
 
 test('the saved repository shows again when it returns to the board', async () => {
   localStorage.setItem(SCOPE_KEY, GONE);
   await mountPage();
-  expect(scopeLabel()).toBe('All repositories');
+  expect(scopeLabel()).toBe(ALL);
   await receive({ ...sample, repos: [...sample.repos, { ...sample.repos[0]!, repo: GONE }] });
-  expect(scopeLabel()).toBe('lar-gone');
+  expect(scopeLabel()).toBe(scoped('lar-gone'));
   expect(deskCards()).toBe(0);
 });
 
-test('a repository the Scope menu offers only for its List items stays shown', async () => {
+test('a repository the board search offers only for its List items stays shown', async () => {
   localStorage.setItem(SCOPE_KEY, GONE);
   const listed = sample.items.find((item) => item.status === 'List')!;
   await mountPage({ ...sample, items: [...sample.items, { ...listed, id: 'gone-item', repo: GONE }] });
-  expect(scopeLabel()).toBe('lar-gone');
+  expect(scopeLabel()).toBe(scoped('lar-gone'));
 });
 
 test('a saved repository in another case shows as the board names it', async () => {
   localStorage.setItem(SCOPE_KEY, 'MADDEC01/LAR-APPLE');
   await mountPage();
-  expect(scopeLabel()).toBe('lar-apple');
+  expect(scopeLabel()).toBe(scoped('lar-apple'));
   await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
   expect(text($('[data-list-modal] .scope-board'))).toBe('Board scoped');
 });
@@ -125,5 +126,5 @@ test('the List modal starts on the shown Scope, and Scope board writes the saved
   await settle(() => nav().find((b) => b.textContent?.includes('lar-apple'))!.click());
   await settle(() => $<HTMLButtonElement>('[data-list-modal] .scope-board')!.click());
   expect(localStorage.getItem(SCOPE_KEY)).toBe('maddec01/lar-apple');
-  expect(scopeLabel()).toBe('lar-apple');
+  expect(scopeLabel()).toBe(scoped('lar-apple'));
 });

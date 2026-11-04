@@ -112,3 +112,15 @@ _Avoid_: auto-start.
 **Model choice**:
 The provider instance and model the board starts a thread on, or T3 Project default. When it names the project's default model, the thread also gets that default's options, such as reasoning effort.
 _Avoid_: model pick, model setting, T3 default.
+
+**Scope**:
+The one repository the board shows, or all repositories.
+_Avoid_: project filter, project picker.
+
+**Board search**:
+The title bar's field and its dialog, which find tickets, actions and settings and set the board's filters. The List modal and Settings keep their own separate searches.
+_Avoid_: command palette, toolbar filters.
+
+**Filter token**:
+The mark in the board search for one active Scope, Kind or Labels choice.
+_Avoid_: chip.

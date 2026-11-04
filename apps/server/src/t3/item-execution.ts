@@ -6,6 +6,7 @@ import { boardProjects } from './board-projects.ts';
 import { readArchivedShells, readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead, type ThreadFamilyRead } from './execution-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 import { titledFrom } from './t3.ts';
+import type { ActivityFamily } from './thread-activity.ts';
 
 type Lineage = { parentThreadId?: string; rootThreadId?: string } | undefined;
 
@@ -21,6 +22,9 @@ function ancestorsOf(id: string, lineages: Map<unknown, Lineage>): Set<string> {
   if (root && root !== id) above.add(root);
   return above;
 }
+
+const pendingTasks = ({ pendingBackgroundTasks }: Record<string, unknown>): { kind?: unknown }[] =>
+  Array.isArray(pendingBackgroundTasks) ? pendingBackgroundTasks as { kind?: unknown }[] : [];
 
 const isSettled = (shell: Record<string, unknown>): boolean => !!shell.settledAt || shell.settledOverride === 'settled';
 
@@ -95,6 +99,33 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
     ? threadIds.flatMap((id) => threadOf(id) ?? []).sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || orderedBy(shellsById.get(b.id)!).localeCompare(orderedBy(shellsById.get(a.id)!))) : undefined;
 }
 
+/**
+ * What thread activity needs from these shells for a thread: the thread and every thread T3 shows at work below it, with
+ * their parents, whose subagent records name them, even after the parent finished; which of those have background tasks;
+ * and whether one of those tasks is a command rather than an agent.
+ */
+export function activityFamilies(shells: Record<string, unknown>[]) {
+  const live = shells.filter((shell) => typeof shell.id === 'string' && !shell.deletedAt);
+  const lineages = new Map<unknown, Lineage>(live.map((shell) => [shell.id, shell.lineage as Lineage]));
+  const background = new Set(live.filter((shell) => pendingTasks(shell).length).map((shell) => shell.id as string));
+  const families = new Map<string, ActivityFamily>();
+  const familyOf = (id: string) => families.get(id) ?? (families.set(id, { threads: new Set([id]), background, commandRunning: false }).get(id)!);
+  for (const shell of live) {
+    const id = shell.id as string;
+    const tasks = pendingTasks(shell);
+    if (!tasks.length && !RUNNING.has(statusOf(shell))) continue;
+    const commandRunning = tasks.some((task) => task.kind !== 'subagent');
+    for (const above of [id, ...ancestorsOf(id, lineages)]) {
+      const family = familyOf(above);
+      family.threads.add(id);
+      const parent = lineages.get(id)?.parentThreadId;
+      if (parent && above !== id) family.threads.add(parent);
+      family.commandRunning ||= commandRunning;
+    }
+  }
+  return (threadId: string): ActivityFamily => families.get(threadId) ?? { threads: new Set([threadId]), background, commandRunning: false };
+}
+
 /** The last lookup the board read while T3 could be read, kept through an outage, and when it read it. */
 let lastSeen: { lookup: ReturnType<typeof executionItemThreads>; observedAt: string } | undefined;
 
@@ -103,7 +134,7 @@ let lastArchived: Record<string, unknown>[] = [];
 /** How long one read of the archived list answers. Refresh runs about every 2 seconds. Any recorded thread missing from the active shells asks for the list, so with one the board reads it every 30 seconds for the server's life. */
 const ARCHIVED_READ_MS = 30_000;
 
-let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; demandArchived?(): void; archivedCurrent?(): boolean; archivedAnswered?(): boolean; archivedFailed?(): boolean; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; available: boolean; shells?: Record<string, unknown>[]; shownShells?: Record<string, unknown>[]; shownById?: Map<unknown, Record<string, unknown>>; shellIds?: Set<unknown>; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
+let current: { key: string; stop(): void; demand?(shells: Record<string, unknown>[]): void; demandArchived?(): void; archivedCurrent?(): boolean; archivedAnswered?(): boolean; archivedFailed?(): boolean; shell?: ShellRead; lookup?: ReturnType<typeof executionItemThreads>; activityFamilies?: ReturnType<typeof activityFamilies>; available: boolean; shells?: Record<string, unknown>[]; shownShells?: Record<string, unknown>[]; shownById?: Map<unknown, Record<string, unknown>>; shellIds?: Set<unknown>; reads?: Map<string, ExecutionRead>; fingerprints?: Map<string, string>; observedAt?: string } | undefined;
 /** Each shell's JSON. T3's events replace a shell's record rather than change it, so a record's JSON never goes stale. */
 const shellJson = new WeakMap<Record<string, unknown>, string>();
 function fingerprintOf(shell: Record<string, unknown>): string {
@@ -198,6 +229,7 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
         state.shownById = new Map();
         for (const shell of state.shownShells) if (!state.shownById.has(shell.id)) state.shownById.set(shell.id, shell);
         state.lookup = executionItemThreads(state.shownShells);
+        state.activityFamilies = undefined;
         lastSeen = { lookup: state.lookup, observedAt: state.observedAt! };
       };
       state.archivedCurrent = () => archivedFresh && Date.now() - archivedReadAt < ARCHIVED_READ_MS;
@@ -330,6 +362,13 @@ export function threadCleanupState(threadId: string): ThreadCleanupState {
   const shell = current.shownById?.get(threadId);
   if (!shell || shell.deletedAt) return 'absent';
   return { archived: !!shell.archivedAt, settled: isSettled(shell), live: mayBeLive(threadId, current.shownShells!) };
+}
+
+/** The current shells' activity families, worked out once per snapshot when a pass first asks; undefined while T3 can't be read, so no read can pass as current. */
+export function protocolActivityFamilies(): ReturnType<typeof activityFamilies> | undefined {
+  protocolItemThreads([]);
+  if (!current?.available || !current.shownShells) return undefined;
+  return current.activityFamilies ??= activityFamilies(current.shownShells);
 }
 
 /**

@@ -138,6 +138,16 @@ consumer outside the adapter. Legacy SQL helpers remain for parity fixtures.
 Production supplies protocol sessions explicitly. The residual production query
 is `CODEX_TURN_SELECTIONS` described above, not project or thread discovery.
 
+Thread activity is a second production read of SQLite, because the protocol's
+shells don't carry turn items or a subagent's latest action. `withT3Reads` makes one
+`activityReads` per refresh pass: it opens `statev2.sqlite` at most once and reads each
+thread at work at most once, walking indexes on `orchestration_v2_projection_turn_items`
+and `orchestration_v2_projection_subagents`. A subagent record's `run_id` names the run
+that started it, and child tasks outlive that run, so an agent with runs of its own goes
+by them. A native subagent has none and goes by that run or its thread's
+`pendingBackgroundTasks`. While T3 can't be read or the read fails, a thread at work carries
+`activity: { available: false }`.
+
 ## Thread commands
 
 `sendThreadCommand` in `thread-commands.ts` sends `thread.settle`, `thread.archive`

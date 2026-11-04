@@ -5,6 +5,7 @@ import type { KindDisagreement } from './kind-disagreement.ts';
 import type { EffectiveVocabulary, VocabularyMapping, VocabularySources } from './vocabulary.ts';
 
 import type { SkillStatus } from './install-skills.ts';
+import type { ThreadActivity } from './thread-activity.ts';
 
 export const STATUSES = [
   'List',
@@ -441,6 +442,8 @@ export interface ItemThread {
   hasRunningChildren?: true;
   /** Current descendant tasks: at most three titles, with the total count. Absent once they stop. */
   childActivity?: { titles: string[]; count: number };
+  /** What the thread and its agents are doing now, read for a thread at work. */
+  activity?: ThreadActivity;
   /** The work record's thread role, when recorded by the factory. */
   purpose?: string;
 }

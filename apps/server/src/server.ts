@@ -9,7 +9,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, limitNumber, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ItemStats, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress, sampleActivityFrom } from '@lar-factory/shared';
+import { ACTIVITY_STALE_MS, GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, limitNumber, onAzure, providerTool, refKey, sameLabel, sameRepo, usesGh, type BoardData, type FirstRead, type Item, type ItemSource, type ItemStats, type LabelChange, type ModelGroup, type ProviderTool, type Status, type ToolChecks, type ToolProgress, sampleActivityFrom } from '@lar-factory/shared';
 import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
@@ -59,7 +59,7 @@ import { protocolActivityFamilies, protocolAwaitingFirstShell, protocolItemThrea
 import type { T3Reads } from './t3/t3-reads.ts';
 import { createUsageCatchUp } from './t3/usage-catch-up.ts';
 import { openT3Db } from './t3/t3-db.ts';
-import { activityReads } from './t3/thread-activity.ts';
+import { activityReads, holdsActivityRead, withoutReadTimes } from './t3/thread-activity.ts';
 import { lookupThread } from './t3/t3.ts';
 import { sendThreadCommand } from './t3/thread-commands.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
@@ -419,6 +419,9 @@ const TEST_READ_MS = Number(process.env.BOARD_READ_MS) || 0;
 /** How often the board reads T3's database for threads, and for stats, which cost several times more; neither calls gh or az. */
 const LOCAL_REFRESH_MS = 2_000;
 const LOCAL_STATS_MS = 30_000;
+/** How often pages get new activity read times when nothing else changed, well inside ACTIVITY_STALE_MS. */
+const ACTIVITY_PUSH_MS = ACTIVITY_STALE_MS / 3;
+let readTimesPushedAt = -Infinity;
 let statsReadAt = -Infinity;
 /** Moves when a stats read already running can no longer be shown. */
 let statsGeneration = 0;
@@ -552,7 +555,15 @@ function afterLocalRefresh(before: Item[], recordsChanged: boolean): void {
   runLocal(() => loopTrace.span('shaping sweep', () => sweepShapingThreads?.()));
   // Before the return below, so a build that finished, or a hold that passed, starts the next build with nothing else changed.
   runLocal(() => loopTrace.span('auto build', () => autoBuildRun.pass()));
-  if (!recordsChanged && loopTrace.span('local compare', () => JSON.stringify(after) === JSON.stringify(before))) return;
+  if (!recordsChanged && loopTrace.span('local compare', () => JSON.stringify(withoutReadTimes(after)) === JSON.stringify(withoutReadTimes(before)))) {
+    // Only read times moved, so nothing else here has work, and pages get them at their own pace.
+    if (holdsActivityRead(after) && Date.now() - readTimesPushedAt >= ACTIVITY_PUSH_MS) {
+      readTimesPushedAt = Date.now();
+      board.push();
+    }
+    return;
+  }
+  readTimesPushedAt = Date.now();
   board.push();
   void loopTrace.span('pr stats', () => syncPrStats(after));
   // A blocker completes from local facts, as a decision's answer the shaping session records, without any ticket read.

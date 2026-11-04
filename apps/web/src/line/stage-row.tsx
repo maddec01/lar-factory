@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { ACTIVITY_WORD, blockedText, canRetryBuild, currentBuildThread, itemActivityStill, itemName } from '@lar-factory/shared';
+import { ACTIVITY_WORD, blockedText, canRetryBuild, currentBuildThread, itemName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -16,7 +16,7 @@ import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
-import { ActivityLine, useActivityState } from './activity-line.tsx';
+import { ActivityLine, useActivityState, useActivityStill } from './activity-line.tsx';
 import { AutoBuildNote } from './auto-build-note.tsx';
 import { Figures, ROW_ACTION, ROW_RULE, RowSecondLine, figuresOf, opensItem } from './columns.tsx';
 import { threadAtWork, threadsOf } from './dossier-parts.ts';
@@ -73,9 +73,9 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
   const implemented = item.slices.length > 0 && done === item.slices.length;
   const note = sliceNote(item);
   const blocked = blockedText(item);
-  const runKnown = (!unavailable || activity === 'working') && threadsOf(item).some(threadAtWork);
+  const runKnown = (!unavailable || activity === 'working') && activity !== 'unavailable' && threadsOf(item).some(threadAtWork);
   const state = (activity && ACTIVITY_WORD[activity]) ?? (shown.working ? 'Working' : stateText(item, shown.word, feedback, runKnown));
-  const still = itemActivityStill(item, disconnected);
+  const still = useActivityStill(item);
   const working = !still && (feedback.running || state === 'Working');
   const showsActivity = n === undefined && activity;
   const figures = figuresOf(item, data);

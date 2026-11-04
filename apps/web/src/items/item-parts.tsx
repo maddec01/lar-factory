@@ -4,10 +4,11 @@
 
 import type { ReactNode } from 'react';
 import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
-import { UNREADABLE, activityUnavailable, buildActivity, clock, day, decisionMethodName, itemActivityLine, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, itemRepoNames, prLabel, ref, labelsOnRow, repoKey, repoName, shortAgo } from '@lar-factory/shared';
+import { UNREADABLE, activityLost, activityUnavailable, buildActivity, clock, day, decisionMethodName, itemActivityLine, itemActivityThread, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, itemRepoNames, prLabel, ref, labelsOnRow, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { AzureWorkItem, BoardData, Checks, Item, ItemStats, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
+import { useClock } from '../board/second-clock.ts';
 import { isDone } from '../line/dossier-parts.ts';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { PURPOSE, useStart } from './start-store.ts';
@@ -249,16 +250,21 @@ export const Age = ({ at }: { at: string }) => <>{useBoardStore((state) => short
 
 export const useActivityUnavailable = () => useBoardStore(({ data, now, clientError }) => activityUnavailable(data, now, clientError));
 
+/** Whether T3's answer for `item`'s thread is lost, which a read going old changes with no new data. */
+const useActivityLost = (item: Item) => useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
+
 export function useActivityFeedback(item: Item) {
   const data = useBoardStore((state) => state.data);
   // Shaping work has an activity only while a start runs; Start build's holds every other status.
   const kind = item.status === 'Shaping' || item.status === 'Queued' ? 'refine' : 'build';
   const pressed = useStart(item.id, kind)?.phase === 'pending';
   const unavailable = useActivityUnavailable();
-  const lineState = itemActivityLine(item, 0, useBoardStore((state) => !!state.clientError))?.state;
+  const disconnected = useBoardStore((state) => !!state.clientError);
+  const lineState = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
   // An error from another read, such as GitHub's, leaves T3's activity readable, and the row's phase with it.
   const readable = !!lineState && lineState !== 'unavailable';
-  return buildActivity(item, unavailable && !readable, pressed ? { phase: 'starting' } : startProgressOf(data, item.id, PURPOSE[kind]));
+  const lost = useActivityLost(item);
+  return buildActivity(item, (unavailable && !readable) || lost, pressed ? { phase: 'starting' } : startProgressOf(data, item.id, PURPOSE[kind]));
 }
 
 /** How the board names an item now: its recorded Status, or Working while it is at work again. */
@@ -266,7 +272,11 @@ export function shownStatus(item: Item, unavailable: boolean): { working: boolea
   return workingAgain(item, unavailable) ? { working: true, word: 'Working', glyph: 'In progress' } : { working: false, word: item.status, glyph: item.status };
 }
 
-export const useShownStatus = (item: Item) => shownStatus(item, useActivityUnavailable());
+export const useShownStatus = (item: Item) => {
+  const unavailable = useActivityUnavailable();
+  const lost = useActivityLost(item);
+  return shownStatus(item, unavailable || lost);
+};
 
 export function ActivityFeedback({ feedback, labelOnly = false }: { feedback: ReturnType<typeof buildActivity>; labelOnly?: boolean }) {
   if (labelOnly) return <span className="block h-4 whitespace-nowrap text-[11px] leading-4 text-(--muted-foreground)">{feedback.label}</span>;

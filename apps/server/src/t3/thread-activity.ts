@@ -1,7 +1,7 @@
 // Thread activity: what a thread and its agents are doing now, from T3's turn items and subagent records.
 
 import type { DatabaseSync } from 'node:sqlite';
-import { isLiveThread, type ItemThread, type ThreadActivity, type ThreadAgent } from '@lar-factory/shared';
+import { isLiveThread, type Item, type ItemThread, type ThreadActivity, type ThreadAgent } from '@lar-factory/shared';
 import { activityItems, unfinishedAgents, type ActivityAgentRow, type ActivityItemRow } from './t3-db.ts';
 
 /** A thread's place among the shells, as thread activity reads it. */
@@ -105,10 +105,12 @@ export interface ActivityRows {
   runLive: boolean;
   agents: { row: ActivityAgentRow; items: ActivityItemRow[] }[];
   commandRunning: boolean;
+  /** When these rows were read. */
+  readAt: string;
 }
 
 /** The activity these rows say. */
-export function threadActivity({ items, runLive, agents, commandRunning }: ActivityRows): ThreadActivity {
+export function threadActivity({ items, runLive, agents, commandRunning, readAt }: ActivityRows): ThreadActivity {
   const { toolRunning, ...own } = actionFrom(items, runLive);
   let anyTool = toolRunning || commandRunning;
   const working = agents.map(({ row, items: agentItems }): ThreadAgent => {
@@ -116,10 +118,26 @@ export function threadActivity({ items, runLive, agents, commandRunning }: Activ
     anyTool ||= agentTool;
     return { title: agentTitle(row.title), ...(row.model ? { model: row.model } : {}), ...(action ? { action } : {}), ...(actionAt ?? row.startedAt ? { actionAt: (actionAt ?? row.startedAt)! } : {}) };
   });
-  return { available: true, ...own, toolRunning: anyTool, agents: working };
+  return { available: true, readAt, ...own, toolRunning: anyTool, agents: working };
 }
 
 const UNAVAILABLE: ThreadActivity = { available: false };
+
+/** `items` without their activity reads' times, which move on every pass, so comparing them finds what a row would show differently. */
+export function withoutReadTimes(items: Item[]): Item[] {
+  return items.map((item) => (!Array.isArray(item.threads) || !item.threads.some((thread) => thread.activity?.available) ? item : {
+    ...item,
+    threads: item.threads.map((thread) => {
+      if (!thread.activity?.available) return thread;
+      const { readAt: _, ...activity } = thread.activity;
+      return { ...thread, activity };
+    }) as Item['threads'],
+  }));
+}
+
+/** Whether any of `items` holds an activity read, whose time pages need to keep seeing. */
+export const holdsActivityRead = (items: Item[]): boolean =>
+  items.some((item) => Array.isArray(item.threads) && item.threads.some((thread) => thread.activity?.available));
 
 /**
  * One refresh pass's activity reads, sharing one open database, opened once a thread at work needs it, and one read per
@@ -159,6 +177,7 @@ export function activityReads(open: () => DatabaseSync, families: () => ((thread
       runLive: thread.state === 'running' || thread.state === 'needs you',
       agents: [...agents.values()].map((row) => ({ row, items: once(itemsRead, row.child, () => activityItems(database, row.child)) })),
       commandRunning: family.commandRunning,
+      readAt: new Date().toISOString(),
     });
   };
 

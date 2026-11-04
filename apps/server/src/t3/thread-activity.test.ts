@@ -1,16 +1,16 @@
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { expect, test, vi, type TestContext } from 'vite-plus/test';
-import type { ItemThread } from '@lar-factory/shared';
+import type { Item, ItemThread } from '@lar-factory/shared';
 import { activityFamilies } from './item-execution.ts';
-import { activityReads, agentWorking, threadActivity } from './thread-activity.ts';
+import { activityReads, agentWorking, holdsActivityRead, threadActivity, withoutReadTimes } from './thread-activity.ts';
 import type { ActivityAgentRow, ActivityItemRow } from './t3-db.ts';
 import { tempDir } from '../../test/stats-db.ts';
 
 const AT = '2026-11-04T12:00:00.000Z';
 const item = (over: Partial<ActivityItemRow>): ActivityItemRow => ({ type: 'command_execution', status: 'completed', runLive: 1, title: null, input: null, toolName: null, fileName: null, streaming: null, startedAt: AT, completedAt: AT, updatedAt: AT, ...over });
 const agent = (over: Partial<ActivityAgentRow>): ActivityAgentRow => ({ child: 'child', title: 'Review', model: 'gpt-6', startedAt: AT, runLive: 1, childRunLive: null, ...over });
-const own = (...items: ActivityItemRow[]) => threadActivity({ items, runLive: true, agents: [], commandRunning: false });
+const own = (...items: ActivityItemRow[]) => threadActivity({ items, runLive: true, agents: [], commandRunning: false, readAt: AT });
 const action = (over: Partial<ActivityItemRow>) => { const read = own(item(over)); return read.available ? read.action : 'unavailable'; };
 
 test('a command reads without its shell wrapper, exports and environment assignments', () => {
@@ -45,8 +45,8 @@ test('Thinking and Writing are actions only while their text streams, and finish
 
 test('a stale running item does not count once its run ended, and a new run has no action until it takes one', () => {
   const stale = item({ status: 'running', input: 'pnpm test', runLive: 0, completedAt: null });
-  expect(own(stale)).toEqual({ available: true, toolRunning: false, agents: [] });
-  const after = threadActivity({ items: [stale, item({ type: 'reasoning', status: 'running', streaming: 1, runLive: 0, completedAt: null })], runLive: false, agents: [], commandRunning: false });
+  expect(own(stale)).toEqual({ available: true, readAt: AT, toolRunning: false, agents: [] });
+  const after = threadActivity({ items: [stale, item({ type: 'reasoning', status: 'running', streaming: 1, runLive: 0, completedAt: null })], runLive: false, agents: [], commandRunning: false, readAt: AT });
   expect(after, 'a thread whose agents or background work go on shows its last action, as finished').toMatchObject({ action: 'pnpm test', toolRunning: false });
 });
 
@@ -55,12 +55,12 @@ test('a running tool counts for the thread or an agent, however old, but waiting
   expect(own(item({ ...running, input: 'sleep 9' }))).toMatchObject({ toolRunning: true });
   expect(own(item({ ...running, type: 'dynamic_tool', toolName: 'mcp__t3-code__delegate_task' }))).toMatchObject({ toolRunning: false });
   expect(own(item({ ...running, type: 'dynamic_tool', toolName: 't3-code.t3_thread_wait' }))).toMatchObject({ toolRunning: false });
-  expect(threadActivity({ items: [], runLive: false, commandRunning: false, agents: [{ row: agent({}), items: [item({ ...running, runLive: null, input: 'sleep 9' })] }] })).toMatchObject({ toolRunning: true });
-  expect(threadActivity({ items: [], runLive: false, commandRunning: true, agents: [] }), 'a background command').toMatchObject({ toolRunning: true });
+  expect(threadActivity({ items: [], runLive: false, commandRunning: false, readAt: AT, agents: [{ row: agent({}), items: [item({ ...running, runLive: null, input: 'sleep 9' })] }] })).toMatchObject({ toolRunning: true });
+  expect(threadActivity({ items: [], runLive: false, commandRunning: true, readAt: AT, agents: [] }), 'a background command').toMatchObject({ toolRunning: true });
 });
 
 test('an agent shows "Subagent" with no title, the last segment of a path, and no missing model', () => {
-  const agents = (row: Partial<ActivityAgentRow>) => { const read = threadActivity({ items: [], runLive: true, commandRunning: false, agents: [{ row: agent(row), items: [] }] }); return read.available ? read.agents : []; };
+  const agents = (row: Partial<ActivityAgentRow>) => { const read = threadActivity({ items: [], runLive: true, commandRunning: false, readAt: AT, agents: [{ row: agent(row), items: [] }] }); return read.available ? read.agents : []; };
   expect(agents({})).toEqual([{ title: 'Review', model: 'gpt-6', actionAt: AT }]);
   expect(agents({ title: null, model: null })).toEqual([{ title: 'Subagent', actionAt: AT }]);
   expect(agents({ startedAt: null }), 'an agent with no time still counts').toEqual([{ title: 'Review', model: 'gpt-6' }]);
@@ -117,6 +117,7 @@ test('a pass reads the agents under a build, its child tasks and their native su
   t.onTestFinished(() => reads.close());
   expect(reads.read(atWork).activity).toEqual({
     available: true,
+    readAt: expect.any(String),
     action: 'delegate_task',
     actionAt: AT,
     toolRunning: true,
@@ -125,6 +126,36 @@ test('a pass reads the agents under a build, its child tasks and their native su
       { title: 'explorer', action: 'Read b.ts', actionAt: AT },
     ],
   });
+});
+
+test('each pass stamps a read with its own time, and a pass that repeats a thread keeps that stamp', (t) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  t.onTestFinished(() => { vi.useRealTimers(); });
+  const path = activityDb(t);
+  const pass = () => {
+    const reads = activityReads(() => new DatabaseSync(path, { readOnly: true }), () => activityFamilies(shells));
+    t.onTestFinished(() => reads.close());
+    return reads;
+  };
+  const stamp = (read: ItemThread) => (read.activity?.available ? read.activity.readAt : undefined);
+  vi.setSystemTime(AT);
+  const first = pass();
+  expect(stamp(first.read(atWork))).toBe(AT);
+  const later = '2026-11-04T12:00:02.000Z';
+  vi.setSystemTime(later);
+  expect(stamp(first.read(atWork))).toBe(AT);
+  expect(stamp(pass().read(atWork))).toBe(later);
+});
+
+test('comparing items without read times sees a change of action, and no change when only the time moved', () => {
+  const at = (action: string, readAt: string) => [{ id: 'i', threads: [{ ...atWork, activity: { available: true, readAt, action, toolRunning: false, agents: [] } }] }] as unknown as Item[];
+  const compared = (items: Item[]) => JSON.stringify(withoutReadTimes(items));
+  expect(compared(at('Read a.ts', AT))).toBe(compared(at('Read a.ts', '2026-11-04T12:00:02.000Z')));
+  expect(compared(at('Read a.ts', AT))).not.toBe(compared(at('Read b.ts', AT)));
+  const unavailable = [{ id: 'i', threads: [{ ...atWork, activity: { available: false } }] }] as unknown as Item[];
+  expect(withoutReadTimes(unavailable)[0]).toBe(unavailable[0]);
+  expect(holdsActivityRead(at('Read a.ts', AT))).toBe(true);
+  expect(holdsActivityRead(unavailable)).toBe(false);
 });
 
 test('a pass opens the database once, reads each thread at work once, and reads nothing for a thread not at work', (t) => {

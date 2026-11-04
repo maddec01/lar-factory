@@ -45,7 +45,7 @@ const unblocked = (data: BoardData = loose): BoardData => withItem('I_sample13',
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 /** T3's read of a thread at work, with its action `seconds` old at NOW. */
 const acting = (action: string, seconds: number, more: Partial<Extract<ThreadActivity, { available: true }>> = {}): ThreadActivity =>
-  ({ available: true, action, actionAt: new Date(NOW - seconds * 1000).toISOString(), toolRunning: false, agents: [], ...more });
+  ({ available: true, readAt: new Date(NOW).toISOString(), action, actionAt: new Date(NOW - seconds * 1000).toISOString(), toolRunning: false, agents: [], ...more });
 
 beforeEach(() => localStorage.clear());
 
@@ -783,7 +783,6 @@ describe('the activity line', () => {
     expect(line()!.dataset.activity).toBe('working');
     expect(line()!.querySelector('[data-mark]')).not.toBeNull();
     expect(lineText()).toBe('Edit stage-row.tsx· 3s· 2 agents');
-    expect(line()!.title).toBe('Review: pnpm test\nFix');
     expect(line()!.closest('[data-col="next"]'), 'in the second line\'s text slot').not.toBeNull();
     expect(meta('I_sample13').querySelector('[data-activity]'), 'the first line holds none of it').toBeNull();
     expect(text(state('I_sample13'))).toBe('Implementing');
@@ -791,6 +790,26 @@ describe('the activity line', () => {
     expect(col('I_sample13', 'next').querySelector('[data-note]'), 'it replaces the slice note').toBeNull();
     await settle(() => vi.advanceTimersByTime(2_000));
     expect(lineText(), 'the age ticks').toBe('Edit stage-row.tsx· 5s· 2 agents');
+  });
+
+  test('hovering or focusing the line lists the thread\'s own action and each working agent\'s title and action, with no model or age', async () => {
+    await mountPage(at({ activity: acting('Edit stage-row.tsx', 3, { agents: [{ title: 'Review', model: 'Opus 5.5', action: 'pnpm test', actionAt: new Date(NOW - 60_000).toISOString() }, { title: 'Fix' }] }) }, { slices: [] }));
+    expect($('[data-agent-list]')).toBeNull();
+    await settle(() => line()!.focus());
+    const listed = [...$('[data-agent-list]')!.querySelectorAll('li')].map((agent) => text(agent).replace(/\s+/g, ' '));
+    expect(listed).toEqual(['Lead threadEdit stage-row.tsx', 'Reviewpnpm test', 'Fix']);
+    await settle(() => line()!.blur());
+    expect($('[data-agent-list]')).toBeNull();
+    await settle(() => line()!.click());
+    expect(dialog(), 'a click on the line still opens the item').not.toBeNull();
+  });
+
+  test('the line has no list to open when nothing is working or activity is unavailable', async () => {
+    await mountPage(at({ activity: { available: false } }));
+    expect(line()!.tabIndex, 'not a stop on the keyboard').toBe(-1);
+    await settle(() => line()!.focus());
+    expect($('[data-agent-list]')).toBeNull();
+    expect($('[role="tooltip"]')).toBeNull();
   });
 
   test('a shaping row shows the line and says Shaping', async () => {
@@ -861,11 +880,33 @@ describe('the activity line', () => {
     const first = at();
     await settle(async () => (await store()).receive({ ...first, firstRead: { ...first.firstRead, settled: false } }));
     expect(lineText()).toBe('Edit stage-row.tsx· 3s');
-    vi.setSystemTime(NOW + fresh.refreshSeconds * 3_000 + 1_000);
+    const later = NOW + fresh.refreshSeconds * 3_000 + 1_000;
+    vi.setSystemTime(later);
     const { isStale } = await import('@lar-factory/shared');
-    await settle(async () => (await store()).tick());
+    await settle(async () => (await store()).receive(at({ activity: { ...acting('Grep', 1), readAt: new Date(later).toISOString() } as ThreadActivity })));
     expect(isStale((await store()).data, Date.now())).toBe(true);
-    expect(line()!.dataset.activity, 'an old GitHub read says nothing of T3').not.toBe('unavailable');
+    expect(line()!.dataset.activity, 'an old GitHub read, with T3 read just now, says nothing of T3').toBe('working');
+    expect(text(state('I_sample13'))).toBe('Implementing');
+  });
+
+  test('a T3 read that goes old with no error says unavailable on its own: the line, the state column, the motion, then back', async () => {
+    const { ACTIVITY_STALE_MS } = await import('@lar-factory/shared');
+    await mountPage(at());
+    expect(text(state('I_sample13'))).toBe('Implementing');
+    expect(moving()).not.toBeNull();
+    // The system time alone moves, as the page's poll would bring the sample back.
+    vi.setSystemTime(NOW + ACTIVITY_STALE_MS - 1_000);
+    await settle(() => vi.advanceTimersByTime(1_000));
+    expect(line()!.dataset.activity, 'still within the limit').toBe('working');
+    await settle(() => vi.advanceTimersByTime(1_000));
+    expect([line()!.dataset.activity, lineText()]).toEqual(['unavailable', 'Activity unavailable']);
+    expect((await store()).data.error).toBeNull();
+    expect(text(state('I_sample13')), 'no phase reads as current').toBe('In progress');
+    expect(moving()).toBeNull();
+    expect(row('I_sample13').querySelector('.status-spin'), 'its glyph stops too').toBeNull();
+    await settle(async () => (await store()).receive(at({ activity: { ...acting('Grep', 1), readAt: new Date(Date.now()).toISOString() } as ThreadActivity })));
+    expect(line()!.dataset.activity).toBe('working');
+    expect(text(state('I_sample13'))).toBe('Implementing');
   });
 
   test('a paused row shows no line, and one with nothing at work goes back to its slice note', async () => {

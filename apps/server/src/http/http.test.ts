@@ -56,3 +56,98 @@ it('leaves the page\'s security headers as they were', async () => {
   expect(response.headers.get('x-content-type-options')).toBe('nosniff');
   expect(response.headers.get('referrer-policy')).toBe('no-referrer');
 });
+
+/** A board server with open event streams, a guarded write and a count of how many times a push stringifies the board. */
+async function serveStreams() {
+  const board = createBoardState({ repos: [], items: [] } as unknown as BoardData);
+  let stringified = 0;
+  board.update({ count: { toJSON: () => (stringified++, 0) } } as unknown as Partial<BoardData>);
+  const { server, endStreams } = createBoardServer({
+    board,
+    page: { template: '<html></html>', assets: new Map() },
+    ready: () => undefined,
+    retention: { save: () => ({ status: 200, body: { error: null } }) },
+  } as unknown as HttpDeps);
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  close = () => new Promise(resolve => { endStreams(); server.close(resolve); });
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const open = async () => {
+    const reader = (await fetch(`${origin}/api/events`)).body!.pipeThrough(new TextDecoderStream()).getReader();
+    let buffered = '';
+    /** The next event's board. */
+    const next = async (): Promise<BoardData> => {
+      while (!buffered.includes('\n\n')) buffered += (await reader.read()).value ?? '';
+      const end = buffered.indexOf('\n\n');
+      const event = buffered.slice('data: '.length, end);
+      buffered = buffered.slice(end + 2);
+      return JSON.parse(event) as BoardData;
+    };
+    return { next };
+  };
+  const write = () => fetch(`${origin}/api/retention`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: '{}' });
+  return { board, open, write, stringified: () => stringified };
+}
+
+const fetchedAt = (at: string) => ({ fetchedAt: at });
+
+it('stringifies the board once per push, however many pages listen', async () => {
+  const { board, open, stringified } = await serveStreams();
+  const [first, second] = [await open(), await open()];
+  await first.next();
+  await second.next();
+  const before = stringified();
+  board.update(fetchedAt('a'));
+  board.push();
+  expect((await first.next()).fetchedAt).toBe('a');
+  expect((await second.next()).fetchedAt).toBe('a');
+  expect(stringified() - before).toBe(1);
+});
+
+it('writes no identical board to a stream, and sends the next one that differs', async () => {
+  const { board, open } = await serveStreams();
+  const stream = await open();
+  await stream.next();
+  board.push();
+  board.push();
+  board.update(fetchedAt('a'));
+  board.push();
+  // The event right after the first is the changed board: the identical pushes wrote nothing.
+  expect((await stream.next()).fetchedAt).toBe('a');
+});
+
+it('sends a new stream the board at once, though the open ones already have it', async () => {
+  const { board, open } = await serveStreams();
+  board.update(fetchedAt('a'));
+  const reconnected = await open();
+  expect((await reconnected.next()).fetchedAt).toBe('a');
+  const another = await open();
+  expect((await another.next()).fetchedAt).toBe('a');
+});
+
+it('calls every subscriber on each push, also when no stream gets the board', async () => {
+  const { board, open } = await serveStreams();
+  const subscriber = vi.fn();
+  board.subscribe(subscriber);
+  await (await open()).next();
+  board.push();
+  board.push();
+  expect(subscriber).toHaveBeenCalledTimes(2);
+});
+
+it('sends the board again after a write, as the write\'s answer may have shown the page something no push did', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    const { board, open, write } = await serveStreams();
+    const stream = await open();
+    await stream.next();
+    // The answer carries the changed board with no push, then the board goes back to what the stream last received.
+    board.update(fetchedAt('answered'));
+    expect((await write()).status).toBe(200);
+    board.update({ fetchedAt: null });
+    board.push();
+    vi.advanceTimersByTime(2_000);
+    expect((await stream.next()).fetchedAt).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});

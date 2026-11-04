@@ -157,10 +157,13 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
+const RESEND_AFTER_WRITE_MS = 2_000;
+
 export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectIcon, projectChoices, keepOnboarding, createProject,
   detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
-  /** Open /api/events responses, one per page. */
-  const streams = new Set<ServerResponse>();
+  /** Open /api/events responses, one per page, with the event each last received. */
+  const streams = new Map<ServerResponse, string>();
+  let resend: NodeJS.Timeout | undefined;
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
   let draining = false;
   /** Guarded writes being answered, and the drain calls waiting for them to finish. */
@@ -168,6 +171,31 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
   const drained: Array<() => void> = [];
 
   const withBoard = (body: object) => ({ ...body, board: board.snapshot() });
+
+  const boardEvent = (data: object) => `data: ${loopTrace.span('board stream', () => JSON.stringify(data))}\n\n`;
+  const sendEvent = (res: ServerResponse, event: string) => {
+    streams.set(res, event);
+    loopTrace.span('board stream write', () => res.write(event));
+  };
+  // A page already showing this board gets nothing. Its clock moves on by itself, and a new stream always gets the board.
+  board.subscribe((data) => {
+    if (!streams.size) return;
+    const event = boardEvent(data);
+    for (const [res, last] of streams) if (last !== event) sendEvent(res, event);
+  });
+
+  /**
+   * A write's answer can show a page a board no push sent, or reach it after a newer push, so what a stream last
+   * received may not be what its page shows. Each page gets the board again once the answer has arrived.
+   */
+  function resendAfterWrite(): void {
+    clearTimeout(resend);
+    resend = setTimeout(() => {
+      for (const res of streams.keys()) streams.set(res, '');
+      board.push();
+    }, RESEND_AFTER_WRITE_MS);
+    resend.unref();
+  }
 
   /** Changes the repository's row on the board at once, before the next read sees it. */
   function changeRow(repo: string, change: (row: RepoConfig) => RepoConfig): void {
@@ -505,6 +533,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       const { status, body } = await write.run(input);
       json(res, status, body);
     } finally {
+      resendAfterWrite();
       if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
     }
   }
@@ -589,17 +618,8 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
   function openStream(req: IncomingMessage, res: ServerResponse): void {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
     if (req.method === 'HEAD') return void res.end();
-    const sendBoard = (data: object) => {
-      const body = `data: ${loopTrace.span('board stream', () => JSON.stringify(data))}\n\n`;
-      loopTrace.span('board stream write', () => res.write(body));
-    };
-    streams.add(res);
-    const unsubscribe = board.subscribe(sendBoard);
-    res.on('close', () => {
-      streams.delete(res);
-      unsubscribe();
-    });
-    sendBoard(board.snapshot());
+    res.on('close', () => streams.delete(res));
+    sendEvent(res, boardEvent(board.snapshot()));
   }
 
   /** The page's image of a project's favicon. Its URL carries the content's revision, so it can stay cached. */
@@ -688,7 +708,8 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
   return {
     server,
     endStreams() {
-      for (const res of streams) res.end();
+      clearTimeout(resend);
+      for (const res of streams.keys()) res.end();
     },
   };
 }

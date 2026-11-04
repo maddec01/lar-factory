@@ -41,8 +41,16 @@ interface Row {
 export interface Group { title: string; description?: string; rows: Row[]; footer?: ReactNode; note?: ReactNode }
 export interface Page { id: string; label: string; icon: ReactNode; description: string; groups: Group[] }
 
+/** The board data Settings shows. Diagnostics says only whether a read has landed, so a new read's time changes nothing here. */
+export type SettingsData = Pick<BoardData, 'repos' | 'onboarding' | 'tools' | 'toolProgress' | 'bundledSkills' | 'retention' | 'refreshSeconds'
+  | 'shapingThreadCleanup' | 'heavyCommandLimit' | 'buildLimit' | 'autoBuild' | 'modelChoices' | 't3Defaults'> & { everRead: boolean };
+
+export function settingsData({ repos, onboarding, tools, toolProgress, bundledSkills, retention, refreshSeconds, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, modelChoices, t3Defaults, fetchedAt }: BoardData): SettingsData {
+  return { repos, onboarding, tools, toolProgress, bundledSkills, retention, refreshSeconds, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, modelChoices, t3Defaults, everRead: !!fetchedAt };
+}
+
 export interface PagesInput {
-  data: BoardData;
+  data: SettingsData;
   /** Whether the board app's bridge is there. */
   app: boolean;
   /** The bridge's Skill folders, null while they load. */
@@ -86,15 +94,15 @@ const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
 
 /** Whether the check leaves gh out, as no listed repository is on GitHub; Diagnostics then leaves gh out. */
-const ghSkipped = (data: BoardData): boolean => !!data.toolProgress?.skipped.includes('gh');
+const ghSkipped = (data: SettingsData): boolean => !!data.toolProgress?.skipped.includes('gh');
 
 /** Why az isn't checked, once the check leaves it out; else nothing. */
-function azSkipped(data: BoardData): string {
+function azSkipped(data: SettingsData): string {
   return data.toolProgress?.skipped.includes('az') ? ' Not checked: no listed repository is on Azure DevOps.' : '';
 }
 
 /** `name`'s state in `data`, Checking while its check runs with no result yet. */
-function stateOf(data: BoardData, name: CheckedTool, login = false): ComponentProps<typeof ToolState> {
+function stateOf(data: SettingsData, name: CheckedTool, login = false): ComponentProps<typeof ToolState> {
   const check = data.tools?.[name];
   if (!check && data.toolProgress?.checking.includes(name)) return { text: 'Checking', tone: 'muted' };
   return toolState(check, login);
@@ -122,7 +130,7 @@ function onboardingDescription(progress: OnboardingProgress): string {
  * step it stopped at and Resume. Add repository opens the onboarding dialog. The
  * board reads GitHub repositories and Azure DevOps sprints.
  */
-function repositoryGroup(data: BoardData): Group {
+function repositoryGroup(data: SettingsData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
     id: `repo-${r.repo}`, title: shownRepo(r.repo), icon: <ProjectIcon repo={r.repo} size="small" />, description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}</>,
     control: custom(() => r.setup ? <Button {...kind('other')} onClick={() => useEditStore.getState().open(r.repo)}>Edit</Button> : null),
@@ -225,7 +233,7 @@ function updateRows({ app, version }: PagesInput): Row[] {
 }
 
 /** This Mac's retention setting, then each piece of work in Archive with what it offers; none in sample mode. */
-function archiveGroups(data: BoardData, archive: PagesInput['archive']): Group[] {
+function archiveGroups(data: SettingsData, archive: PagesInput['archive']): Group[] {
   if (!data.retention) return [{ title: 'Archive', description: 'Sample mode keeps no work records.', rows: [] }];
   const retention = data.retention;
   const work: Row[] = (archive.items ?? []).map((item) => ({
@@ -295,7 +303,7 @@ export function pages(input: PagesInput): Page[] {
         })),
         { id: 'd-az', title: 'az', description: toolDescription(`Reads repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),
           control: custom(() => <ToolState {...stateOf(data, 'az')} />) },
-        { id: 'd-server', title: 'Board server', description: `${location.origin} · last read ${data.fetchedAt ? 'OK' : 'never'}`, control: custom(() => null) },
+        { id: 'd-server', title: 'Board server', description: `${location.origin} · last read ${data.everRead ? 'OK' : 'never'}`, control: custom(() => null) },
       ] },
     ] },
   ];

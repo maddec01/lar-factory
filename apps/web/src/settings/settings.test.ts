@@ -3,6 +3,8 @@
 // states, the update channel, version, the update pill's state and step, and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the targets and updates explain that they need the board app.
 
+import { createElement, Profiler } from 'react';
+import { createRoot } from 'react-dom/client';
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, textBesideIcon, toolChecks, updatesOff } from '../../test/support.ts';
 import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type InstallOperationResult, type InstallSnapshot, type RepositorySetup, type TargetSnapshot, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
@@ -38,6 +40,7 @@ function stubBridge(setResult: InstallOperationResult = { snapshot: listed }) {
   return { ...bridge, getInstallState: reads, push: (snapshot: InstallSnapshot) => settle(() => push(snapshot)) };
 }
 
+const LATER_READ = '2026-11-01T00:00:00.000Z';
 const settingsButton = () => $<HTMLButtonElement>('.open-settings');
 const modal = () => $('[data-slot="modal-content"]');
 const sections = () => $$<HTMLButtonElement>('.settings-nav button');
@@ -1018,4 +1021,61 @@ test('unticking reports removed owned links and retained unowned paths', async (
   expect(result().textContent).toContain('Removed the skill links from ~/.claude/skills.');
   expect(result().textContent).toContain("left these alone because Lar Factory didn't make them");
   expect(result().textContent).not.toContain('Installed into');
+});
+
+/** Opens Settings on its own root at `label`'s section, and counts its renders after the first. */
+async function renderCounted(label: string, data: BoardData = sample) {
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const { useSettingsStore } = await import('./settings-store.ts');
+  const { SettingsDialog } = await import('./settings.tsx');
+  useBoardStore.setState({ data });
+  useSettingsStore.setState({ open: true, section: label });
+  const onRender = vi.fn();
+  document.body.replaceChildren();
+  const host = document.body.appendChild(document.createElement('div'));
+  await settle(() => createRoot(host).render(createElement(Profiler, { id: 'settings', onRender }, createElement(SettingsDialog))));
+  await settle(() => vi.advanceTimersByTime(50));
+  onRender.mockClear();
+  return { onRender, push: (data: BoardData) => settle(() => useBoardStore.getState().receive(JSON.parse(JSON.stringify(data)) as BoardData)) };
+}
+
+test('a push that changes only what Settings does not show renders nothing in it', async () => {
+  const { onRender, push } = await renderCounted('general');
+  await push({ ...sample, items: sample.items.slice(1), fetchedAt: LATER_READ });
+  expect(onRender).not.toHaveBeenCalled();
+});
+
+test('a push that changes what Settings shows updates it', async () => {
+  const { onRender, push } = await renderCounted('general');
+  await push({ ...sample, refreshSeconds: 90 });
+  expect(onRender).toHaveBeenCalled();
+  expect(text(row('refresh'))).toContain('90 seconds');
+});
+
+test('a push with the same repositories renders nothing in the Repositories section, whatever icons they have', async () => {
+  const data: BoardData = { ...sample, projectIcons: { [sample.repos[0]!.repo]: { kind: 'emoji', emoji: '🚀' } } };
+  const { onRender, push } = await renderCounted('repos', data);
+  expect($$('.settings-body [data-project-icon]').map(text).slice(0, 2)).toEqual(['🚀', 'L']);
+  await push({ ...data, items: sample.items.slice(1), fetchedAt: LATER_READ });
+  expect(onRender).not.toHaveBeenCalled();
+});
+
+test('a push that changes an icon or the order of the repositories updates their icons', async () => {
+  const data: BoardData = { ...sample, projectIcons: { [sample.repos[0]!.repo]: { kind: 'emoji', emoji: '🚀' } } };
+  const { push } = await renderCounted('repos', data);
+  const square = (repo: string) => row(`repo-${repo}`).querySelector('[data-project-icon]');
+  const [first, second] = sample.repos;
+  await push({ ...data, projectIcons: { [first!.repo]: { kind: 'emoji', emoji: '🛠' } } });
+  expect(text(square(first!.repo))).toBe('🛠');
+  expect(square(second!.repo)!.classList.contains('repo-tone-1')).toBe(true);
+  await push({ ...data, repos: [second!, first!] });
+  expect(square(second!.repo)!.classList.contains('repo-tone-0')).toBe(true);
+});
+
+test('Diagnostics says the board server has read only once a read has landed', async () => {
+  const { push } = await renderCounted('diagnostics');
+  await push({ ...sample, fetchedAt: null });
+  expect(text(row('d-server'))).toContain('last read never');
+  await push({ ...sample, fetchedAt: LATER_READ });
+  expect(text(row('d-server'))).toContain('last read OK');
 });

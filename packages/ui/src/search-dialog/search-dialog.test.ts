@@ -163,6 +163,16 @@ test('a token shows its content, and its remove button has its own name and retu
   expect(document.activeElement).toBe(input());
 });
 
+test('choosing an option can name the option the highlight moves to, as the list changes', async () => {
+  const props = { onSelect: () => 'Restore' };
+  await show(element(props));
+  await act(async () => {
+    input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    root!.render(element({ ...props, options: ['Add item', 'Settings', 'Restore'] }));
+  });
+  expect(active()).toBe('Restore');
+});
+
 test('the highlight moves to the first option when the active option leaves the list', async () => {
   await show(element({}));
   await press('ArrowUp');

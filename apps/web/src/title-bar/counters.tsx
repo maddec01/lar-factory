@@ -1,9 +1,9 @@
-// The title bar's five counters, in its status strip after the Refreshed time: need you, building, queued, shipped and spend,
-// as lar-server's summary buttons, always for the whole factory whatever repository the board is scoped to. Each shows
-// only its glyph, in the status's own colour, and its number; its label is its accessible name and its tooltip says
-// more. Each opens a popover listing the items behind the number; picking one opens the item dialog. The row keeps its
-// own width; the title bar's width decides what shows: Spend, Queued and Shipped go first, and on a narrow page
-// Building.
+// The title bar's five counters, in its status strip after the Refreshed time: need you, shaping, building, shipped and
+// spend, in the board's order, as lar-server's summary buttons, always for the whole factory whatever repository or
+// filters the board shows. Each shows only its glyph, in the status's own colour, and its number; its label is its
+// accessible name and its tooltip says more. Each opens a popover, padded as a menu, of every item behind the number in
+// a list that scrolls; picking one opens the item dialog. The row holds its width as values load; the title bar's width
+// decides what shows: Spend goes first, then Shaping and Shipped.
 
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
@@ -23,9 +23,13 @@ import { ProjectIcon } from '../repositories/project-icon.tsx';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? item.stats.costUsd ?? 0 : 0);
 
-/** One toolbar counter: an App control with a glyph and a tabular count, named by its label. */
-function Counter({ icon, value, label, hint, hideBelow, children }: {
-  icon: ReactNode; value: ReactNode; label: string; hint: string; hideBelow?: string; children: ReactNode;
+/** How wide a counter's value stays from dash or loader to number: a count, a count over a limit, or a spend under $1,000 with its plus. */
+const VALUE_WIDTH = { count: 'min-w-[2ch]', limit: 'min-w-[4ch]', spend: 'min-w-[8ch]' };
+
+/** One toolbar counter: an App control with a glyph and a tabular count, named by its label, and its panel. */
+function Counter({ icon, value, width = 'count', label, hint, hideBelow, title, sub, foot, children }: {
+  icon: ReactNode; value: ReactNode; width?: keyof typeof VALUE_WIDTH; label: string; hint: string; hideBelow?: string;
+  title: string; sub?: ReactNode; foot?: ReactNode; children: ReactNode;
 }) {
   return (
     <Popover>
@@ -33,44 +37,39 @@ function Counter({ icon, value, label, hint, hideBelow, children }: {
         <TooltipTrigger asChild>
           <Popover.Trigger asChild>
             <Button {...kind('control')} aria-label={`${label}: ${hint}`}
-              className={`min-w-0 gap-1.5 [&_svg]:size-4 text-base-700 hover:text-base-content data-[state=open]:text-base-content ${hideBelow ?? ''}`}>
-              {icon}
-              <span className="font-medium tabular-nums text-base-content">{value}</span>
+              className={`min-w-0 gap-1.5 text-base-700 hover:text-base-content data-[state=open]:bg-base-300/60 data-[state=open]:text-base-content ${hideBelow ?? ''}`}>
+              <span className="counter-icon grid size-4 shrink-0 place-items-center [&_svg]:size-4">{icon}</span>
+              <span className={`counter-value inline-flex items-center font-medium leading-4 tabular-nums text-base-content [&_[data-loader]]:w-full [&_[data-loader]]:justify-center [&_svg]:size-3 ${VALUE_WIDTH[width]}`}>{value}</span>
             </Button>
           </Popover.Trigger>
         </TooltipTrigger>
         <TooltipPopup side="bottom">{hint}</TooltipPopup>
       </Tooltip>
-      <Popover.Content side="bottom" align="end" layout="fill"><div className="counter-popup w-96">{children}</div></Popover.Content>
+      <Popover.Content side="bottom" align="end" layout="fill" presentation="menu">
+        <div className="counter-popup flex max-h-112 min-h-0 w-96 max-w-full flex-col">
+          <div className="counter-head flex h-7 shrink-0 items-center gap-2 px-2 text-xs font-medium text-base-700">
+            <span className="min-w-0 flex-1 truncate">{title}</span>
+            {sub !== undefined && <span className="shrink-0 font-normal tabular-nums">{sub}</span>}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+          {foot !== undefined && <div className="mt-1 shrink-0 border-t border-(--border) px-2 pt-1.5 pb-1 text-xs text-(--muted-foreground)">{foot}</div>}
+        </div>
+      </Popover.Content>
     </Popover>
   );
 }
 
-function PopHead({ icon, title, sub }: { icon: ReactNode; title: string; sub?: ReactNode }) {
-  return (
-    <div className="flex h-10 items-center gap-2 border-b border-(--border) px-3">
-      {icon}
-      <span className="flex-1 text-[13px] font-medium">{title}</span>
-      {sub !== undefined && <span className="text-xs text-(--muted-foreground) tabular-nums">{sub}</span>}
-    </div>
-  );
-}
-
-function PopFoot({ children }: { children: ReactNode }) {
-  return <div className="border-t border-(--border) px-3 py-2 text-xs text-(--muted-foreground)">{children}</div>;
-}
-
 function Empty({ children }: { children: ReactNode }) {
-  return <p className="m-0 px-3 py-6 text-center text-xs text-(--muted-foreground)">{children}</p>;
+  return <p className="m-0 flex min-h-20 items-center justify-center px-2 py-4 text-center text-xs text-(--muted-foreground)">{children}</p>;
 }
 
-/** One item: its status glyph, its number and title, then its repository's icon and age (or a trailing figure). Picking it opens the item dialog. */
+/** One item, as a menu's row: its status glyph, its number and title, then its repository's icon and age (or a trailing figure). Picking it opens the item dialog. */
 function Row({ item, now, trailing }: { item: Item; now: number; trailing?: ReactNode }) {
   return (
     <li>
       <Popover.Close asChild aria-label={`${itemName(item)}`}>
         <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
-          className="flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left text-[13px] text-base-content outline-none hover:bg-base-200 focus-visible:bg-base-200">
+          className="flex min-h-7 w-full cursor-default items-center gap-2 rounded-[0.375rem] px-2 py-1 text-left text-sm text-base-content outline-none hover:bg-base-200 focus-visible:bg-base-200 max-lg:min-h-11 pointer-coarse:min-h-11">
           <ItemStatusGlyph item={item} />
           <SourceIcon item={item} />
           <span className="min-w-0 flex-1 truncate"><ItemTitle item={item} /></span>
@@ -86,11 +85,10 @@ function Row({ item, now, trailing }: { item: Item; now: number; trailing?: Reac
   );
 }
 
-function List({ items, max = 8, children }: { items: Item[]; max?: number; children: (i: Item) => ReactNode }) {
+function List({ items, now, trailing }: { items: Item[]; now: number; trailing?: (item: Item) => ReactNode }) {
   return (
-    <ul className="m-0 grid grid-cols-[minmax(0,1fr)] list-none gap-px p-1">
-      {items.slice(0, max).map(children)}
-      {items.length > max && <li className="px-2 py-1.5 text-xs text-(--muted-foreground)">and {items.length - max} more</li>}
+    <ul className="m-0 grid grid-cols-[minmax(0,1fr)] list-none gap-px p-0">
+      {items.map((item) => <Row key={item.id} item={item} now={now} trailing={trailing?.(item)} />)}
     </ul>
   );
 }
@@ -108,7 +106,20 @@ function LimitBars({ used, limit }: { used: number; limit: number }) {
   );
 }
 
-const USAGE_LOADING = 'Usage totals are still loading.';
+const Dash = () => <span className="font-normal text-(--muted-foreground)">–</span>;
+
+/** What the spend counter says: a figure once it knows one, marked with a plus while it covers only part of the usage. */
+function spendFace(figure: string, known: boolean, unavailable: boolean, loading: boolean) {
+  const partial = known && (unavailable || loading);
+  const why = unavailable ? 'Some usage is unavailable.' : 'Some usage is still loading.';
+  return {
+    partial,
+    notice: partial ? `Partial figures. ${why}` : unavailable ? 'Usage is unavailable.' : loading ? 'Usage totals are still loading.' : null,
+    value: partial ? <>{figure}<span className={`font-normal ${unavailable ? 'text-(--st-amber)' : 'text-(--muted-foreground)'}`}>+</span></>
+      : unavailable ? <Dash /> : loading ? <Loader title="Usage totals are still loading." /> : figure,
+    sub: partial ? `${figure} so far` : unavailable ? 'Unavailable' : loading ? 'Loading' : figure,
+  };
+}
 
 export function Counters() {
   const { data, now, clientError } = useBoardStore();
@@ -121,69 +132,67 @@ export function Counters() {
     .sort((a, b) => b.cost - a.cost);
   const unavailable = !!data.itemSourceProblems?.length || !!data.error || !!data.localProblem || data.usageRead?.readable === false || data.items.some(usageFailed);
   const usageStillLoading = !unavailable && (!data.firstRead.settled || data.items.some(usageIncomplete));
-  const incomplete = unavailable || usageStillLoading;
   const reading = readingScope(data);
-  const spend = costs.reduce((t, c) => t + c.cost, 0);
+  const spend = spendFace(formatUsd(costs.reduce((t, c) => t + c.cost, 0)), costs.length > 0, unavailable, usageStillLoading);
   const free = limit === undefined ? undefined : limit - building.length;
-  const row = (i: Item, trailing?: ReactNode) => <Row key={i.id} item={i} now={now} trailing={trailing} />;
   const running = useStatusActivity();
   const glyph = (status: Status) => <StatusGlyph status={status} running={status === 'In progress' && building.some(running)} />;
+  // Nothing has been read yet, so a zero would be a claim.
+  const unknown = (n: number) => reading && !n;
+  const countOf = (n: number) => (unknown(n) ? <Dash /> : n);
+  const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading projects' : hint);
+  const subFor = (n: number) => (unknown(n) ? undefined : n);
+  const empty = (none: string) => <Empty>{reading ? <Loader label="Loading projects…" /> : none}</Empty>;
+  const listOf = (items: Item[], none: string) => (items.length ? <List items={items} now={now} /> : empty(none));
 
   return (
-    <div className="counters flex shrink-0">
-      <div className="flex items-center gap-0.5 whitespace-nowrap">
-        <Counter label="need you" value={s.needsYou.length} icon={glyph('Needs you')}
-          hint={s.needsYou.length ? `${plural(s.needsYou.length, 'item')} waiting on your answer, verification or merge` : reading ? 'Still loading projects' : 'Nothing waits on you'}>
-          <PopHead icon={glyph('Needs you')} title="Needs you" sub={s.needsYou.length} />
-          {s.needsYou.length ? (
-            <div className="grid gap-1 py-1">
-              {[...new Set(s.needsYou.map((i) => i.status))].map((status) => {
-                const items = s.needsYou.filter((i) => i.status === status);
-                return items.length > 0 && (
-                  <section key={status}>
-                    <h3 className="m-0 px-3 pt-1.5 pb-0.5 text-[11px] font-medium text-(--muted-foreground)">{status} <span className="tabular-nums">{items.length}</span></h3>
-                    <List items={items}>{(i) => row(i)}</List>
-                  </section>
-                );
-              })}
-            </div>
-          ) : <Empty>{reading ? <Loader label="Loading projects…" /> : 'Nothing waits on you.'}</Empty>}
-        </Counter>
+    <div className="counters flex shrink-0 items-center gap-0.5 whitespace-nowrap">
+      <Counter label="need you" value={countOf(s.needsYou.length)} icon={glyph('Needs you')} title="Needs you" sub={subFor(s.needsYou.length)}
+        hint={hintFor(s.needsYou.length, s.needsYou.length ? `${plural(s.needsYou.length, 'item')} waiting on your answer, verification or merge` : 'Nothing waits on you')}>
+        {s.needsYou.length ? (
+          <div className="grid gap-1">
+            {[...new Set(s.needsYou.map((i) => i.status))].map((status) => {
+              const items = s.needsYou.filter((i) => i.status === status);
+              return (
+                <section key={status}>
+                  <h3 className="m-0 flex h-7 items-center gap-1 px-2 text-xs font-medium text-(--muted-foreground)">{status} <span className="tabular-nums">{items.length}</span></h3>
+                  <List items={items} now={now} />
+                </section>
+              );
+            })}
+          </div>
+        ) : empty('Nothing waits on you.')}
+      </Counter>
 
-        <Counter label="building" icon={glyph('In progress')} hideBelow="hidden @min-[40rem]:inline-flex"
-          value={<>{building.length}{limit !== undefined && <span className="font-normal text-(--muted-foreground)">/{limit}</span>}</>}
-          hint={free === undefined ? `${plural(building.length, 'build')} at work` : free > 0 ? `Room for ${plural(free, 'more build')} under the build limit of ${limit}`
-            : free === 0 ? 'At the build limit' : `${-free} over the build limit`}>
-          <PopHead icon={glyph('In progress')} title="Building"
-            sub={limit === undefined ? building.length : <span className="inline-flex items-center gap-2"><LimitBars used={building.length} limit={limit} />{building.length}/{limit}</span>} />
-          {building.length ? <List items={building}>{(i) => row(i)}</List> : <Empty>Nothing building right now.</Empty>}
-          {free !== undefined && <PopFoot>{free > 0 ? `Room for ${plural(free, 'more build')} under the build limit.` : 'At the build limit. Start build and Start after still go ahead.'}</PopFoot>}
-        </Counter>
+      <Counter label="shaping" value={countOf(s.shaping.length)} icon={glyph('Shaping')} hideBelow="hidden @min-[54rem]:inline-flex" title="Shaping" sub={subFor(s.shaping.length)}
+        hint={hintFor(s.shaping.length, s.shaping.length ? `${plural(s.shaping.length, 'item')} being shaped` : 'Nothing shaping right now')}>
+        {listOf(s.shaping, 'Nothing shaping right now.')}
+      </Counter>
 
-        <Counter label="queued" value={s.queued.length} icon={glyph('Queued')} hideBelow="hidden @min-[54rem]:inline-flex"
-          hint={!s.queued.length && reading ? 'Still loading projects' : `${s.queued.length ? `${plural(s.queued.length, 'item')} ready to shape` : 'Nothing queued'}, ${s.list.length} more in List`}>
-          <PopHead icon={glyph('Queued')} title="Queued" sub={s.queued.length} />
-          {s.queued.length ? <List items={s.queued}>{(i) => row(i)}</List> : <Empty>{reading ? <Loader label="Loading projects…" /> : 'Nothing queued.'}</Empty>}
-          {(s.list.length > 0 || !reading) && <PopFoot>{s.list.length ? `${plural(s.list.length, 'item')} more in List, not yet queued.` : 'List is empty.'}</PopFoot>}
-        </Counter>
+      <Counter label="building" icon={glyph('In progress')} width={limit === undefined ? 'count' : 'limit'} title="Building"
+        value={<>{countOf(building.length)}{limit !== undefined && <span className="font-normal text-(--muted-foreground)">/{limit}</span>}</>}
+        hint={hintFor(building.length, free === undefined ? `${plural(building.length, 'build')} at work` : free > 0 ? `Room for ${plural(free, 'more build')} under the build limit of ${limit}`
+          : free === 0 ? 'At the build limit' : `${-free} over the build limit`)}
+        sub={limit === undefined ? subFor(building.length) : unknown(building.length) ? `–/${limit}` : <span className="inline-flex items-center gap-2"><LimitBars used={building.length} limit={limit} />{building.length}/{limit}</span>}
+        foot={reading || free === undefined ? undefined : free > 0 ? `Room for ${plural(free, 'more build')} under the build limit.` : 'At the build limit. Start build and Start after still go ahead.'}>
+        {listOf(building, 'Nothing building right now.')}
+      </Counter>
 
-        <Counter label="shipped" value={s.done.length} icon={glyph('Done')} hideBelow="hidden @min-[54rem]:inline-flex" hint="Done in the last 7 days">
-          <PopHead icon={glyph('Done')} title="Shipped" sub="last 7 days" />
-          {s.done.length ? <List items={s.done}>{(i) => row(i)}</List> : <Empty>Nothing shipped this week.</Empty>}
-        </Counter>
+      <Counter label="shipped" value={countOf(s.done.length)} icon={glyph('Done')} hideBelow="hidden @min-[54rem]:inline-flex" title="Shipped" sub="last 7 days"
+        hint={hintFor(s.done.length, 'Done in the last 7 days')}>
+        {listOf(s.done, 'Nothing shipped this week.')}
+      </Counter>
 
-        <span aria-hidden="true" className="mx-1 hidden h-4 w-px shrink-0 bg-(--border) @min-[66rem]:block" />
+      <span aria-hidden="true" className="mx-1 hidden h-4 w-px shrink-0 bg-(--border) @min-[66rem]:block" />
 
-        <Counter label="spend" value={unavailable ? 'Unavailable' : usageStillLoading ? <Loader title={USAGE_LOADING} /> : formatUsd(spend)} hideBelow="hidden @min-[66rem]:inline-flex" hint={usageStillLoading ? USAGE_LOADING : unavailable ? 'Usage totals are incomplete or unavailable.' : 'Agent cost on open and recent items, an API estimate'}
-          icon={<CircleDollarSign className="size-4 shrink-0" strokeWidth={2.25} />}>
-          <PopHead icon={<CircleDollarSign className="size-3.5 shrink-0 text-(--muted-foreground)" strokeWidth={2.25} />} title="Agent spend" sub={usageStillLoading ? 'Loading' : unavailable ? 'Incomplete' : formatUsd(spend)} />
-          {incomplete && <PopFoot>{usageStillLoading ? USAGE_LOADING : 'Usage totals are incomplete or unavailable.'} Figures below cover available items.</PopFoot>}
-          {costs.length
-            ? <List items={costs.map((c) => c.item)} max={5}>{(i) => row(i, <span className="font-medium text-(--foreground)">{formatUsd(costOf(i))}</span>)}</List>
-            : <Empty>No priced agent work yet.</Empty>}
-          {costs.length > 5 && <PopFoot>Top 5 of {plural(costs.length, 'priced item')}.</PopFoot>}
-        </Counter>
-      </div>
+      <Counter label="spend" value={spend.value} width="spend" hideBelow="hidden @min-[66rem]:inline-flex" title="Agent spend" sub={spend.sub}
+        icon={<CircleDollarSign className="shrink-0" strokeWidth={2.25} />}
+        hint={spend.notice ?? 'Agent cost on open and recent items, an API estimate'}
+        foot={spend.partial ? spend.notice : costs.length ? `${plural(costs.length, 'priced item')}, an API estimate.` : undefined}>
+        {costs.length
+          ? <List items={costs.map((c) => c.item)} now={now} trailing={(i) => <span className="font-medium text-(--foreground)">{formatUsd(costOf(i))}</span>} />
+          : <Empty>{unavailable ? 'Usage is unavailable, so nothing is priced.' : usageStillLoading ? <Loader label="Loading usage…" /> : 'No priced agent work yet.'}</Empty>}
+      </Counter>
     </div>
   );
 }

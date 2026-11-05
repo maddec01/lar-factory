@@ -295,6 +295,7 @@ test('the bar folds by its own width instead of squeezing: the counters keep the
     const span = [...titleBar().querySelectorAll(`${button} span`)].find((s) => text(s) === label);
     expect(classes(span ?? null), `${label}'s label stays for screen readers`).toContain('@max-[70rem]:sr-only');
   }
-  expect(text(counters), 'the counters show no labels').not.toMatch(/need you|building|queued|shipped|spend/);
+  expect(text(counters), 'the counters show no labels').not.toMatch(/need you|shaping|building|shipped|spend/);
   expect(classes(refreshed().querySelector('time')!.parentElement)).toContain('@max-[48rem]:sr-only');
+  expect(classes(refreshed()), 'Refreshed keeps its width while its text changes').toContain('@min-[48rem]:min-w-30');
 });

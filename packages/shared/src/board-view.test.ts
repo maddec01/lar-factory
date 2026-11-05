@@ -11,7 +11,7 @@ test('a discovered concept stays in List until it has been added locally', () =>
   const data = { items: [concept], repos: [], firstRead: { settled: true } } as unknown as BoardData;
   const fresh = boardSections(data, Date.now());
   assert.equal(fresh.list[0]?.id, concept.id);
-  assert.deepEqual([fresh.concepts.length, fresh.queued.length], [0, 0]);
+  assert.deepEqual([fresh.concepts.length, fresh.shaping.length], [0, 0]);
   data.items = [{ ...concept, recorded: true }];
   assert.equal(boardSections(data, Date.now()).concepts[0]?.id, concept.id);
 });
@@ -356,14 +356,20 @@ test('the desk leaves out Ready and a merged build counts under shipped', () => 
   assert.deepEqual(boardSections(boardWith(merged), AT).done.map((item) => item.id), [merged.id]);
 });
 
-test('queued follows the placement rule: a pending start and a part still in its dossier leave the count', () => {
-  const queued = delivered('Queued', { state: 'done' });
-  assert.deepEqual(boardSections(boardWith(queued), AT).queued.map((item) => item.id), [queued.id]);
+test('shaping follows the placement rule: a pending start joins it, and a part still in its dossier leaves it', () => {
+  const ids = (sections: { shaping: Item[] }) => sections.shaping.map((item) => item.id);
+  const shaping = delivered('Shaping', { state: 'done' }, { threads: [] });
+  assert.deepEqual(ids(boardSections(boardWith(shaping), AT)), [shaping.id]);
+  const waiting = { ...shaping, status: 'Needs you' as const };
+  assert.deepEqual(ids(boardSections(boardWith(waiting), AT)), [waiting.id], 'waiting on the user during shaping, it stays in Shaping');
+  assert.deepEqual(boardSections(boardWith(waiting), AT).needsYou.map((item) => item.id), [waiting.id], 'and is on the desk too');
+  const queued = { ...shaping, status: 'Queued' as const };
+  assert.deepEqual(ids(boardSections(boardWith(queued), AT)), []);
   const starting = { startProgress: { [queued.id]: { shape: { phase: 'starting' } } } } as unknown as Partial<BoardData>;
-  assert.deepEqual(boardSections(boardWith(queued, starting), AT).queued, []);
+  assert.deepEqual(ids(boardSections(boardWith(queued, starting), AT)), [queued.id]);
   const failed = { startProgress: { [queued.id]: { shape: { phase: 'failed' } } } } as unknown as Partial<BoardData>;
-  assert.deepEqual(boardSections(boardWith(queued, failed), AT).queued.map((item) => item.id), [queued.id], 'a failed start waits in the Queue again');
+  assert.deepEqual(ids(boardSections(boardWith(queued, failed), AT)), [], 'a failed start waits in the Queue again');
   const parent = delivered('In progress', { state: 'done' }, { id: 'parent' });
-  const part = { ...queued, parentId: 'parent' };
-  assert.deepEqual(boardSections(boardWith(part, { items: [parent, part] }), AT).queued, []);
+  const part = { ...shaping, parentId: 'parent' };
+  assert.deepEqual(ids(boardSections(boardWith(part, { items: [parent, part] }), AT)), []);
 });

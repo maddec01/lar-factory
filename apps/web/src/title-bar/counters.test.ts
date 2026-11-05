@@ -1,8 +1,8 @@
-// The title bar's five counters: need you, building against the build limit, queued, shipped and spend, always for
-// the whole factory. Each opens a popover of the items behind its number; picking one opens the item dialog.
+// The title bar's five counters: need you, shaping, building against the build limit, shipped and spend, always for
+// the whole factory. Each opens a popover of every item behind its number; picking one opens the item dialog.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, moved, mountPage, sample, settle, text, textBesideIcon } from '../../test/support.ts';
+import { $, $$, NOW, moved, mountPage, push, sample, settle, text, textBesideIcon } from '../../test/support.ts';
 import type { BoardData, ItemThread } from '@lar-factory/shared';
 
 /** The sample with a build limit of 2, which sample mode leaves out. */
@@ -14,24 +14,29 @@ const counter = (label: string) => counters().find((b) => b.getAttribute('aria-l
 const popup = () => $('[data-state="open"] .counter-popup');
 const rows = () => [...popup()!.querySelectorAll('li')].map(textBesideIcon);
 /** The popover's head, its title and count, and its foot. */
-const head = (pop: HTMLElement) => text(pop.querySelector('.h-10'));
+const head = (pop: HTMLElement) => text(pop.querySelector('.counter-head'));
 const foot = (pop: HTMLElement) => text(pop.querySelector('.border-t'));
+const classes = (el: Element | null) => el!.className.split(' ');
+const close = () => settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+/** A first read that hasn't settled, with one repository still to land. */
+const firstRead = { step: 'items' as const, ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] };
 
 async function openCounter(label: string): Promise<HTMLElement> {
   await settle(() => counter(label).click());
   return popup()!;
 }
 
-test('the counters show need you, building over the limit of 2, queued, shipped this week and spend, each by its number and named by its label', async () => {
+test('the counters show need you, shaping, building over the limit of 2, shipped this week and spend, in the board\'s order, each by its number and named by its label', async () => {
   await mountPage(completeSample);
-  expect(counters().map(text)).toEqual(['7', '4/2', '3', '4', '$190.25']);
+  expect(counters().map(text)).toEqual(['7', '4', '4/2', '4', '$190.25']);
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
     'need you: 7 items waiting on your answer, verification or merge',
+    'shaping: 4 items being shaped',
     'building: 2 over the build limit',
-    'queued: 3 items ready to shape, 4 more in List',
     'shipped: Done in the last 7 days',
     'spend: Agent cost on open and recent items, an API estimate',
   ]);
+  expect(counter('queued')).toBeUndefined();
 });
 
 test('the counts are the whole factory\'s with a repository scoped', async () => {
@@ -39,7 +44,7 @@ test('the counts are the whole factory\'s with a repository scoped', async () =>
   const before = counters().map(text);
   await openCounter('need you');
   const items = rows();
-  await settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await close();
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect($('[data-search-field]')!.getAttribute('aria-label')).toBe('Search, filtered by lar-apple');
@@ -125,24 +130,44 @@ test('a concept in progress is no build at work', async () => {
   expect(head(pop)).toBe('Building4/2');
 });
 
-test('queued lists the queued items and how many wait in List', async () => {
+test('shaping lists what the board\'s Shaping section holds, across the whole factory whatever the filters', async () => {
   await mountPage();
-  const pop = await openCounter('queued');
-  expect(head(pop)).toBe('Queued3');
-  expect(rows()).toHaveLength(3);
-  expect(foot(pop)).toBe('4 items more in List, not yet queued.');
+  const section = () => $$('[data-stage="shaping"] li[data-item]').map((row) => row.dataset.item);
+  const listed = () => [...popup()!.querySelectorAll('[data-item]')].map((row) => row.getAttribute('data-item'));
+  const board = section();
+  expect(text(counter('shaping'))).toBe(String(board.length));
+  const pop = await openCounter('shaping');
+  expect(head(pop)).toBe(`Shaping${board.length}`);
+  expect(listed().sort()).toEqual([...board].sort());
+  await close();
+  const { useScopeStore } = await import('../board/scope-store.ts');
+  await settle(() => useScopeStore.getState().setFilters({ kinds: ['bug'], labels: [] }));
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
+  expect(section().length, 'the board\'s section narrows').toBeLessThan(board.length);
+  expect(text(counter('shaping'))).toBe(String(board.length));
+  await openCounter('shaping');
+  expect(listed().sort()).toEqual([...board].sort());
 });
 
-test('while a Queue start launches, the queued count, its list and the Queue rail agree, and the row is in Shaping', async () => {
+test('an item waiting on you during shaping counts in both need you and shaping', async () => {
+  const shapingThread = { id: 's', title: 'Shape', purpose: 'shape', state: 'done' as const, updated: '2026-10-21T09:00:00.000Z' };
+  await mountPage(moved('I_sample05', 'Needs you', { ...sample, items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, threads: [shapingThread as ItemThread] } : i)) }));
+  await openCounter('need you');
+  expect(popup()!.querySelector('[data-item="I_sample05"]')).not.toBeNull();
+  await close();
+  await openCounter('shaping');
+  expect(popup()!.querySelector('[data-item="I_sample05"]')).not.toBeNull();
+});
+
+test('while a Queue start launches, the item counts in shaping as its row moves to the Shaping section', async () => {
   await mountPage();
-  const rail = () => $$('.queue ol > li').map((row) => row.dataset.item);
-  expect([text(counter('queued')), rail()]).toEqual(['3', ['I_sample05', 'I_sample06', 'I_sample21']]);
+  const before = Number(text(counter('shaping')));
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...sample, startProgress: { I_sample05: { shape: { phase: 'starting' } } } }));
-  expect([text(counter('queued')), rail()]).toEqual(['2', ['I_sample06', 'I_sample21']]);
+  expect(text(counter('shaping'))).toBe(String(before + 1));
   expect($('[data-stage="shaping"] li[data-item="I_sample05"]')).not.toBeNull();
-  await openCounter('queued');
-  expect(rows()).toHaveLength(2);
+  await openCounter('shaping');
+  expect(popup()!.querySelector('[data-item="I_sample05"]')).not.toBeNull();
 });
 
 test('shipped lists this week\'s done items, newest first', async () => {
@@ -158,19 +183,51 @@ test('each row is named by its item\'s number and title, not by the popover\'s c
   expect(popup()!.querySelector('li button')!.getAttribute('aria-label')).toBe('#150 Relay for streaming away from home');
 });
 
-test('spend lists the five priciest items with their cost, out of every priced item', async () => {
+test('spend lists every priced item, highest cost first, with its cost', async () => {
   await mountPage(completeSample);
   const pop = await openCounter('spend');
   expect(head(pop)).toBe('Agent spend$190.25');
-  expect(rows()).toEqual([
+  expect(rows()).toHaveLength(13);
+  expect(rows().slice(0, 3)).toEqual([
     '#150 Relay for streaming away from home$46.90',
     '#5 Crash when a server goes offline mid-playback$41.20',
     '#40 Resume from the stored position$27.00',
-    '#30 Chapter markers in the scrubber$24.18',
-    '#181 Store the playback position per device$18.00',
-    'and 8 more',
   ]);
-  expect(foot(pop)).toBe('Top 5 of 13 priced items.');
+  const costs = rows().map((row) => Number(/\$([\d.]+)$/.exec(row)![1]));
+  expect(costs).toEqual([...costs].sort((a, b) => b - a));
+  expect(text(pop)).not.toMatch(/and \d+ more|Top 5/);
+  expect(foot(pop)).toBe('13 priced items, an API estimate.');
+});
+
+test('every panel lists every item in a list that scrolls between its head and foot', async () => {
+  const many = { ...limited, items: Array.from({ length: 30 }, (_, n) => ({ ...sample.items.find((i) => i.id === 'I_sample14')!, id: `I_many${n}`, number: 1000 + n })) };
+  await mountPage(moved('I_many0', 'In progress', many));
+  const pop = await openCounter('building');
+  expect(rows()).toHaveLength(30);
+  expect(text(pop)).not.toMatch(/and \d+ more/);
+  const list = pop.querySelector('ul')!.parentElement!;
+  expect(classes(list)).toEqual(expect.arrayContaining(['min-h-0', 'flex-1', 'overflow-y-auto']));
+  expect(list.contains(pop.querySelector('.counter-head')), 'the head stays out of the scroll').toBe(false);
+  expect(list.contains(pop.querySelector('.border-t')), 'the foot stays out of the scroll').toBe(false);
+  expect(classes(pop)).toEqual(expect.arrayContaining(['flex', 'flex-col', 'min-h-0']));
+});
+
+// jsdom lays nothing out, so this checks the classes. The menu rows in packages/ui grow the same way under lg or a coarse pointer.
+test('a panel has a menu\'s padding, and a row a menu row\'s height, radius and font', async () => {
+  await mountPage();
+  const pop = await openCounter('building');
+  expect(classes(pop.closest('[data-slot="popover-content"]'))).toContain('p-1');
+  expect(classes(pop.querySelector('li button'))).toEqual(expect.arrayContaining(['min-h-7', 'max-lg:min-h-11', 'pointer-coarse:min-h-11', 'py-1', 'text-sm', 'rounded-[0.375rem]']));
+});
+
+// jsdom lays nothing out, so this checks the classes behind the strip's steady width and the fold.
+test('each counter has one icon box, a value slot that keeps its width, and folds by the bar\'s width', async () => {
+  await mountPage(completeSample);
+  expect(counters().map((b) => classes(b.querySelector('.counter-icon')))).toEqual(Array(5).fill(expect.arrayContaining(['size-4', 'shrink-0'])));
+  expect(counters().map((b) => classes(b.querySelector('.counter-value')).find((c) => c.startsWith('min-w-')))).toEqual(['min-w-[2ch]', 'min-w-[2ch]', 'min-w-[4ch]', 'min-w-[2ch]', 'min-w-[8ch]']);
+  expect(['need you', 'shaping', 'building', 'shipped', 'spend'].map((label) => classes(counter(label)).find((c) => c.startsWith('@min-')))).toEqual([
+    undefined, '@min-[54rem]:inline-flex', undefined, '@min-[54rem]:inline-flex', '@min-[66rem]:inline-flex',
+  ]);
 });
 
 test('the spend tooltip says the figure is an API estimate', async () => {
@@ -182,30 +239,43 @@ test('the spend tooltip says the figure is an API estimate', async () => {
 
 test('with nothing on the board each popover says so', async () => {
   await mountPage({ ...completeSample, items: [] });
-  expect(counters().map(text)).toEqual(['0', '0/2', '0', '0', '$0.00']);
+  expect(counters().map(text)).toEqual(['0', '0', '0/2', '0', '$0.00']);
   const empty: [string, string][] = [];
-  for (const label of ['need you', 'building', 'queued', 'shipped', 'spend']) {
+  for (const label of ['need you', 'shaping', 'building', 'shipped', 'spend']) {
     const pop = await openCounter(label);
     empty.push([label, text(pop.querySelector('p'))]);
-    await settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await close();
   }
   expect(empty).toEqual([
     ['need you', 'Nothing waits on you.'],
+    ['shaping', 'Nothing shaping right now.'],
     ['building', 'Nothing building right now.'],
-    ['queued', 'Nothing queued.'],
     ['shipped', 'Nothing shipped this week.'],
     ['spend', 'No priced agent work yet.'],
   ]);
   expect(counter('building').getAttribute('aria-label')).toBe('building: Room for 2 more builds under the build limit of 2');
 });
 
-test('queued says it is loading, not empty, while the first read could add items', async () => {
-  await mountPage({ ...completeSample, items: [], firstRead: { step: 'items', running: [], settled: false } });
-  expect(counter('queued').getAttribute('aria-label')).toBe('queued: Still loading projects');
-  const pop = await openCounter('queued');
+test('while the first read could add items, a count with none is a dash, one with items its number, and empty panels show the loader', async () => {
+  const data = structuredClone(completeSample);
+  await mountPage({ ...data, items: data.items.filter((i) => i.status === 'Done'), firstRead });
+  expect(counters().slice(0, 4).map(text)).toEqual(['–', '–', '–/2', '4']);
+  for (const label of ['need you', 'shaping', 'building'] as const) {
+    expect(counter(label).getAttribute('aria-label')).toBe(`${label}: Still loading projects`);
+    const pop = await openCounter(label);
+    expect(text(pop.querySelector('p')), label).toBe('Loading projects…');
+    expect(pop.querySelector('[data-loader]'), label).not.toBeNull();
+    expect(pop.querySelector('.border-t'), `${label} has no foot yet`).toBeNull();
+    await close();
+  }
+  const building = await openCounter('building');
+  expect(head(building), 'no zero claimed in the panel either').toBe('Building–/2');
+  expect(building.querySelector('.counter-head [style]'), 'no empty limit bars').toBeNull();
+  await close();
+  await push({ ...data, items: [], firstRead });
+  expect(text(counter('shipped'))).toBe('–');
+  const pop = await openCounter('shipped');
   expect(text(pop.querySelector('p'))).toBe('Loading projects…');
-  expect(pop.querySelector('[data-loader]')).not.toBeNull();
-  expect(text(pop)).not.toContain('List is empty.');
 });
 
 test('picking a row closes the popover and opens that item\'s dialog', async () => {
@@ -216,66 +286,68 @@ test('picking a row closes the popover and opens that item\'s dialog', async () 
   expect(text($('[data-item-dialog] [data-slot="modal-header"] h2'))).toBe('#150 Relay for streaming away from home');
 });
 
-test('spend does not present partial histories as a complete total', async () => {
-  const data = structuredClone(sample);
-  data.items[0]!.stats = 'unavailable';
-  await mountPage(data);
-  expect(text(counter('spend'))).toBe('Unavailable');
-  const pop = await openCounter('spend');
-  expect(head(pop)).toBe('Agent spendIncomplete');
-  expect(text(pop)).toContain('Usage totals are incomplete or unavailable.');
-});
-
-test('spend reads as unavailable with a failed item, though it shows known figures', async () => {
+test('spend shows the known figures with a plus while some usage is unavailable, and its panel says so below the list', async () => {
   const data = structuredClone(completeSample);
   data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 200 }, usageState: 'failed' };
   await mountPage(data);
-  expect(text(counter('spend'))).toBe('Unavailable');
+  expect(text(counter('spend'))).toMatch(/^\$[\d.,]+\+$/);
   const pop = await openCounter('spend');
-  expect(head(pop)).toBe('Agent spendIncomplete');
+  expect(head(pop)).toMatch(/^Agent spend\$[\d.,]+ so far$/);
   expect(text(pop)).toContain('$200.00');
+  expect(foot(pop)).toBe('Partial figures. Some usage is unavailable.');
+  expect(pop.querySelector('ul')!.parentElement!.compareDocumentPosition(pop.querySelector('.border-t')!) & Node.DOCUMENT_POSITION_FOLLOWING, 'the notice comes after the list').toBeTruthy();
 });
 
-test('spend shows the loader with a loading item, and its popover keeps known figures', async () => {
+test('spend shows a dash with no figures known and usage unavailable, and its panel says usage is unavailable', async () => {
+  const data = structuredClone(completeSample);
+  data.items = [];
+  data.itemSourceProblems = [{ repo: 'owner/failed', problem: 'Read failed' }];
+  await mountPage(data);
+  expect(text(counter('spend'))).toBe('–');
+  const pop = await openCounter('spend');
+  expect(head(pop)).toBe('Agent spendUnavailable');
+  expect(text(pop.querySelector('p'))).toBe('Usage is unavailable, so nothing is priced.');
+});
+
+test('spend shows the known figures with a plus while some usage still loads, and its panel says so', async () => {
   const data = structuredClone(completeSample);
   data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 200 }, usageState: 'loading' };
   await mountPage(data);
-  expect(counter('spend').querySelector('[data-loader]')).not.toBeNull();
-  expect(text(counter('spend'))).not.toContain('Unavailable');
+  expect(counter('spend').querySelector('[data-loader]')).toBeNull();
+  expect(text(counter('spend'))).toMatch(/^\$[\d.,]+\+$/);
   const pop = await openCounter('spend');
-  expect(head(pop)).toBe('Agent spendLoading');
   expect(text(pop)).toContain('$200.00');
-  expect(text(pop)).toContain('Usage totals are still loading.');
+  expect(foot(pop)).toBe('Partial figures. Some usage is still loading.');
 });
 
-test('spend while T3 has not answered yet is loading', async () => {
-  const data: BoardData = structuredClone(completeSample);
-  data.items[0] = { ...data.items[0]!, stats: undefined, threads: 'unavailable', usageState: 'loading' };
-  await mountPage(data);
-  expect(counter('spend').querySelector('[data-loader]')).not.toBeNull();
-});
-
-test('spend with T3 stopped is unavailable', async () => {
-  const data: BoardData = structuredClone(completeSample);
-  data.items[0] = { ...data.items[0]!, stats: undefined, threads: 'unavailable', usageState: undefined };
-  await mountPage(data);
-  expect(text(counter('spend'))).toBe('Unavailable');
-});
-
-test('a failed whole read says unavailable at once, though items read as loading', async () => {
-  const data = structuredClone(completeSample);
-  data.items[0] = { ...data.items[0]!, usageState: 'loading' };
-  await mountPage({ ...data, usageRead: { readable: false } });
-  expect(text(counter('spend'))).toBe('Unavailable');
-});
-
-test('an empty need-you popover during the first read shows the loader', async () => {
+test('spend shows the loader until it has a figure, in the strip and its panel', async () => {
   const data = structuredClone(completeSample);
   data.items = [];
-  data.firstRead = { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] };
-  await mountPage(data);
-  expect(counter('need you').getAttribute('aria-label')).toBe('need you: Still loading projects');
-  expect(text((await openCounter('need you')).querySelector('p'))).toBe('Loading projects…');
+  await mountPage({ ...data, firstRead });
+  expect(counter('spend').querySelector('[data-loader]')).not.toBeNull();
+  const pop = await openCounter('spend');
+  expect(head(pop)).toBe('Agent spendLoading');
+  expect(text(pop.querySelector('p'))).toBe('Loading usage…');
+});
+
+test('unavailable usage takes precedence over loading', async () => {
+  const data = structuredClone(completeSample);
+  data.items = [];
+  await mountPage({ ...data, firstRead, usageRead: { readable: false } });
+  expect(counter('spend').querySelector('[data-loader]')).toBeNull();
+  expect(text(counter('spend'))).toBe('–');
+  const mixed = structuredClone(completeSample);
+  mixed.items[0] = { ...mixed.items[0]!, usageState: 'loading' };
+  await push({ ...mixed, usageRead: { readable: false } });
+  expect(foot(await openCounter('spend'))).toBe('Partial figures. Some usage is unavailable.');
+});
+
+test('spend with T3 stopped and no figures is a dash, and with T3 not answered yet the loader', async () => {
+  const none = (usageState?: 'loading'): BoardData => ({ ...structuredClone(completeSample), items: [{ ...completeSample.items[0]!, stats: undefined, threads: 'unavailable', usageState }] });
+  await mountPage(none());
+  expect(text(counter('spend'))).toBe('–');
+  await push(none('loading'));
+  expect(counter('spend').querySelector('[data-loader]')).not.toBeNull();
 });
 
 test('spend stays complete with figures frozen at merge, or an item with no threads', async () => {
@@ -283,25 +355,7 @@ test('spend stays complete with figures frozen at merge, or an item with no thre
   data.items[0] = { ...data.items[0]!, stats: { agentMs: 60_000, tokens: 1000, costUsd: 2, frozen: true }, usageState: 'failed' };
   data.items[1] = { ...data.items[1]!, stats: 'unavailable', threads: [] };
   await mountPage(data);
-  expect(text(counter('spend'))).not.toBe('Unavailable');
-});
-
-test('spend is loading when an empty source succeeds and another still reads', async () => {
-  const data = structuredClone(completeSample);
-  data.items = [];
-  data.firstRead = { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] };
-  await mountPage(data);
-  expect(counter('spend').querySelector('[data-loader]')).not.toBeNull();
-  expect(head(await openCounter('spend'))).toBe('Agent spendLoading');
-});
-
-test('spend remains incomplete when an empty source succeeds and another failed', async () => {
-  const data = structuredClone(completeSample);
-  data.items = [];
-  data.itemSourceProblems = [{ repo: 'owner/failed', problem: 'Read failed' }];
-  await mountPage(data);
-  expect(text(counter('spend'))).toBe('Unavailable');
-  expect(head(await openCounter('spend'))).toBe('Agent spendIncomplete');
+  expect(text(counter('spend'))).toMatch(/^\$[\d.,]+$/);
 });
 
 test('building animates across the whole factory while the Build heading follows scope and filters', async () => {
@@ -317,9 +371,7 @@ test('building animates across the whole factory while the Build heading follows
   let pop = await openCounter('building');
   const members = () => [...popup()!.querySelectorAll('[data-item]')].map(el => el.getAttribute('data-item'));
   const originalMembers = members();
-  expect(pop.querySelector('.h-10 > .status-spin')).not.toBeNull();
   expect(pop.querySelector('[data-item="I_sample14"] .status-spin')).not.toBeNull();
-  const close = () => settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await close();
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-server'));
@@ -338,7 +390,6 @@ test('building animates across the whole factory while the Build heading follows
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive(fresh));
   expect(counterIcon().classList.contains('lucide-circle')).toBe(true);
-  expect(pop.querySelector('.h-10 > .lucide-circle')).not.toBeNull();
   expect(text(counter('building'))).toBe('4/2');
   expect(members()).toEqual(originalMembers);
 });
@@ -353,7 +404,6 @@ test('starting and idle builds keep their count and membership while shaping alo
   expect(counter('need you').querySelector('svg.status-pulse')).toBeNull();
   expect(counter('need you').querySelector<SVGElement>('svg')!.style.color).toBe('var(--st-amber)');
   const pop = await openCounter('building');
-  expect(pop.querySelector('.h-10 > svg.lucide-circle')).not.toBeNull();
   expect(pop.querySelectorAll('[data-item]')).toHaveLength(5);
   expect(pop.querySelector('[data-item="I_sample13"] svg.lucide-circle-arrow-right')).not.toBeNull();
   expect(pop.querySelector('svg.status-pulse, .status-spin')).toBeNull();

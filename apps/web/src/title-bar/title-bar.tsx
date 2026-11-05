@@ -6,8 +6,8 @@
 // controls. Above the missing-t3 notice there's no board to search, count or add to, so it holds only the brand and
 // Settings.
 // Every control keeps its own width, and the bar folds by its own width (the copied TitleBar is the container
-// queried) instead: the List and Add item labels (kept for screen readers) go first, then Spend, Queued and Shipped,
-// then the Refreshed text, and on a narrow page Building and the Refreshed dot. The field fits itself in what's left.
+// queried) instead: the List and Add item labels (kept for screen readers) go first, then Spend, Shaping and Shipped,
+// then the Refreshed text, and on a narrow page the Refreshed dot. The field fits itself in what's left.
 
 import { useEffect, useRef, useState } from 'react';
 import { clock, failedCheck, inMacApp, isStale, shortAgo } from '@lar-factory/shared';
@@ -82,7 +82,7 @@ function Refreshed({ data }: { data: BoardData }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <span tabIndex={0}
-          className="refreshed inline-flex h-6 shrink-0 @max-[40rem]:hidden items-center gap-1.5 whitespace-nowrap rounded-sm px-1 text-xs tabular-nums text-base-700 outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          className="refreshed inline-flex h-6 shrink-0 @max-[40rem]:hidden @min-[48rem]:min-w-30 items-center gap-1.5 whitespace-nowrap rounded-sm px-1 text-xs tabular-nums text-base-700 outline-none focus-visible:ring-2 focus-visible:ring-primary">
           <span className="relative grid size-2 place-items-center">
             {landed > 0 && health === 'live' && (
               <span key={landed} data-ping className="absolute size-1.5 rounded-full bg-success motion-safe:animate-[refreshed-ping_1.2s_ease-out_forwards]" />

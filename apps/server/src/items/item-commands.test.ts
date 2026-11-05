@@ -64,12 +64,37 @@ for (const operation of ['push-branch', 'open-pr'] as const) for (const state of
   });
 }
 
+test('a failed fetch refuses Start build with its error and writes nothing, then a retry starts the build', async () => {
+  const records = await openRecords();
+  const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Ready' });
+  const build = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  records.setParent(build.workId, build.revision, concept.workId);
+  const before = records.read(build.workId);
+  let offline = true;
+  const { commands, log, bases } = commandsOn([], undefined, records, [], undefined, undefined, undefined, { fetchBase: async () => {
+    if (offline) throw new Error('Could not fetch release from origin.');
+    return 'release-tip';
+  } });
+  const { status, body } = await commands.startBuild(build.workId, undefined);
+  assert.deepEqual([status, (body as { error: string }).error, (body as { hold?: true }).hold], [409, 'Could not fetch release from origin.', true]);
+  assert.deepEqual(log, []);
+  assert.deepEqual(records.launchIntents({ workId: build.workId }), []);
+  const after = records.read(build.workId);
+  assert.deepEqual([after.status, after.buildBranch, after.skills, after.revision], [before.status, before.buildBranch, before.skills, before.revision]);
+  assert.equal(records.read(concept.workId).status, 'Ready');
+  offline = false;
+  assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
+  assert.deepEqual(bases, ['release-tip']);
+  assert.equal(records.read(concept.workId).status, 'In progress');
+});
+
 test("Start build marks the refusals that pass by themselves, a project or default-branch read failing, and not a build that can't start", async () => {
   const records = await openRecords();
   const build = records.importTicket({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready', ticket: `${WEB}#7` }).record;
   const failing: [string, Partial<ItemCommandsDeps>][] = [
     ['T3 has no project for this repository.', { projectOf: async () => ({ error: 'T3 has no project for this repository.' }) }],
     ['Could not read the repository’s default branch. Retry after checking access.', { baseOf: async () => { throw new Error('offline'); } }],
+    ['Could not fetch release from origin.', { fetchBase: async () => { throw new Error('Could not fetch release from origin.'); } }],
   ];
   for (const [error, deps] of failing) {
     const { commands } = commandsOn([], undefined, records, [], undefined, undefined, undefined, deps);
@@ -106,7 +131,7 @@ function commandsOn(items: Item[], showThread?: () => Promise<'live' | 'deleted'
   } as unknown as ItemSource;
   const commands = createItemCommands({ factoryContext:null, checkoutOf: async () => '/repo',
     inspectWorkRecovery: async () => ({ branch: 'old', branchExists: true, worktreePath: null, pr: 'none' }), board, items: source, records: records ?? null, reread, archive, offerModelChoices: () => [],
-    showThread, reopenPr: async (repo, number) => { whileReopening(); log.push(`reopen ${repo}#${number}`); }, readPr: provider.pr ?? (async () => 'open'), projectOf: async (repo) => ({ projectId: repo }), baseOf: async () => 'release', buildAccessOf: () => access,
+    showThread, reopenPr: async (repo, number) => { whileReopening(); log.push(`reopen ${repo}#${number}`); }, readPr: provider.pr ?? (async () => 'open'), projectOf: async (repo) => ({ projectId: repo }), baseOf: async () => 'release', fetchBase: async (_project, branch) => `${branch}-tip`, buildAccessOf: () => access,
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
       bases.push(worktree && 'base' in worktree ? worktree.base : undefined);
@@ -576,7 +601,7 @@ test('Start build reuses a live start, but a confirmed stopped build can start a
   await commands.startBuild(item.id, undefined);
   await commands.startBuild(item.id, undefined);
   assert.equal(log.length, 1, 'a repeated request reuses the original start');
-  assert.deepEqual(bases, ['release'], 'builds use the resolved target even when it is not main');
+  assert.deepEqual(bases, ['release-tip'], 'builds start from the fetched commit of the resolved target, even when it is not main');
   board.update({ items: [{ ...item, threads: [{ id: 'thread-1', title: 'Build', state: 'stopped', updated: '2026-10-29T00:00:00Z' }] }] });
   await Promise.all([commands.startBuild(item.id, undefined), commands.startBuild(item.id, undefined)]);
   assert.equal(log.length, 2, 'concurrent retries start exactly one replacement');
@@ -806,7 +831,7 @@ function recordedCommands(records: WorkRecords, { shown = (ids: string[]) => ids
   const started: string[] = [];
   const commands = createItemCommands({ clearedFailuresFile, factoryContext:null, checkoutOf: async () => '/repo',
     inspectWorkRecovery: async () => ({ branch: 'old', branchExists: true, worktreePath: null, pr: 'none' }), board, items: {} as ItemSource, records, reread, archive: () => [], offerModelChoices: () => [],
-    showThread: lookup, projectOf: async (repo) => { beforeLaunch(board); return { projectId: repo }; }, baseOf: async () => 'release', buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }), recoverThread: recover, skillsOf: () => skills, shapingThreadCleanupChoice: cleanupChoice,
+    showThread: lookup, projectOf: async (repo) => { beforeLaunch(board); return { projectId: repo }; }, baseOf: async () => 'release', fetchBase: async (_project, branch) => `${branch}-tip`, buildAccessOf: () => ({ 'push-branch': 'allowed', 'open-pr': 'allowed' }), recoverThread: recover, skillsOf: () => skills, shapingThreadCleanupChoice: cleanupChoice,
     startThread: async (_project, message) => {
       during();
       const answered = startAnswer();
@@ -1177,6 +1202,40 @@ test('Start again preserves launch intents and continues a deleted build on its 
   assert.deepEqual(bases, ['old']);
   assert.equal(records.threads(work.workId).length, 2);
   assert.equal(records.launchIntents({ workId: work.workId, unresolved: true }).length, 0);
+});
+
+test('Start again on a new branch starts from the fetched commit, and continuing fetches nothing', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Recover build', repository: WEB, kind: 'build', status: 'In progress' });
+  records.addThread(work.workId, records.read(work.workId).revision, 'deleted-build', 'build');
+  records.confirmThreadDeleted(work.workId, records.read(work.workId).revision, 'deleted-build');
+  const fetched: string[] = [];
+  const { board, commands, bases } = commandsOn([], undefined, records, [], undefined, undefined, undefined, { fetchBase: async (_project, branch) => { fetched.push(branch); return 'release-tip'; } });
+  const item = board.find(work.workId)!;
+  board.update({ items: [{ ...item, threads: [], needsYou: { reason: 'Deleted', causes: [], ticketOpen: false, deletedThread: true, offers: ['start-again'] } }] });
+  assert.equal((await commands.startAgain(work.workId, undefined, { branchChoice: 'continue' })).status, 200);
+  assert.deepEqual([bases, fetched], [['old'], []]);
+  const again = board.find(work.workId)!;
+  board.update({ items: [{ ...again, threads: [], needsYou: { reason: 'Deleted', causes: [], ticketOpen: false, deletedThread: true, offers: ['start-again'] } }] });
+  records.confirmThreadDeleted(work.workId, records.read(work.workId).revision, 'thread-1');
+  assert.equal((await commands.startAgain(work.workId, undefined, { branchChoice: 'new' })).status, 200);
+  assert.deepEqual([bases, fetched], [['old', 'release-tip'], ['release']]);
+});
+
+test('Start again on a new branch refuses a failed fetch with its error and starts nothing', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Recover build', repository: WEB, kind: 'build', status: 'In progress' });
+  records.addThread(work.workId, records.read(work.workId).revision, 'deleted-build', 'build');
+  records.confirmThreadDeleted(work.workId, records.read(work.workId).revision, 'deleted-build');
+  const { board, commands, log } = commandsOn([], undefined, records, [], undefined, undefined, undefined, { fetchBase: async () => { throw new Error('Could not fetch release from origin.'); } });
+  const item = board.find(work.workId)!;
+  board.update({ items: [{ ...item, threads: [], needsYou: { reason: 'Deleted', causes: [], ticketOpen: false, deletedThread: true, offers: ['start-again'] } }] });
+  const { revision } = records.read(work.workId);
+  const { status, body } = await commands.startAgain(work.workId, undefined, { branchChoice: 'new' });
+  assert.deepEqual([status, (body as { error: string }).error], [409, 'Could not fetch release from origin.']);
+  assert.deepEqual(log, []);
+  assert.equal(records.read(work.workId).revision, revision);
+  assert.deepEqual(records.launchIntents({ workId: work.workId }), []);
 });
 
 test('recovery options reject invalid values before launching', async () => {

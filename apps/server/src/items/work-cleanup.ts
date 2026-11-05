@@ -96,10 +96,13 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
     }
     dirtyFiles.push(...status.split('\n').filter(Boolean).map(line => `${path}: ${line}`));
   }
+  // A build branch has no upstream, and local default branch may lag the remote it started from.
+  const remoteDefault = `refs/remotes/origin/${input.defaultBranch}`;
+  const defaultBase = (await read(input.checkout, ['for-each-ref', '--format=%(refname)', remoteDefault])).trim() || input.defaultBranch;
   for (const ref of localBranches) {
     state.push(await read(input.checkout, ['rev-parse', `refs/heads/${ref}`]));
     const upstream = await read(input.checkout, ['for-each-ref', '--format=%(upstream:short)', `refs/heads/${ref}`]);
-    const base = upstream.trim() || input.defaultBranch;
+    const base = upstream.trim() || defaultBase;
     const commits = await read(input.checkout, ['log', '--format=%h %s', `${base}..refs/heads/${ref}`, '--']);
     unpushedCommits.push(...commits.split('\n').filter(Boolean).map(line => `${ref}: ${line}`));
   }

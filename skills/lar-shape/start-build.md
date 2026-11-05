@@ -22,17 +22,21 @@ project in T3. Start build:
    local copy with a warning if the read fails. Held GitHub edits stay out until
    accepted in item details. Later edits update the record without changing an
    already running build;
-2. records the project skills selected for the repository on the build's record,
+2. fetches the repository's default branch from origin. If the fetch fails or
+   takes over 2 minutes, the board refuses the start, shows the error and skips
+   the steps below;
+3. records the project skills selected for the repository on the build's record,
    so later selections change only future builds;
-3. sets a parent concept to In progress, where it stays until the concept is
+4. sets a parent concept to In progress, where it stays until the concept is
    complete;
-4. records a launch intent, so a restart finds the start instead of making a
+5. records a launch intent, so a restart finds the start instead of making a
    second thread;
-5. starts the build thread in the build's repository project, in a new
-   worktree on a branch named from the build's kind and title from the repository's resolved default or explicitly chosen PR target branch
+6. starts the build thread in the build's repository project, in a new
+   worktree on a branch named from the build's kind and title
    (`fix` for a `bug`, `feat` for a `feature` or `improvement`, else `chore`),
    with the message
    `Build <work ID>. Read <installed lar-build>/agents/builder.md and follow it.`,
    where `<installed lar-build>` is this skill's absolute path, and records the
-   thread on the build. The board then applies the machine's Shaping thread
-   cleanup setting to the item's shaping threads.
+   thread on the build. The branch starts from the fetched remote tip, whatever
+   the local default branch holds, and has no upstream. The board then applies
+   the machine's Shaping thread cleanup setting to the item's shaping threads.

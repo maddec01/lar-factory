@@ -2,11 +2,13 @@ import {buildMessage,type Item} from '@lar-factory/shared';
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { openWorkRecords, workRecordsPath, writeShapingThreadCleanup } from '@lar-factory/work-records';
 import { changeRecords, testFactoryContext, NOT_LANDED, readsRepositoryConfig, recordBlockers, SAMPLE_MODELS, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
+import { testEnv } from './repo-support.ts';
 import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, DriftChoice, RawItem, SkillCheckOutcome } from '@lar-factory/shared';
 
@@ -25,6 +27,9 @@ async function buildBoard(t: TestContext, items: object[], options: object = {},
 
 const startBuild = (board: Board, itemId: string, model?: unknown, origin = board.url, drift?: unknown) =>
   board.postSession({ itemId, model, drift }, '/api/start-build', origin);
+
+/** The commit on main in the repository fake-ssh.sh answers fetches from. */
+const originTip = (home: string) => execFileSync('git', ['-C', join(home, 'origin.git'), 'rev-parse', 'main'], { env: testEnv(), encoding: 'utf8' }).trim();
 
 const message = (home: string, workId: string, dataDir?: string) =>
   buildMessage({id:workId,number:12,title:'Issue 12'} as Item,`${home}/.agents/skills/lar-build`,{...testFactoryContext(home),...dataDir ? {dataDir}: {}});
@@ -45,8 +50,21 @@ test("Start build moves its concept's work record to In progress, writes nothing
   try { assert.equal(records.read(board.id(40)).status, 'In progress'); } finally { records.close(); }
   assert.deepEqual(await writes(board), []);
   assert.deepEqual(await board.t3Calls(), [
-    ['thread', 'start', 'project-factory', message(home, board.id(12)), '--worktree', 'main', '--branch', 'chore/12-issue-12', '--json'],
+    ['thread', 'start', 'project-factory', message(home, board.id(12)), '--worktree', originTip(home), '--branch', 'chore/12-issue-12', '--json'],
   ]);
+});
+
+test('a fetch that fails refuses Start build, starts no thread and lets a retry start it', async (t) => {
+  const { board, home } = await buildBoard(t, [readyIssue(12, ['build'])]);
+  const origin = join(home, 'origin.git');
+  renameSync(origin, `${origin}.away`);
+  const refused = await startBuild(board, board.id(12));
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, 'Could not fetch main from origin. Check the network and your Git login, then start the build again.');
+  assert.deepEqual(await board.t3Calls(), []);
+  renameSync(`${origin}.away`, origin);
+  assert.equal((await startBuild(board, board.id(12))).status, 200);
+  assert.equal((await board.t3Calls())[0]![5], originTip(home));
 });
 
 test('Start build asks the board app to check the skills before it starts the thread', async (t) => {
@@ -111,7 +129,7 @@ test('Start build runs the thread on the picked model choice', async (t) => {
   assert.equal(response.status, 200);
   assert.deepEqual(await board.t3Calls(), [
     ['launch', 'project-factory', message(home, board.id(12)), { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' },
-      { type: 'worktree', baseRef: 'main', branch: 'fix/12-issue-12' }, 'full-access'],
+      { type: 'worktree', baseRef: originTip(home), branch: 'fix/12-issue-12' }, 'full-access'],
   ]);
   assert.match((await (await startBuild(board, board.id(12), { instanceId: 'codex', model: '--help' })).json()).error, /isn't offered/);
 });

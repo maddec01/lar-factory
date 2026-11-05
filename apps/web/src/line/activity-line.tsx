@@ -89,7 +89,12 @@ export function ItemAgents({ item }: { item: Item }) {
 /** `item`'s line; nothing when it has none. */
 export function ActivityLine({ item }: { item: Item }) {
   const disconnected = useBoardStore((state) => !!state.clientError);
-  useClock((now) => Math.floor(now / 1_000));
+  // Keep checking every second, including the quiet/stale deadlines, but render only when the shown words change.
+  useClock((now) => {
+    const line = itemActivityLine(item, now, disconnected);
+    return line && JSON.stringify([line.state, line.action, line.agents,
+      line.state !== 'quiet' && line.ageMs !== undefined ? shortAge(line.ageMs) : null]);
+  });
   const now = Date.now();
   const line = itemActivityLine(item, now, disconnected);
   if (!line) return null;

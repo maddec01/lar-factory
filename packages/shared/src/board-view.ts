@@ -113,7 +113,7 @@ function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSectio
 
 /** Every section the item shows in, and the concept its stage row names when it is a dossier's part. */
 export function placementOf(item: Item, { starts, unavailable, all }: PlacementFacts): Placement {
-  const parent = all.find((other) => other.id === item.parentId);
+  const parent = item.parentId == null ? undefined : all.find((other) => other.id === item.parentId);
   const part = !!parent && stillOpen(parent);
   // A part still being refined lives in its dossier; from Ready on it also shows where its stage is.
   const dossierOnly = part && (['List', 'Queued', 'Shaping'].includes(item.status) || (item.status === 'Needs you' && !hasBuildThread(item)));

@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import type { BoardData } from '@lar-factory/shared';
 import { refKey, sameRepo, stillReading } from '@lar-factory/shared';
+import { shareBoardData } from './share-board-data.ts';
 
 interface BoardState {
   data: BoardData;
@@ -14,6 +15,8 @@ interface BoardState {
   clientError: string | null;
   /** Counts the page's own writes, so a poll that started before one doesn't show older data after it. */
   writes: number;
+  /** Counts accepted server snapshots, even when their content is unchanged, for connection-recovery notices. */
+  receives: number;
   receive: (data: BoardData, source?: 'live' | 'action') => void;
   fail: (message: string) => void;
   /** Moves the clock on, so ages and the stale banner change with no new data. */
@@ -29,6 +32,7 @@ export const useBoardStore = create<BoardState>()((set) => ({
   now: Date.now(),
   clientError: null,
   writes: 0,
+  receives: 0,
   receive: (data, source = 'live') => set((state) => {
     // A restarted server sends its empty and partial first-read snapshots before its complete board. Keep the last
     // content visible, but accept the new session, warnings, settings and action results immediately.
@@ -45,7 +49,8 @@ export const useBoardStore = create<BoardState>()((set) => ({
       for (const item of data.items) items.set(key(item), item);
       data = { ...data, items: [...items.values()], repos: data.repos.length || (!beforeSources && !cached.length) ? data.repos : state.data.repos };
     }
-    return { data, loaded: state.loaded || Boolean(data.firstRead.ready) || data.firstRead.settled, now: Date.now(), clientError: null };
+    data = shareBoardData(state.data, data);
+    return { data, loaded: state.loaded || Boolean(data.firstRead.ready) || data.firstRead.settled, now: Date.now(), clientError: null, receives: state.receives + 1 };
   }),
   fail: (message) => set({ now: Date.now(), clientError: message }),
   tick: () => set({ now: Date.now() }),

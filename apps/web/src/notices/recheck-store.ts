@@ -43,7 +43,7 @@ export const useRecheckStore = create<RecheckState>()((set, get) => ({
 // New board data from the server answers a failed Recheck's "can't reach" too, so its note goes;
 // a note that found a problem goes once the checks change.
 useBoardStore.subscribe((state, prev) => {
-  if (state.data === prev.data) return;
+  if (state.receives === prev.receives) return;
   const { answer } = useRecheckStore.getState();
   if (answer && (answer.error || answer.tools !== toolsOf(state.data))) useRecheckStore.setState({ answer: undefined });
 });

@@ -3,7 +3,7 @@
 // turn selections follow pingdotgg/t3code main at f054d1b8018721bd997d99cbb918a7b17bf098a4:
 // apps/server/src/usage/CodexUsageHistory.ts.
 
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { expandHome } from './t3-settings.ts';
 
 /** Runs `read` on T3's database at `path`, opened read-only; throws when it is missing or can't be read. */
@@ -262,7 +262,17 @@ export interface ActivityItemRow {
 
 /** A thread's newest tool, its newest text and every tool that still reads unfinished, however old. */
 export function activityItems(db: DatabaseSync, threadId: string): ActivityItemRow[] {
-  return [NEWEST_TOOL, NEWEST_TEXT, UNFINISHED_TOOLS].flatMap((query) => db.prepare(query).all(threadId) as unknown as ActivityItemRow[]);
+  return [NEWEST_TOOL, NEWEST_TEXT, UNFINISHED_TOOLS].flatMap((query) => activityStatement(db, query).all(threadId) as unknown as ActivityItemRow[]);
+}
+
+/** Only the four fixed activity queries are cached, by connection. Results are read afresh on every call. */
+const activityStatements = new WeakMap<DatabaseSync, Map<string, StatementSync>>();
+function activityStatement(db: DatabaseSync, query: string): StatementSync {
+  let statements = activityStatements.get(db);
+  if (!statements) { statements = new Map(); activityStatements.set(db, statements); }
+  let statement = statements.get(query);
+  if (!statement) { statement = db.prepare(query); statements.set(query, statement); }
+  return statement;
 }
 
 // A thread's subagent records that have not finished, with the state of the run
@@ -288,7 +298,7 @@ export interface ActivityAgentRow {
 
 /** The subagent records of `threadId` that have not finished, oldest first. */
 export function unfinishedAgents(db: DatabaseSync, threadId: string): ActivityAgentRow[] {
-  return db.prepare(WORKING_AGENTS).all(threadId) as unknown as ActivityAgentRow[];
+  return activityStatement(db, WORKING_AGENTS).all(threadId) as unknown as ActivityAgentRow[];
 }
 
 /** A folder with `~` expanded and no trailing slash. */

@@ -2,7 +2,8 @@
 // counted through their module, mocked here rather than hoisted, so they keep the store of the page support.ts mounts.
 
 import { expect, test, vi } from 'vite-plus/test';
-import type { ReactNode } from 'react';
+import { createElement, Profiler, type ReactNode } from 'react';
+import { createRoot } from 'react-dom/client';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { $, NOW, mountPage, sample, settle, text } from '../../test/support.ts';
 
@@ -36,4 +37,23 @@ test('a line keeps its tooltip quiet as the connection drops and its list goes',
   await settle(() => useBoardStore.setState({ clientError: null }));
   expect($('[data-activity]')!.dataset.activity).toBe('working');
   expect(warned.flatMap((spy) => spy.mock.calls.flat()).join(' ')).not.toContain('controlled');
+});
+
+test('a minute age skips unchanged second renders but still becomes unavailable on its original deadline', async (t) => {
+  await mountPage({ ...sample, items: [item], error: null, fetchedAt: at, firstRead: { ...sample.firstRead, settled: true } } as BoardData);
+  const { ActivityLine } = await import('./activity-line.tsx');
+  const { TooltipProvider } = await import('@lar-factory/ui/design-system/Tooltip');
+  const older = { ...item, threads: [{ ...thread, activity: { ...thread.activity!, actionAt: new Date(NOW - 65_000).toISOString() } }] } as Item;
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  t.onTestFinished(async () => { await settle(() => root.unmount()); });
+  let commits = 0;
+  await settle(() => root.render(createElement(TooltipProvider, null, createElement(Profiler, { id: 'line', onRender: () => { commits++; } }, createElement(ActivityLine, { item: older })))));
+  expect(host.querySelector('[data-age]')!.textContent).toBe('· 1m');
+  commits = 0;
+  await settle(() => vi.advanceTimersByTime(3_000));
+  expect(commits, 'the second still checks freshness, but the words have not changed').toBe(0);
+  await settle(() => vi.advanceTimersByTime(28_000));
+  expect(host.querySelector('[data-activity]')!.getAttribute('data-activity')).toBe('unavailable');
+  expect(commits).toBeGreaterThan(0);
 });

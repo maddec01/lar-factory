@@ -3,7 +3,7 @@
 // either way and a missing or broken one leaves the initial. Decorative, as a name sits beside it. An SVG favicon only
 // ever renders through this <img>, which runs none of its scripts.
 
-import { lazy, Suspense, useState, type ComponentProps, type ComponentType } from 'react';
+import { lazy, memo, Suspense, useState, type ComponentProps, type ComponentType } from 'react';
 import type { DynamicIcon, IconName } from 'lucide-react/dynamic';
 import { repoName, repositoryProjectIcon, sameRepo, type ProjectChoice, type ProjectIcon as Icon, type ProjectIconColor, type RepoConfig } from '@lar-factory/shared';
 import { useShallow } from 'zustand/react/shallow';
@@ -62,7 +62,16 @@ function Favicon({ src }: { src: string }) {
   return <img src={src} alt="" hidden={!loaded} onLoad={() => setLoaded(true)} onError={() => setFailed(true)} className={`${OVERLAY} object-contain`} />;
 }
 
-const firstGraphemes = (text: string, count: number) => [...new Intl.Segmenter().segment(text)].slice(0, count).map((part) => part.segment).join('');
+const graphemes = new Intl.Segmenter();
+const firstGraphemes = (text: string, count: number) => {
+  let shown = '';
+  let length = 0;
+  for (const { segment } of graphemes.segment(text)) {
+    shown += segment;
+    if (++length === count) break;
+  }
+  return shown;
+};
 
 function IconSquare({ icon, name, tone, size }: { icon: Icon | null | undefined; name: string; tone: string; size: keyof typeof SIZES }) {
   const { square, emoji, monogram } = SIZES[size];
@@ -80,13 +89,13 @@ function IconSquare({ icon, name, tone, size }: { icon: Icon | null | undefined;
 }
 
 /** The icon of a repository the board knows. */
-export function ProjectIcon({ repo, size }: { repo: string; size: keyof typeof SIZES }) {
+export const ProjectIcon = memo(function ProjectIcon({ repo, size }: { repo: string; size: keyof typeof SIZES }) {
   // A push makes new repos and icons, so this selects what they say here, not those objects.
   const name = useBoardStore((state) => repoName(repo, state.data.repos));
   const tone = useBoardStore((state) => repoTone(repo, state.data.repos));
   const icon = useBoardStore(useShallow((state) => repositoryProjectIcon(state.data, repo)));
   return <IconSquare icon={icon} name={name} tone={tone} size={size} />;
-}
+});
 
 /** The icon of a T3 project, which the board may not know: most of onboarding's projects aren't on it. */
 export function ProjectChoiceIcon({ project, size }: { project: ProjectChoice; size: keyof typeof SIZES }) {

@@ -58,12 +58,11 @@ export function StartEntries({ item, data, onPick, requireModel = false }: { ite
 }
 
 /**
- * Start, a Start button named `label`, or the tag that took its place; `main` makes it its area's Main action, and
- * `naming` adds the item's name to the button, for an item whose row a filter hides. `linkedBeside` names a thread
- * Open thread already links beside it, so a finished or stopped run doesn't link it again.
+ * Start, a Start button named `label`, or the tag that took its place. `linkedBeside` names a thread Open thread
+ * already links beside it, so a finished or stopped run doesn't link it again.
  */
-export function StartControl({ item, data, label = 'Start', main, kind = 'refine', naming, linkedBeside }: {
-  item: Item; data: BoardData; label?: string; main?: boolean; kind?: StartKind; naming?: boolean; linkedBeside?: string | undefined;
+export function StartControl({ item, data, label = 'Start', kind = 'refine', linkedBeside }: {
+  item: Item; data: BoardData; label?: string; kind?: StartKind; linkedBeside?: string | undefined;
 }) {
   const { pending, uncertain, error } = useShownStart(item, data, kind);
   const closed = useStart(item.id, kind)?.phase === 'closed';
@@ -102,9 +101,8 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
         : stopped && <><span className="basis-full">Run stopped.</span>{observed.id !== linkedBeside && <OpenThread item={item} data={data} threadId={observed.id} />}</>}
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
-          <Button {...buttonKind(main ? 'main' : 'start')} aria-busy={pending || undefined} leftIcon={pending ? <Spinner spin="animate-spin" className="size-4" /> : !main && !retry && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}
-            {...naming && { className: 'max-w-96', title: `A filter hides ${itemName(item)}` }}>
-            {naming ? <span className="truncate">{verb}: {itemName(item)}</span> : verb}{!pending && ' ▾'}
+          <Button {...buttonKind('start')} aria-busy={pending || undefined} leftIcon={pending ? <Spinner spin="animate-spin" className="size-4" /> : !retry && ICON.play} data-start={item.id} aria-label={`${verb} ${itemName(item)}`} {...state}>
+            {verb}{!pending && ' ▾'}
           </Button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} with`} {...opensOnChecked}>

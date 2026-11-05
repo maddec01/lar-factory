@@ -1,6 +1,5 @@
-// The Queue rail: Queued items as numbered rows that open the item dialog, Shape issue and
-// Start next with their model menu, and what a start shows on the row. Ported from the Queued cases of the old Board
-// view's tests.
+// The Queue rail: Queued items as numbered rows that open the item dialog, Shape issue with its model menu, and what
+// a start shows on the row. Ported from the Queued cases of the old Board view's tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, moved, mountPage, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
@@ -18,7 +17,6 @@ const queue = () => $('.queue')!;
 const rows = () => $$<HTMLLIElement>('.queue ol > li');
 const row = (id: string) => $<HTMLLIElement>(`.queue li[data-item="${id}"]`)!;
 const start = (id = 'I_sample05') => row(id).querySelector<HTMLButtonElement>(`[data-start="${id}"]`)!;
-const startNext = () => queue().querySelector<HTMLButtonElement>('header [data-start]')!;
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
 const press = async (el: HTMLElement) => {
@@ -88,10 +86,11 @@ test("a dossier's parts are left out and show in the dossier; a Queued parent st
   expect($('[data-dossier="I_sample09"] [data-part="I_d200"]'), "concept #200's decision, in its dossier").not.toBeNull();
 });
 
-test('an empty Queue says where items come from, and has no Start next', async () => {
+test('an empty Queue says where items come from, and offers no start', async () => {
   await mountPage({ ...sample, items: sample.items.filter((i) => i.status !== 'Queued') });
   expect(text(queue().querySelector('p'))).toBe('Queue empty. Queue items from the List.');
   expect(queue().querySelector('[data-start]')).toBeNull();
+  expect(queue().querySelector('header button')).toBeNull();
 });
 
 test('a row opens the item dialog and stays marked while it shows', async () => {
@@ -101,7 +100,7 @@ test('a row opens the item dialog and stays marked while it shows', async () => 
   expect(row('I_sample06').className).toContain('ring-2');
 });
 
-test('a Queued item blocked by an open issue shows only Start after, a Start, and Start next passes over it', async () => {
+test('a Queued item blocked by an open issue shows only Start after', async () => {
   const blocked = { ...withChoices, items: sample.items.map((i) => (i.id === 'I_sample05'
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };
   await mountPage(blocked);
@@ -109,31 +108,25 @@ test('a Queued item blocked by an open issue shows only Start after, a Start, an
   const after = row('I_sample05').querySelector<HTMLElement>('[data-start-after]')!;
   expect([text(after), after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual(['Start after ▾', 'start', true]);
   expect(text(row('I_sample05').querySelector('[data-blocked]'))).toBe('Blocked by #202 until it completes');
-  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
-test("a Queued item whose repository has no T3 project has its Shape issue disabled with the project's hint, and Start next passes over it", async () => {
+test("a Queued item whose repository has no T3 project has its Shape issue disabled with the project's hint", async () => {
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   await mountPage({ ...withChoices, repositoryProjects: { 'maddec01/lar-server': hint } });
   expect([text(start()), start().disabled, start().title]).toEqual(['Shape', true, hint]);
   expect(row('I_sample05').querySelector('[data-start-after]'), 'nothing blocks it, so no Start after').toBeNull();
-  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
-test("a Queued item whose repository is still onboarding has its Shape issue disabled until onboarding's PR merges, and Start next passes over it", async () => {
+test("a Queued item whose repository is still onboarding has its Shape issue disabled until onboarding's PR merges", async () => {
   await mountPage({ ...withChoices, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
   expect([text(start()), start().disabled, start().title]).toEqual(['Shape', true, "Waits for onboarding to finish"]);
-  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
-test('when no queued item can start, Start next shows disabled and says why', async () => {
+test('when no queued item can start, the Queue header shows no button and no row waits for a slot', async () => {
   const held = { ...withChoices, items: sample.items.map((i) => (['I_sample05', 'I_sample06', 'I_sample21'].includes(i.id)
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };
   await mountPage(held);
-  const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
-  expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs a T3 project, waits for onboarding, or has a thread at work.']);
-  expect(next.className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
-  expect(next.dataset.kind, 'a Main action while disabled too').toBe('main');
+  expect(queue().querySelector('header button')).toBeNull();
   expect(text(queue()), 'no row waits for a slot').not.toContain('next when a build slot frees');
 });
 
@@ -141,17 +134,17 @@ test('the Queue has no Auto-start and never mentions a build slot, and its Start
   await mountPage(withChoices);
   expect([queue().querySelector('[role="switch"]'), queue().querySelector('.build-limit'), queue().querySelector('.drag')]).toEqual([null, null, null]);
   expect(text(queue())).not.toContain('build slot');
-  expect([start().getAttribute('aria-disabled'), startNext().getAttribute('aria-disabled')]).toEqual(['false', 'false']);
+  expect(start().getAttribute('aria-disabled')).toBe('false');
 });
 
-test('Shape issue sits on Queued issues, one Start on every row, and Start next is filled', async () => {
+test('Shape issue sits on Queued issues, one Start on every row, and none in the Queue header', async () => {
   await mountPage();
   expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['I_sample05', 'I_sample06', 'I_sample21']);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-label')])
     .toEqual(['Shape ▾', 'menu', `Shape #129 ${sample05.title}`]);
   expect([start(), start('I_sample06')].map((b) => [b.dataset.kind, Boolean(b.querySelector('[data-slot="icon"] svg'))]), 'every row the same Start, with its icon')
     .toEqual([['start', true], ['start', true]]);
-  expect(startNext().dataset.kind, "Start next is the Queue's Main action").toBe('main');
+  expect(queue().querySelector('header button')).toBeNull();
 });
 
 test("Shape issue opens its menu without opening the dialog, and starts its row's item with the picked model", async () => {
@@ -172,15 +165,6 @@ test("Shape issue opens its menu without opening the dialog, and starts its row'
   expect(row('I_sample06').querySelector('[data-start]')).toBeNull();
   expect(text(toast())).toBe('Refining started for #20. Open thread');
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({ instanceId: 'claudeAgent', model: 'claude-opus-5-5' });
-});
-
-test('Start next starts the first row that can start, with its model menu', async () => {
-  holdPosts(withChoices);
-  await mountPage(withChoices);
-  expect([text(startNext()), startNext().getAttribute('aria-label')]).toEqual(['Start next ▾', `Start next #129 ${sample05.title}`]);
-  await pressMenu(startNext());
-  await press(entries()[1]!);
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
 });
 
 test('while an item has a running or needs-you thread, its row has Open thread in place of Shape issue', async () => {

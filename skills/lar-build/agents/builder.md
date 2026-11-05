@@ -159,6 +159,13 @@ Build step 1 and plan from the brief.
    Fixer when helpful. The Fixer reruns the failed check after a fix; it does
    not repeat unrelated suites. Close failures with their cause or fix.
    All checks must pass; an unexplained failure that later passed stays open.
+
+   An interrupted or unfinished run leaves its check missing, never passed or
+   failed. After the check subagent reports, read `lar-work checks <work ID>`.
+   Once its runs have ended, start one new check subagent for the missing
+   checks, or for this whole step if no list was saved. If anything is still
+   missing, set **Needs you**, naming it and recommending one more run over
+   waiting while the user looks into it. Then continue from this step.
 7. Run **Remove worktrees**, then push the branch. Don't open the PR yet.
 
 Ordinary questions to the user follow `<lar-build>/shared/questions.md`: Needs you,

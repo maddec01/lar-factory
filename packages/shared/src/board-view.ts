@@ -30,7 +30,8 @@ export interface BoardSections {
   /** Your desk: items waiting on the user's answer, verification or merge, including shaping and concept questions. */
   needsYou: Item[];
   concepts: Item[];
-  queued: Item[];
+  /** What the board's Shaping section holds, across every repository. */
+  shaping: Item[];
   list: Item[];
   /** One per configured repository and any other repository a List item has, the most items in List first (ties in
    *  configured order); each group's items in board order. The List modal and the board search
@@ -148,7 +149,7 @@ export function boardSections(data: BoardData, now: number, clientError?: string
   return {
     needsYou: inSection(items, data, unavailable, 'desk'),
     concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
-    queued: inSection(items, data, unavailable, 'queue'),
+    shaping: inSection(items, data, unavailable, 'shaping'),
     list,
     listGroups,
     done: items

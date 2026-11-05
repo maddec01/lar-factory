@@ -304,8 +304,8 @@ test('sample covers every status and both repositories', () => {
   assert.equal(statuses.size, 10);
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/lar-server') && repos.has('maddec01/lar-apple'));
-  const { needsYou, queued, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
-  assert.deepEqual([sample.items.length, needsYou.length, queued.length, list.length], [28, 7, 3, 4]);
+  const { needsYou, shaping, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
+  assert.deepEqual([sample.items.length, needsYou.length, shaping.length, list.length], [28, 7, 4, 4]);
 });
 
 test('the desk holds Needs you, Verify and Ready to merge, in flow order, including concepts in Needs you, and no Ready item', () => {

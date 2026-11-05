@@ -4,6 +4,10 @@ The board tracks work saved on this machine and in a repository's issue tracker.
 
 ## Language
 
+**Project**:
+A repository the board works with, as a person sees it on the board and in Settings.
+_Avoid_: repository as the visible name for this. Use repository only for the real GitHub or Azure repository.
+
 **Concept**:
 A workspace for understanding an outcome through questions, evidence, decisions and proposed work. Its refinement can finish before its delivery.
 _Avoid_: delivery ticket as a synonym for concept.
@@ -25,7 +29,7 @@ The reason work waits on the user, shown with the actions that resolve it.
 _Avoid_: notification, alert.
 
 **Project icon**:
-The icon a repository's T3 project shows, either a favicon file or a chosen lucide, emoji or monogram icon.
+The icon a Project's T3 project shows, either a favicon file or a chosen lucide, emoji or monogram icon.
 _Avoid_: repository logo, avatar.
 
 **Abandon**:
@@ -126,7 +130,7 @@ The provider instance and model the board starts a thread on, or T3 Project defa
 _Avoid_: model pick, model setting, T3 default.
 
 **Scope**:
-The one repository the board shows, or all repositories.
+The one Project the board shows, or all Projects.
 _Avoid_: project filter, project picker.
 
 **Board search**:

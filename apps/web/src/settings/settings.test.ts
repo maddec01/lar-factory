@@ -201,7 +201,7 @@ test('a Project with a setup offers its page, an unread one has none, and Add Pr
   add.focus();
   await settle(() => add.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repository');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Project');
   expect(dialog()!.contains(document.activeElement), 'the onboarding dialog holds focus').toBe(true);
   expect(text(modal()!.querySelector('[data-slot="modal-header"] h2')), 'Settings stays under it').toBe('Projects');
   await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
@@ -219,7 +219,7 @@ test('a repository still onboarding is listed with its provider and its step, an
   await open('Projects', data);
   expect(groups()[0]).toEqual(['Projects', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
   expect(textBesideIcon(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Work and docsResume');
-  expect(textBesideIcon(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResume');
+  expect(textBesideIcon(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at ProjectResume');
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Work and docs');

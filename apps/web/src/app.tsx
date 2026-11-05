@@ -35,7 +35,7 @@ function Content() {
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pb-4 pt-3 *:shrink-0">
       <OnboardingCards />
       {scope && !loaded && stillReading(data, scope)
-        ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><Loader label="Loading projects…" className="size-4" /></p>
+        ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><Loader label="Loading Projects…" className="size-4" /></p>
         : <StageLayout items={items} desk={<Desk items={items} />} />}
     </div>
   );

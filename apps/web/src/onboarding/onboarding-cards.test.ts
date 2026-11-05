@@ -29,7 +29,7 @@ test("a card for an older board's onboarding says it stopped at the first step",
   const data: BoardData = { ...empty, onboarding: [{ repo: 'maddec01/lar-web', progress: pr }] };
   serve(data, []);
   await mountPage(data);
-  expect(text(card())).toContain('Stopped at Repository');
+  expect(text(card())).toContain('Stopped at Project');
 });
 
 test("an Azure DevOps repository's card shows its name decoded, and its step", async () => {
@@ -56,6 +56,7 @@ test('Resume reopens the dialog on the stored step with the stored project', asy
   await resume();
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Work and docs');
   expect(text(dialog()!.querySelector('#onboarding-place'))).toBe('Set up lar-web.');
+  await settle(() => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).includes('Back'))!.click());
   await settle(() => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).includes('Back'))!.click());
   const radio = dialog()!.querySelector('[data-choice="lar-web"] [role="radio"]')!;
   expect(radio.getAttribute('aria-checked')).toBe('true');

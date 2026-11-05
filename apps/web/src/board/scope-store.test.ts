@@ -76,7 +76,7 @@ test('before the first read settles, a saved repository not on the board still s
   localStorage.setItem(SCOPE_KEY, GONE);
   await mountPage(reader);
   expect(scopeLabel()).toBe(scoped('lar-gone'));
-  expect(text($('[data-reading]'))).toBe('Loading projects…');
+  expect(text($('[data-reading]'))).toBe('Loading Projects…');
 });
 
 test('once the first read settles, a saved repository not on the board shows as All Projects and the saved value stays', async () => {

@@ -142,7 +142,7 @@ test('domain docs requires branch and PR access and keeps its saved paths', asyn
   serve(board); await openEdit(board);
   expect(setting('domainDocs').querySelector<HTMLButtonElement>('[role="combobox"]')!.disabled).toBe(true);
   expect(setting('glossary').querySelector<HTMLInputElement>('input')!.value).toBe('WORDS.md');
-  expect(text(setting('domainDocs'))).toContain('open-pr');
+  expect(text(setting('domainDocs'))).toContain('Open PRs');
 });
 
 test('a label search finds one of 150 choices by keyboard and saves the complete kind once on close', async () => {

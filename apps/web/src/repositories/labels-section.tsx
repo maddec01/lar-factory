@@ -216,7 +216,7 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
       <h3 className="m-0 text-sm font-medium">{heading}</h3>
       <p className="m-0 text-xs text-base-700">Changes here write to the tracker straight away, for everyone using {changeScope === 'project' ? 'the whole project' : 'the repository'}.</p>
     </div>
-    {readOnly && <AccessReason reason={readOnly} onRecheck={() => { void useEditStore.getState().recheck(repo); }} />}
+    {readOnly && <AccessReason repo={repo} reason={readOnly} onRecheck={() => { void useEditStore.getState().recheck(repo); }} />}
     {error
       ? <Alert tone="danger" title={`Could not read ${heading.toLowerCase()}`} action={<Button {...kind('other')} onClick={retry}>Retry</Button>}>{error}</Alert>
       : !labels

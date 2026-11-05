@@ -4,6 +4,22 @@ import { expect, test, vi } from 'vite-plus/test';
 import { $, settle, text } from '../../test/support.ts';
 import type { AccessRow } from './access-list.tsx';
 
+test.each([
+  ['team/app', 'Create issues', 'Edit issues'],
+  ['org/project/repo', 'Create work items', 'Edit work items'],
+])('access reasons use the %s operation names', async (repo, create, edit) => {
+  const { AccessReason } = await import('./access-list.tsx');
+  document.body.replaceChildren();
+  const host = document.body.appendChild(document.createElement('div'));
+  await settle(() => createRoot(host).render(createElement(AccessReason, {
+    repo, reason: 'Access to publish-ticket is not checked yet. Access to edit-ticket was refused.',
+  })));
+  expect(text(host)).toContain(`Access to ${create} is not checked yet.`);
+  await settle(() => host.querySelector<HTMLButtonElement>('[aria-label="About access"]')!.click());
+  expect(text(document.body)).toContain(`Access to ${edit} was refused.`);
+  expect(text(document.body)).not.toMatch(/publish-ticket|edit-ticket/);
+});
+
 test('the shared list accepts a separate read row and the compact onboarding operations', async () => {
   const { AccessList, operationNames } = await import('./access-list.tsx');
   const names = operationNames('team/app');

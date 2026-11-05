@@ -209,7 +209,7 @@ test('without management access the section is read-only and states the reason',
   const board = boardWith({ access: { ...SETUP.access, 'manage-labels': 'refused' } });
   const tracker = serve(board, [{ name: 'docs' }]);
   await openEdit(board);
-  expect(text(section())).toContain('Access to manage-labels was refused.');
+  expect(text(section())).toContain('Access to Manage labels was refused.');
   expect(creating().disabled).toBe(true);
   expect(buttonIn(section(), 'Create label')!.disabled).toBe(true);
   expect(buttonIn(rowOf('docs')!, 'Edit docs')!.disabled).toBe(true);

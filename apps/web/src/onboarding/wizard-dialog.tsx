@@ -10,17 +10,11 @@ import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
 import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
-import { STEP_TITLES, type StepId } from './wizard-choices.ts';
+import { STEP_TITLES } from './wizard-choices.ts';
 import { type Run, pickedProject, runSteps, stepReady, useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { ProjectChoiceIcon, ProjectIcon } from '../repositories/project-icon.tsx';
 import { useSettingsStore } from '../settings/settings-store.ts';
-
-const STEP_HELP: Record<StepId, string> = {
-  project: 'Choose where agents will work.',
-  work: 'Choose what to show and what builds may save.',
-  access: 'Check the access the factory needs.',
-};
 
 /**
  * Where focus goes when the dialog closes and the copied Modal found nowhere to return it: the button that opened it;
@@ -43,7 +37,7 @@ function Nav({ run }: { run: Run }) {
     <>
       {at > 0 && <Button {...kind('other')} disabled={finish.state === 'saving'} onClick={back}>Back</Button>}
       {at === steps.length - 1
-        ? <Button {...kind('main')} disabled={!ready} loading={finish.state === 'saving'} leftIcon={<Check />} onClick={() => void save()}>{savingLabels ? 'Save and add repository' : 'Add repository'}</Button>
+        ? <Button {...kind('main')} disabled={!ready} loading={finish.state === 'saving'} leftIcon={<Check />} onClick={() => void save()}>{savingLabels ? 'Save and add Project' : 'Add Project'}</Button>
         : <Button {...kind('main')} disabled={!ready} rightIcon={<ArrowRight />} onClick={() => void next()}>Next</Button>}
     </>
   );
@@ -83,14 +77,14 @@ function WizardModal({ run }: { run: Run }) {
   const picked = pickedProject(run, projects);
   return (
     <Modal onClose={close}>
-      {/* ninna-ui's Modal drops the description from aria-describedby, so the step's place names itself. */}
-      <Modal.Content ref={dialog} data-onboarding-dialog title={finished ? 'Repository added' : STEP_TITLES[run.step]} aria-describedby="onboarding-place"
-        description={finished ? undefined : STEP_HELP[run.step]} focusFirstField={false}>
+      {/* The progress and Project line describe their own content. */}
+      <Modal.Content ref={dialog} data-onboarding-dialog title={finished ? 'Project added' : STEP_TITLES[run.step]} aria-describedby={undefined}
+        focusFirstField={false}>
         <div className="grid shrink-0 gap-2 px-5 pb-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2">
             {picked ? <ProjectChoiceIcon project={picked} size="row" /> : run.repo && <ProjectIcon repo={run.repo} size="row" />}
             <Text id="onboarding-place" tone="muted">
-              Set up {picked?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'}.
+              Set up {picked?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a Project'}.
             </Text>
           </div>
           <Progress value={doneCount} max={steps.length} caption={done} aria-label={done} />

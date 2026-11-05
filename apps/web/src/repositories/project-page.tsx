@@ -60,7 +60,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
     <section className="grid min-w-0 gap-3"><h3 className="m-0 text-[13px] font-semibold">Docs and skills</h3>
       <div className={FIELD_GROUP}>
         <FieldRow id="domainDocs" label="Glossary and decisions" help="Choose whether builds include domain docs in their PRs." error={errors.domainDocs}
-          description={docsProblem && <AccessReason reason={docsProblem} onRecheck={recheckAccess} checking={running === 'recheck'} />}>
+          description={docsProblem && <AccessReason repo={repo} reason={docsProblem} onRecheck={recheckAccess} checking={running === 'recheck'} />}>
           <span className="w-44 max-w-full"><FormSelect aria-label="Domain docs" writesOnPick value={docsProblem ? 'off' : drafts.domainDocs} disabled={!!docsProblem}
             onChange={(value) => { type(repo, 'domainDocs', value); void save(repo, 'domainDocs', latest.current); }} choices={[{ value: 'off', name: 'Off' }, { value: 'repository', name: 'Write in build PRs' }]} /></span>{resetButton('domainDocs')}
         </FieldRow>

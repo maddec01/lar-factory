@@ -91,7 +91,7 @@ test('the choice is disabled in sample mode, which has no Auto-build', async () 
 });
 
 const REPOS = [{ repo: 'o/a' }, { repo: 'o/b' }, { repo: 'o/c' }] as BoardData['repos'];
-const listed = () => $$('[data-auto-build-model] [aria-label="Default model by repository"] li').map(text);
+const listed = () => $$('[data-auto-build-model] [aria-label="Default model by Project"] li').map(text);
 
 test('T3 Project default lists each repository with its default model, its effort when T3 stores one, or that it is unknown', async () => {
   await openGeneral({ ...withAutoBuild({ on: false }), repos: REPOS, t3Defaults: { 'o/a': { ...OPUS, options: [{ id: 'effort', value: 'medium' }] }, 'o/b': { instanceId: 'codex', model: 'gpt-5.5' } } });
@@ -118,12 +118,13 @@ test('the list stays hidden in sample mode', async () => {
   expect(listed()).toEqual([]);
 });
 
-test("the description says each build uses the default model of its repository's T3 project", async () => {
+test("help explains each build uses its T3 project default model", async () => {
   await openGeneral(withAutoBuild({ on: false }));
-  expect(text(row())).toContain("the default model of its repository's T3 project");
+  await settle(() => row().querySelector<HTMLButtonElement>('[aria-label="About Auto-build model"]')!.click());
+  expect(text($('[data-help-text]'))).toContain("the default model of its T3 project");
 });
 
 test('a board with no repositories has no list', async () => {
   await openGeneral({ ...withAutoBuild({ on: false }), repos: [], t3Defaults: {} });
-  expect($('[data-auto-build-model] [aria-label="Default model by repository"]')).toBeNull();
+  expect($('[data-auto-build-model] [aria-label="Default model by Project"]')).toBeNull();
 });

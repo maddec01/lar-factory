@@ -1,8 +1,8 @@
-// The settings rows' working controls, on the design system's Switch, RadioGroup and Button.
+// The settings rows' working controls, on the design system's Switch, Select and Button.
 
 import type { ReactNode } from 'react';
 import { Button } from '@lar-factory/ui/design-system/Button';
-import { RadioGroup, RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
+import { FormSelect } from '@lar-factory/ui/form-select';
 import { Switch as DesignSwitch } from '@lar-factory/ui/design-system/Switch';
 import { kind } from '../buttons/button-kinds.tsx';
 
@@ -22,7 +22,7 @@ export function Switch({ on, onChange, disabled, busy, label, description }: {
     onCheckedChange={(next) => !busy && onChange?.(next)} />;
 }
 
-/** A choice of a few options, as a row of radios. */
+/** A choice of a few options, in a dropdown. */
 export function Choice({ label, options, value, onChange, disabled, busy }: {
   label: string;
   options: { value: string; label: string }[];
@@ -33,10 +33,8 @@ export function Choice({ label, options, value, onChange, disabled, busy }: {
   busy?: boolean;
 }) {
   return (
-    <RadioGroup aria-label={label} orientation="horizontal" className="flex gap-4" value={value ?? ''} disabled={disabled}
-      onValueChange={(next) => !busy && onChange?.(next)}>
-      {options.map((o) => <RadioGroupItem key={o.value} value={o.value} label={o.label} aria-disabled={busy} className="aria-disabled:cursor-progress" />)}
-    </RadioGroup>
+    <span className="block w-44 max-w-full"><FormSelect aria-label={label} writesOnPick placeholder="Choose" value={value ?? ''} disabled={disabled} aria-disabled={busy}
+      onChange={(next) => !busy && onChange?.(next)} choices={options.map((option) => ({ value: option.value, name: option.label }))} /></span>
   );
 }
 

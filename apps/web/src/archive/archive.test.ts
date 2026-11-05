@@ -3,7 +3,7 @@
 
 import { expect, test } from 'vite-plus/test';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, fetchMock, mountPage, chooseOption, sample, settle, text } from '../../test/support.ts';
 
 const base = sample.items.find((i) => i.id === 'I_sample13')!;
 const archived = (id: string, title: string, archivedAs: Item['archived'], change: Partial<Item> = {}): Item =>
@@ -88,7 +88,7 @@ test('a timed delete names the work it would delete and saves only on its confir
     ? (shelved = [aside], { error: null, saved: true, board: withRetention({ retention: kept }) })
     : { error: null, saved: false, due: [{ workId: 'W_done', title: 'Shipped' }] } });
   const setting = $('[data-retention]')!;
-  await settle(() => $$<HTMLButtonElement>('[data-retention] [role="radio"]').find((r) => r.value === 'delete')!.click());
+  await chooseOption(document.querySelector('[data-retention] [role="combobox"]')!, 'Delete it after');
   await settle(() => $<HTMLButtonElement>('[data-save-retention]')!.click());
   expect(posted('/api/retention')).toEqual([{ hideAfterDays: 7, deleteAfterDays: 30, confirmed: false }]);
   expect(text($('[data-delete-confirm]'))).toContain('Shipped');

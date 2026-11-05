@@ -1,6 +1,7 @@
-import { useId } from 'react';
 import { effectiveIssueSettings } from '@lar-factory/shared';
-import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
+import { Switch } from '../settings/controls.tsx';
+import { FIELD_GROUP, FieldRow } from '../settings/field-row.tsx';
+import { AccessReason } from './access-list.tsx';
 
 const LABELS = {
   createIssuesFromAddItem: 'Create issues from Add item',
@@ -10,19 +11,17 @@ const LABELS = {
 export type IssueSetting = keyof typeof LABELS;
 
 /** Both setup screens show effective values while keeping saved preferences intact. */
-export function IssueDefaults({ setup, disabled = false, onChange }: {
-  setup: Parameters<typeof effectiveIssueSettings>[0]; disabled?: boolean; onChange: (key: IssueSetting, value: boolean) => void;
+export function IssueDefaults({ setup, disabled = false, onChange, onRecheck, checking = false, errors = {} }: {
+  setup: Parameters<typeof effectiveIssueSettings>[0]; disabled?: boolean; onRecheck?: (() => void) | undefined; checking?: boolean; errors?: Partial<Record<IssueSetting, string>>; onChange: (key: IssueSetting, value: boolean) => void;
 }) {
-  const id = useId();
   const effective = effectiveIssueSettings(setup);
-  return <div className="grid gap-4">
+  return <div className={FIELD_GROUP}>
     {(Object.keys(LABELS) as IssueSetting[]).map((key) => {
       const reason = key === 'writeRefinedSpec' ? effective.specReason : effective.createReason;
-      return <div key={key} data-setting={key} className="grid gap-1.5">
-        <Checkbox label={LABELS[key]} checked={effective[key]} disabled={disabled || reason !== null}
-          aria-describedby={reason ? `${id}-${key}` : undefined} onChange={() => onChange(key, !effective[key])} />
-        {reason && <p id={`${id}-${key}`} className="m-0 pl-7 text-xs text-base-700">{reason}</p>}
-      </div>;
+      return <FieldRow key={key} id={key} label={LABELS[key]} error={errors[key]}
+        description={reason && <AccessReason reason={reason} onRecheck={onRecheck} checking={checking} />}>
+        <Switch label={LABELS[key]} description={reason ?? undefined} on={effective[key]} disabled={disabled || reason !== null} onChange={(on) => onChange(key, on)} />
+      </FieldRow>;
     })}
   </div>;
 }

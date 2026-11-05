@@ -13,6 +13,8 @@ import { kind } from '../buttons/button-kinds.tsx';
 import { postAction } from '../items/card-actions.ts';
 import { tint } from '../items/label-tint.ts';
 import { useEditStore, type LabelChange } from './edit-store.ts';
+import { FieldRow, FIELD_GROUP } from '../settings/field-row.tsx';
+import { AccessReason } from './access-list.tsx';
 import { KIND_NAMES, type VocabularyKind } from './vocabulary-editor.tsx';
 
 const SWATCHES = ['D73A4A', 'E99695', 'FBCA04', '0E8A16', 'C2E0C6', 'BFDADC', '1D76DB', '5319E7', 'D4C5F9', 'EDEDED'];
@@ -78,12 +80,12 @@ function LabelEditor({ label, capabilities, mappings, onSave, onDone }: {
     {capabilities.changeScope === 'project' && <Alert tone="warning" title="Renaming affects the whole project">
       {capabilities.heading} belong to the project, not to this repository. Everything with this {capabilities.noun} follows the new name, in every repository of the project. {OTHER_MAPPINGS}
     </Alert>}
-    <label className="grid gap-1.5 text-xs">{Noun} name
+    <div className={FIELD_GROUP}><FieldRow label={`${Noun} name`}>
       <Input aria-label={`${Noun} name`} value={draft.name} disabled={running !== null} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-    </label>
+    </FieldRow>
     <ProblemText>{problem}</ProblemText>
     {mappings && update.name !== undefined && <p className="m-0 text-xs text-base-700">This also updates {mappings}.</p>}
-    {capabilities.color && <div className="grid gap-1.5 text-xs">Colour
+    {capabilities.color && <FieldRow label="Colour">
       <span className="flex flex-wrap items-center gap-1.5">
         {SWATCHES.map((hex) => <button key={hex} type="button" aria-label={`Colour #${hex}`} aria-pressed={hex.toLowerCase() === draft.color.toLowerCase()} disabled={running !== null}
           className={`size-5 rounded-full border ${hex.toLowerCase() === draft.color.toLowerCase() ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--card)' : ''}`} style={{ background: `#${hex}` }}
@@ -91,10 +93,10 @@ function LabelEditor({ label, capabilities, mappings, onSave, onDone }: {
         <Input aria-label="Hex colour" className="w-24" value={draft.color} disabled={running !== null} onChange={(e) => setDraft({ ...draft, color: e.target.value })} />
       </span>
       <ProblemText>{badColor}</ProblemText>
-    </div>}
-    {capabilities.description && <label className="grid gap-1.5 text-xs">Description
+    </FieldRow>}
+    {capabilities.description && <FieldRow label="Description">
       <Input aria-label={`${Noun} description`} placeholder="Optional" value={draft.description} disabled={running !== null} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-    </label>}
+    </FieldRow>}</div>
     <ProblemText>{failure}</ProblemText>
     <span className="flex gap-2">
       <Button {...kind('other')} type="button" disabled={running !== null} onClick={onDone}>Cancel</Button>
@@ -183,11 +185,11 @@ function CreateLabel({ capabilities, cannotCreate, showUnavailable, onCreate }: 
     if (!failed) setFresh('');
   };
   return <>
-    <form className="flex gap-2" onSubmit={(event) => void create(event)}>
+    <div className={FIELD_GROUP}><FieldRow label={`New ${noun}`}><form className="flex min-w-0 max-w-full flex-wrap gap-2" onSubmit={(event) => void create(event)}>
       <Input data-new-label aria-label={`New ${noun}`} placeholder={`New ${noun} name`} value={fresh} disabled={!!cannotCreate || running !== null} onChange={(e) => { setFresh(e.target.value); setFailure(null); }} />
       <Button {...kind('other')} type="submit" className="shrink-0" leftIcon={<Plus />} disabled={!!cannotCreate || !!problem || !fresh.trim() || running !== null}
         {...cannotCreate && { title: cannotCreate }}>Create {noun}</Button>
-    </form>
+    </form></FieldRow></div>
     {showUnavailable && <p className="m-0 text-xs text-base-700">{createUnavailable}</p>}
     <ProblemText>{problem ?? failure}</ProblemText>
   </>;
@@ -214,7 +216,7 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
       <h3 className="m-0 text-sm font-medium">{heading}</h3>
       <p className="m-0 text-xs text-base-700">Changes here write to the tracker straight away, for everyone using {changeScope === 'project' ? 'the whole project' : 'the repository'}.</p>
     </div>
-    {readOnly && <Alert tone="warning" title={`${heading} are read-only here`}>{readOnly}</Alert>}
+    {readOnly && <AccessReason reason={readOnly} onRecheck={() => { void useEditStore.getState().recheck(repo); }} />}
     {error
       ? <Alert tone="danger" title={`Could not read ${heading.toLowerCase()}`} action={<Button {...kind('other')} onClick={retry}>Retry</Button>}>{error}</Alert>
       : !labels

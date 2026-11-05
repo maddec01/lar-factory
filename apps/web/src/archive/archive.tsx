@@ -13,6 +13,7 @@ import { ExportedLine, ExportMarkdown, type Exported } from '../item-dialog/reco
 import { useAbandonStore } from '../items/abandon-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { useArchiveStore } from './archive-store.ts';
+import { FieldRow, FIELD_GROUP } from '../settings/field-row.tsx';
 import { Choice } from '../settings/controls.tsx';
 
 /** Where the work stands in Archive: set aside, or finished on its day. */
@@ -41,7 +42,7 @@ export function ArchiveActions({ item }: { item: Item }) {
   };
   return (
     <span className="flex flex-col items-end gap-1">
-      <span className="flex items-center gap-2">
+      <span className="flex flex-wrap items-center gap-2">
         <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
         {closeable && <Button {...kind('other')} data-archive-close={item.id} onClick={() => useAbandonStore.getState().askClose(item)}>Close ticket</Button>}
         {item.archived?.setAside && <Button {...kind('other')} data-restore={item.id} loading={restoring} onClick={() => void restore()}>Restore</Button>}
@@ -111,18 +112,14 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
   if (retention.problem) return <p className="m-0 text-xs text-(--error-foreground)" role="alert">{retention.problem} The board keeps and shows all work until the setting can be read.</p>;
   return (
     <div className="grid gap-3" data-retention>
-      <label className="flex items-center gap-2 text-sm">
-        Hide finished and set-aside work after
-        <Input className="w-20" inputMode="numeric" aria-label="Days before hiding" value={hide} disabled={saving} onChange={(e) => setHide(e.target.value)} />
-        days
-      </label>
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <Choice label="Delete hidden work" value={deleting ? 'delete' : 'keep'} busy={saving} onChange={(next) => { setDeleting(next === 'delete'); setDue(null); }}
-          options={[{ value: 'keep', label: 'Keep it' }, { value: 'delete', label: 'Delete it after' }]} />
-        {deleting && <span className="flex items-center gap-2">
-          <Input className="w-20" inputMode="numeric" aria-label="Days before deleting" value={deleteAfter} disabled={saving} onChange={(e) => { setDeleteAfter(e.target.value); setDue(null); }} />
-          days
-        </span>}
+      <div className={FIELD_GROUP}>
+        <FieldRow label="Hide finished and set-aside work after"><span className="flex items-center gap-2 text-sm">
+          <Input className="w-20" inputMode="numeric" aria-label="Days before hiding" value={hide} disabled={saving} onChange={(e) => setHide(e.target.value)} />days
+        </span></FieldRow>
+        <FieldRow label="Delete hidden work">
+          <Choice label="Delete hidden work" value={deleting ? 'delete' : 'keep'} busy={saving} onChange={(next) => { setDeleting(next === 'delete'); setDue(null); }} options={[{ value: 'keep', label: 'Keep it' }, { value: 'delete', label: 'Delete it after' }]} />
+          {deleting && <span className="flex items-center gap-2 text-sm"><Input className="w-20" inputMode="numeric" aria-label="Days before deleting" value={deleteAfter} disabled={saving} onChange={(e) => { setDeleteAfter(e.target.value); setDue(null); }} />days</span>}
+        </FieldRow>
       </div>
       {due ? (
         <div className="grid gap-2 rounded-lg border border-(--border) p-3 text-sm" role="alertdialog" aria-label="Turn on timed delete" data-delete-confirm>

@@ -17,6 +17,8 @@ interface SettingsState {
   section: string;
   setSection: (section: string) => void;
   /** Null while the install state loads. */
+  project: string | null;
+  openProject: (repo: string) => void;
   targets: TargetSnapshot[] | null;
   /** False when this run of the app installs nothing; then no tick can change. */
   installs: boolean;
@@ -55,6 +57,8 @@ let unfollow = () => {};
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
   open: false,
   section: 'general',
+  project: null,
+  openProject: (project) => set({ section: 'projects', project }),
   targets: null,
   installs: true,
   installed: true,
@@ -81,7 +85,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       (error) => latest() && set({ targets: [], result: { text: `Couldn't read the Skill folders: ${failure(error)}`, tone: 'error', from: 'targets' } }),
     );
   },
-  setSection: (section) => set({ section }),
+  setSection: (section) => set({ section: section === 'repos' ? 'projects' : section, project: null }),
   setTick: async (path, ticked) => {
     if (get().pending || !get().installed || !get().installs) return;
     set({ pending: path, result: { text: '' } });

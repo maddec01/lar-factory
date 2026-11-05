@@ -171,3 +171,17 @@ test('widened, a read of any repository may still add tickets', () => {
   const data = { ...sample, items: [], firstRead } as unknown as BoardData;
   expect(results('x', [], { data, scope: 'maddec01/lar-server', widened: true }).reading).toBe(true);
 });
+
+test('Projects and their settings open the matching Project page from board search', async () => {
+  const { effectiveVocabulary } = await import('@lar-factory/shared');
+  const { useSettingsStore } = await import('../settings/settings-store.ts');
+  const setup = { ...effectiveVocabulary(), repo: 'team/app', role: '', access: {}, sources: {}, skills: [], labels: [], domainDocs: { kind: 'off' }, structureSync: true } as unknown as import('@lar-factory/shared').RepositorySetup;
+  const data = { ...sample, repos: [{ repo: setup.repo, role: '', labels: [], setup }, { repo: 'team/unread', role: '', labels: [] }] };
+  const options = settingsOptions(data, { app: false, targets: null, version: null }, handlers.leave);
+  expect(options.find((entry) => entry.name === 'Projects')).toBeDefined();
+  expect(options.find((entry) => entry.value === 'project:team/unread')).toBeUndefined();
+  const entry = options.find((entry) => entry.name === 'Project skills')!;
+  expect(entry.hint).toBe('team/app');
+  entry.select();
+  expect(useSettingsStore.getState()).toMatchObject({ open: true, section: 'projects', project: 'team/app' });
+});

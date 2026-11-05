@@ -3,12 +3,16 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import type { BoardData, BuildLimitState, HeavyCommandLimitState } from '@lar-factory/shared';
-import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, fetchMock, mountPage, openOptions, sample, settle, text } from '../../test/support.ts';
 
 const row = () => $('.settings-row[data-row="heavy-command-limit"]')!;
-const radios = (name = 'heavy-command-limit') => $$<HTMLButtonElement>(`[data-limit="${name}"] [role="radio"]`);
-const radio = (value: string) => radios().find((r) => r.value === value)!;
-const picked = (name?: string) => radios(name).filter((r) => r.getAttribute('aria-checked') === 'true').map((r) => r.value);
+const select = (name = 'heavy-command-limit') => $(`[data-limit="${name}"] [role="combobox"]`)!;
+const pick = async (value: string, name = 'heavy-command-limit') => {
+  await openOptions(select(name));
+  await settle(() => $$('[role="option"]').find((option) => value === 'number' ? text(option) === 'Number' : text(option).startsWith('Automatic'))!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+};
+const picked = (name?: string) => text(select(name)) === 'Number' ? ['number'] : text(select(name)).startsWith('Automatic') ? ['automatic'] : [];
 const input = () => $<HTMLInputElement>('[data-limit="heavy-command-limit"] input[aria-label="Heavy command limit"]');
 const saveButton = () => $<HTMLButtonElement>('[data-save-limit="heavy-command-limit"]')!;
 const alerts = (name = 'heavy-command-limit') => $$(`[data-limit="${name}"] [role="alert"]`).map(text);
@@ -37,7 +41,7 @@ test('General has the row in its own group with the build limit, showing Automat
   await openGeneral(withLimit({ limit: 'automatic', automatic: 3 }));
   expect([...row().closest('section')!.querySelectorAll<HTMLElement>('.settings-row')].map((r) => r.dataset.row)).toEqual(['heavy-command-limit', 'build-limit']);
   expect(text(row().querySelector('.settings-row-title'))).toBe('Heavy commands at once');
-  expect(radios().map((r) => text(r.closest('label') ?? r.parentElement))).toEqual(['Automatic (3)', 'Number']);
+  expect(text(select())).toBe('Automatic (3)');
   expect(picked()).toEqual(['automatic']);
   expect(input()).toBeNull();
 });
@@ -50,7 +54,7 @@ test('A saved number shows in its field', async () => {
 
 test('Typing a whole number from 1 saves it and shows the board the server answers with', async () => {
   await openGeneral(withLimit({ limit: 'automatic', automatic: 2 }));
-  await settle(() => radio('number').click());
+  await pick('number');
   await type('4');
   answerSave(200, { error: null, board: withLimit({ limit: 4, automatic: 2 }) });
   await settle(() => saveButton().click());
@@ -62,7 +66,7 @@ test('Typing a whole number from 1 saves it and shows the board the server answe
 
 test('The row refuses anything but a whole number from 1', async () => {
   await openGeneral(withLimit({ limit: 'automatic', automatic: 2 }));
-  await settle(() => radio('number').click());
+  await pick('number');
   for (const value of ['', '0', '-1', '2.5', 'many']) {
     await type(value);
     expect(saveButton().disabled, value).toBe(true);
@@ -74,7 +78,7 @@ test('The row refuses anything but a whole number from 1', async () => {
 test('Picking Automatic saves it', async () => {
   await openGeneral(withLimit({ limit: 5, automatic: 2 }));
   answerSave(200, { error: null, board: withLimit({ limit: 'automatic', automatic: 2 }) });
-  await settle(() => radio('automatic').click());
+  await pick('automatic');
   expect(posted()).toEqual([{ limit: 'automatic' }]);
   expect(picked()).toEqual(['automatic']);
   expect(input()).toBeNull();
@@ -86,7 +90,7 @@ test('An invalid file picks no option, with a note, and picking Automatic replac
   expect(picked()).toEqual([]);
   expect(alerts()).toEqual([`${problem} The board uses Automatic until you save a choice.`]);
   answerSave(200, { error: null, board: withLimit({ limit: 'automatic', automatic: 2 }) });
-  await settle(() => radio('automatic').click());
+  await pick('automatic');
   expect(posted()).toEqual([{ limit: 'automatic' }]);
   expect(picked()).toEqual(['automatic']);
   expect(alerts()).toEqual([]);
@@ -94,7 +98,7 @@ test('An invalid file picks no option, with a note, and picking Automatic replac
 
 test('Switching to Number starts from the Automatic number', async () => {
   await openGeneral(withLimit({ limit: 'automatic', automatic: 3 }));
-  await settle(() => radio('number').click());
+  await pick('number');
   expect(input()!.value).toBe('3');
 });
 
@@ -133,7 +137,7 @@ test('In sample mode nothing is picked and a save shows why it was refused', asy
   await openGeneral(withLimit());
   expect(picked()).toEqual([]);
   answerSave(403, { error: 'The heavy command limit is disabled in sample mode.' });
-  await settle(() => radio('automatic').click());
+  await pick('automatic');
   expect(picked()).toEqual([]);
   expect(alerts()).toEqual(['The heavy command limit is disabled in sample mode.']);
 });
@@ -142,9 +146,9 @@ test('Builds at once shows Automatic with the heavy command limit it follows, an
   await openGeneral(withLimit({ limit: 4, automatic: 2 }, { limit: 'automatic', automatic: 4 }));
   const build = $('.settings-row[data-row="build-limit"]')!;
   expect(text(build.querySelector('.settings-row-title'))).toBe('Builds at once');
-  expect(radios('build-limit').map((r) => text(r.closest('label') ?? r.parentElement))).toEqual(['Automatic (4)', 'Number']);
+  expect(text(select('build-limit'))).toBe('Automatic (4)');
   expect(picked('build-limit')).toEqual(['automatic']);
-  await settle(() => radios('build-limit').find((r) => r.value === 'number')!.click());
+  await pick('number', 'build-limit');
   const field = $<HTMLInputElement>('[data-limit="build-limit"] input[aria-label="Build limit"]')!;
   expect(field.value).toBe('4');
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '1');

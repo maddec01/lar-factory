@@ -4,7 +4,7 @@
 
 import { Archive, Inbox, ListX, RefreshCw, Search, Settings2, SquarePen, TicketPlus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { byFlowOrder, inRepo, isRecentlyDone, readingScope, ref, repoKey, repoName } from '@lar-factory/shared';
+import { byFlowOrder, inRepo, isRecentlyDone, readingScope, ref, repoKey, repoName, shownRepo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { kindFilterOf, rowFilter } from '../filters/item-filters.ts';
@@ -12,6 +12,7 @@ import type { ItemFilters } from '../filters/item-filters.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { matchesSearch } from '../list/list-search.ts';
 import { useListStore } from '../list/list-store.ts';
+import { projectSettings } from '../repositories/project-page.tsx';
 import { pages, settingsData } from '../settings/settings-pages.tsx';
 import type { PagesInput } from '../settings/settings-pages.tsx';
 import { useSettingsStore } from '../settings/settings-store.ts';
@@ -79,13 +80,23 @@ function actions({ query, filtering, update }: SearchInput, { leave, clear }: Se
 
 /** Each page by its label and each of its rows that holds a setting by its title, opening Settings on that page. */
 export function settingsOptions(data: BoardData, settings: Pick<PagesInput, 'app' | 'targets' | 'version'>, leave: SearchHandlers['leave']): SearchOption[] {
-  return pages({ ...settings, data: settingsData(data), archive: { items: null, problem: null } }).flatMap((page) => {
+  const general = pages({ ...settings, data: settingsData(data), archive: { items: null, problem: null } }).flatMap((page) => {
     const entry = { icon: <span className="[&_svg]:size-3.5">{page.icon}</span>, select: () => leave(() => openSettings(page.id)) };
     return [
       { ...entry, value: `section:${page.id}`, name: page.label },
       ...page.groups.flatMap((group) => group.rows).filter((row) => !row.noteOnly).map((row) => ({ ...entry, value: `setting:${page.id}:${row.id}`, name: row.title, hint: page.label })),
     ];
   });
+  const projects = data.repos.filter((repo) => repo.setup).flatMap(({ repo }) => {
+    const name = shownRepo(repo);
+    const entry = { icon: icon(Settings2), select: () => leave(() => {
+      useSettingsStore.getState().openProject(repo);
+      useSettingsStore.getState().setOpen(true);
+    }) };
+    return [{ ...entry, value: `project:${repo}`, name, hint: 'Projects' },
+      ...projectSettings(repo).map((setting) => ({ ...entry, value: `project:${repo}:${setting.id}`, name: setting.label, hint: name }))];
+  });
+  return [...general, ...projects];
 }
 
 const ticketValue = (item: Item) => `ticket:${item.id}`;

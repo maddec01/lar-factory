@@ -24,6 +24,7 @@ import { readJsonRecord } from '../json-file.ts';
 import { log } from '../log.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { inspectWorkRecovery } from './work-recovery.ts';
+import { fetchBaseCommit } from './base-commit.ts';
 import { checkouts, repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
@@ -57,8 +58,9 @@ export interface ItemCommands {
   start(itemId: string, model: unknown, quiet?: boolean): Promise<Reply>;
   /**
    * Starts a Ready build's thread in a new worktree, or retries a confirmed stopped or deleted one, once nothing open
-   * blocks it, as lar-shape's step 5 does after Go: it moves a parent record that isn't a build to In progress first,
-   * and snapshots the repository's selected project skills on the record. Launch intents guard it as they guard Start.
+   * blocks it, as lar-shape's step 5 does after Go: it fetches the default branch, refusing the start with no write when
+   * that fails, moves a parent record that isn't a build to In progress and snapshots the repository's selected project
+   * skills on the record. The branch starts from the fetched commit. Launch intents guard it as they guard Start.
    * Drift refuses it with the skills that changed until `drift` carries the User's DriftChoice.
    */
   inspectOwnedCleanup(itemId: string): Promise<Reply>;
@@ -139,6 +141,8 @@ export interface ItemCommandsDeps {
   projectOf?: (repo: string) => Promise<RepositoryProject>;
   /** The provider's default branch, resolved before changing or launching the build. */
   baseOf?: (repo: string) => Promise<string>;
+  /** Fetches the project's `branch` from origin and resolves with its commit, or throws what to show the user. */
+  fetchBase?: (projectId: string, branch: string) => Promise<string>;
   buildAccessOf?: (repo: string) => Partial<Record<'push-branch' | 'open-pr', OperationAccess>>;
   /** Starts a T3 thread; tests stand in for t3. */
   startThread?: typeof startThread;
@@ -239,6 +243,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     return checkout.folder;
   }, clearedFailuresFile = null, board, items, records, reread, showObservations = () => {}, archive, offerModelChoices, checkSkills, kindTracker, projectOf = currentRepositoryProject,
   baseOf = async (repo) => (await prHost(repo).defaultBranchHead(repo)).branch,
+  fetchBase = async (projectId, branch) => fetchBaseCommit(await checkoutOf(projectId), branch),
   buildAccessOf = (repo) => readRepositorySetups().find(setup => sameRepo(setup.repo, repo))?.access ?? {},
   showThread = lookupThread, startThread: startIn = startThread, recoverThread = recoverStartedThread, shapingThreadCleanupChoice = readShapingThreadCleanup, skillsOf = selectedSkills, factoryContext = currentFactoryContext(),
   reopenPr = (repo, number) => prHost(repo).reopenPr(prUrl(repo, number)), readPr = (repo, number) => observePr(repo, number) }: ItemCommandsDeps): ItemCommands {
@@ -651,6 +656,15 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     return inspect({ repository: item.repo, checkout, item, branch: record.buildBranch, recordedPr: record.pullRequest });
   }
 
+  /** The fetched commit a new build branch starts from, or the refused start, which Auto-build holds, when it can't be had. */
+  async function freshBase(repo: string, projectId: string): Promise<string | Start> {
+    let branch: string;
+    try { branch = await baseOf(repo); }
+    catch { return { thread: null, error: 'Could not read the repository’s default branch. Retry after checking access.', refused: true, hold: true }; }
+    try { return await fetchBase(projectId, branch); }
+    catch (error) { return { thread: null, error: (error as Error).message, refused: true, hold: true }; }
+  }
+
   /** When each unresolved intent may be settled again on a refresh, by intent ID. */
   const settleAt = new Map<string, number>();
 
@@ -937,12 +951,13 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
             if (continuing && inspection.worktreePath && !choice) return { thread: null, error: 'Choose a model before continuing in an existing worktree.', refused: true };
             const skills = await checkSkills?.();
             if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true };
-            const base = await baseOf(item.repo);
+            const base = continuing ? inspection.branch : await freshBase(item.repo, project.projectId);
+            if (typeof base !== 'string') return base;
             const branch = continuing ? inspection.branch : buildBranch(item) + '-recovery-' + randomUUID().slice(0, 8);
             const message = buildMessage(!continuing ? { ...item, slices: [] } : item, larBuild(), factoryContext);
             const workspace = continuing && inspection.worktreePath
               ? { type: 'existing_worktree' as const, worktreePath: inspection.worktreePath, branch }
-              : { base: continuing ? branch : base, branch };
+              : { base, branch };
             const cleanupBranches = continuing ? [] : await cleanupSliceBranches(item);
             const result = await launch(item, 'startedBuilds', project.projectId, message, () => startIn(project.projectId, message, choice, workspace), () => {
               if (!continuing) {
@@ -984,9 +999,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
         if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true, hold: true, ...skills.drift && { drift: skills.drift } };
         const repoProject = await projectOf(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true, hold: true };
-        let base: string;
-        try { base = await baseOf(repo); }
-        catch { return { thread: null, error: 'Could not read the repository’s default branch. Retry after checking access.', refused: true, hold: true }; }
+        const base = await freshBase(repo, repoProject.projectId);
+        if (typeof base !== 'string') return base;
         const error = parentInProgress(item);
         if (error) return { thread: null, error };
         // A build snapshots its skills once, so a retry keeps the selection its first start saw.

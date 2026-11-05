@@ -18,6 +18,30 @@ it('limits ownership to the saved build and its slices and protects live and def
   expect(plan.remoteAvailable).toBe(true);
 });
 
+const planFrom = (refs: { upstream?: string; remoteDefault?: string }, logged: string[]) => inspectCleanup({ repository: 'a/b', checkout: '/project', item: {} as Item,
+  branch: 'saved', sliceIds: [], defaultBranch: 'main', liveWorktreePaths: [], writable: true,
+  provider: { branchExists: async () => false, openPrByHead: async () => null },
+  git: async (_tool, args) => {
+    const at = args.indexOf('log');
+    if (at >= 0) logged.push(args[at + 2]!);
+    return { code: 0, stderr: '', detail: '', stdout: args.includes('--format=%(upstream:short)') ? refs.upstream ?? ''
+      : args.includes('--format=%(refname)') ? refs.remoteDefault ?? '' : args.includes('--format=%(refname:short)') ? 'main\nsaved\n' : '' };
+  },
+});
+
+it("compares a branch with no upstream against the remote's default branch, not the local one", async () => {
+  const logged: string[] = [];
+  await planFrom({ remoteDefault: 'refs/remotes/origin/main\n' }, logged);
+  expect(logged).toEqual(['refs/remotes/origin/main..refs/heads/saved']);
+});
+
+it('compares against the upstream when the branch has one, and the local default branch when origin has no copy', async () => {
+  const logged: string[] = [];
+  await planFrom({ upstream: 'origin/saved\n', remoteDefault: 'refs/remotes/origin/main\n' }, logged);
+  await planFrom({}, logged);
+  expect(logged).toEqual(['origin/saved..refs/heads/saved', 'main..refs/heads/saved']);
+});
+
 it('warns and leaves choices available when the remote cannot be observed', async () => {
   const plan = await inspectCleanup({ repository: 'a/b', checkout: '/project', item: {} as Item,
     branch: 'saved', sliceIds: [], defaultBranch: 'main', liveWorktreePaths: [], writable: true,

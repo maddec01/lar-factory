@@ -46,8 +46,8 @@ Prototypes stay on their prototype branch as references for a later build.
 Shaping implements no product changes.
 
 Choose Start build later for a Ready item you want implemented. It opens an
-isolated worktree from the repository's resolved default branch or the chosen PR
-target, plans and builds the change, runs project checks and reviews,
+isolated worktree from the fetched remote tip of the repository's resolved default
+branch, plans and builds the change, runs project checks and reviews,
 and opens a PR. Visible or risky work goes to Verify with steps for you to check;
 otherwise it goes to Ready to merge. You merge it. Needs you means the work is
 waiting for a decision, an answer or verification.

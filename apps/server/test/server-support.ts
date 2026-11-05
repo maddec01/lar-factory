@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createServer, type Socket } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -12,7 +12,7 @@ import { DONE_WINDOW_MS, REPOSITORY_OPERATIONS, earlierWorkMessage, isSkillCheck
 import type { BoardData, DriftChoice, Item, RawItem, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
 import { boardDataDir, DATA_DIR_ENV } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, workRecordsPath, type WorkRecords } from '@lar-factory/work-records';
-import { checkouts, testEnv } from './repo-support.ts';
+import { checkouts, committingEnv, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
 /** The `repo#number` keys of the builds among sub-issues, and of the open slices whose records are active or blocked. */
@@ -340,13 +340,26 @@ export const writesRepository = (args: readonly string[]) => args.some((a) => /^
 export const readsRepositoryConfig = (args: readonly string[]) => args[0] === 'api' && !!args[1]?.endsWith('/.lar-factory.json');
 
 
+/**
+ * Environment that answers ssh fetches of any repository from a real repository holding one commit on `main`, through
+ * fake-ssh.sh, and the commit there. FAKE_ORIGIN naming no repository makes those fetches fail.
+ */
+function sshOrigin(home: string) {
+  const origin = join(home, 'origin.git');
+  const env = committingEnv();
+  const git = (...args: string[]) => execFileSync('git', ['-C', origin, ...args], { env, encoding: 'utf8' }).trim();
+  execFileSync('git', ['init', '-q', '--bare', origin], { env });
+  git('update-ref', 'refs/heads/main', git('commit-tree', git('hash-object', '-t', 'tree', '-w', '/dev/null'), '-m', 'first'));
+  return { FAKE_ORIGIN: origin, GIT_SSH_COMMAND: `sh '${new URL('./fake-ssh.sh', import.meta.url).pathname}'`, GIT_SSH_VARIANT: 'ssh' };
+}
+
 /** Environment for a board that can Start maddec01/lar-factory items: a temporary home holding its
  * checkout, and a T3 database with a live project there. */
 export function startableEnv(t: TestContext): Record<string, string> {
   const home = mkdtempSync(join(tmpdir(), 'lar-start-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
   checkouts(home, { 'lar-factory': 'git@github.com:maddec01/lar-factory.git' });
-  return { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/lar/lar-factory` }]) };
+  return { HOME: home, ...sshOrigin(home), T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/lar/lar-factory` }]) };
 }
 
 export const testFactoryContext = (home: string) => ({dataDir:boardDataDir(home,{}),bin:join(home,'.local/bin'),shapeSkill:join(home,'.agents/skills/lar-shape/SKILL.md'),azureReadOnly:process.env.LAR_FACTORY_AZURE_READ_ONLY==='1'});

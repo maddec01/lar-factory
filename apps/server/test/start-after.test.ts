@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { shapePrompt, NOT_LANDED, SAMPLE_MODELS, changeRecords, recordBlockers, settleDecisions, startableEnv, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
@@ -185,6 +185,17 @@ test('a failed start disarms the part and shows its error on it, until it is arm
   const rearmed = await arm(board, board.id(12));
   assert.equal(rearmed.status, 200);
   assert.equal((await rearmed.json()).board.armedErrors[board.id(12)], undefined);
+});
+
+test('an armed build whose fetch fails disarms, shows the error on the item and starts nothing', async (t) => {
+  const { board, env, open } = await blockedBuildBoard(t);
+  assert.equal((await arm(board, board.id(12))).status, 200);
+  rmSync(env.FAKE_ORIGIN!, { recursive: true });
+  await settleDecisions(board, board.id(12), [open]);
+  const failed = await until(board, (d) => !!d.armedErrors?.[board.id(12)]);
+  assert.equal(failed.armedErrors![board.id(12)], 'Could not fetch main from origin. Check the network and your Git login, then start the build again.');
+  assert.deepEqual(failed.armed, {});
+  assert.deepEqual((await board.t3Calls()).filter((args) => args[0] === 'thread' && args[1] === 'start'), []);
 });
 
 test('an armed build that reaches a live shaping thread disarms, shows the refusal and starts nothing', async (t) => {

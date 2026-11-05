@@ -11,6 +11,9 @@ export function testEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
 }
 
+/** `testEnv` with no user Git configuration and a commit identity, for tests that make real commits. */
+export const committingEnv = (): NodeJS.ProcessEnv => ({ ...testEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@example.invalid' });
+
 /** Git checkouts under `home`/`parent`, each with the given `origin` (or none). */
 export function checkouts(home: string, origins: Record<string, string | null>, parent = 'Developer/lar'): void {
   const env = { ...testEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };

@@ -37,6 +37,7 @@ the flow and `docs/plan.md` for how it was set up.
 - Release secrets wizard changes: run `bash scripts/release-secrets.test.sh` and
   `shellcheck scripts/release-secrets.sh`. Never run the wizard without `--dry-run`.
 - Shared script changes: run `bash skills/shared/scripts/slice.test.sh`,
+  `bash skills/shared/scripts/remove-slice-worktree.test.sh`,
   `bash skills/shared/scripts/status.test.sh` and
   `bash skills/shared/scripts/repo-config.test.sh`.
 - skill-sync script changes: run each `.agents/skills/skill-sync/scripts/*.test.sh` with `bash`.

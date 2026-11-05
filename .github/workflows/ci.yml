@@ -152,6 +152,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash skills/shared/scripts/slice.test.sh
 
+      - name: Shared slice worktree removal tests
+        if: ${{ !cancelled() }}
+        run: bash skills/shared/scripts/remove-slice-worktree.test.sh
+
       - name: Shared status tests
         if: ${{ !cancelled() }}
         run: bash skills/shared/scripts/status.test.sh

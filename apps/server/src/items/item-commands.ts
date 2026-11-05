@@ -623,10 +623,11 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
     while (cleanupTokens.size >= 100) cleanupTokens.delete(cleanupTokens.keys().next().value!);
   }
   const cleaning = new Set<string>();
+  const savedCleanupBranches = (snapshots: ReturnType<WorkRecords['cleanupOwnership']>) => new Set(snapshots.flatMap(snapshot => [snapshot.branch, ...snapshot.sliceBranches]));
   async function ownedCleanup(item: Item, onlyBranch?: string) {
     if (!records) throw new Error('Work records are unavailable.');
     const snapshots = records.cleanupOwnership(item.id);
-    const saved = new Set(snapshots.flatMap(snapshot => [snapshot.branch, ...snapshot.sliceBranches]));
+    const saved = savedCleanupBranches(snapshots);
     // A build's notice plans its branches in memory, so inspecting and Cancel write nothing. Only a saved branch or a
     // recorded build thread shows the board made them: a name derived from the ticket could be anyone's branch.
     const noticed = item.kind === 'build' && item.needsYou || recovers(item) && recoversBuild(item);
@@ -900,6 +901,8 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
         cleanupTokens.delete(options.token);
         // captureCleanup lists a branch before its slices, as the plan does, so the plans stay comparable after it.
         if (unsaved && item.kind === 'build' && (options.local || options.remote)) write(itemId, revision => records!.captureCleanup(itemId, revision, unsaved.branch, unsaved.sliceBranches));
+        // A gone branch needs no tick, so it can resolve without ever being saved.
+        const savedBranches = savedCleanupBranches(records!.cleanupOwnership(itemId));
         const errors: string[] = [];
         const remainingBranches: string[] = [];
         for (const plan of plans) {
@@ -908,7 +911,7 @@ export function createItemCommands({ inspectWorkRecovery: inspect = inspectWorkR
           const result = await executeCleanup({ plan: fresh, expectedPlan: plan, checkout, repository: item.repo, local: options.local === true, remote: options.remote === true && plan.remoteAvailable, confirmedLoss: options.confirmedLoss === true });
           errors.push(...result.errors);
           remainingBranches.push(...result.remainingBranches);
-          if (!result.remainingBranches.includes(plan.branch) && !result.errors.length) write(itemId, revision => records!.resolveCleanup(itemId, revision, [plan.branch]));
+          if (savedBranches.has(plan.branch) && !result.remainingBranches.includes(plan.branch) && !result.errors.length) write(itemId, revision => records!.resolveCleanup(itemId, revision, [plan.branch]));
         }
         return withBoard(200, { errors, remainingBranches, message: remainingBranches.length ? 'Unticked or failed cleanup targets remain for you to remove.' : 'Cleanup complete.' });
       } catch (error) { return withBoard(409, { error: (error as Error).message }); }

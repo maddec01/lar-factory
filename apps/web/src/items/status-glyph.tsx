@@ -7,6 +7,7 @@ import type { Item, Status } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useClock } from '../board/second-clock.ts';
 import { Spinner } from '../loading/loader.tsx';
+import { ambientMotion } from '../motion/ambient-motion.ts';
 import { useStartStore } from './start-store.ts';
 
 export const STATUS_COLOR: Record<Status, string> = {
@@ -17,7 +18,7 @@ export const STATUS_COLOR: Record<Status, string> = {
 export function StatusGlyph({ status, running = false, className = 'size-3.5' }: { status: Status; running?: boolean; className?: string }) {
   const style = { color: STATUS_COLOR[status] };
   const pulse = running && ['Shaping', 'Review', 'Verify', 'Ready to merge'].includes(status);
-  const props = { className: `shrink-0 ${className}${pulse ? ' status-pulse' : ''}`, style, strokeWidth: 2.25 };
+  const props = { ref: pulse ? ambientMotion : undefined, className: `shrink-0 ${className}${pulse ? ' status-pulse' : ''}`, style, strokeWidth: 2.25 };
   switch (status) {
     case 'List': return <List {...props} />;
     case 'Needs you': case 'Verify': return <CircleDot {...props} />;

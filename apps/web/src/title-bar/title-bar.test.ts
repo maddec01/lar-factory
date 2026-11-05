@@ -240,6 +240,19 @@ test('the tooltip gives the exact time and when reads happen', async () => {
   expect(await tooltip()).toEqual([`Updated 12s ago · ${read}`, 'Checks GitHub for changes every 5s, reads everything every 45s']);
 });
 
+test('the Refreshed clock stops while the window is hidden and catches up immediately when shown', async () => {
+  await mountPage(fresh());
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  await settle(() => document.dispatchEvent(new Event('visibilitychange')));
+  await settle(() => vi.advanceTimersByTime(12_000));
+  expect(text(refreshed())).toBe('0s ago');
+  hidden.mockReturnValue(false);
+  await settle(() => document.dispatchEvent(new Event('visibilitychange')));
+  expect(text(refreshed())).toBe('12s ago');
+  await settle(() => vi.advanceTimersByTime(1_000));
+  expect(text(refreshed())).toBe('13s ago');
+});
+
 test('the tooltip names a failed read by its first line', async () => {
   await mountPage();
   const read = clock(sample.fetchedAt!, undefined);

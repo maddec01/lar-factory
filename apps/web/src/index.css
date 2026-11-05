@@ -4,6 +4,7 @@
 @import "@lar-factory/ui/styles.css";
 @import "./buttons/button-kinds.css";
 @import "./items/items.css";
+@import "./motion/ambient-motion.css";
 @import "./line/rows.css";
 @import "./loading/loading-screen.css";
 @import "./notices/notices.css";
@@ -64,7 +65,8 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
   from { transform: translateX(-100%); }
   to { transform: translateX(300%); }
 }
-.activity-sweep { animation: activity-sweep 1.8s linear infinite; }
+/* 30 updates/s lets the compositor skip unchanged frames on high-refresh displays. */
+.activity-sweep { animation: activity-sweep 1.8s steps(54) infinite; }
 @media (prefers-reduced-motion: reduce) {
   .activity-sweep { animation: none; }
 }

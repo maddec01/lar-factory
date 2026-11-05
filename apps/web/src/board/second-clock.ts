@@ -5,15 +5,31 @@ import { useSyncExternalStore } from 'react';
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setInterval> | undefined;
 
-/** One timer for the board, running while anything follows it. */
+function tick() {
+  for (const each of listeners) each();
+}
+
+function followVisibility() {
+  clearInterval(timer);
+  timer = undefined;
+  if (document.hidden) return;
+  tick();
+  timer = setInterval(tick, 1_000);
+}
+
+/** One timer for the board, running while anything follows it and the window is visible. */
 function onSecond(listener: () => void) {
   listeners.add(listener);
-  timer ??= setInterval(() => { for (const each of listeners) each(); }, 1_000);
+  if (listeners.size === 1) {
+    document.addEventListener('visibilitychange', followVisibility);
+    followVisibility();
+  }
   return () => {
     listeners.delete(listener);
     if (listeners.size) return;
     clearInterval(timer);
     timer = undefined;
+    document.removeEventListener('visibilitychange', followVisibility);
   };
 }
 

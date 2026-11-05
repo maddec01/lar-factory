@@ -15,6 +15,8 @@ export interface CleanupPlan {
   remoteBranch: string | null;
   localAvailable: boolean;
   remoteAvailable: boolean;
+  /** No local ref, and the provider answered that it has neither the branch nor an open PR for it. */
+  gone?: boolean;
   warning?: string;
   fingerprint?: string;
   remoteHead?: string | null;
@@ -109,6 +111,7 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
   let remoteBranch: string | null = null;
   let remoteAvailable = false;
   let remoteHead: string | null = null;
+  let gone = false;
   let warning: string | undefined;
   try {
     const provider = input.provider ?? prHost(input.repository);
@@ -121,6 +124,7 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
     }
     remoteBranch = pushed ? branch : null;
     remoteAvailable = pushed && input.writable && !open;
+    gone = !owned.length && !pushed && !open && branch !== input.defaultBranch;
     if (open) { localBranches.splice(0); worktreePaths.splice(0); }
   } catch {
     remoteBranch = branch;
@@ -128,7 +132,7 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
     warning = 'PR or remote observation failed. A new branch or move could create a second PR. Deleting the remote branch could close an open PR.';
   }
   if (branch === input.defaultBranch || trees.some(tree => tree.branch === branch && tree.path && input.liveWorktreePaths.includes(tree.path))) remoteAvailable = false;
-  return { remoteHead, fingerprint: createHash('sha256').update(JSON.stringify(state)).digest('hex'), branch, localBranches, worktreePaths, dirtyFiles, unpushedCommits, remoteBranch, localAvailable: localBranches.length > 0, remoteAvailable, ...(warning ? { warning } : {}) };
+  return { remoteHead, fingerprint: createHash('sha256').update(JSON.stringify(state)).digest('hex'), branch, localBranches, worktreePaths, dirtyFiles, unpushedCommits, remoteBranch, localAvailable: localBranches.length > 0, remoteAvailable, gone, ...(warning ? { warning } : {}) };
 }
 
 /** Execute a freshly inspected selection, retaining failed targets for retry. */
@@ -150,7 +154,7 @@ export async function executeCleanup(input: {
   const git = input.git ?? runTool;
   const errors: string[] = [];
   const remaining = new Set(plan.localBranches);
-  if (!plan.localAvailable) remaining.add(plan.branch);
+  if (!plan.localAvailable && !plan.gone) remaining.add(plan.branch);
   if (input.local) {
     for (const path of plan.worktreePaths) {
       await validateWorktreeRemoval(input.checkout, path, plan.localBranches, git);

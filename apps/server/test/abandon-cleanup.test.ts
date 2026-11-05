@@ -150,6 +150,40 @@ test('a selection with nothing ticked persists no ownership, and unticked branch
   assert.deepEqual(records.cleanupOwnership(workId), []);
 });
 
+/** Removes `branch` from the checkout and its origin, and has the PR host report it not pushed. */
+function deleteEverywhere(checkout: string, branch: string) {
+  git(checkout, 'push', 'origin', '--delete', branch);
+  git(checkout, 'branch', '-D', branch);
+  vi.mocked(prHost).mockReturnValue({ branchExists: async (_repo: string, name: string) => name !== branch, openPrByHead: async () => null, deleteRemoteBranch } as unknown as ReturnType<typeof prHost>);
+}
+
+test('a confirmed cleanup drops a saved slice branch that was already deleted, with nothing ticked', async () => {
+  const { workId, sliceBranch, checkout, commands } = closedBuild();
+  records.captureCleanup(workId, records.read(workId).revision, BRANCH, [sliceBranch]);
+  deleteEverywhere(checkout, sliceBranch);
+  const { token, plans } = (await commands.inspectOwnedCleanup(workId)).body as Inspected;
+  assert.deepEqual(plans.map(plan => plan.branch), [BRANCH, sliceBranch]);
+  const reply = await commands.executeOwnedCleanup(workId, { token });
+  assert.equal(reply.status, 200, JSON.stringify(reply.body));
+  const body = reply.body as { errors: string[]; remainingBranches: string[] };
+  assert.deepEqual(body.errors, []);
+  assert.deepEqual(body.remainingBranches, [BRANCH]);
+  assert.deepEqual(records.cleanupOwnership(workId).flatMap(snapshot => snapshot.sliceBranches), []);
+  assert.deepEqual(records.cleanupOwnership(workId).map(snapshot => snapshot.branch), [BRANCH]);
+});
+
+test('a gone branch that was never saved causes no error, and nothing ticked persists no ownership', async () => {
+  const { workId, sliceBranch, checkout, commands } = closedBuild();
+  deleteEverywhere(checkout, BRANCH);
+  const { token } = (await commands.inspectOwnedCleanup(workId)).body as Inspected;
+  const reply = await commands.executeOwnedCleanup(workId, { token });
+  assert.equal(reply.status, 200, JSON.stringify(reply.body));
+  const body = reply.body as { errors: string[]; remainingBranches: string[] };
+  assert.deepEqual(body.errors, []);
+  assert.deepEqual(body.remainingBranches, [sliceBranch]);
+  assert.deepEqual(records.cleanupOwnership(workId), []);
+});
+
 test('a failed cleanup step keeps the item and notice, and a retry inspects again in the same order and can succeed', async () => {
   const { workId, sliceBranch, commands, board } = closedBuild();
   const first = (await commands.inspectOwnedCleanup(workId)).body as Inspected;

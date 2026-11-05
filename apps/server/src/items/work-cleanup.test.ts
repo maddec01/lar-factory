@@ -101,6 +101,52 @@ it('deletes an owned branch in a disposable repository and preserves main', asyn
   } finally { await rm(checkout, { recursive: true, force: true }); }
 });
 
+it('resolves only a branch that is gone everywhere, and still reports each held branch as remaining', async () => {
+  const { mkdtemp, mkdir, realpath, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { runTool } = await import('../tools/run-tool.ts');
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'cleanup-gone-')));
+  const checkout = join(root, 'project');
+  await mkdir(checkout);
+  const git = async (args: string[]) => {
+    const result = await runTool('git', ['-C', checkout, ...args], { timeout: 10000 });
+    expect(result.code, result.stderr).toBe(0);
+  };
+  const remainingOf = async (branch: string, provider: { branchExists: (repo: string, branch: string) => Promise<boolean>; openPrByHead: (repo: string, branch: string) => Promise<string | null> }, liveWorktreePaths: string[] = []) => {
+    const plan = await inspectCleanup({ repository: 'a/b', checkout, item: {} as Item, branch, sliceIds: [], sliceBranches: [], defaultBranch: 'main', liveWorktreePaths, writable: true, provider });
+    return executeCleanup({ plan, expectedPlan: plan, checkout, repository: 'a/b', local: true, remote: false, confirmedLoss: false });
+  };
+  const unpushed = { branchExists: async () => false, openPrByHead: async () => null };
+  try {
+    await git(['init', '-b', 'main']);
+    await git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--allow-empty', '-m', 'initial']);
+    const live = join(root, 'live');
+    await git(['worktree', 'add', '-b', 'held', live]);
+    expect(await remainingOf('deleted', unpushed)).toEqual({ errors: [], remainingBranches: [] });
+    expect((await remainingOf('held', unpushed, [live])).remainingBranches).toEqual(['held']);
+    expect((await remainingOf('deleted', { ...unpushed, openPrByHead: async () => 'https://example.com/pr/1' })).remainingBranches).toEqual(['deleted']);
+    expect((await remainingOf('deleted', { ...unpushed, branchExists: async () => { throw new Error('offline'); } })).remainingBranches).toEqual(['deleted']);
+    expect((await remainingOf('deleted', { ...unpushed, openPrByHead: async () => { throw new Error('offline'); } })).remainingBranches).toEqual(['deleted']);
+    expect((await remainingOf('main', unpushed)).remainingBranches).toEqual(['main']);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+it('never counts the default branch as gone, even when neither the checkout nor the remote has it', async () => {
+  const plan = await inspectCleanup({ repository: 'a/b', checkout: '/project', item: {} as Item, branch: 'main', sliceIds: [], sliceBranches: [], defaultBranch: 'main', liveWorktreePaths: [], writable: true,
+    provider: { branchExists: async () => false, openPrByHead: async () => null },
+    git: async () => ({ code: 0, stdout: '', stderr: '', detail: '' }),
+  });
+  expect((await executeCleanup({ plan, expectedPlan: plan, checkout: '/project', repository: 'a/b', local: false, remote: false, confirmedLoss: false })).remainingBranches).toEqual(['main']);
+});
+
+it('keeps a branch remaining when deleting it fails', async () => {
+  const plan = { branch: 'owned', localBranches: ['owned'], worktreePaths: [], dirtyFiles: [], unpushedCommits: [], remoteBranch: null, localAvailable: true, remoteAvailable: false };
+  const result = await executeCleanup({ plan, expectedPlan: plan, checkout: '/repo', repository: 'a/b', local: true, remote: false, confirmedLoss: false,
+    git: async () => ({ code: 1, stdout: '', stderr: 'refused', detail: '' }) });
+  expect(result).toEqual({ errors: ['Could not delete branch owned'], remainingBranches: ['owned'] });
+});
+
 it('refuses unsafe root and symlink worktrees before invoking Git', async () => {
   const { mkdtemp, symlink, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

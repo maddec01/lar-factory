@@ -179,7 +179,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
 
 /** "List <count>", the count being the items in List, or a loading cue for none while the first read could add some; it opens the List modal. */
 export function ListButton() {
-  const count = useBoardStore((state) => boardSections(state.data, state.now).list.length);
+  const count = useBoardStore((state) => state.data.items.filter((item) => item.status === 'List').length);
   const reading = useBoardStore((state) => readingScope(state.data));
   const open = useListStore((state) => state.open);
   const setOpen = useListStore((state) => state.setOpen);

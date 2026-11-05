@@ -143,8 +143,10 @@ export const holdsActivityRead = (items: Item[]): boolean =>
  * One refresh pass's activity reads, sharing one open database, opened once a thread at work needs it, and one read per
  * thread, whether it is at work itself or another's agent. A failed read or a T3 that can't be read gives an unavailable value, never a retained action.
  */
-export function activityReads(open: () => DatabaseSync, families: () => ((threadId: string) => ActivityFamily) | undefined) {
+export function activityReads(open: () => DatabaseSync, families: () => ((threadId: string) => ActivityFamily) | undefined,
+  release: (db: DatabaseSync | undefined, failed: boolean) => void = (db) => db?.close()) {
   let db: DatabaseSync | undefined;
+  let failed = false;
   let familyOf: ReturnType<typeof families> | null = null;
   const read = new Map<string, ThreadActivity>();
   const itemsRead = new Map<string, ActivityItemRow[]>();
@@ -189,11 +191,11 @@ export function activityReads(open: () => DatabaseSync, families: () => ((thread
       let activity = read.get(thread.id);
       if (!activity) {
         try { activity = readThread(thread); }
-        catch { activity = UNAVAILABLE; }
+        catch { failed = true; activity = UNAVAILABLE; }
         read.set(thread.id, activity);
       }
       return { ...thread, activity };
     },
-    close() { db?.close(); db = undefined; },
+    close() { release(db, failed); db = undefined; },
   };
 }

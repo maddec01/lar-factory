@@ -6,6 +6,7 @@ import { activityFamilies } from './item-execution.ts';
 import { activityReads, agentWorking, holdsActivityRead, threadActivity, withoutReadTimes } from './thread-activity.ts';
 import type { ActivityAgentRow, ActivityItemRow } from './t3-db.ts';
 import { tempDir } from '../../test/stats-db.ts';
+import { createActivityDatabase } from './activity-database.ts';
 
 const AT = '2026-11-04T12:00:00.000Z';
 const item = (over: Partial<ActivityItemRow>): ActivityItemRow => ({ type: 'command_execution', status: 'completed', runLive: 1, title: null, input: null, toolName: null, fileName: null, streaming: null, startedAt: AT, completedAt: AT, updatedAt: AT, ...over });
@@ -177,8 +178,36 @@ test('a pass opens the database once, reads each thread at work once, and reads 
   expect(open).toHaveBeenCalledTimes(1);
   expect(families).toHaveBeenCalledTimes(1);
   const afterImpl = prepare.mock.calls.length;
+  expect(afterImpl, 'thread parameters reuse the prepared statements, never their result rows').toBe(queries);
   reads.read({ ...atWork, id: 'impl', state: 'running' });
   expect(prepare.mock.calls.length).toBe(afterImpl);
+});
+
+test('a reused activity connection reads new actions and finished agents on the very next pass', (t) => {
+  const path = activityDb(t);
+  const database = createActivityDatabase(path);
+  const writer = new DatabaseSync(path);
+  writer.exec('PRAGMA journal_mode=WAL');
+  t.onTestFinished(() => { database.close(); writer.close(); });
+  const pass = () => activityReads(database.open, () => activityFamilies(shells), database.release);
+  const first = pass();
+  expect(first.read(atWork).activity).toMatchObject({ agents: [{ action: 'pnpm test' }, { action: 'Read b.ts' }] });
+  first.close();
+  writer.prepare('UPDATE orchestration_v2_projection_turn_items SET payload_json = ? WHERE turn_item_id = ?')
+    .run(JSON.stringify({ input: 'pnpm run typecheck', startedAt: AT, updatedAt: AT }), 'i1');
+  writer.exec("UPDATE orchestration_v2_projection_subagents SET status = 'completed' WHERE subagent_id = 's2'");
+  const next = pass();
+  expect(next.read(atWork).activity).toMatchObject({ agents: [{ action: 'pnpm run typecheck' }] });
+  next.close();
+  // A schema failure is unavailable immediately, then a new connection can recover on the next pass.
+  writer.exec('ALTER TABLE orchestration_v2_projection_turn_items RENAME TO hidden_items');
+  const failed = pass();
+  expect(failed.read(atWork).activity).toEqual({ available: false });
+  failed.close();
+  writer.exec('ALTER TABLE hidden_items RENAME TO orchestration_v2_projection_turn_items');
+  const recovered = pass();
+  expect(recovered.read(atWork).activity).toMatchObject({ available: true, agents: [{ action: 'pnpm run typecheck' }] });
+  recovered.close();
 });
 
 test('a thread at work that is also another thread\'s agent is read once in a pass', (t) => {

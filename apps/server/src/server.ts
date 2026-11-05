@@ -58,7 +58,7 @@ import { createProjectIcons } from './t3/project-icons.ts';
 import { protocolActivityFamilies, protocolAwaitingFirstShell, protocolItemThreads, threadCleanupState } from './t3/item-execution.ts';
 import type { T3Reads } from './t3/t3-reads.ts';
 import { createUsageCatchUp } from './t3/usage-catch-up.ts';
-import { openT3Db } from './t3/t3-db.ts';
+import { createActivityDatabase } from './t3/activity-database.ts';
 import { activityReads, holdsActivityRead, withoutReadTimes } from './t3/thread-activity.ts';
 import { lookupThread } from './t3/t3.ts';
 import { sendThreadCommand } from './t3/thread-commands.ts';
@@ -197,6 +197,7 @@ function recordArgs(read: Pick<ItemsRead, 'items' | 'waiting'>) {
 const archive = (): Item[] => records ? archivedItems(records, tickets, items.repos().map((r) => r.repo), retention.hidden()) : [];
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
+const activityDatabase = createActivityDatabase(statsSources.db);
 const modelManifest = modelManifestPath();
 const environmentIdFile = environmentIdPath();
 // Each read publishes the repositories once their configs load, so Add item offers them while the items still load.
@@ -378,7 +379,7 @@ function itemsWithThreads(items: Item[], withStats: boolean): Item[] {
   const cleanupProblems = records && loopTrace.span('thread cleanup', () => shapingThreadCleanupProblems(records!));
   pruneShownStats(new Set(items.map((item) => item.id)));
   // One open database and one read per thread however many times this pass asks for a thread.
-  const activity = activityReads(() => openT3Db(statsSources.db), protocolActivityFamilies);
+  const activity = activityReads(activityDatabase.open, protocolActivityFamilies, activityDatabase.release);
   const withActivity = (found: ReturnType<typeof threads>) => (Array.isArray(found) ? found.map(activity.read) : found);
   try {
     return items.map((item) => {
@@ -1033,6 +1034,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     clearInterval(timer);
     clearInterval(localTimer);
+    activityDatabase.close();
     clearTimeout(toolRetry);
     stopProjectIcons?.();
     void autoBuildRun.release();

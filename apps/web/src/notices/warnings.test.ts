@@ -240,7 +240,7 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
   const empty: BoardData = { ...healthy, error: null, fetchedAt: new Date(Date.now()).toISOString(), items: sample.items.filter((i) => i.status === 'Queued') };
   await mountPage(empty);
   const dot = () => $('.refreshed [data-dot]')!;
-  const fresh = () => $('.refreshed')!.textContent;
+  const refreshed = () => $('.refreshed')!.textContent;
   expect(dot().className).toContain('bg-success');
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
@@ -250,7 +250,7 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
   expect(dot().className).toContain('bg-danger');
   expect(dot().className).not.toContain('bg-success');
   expect($('.refreshed [data-ping]')).toBeNull();
-  expect(fresh()).toContain('Disconnected');
+  expect(refreshed()).toContain('Disconnected');
   expect($$('.desk-card')).toHaveLength(0);
   expect($('section.desk')!.textContent).toBe('Your deskNothing waited on you at the last read.');
   fetchMock.mockImplementation(async () => new Response(JSON.stringify({ ...empty, fetchedAt: new Date(Date.now()).toISOString() })));
@@ -258,24 +258,24 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
   expect(warning('client-error')).toBeNull();
   expect($('[data-board-notices]')).toBeNull();
   expect(dot().className).toContain('bg-success');
-  expect(fresh()).not.toContain('Disconnected');
+  expect(refreshed()).not.toContain('Disconnected');
   expect($('section.desk')!.textContent).toBe('Your deskNothing waits on you.');
 });
 
 test('closing the disconnected notice leaves the title bar saying Disconnected until the board recovers', async () => {
   const empty: BoardData = { ...healthy, error: null, fetchedAt: new Date(Date.now()).toISOString(), items: [] };
   await mountPage(empty);
-  const fresh = () => $('.refreshed')!.textContent;
+  const refreshed = () => $('.refreshed')!.textContent;
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
   await closeWarning('client-error');
   expect(warning('client-error')).toBeNull();
   await settle(() => vi.advanceTimersByTime(15_000));
   expect(warning('client-error'), 'stays closed while the board is still gone').toBeNull();
-  expect(fresh()).toContain('Disconnected');
+  expect(refreshed()).toContain('Disconnected');
   expect($('.refreshed [data-dot]')!.className).toContain('bg-danger');
   fetchMock.mockImplementation(async () => new Response(JSON.stringify({ ...empty, fetchedAt: new Date(Date.now()).toISOString() })));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect(fresh()).not.toContain('Disconnected');
+  expect(refreshed()).not.toContain('Disconnected');
   expect($('.refreshed [data-dot]')!.className).toContain('bg-success');
 });

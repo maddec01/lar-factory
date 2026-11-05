@@ -1,14 +1,12 @@
 // The page shell: first paint, the control room, live data, and what a re-render keeps.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, warningText, fetchMock, mountPage, push, sample, settle, stream, text } from '../test/support.ts';
+import { $, $$, warningText, fetchMock, fresh, mountPage, push, sample, settle, stream, text } from '../test/support.ts';
 import { BRAND_BLOCK_COLOR, BRAND_MARK_BLOCK, BRAND_MARK_L } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 
-const fresh: BoardData = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
-  await mountPage(fresh);
+  await mountPage(fresh());
   expect($$('.desk-card')).toHaveLength(7);
   expect(text($('.list-button')), 'the List counts its 4 items').toBe('List4');
   expect(fetchMock).not.toHaveBeenCalled();
@@ -17,7 +15,7 @@ test('the first paint shows the board data the server put in the page, with no f
 });
 
 test('the tab shows "Lar Factory" and the logo as its icon', async () => {
-  await mountPage(fresh);
+  await mountPage(fresh());
   expect(document.title).toBe('Lar Factory');
   const icon = decodeURIComponent($<HTMLLinkElement>('link[rel="icon"]')!.getAttribute('href')!);
   expect(icon).toMatch(/^data:image\/svg\+xml,<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 100 100"/);
@@ -28,7 +26,7 @@ test('the tab shows "Lar Factory" and the logo as its icon', async () => {
 
 test('an entered title round-trips through the inline board data without closing its script element', async () => {
   const title = 'Play <queue> & "mix" </script> $& $1';
-  await mountPage({ ...fresh, items: [{ ...fresh.items[0]!, title }] });
+  await mountPage({ ...fresh(), items: [{ ...sample.items[0]!, title }] });
   const script = $('#board-data')!;
   expect(script.innerHTML).not.toContain('</script>');
   expect((JSON.parse(script.textContent!) as BoardData).items[0]!.title).toBe(title);
@@ -56,19 +54,19 @@ test('a page opened at #flow shows the control room and keeps the hash', async (
 });
 
 test('data pushed over /api/events replaces the board, and the open stream stops the polling', async () => {
-  await mountPage(fresh);
+  await mountPage(fresh());
   await settle(() => stream().onopen!());
   await settle(() => vi.advanceTimersByTime(60_000));
   expect(fetchMock).not.toHaveBeenCalled();
   expect($('.refreshed')!.textContent).toBe('1m ago');
 
-  await settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify({ ...fresh, items: fresh.items.slice(0, 1) }) })));
+  await settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify({ ...fresh(), items: sample.items.slice(0, 1) }) })));
   expect(text($('.list-button'))).toBe('List1');
   expect($$('.desk-card')).toHaveLength(0);
 });
 
 test('while the stream is down the page fetches /api/board every 15 s', async () => {
-  await mountPage(fresh);
+  await mountPage(fresh());
   await settle(() => vi.advanceTimersByTime(14_999));
   expect(fetchMock).not.toHaveBeenCalled();
   await settle(() => vi.advanceTimersByTime(1));
@@ -83,19 +81,19 @@ test('while the stream is down the page fetches /api/board every 15 s', async ()
 });
 
 test("a failed fetch says the server can't be reached and keeps the last data", async () => {
-  await mountPage(fresh);
+  await mountPage(fresh());
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
   expect(warningText($('[data-warning="client-error"]')!)).toEqual(['Board disconnected — showing last received data', 'HTTP 502']);
   expect($$('.desk-card')).toHaveLength(7);
 
-  fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh())));
   await settle(() => vi.advanceTimersByTime(15_000));
   expect($('[data-warning="client-error"]')).toBeNull();
 });
 
 test("the lost server's warning closes, and the next failure after the server answers shows it again", async () => {
-  await mountPage(fresh);
+  await mountPage(fresh());
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
   const close = $<HTMLButtonElement>('[data-warning="client-error"] .dismiss')!;
@@ -107,7 +105,7 @@ test("the lost server's warning closes, and the next failure after the server an
   await settle(() => vi.advanceTimersByTime(15_000));
   expect($('[data-warning="client-error"]'), 'it stays closed while the server stays away').toBeNull();
 
-  fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh())));
   await settle(() => vi.advanceTimersByTime(15_000));
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
@@ -115,9 +113,9 @@ test("the lost server's warning closes, and the next failure after the server an
 });
 
 test('new data keeps focus', async () => {
-  await mountPage(fresh);
+  await mountPage(fresh());
   $('.add-item')!.focus();
 
-  await push({ ...fresh, items: [...fresh.items].reverse() });
+  await push({ ...fresh(), items: [...sample.items].reverse() });
   expect(document.activeElement).toBe($('.add-item'));
 });

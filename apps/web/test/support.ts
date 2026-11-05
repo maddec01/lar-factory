@@ -37,6 +37,8 @@ export const toolChecks = (checks: Partial<ToolChecks> = {}): ToolChecks => ({
 });
 /** The page's clock: twenty minutes after the sample was read. */
 export const NOW = Date.parse('2026-10-21T10:00:00Z');
+/** `data` read without an error at NOW, so the board trusts its thread activity. The sample itself reads as stale. */
+export const fresh = (data: BoardData = sample): BoardData => ({ ...data, error: null, fetchedAt: new Date(NOW).toISOString() });
 
 /** The page's event stream, which a test opens, pushes data on or drops. */
 class FakeEventSource extends EventTarget {

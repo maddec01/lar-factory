@@ -2,7 +2,7 @@
 // the whole factory. Each opens a popover of every item behind its number; picking one opens the item dialog.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, moved, mountPage, push, sample, settle, text, textBesideIcon } from '../../test/support.ts';
+import { $, $$, fresh, moved, mountPage, push, sample, settle, text, textBesideIcon } from '../../test/support.ts';
 import type { BoardData, ItemThread } from '@lar-factory/shared';
 
 /** The sample with a build limit of 2, which sample mode leaves out. */
@@ -54,8 +54,7 @@ test('the counts are the whole factory\'s with a repository scoped', async () =>
 });
 
 test('need you leaves out a Verify item while its build thread runs, and counts it again when it stops', async () => {
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-  const verify = (state: ItemThread['state'], currentRunning?: true) => ({ ...fresh, items: fresh.items.map((i) => (i.id === 'I_sample10' ? { ...i, status: 'Verify' as const,
+  const verify = (state: ItemThread['state'], currentRunning?: true) => ({ ...fresh(), items: sample.items.map((i) => (i.id === 'I_sample10' ? { ...i, status: 'Verify' as const,
     threads: [{ id: 'build', title: 'Build', purpose: 'build', state, currentRunning, updated: '2026-10-21T09:00:00.000Z' } as ItemThread] } : i)) });
   const count = () => Number(/need you: (\d+)/.exec(counter('need you').getAttribute('aria-label')!)![1]);
   await mountPage(verify('done'));
@@ -359,9 +358,9 @@ test('spend stays complete with figures frozen at merge, or an item with no thre
 });
 
 test('building animates across the whole factory while the Build heading follows scope and filters', async () => {
-  const fresh = { ...limited, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, slices: [], threads: [] })) };
-  const running = { ...fresh, items: fresh.items.map(item => item.id === 'I_sample14' ? { ...item, kind: 'bug' as const,
-    threads: [{ id: 'b', title: 'Build', purpose: 'build', state: 'running' as const, currentRunning: true as const, updated: fresh.fetchedAt }],
+  const idle = { ...fresh(limited), items: sample.items.map(item => ({ ...item, slices: [], threads: [] })) };
+  const running = { ...idle, items: idle.items.map(item => item.id === 'I_sample14' ? { ...item, kind: 'bug' as const,
+    threads: [{ id: 'b', title: 'Build', purpose: 'build', state: 'running' as const, currentRunning: true as const, updated: idle.fetchedAt! }],
   } : item) };
   await mountPage(running);
   const heading = () => $('[data-stage="build"] header > :is(svg, .status-spin)')!;
@@ -388,17 +387,17 @@ test('building animates across the whole factory while the Build heading follows
   pop = await openCounter('building');
   expect(members()).toEqual(originalMembers);
   const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive(fresh));
+  await settle(() => useBoardStore.getState().receive(idle));
   expect(counterIcon().classList.contains('lucide-circle')).toBe(true);
   expect(text(counter('building'))).toBe('4/2');
   expect(members()).toEqual(originalMembers);
 });
 
 test('starting and idle builds keep their count and membership while shaping alone leaves the building icons still', async () => {
-  const fresh = { ...limited, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, slices: [], threads: item.id === 'I_sample02'
+  const starting = { ...fresh(limited), items: sample.items.map(item => ({ ...item, slices: [], threads: item.id === 'I_sample02'
     ? [{ id: 's', title: 'Shape', purpose: 'shape', state: 'running' as const, currentRunning: true as const, updated: item.updatedAt }] : [] })),
     startProgress: { I_sample13: { build: { phase: 'starting' as const } } } };
-  await mountPage(fresh);
+  await mountPage(starting);
   expect(text(counter('building'))).toBe('5/2');
   expect(counter('building').querySelector('svg.lucide-circle')).not.toBeNull();
   expect(counter('need you').querySelector('svg.status-pulse')).toBeNull();

@@ -2,7 +2,7 @@
 // and its side action.
 
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, NOW, answer, fresh, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text, toast } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread, RepositorySetup, KindDisagreement, RawItem, Slice, ThreadActivity } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -103,13 +103,13 @@ test('a row\'s controls are their own focus stops, none nested in the button tha
 });
 
 test('a run known to be running with no progress details says Working, and the missing telemetry stays out of the row', async () => {
-  await mountPage(withItem('I_sample14', { status: 'In progress', buildPhase: null, threads: [{ ...thread('t1', 'running'), activity: acting('Read a.ts', 3) }] }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() }));
+  await mountPage(withItem('I_sample14', { status: 'In progress', buildPhase: null, threads: [{ ...thread('t1', 'running'), activity: acting('Read a.ts', 3) }] }, fresh(loose)));
   expect(text(state('I_sample14'))).toBe('Working');
   expect(text(row('I_sample14')), 'no telemetry note').not.toContain('unavailable');
 });
 
 test("a row keeps its phase beside live activity through another read's error, and says what it says today when T3 can't be read", async () => {
-  const board = (change: Partial<Item>) => withItem('I_sample14', { status: 'In progress', slices: [], ...change }, { ...loose, error: 'GitHub could not be read.', fetchedAt: new Date(NOW).toISOString() });
+  const board = (change: Partial<Item>) => withItem('I_sample14', { status: 'In progress', slices: [], ...change }, { ...fresh(loose), error: 'GitHub could not be read.' });
   const build = (activity: ThreadActivity) => board({ buildPhase: 'implement', threads: [{ ...thread('t1', 'running'), purpose: 'build', currentRunning: true, activity }] });
   const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
   await mountPage(build(acting('Read a.ts', 3)));
@@ -123,7 +123,7 @@ test("a row keeps its phase beside live activity through another read's error, a
 });
 
 test.each([['stopped', true], ['needs you', true], ['running', false]] as const)('usage loading on a %s row: its spinner stops: %s', async (threadState, still) => {
-  await mountPage(withItem('I_sample14', { status: 'In progress', usageState: 'loading', stats: undefined, threads: [{ ...thread('t1', threadState), activity: acting('Read a.ts', 3) }] }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() }));
+  await mountPage(withItem('I_sample14', { status: 'In progress', usageState: 'loading', stats: undefined, threads: [{ ...thread('t1', threadState), activity: acting('Read a.ts', 3) }] }, fresh(loose)));
   const figures = col('I_sample14', 'figures');
   expect(text(figures)).toBe('Loading usage');
   expect(figures.querySelector('[data-loader] .motion-safe\\:animate-spin') === null).toBe(still);
@@ -145,7 +145,7 @@ test('a row with nothing for its second line takes one line', async () => {
 });
 
 test('a row at work has its phase in the state column, and its bar, count and slice note on its second line', async () => {
-  await mountPage(withItem('I_sample14', { status: 'In progress', buildPhase: 'implement', slices: [], threads: [{ ...thread('t1', 'running'), purpose: 'build', currentRunning: true, activity: acting('Read a.ts', 3) }] }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() }));
+  await mountPage(withItem('I_sample14', { status: 'In progress', buildPhase: 'implement', slices: [], threads: [{ ...thread('t1', 'running'), purpose: 'build', currentRunning: true, activity: acting('Read a.ts', 3) }] }, fresh(loose)));
   const progress = (id: string) => row(id).querySelector<HTMLElement>('[data-progress]');
   expect(text(state('I_sample14')), 'the phase moves to the state column').toBe('Implementing');
   expect(text(progress('I_sample14')), 'and says it once').not.toContain('Implementing');
@@ -702,7 +702,7 @@ test('a row shows a kind disagreement', async () => {
 
 describe.each(['Verify', 'Ready to merge'] as const)('%s with its build thread running', (status) => {
   const threads = (build: ItemThread['state'], more: Partial<ItemThread> = {}): ItemThread[] => [thread('other', 'done'), { ...thread('build', build), purpose: 'build', ...more }];
-  const at = (t: ItemThread[], change: Partial<Item> = {}): BoardData => withItem('I_sample13', { status, blockers: [], threads: t, ...change }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() });
+  const at = (t: ItemThread[], change: Partial<Item> = {}): BoardData => withItem('I_sample13', { status, blockers: [], threads: t, ...change }, fresh(loose));
   const running = threads('running', { currentRunning: true });
   const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
   const desk = () => $('.desk-card[data-item="I_sample13"]');
@@ -756,7 +756,7 @@ test('finishing the last slice keeps a handoff summary until the builder records
     status: 'In progress', blockers: [], buildPhase,
     slices: [{ number: 1, title: 'Startup responsiveness', progress }] as Slice[],
     threads: [{ ...thread('build', 'done'), purpose: 'build' }],
-  }, { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() });
+  }, fresh(loose));
   const receive = async (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
   await mountPage(at('active', 'implement'));
   expect(text(state('I_sample13'))).toBe('Implementing');
@@ -767,8 +767,7 @@ test('finishing the last slice keeps a handoff summary until the builder records
 });
 
 describe('the activity line', () => {
-  const fresh = { ...loose, error: null, fetchedAt: new Date(NOW).toISOString() };
-  const at = (more: Partial<ItemThread> = {}, change: Partial<Item> = {}, data: BoardData = fresh) => withItem('I_sample13', {
+  const at = (more: Partial<ItemThread> = {}, change: Partial<Item> = {}, data: BoardData = fresh(loose)) => withItem('I_sample13', {
     status: 'In progress', blockers: [], buildPhase: 'implement', slices: [{ number: 1, title: 'Startup responsiveness', progress: 'active' }] as Slice[],
     threads: [{ ...thread('build', 'running'), purpose: 'build', currentRunning: true, activity: acting('Edit stage-row.tsx', 3), ...more }], ...change,
   }, data);
@@ -875,12 +874,12 @@ describe('the activity line', () => {
   });
 
   test('a failed read of anything else keeps the line', async () => {
-    await mountPage(at({}, {}, { ...fresh, error: 'GitHub read failed' }));
+    await mountPage(at({}, {}, { ...fresh(loose), error: 'GitHub read failed' }));
     expect(lineText()).toBe('Edit stage-row.tsx· 3s');
     const first = at();
     await settle(async () => (await store()).receive({ ...first, firstRead: { ...first.firstRead, settled: false } }));
     expect(lineText()).toBe('Edit stage-row.tsx· 3s');
-    const later = NOW + fresh.refreshSeconds * 3_000 + 1_000;
+    const later = NOW + loose.refreshSeconds * 3_000 + 1_000;
     vi.setSystemTime(later);
     const { isStale } = await import('@lar-factory/shared');
     await settle(async () => (await store()).receive(at({ activity: { ...acting('Grep', 1), readAt: new Date(later).toISOString() } as ThreadActivity })));
@@ -973,15 +972,15 @@ test('a section says it is loading, not empty, while the first read is still run
 
 test('Build and its row animate for current execution, stop together, and shaping alone never spins Build', async () => {
   const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, slices: [], threads: [] })) };
-  const data = withItem('I_sample14', { slices: [], threads: [build] }, fresh);
+  const idle = { ...fresh(), items: sample.items.map(item => ({ ...item, slices: [], threads: [] })) };
+  const data = withItem('I_sample14', { slices: [], threads: [build] }, idle);
   const buildGlyph = () => $('[data-stage="build"] header svg')!;
   const rowGlyph = () => row('I_sample14').querySelector('[data-glyph] svg')!;
   await mountPage(data);
   expect(buildGlyph().classList.contains('lucide-loader-circle')).toBe(true);
   expect(rowGlyph().closest('.status-spin')).not.toBeNull();
   const { useBoardStore } = await import('../board/board-store.ts');
-  const stopped = withItem('I_sample14', { slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, fresh);
+  const stopped = withItem('I_sample14', { slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, idle);
   await settle(() => useBoardStore.getState().receive(stopped));
   expect(buildGlyph().classList.contains('lucide-circle')).toBe(true);
   expect(rowGlyph().classList.contains('lucide-circle')).toBe(true);
@@ -994,8 +993,8 @@ test('Build and its row animate for current execution, stop together, and shapin
 
 test('status icons require current execution and suppress unavailable, cached, held and starting work', async () => {
   const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true };
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString(), items: sample.items.map(item => ({ ...item, threads: [], slices: [] })) };
-  const data = withItem('I_sample14', { threads: [build] }, withItem('I_sample02', { status: 'Shaping', threads: [{ ...build, purpose: 'shape' }] }, fresh));
+  const idle = { ...fresh(), items: sample.items.map(item => ({ ...item, threads: [], slices: [] })) };
+  const data = withItem('I_sample14', { threads: [build] }, withItem('I_sample02', { status: 'Shaping', threads: [{ ...build, purpose: 'shape' }] }, idle));
   await mountPage(data);
   const { useBoardStore } = await import('../board/board-store.ts');
   const motion = () => $$('[data-stage] [data-glyph] .status-spin, [data-stage] [data-glyph] svg.status-pulse');
@@ -1044,21 +1043,20 @@ test('status icons require current execution and suppress unavailable, cached, h
   ]) {
     await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { threads: [{ ...build, ...evidence }] }, withItem('I_sample02', {
       status: 'Shaping', threads: [{ ...build, purpose: 'shape', ...evidence }],
-    }, fresh))));
+    }, idle))));
     expect(motion(), JSON.stringify(evidence)).toHaveLength(0);
   }
 });
 
 test('status icons include delegated execution and active slices after the parent turn ends', async () => {
   const build: ItemThread = { ...thread('build', 'done'), purpose: 'build', hasRunningChildren: true };
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-  await mountPage(withItem('I_sample14', { slices: [], threads: [build] }, fresh));
+  await mountPage(withItem('I_sample14', { slices: [], threads: [build] }, fresh()));
   const glyph = () => row('I_sample14').querySelector('[data-glyph] svg')!;
   expect(glyph().closest('.status-spin')).not.toBeNull();
   const { useBoardStore } = await import('../board/board-store.ts');
   const slice = { number: 100, repo: 'maddec01/lar-server', title: 'Slice', url: '', state: 'open' as const, progress: 'active' as const };
-  await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { slices: [slice], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh)));
+  await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { slices: [slice], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh())));
   expect(glyph().closest('.status-spin')).not.toBeNull();
-  await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { slices: [{ ...slice, progress: 'done' }], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh)));
+  await settle(() => useBoardStore.getState().receive(withItem('I_sample14', { slices: [{ ...slice, progress: 'done' }], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh())));
   expect(glyph().classList.contains('lucide-circle')).toBe(true);
 });

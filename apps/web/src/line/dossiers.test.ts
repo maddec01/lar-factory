@@ -3,7 +3,7 @@
 // concept block tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text } from '../../test/support.ts';
+import { $, $$, NOW, answer, fresh, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -389,8 +389,7 @@ test('an open dossier has no About section; what keeps the work moving is in lab
 
 test('a part at Verify or Ready to merge counts as moving while its build thread runs, and back on your desk when it stops', async () => {
   const build = { id: 'build', title: 'Build', purpose: 'build', state: 'running', currentRunning: true, updated: '2026-10-21T09:00:00.000Z', activity: { available: true, readAt: new Date(NOW).toISOString(), action: 'Read a.ts', actionAt: new Date(NOW).toISOString(), toolRunning: false, agents: [] } } as ItemThread;
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-  const clear = withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, fresh));
+  const clear = withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, fresh()));
   await mountOpen(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [build] }, clear));
   expect(dossier().querySelector('[data-attention-row="verify"]')).toBeNull();
   expect(text(next())).toBe('Moving#140 Owner accounts');
@@ -406,7 +405,7 @@ test('a part at Verify or Ready to merge counts as moving while its build thread
 test('a decision part and a work map node name the running build thread and say Working', async () => {
   const build = { id: 'build', title: 'Build', purpose: 'build', state: 'done', hasRunningChildren: true, updated: '2026-10-21T09:00:00.000Z' } as ItemThread;
   const shape = { ...build, id: 'shape', title: 'Shape', purpose: 'shape', hasRunningChildren: undefined };
-  const data = withItem('I_sample10', { status: 'Verify', threads: [shape, build] }, { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() });
+  const data = withItem('I_sample10', { status: 'Verify', threads: [shape, build] }, fresh());
   await mountOpen(data);
   expect(text(dossier().querySelector('[data-attention-row="decisions"]'))).toContain('· Working');
   await press(button(dossier(), 'Work map'));
@@ -758,7 +757,7 @@ test('a shaping part with a question leads moving parts in the dossier', async (
 
 /** #200 on its Work map with `parts` as its parts, in place of the sample's. */
 const conceptOf = (parts: Item[], change: Partial<Item> = {}): BoardData => ({
-  ...sample, error: null, fetchedAt: new Date(NOW).toISOString(),
+  ...fresh(),
   items: [{ ...c200, ...change }, ...parts.map((p) => ({ ...p, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'open' as const }, parentId: c200.id }))],
 });
 const base = sample.items.find((i) => i.id === 'I_sample13')!;
@@ -1053,8 +1052,7 @@ test('a part with no figures yet says its usage can\'t be read', async () => {
 
 test.each(['Verify', 'Ready to merge'] as const)('%s keeps its pulsing icon in names and Track, with the activity line for the thread, while its part bar keeps building', async status => {
   const build: ItemThread = { ...thread('build', 'running'), purpose: 'build', currentRunning: true, activity: { available: true, readAt: new Date(NOW).toISOString(), toolRunning: true, agents: [] } };
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-  const data = withItem('I_sample13', { status, blockers: [], slices: [], threads: [build] }, fresh);
+  const data = withItem('I_sample13', { status, blockers: [], slices: [], threads: [build] }, fresh());
   await mountOpen(data);
   const icon = status === 'Verify' ? 'lucide-circle-dot' : 'lucide-git-merge';
   const glyphs = () => step('I_sample13').querySelectorAll(`svg.${icon}.status-pulse`);
@@ -1063,10 +1061,10 @@ test.each(['Verify', 'Ready to merge'] as const)('%s keeps its pulsing icon in n
   const bar = () => [...dossier().querySelectorAll('[data-part-bar] li')].find(li => li.getAttribute('title')?.startsWith('#140')) as HTMLElement;
   expect(bar().classList.contains('status-pulse')).toBe(true);
   expect(bar().style.background).toBe('var(--st-now)');
-  await receive(withItem('I_sample13', { status, blockers: [], slices: [], threads: [{ ...build, observedAt: build.updated }] }, fresh));
+  await receive(withItem('I_sample13', { status, blockers: [], slices: [], threads: [{ ...build, observedAt: build.updated }] }, fresh()));
   expect(step('I_sample13').querySelector('svg.status-pulse')).toBeNull();
   expect(text(step('I_sample13'))).toContain('Activity unavailable');
-  await receive(withItem('I_sample13', { status, blockers: [], slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, fresh));
+  await receive(withItem('I_sample13', { status, blockers: [], slices: [], threads: [{ ...build, state: 'done', currentRunning: undefined }] }, fresh()));
   expect(glyphs()).toHaveLength(0);
   expect(bar().classList.contains('status-pulse')).toBe(false);
   expect(bar().style.background).toBe(status === 'Verify' ? 'var(--st-amber)' : 'var(--st-done)');
@@ -1077,23 +1075,21 @@ test.each([
   ['In progress', 'build', '.status-spin > svg.lucide-loader-circle'],
   ['Review', 'build', 'svg.lucide-eye.status-pulse'],
 ] as const)('%s uses the item icon on its running dossier part name and Track', async (status, purpose, icon) => {
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-  await mountOpen(withItem('I_sample13', { status, slices: [], blockers: [], threads: [{ ...thread('own', 'running'), purpose, currentRunning: true }] }, fresh));
+  await mountOpen(withItem('I_sample13', { status, slices: [], blockers: [], threads: [{ ...thread('own', 'running'), purpose, currentRunning: true }] }, fresh()));
   expect(step('I_sample13').querySelectorAll(icon)).toHaveLength(2);
   expect(step('I_sample13').querySelector('[data-part-kind] svg.lucide-hammer')).not.toBeNull();
-  await receive(withItem('I_sample13', { status, slices: [], blockers: [], threads: [{ ...thread('own', 'done'), purpose, hasRunningChildren: true }] }, fresh));
+  await receive(withItem('I_sample13', { status, slices: [], blockers: [], threads: [{ ...thread('own', 'done'), purpose, hasRunningChildren: true }] }, fresh()));
   expect(step('I_sample13').querySelectorAll(icon), 'delegated work continues after the parent turn').toHaveLength(2);
 });
 
 test('work map nodes keep resumed Verify icons and the Builds lane keeps Hammer', async () => {
   const build: ItemThread = { ...thread('build', 'done'), purpose: 'build', hasRunningChildren: true };
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-  await mountOpen(withItem('I_sample13', { status: 'Verify', slices: [], blockers: [], threads: [build] }, fresh));
+  await mountOpen(withItem('I_sample13', { status: 'Verify', slices: [], blockers: [], threads: [build] }, fresh()));
   await press(button(dossier(), 'Work map'));
   const node = () => dossier().querySelector('[data-map-part="I_sample13"]')!;
   expect(node().querySelector('svg.lucide-circle-dot.status-pulse')).not.toBeNull();
   expect(text(node())).toContain('Working');
   expect(dossier().querySelector('[data-work-map] .lucide-hammer')).not.toBeNull();
-  await receive(withItem('I_sample13', { status: 'Verify', slices: [], blockers: [], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh));
+  await receive(withItem('I_sample13', { status: 'Verify', slices: [], blockers: [], threads: [{ ...build, hasRunningChildren: undefined }] }, fresh()));
   expect(node().querySelector('svg.lucide-circle-dot:not(.status-pulse)')).not.toBeNull();
 });

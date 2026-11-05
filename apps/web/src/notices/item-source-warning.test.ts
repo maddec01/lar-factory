@@ -1,7 +1,7 @@
 // The warning for each onboarded repository whose items the latest read left off, such as one reading through a logged-out az.
 
 import { expect, test } from 'vite-plus/test';
-import { $$, NOW, warningText, mountPage, push, sample, toolChecks } from '../../test/support.ts';
+import { $$, fresh, warningText, mountPage, push, sample, toolChecks } from '../../test/support.ts';
 
 const problems = [
   { repo: 'contoso/Fabrikam/lar-api', problem: 'az is logged out.', fix: 'az login' },
@@ -28,10 +28,10 @@ test("a repository whose problem the failed az check's fix covers shows no warni
 });
 
 test('failed sources mark retained data stale and expose diagnostics until recovery', async () => {
-  await mountPage({ ...sample, error: null, fetchedAt: new Date(NOW).toISOString(), itemSourceProblems: problems });
+  await mountPage({ ...fresh(), itemSourceProblems: problems });
   expect(document.querySelector('[data-dot]')?.className).toContain('bg-amber-500');
   expect(document.querySelector('[data-board-notices]')?.textContent).toContain('Diagnostics');
-  await push({ ...sample, error: null, fetchedAt: new Date(NOW).toISOString(), itemSourceProblems: [] });
+  await push({ ...fresh(), itemSourceProblems: [] });
   expect(document.querySelector('[data-board-notices]')).toBeNull();
   expect(document.querySelector('[data-dot]')?.className).toContain('bg-success');
 });

@@ -3,7 +3,7 @@
 // requests in a sidebar, and its footer carries GitHub and the action the item's status asks for.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, answer, detailsRead, fetchMock, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, textBesideIcon, toast } from '../../test/support.ts';
+import { $, $$, NOW, answer, detailsRead, fetchMock, fresh, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, textBesideIcon, toast } from '../../test/support.ts';
 import type { Blocker, BoardData, DependencyHold, Item, ItemThread } from '@lar-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
@@ -221,8 +221,7 @@ test('Open thread and Answer in T3 link to the latest thread in T3 Code, in the 
 });
 
 test.each(['Verify', 'Ready to merge'] as const)('%s with its build thread running offers Open thread on that thread, says Working and keeps its stage', async (status) => {
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-  const change = (threads: Item['threads']) => ({ ...fresh, items: fresh.items.map((i) => (i.id === 'I_sample10' ? { ...i, status, threads } : i)) });
+  const change = (threads: Item['threads']) => ({ ...fresh(), items: sample.items.map((i) => (i.id === 'I_sample10' ? { ...i, status, threads } : i)) });
   await mountPage(change([thread('other', 'done'), { ...thread('build', 'running'), purpose: 'build', currentRunning: true }]));
   await openItem('I_sample10');
   const open = statusAction() as HTMLAnchorElement;
@@ -1360,8 +1359,7 @@ test.each([true, false])('a concept recorded %s draws no diagram from its map, e
 });
 
 test('concept parts retain their own status icons while work resumes and stops', async () => {
-  const fresh = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-  const data = (currentRunning?: true): BoardData => ({ ...fresh, items: fresh.items.map(item => item.id === 'I_sample13' ? { ...item, status: 'Verify', slices: [],
+  const data = (currentRunning?: true): BoardData => ({ ...fresh(), items: sample.items.map(item => item.id === 'I_sample13' ? { ...item, status: 'Verify', slices: [],
     threads: [{ ...thread('build', currentRunning ? 'running' : 'done'), purpose: 'build', currentRunning }],
   } : item) });
   await mountPage(data(true));
@@ -1381,7 +1379,7 @@ describe('the working agents', () => {
     available: true, readAt: at, action: 'Edit stage-row.tsx', actionAt: at, toolRunning: false,
     agents: [{ title: 'Review', model: 'Opus 5.5', action: 'pnpm test', actionAt: new Date(NOW - 60_000).toISOString() }, { title: 'Subagent' }],
   } };
-  const board = (change: Partial<Item>, data: BoardData = sample): BoardData => ({ ...data, error: null, fetchedAt: new Date(NOW).toISOString(), items: data.items.map((i) => (i.id === 'I_sample13' ? { ...i, status: 'In progress', threads: [working], ...change } : i)) });
+  const board = (change: Partial<Item>, data: BoardData = sample): BoardData => ({ ...fresh(data), items: data.items.map((i) => (i.id === 'I_sample13' ? { ...i, status: 'In progress', threads: [working], ...change } : i)) });
   const section = () => inDialog('[data-working-agents]');
   const agents = () => [...section()!.querySelectorAll('li')].map((agent) => text(agent).replace(/\s+/g, ' '));
 

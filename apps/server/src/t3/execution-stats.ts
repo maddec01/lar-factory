@@ -4,6 +4,14 @@ import type { ThreadRows, ThreadSession } from './t3-db.ts';
 /** How many thread projections a stats read turns into rows between two turns of the event loop. */
 export const PROJECTIONS_PER_CHUNK = 32;
 
+/** The projection fields `executionStats` reads. */
+const STATS_FIELDS = ['thread', 'messages', 'providerSessions', 'providerThreads', 'providerTurns', 'runtimeRequests', 'subagents'] as const;
+
+/** A projection cut to what `executionStats` reads. A thread's history also holds its turn items and nodes, which the board never reads and which held most of its heap. */
+export function statsProjection<P extends Record<string, unknown>>(projection: P): Pick<P, (typeof STATS_FIELDS)[number] & keyof P> {
+  return Object.fromEntries(STATS_FIELDS.filter(key => key in projection).map(key => [key, projection[key]])) as Pick<P, (typeof STATS_FIELDS)[number] & keyof P>;
+}
+
 /** T3 97e35bc orchestrationV2.ts provider threads own native transcript references.
  * Provider sessions describe runtime attachment, not transcript identity.
  * Keep the SQL-era row interface so the stats calculations stay unchanged.

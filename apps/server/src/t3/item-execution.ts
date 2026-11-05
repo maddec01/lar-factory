@@ -1,4 +1,4 @@
-import { executionStats } from './execution-stats.ts';
+import { executionStats, statsProjection } from './execution-stats.ts';
 import type { ItemThread, StartedThread } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
 import { loopTrace } from '../startup/loop-trace.ts';
@@ -191,8 +191,8 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
           const startedEpoch = epoch;
           void readExecution(origin, version, protocol, id).catch((): ExecutionRead => ({ availability: 'unavailable' })).then(result => {
             if (current !== state || epoch !== startedEpoch) return;
-            const retained = entries.get(id)?.observation;
-            entries.set(id, { ...result, observation: result.observation ?? retained });
+            const observation = result.observation && { ...result.observation, projection: statsProjection(result.observation.projection) };
+            entries.set(id, { ...result, observation: observation ?? entries.get(id)?.observation });
             fingerprints.set(id, fingerprint);
             if (result.availability !== 'available') retryAt.set(id, Date.now() + 1000);
             else retryAt.delete(id);

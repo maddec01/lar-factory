@@ -11,7 +11,7 @@ smallest command that settles a specific uncertainty reading cannot settle.
 Name that uncertainty in your report. Run each heavy command (a whole test
 suite, a production build, a performance measurement, or anything expected to
 take over about a minute) on its own as `lar-work heavy -- <command>`, in the
-background or with your tool's longest timeout.
+foreground with your tool's longest timeout.
 
 Assume the author is overconfident. Hunt for:
 

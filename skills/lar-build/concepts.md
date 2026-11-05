@@ -62,8 +62,10 @@ Work a decision record by the method its text names (**Grilling with docs** in
 [SKILL.md 2. Size up](size-up.md), research findings, or a small task).
 Run each heavy command (a whole test suite, a production build, a performance
 measurement, or anything expected to take over about a minute) on its own as
-`lar-work heavy -- <command>`, in the background or with your tool's longest
-timeout. Then, in this order, so completion reads it as complete:
+`lar-work heavy -- <command>`. Top-level decision threads use the background,
+or their tool's longest timeout where it has no background mode. Delegated
+roles use the foreground with their tool's longest timeout, per
+[Wait for delegated work](shared/orchestration.md#wait-for-delegated-work). Then, in this order, so completion reads it as complete:
 
 1. Save the confirmed answer (`lar-work set-body <work ID> --revision N --body answer --file <file>`)
    and, with domain docs ON, the drafts it settled, or "none"

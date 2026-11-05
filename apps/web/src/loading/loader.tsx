@@ -2,13 +2,14 @@
 // and what loads.
 
 import { LoaderCircle, type LucideProps } from 'lucide-react';
+import { ambientMotion } from '../motion/ambient-motion.ts';
 
 /**
  * The loader icon, with `spin`, its animation's class, on a box around it: above a device scale of 1 Chromium can't run
  * a root svg's transform on the compositor, so the page would render every frame.
  */
 export const Spinner = ({ spin, ...icon }: LucideProps & { spin: string }) => (
-  <span className={`flex w-fit shrink-0 ${spin}`}><LoaderCircle {...icon} /></span>
+  <span ref={spin ? ambientMotion : undefined} className={`flex w-fit shrink-0 ${spin}`}><LoaderCircle {...icon} /></span>
 );
 
 /** The spinner and `label`; with no label, the spinner alone, named by `title` for a cue beside values already shown. `still` stops it spinning. */

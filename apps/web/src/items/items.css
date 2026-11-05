@@ -11,9 +11,10 @@
 }
 /* Status icons animate during agent work. Slice and part bars keep their own activity rules. */
 @keyframes status-spin { to { transform: rotate(360deg); } }
-.status-spin { animation: status-spin 2.4s linear infinite; }
+.status-spin { animation: status-spin 2.4s steps(72) infinite; }
 @keyframes status-pulse { 50% { opacity: 0.35; } }
-.status-pulse { animation: status-pulse 1.6s ease-in-out infinite; }
+/* 24 steps per half-cycle: 30 updates/s for these tiny indicators, independent of display refresh rate. */
+.status-pulse { animation: status-pulse 1.6s steps(24) infinite; }
 @media (prefers-reduced-motion: reduce) {
   .status-spin, .status-pulse { animation: none; }
 }

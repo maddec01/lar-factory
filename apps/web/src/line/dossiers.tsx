@@ -25,6 +25,7 @@ import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { ItemStatusGlyph, StatusGlyph, STATUS_COLOR, useStatusActivity } from '../items/status-glyph.tsx';
+import { ambientMotion } from '../motion/ambient-motion.ts';
 import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partLabel, shownThread, threadAtWork, threadsOf } from './dossier-parts.ts';
 import type { DossierItems, Part } from './dossier-parts.ts';
 import { StartBuild } from '../items/start-build.tsx';
@@ -323,8 +324,9 @@ function PartsBar({ m }: { m: Moving }) {
     <ol className="m-0 flex min-w-0 list-none gap-[2px] overflow-hidden p-0" title={`${m.done}/${m.count} parts done`} data-part-bar>
       {order.map((p) => {
         const { word, glyph } = shownStatus(p.item, unavailable);
+        const pulse = glyph === 'In progress' && !itemActivityStill(p.item, Date.now(), disconnected);
         return (
-          <li key={p.item.id} title={`${itemName(p.item)}: ${isDone(p.item) ? 'Complete' : word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${glyph === 'In progress' && !itemActivityStill(p.item, Date.now(), disconnected) ? 'status-pulse' : ''}`}
+          <li key={p.item.id} ref={pulse ? ambientMotion : undefined} title={`${itemName(p.item)}: ${isDone(p.item) ? 'Complete' : word}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${pulse ? 'status-pulse' : ''}`}
             style={{ background: isDone(p.item) ? 'var(--st-done)' : glyph === 'Queued' || glyph === 'List' ? 'var(--soft)' : STATUS_COLOR[glyph] }} />
         );
       })}

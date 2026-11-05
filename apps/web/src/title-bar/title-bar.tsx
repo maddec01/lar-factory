@@ -69,9 +69,19 @@ function Refreshed({ data }: { data: BoardData }) {
   const clientError = useBoardStore((state) => state.clientError);
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1_000);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const followVisibility = () => {
+      clearInterval(timer);
+      if (document.hidden) return;
+      setNow(Date.now());
+      timer = setInterval(() => setNow(Date.now()), 1_000);
+    };
+    document.addEventListener('visibilitychange', followVisibility);
+    followVisibility();
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', followVisibility);
+    };
   }, [fetchedAt]);
   const landed = useLandedReads(fetchedAt);
   // A repository whose items haven't landed would show as empty, so the board says it still reads instead.

@@ -9,6 +9,7 @@ import type { AzureWorkItem, BoardData, Checks, Item, ItemStats, Kind, RepoConfi
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
 import { useClock } from '../board/second-clock.ts';
+import { ambientMotion } from '../motion/ambient-motion.ts';
 import { isDone } from '../line/dossier-parts.ts';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { PURPOSE, useStart } from './start-store.ts';
@@ -54,7 +55,7 @@ export function SliceBar({ item, still = false }: { item: Item; thick?: boolean;
   return (
     <ol className="m-0 flex list-none gap-[2px] p-0">
       {item.slices.map((s, i) => (
-        <li key={i} title={itemName(s)} className={`h-1.5 flex-1 rounded-full ${s.progress === 'active' && !still ? 'status-pulse' : ''}`}
+        <li key={i} ref={s.progress === 'active' && !still ? ambientMotion : undefined} title={itemName(s)} className={`h-1.5 flex-1 rounded-full ${s.progress === 'active' && !still ? 'status-pulse' : ''}`}
           style={{ background: s.progress === 'waiting' ? 'var(--soft)' : SLICE_COLOR[s.progress] }} />
       ))}
     </ol>
@@ -68,7 +69,7 @@ export function SliceMark({ progress, still = false }: { progress: SliceProgress
       style={{ borderColor: SLICE_COLOR[progress], background: progress === 'done' ? 'var(--st-done)' : 'transparent' }}>
       {progress === 'unknown' && <span className="text-[9px] leading-none">?</span>}
       {progress === 'done' && <Check className="size-2.5 text-white" strokeWidth={3} />}
-      {progress === 'active' && <span className={`${still ? '' : 'status-pulse '}size-1.5 rounded-full bg-(--st-now)`} />}
+      {progress === 'active' && <span ref={still ? undefined : ambientMotion} className={`${still ? '' : 'status-pulse '}size-1.5 rounded-full bg-(--st-now)`} />}
     </span>
   );
 }
@@ -280,5 +281,5 @@ export const useShownStatus = (item: Item) => {
 
 export function ActivityFeedback({ feedback, labelOnly = false }: { feedback: ReturnType<typeof buildActivity>; labelOnly?: boolean }) {
   if (labelOnly) return <span className="block h-4 whitespace-nowrap text-[11px] leading-4 text-(--muted-foreground)">{feedback.label}</span>;
-  return <div role="img" aria-label={feedback.label} className="activity-track h-1.5 overflow-hidden rounded-full bg-(--soft)">{feedback.running && <span className="activity-sweep block h-1.5 w-1/3 rounded-full bg-(--st-now)" />}</div>;
+  return <div role="img" aria-label={feedback.label} className="activity-track h-1.5 overflow-hidden rounded-full bg-(--soft)">{feedback.running && <span ref={ambientMotion} className="activity-sweep block h-1.5 w-1/3 rounded-full bg-(--st-now)" />}</div>;
 }

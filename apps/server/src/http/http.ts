@@ -41,8 +41,10 @@ export interface HttpDeps {
   page: BuiltPage;
   /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
   appSecret: string | null;
-  /** Sample mode serves a fixed file: it writes nothing and runs no tools. */
+  /** Sample mode serves a fixed file: it writes nothing and reads no provider. */
   sample: boolean;
+  /** A sample board that reads T3 also answers with T3's projects for onboarding. */
+  sampleReadsT3: boolean;
   /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
   reauthorizeT3?(): Promise<void>;
   recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
@@ -159,7 +161,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 
 const RESEND_AFTER_WRITE_MS = 2_000;
 
-export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectIcon, projectChoices, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, capture, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, archive, page, appSecret, sample, sampleReadsT3, recheck, reauthorizeT3, itemDetails, showTicketType, showLabelChange, readSoon, ready, projectIcon, projectChoices, keepOnboarding, createProject,
   detectSetup, saveSetup, changeRepositorySettings, changeRepositoryLabels }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page, with the event each last received. */
   const streams = new Map<ServerResponse, string>();
@@ -560,7 +562,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
 
   /** Lists T3's projects and repository origins for onboarding. */
   async function projectsRequest(res: ServerResponse): Promise<void> {
-    if (sample) return json(res, 403, { error: 'Sample mode onboards no Project.' });
+    if (sample && !sampleReadsT3) return json(res, 403, { error: 'Sample mode onboards no Project.' });
     try { json(res, 200, { projects: await projectChoices() }); }
     catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
   }

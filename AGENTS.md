@@ -34,6 +34,10 @@ the flow and `docs/plan.md` for how it was set up.
 - Sample board: `BOARD_PORT=<port> pnpm run sample` in `apps/server`, on a port where
   `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing (the board app's board
   usually holds 4317). Stop it with that command `| xargs kill`; never `pkill` by pattern.
+  When a change touches T3-backed screens, use `pnpm run sample:t3` the same way: sample
+  items and PRs with real T3 projects, icons and availability, and every write refused.
+  Keep screenshots of its project step out of PRs, because that step shows real project
+  names and folders and this repo is public.
 - Release secrets wizard changes: run `bash scripts/release-secrets.test.sh` and
   `shellcheck scripts/release-secrets.sh`. Never run the wizard without `--dry-run`.
 - Shared script changes: run `bash skills/shared/scripts/slice.test.sh`,

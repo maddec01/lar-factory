@@ -13,7 +13,7 @@ import { isProgress, isRepo, readRepositoryList, saveOnboarding, stillOnboarding
 export async function keepOnboarding(input: Record<string, unknown>, dir = boardDataDir()): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }> {
   const { repo, progress, replaces } = input;
   if (!isRepo(repo) || !isProgress(progress) || replaces !== undefined && typeof replaces !== 'string') {
-    return { status: 400, error: 'Send the repository and where its onboarding stopped.' };
+    return { status: 400, error: 'Send the Project and where its onboarding stopped.' };
   }
   try {
     const { step, done, answers } = progress;

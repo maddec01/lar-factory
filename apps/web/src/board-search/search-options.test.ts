@@ -3,17 +3,17 @@ import { matchingGroups } from './search-options.ts';
 
 const option = (name: string) => ({ value: name, name, icon: null, select: () => undefined });
 const groups = [
-  { label: 'Repositories', options: [option('All repositories'), option('lar-server')] },
+  { label: 'Projects', options: [option('All Projects'), option('lar-server')] },
   { label: 'Kinds', options: [option('Bug')] },
 ];
 const names = (query: string) => matchingGroups(groups, query).flatMap((group) => group.options.map(({ name }) => name));
 
 test('an empty query lists everything', () => {
-  expect(names('  ')).toEqual(['All repositories', 'lar-server', 'Bug']);
+  expect(names('  ')).toEqual(['All Projects', 'lar-server', 'Bug']);
 });
 
 test('a result contains every word as a case-insensitive substring, in any order', () => {
-  expect(names('REPOS all')).toEqual(['All repositories']);
+  expect(names('PROJECTS all')).toEqual(['All Projects']);
   expect(names('all bug')).toEqual([]);
 });
 

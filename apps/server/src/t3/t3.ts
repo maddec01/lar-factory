@@ -7,7 +7,7 @@ import { launchThread, type ExistingWorktree, type LaunchThread, type LaunchWork
 import { launchSelection, projectDefaults, type ProjectDefaults } from './model-choices.ts';
 
 const UNCERTAIN: StartResult = { thread: null, uncertain: true,
-  error: "The thread's start could not be confirmed. Check the repository's project in T3 Code before starting it again." };
+  error: "The thread's start could not be confirmed. Check its T3 project in T3 Code before starting it again." };
 
 /** A new git worktree for a thread: the branch it is made on, from `base`. */
 export interface NewWorktree {

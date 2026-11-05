@@ -42,7 +42,7 @@ function RepoSelect({ id, repo, onRepo }: { id: string; repo: string; onRepo: (r
   return (<>
     <FormSelect id={id} name="repo" value={repo} onChange={onRepo} aria-describedby={hint ? `${id}-hint` : undefined}
       choices={data.repos.map((r) => ({ value: r.repo, name: repoName(r.repo, data.repos), icon: <ProjectIcon repo={r.repo} size="small" /> }))} />
-    {hint && <p className={HINT} id={`${id}-hint`}>No repository is onboarded. <AddingARepository /></p>}
+    {hint && <p className={HINT} id={`${id}-hint`}>No Project is onboarded. <AddingARepository /></p>}
   </>);
 }
 
@@ -94,7 +94,7 @@ function AddItemForm() {
             <FormResult id="item-result" text={message} />
           </div>
           <aside aria-label="Details" className="grid content-start gap-5 overflow-y-auto border-l border-base-300 bg-base-50/60 px-4 py-4 @max-[40rem]:overflow-visible @max-[40rem]:border-l-0 @max-[40rem]:border-t">
-            <PanelSection heading="Repository" htmlFor="item-repo">
+            <PanelSection heading="Project" htmlFor="item-repo">
               <RepoSelect id="item-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
             </PanelSection>
             <PanelSection heading="Kind" htmlFor="item-kind">
@@ -127,7 +127,7 @@ function PickTicketPane() {
   return (<>
     <div className="grid min-h-0 content-start gap-4 overflow-y-auto border-t border-base-300 px-5 pb-5 pt-4 sm:px-6" id="pick-ticket">
       <p className={HINT}>Find tickets outside your list, or open one you’ve already added.</p>
-      <PanelSection heading="Repository" htmlFor="pick-repo">
+      <PanelSection heading="Project" htmlFor="pick-repo">
         <RepoSelect id="pick-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
       </PanelSection>
       <TicketPicker id="pick" repo={selected?.repo ?? ''} disabled={disabled} key={selected?.repo} onPick={(ticket) => pick(selected!.repo, ticket)} />

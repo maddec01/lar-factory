@@ -185,16 +185,16 @@ test.each(OTHER_DIALOGS)('the shortcut does nothing while %s is open', async (_n
   expect(dialog()).toBeNull();
 });
 
-test('the dialog lists repositories with All repositories first, in List order, then kinds and labels', async () => {
+test('the dialog lists repositories with All Projects first, in List order, then kinds and labels', async () => {
   await mountPage(withItems([item('Q1', { number: 1, labels: ['docs', 'area: web'] })]));
   await openDialog();
   expect(groups()).toEqual([
     ['Actions', ['Add item', 'List', 'Settings']],
-    ['Repositories', ['All repositories', 'lar-server', 'lar-apple']],
+    ['Projects', ['All Projects', 'lar-server', 'lar-apple']],
     ['Kinds', ['Bug', 'Feature', 'Improvement', 'Concept', 'No kind']],
     ['Labels', ['area: web', 'docs']],
   ]);
-  expect(option('All repositories').getAttribute('aria-checked')).toBe('true');
+  expect(option('All Projects').getAttribute('aria-checked')).toBe('true');
 });
 
 test('choosing a kind or label toggles its token, saves it and keeps the dialog open', async () => {
@@ -215,7 +215,7 @@ test('choosing a kind or label toggles its token, saves it and keeps the dialog 
   expect(removes()).toEqual([]);
 });
 
-test('choosing a repository swaps Scope and All repositories clears it, with the dialog open', async () => {
+test('choosing a repository swaps Scope and All Projects clears it, with the dialog open', async () => {
   await mountPage();
   await openDialog();
   await choose('lar-apple');
@@ -225,7 +225,7 @@ test('choosing a repository swaps Scope and All repositories clears it, with the
   await choose('lar-server');
   expect(removes(), 'choosing it again keeps it').toEqual(['Remove lar-server']);
   expect(option('lar-server').getAttribute('aria-checked')).toBe('true');
-  await choose('All repositories');
+  await choose('All Projects');
   expect(removes()).toEqual([]);
   expect(localStorage.getItem(SCOPE_KEY)).toBeNull();
   expect(dialog()).not.toBeNull();
@@ -311,8 +311,8 @@ test('typing repeats none of the work the query does not change', async () => {
 test('every query word must match, and an empty list says nothing matches', async () => {
   await mountPage();
   await openDialog();
-  await type('REPOS all');
-  expect(groups()).toEqual([['Repositories', ['All repositories']]]);
+  await type('PROJECTS all');
+  expect(groups()).toEqual([['Projects', ['All Projects']]]);
   await type('zzz');
   expect(groups()).toEqual([]);
   expect(text($('[data-search-dialog] [role="status"]'))).toBe('Nothing matches.');
@@ -364,7 +364,7 @@ test('a saved Scope missing from the board shows no token, and returns with its 
   await openDialog();
   expect(removes()).toEqual([]);
   expect($('[data-search-clear]')).toBeNull();
-  expect(option('All repositories').getAttribute('aria-checked')).toBe('true');
+  expect(option('All Projects').getAttribute('aria-checked')).toBe('true');
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...sample, repos: [...sample.repos, { ...sample.repos[0]!, repo: 'maddec01/lar-gone' }] }));
   expect(removes()).toEqual(['Remove lar-gone']);
@@ -545,6 +545,6 @@ test('while the first read is unfinished the dialog shows the loading cue, not t
   expect(status(), 'no tickets are on offer before typing').toBe('');
   await type('zzz');
   expect(groups()).toEqual([]);
-  expect(status()).toBe('Loading projects…');
+  expect(status()).toBe('Loading Projects…');
   expect($('[data-search-dialog] [data-loader]')).not.toBeNull();
 });

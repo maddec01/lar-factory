@@ -80,14 +80,14 @@ export function createCapture({ board, items, records, reread, repos, provider =
 
     async options(value) {
       const repo = repoOf(value);
-      if (!repo) return reply(422, { error: 'Choose a configured repository.' });
+      if (!repo) return reply(422, { error: 'Choose a configured Project.' });
       try { return reply(200, { options: await discoverOptions(repo), error: null }); }
       catch { return reply(502, { error: 'Could not read issue options. You can still submit the title and description.' }); }
     },
 
     async searchTickets(input) {
       const repo = repoOf(input.repo);
-      if (!repo) return reply(422, { error: 'Choose a configured repository.' });
+      if (!repo) return reply(422, { error: 'Choose a configured Project.' });
       if (typeof input.query !== 'string' || input.query.length > 256) return reply(422, { error: 'Search with text of at most 256 characters.' });
       let found: TicketMatch[];
       try { found = await items.searchTickets(repo.repo, input.query); }
@@ -102,7 +102,7 @@ export function createCapture({ board, items, records, reread, repos, provider =
 
     async pick(input) {
       const repo = repoOf(input.repo);
-      if (!repo) return reply(422, { error: 'Choose a configured repository.' });
+      if (!repo) return reply(422, { error: 'Choose a configured Project.' });
       if (!isTicketNumber(input.number)) return reply(422, { error: 'Pick one of the tickets the search found.' });
       if (!records) return reply(409, { error: NO_RECORDS });
       const ticket = `${repo.repo}#${input.number}`;

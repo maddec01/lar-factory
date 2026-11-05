@@ -14,24 +14,30 @@ what to build and merge every PR.
 ## Get started
 
 Install the Mac app from [GitHub Releases](https://github.com/maddec01/lar-factory/releases)
-and open it with T3 Code running. In Settings > Repositories, choose Add repository:
+and open it with T3 Code running. In Settings > Projects, choose Add project:
 
-1. Choose a repository from your T3 Code projects.
-2. Choose its issue source and domain docs. GitHub uses repository
-   issues; Azure DevOps uses a team's backlog and current sprint together.
-   Choose whether to write domain docs. Legacy structural publication is suspended.
-3. Choose issue defaults and optional vocabulary mappings, then review Access
-   and add the repository. Create issues from Add item, Create issues from retro
-   captures and Write the refined spec to the issue all default to ON, including
-   for existing repositories. Settings lets you change them later.
+1. Project. Choose a T3 project for the repository you want to work with.
+2. Access. Check what your local login can read and write.
+3. Work and docs. Choose the issue source, issue defaults, domain docs and
+   optional kind mappings. GitHub uses repository issues; Azure DevOps uses a
+   team's backlog and current sprint together.
+4. Done. Review the setup and add the Project.
 
-Verified Access controls writes. Refused or unchecked access disables the
-corresponding options and explains why; Recheck access refreshes it. The session
+Create issues from Add item, Create issues from retro captures and Write the
+refined spec to the issue default to ON, including for existing Projects.
+Open a Project's page in Settings > Projects to change them later. Choices
+save at once, and text saves when you leave its field. Closing Settings counts
+as leaving the field. Label picks in kind mappings save when their popover closes.
+A typed new label is created when you choose Create on the Project page.
+In onboarding, new labels wait for the final add.
+
+Access controls writes. The board disables options whose access is Refused or
+Not checked and says why. Recheck access refreshes the results. The session
 setting `LAR_FACTORY_AZURE_READ_ONLY=1` bars Azure writes. Repository, organization
 and project names and old consent lists grant no permission. Routine writes
 covered by the saved settings need no repeated permission prompt.
 
-The configured source supplies the repository List. Settings stay on this machine.
+The configured source supplies the Project's List. Settings stay on this machine.
 The factory uses existing project conventions, package scripts, manifests, CI and
 nearby tests. Repositories need no factory configuration or guidance files.
 
@@ -58,15 +64,13 @@ writes queue, board Status, workflow stage or per-item progress to a tracker.
 
 ## Add work and create issues
 
-Add item's Create issue checkbox follows the selected repository's default and
+Add item's Create issue checkbox follows the selected Project's default and
 can change it for one submission. GitHub offers labels, assignee and milestone,
 plus issue type for organization repositories. Azure offers work item type,
 tags, assignee and iteration, using the team's default area. Only title,
-repository and kind are required. Kind mappings fill labels and type; the other
+Project and kind are required. Kind mappings fill labels and type; the other
 fields start empty. Fields without write Access are hidden and omitted.
-Optional vocabulary mappings allow none, suggest existing same-name labels and
-create typed labels only when saved. Onboarding folds them into an optional
-section, and leaving it closed creates no labels.
+Kind mappings can have no label or use an existing same-name label.
 
 An unreadable options list still allows title and description; Azure requires a
 readable backlog type. A failed create keeps the draft open and adds nothing to
@@ -88,7 +92,7 @@ for local work; conversion updates the source icon.
 
 With Write the refined spec to the issue ON, a passing gate puts the whole
 brief in the ticket's main description as Spec and preserves its earlier text
-as Original. This includes other people's tickets in onboarded repositories;
+as Original. This includes other people's tickets in onboarded Projects;
 concept maps, decisions, slices and Dependency tickets are excluded.
 The ticket becomes the source of truth and the record keeps a copy for gates
 and builds. Before the first Spec, or with the setting OFF, briefs stay local.
@@ -158,9 +162,9 @@ itself leaves repository files unchanged.
 ## Local data and commands
 
 The app and `lar-work` share `~/Library/Application Support/Lar Factory/`.
-`repository-settings.json` holds the repository list, local settings, access
+`repository-settings.json` holds the Project list, local settings, access
 choices and Connections. `work-records.db` holds work records and their
-bodies. An absolute `LAR_FACTORY_DATA_DIR` selects another data folder. Repository
+bodies. An absolute `LAR_FACTORY_DATA_DIR` selects another data folder. Project
 settings stay on this machine and use your existing local `gh` or `az` login;
 no factory infrastructure or credentials are required.
 

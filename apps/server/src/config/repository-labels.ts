@@ -43,7 +43,7 @@ function followInMappings(repo: string, capabilities: TrackerCapabilities, name:
 /** Reads the tracker's labels, or changes one when the signed-in account may manage them and the name isn't managed. A change to a mapped label also changes its mappings. */
 export async function changeRepositoryLabels(input: Record<string, unknown>, dir = boardDataDir(), tracker?: Tracker): Promise<{ labels?: TrackerLabel[]; setups?: RepositorySetup[] } | Refused> {
   const { repo, change, name, update } = input;
-  if (!isRepo(repo) || !['list', 'create', 'update', 'delete'].includes(change as string)) return { status: 400, error: 'Send the repository and the change to its labels.' };
+  if (!isRepo(repo) || !['list', 'create', 'update', 'delete'].includes(change as string)) return { status: 400, error: 'Send the Project and the change to its labels.' };
   const refused = notEditable(repo, dir);
   if (refused) return refused;
   const { labels, capabilities } = tracker ?? { labels: trackerLabels(repo), capabilities: trackerCapabilities(repo) };

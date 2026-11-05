@@ -469,7 +469,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
     <div className="grid gap-3 border-t border-(--border) p-3" data-dossier-body>
       {noDelivery(parent) && <p className="m-0 text-xs text-(--muted-foreground)" data-no-delivery>{NO_DELIVERY}</p>}
       {missing > 0 && <p className="m-0 text-xs text-(--muted-foreground)" data-unread-parts>
-        {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
+        {plural(missing, 'part')} the board doesn't read. A Project may no longer be on the board.
       </p>}
       <StructureSync item={unsynced} />
       {view === 'map'

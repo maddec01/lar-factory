@@ -13,9 +13,9 @@ import { isRepo, onTheBoard, type OnboardedRepository, type RepositoryConfig } f
 export async function changeRepositorySettings(input: Record<string, unknown>, dir = boardDataDir(), reads?: VocabularyReads, create?: (repo: string, name: string) => Promise<string>): Promise<VocabularySettingsResponse | Refused> {
   const { repo, change, key, value } = input;
   if (!isRepo(repo) || !['override', 'recheck', 'structure-sync', 'vocabulary', 'discover-vocabulary'].includes(change as string)) {
-    return { status: 400, error: 'Send the repository and the change to its settings.' };
+    return { status: 400, error: 'Send the Project and the change to its settings.' };
   }
-  if (change === 'override' && !SHARED_SETTINGS.includes(key as SharedSetting)) return { status: 400, error: 'Choose a repository setting.' };
+  if (change === 'override' && !SHARED_SETTINGS.includes(key as SharedSetting)) return { status: 400, error: 'Choose a Project setting.' };
   const refused = notEditable(repo, dir);
   if (refused) return refused;
   try {

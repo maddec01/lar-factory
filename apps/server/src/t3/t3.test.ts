@@ -169,7 +169,7 @@ test('a lost answer in an existing worktree stays uncertain, as the thread list 
   const { run, calls } = t3With({});
   const answer = await startThread('p', 'T\nm', OPUS, { type: 'existing_worktree', worktreePath: '/w', branch: 'b' }, run, () => ({ selection: null, runtimeMode: 'full-access' }), lost);
   assert.equal(answer.uncertain, true);
-  assert.match(answer.error!, /could not be confirmed. Check the repository's project/);
+  assert.match(answer.error!, /could not be confirmed. Check its T3 project/);
   assert.equal(calls.length, 0);
 });
 

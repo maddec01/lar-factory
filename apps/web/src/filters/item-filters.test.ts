@@ -176,12 +176,12 @@ test('the List counts follow the filters, and its Labels filter holds the chosen
   ]));
   await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
   await open('labels');
-  expect(choices(), 'All repositories lists the union, without case').toEqual(['docs', 'infra']);
+  expect(choices(), 'All Projects lists the union, without case').toEqual(['docs', 'infra']);
   await choose('docs');
   const rows = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').map((b) => b.dataset.item).sort();
   expect(rows(), 'matched without case across repositories').toEqual(['L1', 'L2']);
   await removeChip('docs');
-  await settle(() => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Repositories"] button').find((b) => b.textContent?.includes('lar-apple'))!.click());
+  await settle(() => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Projects"] button').find((b) => b.textContent?.includes('lar-apple'))!.click());
   await open('labels');
   expect(choices(), 'a picked repository offers its own').toEqual(['Docs', 'infra']);
 });

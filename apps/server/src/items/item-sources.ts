@@ -10,7 +10,7 @@ import { az, type Az } from '../azure/azure-items.ts';
 import { ReadProblem, type ItemSource, type ItemsRead, type ReadPace, type ReadProgress } from './item-source.ts';
 
 /** Who answers for a repository no source names, when its repository is not onboarded. */
-const NOT_ONBOARDED = "That item's repository isn't onboarded.";
+const NOT_ONBOARDED = "That item's Project isn't onboarded.";
 const unlisted: ItemSource = {
   read: async () => ({ title: '', items: [] }),
   searchTickets: async () => { throw new Error(NOT_ONBOARDED); },

@@ -140,9 +140,9 @@ export function Counters() {
   // Nothing has been read yet, so a zero would be a claim.
   const unknown = (n: number) => reading && !n;
   const countOf = (n: number) => (unknown(n) ? <Dash /> : n);
-  const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading projects' : hint);
+  const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading Projects' : hint);
   const subFor = (n: number) => (unknown(n) ? undefined : n);
-  const empty = (none: string) => <Empty>{reading ? <Loader label="Loading projects…" /> : none}</Empty>;
+  const empty = (none: string) => <Empty>{reading ? <Loader label="Loading Projects…" /> : none}</Empty>;
   const listOf = (items: Item[], none: string) => (items.length ? <List items={items} now={now} /> : empty(none));
 
   return (

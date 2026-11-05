@@ -1,5 +1,5 @@
 // The title bar's List button and the List modal it opens, on the copied Modal's paned layout. The left pane picks
-// All repositories or a repository, each with how many of its items match the search and filters;
+// All Projects or a repository, each with how many of its items match the search and filters;
 // the right pane shows the chosen group's items with the search, Add item, Scope board, the sort menu and the filters. It starts on
 // the board's scope. An item opens the item dialog and Add item opens the Add item flow, each over the List modal, so
 // closing them comes back to the List as it was.
@@ -116,7 +116,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
   const scope = useShownScope();
   const setScope = useScopeStore((state) => state.setScope);
   const [query, setQuery] = useState('');
-  // The chosen group's repository, or `null` for All repositories.
+  // The chosen group's repository, or `null` for All Projects.
   const [pick, setPick] = useState<string | null>(scope);
   const [sort, setSort] = useState<Sort | null>(null);
   const searchField = useRef<HTMLInputElement>(null);
@@ -127,14 +127,14 @@ function ListModal({ onClose }: { onClose: () => void }) {
   // In boardSections' order, which counts items before the search so the rows stay put while typing.
   const held = boardSections(data, now).listGroups;
   const groups = held.map((group): ListGroup => ({ ...group, items: group.items.filter((i) => matchesSearch(i, q) && shows(i)) }));
-  // A picked group that's gone shows All repositories.
+  // A picked group that's gone shows All Projects.
   const picked = groups.find((group) => group.repo === pick);
   const active = picked?.repo ?? null;
   const unsorted = picked ? [...picked.items] : groups.flatMap((group) => group.items);
   const effectiveSort = sort ?? (unsorted.some((item) => item.azure) ? 'priority' : 'updated');
   const items = unsorted.sort(SORTS[effectiveSort].compare);
   const scoped = picked !== undefined && scope === picked.repo;
-  // A scope the first read may still add to isn't empty, nor its count final: one repository until its items land, All repositories until the read settles.
+  // A scope the first read may still add to isn't empty, nor its count final: one repository until its items land, All Projects until the read settles.
   const reading = readingScope(data, picked?.repo);
   const groupItem = ({ repo, name, items: hits }: ListGroup, icon: React.ReactNode) => (
     <GroupItem key={repo} label={name} count={readingScope(data, repo) ? undefined : hits.length} icon={icon} active={active === repo} onPick={() => setPick(repo)} />
@@ -143,9 +143,9 @@ function ListModal({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose}>
       <Modal.Content data-list-modal data-expanded={expanded} style={expanded ? EXPANDED : undefined} headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />} title="List" focusFirstField
         sidebar={
-          <SidebarPane label="Repositories">
-            <GroupItem label="All repositories" count={readingScope(data) ? undefined : groups.reduce((n, group) => n + group.items.length, 0)} icon={<Inbox />} active={active === null} onPick={() => setPick(null)} />
-            <SidebarNavigationGroup label="Repositories">
+          <SidebarPane label="Projects">
+            <GroupItem label="All Projects" count={readingScope(data) ? undefined : groups.reduce((n, group) => n + group.items.length, 0)} icon={<Inbox />} active={active === null} onPick={() => setPick(null)} />
+            <SidebarNavigationGroup label="Projects">
               {groups.map((group) => groupItem(group, <ProjectIcon repo={group.repo} size="medium" />))}
             </SidebarNavigationGroup>
           </SidebarPane>
@@ -156,7 +156,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
             <Button {...kind('main')} leftIcon={<SquarePen />} className="add-item shrink-0" onClick={() => useAddItemStore.getState().setOpen(true)}>Add item</Button>
           </div>
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-sm font-semibold text-base-content">{picked ? picked.name : 'All repositories'}</span>
+            <span className="truncate text-sm font-semibold text-base-content">{picked ? picked.name : 'All Projects'}</span>
             {!reading && <Badge>{items.length}</Badge>}
             {picked && (
               <Button {...kind('other')} data-toggle className="scope-board" aria-pressed={scoped} selected={scoped} onClick={() => setScope(scoped ? null : picked.repo)}>
@@ -169,8 +169,8 @@ function ListModal({ onClose }: { onClose: () => void }) {
         </div>
         <Modal.Body>
           {items.map((item) => <ItemRow key={item.id} item={item} now={now} showRepo={!picked} onOpen={() => useItemDialogStore.getState().open(item.id, true)} />)}
-          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q || filtering(filters) ? 'Nothing here matches.' : reading ? <Loader label="Loading projects…" /> : 'Nothing in List.'}</p>}
-          {items.length > 0 && reading && <p className="m-0 p-4 text-sm text-base-700" data-reading><Loader label="Loading more projects…" /></p>}
+          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q || filtering(filters) ? 'Nothing here matches.' : reading ? <Loader label="Loading Projects…" /> : 'Nothing in List.'}</p>}
+          {items.length > 0 && reading && <p className="m-0 p-4 text-sm text-base-700" data-reading><Loader label="Loading more Projects…" /></p>}
         </Modal.Body>
       </Modal.Content>
     </Modal>
@@ -186,7 +186,7 @@ export function ListButton() {
   return (
     <>
       <Button {...kind('control')} className="list-button px-2" leftIcon={<Inbox />} title="List" onClick={() => setOpen(true)}>
-        <span className="@max-[70rem]:sr-only">List</span>{count || !reading ? <Badge>{count}</Badge> : <Loader title="Loading projects…" />}
+        <span className="@max-[70rem]:sr-only">List</span>{count || !reading ? <Badge>{count}</Badge> : <Loader title="Loading Projects…" />}
       </Button>
       {open && <ListModal onClose={() => setOpen(false)} />}
     </>

@@ -90,7 +90,7 @@ test("the checkout is Refused with its fix for another origin, a second checkout
 });
 
 test('detection refuses a body without a repository and T3 project', async () => {
-  assert.deepEqual(await detectSetup({ repo: 'nope' }, reads()), { status: 400, error: 'Choose a repository and its T3 project before detecting its setup.' });
+  assert.deepEqual(await detectSetup({ repo: 'nope' }, reads()), { status: 400, error: 'Choose a Project and its T3 project before detecting its setup.' });
 });
 
 test('a triage login can set labels but not manage them, and a write login can do both', async () => {

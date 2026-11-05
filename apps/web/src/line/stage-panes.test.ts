@@ -966,7 +966,7 @@ test('a section says it is loading, not empty, while the first read is still run
   const unsettled = { ...sample, items: sample.items.filter((i) => i.status !== 'Shaping' && i.status !== 'Needs you'), firstRead: { step: 'items' as const, running: ['lar-apple'], settled: false } };
   await mountPage(unsettled);
   const empty = () => $('[data-stage="shaping"] [data-pane-empty]')!;
-  expect([text(empty()), empty().querySelector('[data-loader]') !== null]).toEqual(['Loading projects…', true]);
+  expect([text(empty()), empty().querySelector('[data-loader]') !== null]).toEqual(['Loading Projects…', true]);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive({ ...unsettled, firstRead: { step: 'finishing', running: [], settled: true } }));
   expect([text(empty()), empty().querySelector('[data-loader]')]).toEqual(['Nothing in shaping.', null]);
 });

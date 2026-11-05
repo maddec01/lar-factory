@@ -1,5 +1,5 @@
 // The board's saved Scope, Kind and Labels: they survive a reload, and a saved repository the board no longer offers
-// shows as All repositories once the first read settles, while the saved value waits for it to return.
+// shows as All Projects once the first read settles, while the saved value waits for it to return.
 
 import { expect, test, vi } from 'vite-plus/test';
 import type { BoardData } from '@lar-factory/shared';
@@ -42,7 +42,7 @@ test('filters saved before this store carry over from the same key', async () =>
   expect((await store()).filters).toEqual({ kinds: ['bug'], labels: ['docs'] });
 });
 
-test('choosing All repositories removes the saved Scope, so a reload stays on all', async () => {
+test('choosing All Projects removes the saved Scope, so a reload stays on all', async () => {
   localStorage.setItem(SCOPE_KEY, 'maddec01/lar-apple');
   await mountPage();
   await settle(async () => (await store()).setScope(null));
@@ -79,7 +79,7 @@ test('before the first read settles, a saved repository not on the board still s
   expect(text($('[data-reading]'))).toBe('Loading projects…');
 });
 
-test('once the first read settles, a saved repository not on the board shows as All repositories and the saved value stays', async () => {
+test('once the first read settles, a saved repository not on the board shows as All Projects and the saved value stays', async () => {
   localStorage.setItem(SCOPE_KEY, GONE);
   await mountPage(reader);
   await receive(sample);
@@ -120,8 +120,8 @@ test('the List modal starts on the shown Scope, and Scope board writes the saved
   localStorage.setItem(SCOPE_KEY, GONE);
   await mountPage();
   await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
-  const nav = () => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Repositories"] button');
-  expect(nav().filter((b) => b.getAttribute('aria-current') === 'page').map((b) => text(b.querySelector('.name')))).toEqual(['All repositories']);
+  const nav = () => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Projects"] button');
+  expect(nav().filter((b) => b.getAttribute('aria-current') === 'page').map((b) => text(b.querySelector('.name')))).toEqual(['All Projects']);
   expect($('[data-list-modal] .scope-board')).toBeNull();
   await settle(() => nav().find((b) => b.textContent?.includes('lar-apple'))!.click());
   await settle(() => $<HTMLButtonElement>('[data-list-modal] .scope-board')!.click());

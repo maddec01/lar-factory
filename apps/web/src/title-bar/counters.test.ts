@@ -261,9 +261,9 @@ test('while the first read could add items, a count with none is a dash, one wit
   await mountPage({ ...data, items: data.items.filter((i) => i.status === 'Done'), firstRead });
   expect(counters().slice(0, 4).map(text)).toEqual(['–', '–', '–/2', '4']);
   for (const label of ['need you', 'shaping', 'building'] as const) {
-    expect(counter(label).getAttribute('aria-label')).toBe(`${label}: Still loading projects`);
+    expect(counter(label).getAttribute('aria-label')).toBe(`${label}: Still loading Projects`);
     const pop = await openCounter(label);
-    expect(text(pop.querySelector('p')), label).toBe('Loading projects…');
+    expect(text(pop.querySelector('p')), label).toBe('Loading Projects…');
     expect(pop.querySelector('[data-loader]'), label).not.toBeNull();
     expect(pop.querySelector('.border-t'), `${label} has no foot yet`).toBeNull();
     await close();
@@ -275,7 +275,7 @@ test('while the first read could add items, a count with none is a dash, one wit
   await push({ ...data, items: [], firstRead });
   expect(text(counter('shipped'))).toBe('–');
   const pop = await openCounter('shipped');
-  expect(text(pop.querySelector('p'))).toBe('Loading projects…');
+  expect(text(pop.querySelector('p'))).toBe('Loading Projects…');
 });
 
 test('picking a row closes the popover and opens that item\'s dialog', async () => {

@@ -215,7 +215,7 @@ const noticeOf = (records: WorkRecords, workId: string) => recordItems(records, 
 
 const PR_CLOSED = `Its PR ${REPO}#40 closed without merging.`;
 const TICKET_CLOSED = `Its ticket ${REPO}#12 closed in its provider.`;
-const NO_THREAD_NOW = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code.";
+const NO_THREAD_NOW = "The board asked T3 for a thread, but T3 shows no thread for it. Check its T3 project in T3 Code.";
 const MISSING = `Its ticket ${REPO}#12 wasn't found in its provider, so the board set the work aside. Restore it from Settings › Archive once the ticket is back.`;
 
 test('a no-thread notice names the purpose of the start that failed, and other notices name none', async () => {

@@ -15,6 +15,7 @@ import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { openWorkRecords, WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import { refreshSpecs, syncSpecs } from '@lar-factory/work-records/spec-sync';
 import { createBoardState } from './board/board-state.ts';
+import { startMemorySampler } from './memory/memory-sampler.ts';
 import { coalesced } from './board/coalesced.ts';
 import { oneAtATime } from './board/one-at-a-time.ts';
 import { showInTurns } from './board/show-in-turns.ts';
@@ -70,6 +71,7 @@ const HOST = '127.0.0.1';
 const settings = readBoardSettings();
 // A settings file the board can't use leaves it on the defaults; the problem stays the board's read error until it restarts.
 if (settings.problem) log(`using the default settings: ${settings.problem}`);
+const stopMemorySampler = startMemorySampler();
 const fixture = process.env.BOARD_DATA_FILE;
 /** `pnpm run sample:t3`: the sample board also reads T3's projects, icons and availability, with a session of its own. */
 const sampleT3 = fixture && process.env.BOARD_SAMPLE_T3 ? sampleT3Session() : null;
@@ -1041,6 +1043,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     clearInterval(timer);
     clearInterval(localTimer);
+    stopMemorySampler();
     activityDatabase.close();
     clearTimeout(toolRetry);
     stopProjectIcons?.();

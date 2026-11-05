@@ -32,6 +32,32 @@ The server commands build `apps/web` before serving its page. A process keeps
 the page it started with, so rebuilding another checkout does not replace it.
 The packaged Electron app starts and stops its own server.
 
+## Measure memory
+
+`BOARD_MEMORY_SAMPLES`, set to an absolute file path, makes the server append a
+`process.memoryUsage()` and `maxRSS` sample with its PID at startup and every 30
+seconds. `BOARD_MEMORY_FORCE_GC`, set beside it, also forces a GC every 5 minutes
+with a sample before and after. With both unset the server takes no samples and
+forces no GC. A failed write logs a line and the server carries on.
+
+To repeat a run against a packaged app, quit the installed board, keep Auto-build
+off and start no builds, then run this from `apps/server`:
+
+```sh
+pnpm run memory:run --app "<path to Lar Factory.app>" --out <new folder> [--minutes 30] [--force-gc]
+```
+
+It launches the app with a scratch `LAR_FACTORY_INSTALL_ROOT`, so
+`~/.local/bin/lar-work` stays as it was, and it saves `footprint -j` and
+`vmmap -summary` of the server every 5 minutes. It then quits the app and writes
+`report.txt`: the peak, range and end of RSS, and the regions holding at least 80%
+of the footprint at the capture nearest the highest RSS sample. A forced-GC run
+also gets the conclusion from the GC nearest that sample. Each figure comes from
+the sample right after that GC. It is JS retention when `heapUsed` is above half of
+RSS, or the last GC's `heapUsed` is at least 20% above the first's. It is V8 heap
+slack when `heapTotal` minus `heapUsed` is above half of RSS. Otherwise it is
+allocator or native pages. A server restart voids a run, and the report says so.
+
 ## Repository settings
 
 Onboarding selects the repository, source, domain docs, sync, issue defaults,

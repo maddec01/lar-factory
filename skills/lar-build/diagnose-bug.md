@@ -43,7 +43,7 @@ Treat the loop as a product. Once you have _a_ loop, **tighten** it:
 
 A 30-second flaky loop is barely better than no loop; a 2-second deterministic one is tight, a debugging superpower.
 
-Run each heavy command (a whole test suite, a production build, a performance measurement, or anything expected to take over about a minute) on its own as `lar-work heavy -- <command>`, in the background or with your tool's longest timeout.
+Run each heavy command (a whole test suite, a production build, a performance measurement, or anything expected to take over about a minute) on its own as `lar-work heavy -- <command>`, in the foreground with your tool's longest timeout.
 
 ### Non-deterministic bugs
 

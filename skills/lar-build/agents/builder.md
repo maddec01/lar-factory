@@ -37,7 +37,10 @@ Build step 1 and plan from the brief.
 ## Subagents
 
 - **Spawn**: a native subagent or a child task, per
-  `<lar-build>/shared/orchestration.md`. Keep each running child task's `taskId`.
+  `<lar-build>/shared/orchestration.md`. Every prompt carries that path and
+  the instruction to apply **Wait for delegated work**. Check completion by
+  that section before acting on any role's result. Keep each running child
+  task's `taskId`.
 - **Report**: every prompt names the build's work ID and carries the factory
   report rule: ≤300 words, no whole files, logs or screenshots; check runs
   report pass/fail and only the failures that matter.
@@ -246,8 +249,10 @@ reviewers from it. In parallel, start one **reviewer subagent** for each:
 - **Performance** (`reviewer-performance.md`): the diff touches rendering,
   polling, queries or loops over large data.
 
-Give each only the prose rules, `<lar-build>/project-rules.md`, its file's
-path, the build's work ID, the repo path and the diff command
+Give each only the prose rules, `<lar-build>/project-rules.md`,
+`<lar-build>/shared/orchestration.md` with the instruction to apply **Wait for
+delegated work**, its file's path, the build's work ID, the repo path and the
+diff command
 `git diff origin/$base_branch...HEAD`. Note each reviewer you skip with a reason, and
 say so in chat.
 
@@ -262,8 +267,9 @@ you skipped), what it couldn't check and its findings, each `open`, or
 `lar-work set-disposition ... --disposition fixed`.
 
 Round 2: rerun, in parallel, only the reviewers with a fixed finding. Give
-each the prose rules, `<lar-build>/project-rules.md`, its file's path, the
-build's work ID, the repo path, the
+each the prose rules, `<lar-build>/project-rules.md`,
+`<lar-build>/shared/orchestration.md` with the instruction to apply **Wait for
+delegated work**, its file's path, the build's work ID, the repo path, the
 diff command `git diff <round base>..HEAD` (every fixup of round 1, not only
 its own) and the list of its findings that were fixed; never the whole-branch
 diff. The UI reviewer also gets round 1's app report, to reuse the app it left

@@ -31,6 +31,38 @@ A thread that starts no child task makes no call.
 - Every prompt names the work ID it serves and carries the factory report
   rule: ≤300 words, no whole files, logs or screenshots.
 
+## Wait for delegated work
+
+Every delegated prompt, for a child task or a native subagent, carries this
+guide's path and the instruction to apply this section.
+
+A delegated role runs heavy commands in the foreground with its tool's longest
+timeout. It sends no message until its work is done, and its last message is
+the report. Time waiting for a heavy slot counts toward the tool's timeout.
+
+If the tool moves an overrun command to the background, end the turn silently,
+without a report or a "still running" message. Resume when the command finishes
+and report after completing the work. If the tool kills the command at its
+timeout, report it as unfinished, never as a pass, and do not retry it. The
+owning thread decides what happens next.
+
+Concept research decisions still start in the background so the owning thread
+can carry on. Their roles follow the command and report rules above. A UI
+reviewer may leave the app processes it lists in its report running.
+
+Before merging or otherwise acting on a child task's completion notice, read
+it with `task_status`. When `hasPendingChildRuns` is true, the task is
+unfinished, even when `status` is `completed` and `workState` is
+`result_available`. Take no action on that notice and wait for the next one,
+without polling.
+
+Then judge the report, also for native subagents, which have no task to read.
+A message that does not state the result of the work, such as "still running",
+is unfinished even when no child runs are pending. Ask the role once to finish,
+telling it to wait for a running command rather than restart it. For a child
+task, use a new `delegate_task` with the earlier brief and message, as above.
+If the next message is still unfinished, follow **Recover unfinished work**.
+
 ## Recover unfinished work
 
 When a delegated task ends, errors or is cancelled before finishing, read what

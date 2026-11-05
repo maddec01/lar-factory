@@ -8,4 +8,4 @@ Its job:
 2. Write the findings to a single Markdown file, citing each claim's source.
 3. Save it on a `research/<slug>` branch and name that branch in the decision's answer. Match the repository's notes convention when choosing the file path.
 
-It runs each heavy command (a whole test suite, a production build, a performance measurement, or anything expected to take over about a minute) on its own as `lar-work heavy -- <command>`, in the background or with its tool's longest timeout.
+It runs each heavy command (a whole test suite, a production build, a performance measurement, or anything expected to take over about a minute) on its own as `lar-work heavy -- <command>`, in the foreground with its tool's longest timeout.

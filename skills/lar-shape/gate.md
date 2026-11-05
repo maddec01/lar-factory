@@ -5,7 +5,8 @@
    read and that the last local copy is in use. Resolve held edits in item
    details before gating. Then reread the brief and record revision. Review
    this refreshed text, per [Ticket Specs](shared/issue-tracker/work-records.md#ticket-specs).
-2. A **Doubt subagent** gets only the path of
+2. A **Doubt subagent** gets the shared orchestration guide with the instruction
+   to apply **Wait for delegated work**, the path of
    [`agents/doubt.md`](agents/doubt.md), the brief and the repo path, no
    conversation. Fix what it finds, saving the brief again.
 3. In one batch, ask the user every assumption they haven't confirmed and every

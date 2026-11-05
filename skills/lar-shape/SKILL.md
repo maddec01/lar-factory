@@ -18,7 +18,9 @@ covers issue creation, whole gated Specs and tracker edits. Move Status locally
 at each step with `status.sh`.
 Facts are yours to find; decisions are the user's. Delegated work follows
 [orchestration](shared/orchestration.md), with reports of at most 300 words,
-without files, logs or screenshots. Ask ordinary questions per the
+without files, logs or screenshots. Every delegated prompt carries that guide's
+path and the instruction to apply **Wait for delegated work**. Check completion
+by that section before acting on any role's result. Ask ordinary questions per the
 [question guide](shared/questions.md). Retro picks stay in chat.
 Past about 150k tokens, follow [handoff](shared/handoff.md).
 Leave product changes for Build and keep prototypes on their prototype branch.

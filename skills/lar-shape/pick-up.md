@@ -31,7 +31,7 @@ Send it through Gate again with new final confirmation before marking it Ready. 
   reading cannot settle, and names that uncertainty in its report. It runs each
   heavy command (a whole test suite, a production build, a performance
   measurement, or anything expected to take over about a minute) on its own as
-  `lar-work heavy -- <command>`, in the background or with its tool's longest
+  `lar-work heavy -- <command>`, in the foreground with its tool's longest
   timeout. It also returns each onboarded repository's
   **role**: `bash <this skill>/shared/scripts/repo-config.sh --list` lists the
   repositories, and `bash <this skill>/shared/scripts/repo-config.sh <owner/repo>`

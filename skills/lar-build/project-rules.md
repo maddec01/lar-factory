@@ -59,9 +59,11 @@ goes through `sh -c`. Give each independent heavy command its own wrapper; one
 wrapper starts one job. A heavy command started inside a wrapped one runs
 without waiting, and that covers only the wrapped command's own children.
 
-Run heavy commands, `run-check` included, in the background, or with the
-longest timeout your tool allows where it has no background mode. Time spent
-waiting for a slot counts toward a foreground tool's timeout.
+Top-level threads run heavy commands, `run-check` included, in the background,
+or with the longest timeout their tool allows where it has no background mode.
+Delegated roles run them in the foreground with their tool's longest timeout,
+per [Wait for delegated work](shared/orchestration.md#wait-for-delegated-work).
+Time spent waiting for a slot counts toward a foreground tool's timeout.
 
 ## Base branch
 

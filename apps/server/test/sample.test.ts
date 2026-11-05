@@ -1,6 +1,8 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { SAMPLE_DATA, startBoard } from './server-support.ts';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -61,4 +63,14 @@ test('sample mode shows only the sample\'s chosen icons, and the image endpoint 
   assert.ok(icons.every(icon => icon.kind !== 'favicon'));
   assert.equal((await fetch(`${url}/api/project-icon/I_sample`)).status, 404);
   assert.deepEqual(await t3Calls(), []);
+});
+
+test('the sampler variable makes the board write a sample from startup, with its PID', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'lar-memory-board-'));
+  t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  const file = join(dir, 'samples.jsonl');
+  const board = await startBoard(t, {}, true, false, { BOARD_MEMORY_SAMPLES: file });
+  const [first] = (await readFile(file, 'utf8')).trim().split('\n').map((line) => JSON.parse(line) as { kind: string; pid: number });
+  assert.equal(first?.kind, 'start');
+  assert.equal(first?.pid, board.pid);
 });

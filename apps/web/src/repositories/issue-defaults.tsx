@@ -1,7 +1,7 @@
 import { effectiveIssueSettings } from '@lar-factory/shared';
 import { Switch } from '../settings/controls.tsx';
 import { FIELD_GROUP, FieldRow } from '../settings/field-row.tsx';
-import { AccessReason } from './access-list.tsx';
+import { AccessReason, accessExplanation } from './access-list.tsx';
 
 const LABELS = {
   createIssuesFromAddItem: 'Create issues from Add item',
@@ -19,8 +19,8 @@ export function IssueDefaults({ setup, disabled = false, onChange, onRecheck, ch
     {(Object.keys(LABELS) as IssueSetting[]).map((key) => {
       const reason = key === 'writeRefinedSpec' ? effective.specReason : effective.createReason;
       return <FieldRow key={key} id={key} label={LABELS[key]} error={errors[key]}
-        description={reason && <AccessReason reason={reason} onRecheck={onRecheck} checking={checking} />}>
-        <Switch label={LABELS[key]} description={reason ?? undefined} on={effective[key]} disabled={disabled || reason !== null} onChange={(on) => onChange(key, on)} />
+        description={reason && <AccessReason repo={setup.repo} reason={reason} onRecheck={onRecheck} checking={checking} />}>
+        <Switch label={LABELS[key]} description={reason ? accessExplanation(setup.repo, reason) : undefined} on={effective[key]} disabled={disabled || reason !== null} onChange={(on) => onChange(key, on)} />
       </FieldRow>;
     })}
   </div>;

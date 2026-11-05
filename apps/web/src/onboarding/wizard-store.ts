@@ -44,7 +44,7 @@ type Finish = { state: 'idle' } | { state: 'saving' } | { state: 'failed'; error
  */
 export function unpickable(project: ProjectChoice, run: Run, data: Pick<BoardData, 'onboarding'> = useBoardStore.getState().data): string | null {
   if (project.onBoard && !(project.repo && run.savedAs && sameRepo(project.repo, run.savedAs))) {
-    return isOnboarding(data, project.repo) ? 'Setup is already in progress. Close this window and choose Resume.' : 'This repository is already on the board.';
+    return isOnboarding(data, project.repo) ? 'Setup is already in progress. Close this window and choose Resume.' : 'This Project is already on the board.';
   }
   if (!project.repo) return project.blocked === 'linked-worktree' ? 'This folder is a git worktree. Add its main checkout instead.' : 'This folder has no GitHub or Azure DevOps origin.';
   return null;
@@ -67,12 +67,13 @@ export function stepReady(run: Run, projects: Projects, detection: Read<SetupDet
   if (run.step === 'project') return true;
   const detected = detectedOf(detection);
   if (!detected || !('found' in detected.checkout)) return false;
+  if (run.step === 'access') return true;
   const answers = answersOf(detected, run.choices);
   const options = detected.azureReadOnly === undefined ? {} : { azureReadOnly: detected.azureReadOnly };
   const terms = Object.values(run.choices.vocabulary ?? {});
-  if (terms.some((term) => term.type !== null) && writeAccessProblem(detected.repo, 'type-ticket', detected.access, options)) return false;
-  if (terms.some((term) => term.labels.length) && writeAccessProblem(detected.repo, 'tag-ticket', detected.access, options)) return false;
   const typed = Object.values(run.choices.newLabels ?? {}).flat();
+  if (terms.some((term) => term.type !== null) && writeAccessProblem(detected.repo, 'type-ticket', detected.access, options)) return false;
+  if ((terms.some((term) => term.labels.length) || typed.length) && writeAccessProblem(detected.repo, 'tag-ticket', detected.access, options)) return false;
   if (typed.length && (newLabelProblem(detected.repo, detected.access, options) ?? typedLabelsProblem(detected.repo, typed))) return false;
   if (answerProblem(run.step, answers) || !answers.itemSource) return false;
   return true;

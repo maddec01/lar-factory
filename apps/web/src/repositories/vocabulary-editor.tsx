@@ -50,6 +50,9 @@ function vocabularyAccess(setup: VocabularyAccess) {
 
 const unavailable = (capability: VocabularyCapability) => capability.state === 'available' ? null : capability.reason;
 
+// Ninna forwards Radix collision padding, though its public prop type omits it.
+const labelPopoverPosition = { collisionPadding: 16 };
+
 /** Without onCommit this edits onboarding drafts only. A Project commits one complete kind on close or Create. */
 export function VocabularyFields({ name, setup, discovery, value, newLabels, disabled = false, onChange, onCommit, onRecheck, error }: {
   name: VocabularyKind; setup: VocabularyAccess; discovery: VocabularyDiscovery; value: VocabularyTerm; newLabels: string[];
@@ -68,7 +71,8 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
   }, []);
   const access = vocabularyAccess(setup);
   const labelsProblem = unavailable(discovery.labels) ?? access.labels;
-  const typesProblem = unavailable(discovery.types) ?? access.types;
+  const noTypes = discovery.types.state === 'available' && !discovery.types.choices.length;
+  const typesProblem = unavailable(discovery.types) ?? (noTypes && !value.type ? null : access.types);
   const { noun, heading } = trackerCapabilities(setup.repo);
   const plural = heading.toLowerCase();
   const labels = discovery.labels.state === 'available' ? discovery.labels.choices.filter((label) => kindMappingOffers(setup.repo, label)) : [];
@@ -121,8 +125,8 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
         {suggested && <button type="button" disabled={disabled} className="cursor-pointer rounded-full border border-dashed border-(--border) px-2 py-0.5 text-xs" onClick={() => update({ ...value, labels: [suggested] })}>+ {suggested} · suggested</button>}
         <Popover open={open} onOpenChange={close}>
           <Popover.Trigger asChild><Button {...kind('control')} disabled={disabled} className="ms-auto" aria-label={`Choose ${title} ${plural}`}>{chosen.length ? 'Edit' : `Add ${noun}`}</Button></Popover.Trigger>
-          <Popover.Content align="end">
-            <div className="grid w-80 max-w-[calc(100vw-3rem)] gap-2" data-label-picker={name}>
+          <Popover.Content align="end" data-kind-label-popover {...labelPopoverPosition}>
+            <div className="grid w-full min-w-0 gap-2" data-label-picker={name}>
               <Input autoFocus type="search" role="combobox" aria-expanded aria-controls={`labels-${name}`} aria-activedescendant={matches[at] ? `label-${name}-${at}` : undefined}
                 aria-label={`Search ${plural} for ${title}`} placeholder={`Search ${labels.length} ${plural}`} value={query} onChange={(event) => { setQuery(event.target.value); setActive(0); }}
                 onKeyDown={(event) => {
@@ -141,22 +145,23 @@ export function VocabularyFields({ name, setup, discovery, value, newLabels, dis
                 </li>)}
                 {!matches.length && <li role="status" className="px-2 py-2 text-xs text-(--muted-foreground)">{typed ? `No ${plural} match "${typed}".` : `This Project has no ${plural} yet.`}</li>}
               </ul>
-              {canCreate && <Button {...kind('other')} disabled={!!createProblem || disabled} onClick={() => {
+              {canCreate && <Button {...kind('other')} className="h-auto min-h-8 min-w-0 max-w-full whitespace-normal wrap-anywhere py-1 text-left" disabled={!!createProblem || disabled} onClick={() => {
                 if (createProblem) return;
                 update(value, [...newLabels, typed], !!onCommit);
                 if (!onCommit) setQuery('');
               }}>{onCommit ? `Create "${typed}"` : `Create "${typed}" when you add the Project`}</Button>}
-              {canCreate && createProblem && <AccessReason reason={createProblem} onRecheck={onRecheck} />}
+              {canCreate && createProblem && <AccessReason repo={setup.repo} reason={createProblem} onRecheck={onRecheck} />}
               <div className="flex justify-between gap-2 border-t border-(--border) pt-2"><Button {...kind('other')} onClick={() => update(emptyVocabularyTerm(), [])}>None</Button><Button {...kind('other')} onClick={() => close(false)}>Done</Button></div>
             </div>
           </Popover.Content>
         </Popover>
       </div>
     </div>
-    {labelsProblem && <AccessReason reason={labelsProblem} onRecheck={onRecheck} />}
-    {typesProblem && <AccessReason reason={typesProblem} onRecheck={discovery.types.state === 'unsupported' ? undefined : onRecheck} />}
+    {labelsProblem && <AccessReason repo={setup.repo} reason={labelsProblem} onRecheck={onRecheck} />}
+    {newLabels.length > 0 && access.newLabels && <AccessReason repo={setup.repo} reason={access.newLabels} onRecheck={onRecheck} />}
+    {typesProblem && <AccessReason repo={setup.repo} reason={typesProblem} onRecheck={discovery.types.state === 'unsupported' ? undefined : onRecheck} />}
     {!types.length && !typesProblem && <span className="text-xs text-(--muted-foreground)">This Project has no {discovery.provider === 'azure' ? 'work item' : 'issue'} types.</span>}
-    {value.type && (typesProblem || !types.includes(value.type)) && <span className="text-xs"><Button {...kind('other')} onClick={() => update({ ...value, type: null }, newLabels, true)}>Remove {value.type}</Button></span>}
+    {value.type && (typesProblem || !types.includes(value.type)) && <span className="text-xs"><Button {...kind('other')} className="h-auto min-h-8 max-w-full whitespace-normal wrap-anywhere py-1 text-left" onClick={() => update({ ...value, type: null }, newLabels, true)}>Remove {value.type}</Button></span>}
     {error && <p role="alert" className="m-0 text-xs text-(--error-foreground)">{error} <button type="button" className="cursor-pointer bg-transparent p-0 underline" onClick={() => { changed.current = false; onCommit?.(value, newLabels); }}>Retry</button></p>}
   </div>;
 }

@@ -70,3 +70,11 @@ test('refused metadata keeps mapped names and permits removing them', async () =
   await settle(() => $<HTMLButtonElement>('[aria-label="Remove bug from Bug"]')!.click());
   expect(text($('[data-vocabulary]'))).not.toContain('bug');
 });
+
+
+test('an empty type list does not offer Recheck for an operation no type can use', async () => {
+  await render({ setup: { ...setup, access: { ...setup.access, 'type-ticket': 'unverified' } } });
+  expect($<HTMLButtonElement>('[aria-label="Bug type"]')!.disabled).toBe(true);
+  expect(text(document.body)).toContain('This Project has no issue types.');
+  expect($$<HTMLButtonElement>('button').some((button) => text(button) === 'Recheck')).toBe(false);
+});

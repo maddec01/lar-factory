@@ -24,10 +24,16 @@ export function AccessList({ rows, checking = false, onRecheck }: { rows: Access
   </div>;
 }
 
-export function AccessReason({ reason, onRecheck, checking = false }: { reason: string; onRecheck?: (() => void) | undefined; checking?: boolean }) {
-  const short = reason.split('. ')[0]!.replace(/\.$/, '');
+export function accessExplanation(repo: string, reason: string): string {
+  const names = operationNames(repo);
+  return REPOSITORY_OPERATIONS.reduce((text, operation) => text.replaceAll(operation, names[operation]), reason);
+}
+
+export function AccessReason({ repo, reason, onRecheck, checking = false }: { repo: string; reason: string; onRecheck?: (() => void) | undefined; checking?: boolean }) {
+  const explanation = accessExplanation(repo, reason);
+  const short = explanation.split('. ')[0]!.replace(/\.$/, '');
   return <span className="inline-flex min-w-0 flex-wrap items-center gap-1 text-xs text-(--muted-foreground)">
-    <span>{short}.</span><HelpTip title="access">{reason}</HelpTip>
+    <span>{short}.</span><HelpTip title="access">{explanation}</HelpTip>
     {onRecheck && <button type="button" className="cursor-pointer bg-transparent p-0 text-(--foreground) underline" disabled={checking} onClick={onRecheck}>{checking ? 'Checking…' : 'Recheck'}</button>}
   </span>;
 }

@@ -1,12 +1,12 @@
-// Onboarding chooses a source and local settings, then checks access once.
+// Onboarding checks access before choosing local settings.
 import { sameRepo, shownRepo, type Detected, type DomainDocLocation, type OnboardingChoices,
   type RepoConfig, type RepositoryItemSource, type SetupDetection } from '@lar-factory/shared';
 
-export const STEP_TITLES = { project: 'Repository', work: 'Work and docs', access: 'Access and add' } as const;
+export const STEP_TITLES = { project: 'Project', access: 'Access', work: 'Work and docs' } as const;
 export type StepId = keyof typeof STEP_TITLES;
 export const isStep = (id: string): id is StepId => Object.hasOwn(STEP_TITLES, id);
-export const found = <T>(fact: Detected<T>): T | null => 'found' in fact ? fact.found : null;
-export const stepsOf = (): StepId[] => ['project', 'work', 'access'];
+const found = <T>(fact: Detected<T>): T | null => 'found' in fact ? fact.found : null;
+export const stepsOf = (): StepId[] => ['project', 'access', 'work'];
 export interface Answers {
   itemSource: RepositoryItemSource | null;
   role: string;

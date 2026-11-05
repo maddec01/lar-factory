@@ -565,3 +565,25 @@ it('reads as loading while T3 runs with its thread list unread, and throws once 
   fixture.changed!({ availability: 'unavailable' });
   await expect(protocolStatsInputs(['one'])).rejects.toThrow('unavailable');
 });
+
+it('keeps only what stats read from each thread\'s history, and still counts it', async () => {
+  const { protocolItemThreads, protocolStatsInputs, protocolThreadById } = await import('./item-execution.ts');
+  const observedAt = '2026-10-31T12:00:00Z';
+  fixture.read.mockImplementation(async id => ({ availability: 'available', observation: { observedAt, projection: {
+    thread: { id, title: 'Own' }, updatedAt: observedAt, messages: [{ role: 'user', text: 'Build it', createdAt: observedAt }],
+    providerSessions: [], providerThreads: [{ id: 'provider', status: 'active', createdAt: observedAt }],
+    providerTurns: [{ id: 'turn', providerThreadId: 'provider', status: 'completed', startedAt: observedAt, completedAt: observedAt }],
+    runtimeRequests: [], subagents: [], runs: [{ id: 'run' }], attempts: [{ id: 'attempt' }], nodes: [{ id: 'node' }],
+    turnItems: [{ id: 'item' }], visibleTurnItems: [{ id: 'item' }],
+  } } }));
+  protocolItemThreads(['own']);
+  fixture.changed!({ availability: 'available', observation: { observedAt, snapshot: { threads: [{ id: 'own', updatedAt: observedAt }], archivedThreads: [] } } });
+  await protocolStatsInputs(['own']);
+  await vi.waitFor(() => expect(protocolThreadById('own').availability).toBe('available'));
+  expect(Object.keys(protocolThreadById('own').observation!.projection).sort())
+    .toEqual(['messages', 'providerSessions', 'providerThreads', 'providerTurns', 'runtimeRequests', 'subagents', 'thread']);
+  const { rows } = (await protocolStatsInputs(['own']))!;
+  expect(rows.threads).toMatchObject([{ id: 'own', title: 'Own', text: 'Build it' }]);
+  expect(rows.turns).toMatchObject([{ id: 'turn', thread: 'own', status: 'completed' }]);
+  expect([...rows.active]).toEqual(['provider']);
+});

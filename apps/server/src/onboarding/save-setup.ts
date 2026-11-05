@@ -41,7 +41,7 @@ function answersOf({ projectId, role, itemSource, domainDocs, skills, structureS
   return { ...(vocabulary === undefined ? {} : { vocabulary }), projectId, structureSync: structureSync !== false, role: typeof role === 'string' ? role.trim() : '', itemSource, domainDocs, skills, createIssuesFromAddItem, createIssuesFromRetro, writeRefinedSpec } as unknown as LocalSetupAnswers;
 }
 
-const ANSWERS = 'Send the repository, its T3 project, role, item source, domain-doc location, skills.';
+const ANSWERS = 'Send the Project, its T3 project, role, item source, domain-doc location, skills.';
 
 /**
  * Saves the body's answers as its `repo`'s local settings and finishes its onboarding, in place of the one saved under

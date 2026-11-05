@@ -100,7 +100,7 @@ function Refreshed({ data }: { data: BoardData }) {
             <span data-dot className={`size-1.5 rounded-full ${DOT[health]}`} />
           </span>
           <span className="@max-[48rem]:sr-only">
-            {health === 'disconnected' ? (fetchedAt ? <time dateTime={fetchedAt}>Disconnected · {ago}</time> : 'Disconnected') : reading.length ? 'Loading projects' : !fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
+            {health === 'disconnected' ? (fetchedAt ? <time dateTime={fetchedAt}>Disconnected · {ago}</time> : 'Disconnected') : reading.length ? 'Loading Projects' : !fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
           </span>
         </span>
       </TooltipTrigger>

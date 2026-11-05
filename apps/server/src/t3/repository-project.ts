@@ -23,7 +23,7 @@ export type RepositoryProject = { projectId: string; error?: undefined } | { err
 export async function repositoryProject(repo: string, repos: readonly { repo: string }[],
   env: NodeJS.ProcessEnv = process.env): Promise<RepositoryProject> {
   if (!repos.some((r) => r.repo.toLowerCase() === repo.toLowerCase())) {
-    return { error: `${repo} isn't onboarded; add it to the board's repositories` };
+    return { error: `${repo} isn't onboarded. Add it in Settings > Projects.` };
   }
   return (await projectFinder(env))(repo);
 }

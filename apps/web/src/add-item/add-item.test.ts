@@ -69,11 +69,11 @@ test('Add item opens a dialog with the configured repositories and kinds, and no
   expect($('#item-labels')).toBeNull();
 });
 
-test('the side panel heads Repository and Kind in small uppercase labels, beside the title and the editor', async () => {
+test('the side panel heads Project and Kind in small uppercase labels, beside the title and the editor', async () => {
   await open();
   const panel = $('#add-item-dialog aside[aria-label="Details"]')!;
   const labels = [...panel.querySelectorAll<HTMLLabelElement>(':scope > div > label')];
-  expect(labels.filter(l => l.htmlFor).map((l) => [l.htmlFor, l.textContent])).toEqual([['item-repo', 'Repository'], ['item-kind', 'Kind']]);
+  expect(labels.filter(l => l.htmlFor).map((l) => [l.htmlFor, l.textContent])).toEqual([['item-repo', 'Project'], ['item-kind', 'Kind']]);
   expect(labels.filter(l => l.htmlFor).every((l) => l.classList.contains('uppercase'))).toBe(true);
   expect(field('item-repo').getAttribute('role')).toBe('combobox');
   expect(field('item-kind').getAttribute('role')).toBe('combobox');
@@ -292,7 +292,7 @@ test('with no repository onboarded, adding is disabled and says where to add one
   await open(empty);
   expect(submit().disabled).toBe(true);
   expect(dialog()!.textContent).toContain('Record work and add it to List.');
-  expect(hint()!.textContent).toBe('No repository is onboarded. Read how to add a repository.');
+  expect(hint()!.textContent).toBe('No Project is onboarded. Read how to add a Project.');
   expect(field('item-repo').getAttribute('aria-describedby')).toBe('item-repo-hint');
   for (const data of [{ ...empty, error: 'gh: HTTP 502' }, { ...empty, fetchedAt: null },
     { ...empty, repositoryConfigProblems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }] }]) {

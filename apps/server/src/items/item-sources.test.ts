@@ -48,7 +48,7 @@ test('a merged source lists every item it read, with or without a status', async
 test('with no source a read lists nothing and an abandon is refused', async () => {
   const sources = mergeSources(new Map());
   assert.deepEqual(await sources.read(), { title: '', items: [] });
-  assert.equal(await sources.abandon(item('I_1', 'maddec01/lar-server')), "That item's repository isn't onboarded.");
+  assert.equal(await sources.abandon(item('I_1', 'maddec01/lar-server')), "That item's Project isn't onboarded.");
 });
 
 const config = (repo: string): RepositoryConfig =>

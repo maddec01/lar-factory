@@ -45,7 +45,7 @@ test("T3's projects that can't be read answer with the problem", async (t) => {
 test('the sample board lists no T3 projects to onboard', async (t) => {
   const board = await startBoard(t, {}, true);
   const response = await fetch(`${board.url}/api/onboarding/projects`);
-  assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }]);
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no Project.' }]);
 });
 
 test('creating a T3 project runs t3 project add on the folder and answers with the new project to pick', async (t) => {
@@ -73,7 +73,7 @@ test("a failing t3 project add answers with t3's message", async (t) => {
 test('the sample board creates no T3 project', async (t) => {
   const board = await startBoard(t, {}, true);
   const response = await board.post({ folder: '/tmp' }, board.url, '/api/onboarding/projects');
-  assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }]);
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no Project.' }]);
 });
 
 const progress = { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } };
@@ -108,7 +108,7 @@ test('keeping an onboarding without its progress, or for a repository onboarded 
   const board = await startBoard(t, { repositories: ['maddec01/lar-web'] });
   const keep = (body: object) => board.post(body, board.url, '/api/onboarding/repositories');
   const unsent = await keep({ repo: 'maddec01/lar-web', progress: { step: 'setup' } });
-  assert.deepEqual([unsent.status, await unsent.json()], [400, { error: 'Send the repository and where its onboarding stopped.' }]);
+  assert.deepEqual([unsent.status, await unsent.json()], [400, { error: 'Send the Project and where its onboarding stopped.' }]);
   const onboarded = await keep({ repo: 'maddec01/lar-web', progress });
   assert.deepEqual([onboarded.status, await onboarded.json()], [409, { error: 'maddec01/lar-web is onboarded already.' }]);
 });
@@ -116,7 +116,7 @@ test('keeping an onboarding without its progress, or for a repository onboarded 
 test('the sample board keeps no onboarding', async (t) => {
   const board = await startBoard(t, {}, true);
   const response = await board.post({ repo: 'maddec01/lar-web', progress }, board.url, '/api/onboarding/repositories');
-  assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }]);
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no Project.' }]);
 });
 
 /** Whether a gh call writes to a repository: a POST, PATCH, PUT or DELETE through the API, or a label, issue or PR change. */
@@ -145,17 +145,17 @@ test('a repository with no factory files is detected and onboards with no write 
 test('detection and saving refuse a body they cannot use', async (t) => {
   const board = await startBoard(t);
   const detected = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/detect');
-  assert.deepEqual([detected.status, await detected.json()], [400, { error: 'Choose a repository and its T3 project before detecting its setup.' }]);
+  assert.deepEqual([detected.status, await detected.json()], [400, { error: 'Choose a Project and its T3 project before detecting its setup.' }]);
   const saved = await board.post({ repo: 'maddec01/lar-web', ...ANSWERS, structureSync: 'invalid' }, board.url, '/api/onboarding/setup');
   assert.deepEqual([saved.status, await saved.json()],
-    [400, { error: 'Send the repository, its T3 project, role, item source, domain-doc location, skills.' }]);
+    [400, { error: 'Send the Project, its T3 project, role, item source, domain-doc location, skills.' }]);
 });
 
 test('the sample board detects nothing, saves no setup and imports no ticket', async (t) => {
   const board = await startBoard(t, {}, true);
   for (const path of ['/api/onboarding/detect', '/api/onboarding/setup']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
-    assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
+    assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no Project.' }], path);
   }
 });
 

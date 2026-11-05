@@ -133,7 +133,7 @@ async function treeFacts(repo: string, reads: DetectReads): Promise<TreeFacts> {
 export async function detectSetup(input: Record<string, unknown>, reads: DetectReads = detectReads()):
   Promise<{ detection: SetupDetection } | { status: number; error: string }> {
   const { repo, projectId } = input;
-  if (!isRepo(repo) || typeof projectId !== 'string') return { status: 400, error: 'Choose a repository and its T3 project before detecting its setup.' };
+  if (!isRepo(repo) || typeof projectId !== 'string') return { status: 400, error: 'Choose a Project and its T3 project before detecting its setup.' };
   const azure = onAzure(repo);
   const [checkout, { itemSources, access }, facts] = await Promise.all([
     detectCheckout(repo, projectId, reads), (azure ? azureAccess : githubAccess)(repo, reads), treeFacts(repo, reads),

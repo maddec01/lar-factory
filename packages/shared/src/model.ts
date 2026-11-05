@@ -1172,7 +1172,7 @@ export type OperationAccess = 'unverified' | 'allowed' | 'refused';
 export function buildAccessProblem(access: Partial<Record<'push-branch' | 'open-pr', OperationAccess>> = {}): string | null {
   const missing = ([['push-branch', 'push branches'], ['open-pr', 'open pull requests']] as const)
     .filter(([operation]) => access[operation] !== 'allowed').map(([, name]) => name);
-  return missing.length ? `Builds need verified access to ${missing.join(' and ')}. Recheck repository access in Settings.` : null;
+  return missing.length ? `Builds need verified access to ${missing.join(' and ')}. Recheck Project access in Settings.` : null;
 }
 
 /**

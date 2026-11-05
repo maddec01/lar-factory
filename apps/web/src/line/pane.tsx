@@ -28,5 +28,5 @@ export function Pane({ id, title, status, running, count, right, className = '',
 export function PaneEmpty({ filtered, none, children }: { filtered: boolean; none: string; children: string }) {
   const scope = useShownScope();
   const reading = useBoardStore((state) => readingScope(state.data, scope ?? undefined));
-  return <p data-pane-empty className="m-0 px-3 py-3 text-[12px] text-(--muted-foreground)">{reading ? <Loader label="Loading projects…" /> : filtered ? children : none}</p>;
+  return <p data-pane-empty className="m-0 px-3 py-3 text-[12px] text-(--muted-foreground)">{reading ? <Loader label="Loading Projects…" /> : filtered ? children : none}</p>;
 }

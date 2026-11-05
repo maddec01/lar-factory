@@ -104,9 +104,9 @@ export function useFilterGroups(): SearchGroup[] {
     const labelOptions = [...choices, ...unseen.map((name) => ({ name, color: colorOf(name) }))].sort((a, b) => a.name.localeCompare(b.name));
     return [
       {
-        label: 'Repositories',
+        label: 'Projects',
         options: [
-          { value: 'repo:', name: 'All repositories', icon: <Layers aria-hidden="true" className="size-3.5" />, on: !scope, select: () => setScope(null) },
+          { value: 'repo:', name: 'All Projects', icon: <Layers aria-hidden="true" className="size-3.5" />, on: !scope, select: () => setScope(null) },
           ...boardSections(data, now).listGroups.map(({ repo, name }) => ({
             value: `repo:${repo}`, name, icon: <ProjectIcon repo={repo} size="row" />, on: !!scope && sameRepo(repo, scope), select: () => setScope(repo),
           })),

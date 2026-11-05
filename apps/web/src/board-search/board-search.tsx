@@ -172,7 +172,7 @@ function Dialog({ tokens, clear, leave, onClose }: { tokens: FilterToken[]; clea
       onClose={onClose}
       listLabel="Search results"
       empty="Nothing matches."
-      busy={reading ? <Loader label="Loading projects…" /> : undefined}
+      busy={reading ? <Loader label="Loading Projects…" /> : undefined}
       footer={<>
         <span><Key>↑↓</Key> move</span>
         <span><Key>↵</Key> choose</span>

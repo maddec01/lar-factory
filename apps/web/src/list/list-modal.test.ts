@@ -10,7 +10,7 @@ afterEach(() => {
 
 const listButton = () => $<HTMLButtonElement>('.title-bar button.list-button')!;
 const modal = () => $('[role="dialog"][data-list-modal]');
-const groups = () => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Repositories"] button');
+const groups = () => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Projects"] button');
 const group = (name: string) => groups().find((b) => b.querySelector('.name')?.textContent === name)!;
 const counts = () => groups().map((b) => [text(b.querySelector('.name')), text(b.querySelector('.count'))]);
 const rows = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').map((b) => b.dataset.item);
@@ -42,7 +42,7 @@ test('the title bar\'s List button counts the List and opens the List modal', as
 test('the List button shows a loading cue, not 0, while the first read could add items', async () => {
   const empty = { ...sample, items: [] };
   await mountPage({ ...empty, firstRead: { step: 'items' as const, running: [], settled: false } });
-  expect(text(listButton())).toBe('ListLoading projects…');
+  expect(text(listButton())).toBe('ListLoading Projects…');
   expect(listButton().querySelector('[data-loader]')).not.toBeNull();
   await push({ ...empty, firstRead: { step: 'finishing', running: [], settled: true } });
   expect(text(listButton())).toBe('List0');
@@ -56,25 +56,25 @@ test('choosing a repository in the left pane shows only its items on the right',
   await settle(() => group('lar-apple').click());
   expect(rows()).toEqual(['I_sample03']);
   expect(group('lar-apple').getAttribute('aria-current')).toBe('page');
-  await settle(() => group('All repositories').click());
+  await settle(() => group('All Projects').click());
   expect(rows()).toHaveLength(4);
 });
 
 test('the left pane lists All, each repository with its count', async () => {
   await mountPage();
   await open();
-  expect(counts()).toEqual([['All repositories', '4'], ['lar-server', '3'], ['lar-apple', '1']]);
-  const nav = $('[data-list-modal] nav[aria-label="Repositories"]')!;
-  expect(nav.querySelector('[aria-label="No repository"]')).toBeNull();
+  expect(counts()).toEqual([['All Projects', '4'], ['lar-server', '3'], ['lar-apple', '1']]);
+  const nav = $('[data-list-modal] nav[aria-label="Projects"]')!;
+  expect(nav.querySelector('[aria-label="No Project"]')).toBeNull();
 });
 
 test('the repositories go by their items in List, most first, whatever the config\'s order', async () => {
   await mountPage({ ...sample, repos: [...sample.repos].reverse() });
   await open();
-  expect(counts()).toEqual([['All repositories', '4'], ['lar-server', '3'], ['lar-apple', '1']]);
+  expect(counts()).toEqual([['All Projects', '4'], ['lar-server', '3'], ['lar-apple', '1']]);
   // The order holds while the search changes the counts.
   await type('subtitle');
-  expect(counts().map(([name]) => name)).toEqual(['All repositories', 'lar-server', 'lar-apple']);
+  expect(counts().map(([name]) => name)).toEqual(['All Projects', 'lar-server', 'lar-apple']);
 });
 
 test('the List modal starts on the board\'s scope', async () => {
@@ -88,7 +88,7 @@ test('the List modal starts on the board\'s scope', async () => {
   expect(rows()).toEqual(['I_sample03']);
 });
 
-test('under All repositories a row names its repository', async () => {
+test('under All Projects a row names its repository', async () => {
   await mountPage();
   await open();
   const meta = (id: string) => text($(`[data-list-modal] button[data-item="${id}"] .tabular-nums`));
@@ -102,7 +102,7 @@ test('a repository whose items have not landed yet says it is reading, not that 
   await mountPage(reading);
   await open();
   await settle(() => group('lar-apple').click());
-  expect(text($('[data-list-modal] .empty'))).toBe('Loading projects…');
+  expect(text($('[data-list-modal] .empty'))).toBe('Loading Projects…');
   expect(counts().find(([name]) => name === 'lar-apple'), 'no count in the left pane').toEqual(['lar-apple', '']);
   const header = () => text($('[data-list-modal] button.scope-board')!.parentElement);
   expect(header(), 'no count in the header').toBe('lar-appleScope boardRecently updated');
@@ -112,33 +112,33 @@ test('a repository whose items have not landed yet says it is reading, not that 
   expect(header()).toBe('lar-apple1Scope boardRecently updated');
 });
 
-test('All repositories keeps a loading cue and no count under the rows that landed until the first read settles', async () => {
+test('All Projects keeps a loading cue and no count under the rows that landed until the first read settles', async () => {
   const reading = { ...sample, items: sample.items.filter((i) => i.repo !== 'maddec01/lar-apple'),
     firstRead: { step: 'items' as const, running: ['lar-apple'], waiting: ['maddec01/lar-apple'], settled: false } };
   await mountPage(reading);
   await open();
   const header = () => text($('[data-list-modal] span.font-semibold')!.parentElement);
   expect(rows().length).toBeGreaterThan(0);
-  expect(text($('[data-list-modal] [data-reading]'))).toBe('Loading more projects…');
+  expect(text($('[data-list-modal] [data-reading]'))).toBe('Loading more Projects…');
   expect($('[data-list-modal] [data-reading] [data-loader]')).not.toBeNull();
-  expect(header(), 'no final-looking count').not.toMatch(/All repositories\d/);
-  expect(counts().find(([name]) => name === 'All repositories'), 'none in the left pane either').toEqual(['All repositories', '']);
+  expect(header(), 'no final-looking count').not.toMatch(/All Projects\d/);
+  expect(counts().find(([name]) => name === 'All Projects'), 'none in the left pane either').toEqual(['All Projects', '']);
   await push({ ...sample, firstRead: { step: 'finishing', running: [], settled: true } });
   expect($('[data-list-modal] [data-reading]')).toBeNull();
-  expect(header()).toMatch(/All repositories\d/);
-  expect(counts()[0]).toEqual(['All repositories', '4']);
+  expect(header()).toMatch(/All Projects\d/);
+  expect(counts()[0]).toEqual(['All Projects', '4']);
 });
 
 test('before any repository has landed, no group in the left pane shows a count', async () => {
   await mountPage({ ...sample, firstRead: { step: 'items' as const, running: [], settled: false } });
   await open();
-  expect(counts()).toEqual([['All repositories', ''], ['lar-server', ''], ['lar-apple', '']]);
+  expect(counts()).toEqual([['All Projects', ''], ['lar-server', ''], ['lar-apple', '']]);
 });
 
-test('once no repository is left waiting, each shows its count and All repositories stays blank until the first read settles', async () => {
+test('once no repository is left waiting, each shows its count and All Projects stays blank until the first read settles', async () => {
   await mountPage({ ...sample, firstRead: { step: 'finishing' as const, running: [], waiting: [], settled: false } });
   await open();
-  expect(counts()).toEqual([['All repositories', ''], ['lar-server', '3'], ['lar-apple', '1']]);
+  expect(counts()).toEqual([['All Projects', ''], ['lar-server', '3'], ['lar-apple', '1']]);
 });
 
 test('the search filters the right pane and the counts on the left follow it', async () => {
@@ -146,7 +146,7 @@ test('the search filters the right pane and the counts on the left follow it', a
   await open();
   await type('subtitle');
   expect(rows()).toEqual(['I_sample03']);
-  expect(counts()).toEqual([['All repositories', '1'], ['lar-server', '0'], ['lar-apple', '1']]);
+  expect(counts()).toEqual([['All Projects', '1'], ['lar-server', '0'], ['lar-apple', '1']]);
   await settle(() => group('lar-server').click());
   expect(rows()).toEqual([]);
   expect(text($('[data-list-modal] .empty'))).toBe('Nothing here matches.');

@@ -139,7 +139,7 @@ const noWaiting = sample.items.filter((i) => !['Needs you', 'Verify', 'Ready to 
 
 test('an empty desk during the first read shows the loader, as the read may still add items', async () => {
   await mountPage({ ...sample, items: noWaiting, firstRead: { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] } });
-  expect(text($('.desk'))).toBe('Your deskLoading projects…');
+  expect(text($('.desk'))).toBe('Your deskLoading Projects…');
   expect($('.desk [data-loader]')).not.toBeNull();
 });
 
@@ -208,7 +208,7 @@ describe('narrowed by Scope, Kind and Labels', () => {
   test('the loader comes before the filtered message', async () => {
     seedFilters([], ['no such label']);
     await mountPage({ ...sample, firstRead: { step: 'items', ready: true, settled: false, running: ['owner/pending'], waiting: ['owner/pending'] } });
-    expect(text($('.desk'))).toBe('Your deskLoading projects…');
+    expect(text($('.desk'))).toBe('Your deskLoading Projects…');
   });
 });
 

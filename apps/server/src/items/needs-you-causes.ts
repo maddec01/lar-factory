@@ -4,7 +4,7 @@
 import type { Item, NeedsYouCause, NeedsYouOffer } from '@lar-factory/shared';
 import type { LaunchIntent, Observation, WorkRecord } from '@lar-factory/work-records';
 
-export const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check the repository's project in T3 Code.";
+export const NO_THREAD = "The board asked T3 for a thread, but T3 shows no thread for it. Check its T3 project in T3 Code.";
 
 const named = (what: string, reference: string | null) => (reference ? `${what} ${reference}` : what);
 

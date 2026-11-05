@@ -27,7 +27,7 @@ test('the board page opens on the loading screen, over the board, with the mark 
   expect($('.loading-line')!.getAttribute('role'), 'only the step line is live').toBe('status');
   expect(text($('.loading-wordmark'))).toBe('arFactory');
   expect(screen()!.classList.contains('is-drawn')).toBe(false);
-  expect(line()).toBe('Loading projects');
+  expect(line()).toBe('Loading Projects');
   expect($('.title-bar'), 'the board is under the screen').not.toBeNull();
 });
 
@@ -37,7 +37,7 @@ test('a new step rolls the old line out while the new one rolls in, and only the
   const mark = $('.loading-mark');
 
   await push(unsettled(firstRead('finishing')));
-  expect(text($('.loading-roll-out'))).toBe('Loading projects');
+  expect(text($('.loading-roll-out'))).toBe('Loading Projects');
   expect(text($('.loading-roll-in'))).toBe('Finishing up');
   expect($('.loading-mark'), 'the mark is not redrawn').toBe(mark);
   expect($('.loading-roll-out')!.getAttribute('aria-hidden'), 'the leaving line is not announced').toBe('true');
@@ -108,7 +108,7 @@ test('a drawn page still waits for an unsettled read, with its current step and 
   await mountPage(unsettled(firstRead('items', ['lar-server'])), '', '?loading=drawn');
   expect(screen()!.classList.contains('is-drawn')).toBe(true);
   expect(leaving()).toBe(false);
-  expect(line()).toBe('Loading projects');
+  expect(line()).toBe('Loading Projects');
   expect($('.loading-roll-in')).toBeNull();
 });
 
@@ -190,7 +190,7 @@ test('with reduced motion the finished mark shows at once, the line swaps withou
 
   await push(unsettled(firstRead('items', ['lar-apple'])));
   expect($$('.loading-line-slot > span')).toHaveLength(1);
-  expect(text($('.loading-line'))).toBe('Loading projects');
+  expect(text($('.loading-line'))).toBe('Loading Projects');
 
   await push(settled());
   expect(leaving(), 'no draw to wait for').toBe(true);
@@ -201,16 +201,16 @@ test('with reduced motion the finished mark shows at once, the line swaps withou
 test('project updates do not roll or name individual projects', async () => {
   await mountPage(unsettled());
   await push(unsettled(firstRead('items', ['lar-apple', 'lar-server'])));
-  expect(line()).toBe('Loading projects');
+  expect(line()).toBe('Loading Projects');
   expect($('.loading-roll-in')).toBeNull();
   await push(unsettled(firstRead('items', ['lar-server'])));
-  expect(line()).toBe('Loading projects');
+  expect(line()).toBe('Loading Projects');
   expect($('.loading-roll-in')).toBeNull();
   await advance(10_000);
   expect(screen(), 'an unsettled read keeps the screen').not.toBeNull();
   expect(leaving()).toBe(false);
   await push(unsettled(firstRead('finishing')));
-  expect(text($('.loading-roll-out'))).toBe('Loading projects');
+  expect(text($('.loading-roll-out'))).toBe('Loading Projects');
   expect(line()).toBe('Finishing up');
 });
 

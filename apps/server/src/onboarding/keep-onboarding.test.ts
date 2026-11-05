@@ -24,9 +24,9 @@ test('keeping an onboarding returns the repositories still onboarding, the one i
 test('a body without a repository of the form owner/name and progress is a 400; a repository the list refuses is a 409 with why', async (t) => {
   const dir = await dataDir(t);
   for (const body of [{ progress }, { repo: 'maddec01/lar-web' }, { repo: 'maddec01/lar-web', progress, replaces: 3 }]) {
-    assert.deepEqual(await keepOnboarding(body, dir), { status: 400, error: 'Send the repository and where its onboarding stopped.' }, JSON.stringify(body));
+    assert.deepEqual(await keepOnboarding(body, dir), { status: 400, error: 'Send the Project and where its onboarding stopped.' }, JSON.stringify(body));
   }
-  assert.deepEqual(await keepOnboarding({ repo: 'lar-web', progress }, dir), { status: 400, error: 'Send the repository and where its onboarding stopped.' });
+  assert.deepEqual(await keepOnboarding({ repo: 'lar-web', progress }, dir), { status: 400, error: 'Send the Project and where its onboarding stopped.' });
   saveOnboarded('maddec01/lar-web', null, dir);
   assert.deepEqual(await keepOnboarding({ repo: 'maddec01/lar-web', progress }, dir), { status: 409, error: 'maddec01/lar-web is onboarded already.' });
 });

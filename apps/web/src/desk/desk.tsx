@@ -92,7 +92,7 @@ export function Desk({ items: inScope }: { items: Item[] }) {
   if (!items.length) return (
     <section className="desk flex shrink-0 items-baseline gap-2 text-xs text-(--muted-foreground)" aria-labelledby="desk-h">
       <h2 id="desk-h" className="m-0 text-[13px] font-medium text-(--foreground)">Your desk</h2>
-      <p className="m-0">{clientError ? 'Nothing waited on you at the last read.' : readingScope(data, scope ?? undefined) ? <Loader label="Loading projects…" /> : deskItems(data, unavailable).length ? 'Nothing on your desk matches the filters.' : 'Nothing waits on you.'}</p>
+      <p className="m-0">{clientError ? 'Nothing waited on you at the last read.' : readingScope(data, scope ?? undefined) ? <Loader label="Loading Projects…" /> : deskItems(data, unavailable).length ? 'Nothing on your desk matches the filters.' : 'Nothing waits on you.'}</p>
     </section>
   );
   return (

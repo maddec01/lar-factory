@@ -204,7 +204,7 @@ const currentFactoryContext = (): FactoryThreadContext => ({dataDir:boardDataDir
 async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
   let repos;
   try { repos = readRepositoryList(); }
-  catch (err) { return { error: `Can't read the onboarded repositories: ${(err as Error).message}` }; }
+  catch (err) { return { error: `Can't read the onboarded Projects: ${(err as Error).message}` }; }
   return repositoryProject(repo, repos);
 }
 
@@ -230,7 +230,7 @@ const SHOW_GRACE_MS = 60_000;
 const PURPOSES = { started: 'shape', startedBuilds: 'build' } as const;
 type StartRecord = keyof typeof PURPOSES;
 
-const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Check the repository's project in T3 Code; the board settles it once T3 shows it.";
+const MAY_HAVE_STARTED = "This work's last start may have opened a T3 thread. Check its T3 project in T3 Code. The board settles it once T3 shows it.";
 const START_CRASHED = 'The start failed. Check the board log.';
 const START_PURPOSES: readonly StartPurpose[] = ['shape', 'build'];
 const isStartPurpose = (purpose: unknown): purpose is StartPurpose => START_PURPOSES.includes(purpose as StartPurpose);

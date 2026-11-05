@@ -233,7 +233,7 @@ export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean 
   const parentIsConcept = item.tracker?.parent?.kind === 'concept' || parentKind === 'concept';
   if (parentIsConcept) words.push('Part of a concept');
   else if (item.parent) words.push('Part of another issue');
-  if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Cross-repository');
+  if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Across Projects');
   const badge = KIND_BADGES[item.kind];
   return badge || words.length ? <span data-item-kind className="inline-flex flex-wrap gap-1"><KindBadge kind={item.kind} />{onRow && <KindMarker item={item} />}{words.map((word) => <Badge key={word}>{word}</Badge>)}</span> : null;
 }

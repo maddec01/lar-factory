@@ -225,7 +225,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       run: (input) => capture.capture(input),
     },
     '/api/pick-ticket': {
-      what: 'the repository and the ticket to pick', disabled: 'Picking tickets is disabled in sample mode.',
+      what: 'the Project and the ticket to pick', disabled: 'Picking tickets is disabled in sample mode.',
       run: (input) => capture.pick(input),
     },
     '/api/create-ticket': {
@@ -420,14 +420,14 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       }),
     },
     '/api/onboarding/projects': {
-      what: 'the folder to add', disabled: 'Sample mode onboards no repository.',
+      what: 'the folder to add', disabled: 'Sample mode onboards no Project.',
       async run(input) {
         const created = await createProject(input);
         return 'error' in created ? { status: created.status, body: { error: created.error } } : { status: 200, body: { ...created, error: null } };
       },
     },
     '/api/onboarding/repositories': {
-      what: 'the onboarding to keep', disabled: 'Sample mode onboards no repository.',
+      what: 'the onboarding to keep', disabled: 'Sample mode onboards no Project.',
       async run(input) {
         const kept = await keepOnboarding(input);
         if ('error' in kept) return { status: kept.status, body: { error: kept.error } };
@@ -437,7 +437,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       },
     },
     '/api/onboarding/vocabulary': {
-      what: 'the repository vocabulary to discover', disabled: 'Sample mode onboards no repository.',
+      what: 'the Project vocabulary to discover', disabled: 'Sample mode onboards no Project.',
       async run(input) {
         try {
           const discovery = await discoverVocabulary(input.repo as string);
@@ -446,7 +446,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
       },
     },
     '/api/onboarding/detect': {
-      what: 'the repository whose setup to detect', disabled: 'Sample mode onboards no repository.',
+      what: 'the Project whose setup to detect', disabled: 'Sample mode onboards no Project.',
       async run(input) {
         const detected = await detectSetup(input);
         return 'error' in detected ? { status: detected.status, body: { error: detected.error } } : { status: 200, body: { ...detected, error: null } };
@@ -454,7 +454,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     },
     // The repository goes on the board with its local settings, and the next read loads its items.
     '/api/onboarding/setup': {
-      what: 'the answers to save', disabled: 'Sample mode onboards no repository.',
+      what: 'the answers to save', disabled: 'Sample mode onboards no Project.',
       async run(input) {
         const saved = await saveSetup(input);
         if ('error' in saved) return { status: saved.status, body: { error: saved.error } };
@@ -466,7 +466,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     },
     // The row shows the new setup at once; the read after it shows what the setup changes, such as paused work.
     '/api/repositories/settings': {
-      what: 'the repository and the change to its settings', disabled: 'Sample mode changes no repository settings.',
+      what: 'the Project and the change to its settings', disabled: 'Sample mode changes no Project settings.',
       async run(input) {
         const changed = await changeRepositorySettings(input);
         if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
@@ -477,7 +477,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     },
     // The tracker holds the labels, so a change shows on rows at the read it starts.
     '/api/repositories/labels': {
-      what: 'the repository and the change to its labels', disabled: 'Sample mode reads and changes no labels.',
+      what: 'the Project and the change to its labels', disabled: 'Sample mode reads and changes no labels.',
       async run(input) {
         const changed = await changeRepositoryLabels(input);
         if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
@@ -560,7 +560,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
 
   /** Lists T3's projects and repository origins for onboarding. */
   async function projectsRequest(res: ServerResponse): Promise<void> {
-    if (sample) return json(res, 403, { error: 'Sample mode onboards no repository.' });
+    if (sample) return json(res, 403, { error: 'Sample mode onboards no Project.' });
     try { json(res, 200, { projects: await projectChoices() }); }
     catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
   }

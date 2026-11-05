@@ -65,7 +65,7 @@ export function validateDraft(input: unknown, repos: RepoConfig[], kinds: readon
   if (!input || typeof input !== 'object') throw new Error('Enter the item details.');
   const value = input as Record<string, unknown>;
   const repo = repos.find((r) => r.repo === value.repo);
-  if (!repo) throw new Error('Choose a configured repository.');
+  if (!repo) throw new Error('Choose a configured Project.');
   if (!kinds.includes(value.kind as string)) throw new Error(kinds === ITEM_KINDS ? 'Choose bug, feature or improvement.' : 'Choose a valid work kind.');
   if (typeof value.title !== 'string' || !value.title.trim() || /[\r\n]/.test(value.title) || value.title.length > 256) {
     throw new Error('Enter a nonblank title of at most 256 characters.');

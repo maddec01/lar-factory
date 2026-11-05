@@ -1,10 +1,10 @@
 import { test, vi, expect } from 'vite-plus/test';
-import { repositoryProjectAccess, repositoryProjects, reauthorizeRepositoryProjects, subscribeRepositoryProjects } from './repository-project-discovery.ts';
+import { repositoryProjectAccess, repositoryProjects, reauthorizeRepositoryProjects, subscribeRepositoryProjects, useProjectSessions } from './repository-project-discovery.ts';
 
-const fixture = vi.hoisted(() => ({ read: { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } } as import('./project-protocol.ts').ProjectRead, renew: vi.fn(async () => {}), stop: vi.fn(), running: vi.fn(() => true), notify: (_read: import('./project-protocol.ts').ProjectRead) => {} }));
+const fixture = vi.hoisted(() => ({ read: { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } } as import('./project-protocol.ts').ProjectRead, renew: vi.fn(async () => {}), stop: vi.fn(), running: vi.fn(() => true), sessions: vi.fn(), notify: (_read: import('./project-protocol.ts').ProjectRead) => {} }));
 vi.mock('../json-file.ts', () => ({ readJsonRecord: () => ({ origin: 'http://127.0.0.1:3773', serverVersion: undefined }) }));
 vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture/runtime', t3Running: () => fixture.running() }));
-vi.mock('./board-projects.ts', () => ({ boardProjects: () => ({ readProjects: async () => fixture.read, reauthorize: fixture.renew }) }));
+vi.mock('./board-projects.ts', () => ({ boardProjects: (_origin: string, _version: string, sessions: unknown) => { fixture.sessions(sessions); return { readProjects: async () => fixture.read, reauthorize: fixture.renew }; } }));
 vi.mock('./project-subscription.ts', () => ({ subscribeProjects: (_origin: URL, _version: string, _protocol: unknown, notify: typeof fixture.notify) => { fixture.notify = notify; return fixture.stop; } }));
 
 test('successful empty discovery stays distinct from disconnect and retains its observation', async () => {
@@ -91,4 +91,15 @@ test('tells subscribers when project facts or availability change, not when only
   stop();
   fixture.notify({ availability: 'malformed' });
   expect(changed).toHaveBeenCalledTimes(4);
+});
+
+test('reads with the Keychain session until told to use another', async () => {
+  fixture.read = { availability: 'available', observation: { projects: [], observedAt: '2026-10-31T00:00:00Z' } };
+  fixture.sessions.mockClear();
+  await reauthorizeRepositoryProjects();
+  expect(fixture.sessions).toHaveBeenLastCalledWith(undefined);
+  const own = { vault: { read: async () => undefined, write: async () => {} }, authority: { issue: async () => { throw new Error('unused'); }, revoke: async () => {} } };
+  useProjectSessions(own);
+  await reauthorizeRepositoryProjects();
+  expect(fixture.sessions).toHaveBeenLastCalledWith(own);
 });

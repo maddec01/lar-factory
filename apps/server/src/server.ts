@@ -1,5 +1,6 @@
 import { deletedThreadNotice } from './items/deleted-thread-notice.ts';
-import { repositoryProjects, reauthorizeRepositoryProjects } from './t3/repository-project-discovery.ts';
+import { repositoryProjects, reauthorizeRepositoryProjects, useProjectSessions } from './t3/repository-project-discovery.ts';
+import { sampleT3Session } from './t3/sample-t3-session.ts';
 // The board server: reads each item source through `gh` or `az` at its own pace, every 15 s while it holds active work
 // and every 5 min while idle, refreshes T3's threads and stats every 2 s without either, keeps the last good copy in
 // memory, serves it on 127.0.0.1 and pushes each change to open pages over /api/events.
@@ -70,6 +71,9 @@ const settings = readBoardSettings();
 // A settings file the board can't use leaves it on the defaults; the problem stays the board's read error until it restarts.
 if (settings.problem) log(`using the default settings: ${settings.problem}`);
 const fixture = process.env.BOARD_DATA_FILE;
+/** `pnpm run sample:t3`: the sample board also reads T3's projects, icons and availability, with a session of its own. */
+const sampleT3 = fixture && process.env.BOARD_SAMPLE_T3 ? sampleT3Session() : null;
+if (sampleT3) useProjectSessions(sampleT3);
 const capture = { session: randomUUID(), enabled: !fixture };
 const bundled = loopTrace.span('bundled skills', loadBundledSkills);
 if (bundled.error) log(`no bundled skills in Settings: ${bundled.error}`);
@@ -220,7 +224,7 @@ const items = onboardedSources(async () => {
   moveFirstRead({ step: 'items', waiting: waiting ?? unread, ...(read.configs.length === 0 ? { ready: true } : {}) });
   return read;
 });
-const choices = async () => projectChoices(onboarded(), await projectIcons?.byProject() ?? new Map());
+const choices = async () => projectChoices(fixture ? board.snapshot().repos : onboarded(), await projectIcons?.byProject() ?? new Map());
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;
@@ -535,12 +539,16 @@ function refreshLocal(recordsChanged = false): void {
   runLocal(() => loopTrace.span('local refresh', () => refreshLocalNow(recordsChanged)));
 }
 
-async function refreshLocalNow(recordsChanged: boolean): Promise<void> {
-  if (refreshing && !recordsChanged) return;
+function showT3Availability(): void {
   void loopTrace.span('t3 availability', t3Availability).then(source => {
     board.update({ t3Availability: source });
     board.push();
   });
+}
+
+async function refreshLocalNow(recordsChanged: boolean): Promise<void> {
+  if (refreshing && !recordsChanged) return;
+  showT3Availability();
   const before = board.snapshot().items;
   if (board.snapshot().fetchedAt !== null || before.length) await showRecordsInTurns();
   // What the refresh showed is checked in a turn of its own.
@@ -959,10 +967,10 @@ const adding = createCapture({ board, items, records, reread, repos: () => board
 const startAfter = createStartAfter({ board, commands, offerModelChoices, gone: armedWorkGone(records, readRepositoryList), file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 /** Starts eligible Ready builds up to the build limit while the switch is on; sample mode has no records, so it starts none. */
 const autoBuildRun = createAutoBuild({ board, records, commands, offerModelChoices, setting: () => autoBuild.state(), limit: () => limitNumber(buildLimit.state()) });
-// Sample mode asks T3 for nothing, so its boards show toned initials.
-const projectIcons = fixture ? null : createProjectIcons(board);
+// Sample mode asks T3 for nothing, so its boards show toned initials, unless it reads T3.
+const projectIcons = fixture && !sampleT3 ? null : createProjectIcons(board);
 const { server, endStreams } = createBoardServer({
-  board, commands, capture: adding, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  board, commands, capture: adding, startAfter, retention, shapingThreadCleanup, heavyCommandLimit, buildLimit, autoBuild, archive, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture, sampleReadsT3: !!sampleT3,
   reauthorizeT3: async () => {
     const read = await reauthorizeRepositoryProjects();
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
@@ -1004,20 +1012,21 @@ if (!fixture) process.on('exit', recordBoard(port));
 if (!fixture) firstGhCheck = new Promise((resolve, reject) => void recheckTools(true, {}, resolve).catch(reject));
 // Onboarding progress shows before the first read, which waits for the tool lookup.
 if (!fixture) board.update({ onboarding: stillOnboarding(onboarded()) });
-const stopProjectIcons = projectIcons?.start();
-
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).
 if (fixture) {
-  board.update({ ...sampleActivityFrom(JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, Date.now()), capture, firstRead: SETTLED_FIRST_READ });
+  board.update({ ...sampleActivityFrom(JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, Date.now()), capture, firstRead: SETTLED_FIRST_READ, ...(sampleT3 ? { projectIcons: {} } : {}) });
   offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
+  if (sampleT3) showT3Availability();
 }
+const stopProjectIcons = projectIcons?.start();
 // Each tick only checks whether a source is due; refresh reads nothing when none is.
 const timer = setInterval(() => {
   if (!fixture) loopTrace.span('read tick', () => runLocal(() => refresh()));
 }, 1_000);
 const localTimer = setInterval(() => {
+  if (sampleT3) showT3Availability();
   if (!fixture) {
     loopTrace.span('local tick', () => runLocal(() => {
       refreshLocal();
@@ -1037,7 +1046,8 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     stopProjectIcons?.();
     void autoBuildRun.release();
     endStreams();
-    server.close(() => process.exit(0));
+    const revoked = sampleT3?.revoke().catch(() => log('revoking the sample board\'s T3 session failed'));
+    server.close(() => void Promise.resolve(revoked).finally(() => process.exit(0)));
     setTimeout(() => process.exit(0), 2000).unref();
   });
 }

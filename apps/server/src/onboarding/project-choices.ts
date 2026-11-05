@@ -1,5 +1,4 @@
 import type { ProjectChoice, ProjectIcon, Provider } from '@lar-factory/shared';
-import type { OnboardedRepository } from '../config/repository-config.ts';
 import { azureRepo, checkouts, githubRepo, linkedWorktree, onAzureDevOps, originHost, tilde } from '../t3/repository-project.ts';
 
 /** The provider an origin URL is on, or null for any other host. */
@@ -11,7 +10,7 @@ function providerOf(origin: string): Provider | null {
 /**
  * T3's projects, their repository origins and their `icons` by project ID, read without contacting the tracker.
  */
-export async function projectChoices(list: readonly OnboardedRepository[], icons: ReadonlyMap<string, ProjectIcon>, env: NodeJS.ProcessEnv = process.env): Promise<ProjectChoice[]> {
+export async function projectChoices(list: readonly { repo: string }[], icons: ReadonlyMap<string, ProjectIcon>, env: NodeJS.ProcessEnv = process.env): Promise<ProjectChoice[]> {
   let found;
   try { found = await checkouts(env); }
   catch { throw new Error("Can't read T3 Code's projects; reconnect T3 Code before onboarding"); }

@@ -22,7 +22,9 @@ pnpm start
 ```
 
 `pnpm run dev` rebuilds the page and restarts the server on changes.
-`pnpm run sample` uses fixtures without provider calls. Choose a free port for a
+`pnpm run sample` uses fixtures without provider calls. `pnpm run sample:t3` adds
+real T3 reads for the project list, project icons and T3 availability, with its own
+session held in memory, and refuses the same writes. Choose a free port for a
 second instance with `BOARD_PORT`. The app normally uses the first free port
 between 4317 and 4416; `BOARD_PORT=0` asks the OS for one.
 

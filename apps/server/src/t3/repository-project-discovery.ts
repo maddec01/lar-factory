@@ -1,7 +1,7 @@
 // Runtime discovery follows T3 apps/server/src/serverRuntimeState.ts.
 // Exercised 2026-10-31 on nightly 0.1.6-nightly.20261030.3917: eight projects.
 import { readJsonRecord } from '../json-file.ts';
-import { boardProjects } from './board-projects.ts';
+import { boardProjects, type BoardSessions } from './board-projects.ts';
 import { subscribeProjects } from './project-subscription.ts';
 import type { ProjectProtocol, ProjectRead } from './project-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
@@ -10,6 +10,12 @@ let pending: Promise<ProjectRead> | undefined;
 let current: { key: string; origin: string; read: ProjectRead; stop: () => void; protocol: ReturnType<typeof boardProjects> } | undefined;
 const subscribers = new Set<() => void>();
 let announced: string | undefined;
+let sessions: BoardSessions | undefined;
+
+/** Has discovery read T3 with `own` instead of the board's Keychain session, from its next read. */
+export function useProjectSessions(own: BoardSessions): void {
+  sessions = own;
+}
 
 /** Calls `changed` when T3's project facts or availability differ from the last it announced, until the returned function is called. Thread updates never do. */
 export function subscribeRepositoryProjects(changed: () => void): () => void {
@@ -50,7 +56,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
   current?.stop();
   try {
     const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
-    const protocol = boardProjects(runtime.origin, version);
+    const protocol = boardProjects(runtime.origin, version, sessions);
     const read = await protocol.readProjects();
     const state = { key, origin: runtime.origin, protocol, read: { ...read, observation: read.observation ?? current?.read.observation }, stop: () => {} };
     current = state;

@@ -47,7 +47,7 @@ function serve(board: BoardData, labels: TrackerLabel[], fail: (body: Record<str
   return tracker;
 }
 
-const section = () => $('[data-edit-dialog] [data-labels]')!;
+const section = () => $('[data-project-page] [data-labels]')!;
 const rowOf = (name: string) => section().querySelector<HTMLElement>(`[data-label="${name}"]`);
 const names = () => [...section().querySelectorAll('[data-label]')].map((row) => row.getAttribute('data-label'));
 const buttonIn = (el: Element, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label || b.getAttribute('aria-label') === label);
@@ -66,9 +66,9 @@ async function openEdit(board: BoardData): Promise<void> {
 
 async function openDialog(board: BoardData): Promise<void> {
   await settle(() => $<HTMLButtonElement>('.open-settings')!.click());
-  await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Repositories')!.click());
+  await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Projects')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  await settle(() => buttonIn($(`.settings-row[data-row="repo-${board.repos[0]!.repo}"]`)!, 'Edit')!.click());
+  await settle(() => buttonIn($(`.settings-row[data-row="repo-${board.repos[0]!.repo}"]`)!, 'Open Project')!.click());
   await settle(() => vi.advanceTimersByTime(50));
 }
 
@@ -76,8 +76,8 @@ test("the table replaces Custom labels and lists the tracker's labels with colou
   const board = boardWith();
   serve(board, [{ name: 'docs', color: 'ff0000', description: 'Writing' }, { name: 'area-ui', color: '00ff00' }]);
   await openEdit(board);
-  expect(text($('[data-edit-dialog]')!)).not.toMatch(/Custom labels/);
-  expect($('[data-edit-dialog] [data-setting="labels"]')).toBeNull();
+  expect(text($('[data-project-page]')!)).not.toMatch(/Custom labels/);
+  expect($('[data-project-page] [data-setting="labels"]')).toBeNull();
   expect(names()).toEqual(['area-ui', 'docs']);
   expect(text(rowOf('docs')!)).toContain('Writing');
   expect(rowOf('docs')!.querySelector<HTMLElement>('[data-label-chip]')!.style.backgroundColor).toContain('rgb(255, 0, 0)');
@@ -150,7 +150,7 @@ test('Escape closes only the delete confirmation', async () => {
   await settle(() => focused.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
   await settle(() => vi.advanceTimersByTime(50));
   expect($('[data-delete-label]')).toBeNull();
-  expect($('[data-edit-dialog]')).not.toBeNull();
+  expect($('[data-project-page]')).not.toBeNull();
 });
 
 test('managed labels appear locked, with no controls', async () => {
@@ -314,7 +314,6 @@ test('an open mapping reads the tracker again after a rename, so the new name is
     return undefined;
   });
   await openEdit(board);
-  await settle(() => buttonIn($('[data-edit-dialog]')!, 'Edit vocabulary')!.click());
   await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
   await type(section().querySelector<HTMLInputElement>('[aria-label="Label name"]')!, 'guides');
   await settle(() => buttonIn(rowOf('docs')!, 'Save')!.click());

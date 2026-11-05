@@ -8,7 +8,7 @@ import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ArchiveActions, archivedAs, RetentionSetting } from '../archive/archive.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
-import { useEditStore } from '../repositories/edit-store.ts';
+import { useSettingsStore } from './settings-store.ts';
 import { ProjectIcon } from '../repositories/project-icon.tsx';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { AutoBuildModelSetting } from './auto-build-model.tsx';
@@ -34,13 +34,14 @@ interface Row {
   /** Beside the title, in its line. */
   icon?: ReactNode;
   description?: ReactNode;
+  help?: ReactNode;
   control: Control;
   /** Shown under the title and the control, across the row's whole width. */
   below?: ReactNode;
   /** It only says something, with nothing to set or read, so the board search doesn't offer it as a setting. */
   noteOnly?: true;
 }
-export interface Group { title: string; description?: string; rows: Row[]; footer?: ReactNode; note?: ReactNode }
+export interface Group { title: string; help?: ReactNode; description?: string; rows: Row[]; footer?: ReactNode; note?: ReactNode }
 export interface Page { id: string; label: string; icon: ReactNode; description: string; groups: Group[] }
 
 /** The board data Settings shows. Diagnostics says only whether a read has landed, so a new read's time changes nothing here. */
@@ -100,7 +101,7 @@ const ghSkipped = (data: SettingsData): boolean => !!data.toolProgress?.skipped.
 
 /** Why az isn't checked, once the check leaves it out; else nothing. */
 function azSkipped(data: SettingsData): string {
-  return data.toolProgress?.skipped.includes('az') ? ' Not checked: no listed repository is on Azure DevOps.' : '';
+  return data.toolProgress?.skipped.includes('az') ? ' Not checked: no listed Project uses Azure DevOps.' : '';
 }
 
 /** `name`'s state in `data`, Checking while its check runs with no result yet. */
@@ -126,24 +127,19 @@ function onboardingDescription(progress: OnboardingProgress): string {
   return [progress.answers.provider, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
 }
 
-/**
- * Each repository on this Mac's list by its name: an onboarded one with its provider and item source,
- * Edit, which opens Edit's dialog once the board has its setup; one still onboarding with what it has answered, the
- * step it stopped at and Resume. Add repository opens the onboarding dialog. The
- * board reads GitHub repositories and Azure DevOps sprints.
- */
+/** Projects with their provider and work source. Read setups open a page, onboarding offers Resume. */
 function repositoryGroup(data: SettingsData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
     id: `repo-${r.repo}`, title: shownRepo(r.repo), icon: <ProjectIcon repo={r.repo} size="small" />, description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}</>,
-    control: custom(() => r.setup ? <Button {...kind('other')} onClick={() => useEditStore.getState().open(r.repo)}>Edit</Button> : null),
+    control: custom(() => r.setup ? <Button {...kind('other')} onClick={() => useSettingsStore.getState().openProject(r.repo)}>Open Project</Button> : null),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
     id: `repo-${repo}`, title: shownRepo(repo), icon: <ProjectIcon repo={repo} size="small" />, description: onboardingDescription(progress),
     control: custom(() => <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>),
   }));
-  return { title: 'Repositories', description: 'Settings stay on this machine. Repositories need no factory files.',
+  return { title: 'Projects', description: 'Settings stay on this machine. Projects need no factory files.',
     rows: [...onboarded, ...onboarding],
-    footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add repository</Button> };
+    footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add Project</Button> };
 }
 
 /** Why a target can't be unticked, or nothing. */
@@ -165,9 +161,9 @@ function targetNote(target: TargetSnapshot): string | undefined {
 
 function targetGroup({ app, targets }: PagesInput): Group {
   const description = 'The app installs its skills into each ticked folder: copies, or links in a Claude home.';
-  if (!app) return { title: 'Skill folders', description: ONLY_APP_TARGETS, rows: [] };
+  if (!app) return { title: 'Skill folders', rows: [], note: <p className="m-0 text-xs text-(--muted-foreground)">{ONLY_APP_TARGETS}</p> };
   return {
-    title: 'Skill folders', description, note: <TargetsNote />,
+    title: 'Skill folders', help: description, note: <TargetsNote />,
     rows: (targets ?? []).map((target) => ({
       id: `target-${target.path}`, title: target.path, description: targetNote(target), control: custom(() => <TargetSwitch path={target.path} reason={targetNote(target)} />),
       below: <><TargetReaders target={target} /><TargetProgress target={target} /></>,
@@ -222,7 +218,7 @@ function bundledGroup({ data, version }: PagesInput): Group {
       <a className="inline-flex items-center gap-1 text-xs font-medium text-(--foreground) underline-offset-2 hover:underline [&_svg]:size-3.5" aria-label={`${skill.name} source`} href={skill.source} target="_blank" rel="noopener"><ExternalLink /> Source</a>
     </span>),
   })) : [{ id: 'bundled-unread', title: "Couldn't read the bundled skills", noteOnly: true, description: "The board server couldn't read the app's bundle, so it can't credit them here.", control: custom(() => null) }];
-  return { title: 'Bundled skills', description: 'The skills and checklists the app installs, and who wrote them.', rows };
+  return { title: 'Bundled skills', help: 'The skills and checklists the app installs, and who wrote them.', rows };
 }
 
 function updateRows({ app, version }: PagesInput): Row[] {
@@ -255,50 +251,50 @@ function archiveGroups(data: SettingsData, archive: PagesInput['archive']): Grou
 export function pages(input: PagesInput): Page[] {
   const { data } = input;
   return [
-    { id: 'general', label: 'General', icon: <Settings2 />, description: 'Board preferences.', groups: [
+    { id: 'general', label: 'General', icon: <Settings2 />, description: '', groups: [
       { title: 'Dialogs', rows: [
         { id: 'match-list-size', title: 'Match list size when opening an item', control: custom(() => <DialogPreference preference="matchList" label="Match list size when opening an item" />) },
         { id: 'open-list-expanded', title: 'Open list expanded', control: custom(() => <DialogPreference preference="openList" label="Open list expanded" />) },
       ] },
       { title: 'Threads', rows: [{
-        id: 'shaping-thread-cleanup', title: 'Shaping threads after Start build',
-        description: "What the board does to an item's shaping threads when its build starts. Keep changes nothing. Settle settles them in T3, and Archive archives them there. Item details still links to a settled thread. An archived thread has no link on the board and reopens from T3's Settings, Archived. Delete removes them from T3. Delete can't be undone from the board, and the item's stats no longer count that thread.",
-        control: custom(() => null), below: <ShapingThreadCleanupSetting state={data.shapingThreadCleanup} />,
+        id: 'shaping-thread-cleanup', title: 'Shaping threads after Start build', description: 'Choose what happens when a build starts.',
+        help: "What the board does to an item's shaping threads when its build starts. Keep changes nothing. Settle settles them in T3, and Archive archives them there. Item details still links to a settled thread. An archived thread has no link on the board and reopens from T3's Settings, Archived. Delete removes them from T3. Delete can't be undone from the board, and the item's stats no longer count that thread.",
+        control: custom(() => <ShapingThreadCleanupSetting state={data.shapingThreadCleanup} />),
       }] },
       { title: 'Commands', rows: [{
-        id: 'heavy-command-limit', title: 'Heavy commands at once',
-        description: "How many heavy commands, such as test suites and builds, may run at once on this Mac, across all builds and worktrees. Automatic allows one for every 4 CPUs or 8 GB of memory, whichever is fewer, and at least one.",
-        control: custom(() => null), below: <LimitSetting name="heavy-command-limit" label="Heavy commands at once" field="Heavy command limit" state={data.heavyCommandLimit} />,
+        id: 'heavy-command-limit', title: 'Heavy commands at once', description: 'Limit test suites and builds on this Mac.',
+        help: "How many heavy commands, such as test suites and builds, may run at once on this Mac, across all builds and worktrees. Automatic allows one for every 4 CPUs or 8 GB of memory, whichever is fewer, and at least one.",
+        control: custom(() => <LimitSetting name="heavy-command-limit" label="Heavy commands at once" field="Heavy command limit" state={data.heavyCommandLimit} />),
       }, {
-        id: 'build-limit', title: 'Builds at once',
-        description: 'How many builds may work at once on this Mac, across all repositories. Automatic follows the heavy command limit. Start build and Start after always go ahead, even past this limit.',
-        control: custom(() => null), below: <LimitSetting name="build-limit" label="Builds at once" field="Build limit" state={data.buildLimit} />,
+        id: 'build-limit', title: 'Builds at once', description: 'Limit builds on this Mac.',
+        help: 'How many builds may work at once on this Mac, across all Projects. Automatic follows the heavy command limit. Start build and Start after always go ahead, even past this limit.',
+        control: custom(() => <LimitSetting name="build-limit" label="Builds at once" field="Build limit" state={data.buildLimit} />),
       }] },
       { title: 'Auto-build', rows: [{
-        id: 'auto-build-model', title: 'Auto-build model',
-        description: "The model of the build threads Auto-build starts. With T3 Project default, each build uses the default model of its repository's T3 project. Turn Auto-build on in the Ready to build header.",
-        control: custom(() => null), below: <AutoBuildModelSetting data={data} />,
+        id: 'auto-build-model', title: 'Auto-build model', description: 'Used when Auto-build starts a build.',
+        help: "The model of the build threads Auto-build starts. With T3 Project default, each build uses the default model of its T3 project. Turn Auto-build on in the Ready to build header.",
+        control: custom(() => <AutoBuildModelSetting data={data} />),
       }] },
       { title: 'Refresh', rows: [{ id: 'refresh', title: 'Full refresh', description: 'Changes also arrive between full refreshes.', control: refreshEvery(data.refreshSeconds) }] },
     ] },
-    { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, description: 'The repositories and issue sources shown on the board.', groups: [repositoryGroup(data)] },
-    { id: 'integrations', label: 'Integrations', icon: <Plug />, description: 'Provider logins shared by your repositories.', groups: [
-      { title: 'Issue trackers', description: 'Uses your own command line login. Lar Factory never stores a token.', rows: [
+    { id: 'projects', label: 'Projects', icon: <FolderGit2 />, description: '', groups: [repositoryGroup(data)] },
+    { id: 'integrations', label: 'Integrations', icon: <Plug />, description: 'Uses your own command line login. Lar Factory never stores a token.', groups: [
+      { title: 'Issue trackers', rows: [
         { id: 'gh', title: 'GitHub', description: toolDescription('Uses your GitHub CLI login.', data.tools?.gh),
           control: custom(() => <ToolState {...stateOf(data, 'gh', true)} />) },
         { id: 'az', title: 'Azure DevOps', description: toolDescription(`Uses your Azure CLI login and Azure DevOps extension.${azSkipped(data)}`, data.tools?.az),
           control: custom(() => <ToolState {...stateOf(data, 'az', true)} />) },
       ] },
     ] },
-    { id: 'skills', label: 'Skills', icon: <Sparkles />, description: 'The skills and checklists Lar Factory installs, and the folders that get them.', groups: [
+    { id: 'skills', label: 'Skills', icon: <Sparkles />, description: '', groups: [
       targetGroup(input),
       bundledGroup(input),
     ] },
-    { id: 'updates', label: 'Updates', icon: <RefreshCw />, description: 'Which Releases Lar Factory offers, and when it installs them.', groups: [
-      { title: 'Updates', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) },
+    { id: 'updates', label: 'Updates', icon: <RefreshCw />, description: '', groups: [
+      { title: '', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) },
     ] },
     { id: 'archive', label: 'Archive', icon: <Archive />, description: 'Work off the board: set aside, or finished and hidden. This Mac keeps it until a timed delete runs.', groups: archiveGroups(data, input.archive) },
-    { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, description: 'The commands the board runs, and its server.', groups: [
+    { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, description: '', groups: [
       { title: 'Tools', rows: [
         ...DIAGNOSED.filter(([name]) => name !== 'gh' || !ghSkipped(data)).map(([name, does]): Row => ({
           id: `d-${name}`, title: name, description: toolDescription(does, data.tools?.[name]), control: custom(() => <ToolState {...stateOf(data, name)} />),

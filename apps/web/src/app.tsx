@@ -22,7 +22,6 @@ import { NotificationStack } from './notices/toasts.tsx';
 import { EmptyState } from './onboarding/empty-state.tsx';
 import { OnboardingCards } from './onboarding/onboarding-cards.tsx';
 import { WizardDialog } from './onboarding/wizard-dialog.tsx';
-import { EditDialog } from './repositories/edit-dialog.tsx';
 import { SettingsDialog } from './settings/settings.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
 
@@ -63,7 +62,6 @@ export function App() {
         <SettingsDialog />
         <AbandonDialog />
         <WizardDialog />
-        <EditDialog />
         <LoadingScreen />
       </div>
     </TooltipProvider>

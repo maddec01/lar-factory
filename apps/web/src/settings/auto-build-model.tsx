@@ -20,7 +20,7 @@ type AutoBuildData = Pick<BoardData, 'repos' | 'autoBuild' | 'modelChoices' | 't
 /** Each repository's default model, once the board has read the setting and T3's defaults, which it never does in sample mode. */
 function RepositoryDefaults({ data }: { data: AutoBuildData }) {
   if (!data.autoBuild || data.autoBuild.model || !data.t3Defaults || !data.repos.length) return null;
-  return <ul className="m-0 grid list-none gap-1 p-0 text-xs" aria-label="Default model by repository">
+  return <ul className="m-0 grid list-none gap-1 p-0 text-xs" aria-label="Default model by Project">
     {data.repos.map(({ repo }) => <li key={repo} className="flex flex-wrap justify-between gap-x-3">
       <span className="[overflow-wrap:anywhere]">{shownRepo(repo)}</span>{' '}
       <span className="text-(--muted-foreground) [overflow-wrap:anywhere]">{t3DefaultDetail(data.modelChoices, repositoryT3Default(data, repo)) ?? 'Default model unknown'}</span>

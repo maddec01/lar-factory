@@ -164,12 +164,12 @@ const OTHER_DIALOGS: [string, () => Promise<void>][] = [
     const { useWizardStore } = await import('../onboarding/wizard-store.ts');
     await settle(() => useWizardStore.getState().start());
   }],
-  ['Edit repository', async () => {
+  ['a Project page', async () => {
     const { useBoardStore } = await import('../board/board-store.ts');
-    const { useEditStore } = await import('../repositories/edit-store.ts');
+    const { useSettingsStore } = await import('../settings/settings-store.ts');
     const setup = { ...effectiveVocabulary(), repo: sample.repos[0]!.repo, role: '', itemSource: { kind: 'issues' }, labels: [], domainDocs: { kind: 'off' }, skills: [], access: {}, sources: {} } as unknown as RepositorySetup;
     await settle(() => useBoardStore.getState().receive({ ...sample, repos: [{ ...sample.repos[0]!, setup }, sample.repos[1]!] }));
-    await settle(() => useEditStore.getState().open(sample.repos[0]!.repo));
+    await settle(() => { useSettingsStore.getState().openProject(sample.repos[0]!.repo); useSettingsStore.getState().setOpen(true); });
   }],
   ['Abandon', async () => {
     const { useAbandonStore } = await import('../items/abandon-store.ts');

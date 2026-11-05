@@ -1,12 +1,12 @@
 // Settings: the modal with its section list in groups, each section's title and description over its rows, the
 // Skill folders with their switches and what a change did, the bundled skills with their last updates and install
-// states, the update channel, version, the update pill's state and step, and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
+// states, the update channel, version, the update pill's state and step, and Check now, the tool rows, the repository rows with Resume and Add Project (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the targets and updates explain that they need the board app.
 
 import { createElement, Profiler } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, textBesideIcon, toolChecks, updatesOff } from '../../test/support.ts';
+import { $, $$, addStylesheet, answerRestart, mountPage, chooseOption, openOptions, push, sample, settle, stubApp, text, textBesideIcon, toolChecks, updatesOff } from '../../test/support.ts';
 import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type InstallOperationResult, type InstallSnapshot, type RepositorySetup, type TargetSnapshot, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { dialog, project, serve } from '../onboarding/onboarding-support.ts';
@@ -73,23 +73,23 @@ test('Settings opens from the title bar, in a browser too, as a modal over the b
   expect(modal()!.getAttribute('role')).toBe('dialog');
   expect($$('.settings-nav [role="group"]').map((g) => [g.getAttribute('aria-label'), [...g.querySelectorAll('button')].map(text)])).toEqual([
     ['Board', ['General']],
-    ['Connections', ['Repositories', 'Integrations', 'Skills']],
+    ['Connections', ['Projects', 'Integrations', 'Skills']],
     ['App', ['Updates', 'Archive', 'Diagnostics']],
   ]);
   expect(section('General').getAttribute('aria-current')).toBe('page');
   expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
-  expect(text(modal())).toContain('Board preferences.');
+  expect(text(modal())).not.toContain('Board preferences.');
   expect($$('.settings-group h3').map(text)).toEqual(['Dialogs', 'Threads', 'Commands', 'Auto-build', 'Refresh']);
   expect($('.title-bar')!.closest('[hidden]'), 'the board stays under it').toBeNull();
   expect($('.desk')).not.toBeNull();
 });
 
 test('choosing a section shows useful controls', async () => {
-  await open('Repositories');
-  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repositories');
-  expect(section('Repositories').getAttribute('aria-current')).toBe('page');
+  await open('Projects');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Projects');
+  expect(section('Projects').getAttribute('aria-current')).toBe('page');
   expect(section('General').getAttribute('aria-current')).toBeNull();
-  expect(text(body())).toContain('Add repository');
+  expect(text(body())).toContain('Add Project');
 });
 
 test('search keeps the sections whose name or a row matches, and / focuses it', async () => {
@@ -162,12 +162,12 @@ test('settings only show working controls', async () => {
 /** Each Settings group's title with its rows' ids. */
 const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
 
-test('Repositories only shows each repository with its provider and item source', async () => {
+test('Projects only shows each repository with its provider and item source', async () => {
   const repos = [sample.repos[0]!, { ...sample.repos[1]!, items: 'issues' as const },
     { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'azure-board' as const, team: 'Fabrikam Team', labels: [] },
     { repo: 'contoso/Fabrikam/lar-web', role: 'Web', items: 'azure-board' as const, team: 'Web Team', labels: [] }];
-  await open('Repositories', { ...sample, repos });
-  expect(groups()).toEqual([['Repositories', repos.map((r) => `repo-${r.repo}`)]]);
+  await open('Projects', { ...sample, repos });
+  expect(groups()).toEqual([['Projects', repos.map((r) => `repo-${r.repo}`)]]);
   expect(row('gh')).toBeNull();
   expect(row('az')).toBeNull();
   expect(repos.map((r) => textBesideIcon(row(`repo-${r.repo}`)))).toEqual([
@@ -182,7 +182,7 @@ test('onboarded and onboarding repository rows show the project icon or toned in
   const data: BoardData = { ...sample, projectIcons: { [sample.repos[0]!.repo]: { kind: 'emoji', emoji: '🚀' } },
     onboarding: [{ repo: 'maddec01/lar-web', progress: { step: 'work', done: ['project'], answers: { projectId: 'lar-web', provider: 'GitHub' } } }] };
   serve(data, [project('lar-web', { onBoard: true })]);
-  await open('Repositories', data);
+  await open('Projects', data);
   const icon = (id: string) => row(id).querySelector('.settings-row-title [data-project-icon]');
   expect(text(icon(`repo-${sample.repos[0]!.repo}`))).toBe('🚀');
   expect(text(icon(`repo-${sample.repos[1]!.repo}`))).toBe('L');
@@ -191,23 +191,23 @@ test('onboarded and onboarding repository rows show the project icon or toned in
   expect($('.settings-body [data-project-icon]')).toBeNull();
 });
 
-test('an onboarded repository whose setup the board read has Edit, one without none, and Add repository opens the onboarding dialog over Settings', async () => {
+test('a Project with a setup offers its page, an unread one has none, and Add Project opens onboarding over Settings', async () => {
   const board = { ...sample, repos: [{ ...sample.repos[0]!, setup: {} as RepositorySetup }, sample.repos[1]!] };
   serve(board, [project('lar-web')]);
-  await open('Repositories', board);
-  expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([['Edit', false], ['Add repository', false]]);
-  const add = $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === 'Add repository')!;
+  await open('Projects', board);
+  expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([['Open Project', false], ['Add Project', false]]);
+  const add = $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === 'Add Project')!;
   // A click focuses the button it presses.
   add.focus();
   await settle(() => add.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repository');
   expect(dialog()!.contains(document.activeElement), 'the onboarding dialog holds focus').toBe(true);
-  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2')), 'Settings stays under it').toBe('Repositories');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2')), 'Settings stays under it').toBe('Projects');
   await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(dialog()).toBeNull();
-  expect(document.activeElement, 'focus goes back to Add repository').toBe(add);
+  expect(document.activeElement, 'focus goes back to Add Project').toBe(add);
 });
 
 test('a repository still onboarding is listed with its provider and its step, and Resume reopens the dialog there', async () => {
@@ -216,8 +216,8 @@ test('a repository still onboarding is listed with its provider and its step, an
     { repo: 'contoso/Fabrikam%20Fiber/lar-api', progress: { step: 'checks', done: ['project'], answers: { projectId: 'lar-api', provider: 'Azure DevOps' } } },
   ] };
   serve(data, [project('lar-web', { onBoard: true })]);
-  await open('Repositories', data);
-  expect(groups()[0]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
+  await open('Projects', data);
+  expect(groups()[0]).toEqual(['Projects', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
   expect(textBesideIcon(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Work and docsResume');
   expect(textBesideIcon(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResume');
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
@@ -233,7 +233,7 @@ test('Diagnostics shows every command Not checked before the first check, then O
   await push({ ...sample, tools: toolChecks(), toolProgress: { checking: [], skipped: ['az'] } });
   expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● OK', '● OK', '● OK', '● OK', '● OK']);
   expect(text(row('d-az').querySelector('.tool-state'))).toBe('● Not checked');
-  expect(text(row('d-az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
+  expect(text(row('d-az'))).toContain('Not checked: no listed Project uses Azure DevOps.');
 });
 
 test('Integrations shows provider logins and the fix for missing access tools', async () => {
@@ -427,7 +427,7 @@ test("Skills says so in one row when it couldn't read the bundled skills", async
   const group = $$('.settings-group').find((g) => text(g.querySelector('h3')) === 'Bundled skills')!;
   expect([...group.querySelectorAll<HTMLElement>('.settings-row')].map((r) => [r.dataset.row, text(r.querySelector('.font-medium'))])).toEqual(
     [['bundled-unread', "Couldn't read the bundled skills"]]);
-  expect(group.querySelector('a, button, input')).toBeNull();
+  expect(group.querySelector('a, button:not([aria-label^="About"]), input')).toBeNull();
 });
 
 /** The switch of the target at `path`. */
@@ -468,8 +468,8 @@ test('a long target path wraps beside its switch, which keeps its size', async (
   await open();
   const title = row(`target-${long}`).querySelector('.settings-row-title')!;
   expect(title.classList.contains('truncate')).toBe(false);
-  expect([...title.classList]).toEqual(expect.arrayContaining(['min-w-0', '[overflow-wrap:anywhere]']));
-  expect(switchOf(long).closest('.settings-row-control')!.classList.contains('shrink-0')).toBe(true);
+  expect([...title.classList]).toEqual(expect.arrayContaining(['min-w-0', 'wrap-anywhere']));
+  expect(switchOf(long).closest('.settings-row-control')!.classList.contains('max-w-full')).toBe(true);
 });
 
 test('ticking a target installs it and shows the new ticks', async () => {
@@ -654,17 +654,19 @@ describe('updates', () => {
     return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
   }
 
-  const radios = () => $$<HTMLButtonElement>('.settings-body [role="radio"]');
-  const checked = () => radios().find((each) => each.getAttribute('aria-checked') === 'true')?.value;
-  const radio = (channel: UpdateChannel) => radios().find((each) => each.value === channel)!;
+  const select = () => $('.settings-body [role="combobox"]')!;
+  const checked = () => text(select()).toLowerCase();
+  const pick = (channel: UpdateChannel) => chooseOption(select(), channel === 'latest' ? 'Latest' : 'Nightly');
   const status = () => $('#update-status')!.textContent;
   const checkNow = () => $<HTMLButtonElement>('.settings-body .check-now')!;
 
   test('shows the channel the app is on, nightly and latest to choose from, and the version', async () => {
     stubChannel();
     await open('Updates');
-    expect($('.settings-body [role="radiogroup"]')!.getAttribute('aria-label')).toBe('Update channel');
-    expect(radios().map((each) => [each.value, text(each.labels[0]!)])).toEqual([['nightly', 'Nightly'], ['latest', 'Latest']]);
+    expect(select().getAttribute('aria-label')).toBe('Update channel');
+    expect(await openOptions(select())).toEqual(['Nightly', 'Latest']);
+    await settle(() => $('[role="listbox"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await settle(() => vi.advanceTimersByTime(50));
     expect(checked()).toBe('nightly');
     expect(text(row('version'))).toContain('Lar Factory 0.2.0-nightly.20261023.41');
     expect(status()).toBe('Up to date on 0.2.0-nightly.20261023.41.');
@@ -673,7 +675,7 @@ describe('updates', () => {
   test('choosing a channel switches the app to it and shows what its check found', async () => {
     const { bridge, push } = stubChannel();
     await open('Updates');
-    await settle(() => radio('latest').click());
+    await pick('latest');
     expect(bridge.setUpdateChannel).toHaveBeenCalledWith('latest');
     expect(checked()).toBe('latest');
     await push({ ...nightly, channel: 'latest', status: 'checking' });
@@ -696,13 +698,13 @@ describe('updates', () => {
     let finish!: (state: UpdateState) => void;
     bridge.setUpdateChannel.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     await open('Updates');
-    await settle(() => radio('latest').click());
-    expect(radio('nightly').getAttribute('aria-disabled')).toBe('true');
-    await settle(() => radio('nightly').click());
+    await pick('latest');
+    expect(select().getAttribute('aria-disabled')).toBe('true');
+    await pick('nightly');
     expect(bridge.setUpdateChannel).toHaveBeenCalledOnce();
     await settle(() => finish({ ...nightly, channel: 'latest' }));
     expect(checked()).toBe('latest');
-    expect(radio('nightly').getAttribute('aria-disabled')).toBe('false');
+    expect(select().getAttribute('aria-disabled')).toBe('false');
   });
 
   test('the channels are busy while an update downloads or installs, when the app would refuse a switch', async () => {
@@ -711,22 +713,22 @@ describe('updates', () => {
     bridge.installUpdate = vi.fn(() => new Promise<never>(() => {}));
     bridge.confirmRestart = answerRestart(true);
     await open('Updates');
-    expect(radio('latest').getAttribute('aria-disabled')).toBe('true');
-    await settle(() => radio('latest').click());
+    expect(select().getAttribute('aria-disabled')).toBe('true');
+    await pick('latest');
     expect(bridge.setUpdateChannel).not.toHaveBeenCalled();
     expect(checked()).toBe('nightly');
 
     await push(downloaded);
-    expect(radio('latest').getAttribute('aria-disabled')).toBe('false');
+    expect(select().getAttribute('aria-disabled')).toBe('false');
     await settle(() => $<HTMLButtonElement>('.update-button')!.click());
-    expect(radio('latest').getAttribute('aria-disabled')).toBe('true');
+    expect(select().getAttribute('aria-disabled')).toBe('true');
   });
 
   test('a refused switch keeps the old channel and says why', async () => {
     const { bridge } = stubChannel();
     bridge.setUpdateChannel.mockRejectedValueOnce(new Error('Cannot change the update channel to latest while an update download is in progress.'));
     await open('Updates');
-    await settle(() => radio('latest').click());
+    await pick('latest');
     expect(checked()).toBe('nightly');
     expect(result().textContent).toBe('Couldn\'t switch to latest: Cannot change the update channel to latest while an update download is in progress.');
     expect(result().dataset.tone).toBe('error');
@@ -1052,9 +1054,9 @@ test('a push that changes what Settings shows updates it', async () => {
   expect(text(row('refresh'))).toContain('90 seconds');
 });
 
-test('a push with the same repositories renders nothing in the Repositories section, whatever icons they have', async () => {
+test('a push with the same repositories renders nothing in the Projects section, whatever icons they have', async () => {
   const data: BoardData = { ...sample, projectIcons: { [sample.repos[0]!.repo]: { kind: 'emoji', emoji: '🚀' } } };
-  const { onRender, push } = await renderCounted('repos', data);
+  const { onRender, push } = await renderCounted('projects', data);
   expect($$('.settings-body [data-project-icon]').map(text).slice(0, 2)).toEqual(['🚀', 'L']);
   await push({ ...data, items: sample.items.slice(1), fetchedAt: LATER_READ });
   expect(onRender).not.toHaveBeenCalled();
@@ -1062,7 +1064,7 @@ test('a push with the same repositories renders nothing in the Repositories sect
 
 test('a push that changes an icon or the order of the repositories updates their icons', async () => {
   const data: BoardData = { ...sample, projectIcons: { [sample.repos[0]!.repo]: { kind: 'emoji', emoji: '🚀' } } };
-  const { push } = await renderCounted('repos', data);
+  const { push } = await renderCounted('projects', data);
   const square = (repo: string) => row(`repo-${repo}`).querySelector('[data-project-icon]');
   const [first, second] = sample.repos;
   await push({ ...data, projectIcons: { [first!.repo]: { kind: 'emoji', emoji: '🛠' } } });

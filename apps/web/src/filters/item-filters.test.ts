@@ -1,5 +1,5 @@
 // The Kind and Labels filters on List and the board: what each row matches, what the Labels filter offers, how each
-// surface keeps its own choices, and that Queue numbers and Start next ignore them.
+// surface keeps its own choices, and that Queue numbers ignore them.
 
 import { expect, test } from 'vite-plus/test';
 import { $, $$, mountPage, sample, settle, text } from '../../test/support.ts';
@@ -15,7 +15,6 @@ const saved = (key: string) => JSON.parse(localStorage.getItem(key)!) as unknown
 const seed = (key: string, kinds: string[], labels: string[] = []) => localStorage.setItem(key, JSON.stringify({ kinds, labels }));
 
 const queueRows = () => $$<HTMLLIElement>('.queue ol > li');
-const startNext = () => $<HTMLButtonElement>('.queue header [data-start]')!;
 const bar = () => $('[data-list-modal] [data-item-filters]')!;
 const open = (which: string) => settle(() => bar().querySelector<HTMLButtonElement>(`[data-filter="${which}"]`)!.click());
 const choices = () => $$<HTMLLabelElement>('[data-filter-choice], [data-label-choice]').map((c) => text(c));
@@ -72,7 +71,7 @@ test('a label mapped to the item\'s kind is neither offered nor matched on that 
   expect(rowFilter({ kinds: [], labels: ['oops'] }, repos)({ ...mapped, kind: 'feature' })).toBe(true);
 });
 
-test('the board keeps Queue numbers, and Start next starts and names the first startable item a filter hides', async () => {
+test('the board keeps Queue numbers while a filter hides the first row, whose item the Queue header never offers', async () => {
   seed(BOARD_KEY, ['bug']);
   await mountPage(withItems([
     item('Q1', { number: 1, title: 'First', kind: 'feature' }),
@@ -81,29 +80,21 @@ test('the board keeps Queue numbers, and Start next starts and names the first s
   ]));
   expect(queueRows().map((r) => [r.dataset.item, text(r.querySelector('.queue-n'))])).toEqual([['Q2', '2'], ['Q3', '3']]);
   expect(text($('#queue-h'))).toBe('Queue 2');
-  expect(startNext().dataset.start).toBe('Q1');
-  expect(text(startNext())).toContain('Start next: #1 First');
+  expect($('.queue header button')).toBeNull();
   await search();
   await removeToken('Bug');
   expect(queueRows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
-  expect(startNext().dataset.start, 'an unfiltered Queue starts the same item').toBe('Q1');
-  expect(text(startNext())).toContain('Start next');
-  expect(text(startNext())).not.toContain('First');
 });
 
-test('a failed Start next on a hidden row still shows its error', async () => {
+test('a start error on a hidden row stays out of view, and shows on the row once the filter clears', async () => {
   seed(BOARD_KEY, ['bug']);
   await mountPage(withItems([item('Q1', { number: 1, title: 'First', kind: 'feature' })]));
   const { useStartStore } = await import('../items/start-store.ts');
   await settle(() => useStartStore.getState().set('Q1', { phase: 'error', message: 'T3 is down' }));
-  expect(text($('.queue'))).toContain('T3 is down');
-});
-
-test('a shown Start next item keeps the plain button', async () => {
-  seed(BOARD_KEY, ['feature']);
-  await mountPage(withItems([item('Q1', { number: 1, title: 'First', kind: 'feature' }), item('Q2', { number: 2, title: 'Second', kind: 'bug' })]));
-  expect(startNext().dataset.start).toBe('Q1');
-  expect(text(startNext())).not.toContain('First');
+  expect(text($('.queue'))).not.toContain('T3 is down');
+  await search();
+  await removeToken('Bug');
+  expect(text($('.queue li[data-item="Q1"] [role="alert"]'))).toBe('T3 is down');
 });
 
 const parent = item('P', { number: 10, title: 'Parent', kind: 'bug', status: 'In progress', labels: ['area: web'] });

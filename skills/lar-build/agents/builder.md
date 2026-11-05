@@ -125,7 +125,8 @@ Build step 1 and plan from the brief.
    - Any other failure, such as a dirty tree or an unknown branch: follow the
      stop rule below.
 
-   After the slice is finished, run **Implement** again. A slice reported
+   After the slice is finished, run **Remove worktrees**, then **Implement**
+   again. A slice reported
    blocked gets the blocked-slice command in **Slices**, and a
    re-slice planner if none runs. A wrong brief follows the stop rule below.
    Done when every slice is finished or set aside.
@@ -155,7 +156,7 @@ Build step 1 and plan from the brief.
    Fixer when helpful. The Fixer reruns the failed check after a fix; it does
    not repeat unrelated suites. Close failures with their cause or fix.
    All checks must pass; an unexplained failure that later passed stays open.
-7. Push the branch. Don't open the PR yet.
+7. Run **Remove worktrees**, then push the branch. Don't open the PR yet.
 
 Ordinary questions to the user follow `<lar-build>/shared/questions.md`: Needs you,
 `AskUserQuestion`, answers kept for the record, status back. Retro picks and their
@@ -174,8 +175,8 @@ The handoff names the step and review round to resume at. For a Small build
 it says `Small build` and whether the change is done, so the next thread skips
 **Plan** instead of reading no slices as not planned. It carries the
 **Domain docs added by the build**
-list. At a review round, `lar-work review-rounds` already holds each round's
-base, verdicts and findings; the handoff adds the unreviewed fixes so far,
+list and the latest **Remove worktrees** lines. At a review round,
+`lar-work review-rounds` already holds each round's base, verdicts and findings; the handoff adds the unreviewed fixes so far,
 each as the line **Approve** describes, and every UI app report so far,
 whose processes the next thread stops when review ends. Otherwise finish in
 place.
@@ -197,6 +198,34 @@ the user what you found and your recommendation per
 (`lar-work set-body <work ID> --revision N --body brief --file <file>`) once
 they answer, and continue. A Clash stops the build the same way
 (`<lar-build>/project-rules.md`).
+
+## Remove worktrees
+
+A pass covers every finished slice of the build (`lar-work children <work ID>`
+with `finishedAt` set) and each of its implement threads
+(`lar-work threads <slice>` with purpose `implement`). For each thread, gather
+T3's facts:
+
+- **Path.** `worktreePath` from `t3_thread_read`, with `limit` 1. Use an empty
+  path when T3 can't read the thread.
+- **Activity.** `inactive` when `activeRunId` is null, `pendingRequestCount` is
+  0 and no running thread descends from it. Find those with `t3_thread_list`,
+  using `allProjects`, `includeSubagents` and the statuses `preparing`, `queued`,
+  `starting`, `running` and `waiting`, reading every page through `nextCursor`,
+  and follow each result's `parentThreadId` up to this thread. Otherwise pass the
+  reason, such as `T3 shows an active run` or `T3 is unavailable`. A page that
+  fails counts as `T3 is unavailable`.
+
+Then run the script from the build worktree:
+
+```sh
+bash <lar-build>/shared/scripts/remove-slice-worktree.sh <build work ID> <slice work ID> <thread ID> <build worktree> "<path>" "<activity>"
+```
+
+The script makes every other check and does the removal. Write each line it
+prints in this thread. A kept worktree leaves the build running and its status
+unchanged, and each later pass retries it. Done when every implement thread of
+every finished slice has had its run.
 
 ## Review
 

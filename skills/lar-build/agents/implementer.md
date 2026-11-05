@@ -18,7 +18,7 @@ per `../shared/cross-repo-citations.md`.
 
 Follow Checks in `<lar-build>/project-rules.md` while implementing, and
 `project-rules.md#validation-record` for broad runs and failures. Then rebase
-onto the build branch tip.
+onto the build branch tip, and stop every process you started before you report.
 
 Report your absolute worktree path and slice branch, or that the slice is
 blocked (too big, checks won't pass) and why, with your worktree path.

@@ -5,7 +5,7 @@
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { clock, type InstallSnapshot } from '@lar-factory/shared';
-import { $, $$, NOW, fullScreen, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
+import { $, $$, NOW, fresh, fullScreen, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
 
 // jsdom has no ResizeObserver, which the copied Modal's scroll fade observes with.
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
@@ -15,7 +15,7 @@ const field = () => titleBar().querySelector<HTMLButtonElement>('[data-search-fi
 const refreshed = () => titleBar().querySelector<HTMLElement>('.refreshed')!;
 const dot = () => refreshed().querySelector<HTMLElement>('[data-dot]')!;
 const ping = () => refreshed().querySelector('[data-ping]');
-const fresh = (ago = 0) => ({ ...sample, error: null, fetchedAt: new Date(NOW - ago).toISOString() });
+const readAgo = (ago: number) => ({ ...sample, error: null, fetchedAt: new Date(NOW - ago).toISOString() });
 const isAmber = (el: Element) => el.classList.contains('bg-amber-500');
 const isGreen = (el: Element) => el.classList.contains('bg-success');
 const tooltip = async () => {
@@ -197,11 +197,11 @@ test('a fresh board has a green dot; stale turns the dot amber and says Stale, w
   await mountPage(fresh());
   expect(isGreen(dot())).toBe(true);
   expect(text(refreshed())).toBe('0s ago');
-  await push({ ...fresh(4 * 86_400_000), error: null });
+  await push(readAgo(4 * 86_400_000));
   expect(text(refreshed())).toBe('Stale · 4d ago');
   expect(isAmber(dot())).toBe(true);
   expect(refreshed().className.split(' ')).toContain('text-base-700');
-  await push(fresh(20 * 60_000 + 1));
+  await push(readAgo(20 * 60_000 + 1));
   expect(text(refreshed()), 'no error, but not read for 3 intervals').toBe('Stale · 20m ago');
 });
 
@@ -228,13 +228,13 @@ test('while some repositories still read, it shows Loading Projects behind a gre
   expect([isAmber(dot()), isGreen(dot())]).toEqual([false, false]);
   await push(reading(['maddec01/lar-apple']));
   expect(text(refreshed())).toBe('Loading Projects');
-  await push({ ...fresh(), firstRead: { step: 'finishing', running: [], settled: true } });
+  await push(fresh());
   expect(text(refreshed())).toBe('0s ago');
   expect(isGreen(dot())).toBe(true);
 });
 
 test('the tooltip gives the exact time and when reads happen', async () => {
-  await mountPage(fresh(11_000));
+  await mountPage(readAgo(11_000));
   const read = clock(new Date(NOW - 11_000).toISOString(), undefined);
   expect(read).toMatch(/^\d\d:\d\d$/);
   expect(await tooltip()).toEqual([`Updated 12s ago · ${read}`, 'Checks GitHub for changes every 5s, reads everything every 45s']);
@@ -267,29 +267,29 @@ test('before the first read the tooltip says so', async () => {
 });
 
 test('the dot pings once for each newer read, never on page load, in stale or when older data arrives', async () => {
-  await mountPage(fresh(10_000));
+  await mountPage(readAgo(10_000));
   expect(ping(), 'not on page load').toBeNull();
   await settle(() => vi.advanceTimersByTime(5_000));
   expect(ping()).toBeNull();
-  await push(fresh(0));
+  await push(fresh());
   const first = ping();
   expect(first).not.toBeNull();
   expect(first!.className.split(' ')).toEqual(expect.arrayContaining(['motion-safe:animate-[refreshed-ping_1.2s_ease-out_forwards]']));
-  await push(fresh(0));
+  await push(fresh());
   expect(ping(), 'the same read again does not replay it').toBe(first);
   await settle(() => vi.advanceTimersByTime(2_000));
-  await push(fresh(1_000));
+  await push(readAgo(1_000));
   expect(ping(), 'an older read does not ping').toBe(first);
   await settle(() => vi.advanceTimersByTime(3_000));
-  await push({ ...fresh(-5_000), items: [] });
+  await push({ ...readAgo(-5_000), items: [] });
   expect(ping(), 'a newer read replays it').not.toBe(first);
 });
 
 test('the first read of a page that had none pings, a failed read does not', async () => {
   await mountPage({ ...sample, fetchedAt: null, error: null });
-  await push(fresh(0));
+  await push(fresh());
   expect(ping(), 'a first read is newer than none').not.toBeNull();
-  await push({ ...fresh(0), error: 'boom' });
+  await push({ ...fresh(), error: 'boom' });
   expect(ping()).toBeNull();
 });
 

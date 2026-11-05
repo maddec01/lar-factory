@@ -4,8 +4,8 @@
 import { expect, test, vi } from 'vite-plus/test';
 import { createElement, Profiler, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
-import { $, NOW, mountPage, sample, settle, text } from '../../test/support.ts';
+import type { Item, ItemThread } from '@lar-factory/shared';
+import { $, NOW, fresh, mountPage, sample, settle, text } from '../../test/support.ts';
 
 let glyphRenders = 0;
 
@@ -18,7 +18,7 @@ test('a second moves the age and renders nothing around the line', async () => {
     const real = await original<typeof import('../items/status-glyph.tsx')>();
     return { ...real, StatusGlyph: (props: Parameters<typeof real.StatusGlyph>[0]): ReactNode => { glyphRenders += 1; return real.StatusGlyph(props); } };
   });
-  await mountPage({ ...sample, items: [item], error: null, fetchedAt: at, firstRead: { ...sample.firstRead, settled: true } } as BoardData);
+  await mountPage({ ...fresh(), items: [item] });
   expect(text($('[data-age]'))).toBe('· 0s');
   glyphRenders = 0;
   await settle(() => vi.advanceTimersByTime(3_000));
@@ -28,7 +28,7 @@ test('a second moves the age and renders nothing around the line', async () => {
 
 test('a line keeps its tooltip quiet as the connection drops and its list goes', async () => {
   const warned = [vi.spyOn(console, 'error'), vi.spyOn(console, 'warn')];
-  await mountPage({ ...sample, items: [item], error: null, fetchedAt: at, firstRead: { ...sample.firstRead, settled: true } } as BoardData);
+  await mountPage({ ...fresh(), items: [item] });
   const { useBoardStore } = await import('../board/board-store.ts');
   expect($('[data-activity]')!.getAttribute('tabindex')).toBe('0');
   await settle(() => useBoardStore.setState({ clientError: 'Connection lost' }));
@@ -40,7 +40,7 @@ test('a line keeps its tooltip quiet as the connection drops and its list goes',
 });
 
 test('a minute age skips unchanged second renders but still becomes unavailable on its original deadline', async (t) => {
-  await mountPage({ ...sample, items: [item], error: null, fetchedAt: at, firstRead: { ...sample.firstRead, settled: true } } as BoardData);
+  await mountPage({ ...fresh(), items: [item] });
   const { ActivityLine } = await import('./activity-line.tsx');
   const { TooltipProvider } = await import('@lar-factory/ui/design-system/Tooltip');
   const older = { ...item, threads: [{ ...thread, activity: { ...thread.activity!, actionAt: new Date(NOW - 65_000).toISOString() } }] } as Item;

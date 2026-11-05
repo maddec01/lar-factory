@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, expect, test, vi } from 'vite-plus/test';
 import { STATUSES, type BoardData, type Item } from '@lar-factory/shared';
-import { NOW, sample, settle } from '../../test/support.ts';
+import { fresh, sample, settle } from '../../test/support.ts';
 
 // The glyphs read the board store, which starts from the page that support.ts serves.
 let StatusGlyph: typeof import('./status-glyph.tsx').StatusGlyph;
@@ -47,8 +47,7 @@ async function runningGlyph() {
   const { ItemStatusGlyph } = await import('./status-glyph.tsx');
   const item = { ...sample.items[0], status: 'In progress', paused: false, archived: false, needsYou: null,
     threads: [{ purpose: 'build', state: 'working', currentRunning: true }] } as unknown as Item;
-  const data = { ...sample, items: [item], error: null, refreshSeconds: 60, fetchedAt: new Date(NOW).toISOString(),
-    firstRead: { ...sample.firstRead, settled: true } } as BoardData;
+  const data = { ...fresh(), items: [item], refreshSeconds: 60 };
   await settle(() => useBoardStore.getState().receive(data, 'action'));
   const onRender = vi.fn();
   document.body.replaceChildren();

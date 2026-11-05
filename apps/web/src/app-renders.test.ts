@@ -5,7 +5,7 @@
 import { expect, test, vi } from 'vite-plus/test';
 import type { ReactNode } from 'react';
 import type { BoardData, Item, Status } from '@lar-factory/shared';
-import { $, $$, NOW, mountPage, moved, push, sample, settle, text } from '../test/support.ts';
+import { $, $$, NOW, fresh, mountPage, moved, push, sample, settle, text } from '../test/support.ts';
 
 let glyphRenders = 0;
 
@@ -19,7 +19,7 @@ const queued = { ...sample.items[0], id: 'I_queued', number: null, status: 'Queu
 const awaiting = { ...sample.items[0], id: 'I_verify', number: null, status: 'Verify', needsYou: null, threads: [], updatedAt: FRESH } as unknown as Item;
 
 /** The live board read at NOW, which goes stale after `3 * refreshSeconds`. */
-const boardOf = (items: Item[], refreshSeconds: number) => ({ ...sample, items, refreshSeconds, error: null, fetchedAt: FRESH, firstRead: { ...sample.firstRead, settled: true } }) as BoardData;
+const boardOf = (items: Item[], refreshSeconds: number) => ({ ...fresh(), items, refreshSeconds });
 
 /** Mounts the real page with `data`, and counts the glyph renders after its first paint. The module is mocked here, not
  *  hoisted, as a hoisted mock would keep the glyphs on the store of the page that support.ts loads first. */

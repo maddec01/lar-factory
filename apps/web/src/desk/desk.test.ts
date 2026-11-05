@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from 'vite-plus/test';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { $, $$, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, fresh, mountPage, sample, settle, text } from '../../test/support.ts';
 
 const cards = () => $$('.desk-card');
 const card = (id: string) => $(`.desk-card[data-item="${id}"]`)!;
@@ -301,7 +301,7 @@ test.each([['prototype', 'Prototype'], [null, 'No method']] as const)('a decisio
 });
 
 test('desk status icons stay still and Needs you keeps its amber colour even with running threads', async () => {
-  const data = { ...sample, error: null, fetchedAt: '2026-10-21T10:00:00Z', items: sample.items.map(item => ({ ...item, paused: 'Settings changed',
+  const data = { ...fresh(), items: sample.items.map(item => ({ ...item, paused: 'Settings changed',
     threads: [{ id: 'b', title: 'Build', purpose: 'build', state: 'running' as const, currentRunning: true as const, updated: item.updatedAt }],
   })) };
   await mountPage(data);

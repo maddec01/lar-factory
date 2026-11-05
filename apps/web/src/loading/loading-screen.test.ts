@@ -3,7 +3,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import type { BoardData, FirstRead } from '@lar-factory/shared';
-import { $, $$, NOW, mountPage, push, sample, settle, stubApp, text } from '../../test/support.ts';
+import { $, $$, fresh, mountPage, push, sample, settle, stubApp, text } from '../../test/support.ts';
 
 const DRAW_MS = 1750;
 const EXIT_MS = 600;
@@ -11,7 +11,6 @@ const ROLL_MS = 380;
 
 const firstRead = (step: FirstRead['step'], running: string[] = [], settled = false): FirstRead => ({ step, running, settled });
 const unsettled = (read: FirstRead = firstRead('repositories')): BoardData => ({ ...sample, fetchedAt: null, firstRead: read });
-const settled = (): BoardData => ({ ...sample, error: null, fetchedAt: new Date(NOW).toISOString(), firstRead: firstRead('finishing', [], true) });
 
 const screen = () => $('.loading-screen');
 const line = () => text($('.loading-line-slot > span:not(.loading-roll-out)'));
@@ -49,7 +48,7 @@ test('a new step rolls the old line out while the new one rolls in, and only the
 });
 
 test('a read that settles at once still keeps the screen until the draw has finished, then fades over 600 ms', async () => {
-  await mountPage(settled());
+  await mountPage(fresh());
   expect(screen()).not.toBeNull();
   await advance(DRAW_MS - 1);
   expect(leaving()).toBe(false);
@@ -65,14 +64,14 @@ test('the screen waits for the draw even when the read settled long before, and 
   await mountPage(unsettled());
   await advance(DRAW_MS + 2_000);
   expect(leaving(), 'drawn but unsettled').toBe(false);
-  await push(settled());
+  await push(fresh());
   expect(leaving()).toBe(true);
 });
 
 test.each([
-  ['the repositories are read, zero of them included', { ...settled(), repos: [], items: [], onboarding: [] }],
-  ['the read fails', { ...settled(), fetchedAt: null, error: 'gh api failed' }],
-  ['gh blocks the read', { ...settled(), fetchedAt: null, error: null, tools: { ...sample.tools!, gh: { result: 'missing' as const, fix: 'Install gh' } } }],
+  ['the repositories are read, zero of them included', { ...fresh(), repos: [], items: [], onboarding: [] }],
+  ['the read fails', { ...fresh(), fetchedAt: null, error: 'gh api failed' }],
+  ['gh blocks the read', { ...fresh(), fetchedAt: null, error: null, tools: { ...sample.tools!, gh: { result: 'missing' as const, fix: 'Install gh' } } }],
 ])('the screen ends the same way when %s', async (_name, data) => {
   await mountPage({ ...unsettled(), ...data, firstRead: firstRead('repositories') });
   await push({ ...data, firstRead: firstRead('finishing', [], true) });
@@ -97,7 +96,7 @@ test('an empty successful source reveals the board while another source waits, a
 });
 
 test('a page opened with ?loading=drawn starts with the mark drawn and leaves at once when the read has settled', async () => {
-  await mountPage(settled(), '', '?loading=drawn');
+  await mountPage(fresh(), '', '?loading=drawn');
   expect(screen()!.classList.contains('is-drawn')).toBe(true);
   expect(leaving()).toBe(true);
   await advance(EXIT_MS);
@@ -120,7 +119,7 @@ test('without the flag a browser visit draws the mark', async () => {
 });
 
 test('a restarted server keeps the last complete board visible until fresh data settles', async () => {
-  await mountPage(settled());
+  await mountPage(fresh());
   await advance(DRAW_MS);
   await advance(EXIT_MS);
   const { useBoardStore } = await import('../board/board-store.ts');
@@ -146,14 +145,14 @@ test('a restarted server keeps the last complete board visible until fresh data 
   expect(current.items.find(item => item.id === added.id)?.title).toBe(added.title);
   expect(screen()).toBeNull();
 
-  const fresh = { ...settled(), items: sample.items.slice(0, 1) };
-  await push(fresh);
+  const oneItem = { ...fresh(), items: sample.items.slice(0, 1) };
+  await push(oneItem);
   expect(screen()).toBeNull();
-  expect(useBoardStore.getState().data.items).toEqual(fresh.items);
+  expect(useBoardStore.getState().data.items).toEqual(oneItem.items);
 });
 
 test('restart snapshots honor completed-source removals while retaining unread source rows', async () => {
-  await mountPage(settled());
+  await mountPage(fresh());
   const { useBoardStore } = await import('../board/board-store.ts');
   const server = sample.items.filter(item => item.repo === 'maddec01/lar-server');
   const apple = sample.items.filter(item => item.repo === 'maddec01/lar-apple');
@@ -165,7 +164,7 @@ test('restart snapshots honor completed-source removals while retaining unread s
 });
 
 test('Queue and Abandon responses stay authoritative during a restarted read', async () => {
-  await mountPage(settled());
+  await mountPage(fresh());
   await advance(DRAW_MS);
   await advance(EXIT_MS);
   const { useBoardStore } = await import('../board/board-store.ts');
@@ -192,7 +191,7 @@ test('with reduced motion the finished mark shows at once, the line swaps withou
   expect($$('.loading-line-slot > span')).toHaveLength(1);
   expect(text($('.loading-line'))).toBe('Loading Projects');
 
-  await push(settled());
+  await push(fresh());
   expect(leaving(), 'no draw to wait for').toBe(true);
   await advance(EXIT_MS);
   expect(screen()).toBeNull();
@@ -221,7 +220,7 @@ test('the board behind is inert while the screen is up, through the fade, and se
   expect($('#app .title-bar'), 'the board is').not.toBeNull();
 
   await advance(DRAW_MS);
-  await push(settled());
+  await push(fresh());
   expect(leaving()).toBe(true);
   expect(covered(), 'the fade').toBe(true);
   await push(unsettled());
@@ -246,7 +245,7 @@ test('installation readiness waits until the loading screen has finished leaving
     getInstallState: async () => ({ installs: true, installed: false, version: '1.0.0', running: null,
       discovery: 'waiting', instances: [], targets: [], drift: [], replaced: [], conflicts: [], blocked: [] }),
   });
-  await mountPage(settled(), '', '?loading=drawn');
+  await mountPage(fresh(), '', '?loading=drawn');
   expect(bridge.boardReady).not.toHaveBeenCalled();
   await advance(EXIT_MS - 1);
   expect(bridge.boardReady).not.toHaveBeenCalled();
@@ -260,23 +259,23 @@ test('a development app without installation enabled never sends installation re
     getInstallState: async () => ({ installs: false, installed: false, version: '1.0.0', running: null,
       discovery: 'waiting', instances: [], targets: [], drift: [], replaced: [], conflicts: [], blocked: [] }),
   });
-  await mountPage(settled(), '', '?loading=drawn');
+  await mountPage(fresh(), '', '?loading=drawn');
   await advance(EXIT_MS);
   expect(bridge.boardReady).not.toHaveBeenCalled();
 });
 
 test('restart keeps rows before readiness and through failed settlement, then accepts successful empty sources', async () => {
-  await mountPage(settled());
+  await mountPage(fresh());
   const { useBoardStore } = await import('../board/board-store.ts');
   const before = useBoardStore.getState().data.items;
   await push({ ...unsettled({ ...firstRead('items'), waiting: [] }), items: [], repos: [] });
   expect(useBoardStore.getState().data.items).toEqual(before);
   expect(useBoardStore.getState().data.repos).toEqual(sample.repos);
   const failed = sample.repos.map(repo => ({ repo: repo.repo, problem: 'Source unavailable' }));
-  await push({ ...settled(), items: [], itemSourceProblems: failed });
+  await push({ ...fresh(), items: [], itemSourceProblems: failed });
   expect(useBoardStore.getState().data.items).toEqual(before);
-  await push({ ...settled(), items: [], itemSourceProblems: failed.slice(1) });
+  await push({ ...fresh(), items: [], itemSourceProblems: failed.slice(1) });
   expect(useBoardStore.getState().data.items).toEqual(before.filter(item => item.repo !== failed[0]!.repo));
-  await push({ ...settled(), items: [] });
+  await push({ ...fresh(), items: [] });
   expect(useBoardStore.getState().data.items).toEqual([]);
 });

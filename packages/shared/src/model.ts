@@ -632,8 +632,8 @@ export interface FirstRead {
   running: string[];
   /**
    * The onboarded repositories whose items haven't landed yet, by owner/name, as their source still reads or waits for
-   * its tool, once another repository's have; absent before any have and when none waits. The board shows the landed
-   * repositories' items meanwhile.
+   * its tool; absent until the board knows them, and empty once none waits. The board shows the landed repositories'
+   * items meanwhile.
    */
   waiting?: string[];
   /** Whether the read finished, failed, or gh blocked it. A settled first read stays settled until the server restarts. */
@@ -993,7 +993,7 @@ export const stillReading = (data: Pick<BoardData, 'firstRead'>, repo: string): 
 
 /**
  * Whether the first read may still add items to a scope: the whole board until it settles, or one repository until its
- * items land, which, before any repository's have, is every repository.
+ * items land, which, before the board knows which repositories wait, is every repository.
  */
 export const readingScope = (data: Pick<BoardData, 'firstRead'>, repo?: string): boolean =>
   !data.firstRead.settled && (!repo || !data.firstRead.waiting || stillReading(data, repo));

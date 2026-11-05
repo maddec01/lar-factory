@@ -135,6 +135,12 @@ test('before any repository has landed, no group in the left pane shows a count'
   expect(counts()).toEqual([['All repositories', ''], ['lar-server', ''], ['lar-apple', '']]);
 });
 
+test('once no repository is left waiting, each shows its count and All repositories stays blank until the first read settles', async () => {
+  await mountPage({ ...sample, firstRead: { step: 'finishing' as const, running: [], waiting: [], settled: false } });
+  await open();
+  expect(counts()).toEqual([['All repositories', ''], ['lar-server', '3'], ['lar-apple', '1']]);
+});
+
 test('the search filters the right pane and the counts on the left follow it', async () => {
   await mountPage();
   await open();

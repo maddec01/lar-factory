@@ -214,7 +214,10 @@ const items = onboardedSources(async () => {
     repos: read.configs.map((config, index) => ({ ...repoView(config), setup: read.setups[index]! })),
     repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list),
   });
-  moveFirstRead({ step: 'items', ...(read.configs.length === 0 ? { ready: true } : {}) });
+  // Each repository waits from here until its read lands. A later load leaves what has landed by then.
+  const { settled, waiting } = board.snapshot().firstRead;
+  if (!settled && waiting === undefined) unread = read.configs.map((config) => config.repo);
+  moveFirstRead({ step: 'items', waiting: waiting ?? unread, ...(read.configs.length === 0 ? { ready: true } : {}) });
   return read;
 });
 const choices = async () => projectChoices(onboarded(), await projectIcons?.byProject() ?? new Map());
@@ -782,11 +785,6 @@ async function refresh(): Promise<void> {
     await checkQuota();
     const pace = loopTrace.span('read pace', readPace);
     await items.probe(pace);
-    if (!board.snapshot().firstRead.settled && board.snapshot().firstRead.waiting === undefined) {
-      unread = items.repos().map(repo => repo.repo);
-      moveFirstRead({ waiting: unread });
-      showRecords();
-    }
     if (!items.due(pace)) return;
     loopTrace.span('read start', () => {
       loopTrace.span('model choices', offerModelChoices);
@@ -804,7 +802,7 @@ async function refresh(): Promise<void> {
       board.update({ itemSourceProblems: partial.problems ?? [] });
       const successful = items.repos().some(repo =>
         !partial.waiting?.includes(repo.repo) && !partial.problems?.some(problem => problem.repo === repo.repo));
-      moveFirstRead({ waiting: partial.waiting, ...(successful || board.snapshot().items.length > 0 ? { ready: true } : {}) });
+      moveFirstRead({ waiting: partial.waiting ?? [], ...(successful || board.snapshot().items.length > 0 ? { ready: true } : {}) });
     });
     const snapshot = await items.read({ ...firstReadProgress, landed }, pace);
     const repos = items.repos();
@@ -822,7 +820,7 @@ async function refresh(): Promise<void> {
       (read) => loopTrace.span('records apply', () => board.applyRead(read, readRevision, (shown) => withT3Reads(shown), items.readAfresh)));
     recordsShown();
     askForStats();
-    moveFirstRead({ step: 'finishing', waiting: snapshot.waiting, ready: true });
+    moveFirstRead({ step: 'finishing', waiting: snapshot.waiting ?? [], ready: true });
     board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? recordsProblem, itemSourceProblems: snapshot.problems ?? [],
       t3Availability: await t3Availability(), t3EnvironmentId: readEnvironmentId(environmentIdFile), ...await repositoryProjectReads(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);

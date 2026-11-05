@@ -101,13 +101,32 @@ Build step 1 and plan from the brief.
    (errors or returns no outcome), record the slice blocked again with its
    reason, start no planner for that slice again, and follow the stop rule
    below.
-4. **Merge.** As each implementer reports, run
-   `git merge --ff-only <reported slice branch>` here; if it can't
-   fast-forward, send a subagent to the implementer's reported worktree path to
-   rebase onto the build branch tip, then merge again. After each merge,
-   record the slice finished (**Slices** in
-   `<lar-build>/shared/issue-tracker/slices.md`), and run **Implement** again. A
-   slice reported blocked gets the blocked-slice command in **Slices**, and a
+4. **Merge.** As each implementer reports, merge its reported slice branch and
+   finish its slice work ID here with this one command. It reads the revision
+   when it runs and finishes the slice only after the merge exits 0:
+
+   ```sh
+   git merge --ff-only <slice branch> && lar-work finish <slice work ID> --revision "$(lar-work read <slice work ID> | jq -r .revision)"
+   ```
+
+   A parallel slice that rebased before another slice merged will fail to
+   fast-forward. That failure is expected. When the command exits non-zero,
+   read the error:
+
+   - "Not possible to fast-forward": send a subagent to the implementer's
+     reported worktree path to rebase onto the build branch tip, then run the
+     same command again. It resolves rebase conflicts for the intent of both
+     sides and runs focused tests on the conflicted code. If it can't resolve
+     a conflict, it aborts the rebase and you follow the stop rule below.
+     A rebase conflict never starts a re-slice planner.
+   - The merge landed and the finish failed: run the same command again,
+     without a rebase.
+   - "is already finished": the slice is done, so carry on.
+   - Any other failure, such as a dirty tree or an unknown branch: follow the
+     stop rule below.
+
+   After the slice is finished, run **Implement** again. A slice reported
+   blocked gets the blocked-slice command in **Slices**, and a
    re-slice planner if none runs. A wrong brief follows the stop rule below.
    Done when every slice is finished or set aside.
 5. Read where the repository keeps domain docs (**Where domain docs live** in

@@ -13,9 +13,11 @@ const t3 = vi.hoisted(() => ({
   session: vi.fn(async () => ({ token: 'board-token', sessionId: 'board', expiresAt: '2099-01-01' })),
   invalidate: vi.fn(),
   listeners: new Set<() => void>(),
+  /** When each read of T3's projects started, which every icon read does first. */
+  reads: [] as number[],
 }));
 vi.mock('./repository-project-discovery.ts', () => ({
-  repositoryProjects: async () => t3.read,
+  repositoryProjects: async () => { t3.reads.push(Date.now()); return t3.read; },
   subscribeRepositoryProjects(listener: () => void) { t3.listeners.add(listener); return () => t3.listeners.delete(listener); },
   repositoryProjectAccess: () => t3.read.availability === 'available'
     ? { origin: new URL('http://127.0.0.1:3773'), protocol: { subscriptionSession: t3.session, invalidateSession: t3.invalidate } } : undefined,
@@ -66,6 +68,7 @@ class FakeT3Socket extends EventTarget {
 }
 
 beforeEach(() => {
+  t3.reads = [];
   assets = {};
   requests = [];
   requestHeaders = [];
@@ -250,6 +253,247 @@ describe('with no 4-minute tick', () => {
 
     expect(board.snapshot().projectIcons).toEqual(known);
     stop();
+  });
+});
+
+describe('between reads for T3 changes', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] }); });
+  afterEach(() => { t3.listeners.clear(); });
+
+  const started = (count: number) => vi.waitFor(() => expect(t3.reads).toHaveLength(count));
+  /** The board's reads running with the startup read finished. Each read gets new bytes, so it ends by publishing them. */
+  const running = async () => {
+    let answers = 0;
+    const newBytes = () => png(String(++answers))();
+    t3.read = listed(fact('factory'));
+    assets = { factory: newBytes };
+    const board = boardOf('lar-factory');
+    const update = vi.spyOn(board, 'update');
+    const icons = createProjectIcons(board);
+    const stop = icons.start();
+    /** Waits for every read started so far to end. */
+    const readsEnded = async () => {
+      await vi.waitFor(() => expect(update.mock.calls.filter(([fields]) => 'projectIcons' in fields)).toHaveLength(t3.reads.length));
+      await vi.advanceTimersByTimeAsync(0);
+    };
+    /** Runs a read for a T3 change, which opens a gap, until it ends, and returns when it started. */
+    const changeRead = async () => {
+      const before = t3.reads.length;
+      projectsChanged();
+      await started(before + 1);
+      await readsEnded();
+      return t3.reads.at(-1)!;
+    };
+    /** Makes the next read run until `release`. */
+    const holdNextRead = () => {
+      const hold = held(() => { assets = { factory: newBytes }; return newBytes(); });
+      assets = { factory: hold.answer };
+      return hold;
+    };
+    /** Starts a direct read that runs until `release`. */
+    const heldRead = async () => {
+      const hold = holdNextRead();
+      const asked = requests.length;
+      const read = icons.refresh();
+      await vi.waitFor(() => expect(requests).toHaveLength(asked + 1));
+      return { read, release: hold.release };
+    };
+    /** Stops once every read has ended, so none reaches the next test's fixtures. */
+    const finish = async () => { await readsEnded(); stop(); };
+    await readsEnded();
+    return { board, icons, stop, finish, readsEnded, changeRead, holdNextRead, heldRead };
+  };
+  const listRepositories = (board: ReturnType<typeof boardOf>) => {
+    board.update({ repos: [repo('lar-factory'), repo('lar-apple')] } as Partial<BoardData>);
+    board.push();
+  };
+  /** Advances to just before `read`'s gap ends and checks no read came, then to its end and checks one did. */
+  const readsAtGapEnd = async (read: number) => {
+    const reads = t3.reads.length;
+    await vi.advanceTimersByTimeAsync(read + 29_999 - Date.now());
+    expect(t3.reads).toHaveLength(reads);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(t3.reads).toHaveLength(reads + 1);
+    expect(t3.reads.at(-1)! - read).toBe(30_000);
+  };
+
+  it('reads the first change at once, because the startup read opens no gap', async () => {
+    const { finish } = await running();
+    const changedAt = Date.now();
+    projectsChanged();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(t3.reads).toHaveLength(2);
+    expect(t3.reads[1]).toBe(changedAt);
+    await finish();
+  });
+
+  it('answers any number of changes inside a gap with one read when it ends, which opens the next gap', async () => {
+    const { finish, changeRead, readsEnded } = await running();
+    const first = await changeRead();
+    projectsChanged();
+    projectsChanged();
+    projectsChanged();
+    await readsAtGapEnd(first);
+    await readsEnded();
+    const second = t3.reads.at(-1)!;
+
+    projectsChanged();
+    await readsAtGapEnd(second);
+    await finish();
+  });
+
+  it('holds a change during a read for T3 until the gap that read opened ends', async () => {
+    const { finish, holdNextRead, readsEnded } = await running();
+    const hold = holdNextRead();
+    projectsChanged();
+    await started(2);
+    const read = t3.reads[1]!;
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+
+    projectsChanged();
+    hold.release();
+    await readsEnded();
+    await readsAtGapEnd(read);
+    await finish();
+  });
+
+  it('reads a change right after a running read and measures the gap from when its read starts', async () => {
+    const { finish, heldRead, readsEnded } = await running();
+    const hold = await heldRead();
+    projectsChanged();
+    projectsChanged();
+    await vi.advanceTimersByTimeAsync(1_000);
+    const reads = t3.reads.length;
+    hold.release();
+    await started(reads + 1);
+    const read = t3.reads.at(-1)!;
+    await readsEnded();
+    expect(t3.reads, 'both changes share it').toHaveLength(reads + 1);
+
+    projectsChanged();
+    await readsAtGapEnd(read);
+    await finish();
+  });
+
+  it('opens a gap from a read shared with a repository list change', async () => {
+    const { board, finish, heldRead, readsEnded } = await running();
+    const hold = await heldRead();
+    listRepositories(board);
+    projectsChanged();
+    const reads = t3.reads.length;
+    hold.release();
+    await started(reads + 1);
+    const read = t3.reads.at(-1)!;
+    await readsEnded();
+    expect(t3.reads, 'the change and the list share one read').toHaveLength(reads + 1);
+
+    projectsChanged();
+    await readsAtGapEnd(read);
+    await finish();
+  });
+
+  it('ends a gap with no changes without a read or a timer of its own', async () => {
+    const { finish, changeRead } = await running();
+    await changeRead();
+    const reads = t3.reads.length;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(t3.reads).toHaveLength(reads);
+    expect(vi.getTimerCount(), 'only the 4-minute refresh is left').toBe(1);
+
+    const changedAt = Date.now();
+    projectsChanged();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(t3.reads, 'the next change reads at once').toHaveLength(reads + 1);
+    expect(t3.reads.at(-1)).toBe(changedAt);
+    await finish();
+  });
+
+  it('lets repository list changes and the picker read inside a gap, and their reads leave the gap alone', async () => {
+    const { board, icons, finish, changeRead, readsEnded } = await running();
+    const first = await changeRead();
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    const listedAt = Date.now();
+    listRepositories(board);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(t3.reads).toHaveLength(3);
+    expect(t3.reads[2]).toBe(listedAt);
+    await readsEnded();
+
+    await icons.byProject();
+    expect(t3.reads).toHaveLength(4);
+    await readsEnded();
+
+    projectsChanged();
+    await readsAtGapEnd(first);
+    await finish();
+  });
+
+  it('lets the 4-minute refresh read inside a gap, and it opens none', async () => {
+    const { finish, changeRead, readsEnded } = await running();
+    await vi.advanceTimersByTimeAsync(230_000);
+    const first = await changeRead();
+    const reads = t3.reads.length;
+    await vi.advanceTimersByTimeAsync(10_000);
+    await started(reads + 1);
+    await readsEnded();
+
+    await vi.advanceTimersByTimeAsync(first + 30_000 - Date.now());
+    expect(t3.reads, 'nothing changed in the gap').toHaveLength(reads + 1);
+    const changedAt = Date.now();
+    projectsChanged();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(t3.reads, 'the refresh left no gap of its own').toHaveLength(reads + 2);
+    expect(t3.reads.at(-1)).toBe(changedAt);
+    await finish();
+  });
+
+  it('keeps a good icon on the board through a gap and while T3 is unavailable', async () => {
+    const { board, stop } = await running();
+    const known = board.snapshot().projectIcons;
+    t3.read = { ...t3.read, availability: 'unavailable' };
+    projectsChanged();
+    await started(2);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(board.snapshot().projectIcons).toEqual(known);
+
+    t3.read = { ...t3.read, availability: 'available' };
+    projectsChanged();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(t3.reads).toHaveLength(2);
+    expect(board.snapshot().projectIcons).toEqual(known);
+    stop();
+  });
+
+  it('starts no read after stop for a change waiting for a gap, and direct calls still read', async () => {
+    const { icons, stop, changeRead } = await running();
+    await changeRead();
+    projectsChanged();
+    const atStop = t3.reads.length;
+    stop();
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(t3.reads).toHaveLength(atStop);
+
+    await icons.refresh();
+    expect(t3.reads, 'a direct call is exempt').toHaveLength(atStop + 1);
+    await icons.byProject();
+    expect(t3.reads).toHaveLength(atStop + 2);
+  });
+
+  it('starts no read after stop for a T3 or repository list change waiting for a running read', async () => {
+    const { board, stop, heldRead } = await running();
+    const hold = await heldRead();
+    projectsChanged();
+    listRepositories(board);
+    const reads = t3.reads.length;
+    stop();
+    hold.release();
+    await hold.read;
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(t3.reads).toHaveLength(reads);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

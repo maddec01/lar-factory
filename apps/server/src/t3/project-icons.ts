@@ -11,6 +11,8 @@ import { repositoryProjectAccess, repositoryProjects, subscribeRepositoryProject
 import { subscribeProjects } from './project-subscription.ts';
 
 const REFRESH_MS = 240_000;
+/** Equal to the longest reconnect retry, so a T3 server that keeps dropping drives one read per gap. */
+const CHANGE_GAP_MS = 30_000;
 const FETCH_MS = 5_000;
 const MAX_BYTES = 1024 * 1024;
 const MAX_FETCHES = 4;
@@ -90,7 +92,7 @@ const repositories = (data: BoardData) => [...data.repos, ...data.onboarding ?? 
 export interface ProjectIcons {
   /** Reads T3 once and updates the board when an icon changed. Calls during a refresh share it. */
   refresh(): Promise<void>;
-  /** Refreshes now, on a timer of its own and when the repositories or T3's projects change, until the returned function is called. */
+  /** Refreshes now, on a timer of its own and when the repositories or T3's projects change, until the returned function is called. Reads for T3's changes start at least 30 seconds apart. */
   start(): () => void;
   /** The icon of every project T3 lists, by project ID, once a read started by this call ends or after 2 seconds. */
   byProject(): Promise<ReadonlyMap<string, ProjectIcon>>;
@@ -148,22 +150,40 @@ export function createProjectIcons(board: Pick<BoardState, 'snapshot' | 'update'
     return pending;
   };
   // A read already running may have started before what this one is for changed. Calls during a read share the one after it.
-  const refreshAfterRunning = () => (pending ?? Promise.resolve()).then(refresh);
+  const afterRunning = (next: () => void | Promise<void>) => (pending ?? Promise.resolve()).then(next);
 
   return {
     refresh,
     start() {
       const listed = () => repositories(board.snapshot()).join('\n');
       let listedRepositories = listed();
+      let stopped = false;
+      let gap: NodeJS.Timeout | undefined;
+      // T3 changes inside a gap, or while their read waits for a running one, share the next read. Only that read opens a gap.
+      let changeWaiting = false;
+      const readChanges = () => void afterRunning(() => {
+        if (stopped) return;
+        changeWaiting = false;
+        gap = setTimeout(() => {
+          gap = undefined;
+          if (changeWaiting) readChanges();
+        }, CHANGE_GAP_MS);
+        void refresh();
+      });
       void refresh();
       const timer = setInterval(() => void refresh(), REFRESH_MS);
       const unsubscribe = board.subscribe(() => {
         if (listed() === listedRepositories) return;
         listedRepositories = listed();
-        void refreshAfterRunning();
+        void afterRunning(() => stopped ? undefined : refresh());
       });
-      const unsubscribeProjects = subscribeRepositoryProjects(() => void refreshAfterRunning());
+      const unsubscribeProjects = subscribeRepositoryProjects(() => {
+        if (!changeWaiting && !gap) readChanges();
+        changeWaiting = true;
+      });
       return () => {
+        stopped = true;
+        clearTimeout(gap);
         clearInterval(timer);
         unsubscribe();
         unsubscribeProjects();
@@ -171,7 +191,7 @@ export function createProjectIcons(board: Pick<BoardState, 'snapshot' | 'update'
     },
     async byProject() {
       let timer: NodeJS.Timeout | undefined;
-      await Promise.race([refreshAfterRunning(), new Promise(resolve => { timer = setTimeout(resolve, LIST_WAIT_MS); })]);
+      await Promise.race([afterRunning(refresh), new Promise(resolve => { timer = setTimeout(resolve, LIST_WAIT_MS); })]);
       clearTimeout(timer);
       return known;
     },

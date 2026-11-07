@@ -28,6 +28,10 @@
 @source "./features/items/AbandonDialog.tsx";
 @source "./features/items/CleanupChoices.tsx";
 @source "./features/items/ItemParts.tsx";
+@source "./features/items/ActivityFeedback.tsx";
+@source "./features/items/AgentWork.tsx";
+@source "./features/items/PrList.tsx";
+@source "./features/items/SliceParts.tsx";
 @source "./features/items/NeedsYouDialog.tsx";
 @source "./features/items/OpenThread.tsx";
 @source "./features/items/StartBuild.tsx";

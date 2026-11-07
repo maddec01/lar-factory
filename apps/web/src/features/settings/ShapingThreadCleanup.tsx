@@ -5,7 +5,7 @@ import type { ShapingThreadCleanup, ShapingThreadCleanupState } from '@lar-facto
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { postAction, receive } from '@/features/items/CardActions';
+import { postAction, receive } from '@/services/board/board.service';
 import { Choice } from '@/shared/ui/setting-rows/SettingControls';
 
 const CHOICES: { value: ShapingThreadCleanup; label: string }[] = [

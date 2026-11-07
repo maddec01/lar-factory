@@ -6,7 +6,7 @@ import { Button, Input } from '@lar-works/design-system';
 import { useId, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
-import { postAction, receive } from '@/features/items/CardActions';
+import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { Choice } from '@/shared/ui/setting-rows/SettingControls';
 

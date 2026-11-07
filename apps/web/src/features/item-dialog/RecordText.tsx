@@ -7,7 +7,7 @@ import { RichText } from '@lar-factory/ui/rich-text';
 import { Button } from '@lar-works/design-system';
 import { useState, type ReactNode } from 'react';
 
-import { postAction } from '@/features/items/CardActions';
+import { postAction } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { MarkdownDiagrams } from '@/shared/ui/diagrams/MarkdownDiagrams';
 

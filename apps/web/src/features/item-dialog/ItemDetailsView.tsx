@@ -41,7 +41,6 @@ import type { DescriptionEdit } from './useDescriptionEdit';
 import type { ItemDetailsRead } from './useItemDetails';
 import { useLabelEdit } from './useLabelEdit';
 import { useOlderComments } from './useOlderComments';
-import { postAction } from '@/features/items/CardActions';
 import {
     AzureFields,
     AgentWork,
@@ -51,6 +50,7 @@ import {
     useShownLabels,
 } from '@/features/items/ItemParts';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { DescriptionEditor } from '@/shared/ui/description-editor/DescriptionEditor';
 import { MarkdownDiagrams } from '@/shared/ui/diagrams/MarkdownDiagrams';

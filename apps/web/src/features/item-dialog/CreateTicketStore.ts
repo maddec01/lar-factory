@@ -3,8 +3,8 @@ import { writeHeaders, type BoardData, type Item, type TicketOptions } from '@la
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { receive } from '@/features/items/CardActions';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { receive } from '@/services/board/board.service';
 
 export interface TicketPreview {
     title: string;

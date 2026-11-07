@@ -6,8 +6,8 @@ import { flushSync } from 'react-dom';
 import { create } from 'zustand';
 
 import { refocus } from './Toasts';
-import { postAction, receive } from '@/features/items/CardActions';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 
 /** A Recheck's answer: the error when it failed, else null, and the checks it left, serialised. */
 interface RecheckAnswer {

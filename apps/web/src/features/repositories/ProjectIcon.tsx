@@ -12,6 +12,7 @@ import {
     type ProjectIconColor,
     type RepoConfig,
 } from '@lar-factory/shared';
+// oxlint-disable-next-line lar/boundaries -- the design system doesn't offer DynamicIcon yet; step 2b moves this icon there
 import type { DynamicIcon, IconName } from 'lucide-react/dynamic';
 import { lazy, memo, Suspense, useState, type ComponentProps, type ComponentType } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -61,6 +62,7 @@ const OVERLAY = 'absolute inset-0 size-full bg-base-100';
 /** lucide's name map and its icons are lazy chunks, loaded when first shown. DynamicIcon draws nothing for a
  *  name lucide lacks or an icon that won't load, and a name map that won't load draws nothing here. */
 const LucideIcon = lazy<ComponentType<ComponentProps<typeof DynamicIcon>>>(() =>
+    // oxlint-disable-next-line lar/boundaries -- as the type import above
     import('lucide-react/dynamic').then(
         (lucide) => ({ default: lucide.DynamicIcon }),
         () => ({ default: () => null }),

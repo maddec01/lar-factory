@@ -154,12 +154,12 @@ test('each toolbar button applies its format and shows pressed while the selecti
         ['Numbered list', '1. word'],
         ['Link', '[word](https://example.com)'],
     ] as const) {
-        expect(button(label).getAttribute('aria-pressed'), label).toBe('false');
+        expect(button(label).getAttribute('aria-pressed'), `${label} button`).toBe('false');
         await toggle(label);
 
         if (label === 'Link') await enterUrl('https://example.com');
 
-        expect(button(label).getAttribute('aria-pressed'), label).toBe('true');
+        expect(button(label).getAttribute('aria-pressed'), `${label} button`).toBe('true');
         expect(markdown()).toBe(expected);
         await toggle(label);
         expect(button(label).getAttribute('aria-pressed'), `${label} again`).toBe('false');

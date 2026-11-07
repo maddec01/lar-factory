@@ -86,6 +86,7 @@ class FakeT3Socket extends EventTarget {
 
         if (frame._tag !== 'Request') return;
 
+        // oxlint-disable-next-line vitest/no-standalone-expect -- the fake socket runs inside the test that drives it
         expect(frame.tag).toBe('assets.createUrl');
         requests.push(frame.payload.resource);
 
@@ -138,6 +139,7 @@ beforeEach(() => {
             if (input.pathname === '/api/auth/websocket-ticket/rpc') return Response.json({ ticket: 'fixture' });
 
             requestHeaders.push(new Headers(init?.headers));
+            // oxlint-disable-next-line vitest/no-standalone-expect -- the fetch stub runs inside the test that drives it
             expect(init?.redirect).toBe('error');
 
             return Promise.race([
@@ -480,6 +482,7 @@ describe('between reads for T3 changes', () => {
         await finish();
     });
 
+    // oxlint-disable-next-line vitest/expect-expect -- readsAtGapEnd asserts the reads
     it('answers any number of changes inside a gap with one read when it ends, which opens the next gap', async () => {
         const { finish, changeRead, readsEnded } = await running();
         const first = await changeRead();
@@ -836,11 +839,11 @@ it('keeps the last good bytes through an inconclusive fetch, and drops them when
     for (const [name, answer] of gone) {
         assets = { factory: answer };
         await icons.refresh();
-        expect(board.snapshot().projectIcons, name).toEqual({});
-        expect(await icons.image('id-factory'), name).toBeUndefined();
+        expect(board.snapshot().projectIcons, `${name} answer`).toEqual({});
+        expect(await icons.image('id-factory'), `${name} answer`).toBeUndefined();
         assets = { factory: png('good') };
         await icons.refresh();
-        expect(board.snapshot().projectIcons, name).toEqual(known);
+        expect(board.snapshot().projectIcons, `${name} answer`).toEqual(known);
     }
     t3.read = listed();
     expect(await icons.image('id-factory'), 'an unlisted project answers at once').toBeUndefined();

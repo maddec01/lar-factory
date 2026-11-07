@@ -55,7 +55,7 @@ describe('heavy command limit setting', () => {
 
         writeHeavyCommandLimit(2, dir);
         for (const limit of [0, -1, 1.5, '2', 'auto', null, Infinity]) {
-            expect(() => writeHeavyCommandLimit(limit as HeavyCommandLimit, dir), String(limit)).toThrow(
+            expect(() => writeHeavyCommandLimit(limit as HeavyCommandLimit, dir), `limit ${String(limit)}`).toThrow(
                 WorkRecordError,
             );
         }

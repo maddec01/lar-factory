@@ -1822,9 +1822,9 @@ test('status icons require current execution and suppress unavailable, cached, h
 
     for (const [label, next] of cases) {
         await settle(() => useBoardStore.getState().receive(next));
-        expect(motion(), label).toHaveLength(0);
-        expect($('[data-stage="build"] header .status-spin'), label).toBeNull();
-        expect($('.counters button[aria-label^="building:"] .status-spin'), label).toBeNull();
+        expect(motion(), `after ${label}`).toHaveLength(0);
+        expect($('[data-stage="build"] header .status-spin'), `after ${label}`).toBeNull();
+        expect($('.counters button[aria-label^="building:"] .status-spin'), `after ${label}`).toBeNull();
     }
     await settle(() => useBoardStore.getState().receive(data));
     await settle(() => useBoardStore.getState().fail('Disconnected'));
@@ -1863,7 +1863,7 @@ test('status icons require current execution and suppress unavailable, cached, h
                 ),
             ),
         );
-        expect(motion(), JSON.stringify(evidence)).toHaveLength(0);
+        expect(motion(), `evidence ${JSON.stringify(evidence)}`).toHaveLength(0);
     }
 });
 

@@ -56,6 +56,7 @@ function useNoticeCleanup(itemId: string | null) {
         setFailure(null);
         setInspected(false);
 
+        // oxlint-disable-next-line react/set-state-in-effect -- a new item's inspection clears the last one's answer as it starts
         if (itemId) void inspect(itemId);
     }, [itemId]);
 

@@ -20,6 +20,11 @@ export interface DetailsEntry {
     older: OlderPages | null;
 }
 
+/** Keeps what "Load 10 more" added with `entry`, so a reopen shows it. */
+export function keepOlder(entry: DetailsEntry, older: OlderPages): void {
+    entry.older = older;
+}
+
 /** Entries kept at once; the least recently used goes first. */
 const BOUND = 20;
 

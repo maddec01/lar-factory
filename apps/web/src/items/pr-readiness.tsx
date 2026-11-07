@@ -41,8 +41,8 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
     const [open, setOpen] = useState(false);
     const [attempt, setAttempt] = useState(0);
     const [evidence, setEvidence] = useState<Evidence>();
-    const [settledKey, setSettledKey] = useState<string>();
-    const [loading, setLoading] = useState(false);
+    // The request the evidence on show answers; any other request leaves it stale until its own answer.
+    const [answered, setAnswered] = useState<string>();
     const sequence = useRef(0);
     const disconnected = useBoardStore(
         (s) => s.clientError || s.data.itemSourceProblems?.find((p) => p.repo === item.repo)?.problem,
@@ -62,12 +62,11 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
         pr.checks?.since,
         attempt,
     ]);
-    const stale = loading || settledKey !== key;
+    const request = JSON.stringify([key, open, !!disconnected]);
+    const stale = answered !== request;
 
     useEffect(() => {
-        const request = ++sequence.current;
-
-        setLoading(true);
+        const sent = ++sequence.current;
 
         if (!open || disconnected) return;
 
@@ -85,17 +84,15 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
                 return response.json() as Promise<{ evidence: Evidence }>;
             })
             .then(({ evidence: next }) => {
-                if (sequence.current === request) {
+                if (sequence.current === sent) {
                     setEvidence(next);
-                    setSettledKey(key);
-                    setLoading(false);
+                    setAnswered(request);
                 }
             })
             .catch(() => {
-                if (sequence.current === request) {
+                if (sequence.current === sent) {
                     setEvidence({ available: false, reason: 'Azure evidence is unavailable. Refresh to try again.' });
-                    setSettledKey(key);
-                    setLoading(false);
+                    setAnswered(request);
                 }
             });
 
@@ -103,7 +100,7 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
             ++sequence.current;
             controller.abort();
         };
-    }, [open, item.id, pr.number, disconnected, key]);
+    }, [open, item.id, pr.number, disconnected, key, request]);
 
     if (!item.azure) return null;
 
@@ -114,7 +111,8 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
                 aria-expanded={open}
                 aria-controls={detailsId}
                 onClick={() => {
-                    setLoading(true);
+                    // A new attempt, so a reopened panel reads afresh.
+                    setAttempt((n) => n + 1);
                     setOpen(!open);
                 }}
             >
@@ -149,13 +147,7 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
                         </>
                     )}
                     <p>T3 Azure PR context is unsupported; evidence comes from Azure.</p>
-                    <Button
-                        {...kind('other')}
-                        onClick={() => {
-                            setLoading(true);
-                            setAttempt((n) => n + 1);
-                        }}
-                    >
+                    <Button {...kind('other')} onClick={() => setAttempt((n) => n + 1)}>
                         Refresh readiness
                     </Button>
                 </div>

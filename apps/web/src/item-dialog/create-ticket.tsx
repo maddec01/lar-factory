@@ -13,8 +13,10 @@ export function CreateTicket({ item }: { item: Item }) {
     const [open, setOpen] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const section = useRef<HTMLElement>(null);
-    const [preview, setPreview] = useState<TicketPreview | null>(null);
-    const [error, setError] = useState('');
+    // The outgoing text read for an item, or why it couldn't be; a read for another item doesn't show.
+    const [read, setRead] = useState<{ itemId: string; preview?: TicketPreview; error?: string } | null>(null);
+    const preview = (read?.itemId === item.id && read.preview) || null;
+    const error = (read?.itemId === item.id && read.error) || '';
     const data = useBoardStore((state) => state.data);
     const attempt = useCreateTicketStore((state) => state.attempts[item.id]);
     const submit = useCreateTicketStore((state) => state.submit);
@@ -29,26 +31,28 @@ export function CreateTicket({ item }: { item: Item }) {
 
         section.current?.focus();
 
-        let current = true;
+        const itemId = item.id;
+        const shown = new AbortController();
 
-        setPreview(null);
-        setError('');
-        void fetch(`/api/ticket-preview?itemId=${encodeURIComponent(item.id)}`)
+        void fetch(`/api/ticket-preview?itemId=${encodeURIComponent(itemId)}`)
             .then(async (response) => {
                 const result = (await response.json()) as { preview?: TicketPreview; error?: string };
 
                 if (!response.ok || !result.preview)
                     throw Error(result.error ?? 'Could not read the outgoing issue text.');
 
-                if (current) setPreview(result.preview);
+                if (!shown.signal.aborted) setRead({ itemId, preview: result.preview });
             })
             .catch(() => {
-                if (current)
-                    setError('Could not read the outgoing issue text. Close and reopen Create issue to retry.');
+                if (!shown.signal.aborted)
+                    setRead({
+                        itemId,
+                        error: 'Could not read the outgoing issue text. Close and reopen Create issue to retry.',
+                    });
             });
 
         return () => {
-            current = false;
+            shown.abort();
             trigger.current?.focus();
         };
     }, [open, item.id]);
@@ -57,7 +61,15 @@ export function CreateTicket({ item }: { item: Item }) {
 
     if (!open)
         return (
-            <Button ref={trigger} {...kind('other')} data-create-ticket={item.id} onClick={() => setOpen(true)}>
+            <Button
+                ref={trigger}
+                {...kind('other')}
+                data-create-ticket={item.id}
+                onClick={() => {
+                    setRead(null);
+                    setOpen(true);
+                }}
+            >
                 Create issue
             </Button>
         );

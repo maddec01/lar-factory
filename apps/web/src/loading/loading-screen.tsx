@@ -32,7 +32,10 @@ type Phase = 'showing' | 'leaving' | 'gone';
 /** The screen's phase and whether the mark is drawn. Readiness stays true after the page's initial read. */
 function useScreen(settled: boolean): { phase: Phase; drawn: boolean } {
     const [drawn, setDrawn] = useState(() => drawnByDesktop() || reducedMotion());
-    const [phase, setPhase] = useState<Phase>('showing');
+    // Whether the screen has finished leaving; it starts once the page is ready and the mark drawn, which both stay so.
+    const [left, setLeft] = useState(false);
+    const leaving = settled && drawn;
+    const phase: Phase = !leaving ? 'showing' : left ? 'gone' : 'leaving';
 
     useEffect(() => {
         if (drawn) return;
@@ -42,16 +45,12 @@ function useScreen(settled: boolean): { phase: Phase; drawn: boolean } {
         return () => clearTimeout(timer);
     }, [drawn]);
     useEffect(() => {
-        if (!settled) return setPhase('showing');
+        if (!leaving) return;
 
-        if (!drawn) return;
-
-        setPhase('leaving');
-
-        const timer = setTimeout(() => setPhase('gone'), EXIT_MS);
+        const timer = setTimeout(() => setLeft(true), EXIT_MS);
 
         return () => clearTimeout(timer);
-    }, [settled, drawn]);
+    }, [leaving]);
 
     return { phase, drawn };
 }

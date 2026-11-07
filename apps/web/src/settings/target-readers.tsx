@@ -1,6 +1,6 @@
 // Reader badges are shared by Settings and the install overview. Targets arrive physically deduplicated from the app.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Badge } from '@lar-works/design-system';
 import { useInstallStore } from './install-store.ts';
 
 export function TargetReaders({ target }: { target: TargetSnapshot }) {

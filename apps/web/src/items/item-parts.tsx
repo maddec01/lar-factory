@@ -3,10 +3,10 @@
 // the repository's project icon.
 
 import type { ReactNode } from 'react';
-import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bug, Check, GitPullRequest, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from '@lar-works/design-system/icons';
 import { UNREADABLE, activityLost, activityUnavailable, buildActivity, clock, day, decisionMethodName, itemActivityLine, itemActivityThread, startProgressOf, workingAgain, checkState, duration, formatTokens, formatUsd, itemName, itemRepoNames, prLabel, ref, labelsOnRow, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { AzureWorkItem, BoardData, Checks, Item, ItemStats, Kind, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Badge } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { useClock } from '../board/second-clock.ts';
 import { ambientMotion } from '../motion/ambient-motion.ts';

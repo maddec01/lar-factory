@@ -1,7 +1,7 @@
 // A button that copies its text and says Copied for a moment, and the live region that announces it.
 
 import { useEffect, useState } from 'react';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useCopyStore } from './copy-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 

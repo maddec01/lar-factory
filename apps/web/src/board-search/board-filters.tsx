@@ -3,7 +3,7 @@
 // hide, plus any picked label none of them shows, so it stays removable.
 
 import { useMemo } from 'react';
-import { CircleDashed, Layers } from 'lucide-react';
+import { CircleDashed, Layers } from '@lar-works/design-system/icons';
 import { boardSections, deskItems, inRepo, repoName, sameLabel, sameRepo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { SearchDialogToken } from '@lar-factory/ui/search-dialog';

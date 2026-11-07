@@ -3,9 +3,8 @@
 
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
-import { IconButton } from '@lar-factory/ui/design-system/IconButton';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { Maximize2, Minimize2 } from '@lar-works/design-system/icons';
+import { IconButton, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
 export const DIALOG_PREFERENCES = {
   matchList: 'lar-board:match-list-size',

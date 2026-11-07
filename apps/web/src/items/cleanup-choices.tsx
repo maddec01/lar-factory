@@ -4,8 +4,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ABANDON_CLEANUP } from '@lar-factory/shared';
-import { Alert } from '@lar-factory/ui/design-system/Alert';
-import { Text } from '@lar-factory/ui/design-system/Typography';
+import { Alert, Text } from '@lar-works/design-system';
 import { postAction, receive } from './card-actions.ts';
 
 interface CleanupPlan {

@@ -1,6 +1,6 @@
 // One glyph per status, the way T3 marks a thread working, waiting or done, in the status's colour.
 
-import { Check, Circle, CircleArrowRight, CircleDashed, CircleDot, Clock3, Eye, GitMerge, List } from 'lucide-react';
+import { Check, Circle, CircleArrowRight, CircleDashed, CircleDot, Clock3, Eye, GitMerge, List } from '@lar-works/design-system/icons';
 import { useShallow } from 'zustand/react/shallow';
 import { activityLost, activityUnavailable, buildActivity, itemActivityLine, itemActivityThread } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';

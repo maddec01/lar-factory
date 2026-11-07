@@ -1,7 +1,7 @@
 // A link drawn as the design system's Button, for an action that opens a page: GitHub, a pull request or a T3
-// thread. The copied Button renders only a <button>, so these classes repeat its base, less its height, which the
-// button kind sets, and its primary and secondary recipes from packages/ui/src/design-system/actions/Button.tsx; keep
-// them in step when that Copy changes.
+// thread. The design system's Button renders only a <button>, so these classes repeat its base, less its height, which the
+// button kind sets, and its primary and secondary recipes from @lar-works/design-system's Button; keep
+// them in step when that Button changes.
 
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { kind as kindOf } from '../buttons/button-kinds.tsx';

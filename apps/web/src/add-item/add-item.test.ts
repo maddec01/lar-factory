@@ -311,7 +311,7 @@ test('opened before the repositories arrive, the dialog picks the first one once
   expect(submit().disabled).toBe(false);
 });
 
-test('the dialog opens as the copied Modal, and nothing over the title bar drags', async () => {
+test("the dialog opens as the design system's Modal, and nothing over the title bar drags", async () => {
   const warnings = vi.spyOn(console, 'warn');
   await open();
   const { noDrag } = addStylesheet();

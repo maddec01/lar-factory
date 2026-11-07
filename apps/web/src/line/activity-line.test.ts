@@ -42,7 +42,7 @@ test('a line keeps its tooltip quiet as the connection drops and its list goes',
 test('a minute age skips unchanged second renders but still becomes unavailable on its original deadline', async (t) => {
   await mountPage({ ...fresh(), items: [item] });
   const { ActivityLine } = await import('./activity-line.tsx');
-  const { TooltipProvider } = await import('@lar-factory/ui/design-system/Tooltip');
+  const { TooltipProvider } = await import('@lar-works/design-system');
   const older = { ...item, threads: [{ ...thread, activity: { ...thread.activity!, actionAt: new Date(NOW - 65_000).toISOString() } }] } as Item;
   const host = document.createElement('div');
   const root = createRoot(host);

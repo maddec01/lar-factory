@@ -30,7 +30,7 @@ test('the style names both modes, and anything but a colour keeps the neutral st
 });
 
 test('the palette values match the theme', () => {
-  const theme = readFileSync('../../packages/ui/src/design-system/foundations/theme.css', 'utf8');
+  const theme = readFileSync(new URL('foundations/theme.css', import.meta.resolve('@lar-works/design-system/styles.css')), 'utf8');
   const [light, dark] = theme.split('@utility lar-dark-palette') as [string, string];
   expect(light).toContain(`--color-base-content: ${PALETTE.light.foreground};`);
   expect(light).toContain(`--color-base-200: ${PALETTE.light.surface};`);

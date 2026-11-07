@@ -253,7 +253,7 @@ test('Add item opens the Add item flow over the List modal, and closing it hands
   expect(document.activeElement, 'focus goes back to Add item').toBe(add);
 });
 
-test('the List\'s items sit in the copied Modal.Body, which fades at its scrolled edges', async () => {
+test("the List's items sit in the design system's Modal.Body, which fades at its scrolled edges", async () => {
   await mountPage();
   await open();
   expect($('[data-list-modal] [data-slot="modal-body"]')!.className).toContain('mask-image');

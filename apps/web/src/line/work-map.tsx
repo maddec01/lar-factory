@@ -4,10 +4,10 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, FlaskConical, GitPullRequest, Hammer, ListChecks, Lightbulb, MessagesSquare, Shapes } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, FlaskConical, GitPullRequest, Hammer, ListChecks, Lightbulb, MessagesSquare, Shapes } from '@lar-works/design-system/icons';
 import { buildActivity, itemName, needsAnswer, openQuestionThread, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';

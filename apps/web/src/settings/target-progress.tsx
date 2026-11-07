@@ -1,6 +1,6 @@
 // Skill work and retained results, with recovery through the desktop-owned installer.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useDriftStore } from '../notices/drift-store.ts';
 import { useInstallStore } from './install-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';

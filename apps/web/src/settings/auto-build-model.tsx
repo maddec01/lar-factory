@@ -2,8 +2,7 @@
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 import { repositoryT3Default, shownRepo, t3DefaultDetail, type BoardData, type ModelChoice, type ModelGroup } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
+import { Button, DropdownMenu } from '@lar-works/design-system';
 import { kind } from '../buttons/button-kinds.tsx';
 import { ModelEntries, opensOnChecked } from '../items/model-entries.tsx';
 import { postAction, receive } from '../items/card-actions.ts';

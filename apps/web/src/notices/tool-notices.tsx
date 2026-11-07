@@ -4,8 +4,7 @@
 
 import type { ReactNode } from 'react';
 import { GH_FLOOR, type AzCheck, type CommandCheck, type FailedCheck, type GhCheck, type T3Check } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
+import { Button, BrandMark } from '@lar-works/design-system';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { Warning } from './warning.tsx';
 import { useRecheckStore } from './recheck-store.ts';

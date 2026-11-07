@@ -1,14 +1,13 @@
 // The board search's dialog: a field with its tokens over one keyboard list of grouped options, near the top of the
-// page or, on phones, the whole screen. lar-server's CommandPalette has the same look and keys but only one scope chip,
-// and the copied Modal always renders a heading, so this sits directly on ninna-ui. It knows nothing of the board.
+// page or, on phones, the whole screen. The design system's CommandPalette has the same look and keys but only one
+// scope chip, and its Modal always renders a heading, so this sits directly on ninna-ui. It knows nothing of the
+// board. useModalAutoFocus and useScrollFade are Copies of the design system's own, which it doesn't export.
 import { Modal } from '@ninna-ui/overlays';
 import { createContext, type ReactNode, useContext, useEffect, useId, useRef, useState } from 'react';
-import { IconButton } from '../design-system/actions/IconButton.tsx';
-import { useDesignSystemLabels } from '../design-system/foundations/DesignSystemProvider.tsx';
-import { CloseIcon, SearchIcon } from '../design-system/icons/NavigationIcons.tsx';
-import { useModalAutoFocus } from '../design-system/overlays/useModalAutoFocus.ts';
-import { useScrollFade } from '../design-system/overlays/useScrollFade.ts';
-import { Text } from '../design-system/typography/Typography.tsx';
+import { IconButton, Text, useDesignSystemLabels } from '@lar-works/design-system';
+import { SearchIcon, XIcon as CloseIcon } from '@lar-works/design-system/icons';
+import { useModalAutoFocus } from './useModalAutoFocus.ts';
+import { useScrollFade } from './useScrollFade.ts';
 
 export interface SearchDialogToken {
   id: string;

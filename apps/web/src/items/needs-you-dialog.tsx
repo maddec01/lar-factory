@@ -4,11 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { needsYouPrompt } from '@lar-factory/shared';
 import type { BoardData, Item, NeedsYouAction } from '@lar-factory/shared';
-import { Alert } from '@lar-factory/ui/design-system/Alert';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
-import { Modal } from '@lar-factory/ui/design-system/Modal';
-import { Text } from '@lar-factory/ui/design-system/Typography';
+import { Alert, Button, DropdownMenu, Modal, Text } from '@lar-works/design-system';
 import { useActionStore, useItemAction } from './action-store.ts';
 import { inspectRecovery, resolveNeedsYou, startAgain } from './card-actions.ts';
 import type { ActionResult, RecoveryInspection } from './card-actions.ts';

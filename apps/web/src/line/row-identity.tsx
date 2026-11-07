@@ -4,7 +4,7 @@
 import { isBuild } from '@lar-factory/shared';
 import { memo } from 'react';
 import type { Item } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Badge } from '@lar-works/design-system';
 import { KIND_BADGES, KindBadge, RepoCell } from '../items/item-parts.tsx';
 import { SourceIcon } from '../items/source-icon.tsx';
 import { partKind } from './dossier-parts.ts';

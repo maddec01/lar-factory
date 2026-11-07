@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { kindMappingOffers, newLabelProblem, trackerCapabilities, typedLabelsProblem, writeAccessProblem, type RepositorySetup, type VocabularyTerm } from '@lar-factory/shared';
 import { emptyVocabularyTerm, suggestVocabularyLabels, type VocabularyCapability, type VocabularyDiscovery } from '@lar-factory/shared/vocabulary';
-import { Alert } from '@lar-factory/ui/design-system/Alert';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Popover } from '@lar-factory/ui/design-system/Popover';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Alert, Button, Popover, Badge, Input } from '@lar-works/design-system';
 import { FIELD_GROUP, HelpTip } from '../settings/field-row.tsx';
 import { AccessReason } from './access-list.tsx';
-import { Input } from '@lar-factory/ui/design-system/Input';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { kind } from '../buttons/button-kinds.tsx';
 import { postAction } from '../items/card-actions.ts';

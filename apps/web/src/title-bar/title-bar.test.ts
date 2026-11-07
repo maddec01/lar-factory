@@ -7,7 +7,7 @@ import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { clock, type InstallSnapshot } from '@lar-factory/shared';
 import { $, $$, NOW, fresh, fullScreen, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
 
-// jsdom has no ResizeObserver, which the copied Modal's scroll fade observes with.
+// jsdom has no ResizeObserver, which the design system's Modal's scroll fade observes with.
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
 
 const titleBar = () => $<HTMLElement>('.title-bar')!;
@@ -80,7 +80,7 @@ test('in a browser, where nothing updates, there\'s no update pill', async () =>
   expect(controls()).toEqual(['brand', 'refreshed', 'counters', 'search', 'list', 'add item', 'divider', 'settings']);
 });
 
-test('the brand reads "Lar Factory": the copied BrandMark, then Factory on its baseline', async () => {
+test(`the brand reads "Lar Factory": the design system's BrandMark, then Factory on its baseline`, async () => {
   await mountPage();
   const brand = $('.title-bar .brand')!;
   expect(text(brand)).toBe('arFactory');
@@ -299,7 +299,7 @@ test('the bar folds by its own width instead of squeezing: the counters keep the
   stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'downloaded' as const, availableVersion: '1.1.0', downloadedVersion: '1.1.0', message: null })) });
   await mountPage();
   const classes = (el: Element | null) => el!.className.split(' ');
-  expect(classes(titleBar().querySelector('header')), 'the copied TitleBar is the container the fold reads').toContain('@container');
+  expect(classes(titleBar().querySelector('header')), "the design system's TitleBar is the container the fold reads").toContain('@container');
   const counters = titleBar().querySelector('.counters')!;
   expect(classes(counters)).toContain('shrink-0');
   expect(classes(counters), 'a size container would have no width of its own').not.toContain('@container');

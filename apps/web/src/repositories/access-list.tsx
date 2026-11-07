@@ -1,5 +1,5 @@
 import { REPOSITORY_OPERATIONS, onAzure, trackerCapabilities, type OperationAccess, type RepositoryOperation, type RepositorySetup } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { kind } from '../buttons/button-kinds.tsx';
 import { FIELD_GROUP, FieldRow, HelpTip } from '../settings/field-row.tsx';
 import { ToolState } from '../settings/controls.tsx';

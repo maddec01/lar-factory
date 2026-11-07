@@ -1,7 +1,7 @@
 // A dialog form's result. It stays mounted, as a live region, so screen readers hear each new message.
 
 import type { ReactNode } from 'react';
-import { Alert } from '@lar-factory/ui/design-system/Alert';
+import { Alert } from '@lar-works/design-system';
 
 /** Empty, it has no border, padding or icon. With no tone it's a warning, as a validation message is. */
 export function FormResult({ id, text, tone = 'warning', children }: {

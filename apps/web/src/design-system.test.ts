@@ -1,13 +1,12 @@
-// lar-server's design system, copied into @lar-factory/ui, renders in the page with its ninna-ui dependencies.
+// The design system (@lar-works/design-system) renders in the page with its ninna-ui dependencies.
 
 import { act, createElement, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, test, vi } from 'vite-plus/test';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Modal } from '@lar-factory/ui/design-system/Modal';
+import { Button, Modal } from '@lar-works/design-system';
 import { FormSelect } from '@lar-factory/ui/form-select';
 
-test("lar-server's Modal opens a titled dialog with its close button and content", async () => {
+test("The design system's Modal opens a titled dialog with its close button and content", async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   const onClose = vi.fn();
   const host = document.body.appendChild(document.createElement('div'));

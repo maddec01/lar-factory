@@ -1,5 +1,5 @@
 // Variant C of the source-icon prototype: a corner tab on cards, a bordered square in rows and details.
-import { Laptop } from 'lucide-react';
+import { Laptop } from '@lar-works/design-system/icons';
 import { onAzure, type Item } from '@lar-factory/shared';
 
 const SOURCE_TEXT = {

@@ -1,7 +1,7 @@
 // The model menu shared by Start, Start after and Settings: T3 Project default first, then models grouped by provider instance.
 import { useId } from 'react';
 import { offers, storedChoice, t3DefaultDetail, type ModelChoice, type ModelGroup, type ModelSelection } from '@lar-factory/shared';
-import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
+import { DropdownMenu } from '@lar-works/design-system';
 
 export function ModelEntries({ groups, t3Default, selected, heading, held, defaultHeld, itemId, onPick }: {
   groups: ModelGroup[]; t3Default?: ModelSelection | undefined; selected?: ModelChoice; heading: string; held?: string; defaultHeld?: string; itemId?: string;
@@ -30,7 +30,7 @@ export function ModelEntries({ groups, t3Default, selected, heading, held, defau
   </DropdownMenu.RadioGroup>;
 }
 
-/** Focus the checked model on open. The copied menu forwards this Radix prop but omits it from its type. */
+/** Focus the checked model on open. The design system's menu forwards this Radix prop but omits it from its type. */
 export const opensOnChecked = {
   onOpenAutoFocus: (event: Event): void => {
     event.preventDefault();

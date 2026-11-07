@@ -4,7 +4,7 @@
 import { useId, useRef } from 'react';
 import { canAbandon, itemName, ref } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useActionStore, useItemAction } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
 import { askAbandon, backToList, queueItem } from './card-actions.ts';

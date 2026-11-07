@@ -1,6 +1,7 @@
 /* The board page's own styles. Tokens, base styles and the base components' styles come from the design
-   system (packages/ui). Each feature folder holds its own layout rules; all of them use only the design
-   system's tokens and Tailwind's spacing scale. */
+   system (@lar-works/design-system), and the board's roles from packages/ui. Each feature folder holds its own
+   layout rules; all of them use only the design system's tokens and Tailwind's spacing scale. */
+@import "@lar-works/design-system/styles.css" source(none);
 @import "@lar-factory/ui/styles.css";
 @import "./buttons/button-kinds.css";
 @import "./items/items.css";
@@ -54,11 +55,11 @@ code { font: var(--text-xs) var(--font-mono); }
   a { color: inherit; text-decoration: underline; }
   a[data-slot="button"] { text-decoration: none; }
   a:hover { text-decoration-thickness: --spacing(0.5); }
-  /* So a copied control's outline-none wins and its own focus ring is the only one. */
+  /* So a design-system control's outline-none wins and its own focus ring is the only one. */
   :focus-visible { outline: --spacing(0.5) solid var(--ring); outline-offset: --spacing(0.5); border-radius: var(--radius-sm); }
 }
 .sr-only { position: absolute; width: --spacing(0.25); height: --spacing(0.25); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* The copied Button, ninna-ui's, takes no pointer events while disabled; one that says why keeps them, so its title shows. */
+/* The design system's Button, ninna-ui's, takes no pointer events while disabled; one that says why keeps them, so its title shows. */
 button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 
 @keyframes activity-sweep {

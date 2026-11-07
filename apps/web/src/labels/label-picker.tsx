@@ -3,10 +3,8 @@
 
 import { useState } from 'react';
 import { sameLabel } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
-import { Input } from '@lar-factory/ui/design-system/Input';
-import { Plus } from 'lucide-react';
+import { Button, Checkbox, Input } from '@lar-works/design-system';
+import { Plus } from '@lar-works/design-system/icons';
 import { kind } from '../buttons/button-kinds.tsx';
 
 export interface LabelChoice {

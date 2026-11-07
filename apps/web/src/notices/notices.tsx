@@ -8,7 +8,7 @@ import { ToastFailure, ToastLifetime } from './toasts.tsx';
 
 import { ref, threadLink, abandonPrompt, closeTicketPrompt } from '@lar-factory/shared';
 import type { Item, StartedThread, Status } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { TitleLink } from '../items/item-parts.tsx';

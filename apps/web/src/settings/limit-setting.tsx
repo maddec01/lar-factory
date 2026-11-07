@@ -4,8 +4,7 @@
 import { useId, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 import type { HeavyCommandLimit, HeavyCommandLimitState } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Input } from '@lar-factory/ui/design-system/Input';
+import { Button, Input } from '@lar-works/design-system';
 import { kind } from '../buttons/button-kinds.tsx';
 import { postAction, receive } from '../items/card-actions.ts';
 import { Choice } from './controls.tsx';

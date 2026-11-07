@@ -4,7 +4,7 @@
 // call did.
 
 import type { UpdateChannel } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { FormResult } from '../notices/form-result.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { canCheckForUpdate, getUpdateDisabledReason, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from '../updates/update-button-logic.ts';

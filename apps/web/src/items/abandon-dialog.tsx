@@ -3,10 +3,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { ABANDON_CLEANUP, abandonPrompt, abandonsNotice, closeTicketPrompt, closesTicketOnAbandon, hasClosedPr } from '@lar-factory/shared';
-import { Alert } from '@lar-factory/ui/design-system/Alert';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Modal } from '@lar-factory/ui/design-system/Modal';
-import { Text } from '@lar-factory/ui/design-system/Typography';
+import { Alert, Button, Modal, Text } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { useAbandonStore } from './abandon-store.ts';
 import { abandonItem, postAction, receive, closeTicket } from './card-actions.ts';

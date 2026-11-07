@@ -3,7 +3,7 @@
 
 import { itemPr } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { LinkButton } from './link-button.tsx';
 

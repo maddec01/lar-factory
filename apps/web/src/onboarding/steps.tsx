@@ -1,12 +1,7 @@
 // Onboarding screens built from the board's existing controls.
-import { FolderPlus } from 'lucide-react';
+import { FolderPlus } from '@lar-works/design-system/icons';
 import { writeAccessProblem, isOnboarding, shownRepo, trackerCapabilities, type ProjectChoice, type SetupDetection } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
-import { Alert } from '@lar-factory/ui/design-system/Alert';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
-import { Input } from '@lar-factory/ui/design-system/Input';
-import { RadioGroup } from '@lar-factory/ui/design-system/RadioGroup';
+import { Badge, Alert, Button, Checkbox, Input, RadioGroup } from '@lar-works/design-system';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';

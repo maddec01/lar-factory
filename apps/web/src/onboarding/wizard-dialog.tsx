@@ -1,13 +1,11 @@
-// The onboarding dialog: the copied Modal over the board, showing one step at a time with a progress bar, Back and Next,
+// The onboarding dialog: the design system's Modal over the board, showing one step at a time with a progress bar, Back and Next,
 // and Finish on the last step. The empty board, an offer and Resume open it; closing it drops the run until a T3 project
 // is picked, or an offered run until Next or a change, then keeps it to resume. Once Finish saves, it says so, with Go to the board.
 
 import { useEffect, useRef } from 'react';
-import { ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check } from '@lar-works/design-system/icons';
 import { shownRepo } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Modal } from '@lar-factory/ui/design-system/Modal';
-import { Text } from '@lar-factory/ui/design-system/Typography';
+import { Button, Modal, Text } from '@lar-works/design-system';
 import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
 import { STEP_TITLES } from './wizard-choices.ts';
@@ -17,7 +15,7 @@ import { ProjectChoiceIcon, ProjectIcon } from '../repositories/project-icon.tsx
 import { useSettingsStore } from '../settings/settings-store.ts';
 
 /**
- * Where focus goes when the dialog closes and the copied Modal found nowhere to return it: the button that opened it;
+ * Where focus goes when the dialog closes and the design system's Modal found nowhere to return it: the button that opened it;
  * once that's gone, as the Resume of a repository the dialog finished, the page's main heading.
  */
 function closedFocus(opener: HTMLElement | null): HTMLElement | null {
@@ -43,7 +41,7 @@ function Nav({ run }: { run: Run }) {
   );
 }
 
-/** The step's heading in the copied Modal's header, which takes focus without being a Tab stop. */
+/** The step's heading in the design system's Modal's header, which takes focus without being a Tab stop. */
 function stepHeading(dialog: HTMLElement | null): HTMLElement | null {
   const heading = dialog?.querySelector<HTMLElement>('[data-slot="modal-header"] h2') ?? null;
   if (heading) {
@@ -105,7 +103,7 @@ export function WizardDialog() {
     const closed = wasOpen.current && !open;
     wasOpen.current = open;
     if (!closed) return;
-    // The copied Modal returns focus on the next task when the element that had it is still on the page.
+    // The design system's Modal returns focus on the next task when the element that had it is still on the page.
     const timer = setTimeout(() => { if (document.activeElement === document.body) closedFocus(opener)?.focus(); });
     return () => clearTimeout(timer);
   }, [open, opener]);

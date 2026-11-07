@@ -6,7 +6,7 @@
 // settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
 
 import { failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
-import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
+import { TooltipProvider } from '@lar-works/design-system';
 import { useBoardStore } from './board/board-store.ts';
 import { useShownScope } from './board/scope-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
@@ -47,7 +47,7 @@ export function App() {
   const missing = t3?.result === 'missing' ? t3 : undefined;
   const empty = useBoardStore((state) => noneOnboarded(state.data));
   return (
-    // The copied Tooltip needs a provider above it.
+    // The design system's Tooltip needs a provider above it.
     <TooltipProvider>
       <div className="fixed inset-0 flex flex-col bg-(--background) text-(--foreground)">
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">

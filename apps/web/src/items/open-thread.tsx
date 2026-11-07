@@ -4,8 +4,7 @@
 
 import { isLiveThread, needsAnswer, openQuestionThread, threadLink } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { Button, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { LinkButton } from './link-button.tsx';
 import { useOnRow } from './row-actions.tsx';

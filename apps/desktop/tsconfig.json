@@ -1,19 +1,10 @@
 {
+  "extends": "@lar-works/config/tsconfig/node.json",
   "compilerOptions": {
-    "target": "es2023",
     "lib": ["es2023", "dom"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
     "types": ["node", "electron"],
-    "strict": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true,
-    "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "scripts", "test", "vite.config.ts"]
 }

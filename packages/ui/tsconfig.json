@@ -1,21 +1,8 @@
-// lar-server's Copies import each other extensionless, which needs Bundler resolution, as in lar-server's web/.
+// The package's modules import each other extensionless, which needs Bundler resolution, as a Lar web app has.
 {
+  "extends": "@lar-works/config/tsconfig/app.json",
   "compilerOptions": {
-    "target": "es2023",
-    "lib": ["es2023", "dom", "dom.iterable"],
-    "module": "preserve",
-    "moduleResolution": "bundler",
-    "types": ["node"],
-    "jsx": "react-jsx",
-    "strict": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true,
-    "noUncheckedIndexedAccess": true,
-    "noFallthroughCasesInSwitch": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true
+    "types": ["node"]
   },
   "include": ["src", "vite.config.ts"]
 }

@@ -16,7 +16,7 @@ allowBuilds:
 # Vite+ ships its own Vite. Point every dependent at that copy, as T3 Code does,
 # and keep Effect's packages on the version T3 Code pins.
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.5.0
   "@effect/platform-node-shared": 4.0.5
 
 # Vite+ ships Vite as @voidzero-dev/vite-plus-core, which plugins don't recognise as vite;
@@ -26,3 +26,7 @@ peerDependencyRules:
     - vite
   allowedVersions:
     vite: "*"
+
+# pnpm waits a day before installing a new release; Lar's own packages are trusted as soon as they're out.
+minimumReleaseAgeExclude:
+  - "@lar-works/*"

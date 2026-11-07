@@ -4,7 +4,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite-plus';
 import type { Plugin } from 'vite-plus';
-import { sharedTest } from '../../vitest.shared.ts';
+import { test } from '@lar-works/config';
 
 /** Holds the first paint until the page script has run, so it shows the board rather than an empty
  *  page. Vite drops the attribute from index.html, so it goes on the built tag. */
@@ -65,7 +65,7 @@ export default defineConfig({
     },
   },
   test: {
-    ...sharedTest,
+    ...test,
     environment: 'jsdom',
     maxWorkers: 2,
     include: ['src/**/*.test.ts'],

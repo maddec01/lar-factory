@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite-plus';
-import { sharedTest } from '../../vitest.shared.ts';
+import { test } from '@lar-works/config';
 
 export default defineConfig({
   test: {
-    ...sharedTest,
+    ...test,
     environment: 'node',
     include: ['src/**/*.test.ts', 'test/*.test.ts'],
     // The tests spawn the board, which can take many seconds in CI.

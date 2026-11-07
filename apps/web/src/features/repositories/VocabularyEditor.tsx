@@ -19,7 +19,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { AccessReason } from './AccessList';
 import { useEditStore } from './EditStore';
-import { postAction } from '@/features/items/CardActions';
+import { postAction } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { FIELD_GROUP, HelpTip } from '@/shared/ui/setting-rows/FieldRow';
 

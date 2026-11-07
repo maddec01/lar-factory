@@ -1,8 +1,8 @@
 // Queue, Move to List, Keep, Abandon and the ticket close after it, Needs you's choices and a Dependency's met mark, from the item dialog: each posts to the board server, shows the result, and keeps
 // keyboard focus in the dialog.
 
-import { abandonsNotice, writeHeaders, remembersChoice } from '@lar-factory/shared';
-import type { BoardData, Item, NeedsYouAction, ModelChoice, StartResult } from '@lar-factory/shared';
+import { abandonsNotice, remembersChoice } from '@lar-factory/shared';
+import type { Item, NeedsYouAction, ModelChoice, StartResult } from '@lar-factory/shared';
 import { flushSync } from 'react-dom';
 
 import { useAbandonStore } from './AbandonStore';
@@ -13,79 +13,8 @@ import { OPEN_ITEM_DIALOG, useItemDialogStore } from '@/features/item-dialog/Ite
 import { notify } from '@/features/notices/Notices';
 import { refocus } from '@/features/notices/Toasts';
 import { useBoardStore } from '@/services/board/board.hooks';
-
-export interface ActionResult {
-    error: string | null;
-    board?: BoardData;
-    /** Queueing an issue from the list creates its local work ID. */
-    itemId?: string;
-}
-
-/** Posts an item action and returns the server's answer, or a message when the server can't be reached. */
-export async function postAction<T extends object = object>(
-    path: string,
-    body: object,
-    progress?: (value: Partial<T>) => void,
-): Promise<ActionResult & Partial<T>> {
-    useBoardStore.getState().beginWrite();
-
-    try {
-        const response = await fetch(path, {
-            method: 'POST',
-            headers: { ...writeHeaders(), ...(progress && { Accept: 'application/x-ndjson' }) },
-            body: JSON.stringify(body),
-        });
-
-        if (response.headers.get('content-type')?.startsWith('application/x-ndjson') && response.body) {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let pending = '';
-
-            try {
-                while (true) {
-                    const chunk = await reader.read();
-
-                    pending += decoder.decode(chunk.value, { stream: !chunk.done });
-
-                    let newline;
-
-                    while ((newline = pending.indexOf('\n')) >= 0) {
-                        const event = JSON.parse(pending.slice(0, newline)) as {
-                            progress?: Partial<T>;
-                            result?: ActionResult & Partial<T>;
-                        };
-
-                        pending = pending.slice(newline + 1);
-
-                        if (event.progress) progress?.(event.progress);
-
-                        if (event.result) return event.result;
-                    }
-
-                    if (chunk.done) throw new Error('Incomplete progress response');
-                }
-            } finally {
-                reader.releaseLock();
-            }
-        }
-
-        const result = (await response.json()) as Partial<ActionResult & T>;
-
-        return { ...result, error: result.error ?? (response.ok ? null : `Request failed (HTTP ${response.status}).`) };
-    } catch {
-        return { error: "Can't reach the board server. Try again." } as ActionResult & Partial<T>;
-    }
-}
-
-/** Shows the board the server sent back with the action. Call inside the flushSync that shows the result. */
-export function receive(result: ActionResult): void {
-    if (!result.board) return;
-
-    const board = useBoardStore.getState();
-
-    board.beginWrite();
-    board.receive(result.board, 'action');
-}
+import { postAction, receive } from '@/services/board/board.service';
+import type { ActionResult } from '@/services/board/board.service';
 
 const by = (attr: string, value: string) => `[${attr}="${CSS.escape(value)}"]`;
 

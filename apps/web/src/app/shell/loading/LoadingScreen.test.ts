@@ -214,7 +214,7 @@ test('Queue and Abandon responses stay authoritative during a restarted read', a
     await advance(EXIT_MS);
 
     const { useBoardStore } = await import('@/services/board/board.hooks');
-    const { receive } = await import('@/features/items/CardActions');
+    const { receive } = await import('@/services/board/board.service');
     const issue = sample.items.find((item) => item.status === 'List')!;
     const queued = { ...issue, id: 'new-work-record', status: 'Queued' as const };
     const read = { ...firstRead('items', ['lar-apple']), waiting: sample.repos.map((repo) => repo.repo) };

@@ -11,7 +11,7 @@ import { useCallback, useState } from 'react';
 
 import { detailsCache } from './DetailsCache';
 import type { ItemDetailsRead } from './useItemDetails';
-import { postAction } from '@/features/items/CardActions';
+import { postAction } from '@/services/board/board.service';
 
 interface Editing {
     /** The editor's Markdown of the description it opened on; null until it reports it. */

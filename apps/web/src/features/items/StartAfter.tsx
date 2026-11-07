@@ -17,7 +17,6 @@ import { Button, DropdownMenu } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { postAction, receive } from './CardActions';
 import { writeState } from './ItemActions';
 import { opensOnChecked } from './ModelEntries';
 import { StartControl, StartEntries } from './StartControl';
@@ -25,6 +24,7 @@ import type { StartKind } from './StartStore';
 import { notify } from '@/features/notices/Notices';
 import { DismissButton, closeKeepingFocus } from '@/features/notices/Toasts';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 import { ICON, kind as buttonKind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */

@@ -462,7 +462,7 @@ test('reopening after the ticket changed, with updatedAt unmoved, reads the deta
     await settle(() => useItemDialogStore.getState().close());
 
     const release = holdDetails();
-    const { receive } = await import('@/features/items/CardActions');
+    const { receive } = await import('@/services/board/board.service');
 
     await settle(() =>
         receive({

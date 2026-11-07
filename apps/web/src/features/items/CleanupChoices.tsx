@@ -6,7 +6,7 @@ import { Alert, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { postAction, receive } from './CardActions';
+import { postAction, receive } from '@/services/board/board.service';
 
 interface CleanupPlan {
     branch: string;

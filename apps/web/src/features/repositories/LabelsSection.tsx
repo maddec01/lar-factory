@@ -14,7 +14,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { AccessReason } from './AccessList';
 import { useEditStore, type LabelChange } from './EditStore';
 import { KIND_NAMES, type VocabularyKind } from './VocabularyEditor';
-import { postAction } from '@/features/items/CardActions';
+import { postAction } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { tint } from '@/shared/ui/labels/LabelTint';
 import { FieldRow, FIELD_GROUP } from '@/shared/ui/setting-rows/FieldRow';

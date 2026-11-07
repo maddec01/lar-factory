@@ -10,7 +10,7 @@ import {
 import { create } from 'zustand';
 
 import type { IssueSetting } from './IssueDefaults';
-import { postAction, receive } from '@/features/items/CardActions';
+import { postAction, receive } from '@/services/board/board.service';
 
 /** Settings whose editor uses text drafts. Vocabulary saves one complete term at a time. */
 export type DraftSetting = Exclude<

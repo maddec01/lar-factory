@@ -6,9 +6,9 @@ import type { AutoBuildPass } from '@lar-factory/shared';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { postAction, receive } from '@/features/items/CardActions';
 import { showToast } from '@/features/notices/Toasts';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 import { Switch } from '@/shared/ui/setting-rows/SettingControls';
 
 /** How many builds a pass would start now. */

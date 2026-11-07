@@ -10,8 +10,8 @@ import { flushSync } from 'react-dom';
 
 import { ExportedLine, ExportMarkdown, type Exported } from '@/features/item-dialog/RecordText';
 import { useAbandonStore } from '@/features/items/AbandonStore';
-import { postAction, receive } from '@/features/items/CardActions';
 import { useArchiveStore } from '@/services/archive/archive.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { FieldRow, FIELD_GROUP } from '@/shared/ui/setting-rows/FieldRow';
 import { Choice } from '@/shared/ui/setting-rows/SettingControls';

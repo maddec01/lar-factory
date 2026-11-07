@@ -6,8 +6,8 @@ import { Button } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { TicketPicker } from '@/features/add-item/TicketPicker';
-import { postAction, receive } from '@/features/items/CardActions';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export function AttachTicket({ item }: { item: Item }) {

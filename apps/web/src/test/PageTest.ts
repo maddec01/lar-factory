@@ -136,16 +136,9 @@ beforeEach(() => {
     vi.stubGlobal('scrollTo', vi.fn());
     vi.stubGlobal('scrollBy', vi.fn());
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
-    Element.prototype.scrollIntoView = vi.fn();
-    // nor does it watch sizes, which lar-server's Modal does for its scroll fade.
-    vi.stubGlobal(
-        'ResizeObserver',
-        class {
-            observe() {}
-            unobserve() {}
-            disconnect() {}
-        },
-    );
+    // The design system's stubs (src/test/setup.ts) give elements a scrollIntoView that does nothing; a test reads
+    // its calls.
+    vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
     history.replaceState(null, '', '/');
     // The board saves its Scope and filters, and a test's choices are not the next test's.
     localStorage.clear();

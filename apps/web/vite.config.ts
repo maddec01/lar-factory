@@ -96,6 +96,7 @@ export default defineConfig({
         environment: 'jsdom',
         maxWorkers: 2,
         include: ['src/**/*.test.ts'],
+        setupFiles: ['./src/test/setup.ts'],
         // Each test's mountPage loads src/main.tsx afresh, which is slow while the root `pnpm test` runs packages
         // at once. The warm-up in src/test/PageTest.ts runs in a beforeAll, so hooks get the same time.
         testTimeout: 15_000,

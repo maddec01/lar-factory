@@ -15,10 +15,10 @@ import {
     ListHeader,
     ListNote,
     ListSortMenu,
+    Loading,
     Modal,
     SidebarNavigationGroup,
     SidebarPane,
-    Spinner,
 } from '@lar-works/design-system';
 import { Inbox, SquarePen } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
@@ -171,7 +171,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             {q || filtering(filters) ? (
                                 'Nothing here matches.'
                             ) : reading ? (
-                                <Spinner label="Loading Projects…" />
+                                <Loading presentation="inline" label="Loading Projects…"  />
                             ) : (
                                 'Nothing in List.'
                             )}
@@ -179,7 +179,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                     )}
                     {items.length > 0 && reading && (
                         <ListNote reading>
-                            <Spinner label="Loading more Projects…" />
+                            <Loading presentation="inline" label="Loading more Projects…"  />
                         </ListNote>
                     )}
                 </Modal.Body>

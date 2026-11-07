@@ -3,7 +3,7 @@
 
 import { readingScope } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
-import { Spinner, StagePane, StagePaneEmpty } from '@lar-works/design-system';
+import { Loading, StagePane, StagePaneEmpty } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useShownScope } from '@/features/filters';
@@ -46,6 +46,6 @@ export function PaneEmpty({ filtered, none, children }: { filtered: boolean; non
     const reading = useBoardStore((state) => readingScope(state.data, scope ?? undefined));
 
     return (
-        <StagePaneEmpty>{reading ? <Spinner label="Loading Projects…" /> : filtered ? children : none}</StagePaneEmpty>
+        <StagePaneEmpty>{reading ? <Loading presentation="inline" label="Loading Projects…"  /> : filtered ? children : none}</StagePaneEmpty>
     );
 }

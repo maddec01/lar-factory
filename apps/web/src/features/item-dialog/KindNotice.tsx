@@ -2,7 +2,7 @@
 
 import { kindSwapAccessProblem, sameRepo, trackerCapabilities } from '@lar-factory/shared';
 import type { Item, KindTicketSwap, SwapKind } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { detailsCache } from './DetailsCache';
@@ -11,7 +11,6 @@ import { useKindChangeStore } from './KindChangeStore';
 import type { ItemDetailsRead } from './useItemDetails';
 import { KIND_BADGES } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 const kindName = (value: SwapKind) => KIND_BADGES[value]!.name;
 const NOTICE_HINT = 'm-0 text-xs text-(--muted-foreground)';
@@ -124,7 +123,7 @@ export function KindNotice({
             <span className="flex flex-wrap gap-2">
                 {ticketMoved ? (
                     <Button
-                        {...kind('other')}
+                        {...buttonKind('other')}
                         disabled={busy}
                         onClick={() => void answer(item.id, 'update-item', ticketKind)}
                     >
@@ -132,14 +131,14 @@ export function KindNotice({
                     </Button>
                 ) : (
                     <Button
-                        {...kind('other')}
+                        {...buttonKind('other')}
                         disabled={busy || checking || problem !== null}
                         onClick={() => void start(item.id, item.kind as SwapKind)}
                     >
                         {said ? `Update ticket to ${mine}` : `Add ${mine} to ticket`}
                     </Button>
                 )}
-                <Button {...kind('other')} disabled={busy} onClick={keep}>
+                <Button {...buttonKind('other')} disabled={busy} onClick={keep}>
                     {ticketMoved ? `Keep item as ${mine}` : said ? `Keep ticket as ${said}` : 'Leave ticket as is'}
                 </Button>
             </span>

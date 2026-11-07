@@ -1,6 +1,6 @@
 import { trackerCapabilities, type SetupDetection } from '@lar-factory/shared';
 import { emptyVocabularyTerm } from '@lar-factory/shared/vocabulary';
-import { Badge } from '@lar-works/design-system';
+import { Badge, HelpTip, InsetPanel } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { useWizardStore, type Run } from './WizardStore';
@@ -11,7 +11,6 @@ import {
     VocabularyRead,
     type VocabularyKind,
 } from '@/features/repositories';
-import { FIELD_GROUP, HelpTip } from '@/shared/ui/setting-rows/FieldRow';
 
 function KindMappingFields({ run, detection }: { run: Run; detection: SetupDetection }) {
     const { choose, detect } = useWizardStore();
@@ -20,7 +19,7 @@ function KindMappingFields({ run, detection }: { run: Run; detection: SetupDetec
     if (!discovery) return <VocabularyRead repo={run.repo!} error={error} retry={retry} />;
 
     return (
-        <div className={FIELD_GROUP}>
+        <InsetPanel presentation="settings">
             {(Object.keys(KIND_NAMES) as VocabularyKind[]).map((key) => (
                 <VocabularyFields
                     key={key}
@@ -44,7 +43,7 @@ function KindMappingFields({ run, detection }: { run: Run; detection: SetupDetec
                     }}
                 />
             ))}
-        </div>
+        </InsetPanel>
     );
 }
 
@@ -67,7 +66,7 @@ export function KindMapping({ run, detection }: { run: Run; detection: SetupDete
                 <div className="mt-3 grid min-w-0 gap-3">
                     <span className="text-xs text-(--muted-foreground)">
                         New {labels} wait until you add the Project.{' '}
-                        <HelpTip title="kind mapping">
+                        <HelpTip label="kind mapping">
                             Skip this if you like. Without a mapping, new tickets get no {labels} from their kind. New{' '}
                             {labels} are created only when you choose Save and add Project. You can edit these mappings
                             later in Settings.

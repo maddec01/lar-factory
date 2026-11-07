@@ -1,4 +1,4 @@
-// CSS that @lar-factory/ui's compiledCss plugin compiles at build time, imported as a string.
+// CSS that the compiledCss plugin (scripts/compiled-css.ts) compiles at build time, imported as a string.
 declare module '*.css?compiled' {
     const css: string;
     export default css;

@@ -6,25 +6,35 @@
 
 import { boardSections, readingScope } from '@lar-factory/shared';
 import type { ListGroup } from '@lar-factory/shared';
-import { Button, Badge, Input, Modal, SidebarNavigationGroup, SidebarPane } from '@lar-works/design-system';
+import {
+    Button,
+    buttonKind,
+    Input,
+    ListButton as TitleBarListButton,
+    ListGroupItem as GroupItem,
+    ListHeader,
+    ListNote,
+    ListSortMenu,
+    Modal,
+    SidebarNavigationGroup,
+    SidebarPane,
+    Spinner,
+} from '@lar-works/design-system';
 import { Inbox, SquarePen } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 
-import { GroupItem, ItemRow } from './ListRows';
+import { ItemRow } from './ListRows';
 import { matchesSearch } from './ListSearch';
-import { SORTS } from './ListSorts';
+import { SORT_OPTIONS, SORTS } from './ListSorts';
 import type { Sort } from './ListSorts';
 import { useListStore } from './ListStore';
-import { SortMenu } from './SortMenu';
 import { useFocusSearchWhenOpenerGoes } from './useFocusSearchWhenOpenerGoes';
 import { useAddItemStore } from '@/features/add-item';
 import { ItemFilterBar, filtering, rowFilter, useItemFilters, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { EXPANDED, ExpandButton, useExpand, dialogPreference } from '@/shared/ui/expand-dialog/ExpandDialog';
-import { Loader } from '@/shared/ui/loading/Loader';
+import { ExpandButton, useExpand, dialogPreference } from '@/shared/dialogs/ExpandDialog';
 
 function ListModal({ onClose }: { onClose: () => void }) {
     const childOpen = useItemDialogStore((state) => state.itemId !== null);
@@ -76,7 +86,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
             <Modal.Content
                 data-list-modal
                 data-expanded={expanded}
-                style={expanded ? EXPANDED : undefined}
+                expanded={expanded}
                 headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />}
                 title="List"
                 focusFirstField
@@ -97,8 +107,8 @@ function ListModal({ onClose }: { onClose: () => void }) {
                     </SidebarPane>
                 }
             >
-                <div className="flex shrink-0 flex-col gap-2 px-5 sm:px-6">
-                    <div className="flex items-center gap-2">
+                <ListHeader
+                    search={
                         <Input
                             ref={searchField}
                             type="search"
@@ -107,42 +117,45 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             placeholder="Search List"
                             aria-label="Search List items"
                         />
+                    }
+                    add={
                         <Button
-                            {...kind('main')}
+                            {...buttonKind('main')}
                             leftIcon={<SquarePen />}
-                            className="add-item shrink-0"
+                            data-add-item
                             onClick={() => useAddItemStore.getState().setOpen(true)}
                         >
                             Add item
                         </Button>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2">
-                        <span className="text-base-content truncate text-sm font-semibold">
-                            {picked ? picked.name : 'All Projects'}
-                        </span>
-                        {!reading && <Badge>{items.length}</Badge>}
-                        {picked && (
+                    }
+                    title={picked ? picked.name : 'All Projects'}
+                    {...(!reading && { count: items.length })}
+                    scope={
+                        picked && (
                             <Button
-                                {...kind('other')}
+                                {...buttonKind('other')}
+                                compact={false}
                                 data-toggle
-                                className="scope-board"
+                                data-scope-board
                                 aria-pressed={scoped}
                                 selected={scoped}
                                 onClick={() => setScope(scoped ? null : picked.repo)}
                             >
                                 {scoped ? 'Board scoped' : 'Scope board'}
                             </Button>
-                        )}
-                        <SortMenu sort={effectiveSort} onSort={setSort} />
-                    </div>
-                    <ItemFilterBar
-                        filters={filters}
-                        onChange={setFilters}
-                        rows={held
-                            .filter((group) => !picked || group.repo === picked.repo)
-                            .flatMap((group) => group.items)}
-                    />
-                </div>
+                        )
+                    }
+                    sort={<ListSortMenu value={effectiveSort} options={SORT_OPTIONS} onChange={setSort} />}
+                    filters={
+                        <ItemFilterBar
+                            filters={filters}
+                            onChange={setFilters}
+                            rows={held
+                                .filter((group) => !picked || group.repo === picked.repo)
+                                .flatMap((group) => group.items)}
+                        />
+                    }
+                />
                 <Modal.Body>
                     {items.map((item) => (
                         <ItemRow
@@ -154,20 +167,20 @@ function ListModal({ onClose }: { onClose: () => void }) {
                         />
                     ))}
                     {!items.length && (
-                        <p className="empty text-base-700 m-0 p-4 text-sm">
+                        <ListNote>
                             {q || filtering(filters) ? (
                                 'Nothing here matches.'
                             ) : reading ? (
-                                <Loader label="Loading Projects…" />
+                                <Spinner label="Loading Projects…" />
                             ) : (
                                 'Nothing in List.'
                             )}
-                        </p>
+                        </ListNote>
                     )}
                     {items.length > 0 && reading && (
-                        <p className="text-base-700 m-0 p-4 text-sm" data-reading>
-                            <Loader label="Loading more Projects…" />
-                        </p>
+                        <ListNote reading>
+                            <Spinner label="Loading more Projects…" />
+                        </ListNote>
                     )}
                 </Modal.Body>
             </Modal.Content>
@@ -184,16 +197,13 @@ export function ListButton() {
 
     return (
         <>
-            <Button
-                {...kind('control')}
-                className="list-button px-2"
-                leftIcon={<Inbox />}
-                title="List"
-                onClick={() => setOpen(true)}
-            >
-                <span className="@max-[70rem]:sr-only">List</span>
-                {count || !reading ? <Badge>{count}</Badge> : <Loader title="Loading Projects…" />}
-            </Button>
+            <TitleBarListButton
+                label="List"
+                icon={<Inbox />}
+                count={count || !reading ? count : undefined}
+                loadingLabel="Loading Projects…"
+                onOpen={() => setOpen(true)}
+            />
             {open && <ListModal onClose={() => setOpen(false)} />}
         </>
     );

@@ -10,7 +10,7 @@ import { Fact, LABEL_ERROR } from './DetailsParts';
 import { useLabelEdit } from './useLabelEdit';
 import { LabelChips, useShownLabels } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { LabelPicker } from '@/shared/ui/labels/LabelPicker';
+import { LabelPicker } from '@/shared/labels/LabelPicker';
 
 /**
  * The tracker's labels on the item, without those its row hides, and the picker that adds and removes them; linked-work

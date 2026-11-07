@@ -34,7 +34,7 @@ const removeChip = (name: string) =>
 const clear = () => settle(() => bar().querySelector<HTMLButtonElement>('[data-filter-clear]')!.click());
 const search = () => settle(() => $<HTMLButtonElement>('[data-search-field]')!.click());
 const removeToken = (name: string) =>
-    settle(() => $<HTMLButtonElement>(`[data-search-dialog] button[aria-label="Remove ${name}"]`)!.click());
+    settle(() => $<HTMLButtonElement>(`[data-command-palette] button[aria-label="Remove ${name}"]`)!.click());
 const withItems = (items: Item[], rest: Partial<BoardData> = {}): BoardData => ({ ...sample, ...rest, items });
 
 test('choices within a filter match any, and the two filters must both match', () => {
@@ -164,7 +164,7 @@ test('a dossier stays while its parent matches, and the board search offers the 
     expect($('[data-dossiers]'), 'the parent matches, its part does not').not.toBeNull();
     expect($('[data-stage="build"] li[data-item="C"]')).toBeNull();
     await search();
-    expect($$('[data-search-dialog] [role="group"]').at(-1)!.textContent).toBe('Labelsarea: webonly-on-part');
+    expect($$('[data-command-palette] [role="group"]').at(-1)!.textContent).toBe('Labelsarea: webonly-on-part');
 });
 
 test('the filters apply to every pane, their counts follow, and each says when nothing matches', async () => {

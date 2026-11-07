@@ -9,7 +9,7 @@ import { repositoryGroup } from './ProjectRows';
 import { custom, type Page, type PagesInput, type Row } from './SettingsModel';
 import { bundledGroup, targetGroup } from './SkillRows';
 import { DIAGNOSED, azSkipped, ghSkipped, stateOf, toolDescription } from './ToolRows';
-import { ToolState } from '@/shared/ui/setting-rows/SettingControls';
+import { ToolState } from '@/shared/settings/SettingControls';
 
 export { settingsData } from './SettingsModel';
 export type { Group, Page, PagesInput, SettingsData } from './SettingsModel';

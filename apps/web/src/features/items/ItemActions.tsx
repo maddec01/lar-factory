@@ -3,14 +3,13 @@
 
 import { canAbandon, itemName, ref } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 import { useId, useRef } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
 import type { ItemAction } from './ActionStore';
 import { askAbandon, backToList, queueItem } from './CardActions';
 import { DismissButton, closeKeepingFocus } from '@/features/notices';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** Board writes are off in sample mode, so its buttons are too; an action in flight holds them. */
 export function writeState(
@@ -29,7 +28,7 @@ export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
 
     return (
         <Button
-            {...kind('other')}
+            {...buttonKind('other')}
             data-queue={item.id}
             aria-label={`${verb} ${itemName(item)}`}
             {...writeState(data, action)}
@@ -47,7 +46,7 @@ export function BackToListButton({ item, data }: { item: Item; data: BoardData }
 
     return (
         <Button
-            {...kind('other')}
+            {...buttonKind('other')}
             className="link-action"
             data-back-to-list={item.id}
             aria-label={`${moving ? 'Moving' : 'Move to List'} ${itemName(item)}`}
@@ -75,7 +74,7 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
     return (
         <>
             <Button
-                {...kind('other')}
+                {...buttonKind('other')}
                 className="link-action disabled:pointer-events-auto"
                 data-abandon={item.id}
                 aria-label={`${verb} ${itemName(item)}`}
@@ -108,7 +107,7 @@ export function ActionError({ item }: { item: Item }) {
     return (
         <span className="action-error" ref={el}>
             <span role="alert">{action.message}</span>{' '}
-            <DismissButton what={` error for ${ref(item)}`} onClick={close} />
+            <DismissButton inline what={` error for ${ref(item)}`} onClick={close} />
         </span>
     );
 }

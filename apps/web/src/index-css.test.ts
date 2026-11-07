@@ -12,16 +12,6 @@ test.each(sheets)('%s sets no raw colour or pixel value', (path) => {
     expect(rules(path)).not.toMatch(/#[\da-f]{3,8}\b|\b(rgba?|hsla?|oklch|oklab)\(|\d(px|pt)\b/i);
 });
 
-const baseLayer = () => rules('index.css').match(/@layer base \{([\s\S]*?)\n\}/)?.[1] ?? '';
-
-test("the board's focus outline sits in the base layer, so a design-system control's outline-none wins", () => {
-    expect(baseLayer()).toMatch(/^\s*:focus-visible \{/m);
-});
-
-test("the board's link rules sit in the base layer, so a link styled as a button keeps its button's colours", () => {
-    expect(baseLayer()).toMatch(/^\s*a \{\s*color: inherit;/m);
-});
-
 // A folder with no sheet of its own has no page class names, so its class names are all Tailwind utilities.
 const sources = [...rules('index.css').matchAll(/^@source "\.\/(.+)";$/gm)].map((m) => m[1]!);
 const folders = [

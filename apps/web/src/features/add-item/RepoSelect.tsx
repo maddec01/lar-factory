@@ -1,7 +1,7 @@
 // The repository select both Add item panes start with, and the hint when none is onboarded.
 
 import { noneOnboarded, repoName } from '@lar-factory/shared';
-import { FormSelect } from '@lar-factory/ui/form-select';
+import { FormSelect } from '@lar-works/design-system';
 
 import { AddingARepository } from '@/features/notices';
 import { ProjectIcon } from '@/features/repositories';

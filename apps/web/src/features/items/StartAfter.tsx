@@ -13,10 +13,11 @@ import {
     startRequest,
 } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-import { Button, DropdownMenu } from '@lar-works/design-system';
+import { Button, buttonKind, DropdownMenu } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
+import { ICON } from './ButtonIcons';
 import { writeState } from './ItemActions';
 import { opensOnChecked } from './ModelEntries';
 import { StartControl, StartEntries } from './StartControl';
@@ -24,7 +25,6 @@ import type { StartKind } from './StartStore';
 import { notify, DismissButton, closeKeepingFocus } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { ICON, kind as buttonKind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */
 const startsAfter = (item: Item, short = false): string | null => openBlockerRefs(item, short).at(-1) ?? null;
@@ -191,7 +191,7 @@ export function StartAfterError({ item, data }: { item: Item; data: BoardData })
         <p className="start" ref={el} data-start-after-error={item.id}>
             <span className="action-error">
                 <span role="alert">Start after failed: {error}</span>{' '}
-                <DismissButton what={` Start after error for ${ref(item)}`} onClick={close} />
+                <DismissButton inline what={` Start after error for ${ref(item)}`} onClick={close} />
             </span>
         </p>
     );

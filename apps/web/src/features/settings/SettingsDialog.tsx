@@ -6,10 +6,13 @@
 import { boardApp, shownRepo } from '@lar-factory/shared';
 import {
     Button,
+    buttonKind,
+    HelpTip,
     Input,
+    InsetPanel,
     Modal,
-    SidebarNavigationItem,
     SidebarNavigationGroup,
+    SidebarNavigationItem,
     SidebarPane,
 } from '@lar-works/design-system';
 import { SettingsIcon } from '@lar-works/design-system/icons';
@@ -21,8 +24,7 @@ import { ProjectPage, projectSettings } from '@/features/repositories';
 import { useUpdateStore } from '@/features/updates';
 import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { FieldRow, HelpTip, FIELD_GROUP } from '@/shared/ui/setting-rows/FieldRow';
+import { FieldRow } from '@/shared/settings/FieldRow';
 
 /** The section list's groups, by section id. */
 const NAV: { label: string; ids: string[] }[] = [
@@ -36,7 +38,7 @@ const NAV: { label: string; ids: string[] }[] = [
 export function SettingsButton() {
     return (
         <Button
-            {...kind('control')}
+            {...buttonKind('control')}
             data-icon-only="large"
             className="open-settings text-base-content"
             aria-label="Settings"
@@ -57,7 +59,7 @@ function GroupView({ group }: { group: Group }) {
                     {group.title && (
                         <h3 className="m-0 flex items-center gap-1.5 text-[13px] font-semibold">
                             {group.title}
-                            {group.help && <HelpTip title={group.title}>{group.help}</HelpTip>}
+                            {group.help && <HelpTip label={group.title}>{group.help}</HelpTip>}
                         </h3>
                     )}
                     {group.description && (
@@ -66,7 +68,7 @@ function GroupView({ group }: { group: Group }) {
                 </div>
             )}
             {(group.rows.length > 0 || group.footer) && (
-                <div className={FIELD_GROUP}>
+                <InsetPanel presentation="settings">
                     {group.rows.map((row) => (
                         <FieldRow
                             key={row.id}
@@ -93,7 +95,7 @@ function GroupView({ group }: { group: Group }) {
                         </FieldRow>
                     ))}
                     {group.footer && <div className="rounded-b-xl bg-(--muted) px-4 py-2">{group.footer}</div>}
-                </div>
+                </InsetPanel>
             )}
             {group.note}
         </section>
@@ -229,7 +231,7 @@ function SettingsModal() {
                         {setup ? (
                             <>
                                 <span>
-                                    <Button {...kind('other')} onClick={() => setSection('projects')}>
+                                    <Button {...buttonKind('other')} onClick={() => setSection('projects')}>
                                         ← Projects
                                     </Button>
                                 </span>

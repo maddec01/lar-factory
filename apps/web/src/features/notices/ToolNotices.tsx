@@ -10,13 +10,12 @@ import {
     type GhCheck,
     type T3Check,
 } from '@lar-factory/shared';
-import { Button, BrandMark } from '@lar-works/design-system';
+import { Button, buttonKind, ToolMissing } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useRecheckStore } from './RecheckStore';
 import { Warning } from './Warning';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { CopyButton } from '@/shared/ui/copy/CopyButton';
+import { CopyButton } from '@/shared/copy/CopyButton';
 
 const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';
 
@@ -36,19 +35,13 @@ function Recheck({ check }: { check: FailedCheck }) {
 
     return (
         <>
-            <Button
-                {...kind('other')}
-                className="recheck"
-                data-recheck
-                disabled={checking}
-                onClick={() => void recheck()}
-            >
+            <Button {...buttonKind('other')} data-recheck disabled={checking} onClick={() => void recheck()}>
                 {checking ? 'Checking…' : 'Recheck'}
             </Button>
             {note && (
                 <>
                     {' '}
-                    <span className="recheck-note" role="status">
+                    <span data-recheck-note role="status">
                         {note}
                     </span>
                 </>
@@ -82,23 +75,13 @@ function Fix({ check, tool, what, children }: { check: FailedCheck; tool: string
 /** The notice that fills the main area while no t3 is found. */
 export function T3Missing({ check }: { check: FailedCheck<T3Check> }) {
     return (
-        <div className="tool-missing">
-            <div className="tool-missing-box" role="alert">
-                <BrandMark label="Lar" />
-                <h1>T3 Code not found</h1>
-                <p>
-                    <Fix check={check} tool="t3" what="the T3 Code CLI">
-                        The board starts threads through T3 Code's <code>t3</code> command and didn't find it on the
-                        login shell's PATH, in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press
-                        Recheck.
-                    </Fix>{' '}
-                    {LOOKS_AGAIN}
-                </p>
-                <p>
-                    <Recheck check={check} />
-                </p>
-            </div>
-        </div>
+        <ToolMissing title="T3 Code not found" action={<Recheck check={check} />}>
+            <Fix check={check} tool="t3" what="the T3 Code CLI">
+                The board starts threads through T3 Code's <code>t3</code> command and didn't find it on the login
+                shell's PATH, in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck.
+            </Fix>{' '}
+            {LOOKS_AGAIN}
+        </ToolMissing>
     );
 }
 

@@ -1,5 +1,5 @@
 import { trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
-import { Alert, Button } from '@lar-works/design-system';
+import { Alert, Button, buttonKind } from '@lar-works/design-system';
 // Settings' Labels section. The tracker holds the only copy, so the section reads it each time and keeps no list. It reads
 // the capability description for what the tracker's labels have, and never checks a provider's name.
 import { useState } from 'react';
@@ -11,7 +11,6 @@ import { useEditStore, type LabelChange } from './EditStore';
 import { LabelRow } from './LabelRow';
 import { useTrackerLabels } from './useTrackerLabels';
 import { KIND_NAMES, type VocabularyKind } from './VocabularyKinds';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** The kind mappings holding `name` in this repository, as a sentence names them, or null when none does. */
 function mappingsOf(name: string, setup: RepositorySetup): string | null {
@@ -63,7 +62,7 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
                     tone="danger"
                     title={`Could not read ${heading.toLowerCase()}`}
                     action={
-                        <Button {...kind('other')} onClick={retry}>
+                        <Button {...buttonKind('other')} onClick={retry}>
                             Retry
                         </Button>
                     }

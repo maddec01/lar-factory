@@ -10,7 +10,6 @@ import type { ReactNode } from 'react';
 
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { tint } from '@/shared/ui/labels/LabelTint';
 
 /** The control room's repository badge, with a medium label. */
 export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoConfig[] }) {
@@ -143,7 +142,7 @@ export function LabelChips({ item }: { item: LabelledItem }) {
     return (
         <>
             {useShownLabels(item).map((label) => (
-                <Badge key={label} data-label-chip className="max-w-full" style={tint(item.labelColors?.[label])}>
+                <Badge key={label} data-label-chip className="max-w-full" labelColor={item.labelColors?.[label]}>
                     <span className="max-w-52 truncate" title={label}>
                         {label}
                     </span>

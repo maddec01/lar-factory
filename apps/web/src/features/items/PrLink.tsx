@@ -3,10 +3,10 @@
 
 import { itemPr } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 
+import { ICON } from './ButtonIcons';
 import { LinkButton } from './LinkButton';
-import { ICON, kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export function PrLink({ item, label }: { item: Item; label: string }) {
     const url = itemPr(item)?.url;
@@ -15,7 +15,7 @@ export function PrLink({ item, label }: { item: Item; label: string }) {
     if (!url)
         return (
             <Button
-                {...kind('open')}
+                {...buttonKind('open')}
                 leftIcon={ICON.pr}
                 className="disabled:pointer-events-auto"
                 data-pr-link={item.id}

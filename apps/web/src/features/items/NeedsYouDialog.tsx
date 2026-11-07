@@ -3,7 +3,7 @@
 
 import { needsYouPrompt } from '@lar-factory/shared';
 import type { BoardData, Item, NeedsYouAction } from '@lar-factory/shared';
-import { Alert, Button, DropdownMenu, Modal, Text } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, DropdownMenu, Modal, Text } from '@lar-works/design-system';
 import { useEffect, useRef, useState } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
@@ -13,7 +13,6 @@ import { CleanupChoices, executeCleanup, inspectCleanup, offersCleanup, useClean
 import { writeState } from './ItemActions';
 import { StartEntries } from './StartControl';
 import type { ActionResult } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 interface Props {
     item: Item;
@@ -131,7 +130,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
         else void finish(() => resolveNeedsYou(item.id, offer));
     };
     const confirmButton = (name: string, press: () => void) => (
-        <Button {...kind('main')} {...state} key={name} disabled={held} onClick={press}>
+        <Button {...buttonKind('main')} {...state} key={name} disabled={held} onClick={press}>
             {name}
         </Button>
     );
@@ -155,7 +154,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
             return choices.map((branchChoice) => (
                 <DropdownMenu key={branchChoice}>
                     <DropdownMenu.Trigger asChild>
-                        <Button {...kind('main')} {...state} disabled={held}>
+                        <Button {...buttonKind('main')} {...state} disabled={held}>
                             {branchChoice === 'continue' ? 'Continue on old branch' : 'Start on new branch'}
                         </Button>
                     </DropdownMenu.Trigger>
@@ -244,7 +243,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button {...kind('other')} disabled={loading} onClick={dismiss}>
+                    <Button {...buttonKind('other')} disabled={loading} onClick={dismiss}>
                         Cancel
                     </Button>
                     {actions()}

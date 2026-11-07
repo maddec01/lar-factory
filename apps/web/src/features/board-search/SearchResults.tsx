@@ -66,7 +66,7 @@ export interface SearchHandlers {
     widen: () => void;
 }
 
-const icon = (Icon: LucideIcon) => <Icon aria-hidden="true" className="size-3.5" />;
+const icon = (Icon: LucideIcon) => <Icon aria-hidden="true" />;
 
 const openSettings = (section?: string) => {
     const store = useSettingsStore.getState();
@@ -126,7 +126,7 @@ export function settingsOptions(
     const general = pages({ ...settings, data: settingsData(data), archive: { items: null, problem: null } }).flatMap(
         (page) => {
             const entry = {
-                icon: <span className="[&_svg]:size-3.5">{page.icon}</span>,
+                icon: page.icon,
                 select: () => leave(() => openSettings(page.id)),
             };
 

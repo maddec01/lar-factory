@@ -1,10 +1,7 @@
-// The settings rows' working controls, on the design system's Switch, Select and Button.
+// The settings rows' working controls, on the design system's Switch, FormSelect, Button and StatusText.
 
-import { FormSelect } from '@lar-factory/ui/form-select';
-import { Button, Switch as DesignSwitch } from '@lar-works/design-system';
+import { Button, buttonKind, FormSelect, StatusText, Switch as DesignSwitch } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
-
-import { kind } from '../buttons/ButtonKinds';
 
 /** A working row renders its control. Unbuilt settings carry no value. */
 export type Control = { type: 'unavailable' } | { type: 'custom'; render: () => ReactNode };
@@ -32,8 +29,8 @@ export function Switch({
             aria-description={description}
             disabled={disabled}
             aria-disabled={busy}
-            className="aria-disabled:cursor-progress"
-            onCheckedChange={(next) => !busy && onChange?.(next)}
+            busy={busy}
+            onCheckedChange={(next) => onChange?.(next)}
         />
     );
 }
@@ -56,18 +53,18 @@ export function Choice({
     busy?: boolean;
 }) {
     return (
-        <span className="block w-44 max-w-full">
-            <FormSelect
-                aria-label={label}
-                writesOnPick
-                placeholder="Choose"
-                value={value ?? ''}
-                disabled={disabled}
-                aria-disabled={busy}
-                onChange={(next) => !busy && onChange?.(next)}
-                choices={options.map((option) => ({ value: option.value, name: option.label }))}
-            />
-        </span>
+        <FormSelect
+            aria-label={label}
+            presentation="setting"
+            writesOnPick
+            placeholder="Choose"
+            value={value ?? ''}
+            disabled={disabled}
+            aria-disabled={busy}
+            busy={busy}
+            onChange={(next) => onChange?.(next)}
+            choices={options.map((option) => ({ value: option.value, name: option.label }))}
+        />
     );
 }
 
@@ -76,15 +73,14 @@ export function SmallButton({
     children,
     reason,
     onClick,
-    className,
+    ...data
 }: {
     children: ReactNode;
     reason?: string;
     onClick?: () => void;
-    className?: string;
-}) {
+} & { [key: `data-${string}`]: string | boolean | undefined }) {
     return (
-        <Button {...kind('other')} className={className} disabled={!!reason} title={reason} onClick={onClick}>
+        <Button {...buttonKind('other')} {...data} disabled={!!reason} title={reason} onClick={onClick}>
             {children}
         </Button>
     );
@@ -94,12 +90,5 @@ export function SmallButton({
 type ToolTone = 'success' | 'warning' | 'error' | 'muted';
 
 export function ToolState({ text, tone }: { text: string; tone: ToolTone }) {
-    const color = {
-        success: 'text-(--success-foreground)',
-        warning: 'text-(--warning-foreground)',
-        error: 'text-(--destructive-foreground)',
-        muted: 'text-(--muted-foreground)',
-    }[tone];
-
-    return <span className={`tool-state text-xs font-medium whitespace-nowrap ${color}`}>● {text}</span>;
+    return <StatusText text={text} tone={tone === 'error' ? 'danger' : tone} />;
 }

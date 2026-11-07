@@ -1,7 +1,7 @@
 // Add item captures a draft locally or creates its tracker ticket, and can find existing tickets.
 
 import { repoName } from '@lar-factory/shared';
-import { Button, Modal } from '@lar-works/design-system';
+import { Button, buttonKind, Modal } from '@lar-works/design-system';
 import { SquarePen } from '@lar-works/design-system/icons';
 import { useEffect, useState } from 'react';
 
@@ -12,8 +12,7 @@ import { PanelSection } from './IssueFields';
 import { HINT, RepoSelect } from './RepoSelect';
 import { TicketPicker } from './TicketPicker';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { EXPANDED, ExpandButton, useExpand } from '@/shared/ui/expand-dialog/ExpandDialog';
+import { ExpandButton, useExpand } from '@/shared/dialogs/ExpandDialog';
 
 /** Find a ticket: the repository, then the ticket picker for it. Picking closes the dialog. */
 function PickTicketPane() {
@@ -44,7 +43,7 @@ function PickTicketPane() {
                 {data.capture?.enabled === false && <p className={HINT}>Picking tickets is disabled in sample mode.</p>}
             </div>
             <Modal.Footer>
-                <Button {...kind('other')} onClick={() => setOpen(false)}>
+                <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
                     Cancel
                 </Button>
             </Modal.Footer>
@@ -103,7 +102,8 @@ function AddItemDialog() {
                 description={description}
                 aria-describedby="add-item-description"
                 presentation="paned"
-                style={expanded ? EXPANDED : pane === 'pick' ? FITS_CONTENT : undefined}
+                expanded={expanded}
+                style={!expanded && pane === 'pick' ? FITS_CONTENT : undefined}
                 headerActions={
                     <>
                         <PaneSwitch />
@@ -140,7 +140,7 @@ export function AddItem() {
     return (
         <>
             <Button
-                {...kind('main')}
+                {...buttonKind('main')}
                 className="add-item px-2"
                 leftIcon={<SquarePen />}
                 title="Add item (⌘N)"

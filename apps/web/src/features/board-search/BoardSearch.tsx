@@ -4,47 +4,26 @@
 // other choice closes it first, so a dialog that opens next returns the focus to the field.
 
 import { boardApp } from '@lar-factory/shared';
-import { SearchDialog, SearchDialogGroup, useSearchDialogOption } from '@lar-factory/ui/search-dialog';
-import { Button } from '@lar-works/design-system';
-import { Check } from '@lar-works/design-system/icons';
+import {
+    Button,
+    buttonKind,
+    CommandPalette,
+    CommandPaletteGroup,
+    CommandPaletteOption,
+    CommandPaletteTrigger,
+    Kbd,
+    Spinner,
+} from '@lar-works/design-system';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { useFilterGroups, useFilterTokens } from './BoardFilters';
 import type { FilterToken } from './BoardFilters';
-import { Field, Key } from './SearchField';
-import type { SearchOption } from './SearchOptions';
 import { searchResults, settingsOptions } from './SearchResults';
 import { useScopeStore, useShownScope } from '@/features/filters';
 import { resolveUpdateButtonAction, useUpdateStore } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { Loader } from '@/shared/ui/loading/Loader';
-
-function OptionRow({ option }: { option: SearchOption }) {
-    const props = useSearchDialogOption(option.value);
-
-    return (
-        <div
-            {...props}
-            aria-checked={option.on}
-            className="text-base-800 aria-selected:bg-primary/10 aria-selected:ring-primary/30 dark:text-base-content flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-sm aria-selected:ring-1 aria-selected:ring-inset pointer-coarse:h-11"
-        >
-            <span className="text-base-700 grid size-4 shrink-0 place-items-center">{option.icon}</span>
-            <span title={option.name} className="min-w-0 flex-1 truncate">
-                {option.name}
-            </span>
-            {option.hint && (
-                <span className="text-base-700 max-w-40 shrink-0 truncate text-xs tabular-nums">{option.hint}</span>
-            )}
-            {option.meta && (
-                <span className="text-base-700 max-w-56 shrink-0 truncate text-xs max-sm:hidden">{option.meta}</span>
-            )}
-            {option.on && <Check aria-hidden="true" className="text-primary size-3.5 shrink-0" />}
-        </div>
-    );
-}
 
 /** The step the Update pill would run now; none while it does nothing, as when another step is under way. */
 function useUpdateStep() {
@@ -94,7 +73,7 @@ function Dialog({
     const options = groups.flatMap((group) => group.options);
 
     return (
-        <SearchDialog
+        <CommandPalette
             label="Search the board"
             description="Find tickets, actions and settings, and filter the board."
             placeholder="Search"
@@ -107,7 +86,7 @@ function Dialog({
             onBackspaceEmpty={() => tokens.at(-1)?.remove?.onRemove()}
             trailing={
                 tokens.length > 0 && (
-                    <Button {...kind('other')} data-search-clear className="pointer-coarse:h-11!" onClick={clear}>
+                    <Button {...buttonKind('other')} data-search-clear onClick={clear}>
                         Clear
                     </Button>
                 )
@@ -117,34 +96,43 @@ function Dialog({
             onClose={onClose}
             listLabel="Search results"
             empty="Nothing matches."
-            busy={reading ? <Loader label="Loading Projects…" /> : undefined}
+            busy={reading}
+            busyLabel={<Spinner label="Loading Projects…" />}
             footer={
                 <>
                     <span>
-                        <Key>↑↓</Key> move
+                        <Kbd>↑↓</Kbd> move
                     </span>
                     <span>
-                        <Key>↵</Key> choose
+                        <Kbd>↵</Kbd> choose
                     </span>
                     {tokens.length > 0 && (
                         <span>
-                            <Key>⌫</Key> remove filter
+                            <Kbd>⌫</Kbd> remove filter
                         </span>
                     )}
                     <span>
-                        <Key>esc</Key> close
+                        <Kbd>esc</Kbd> close
                     </span>
                 </>
             }
         >
             {groups.map((group) => (
-                <SearchDialogGroup key={group.label} label={group.label}>
+                <CommandPaletteGroup key={group.label} label={group.label}>
                     {group.options.map((option) => (
-                        <OptionRow key={option.value} option={option} />
+                        <CommandPaletteOption
+                            key={option.value}
+                            value={option.value}
+                            icon={option.icon}
+                            name={option.name}
+                            {...(option.hint !== undefined && { hint: option.hint })}
+                            {...(option.meta !== undefined && { meta: option.meta })}
+                            {...(option.on !== undefined && { checked: option.on })}
+                        />
                     ))}
-                </SearchDialogGroup>
+                </CommandPaletteGroup>
             ))}
-        </SearchDialog>
+        </CommandPalette>
     );
 }
 
@@ -162,7 +150,14 @@ export function BoardSearch() {
 
     return (
         <>
-            <Field button={button} tokens={tokens} onOpen={show} />
+            <CommandPaletteTrigger
+                ref={button}
+                label="Search"
+                shortcut="k"
+                tokens={tokens}
+                filterLabel={(labels) => `filtered by ${labels.join(', ')}`}
+                onOpen={show}
+            />
             {open && <Dialog tokens={tokens} clear={clear} leave={leave} onClose={() => setOpen(false)} />}
         </>
     );

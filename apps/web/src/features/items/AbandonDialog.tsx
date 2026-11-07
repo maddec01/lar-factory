@@ -9,7 +9,7 @@ import {
     closesTicketOnAbandon,
     hasClosedPr,
 } from '@lar-factory/shared';
-import { Alert, Button, Modal, Text } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, Modal, Text } from '@lar-works/design-system';
 import { useEffect, useState, useRef } from 'react';
 
 import { useAbandonStore } from './AbandonStore';
@@ -17,7 +17,6 @@ import { abandonItem, closeTicket } from './CardActions';
 import { CleanupChoices, executeCleanup, inspectCleanup, useCleanupChoices } from './CleanupChoices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** The cleanup of the notice's work `itemId` names while its confirmation is open: null for any other Abandon. */
 function useNoticeCleanup(itemId: string | null) {
@@ -235,17 +234,17 @@ export function AbandonDialog() {
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button {...kind('other')} disabled={pending || unknown} onClick={dismiss}>
+                    <Button {...buttonKind('other')} disabled={pending || unknown} onClick={dismiss}>
                         {closing ? closeTicketPrompt(item).keep : 'Cancel'}
                     </Button>
                     {notice.failure ? (
                         <>
-                            <Button {...kind('other')} disabled={pending} onClick={notice.retry}>
+                            <Button {...buttonKind('other')} disabled={pending} onClick={notice.retry}>
                                 Try cleanup again
                             </Button>
                             <Button
-                                {...kind('main', 'danger')}
-                                data-wrap
+                                {...buttonKind('main', 'danger')}
+                                wrap
                                 disabled={pending}
                                 onClick={() => void confirm(failedCombined, true)}
                             >
@@ -257,8 +256,8 @@ export function AbandonDialog() {
                     ) : (
                         <>
                             <Button
-                                {...kind('main', 'danger')}
-                                data-wrap
+                                {...buttonKind('main', 'danger')}
+                                wrap
                                 disabled={pending || unknown || notice.checking}
                                 onClick={() => void confirm()}
                             >
@@ -270,8 +269,8 @@ export function AbandonDialog() {
                             </Button>
                             {!closing && closesTicketOnAbandon(item) && (
                                 <Button
-                                    {...kind('main', 'danger')}
-                                    data-wrap
+                                    {...buttonKind('main', 'danger')}
+                                    wrap
                                     disabled={pending || notice.checking}
                                     onClick={() => void confirm(true)}
                                 >

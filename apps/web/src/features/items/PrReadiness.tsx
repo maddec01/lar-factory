@@ -1,9 +1,8 @@
 import { writeHeaders, type Item, type LinkedPr } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 type Evidence =
     | { available: true; sourceRevision: string; observedAt: string; blockers: string[] }
@@ -107,7 +106,7 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
     return (
         <div className="basis-full text-xs text-(--muted-foreground)">
             <Button
-                {...kind('other')}
+                {...buttonKind('other')}
                 aria-expanded={open}
                 aria-controls={detailsId}
                 onClick={() => {
@@ -147,7 +146,7 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
                         </>
                     )}
                     <p>T3 Azure PR context is unsupported; evidence comes from Azure.</p>
-                    <Button {...kind('other')} onClick={() => setAttempt((n) => n + 1)}>
+                    <Button {...buttonKind('other')} onClick={() => setAttempt((n) => n + 1)}>
                         Refresh readiness
                     </Button>
                 </div>

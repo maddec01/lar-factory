@@ -4,12 +4,11 @@
 
 import { DEPENDENCY_OBSERVATION_WORDS, dependencyNotice, itemName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, DependencyHold, Item } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 
 import { useItemAction } from './ActionStore';
 import { markDependencyMet } from './CardActions';
 import { writeState } from './ItemActions';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** The Dependencies holding the item, met or not. */
 export const dependenciesOf = (item: Item): DependencyHold[] =>
@@ -77,7 +76,7 @@ export function Dependencies({ item, data, now }: { item: Item; data: BoardData;
                         )}
                         <span>
                             <Button
-                                {...kind('other')}
+                                {...buttonKind('other')}
                                 {...state}
                                 data-dependency-met={item.id}
                                 aria-label={`${d.met ? `Clear the met mark on the Dependency on ${d.owner}` : `Mark the Dependency on ${d.owner} met`}: ${itemName(item)}`}

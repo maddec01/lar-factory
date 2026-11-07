@@ -2,9 +2,10 @@
 // apps/desktop/vite.config.ts does, and bundles the board server into
 // dist-electron/server/server.mjs and the lar-work command into dist-electron/work-records/lar-work.mjs for the
 // packaged app, which has no node_modules. The dev window runs apps/server/src/server.ts as source.
-import { compiledCss } from '@lar-factory/ui/compiled-css';
 import { test } from '@lar-works/config';
 import { defineConfig, type UserConfig } from 'vite-plus';
+
+import { compiledCss } from './scripts/compiled-css.ts';
 
 const electronOnly = (id: string) => id === 'electron' || id.startsWith('electron/');
 

@@ -6,9 +6,9 @@ import { AutoBuildModelSetting } from './AutoBuildModel';
 import { LimitSetting } from './LimitSetting';
 import { custom, type Group, type SettingsData } from './SettingsModel';
 import { ShapingThreadCleanupSetting } from './ShapingThreadCleanup';
-import { DIALOG_PREFERENCES, dialogPreference } from '@/shared/ui/expand-dialog/ExpandDialog';
-import type { Control } from '@/shared/ui/setting-rows/SettingControls';
-import { Switch } from '@/shared/ui/setting-rows/SettingControls';
+import { DIALOG_PREFERENCES, dialogPreference } from '@/shared/dialogs/ExpandDialog';
+import type { Control } from '@/shared/settings/SettingControls';
+import { Switch } from '@/shared/settings/SettingControls';
 
 function DialogPreference({ preference, label }: { preference: keyof typeof DIALOG_PREFERENCES; label: string }) {
     const [on, setOn] = useState(() => dialogPreference(preference));

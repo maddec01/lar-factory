@@ -6,14 +6,13 @@ import {
     type ModelChoice,
     type ModelGroup,
 } from '@lar-factory/shared';
-import { Button, DropdownMenu } from '@lar-works/design-system';
+import { Button, buttonKind, DropdownMenu } from '@lar-works/design-system';
 // Settings uses the same provider groups and keyboard navigation as Start, with its saved model checked, and names the model each repository's builds use on T3 Project default.
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { ModelEntries, opensOnChecked } from '@/features/items';
 import { postAction, receive } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 function modelLabel(groups: ModelGroup[], selected: ModelChoice | undefined): string {
     if (!selected) return 'T3 Project default';
@@ -72,7 +71,7 @@ export function AutoBuildModelSetting({ data }: { data: AutoBuildData }) {
                 <DropdownMenu open={open && !saving} onOpenChange={(next) => setOpen(next && !saving)} modal={false}>
                     <DropdownMenu.Trigger asChild>
                         <Button
-                            {...kind('other')}
+                            {...buttonKind('other')}
                             aria-label="Auto-build model"
                             disabled={!state}
                             aria-busy={saving || undefined}

@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { postAction, receive } from '@/services/board/board.service';
-import { Choice } from '@/shared/ui/setting-rows/SettingControls';
+import { Choice } from '@/shared/settings/SettingControls';
 
 const CHOICES: { value: ShapingThreadCleanup; label: string }[] = [
     { value: 'keep', label: 'Keep' },

@@ -101,8 +101,9 @@ export default defineConfig({
         // at once. The warm-up in src/test/PageTest.ts runs in a beforeAll, so hooks get the same time.
         testTimeout: 15_000,
         hookTimeout: 60_000,
-        // Every test's page stays mounted, and ninna-ui's toast list is global to its module. Run through Vite, the
-        // module is loaded again after each test's vi.resetModules, so a test's toasts reach only its own page.
-        server: { deps: { inline: ['@ninna-ui/feedback'] } },
+        // Every test's page stays mounted, and the design system's notifications (on ninna-ui's toast list) are global
+        // to their modules. Run through Vite, the modules are loaded again after each test's vi.resetModules, so a
+        // test's toasts reach only its own page.
+        server: { deps: { inline: ['@ninna-ui/feedback', '@lar-works/design-system'] } },
     },
 });

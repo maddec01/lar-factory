@@ -17,12 +17,24 @@ import {
     usageIncomplete,
 } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
+import {
+    BoardCounter as Counter,
+    BoardCounters,
+    CounterDash,
+    CounterDivider,
+    CounterEmpty as Empty,
+    CounterFigure,
+    CounterGroup,
+    CounterGroups,
+    CounterOfLimit,
+    LimitBars,
+    Spinner,
+} from '@lar-works/design-system';
 import { CircleDollarSign } from '@lar-works/design-system/icons';
 
-import { Counter, Dash, Empty, LimitBars, List, spendFace } from './CounterParts';
+import { List, spendFace } from './CounterParts';
 import { StatusGlyph, useStatusActivity } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { Loader } from '@/shared/ui/loading/Loader';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? (item.stats.costUsd ?? 0) : 0);
 
@@ -56,14 +68,14 @@ export function Counters() {
     );
     // Nothing has been read yet, so a zero would be a claim.
     const unknown = (n: number) => reading && !n;
-    const countOf = (n: number) => (unknown(n) ? <Dash /> : n);
+    const countOf = (n: number) => (unknown(n) ? <CounterDash /> : n);
     const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading Projects' : hint);
     const subFor = (n: number) => (unknown(n) ? undefined : n);
-    const empty = (none: string) => <Empty>{reading ? <Loader label="Loading Projects…" /> : none}</Empty>;
+    const empty = (none: string) => <Empty>{reading ? <Spinner label="Loading Projects…" /> : none}</Empty>;
     const listOf = (items: Item[], none: string) => (items.length ? <List items={items} now={now} /> : empty(none));
 
     return (
-        <div className="counters flex shrink-0 items-center gap-0.5 whitespace-nowrap">
+        <BoardCounters>
             <Counter
                 label="need you"
                 value={countOf(s.needsYou.length)}
@@ -78,20 +90,17 @@ export function Counters() {
                 )}
             >
                 {s.needsYou.length ? (
-                    <div className="grid gap-1">
+                    <CounterGroups>
                         {[...new Set(s.needsYou.map((i) => i.status))].map((status) => {
                             const items = s.needsYou.filter((i) => i.status === status);
 
                             return (
-                                <section key={status}>
-                                    <h3 className="m-0 flex h-7 items-center gap-1 px-2 text-xs font-medium text-(--muted-foreground)">
-                                        {status} <span className="tabular-nums">{items.length}</span>
-                                    </h3>
+                                <CounterGroup key={status} title={status} count={items.length}>
                                     <List items={items} now={now} />
-                                </section>
+                                </CounterGroup>
                             );
                         })}
-                    </div>
+                    </CounterGroups>
                 ) : (
                     empty('Nothing waits on you.')
                 )}
@@ -101,7 +110,7 @@ export function Counters() {
                 label="shaping"
                 value={countOf(s.shaping.length)}
                 icon={glyph('Shaping')}
-                hideBelow="hidden @min-[54rem]:inline-flex"
+                fold="medium"
                 title="Shaping"
                 sub={subFor(s.shaping.length)}
                 hint={hintFor(
@@ -118,10 +127,11 @@ export function Counters() {
                 width={limit === undefined ? 'count' : 'limit'}
                 title="Building"
                 value={
-                    <>
-                        {countOf(building.length)}
-                        {limit !== undefined && <span className="font-normal text-(--muted-foreground)">/{limit}</span>}
-                    </>
+                    limit === undefined ? (
+                        countOf(building.length)
+                    ) : (
+                        <CounterOfLimit count={countOf(building.length)} limit={limit} />
+                    )
                 }
                 hint={hintFor(
                     building.length,
@@ -139,10 +149,7 @@ export function Counters() {
                     ) : unknown(building.length) ? (
                         `–/${limit}`
                     ) : (
-                        <span className="inline-flex items-center gap-2">
-                            <LimitBars used={building.length} limit={limit} />
-                            {building.length}/{limit}
-                        </span>
+                        <LimitBars used={building.length} limit={limit} />
                     )
                 }
                 foot={
@@ -160,7 +167,7 @@ export function Counters() {
                 label="shipped"
                 value={countOf(s.done.length)}
                 icon={glyph('Done')}
-                hideBelow="hidden @min-[54rem]:inline-flex"
+                fold="medium"
                 title="Shipped"
                 sub="last 7 days"
                 hint={hintFor(s.done.length, 'Done in the last 7 days')}
@@ -168,16 +175,16 @@ export function Counters() {
                 {listOf(s.done, 'Nothing shipped this week.')}
             </Counter>
 
-            <span aria-hidden="true" className="mx-1 hidden h-4 w-px shrink-0 bg-(--border) @min-[66rem]:block" />
+            <CounterDivider />
 
             <Counter
                 label="spend"
                 value={spend.value}
                 width="spend"
-                hideBelow="hidden @min-[66rem]:inline-flex"
+                fold="wide"
                 title="Agent spend"
                 sub={spend.sub}
-                icon={<CircleDollarSign className="shrink-0" strokeWidth={2.25} />}
+                icon={<CircleDollarSign strokeWidth={2.25} />}
                 hint={spend.notice ?? 'Agent cost on open and recent items, an API estimate'}
                 foot={
                     spend.partial
@@ -191,22 +198,20 @@ export function Counters() {
                     <List
                         items={costs.map((c) => c.item)}
                         now={now}
-                        trailing={(i) => (
-                            <span className="font-medium text-(--foreground)">{formatUsd(costOf(i))}</span>
-                        )}
+                        trailing={(i) => <CounterFigure>{formatUsd(costOf(i))}</CounterFigure>}
                     />
                 ) : (
                     <Empty>
                         {unavailable ? (
                             'Usage is unavailable, so nothing is priced.'
                         ) : usageStillLoading ? (
-                            <Loader label="Loading usage…" />
+                            <Spinner label="Loading usage…" />
                         ) : (
                             'No priced agent work yet.'
                         )}
                     </Empty>
                 )}
             </Counter>
-        </div>
+        </BoardCounters>
     );
 }

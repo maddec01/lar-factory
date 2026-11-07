@@ -11,7 +11,7 @@ the flow and `docs/plan.md` for how it was set up.
   in the Copy's "Overridden in" column of `UPSTREAM.md`.
 - The board is a root pnpm workspace laid out like T3 Code's monorepo:
   `apps/server`, `apps/web`, `apps/desktop` (the Electron board app),
-  `packages/shared`, `packages/ui` (the board's own UI on the design system) and `packages/work-records`
+  `packages/shared` and `packages/work-records`
   (the work-record database and its `lar-work` command, which browser code never
   imports). Apps import only packages, never each other. Code sits in feature folders (`src/github/`,
   `src/items/`) with no wrapper folders such as `services/`. File names are
@@ -20,14 +20,15 @@ the flow and `docs/plan.md` for how it was set up.
 - `apps/web/src` is laid out like Lar's other web apps (lar-server's and lar-platform's `web/src`), not as above:
   `app/` is the composition root (providers, the shell with the title bar and loading screen), `features/<feature>/`
   holds one user-facing area with an `index.ts` public API, `services/<domain>/` the board's data and server calls
-  (`<domain>.service.ts`, `<domain>.hooks.ts`, never UI), `shared/` cross-cutting foundations (`shared/ui/` holds
-  the board's own visual building blocks, on their way into the design system) and `test/` the test support. Components are PascalCase (`ItemDialog.tsx`), hooks `useX.ts`; imports across those folders use the `@/`
+  (`<domain>.service.ts`, `<domain>.hooks.ts`, never UI), `shared/` cross-cutting foundations and `test/` the test
+  support. `apps/web` composes the design system's components and styles nothing itself (`lar/no-visual-recipes`;
+  the feature folders that still hold class names are moving into the design system), and `src/index.css` imports
+  `@lar-works/design-system/board.css`. Components are PascalCase (`ItemDialog.tsx`), hooks `useX.ts`; imports across those folders use the `@/`
   alias, with no file extensions. `lar/boundaries` and `max-lines` (in `@lar-works/config`) enforce it.
 - Components, tokens and styles come from `@lar-works/design-system` (lar-web); import icons from
   `@lar-works/design-system/icons`, never from `lucide-react` (only `DynamicIcon`, which it doesn't re-export, comes
-  from `lucide-react/dynamic`). `packages/ui` holds the board's own UI on top of it
-  and two Copies from lar-web, listed in its `UPSTREAM.md`. Never edit one: take a fresh copy from upstream and
-  update its row.
+  from `lucide-react/dynamic`). A look the board needs and the design system lacks is added there, in lar-web, as a
+  generic component or, for the board's own compositions, in its `board/` category.
 - Repository settings live only in the local app data folder. The factory never
   reads, writes, detects or offers repository configuration or guidance files.
   Nothing secret goes in this public repo. Provider access uses local logins.
@@ -37,7 +38,7 @@ the flow and `docs/plan.md` for how it was set up.
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   The user merges every PR.
 - Board changes: run `pnpm test` in each of `apps/server`, `apps/web`,
-  `apps/desktop`, `packages/shared`, `packages/ui` and `packages/work-records` that changed (`pnpm test` at
+  `apps/desktop`, `packages/shared` and `packages/work-records` that changed (`pnpm test` at
   the root runs them all), then `pnpm run typecheck`, `pnpm run knip` and `pnpm run check` at the root.
   `pnpm run check` checks formatting, lint and types with Lar's shared rules (`@lar-works/config`, set up in the
   root `vite.config.ts`); `pnpm run fix` formats and applies the lint fixes. Copies and skill text stay unformatted.

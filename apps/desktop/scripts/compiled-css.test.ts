@@ -8,7 +8,7 @@ import { test } from 'vite-plus/test';
 import { compiledCss } from './compiled-css.ts';
 
 const designSystem = fileURLToPath(import.meta.resolve('@lar-works/design-system/styles.css'));
-const styles = fileURLToPath(new URL('../styles.css', import.meta.url));
+const styles = fileURLToPath(import.meta.resolve('@lar-works/design-system/board.css'));
 
 const load = async (css: string) => {
     const dir = await mkdtemp(join(tmpdir(), 'compiled-css-'));

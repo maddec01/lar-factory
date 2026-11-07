@@ -45,8 +45,8 @@ const seed = (kinds: string[], labels: string[] = []) =>
     localStorage.setItem(FILTERS_KEY, JSON.stringify({ kinds, labels }));
 
 const field = () => $<HTMLButtonElement>('[data-search-field]')!;
-const dialog = () => $('[data-search-dialog]');
-const input = () => $<HTMLInputElement>('[data-search-dialog] input')!;
+const dialog = () => $('[data-command-palette]');
+const input = () => $<HTMLInputElement>('[data-command-palette] input')!;
 const openDialog = () => settle(() => field().click());
 const press = (key: string, modifiers: KeyboardEventInit = {}) =>
     settle(() =>
@@ -60,14 +60,14 @@ const type = (value: string) =>
         input().dispatchEvent(new Event('input', { bubbles: true }));
     });
 const groups = () =>
-    $$('[data-search-dialog] [role="group"]').map((group) => [
+    $$('[data-command-palette] [role="group"]').map((group) => [
         text(group.querySelector('span')),
         [...group.querySelectorAll('[role="option"] .flex-1')].map((name) => text(name)),
     ]);
 const option = (name: string) =>
-    $$<HTMLElement>('[data-search-dialog] [role="option"]').find((o) => text(o.querySelector('.flex-1')) === name)!;
+    $$<HTMLElement>('[data-command-palette] [role="option"]').find((o) => text(o.querySelector('.flex-1')) === name)!;
 const choose = (name: string) => settle(() => option(name).click());
-const removes = () => $$('[data-search-dialog] li button').map((button) => button.getAttribute('aria-label'));
+const removes = () => $$('[data-command-palette] li button').map((button) => button.getAttribute('aria-label'));
 const clear = () => settle(() => $<HTMLButtonElement>('[data-search-clear]')!.click());
 const saved = () => JSON.parse(localStorage.getItem(FILTERS_KEY)!) as unknown;
 const queue = () => $$<HTMLLIElement>('.queue ol > li').map((row) => row.dataset.item);
@@ -164,6 +164,8 @@ test('off Apple platforms Ctrl K opens the dialog, ⌘K does not, and the field 
 
 test('on Apple platforms ⌘K opens the dialog, Ctrl K does not, and the hint says ⌘K', async () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    // The design system reads the platform from the user agent.
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0)');
     layOut(416, 60);
     await mountPage();
     expect(field().getAttribute('aria-keyshortcuts')).toBe('Meta+K');
@@ -388,7 +390,7 @@ test('every query word must match, and an empty list says nothing matches', asyn
     expect(groups()).toEqual([['Projects', ['All Projects']]]);
     await type('zzz');
     expect(groups()).toEqual([]);
-    expect(text($('[data-search-dialog] [role="status"]'))).toBe('Nothing matches.');
+    expect(text($('[data-command-palette] [role="status"]'))).toBe('Nothing matches.');
 });
 
 test('labels come from the items in Scope on the desk and the stages', async () => {
@@ -639,11 +641,11 @@ test('while the first read is unfinished the dialog shows the loading cue, not t
     await mountPage({ ...sample, items: [], firstRead: { step: 'items', running: [], settled: false } });
     await openDialog();
 
-    const status = () => text($('[data-search-dialog] [role="status"]'));
+    const status = () => text($('[data-command-palette] [role="status"]'));
 
     expect(status(), 'no tickets are on offer before typing').toBe('');
     await type('zzz');
     expect(groups()).toEqual([]);
     expect(status()).toBe('Loading Projects…');
-    expect($('[data-search-dialog] [data-loader]')).not.toBeNull();
+    expect($('[data-command-palette] [data-loader]')).not.toBeNull();
 });

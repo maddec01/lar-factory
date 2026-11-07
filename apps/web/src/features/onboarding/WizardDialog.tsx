@@ -3,8 +3,7 @@
 // is picked, or an offered run until Next or a change, then keeps it to resume. Once Finish saves, it says so, with Go to the board.
 
 import { shownRepo } from '@lar-factory/shared';
-import { Progress } from '@lar-factory/ui/progress';
-import { Button, Modal, Text } from '@lar-works/design-system';
+import { Button, buttonKind, Modal, Progress, Text } from '@lar-works/design-system';
 import { ArrowRight, Check } from '@lar-works/design-system/icons';
 import { useEffect, useRef } from 'react';
 
@@ -13,7 +12,6 @@ import { STEP_TITLES } from './WizardChoices';
 import { type Run, pickedProject, runSteps, stepReady, useWizardStore } from './WizardStore';
 import { ProjectChoiceIcon, ProjectIcon } from '@/features/repositories';
 import { useSettingsStore } from '@/features/settings';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /**
  * Where focus goes when the dialog closes and the design system's Modal found nowhere to return it: the button that opened it;
@@ -32,7 +30,7 @@ function Nav({ run }: { run: Run }) {
     if (finish.state === 'done')
         return (
             <Button
-                {...kind('main')}
+                {...buttonKind('main')}
                 leftIcon={<Check />}
                 onClick={() => {
                     close();
@@ -51,13 +49,13 @@ function Nav({ run }: { run: Run }) {
     return (
         <>
             {at > 0 && (
-                <Button {...kind('other')} disabled={finish.state === 'saving'} onClick={back}>
+                <Button {...buttonKind('other')} disabled={finish.state === 'saving'} onClick={back}>
                     Back
                 </Button>
             )}
             {at === steps.length - 1 ? (
                 <Button
-                    {...kind('main')}
+                    {...buttonKind('main')}
                     disabled={!ready}
                     loading={finish.state === 'saving'}
                     leftIcon={<Check />}
@@ -66,7 +64,12 @@ function Nav({ run }: { run: Run }) {
                     {savingLabels ? 'Save and add Project' : 'Add Project'}
                 </Button>
             ) : (
-                <Button {...kind('main')} disabled={!ready} rightIcon={<ArrowRight />} onClick={() => void next()}>
+                <Button
+                    {...buttonKind('main')}
+                    disabled={!ready}
+                    rightIcon={<ArrowRight />}
+                    onClick={() => void next()}
+                >
                     Next
                 </Button>
             )}

@@ -1,8 +1,9 @@
 // Operational warnings are inline details. They never open a toast or dialog.
+import { BoardWarning } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useDismissed, useDismissStore } from './DismissStore';
-import { DismissButton, closeKeepingFocus } from './Toasts';
+import { closeKeepingFocus } from './Toasts';
 
 export function Warning({
     dismissKey,
@@ -22,24 +23,18 @@ export function Warning({
     if (dismissed) return null;
 
     return (
-        <div data-slot="notice" className="relative border-t py-3 pr-8 text-xs first:border-t-0 first:py-1">
-            <div data-warning={dismissKey}>
-                <DismissButton
-                    what={`: ${what}`}
-                    onClick={(event) =>
-                        closeKeepingFocus(event.currentTarget.closest('[data-slot="notice"]'), () =>
-                            useDismissStore.getState().dismiss(dismissKey),
-                        )
-                    }
-                />
-                <div data-slot="title" className="font-medium">
-                    {title}
-                </div>
-                <div data-slot="description" className="text-base-700 mt-1">
-                    {children}
-                </div>
-                {action && <div className="mt-2">{action}</div>}
-            </div>
-        </div>
+        <BoardWarning
+            name={dismissKey}
+            title={title}
+            dismissLabel={`Dismiss: ${what}`}
+            onDismiss={(event) =>
+                closeKeepingFocus(event.currentTarget.closest('[data-slot="notice"]'), () =>
+                    useDismissStore.getState().dismiss(dismissKey),
+                )
+            }
+            action={action}
+        >
+            {children}
+        </BoardWarning>
     );
 }

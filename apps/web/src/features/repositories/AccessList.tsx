@@ -6,11 +6,10 @@ import {
     type RepositoryOperation,
     type RepositorySetup,
 } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind, HelpTip, InsetPanel } from '@lar-works/design-system';
 
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { FIELD_GROUP, FieldRow, HelpTip } from '@/shared/ui/setting-rows/FieldRow';
-import { ToolState } from '@/shared/ui/setting-rows/SettingControls';
+import { FieldRow } from '@/shared/settings/FieldRow';
+import { ToolState } from '@/shared/settings/SettingControls';
 
 export function operationNames(repo: string): Record<RepositoryOperation, string> {
     const azure = onAzure(repo);
@@ -52,7 +51,7 @@ export function AccessList({
 }) {
     return (
         <div data-access data-access-list className="grid min-w-0 gap-3">
-            <div className={FIELD_GROUP}>
+            <InsetPanel presentation="settings">
                 {rows.map((row) => (
                     <div key={row.name} data-operation={row.operation}>
                         <FieldRow label={row.name}>
@@ -77,10 +76,10 @@ export function AccessList({
                         </FieldRow>
                     </div>
                 ))}
-            </div>
+            </InsetPanel>
             {onRecheck && (
                 <span>
-                    <Button {...kind('other')} loading={checking} onClick={onRecheck}>
+                    <Button {...buttonKind('other')} loading={checking} onClick={onRecheck}>
                         Recheck access
                     </Button>
                 </span>
@@ -112,7 +111,7 @@ export function AccessReason({
     return (
         <span className="inline-flex min-w-0 flex-wrap items-center gap-1 text-xs text-(--muted-foreground)">
             <span>{short}.</span>
-            <HelpTip title="access">{explanation}</HelpTip>
+            <HelpTip label="access">{explanation}</HelpTip>
             {onRecheck && (
                 <button
                     type="button"

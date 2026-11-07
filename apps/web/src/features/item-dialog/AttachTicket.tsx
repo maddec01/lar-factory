@@ -2,13 +2,12 @@
 // The work keeps its work ID, and its ticket then adds the ticket's link and context.
 
 import type { Item } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { TicketPicker } from '@/features/add-item';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export function AttachTicket({ item }: { item: Item }) {
     const [open, setOpen] = useState(false);
@@ -19,7 +18,7 @@ export function AttachTicket({ item }: { item: Item }) {
     if (!open)
         return (
             <Button
-                {...kind('other')}
+                {...buttonKind('other')}
                 className="justify-self-start"
                 data-attach-ticket={item.id}
                 onClick={() => setOpen(true)}

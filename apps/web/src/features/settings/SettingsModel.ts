@@ -3,7 +3,7 @@
 import type { BoardData, Item, TargetSnapshot } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
 
-import type { Control } from '@/shared/ui/setting-rows/SettingControls';
+import type { Control } from '@/shared/settings/SettingControls';
 
 export interface Row {
     id: string;

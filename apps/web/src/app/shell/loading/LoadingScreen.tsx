@@ -11,6 +11,7 @@ import {
     BRAND_MARK_L,
     BRAND_MARK_VIEWBOX,
 } from '@lar-factory/shared';
+import { LoadingScreen as Screen } from '@lar-works/design-system';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -101,25 +102,16 @@ function useLines(text: string): Lines {
     return lines;
 }
 
-/** The mark: the block springing in, then the L traced around it along its centre line; the filled L stands in for the trace once drawn. */
-function Mark() {
-    return (
-        <svg className="loading-mark" viewBox={BRAND_MARK_VIEWBOX} aria-hidden>
-            <path className="loading-mark-block" d={BRAND_MARK_BLOCK} fill={BRAND_BLOCK_COLOR} />
-            <path
-                className="loading-mark-trace"
-                d={BRAND_MARK_CENTRE_LINE}
-                pathLength={1}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={BRAND_MARK_BAR}
-                strokeLinecap="butt"
-                strokeLinejoin="miter"
-            />
-            <path className="loading-mark-fill" d={BRAND_MARK_L} fill="currentColor" />
-        </svg>
-    );
-}
+/** The mark, as the design system's LoadingScreen draws it: the block springing in, then the L traced around it along
+ *  its centre line; the filled L stands in for the trace once drawn. */
+const MARK = {
+    viewBox: BRAND_MARK_VIEWBOX,
+    block: BRAND_MARK_BLOCK,
+    blockColor: BRAND_BLOCK_COLOR,
+    centreLine: BRAND_MARK_CENTRE_LINE,
+    bar: BRAND_MARK_BAR,
+    l: BRAND_MARK_L,
+};
 
 /** Keeps the board out of the keyboard's and screen readers' reach while `covered`: the board is the page's root, which the screen sits beside. */
 function useInertBoard(covered: boolean) {
@@ -157,29 +149,15 @@ export function LoadingScreen() {
 
     // In the body, beside the board's root, so the board can be inert without the screen.
     return createPortal(
-        <div className={`loading-screen ${drawn ? 'is-drawn' : ''} ${phase === 'leaving' ? 'is-leaving' : ''}`}>
-            <div className="loading-lockup">
-                <div className="loading-wordmark">
-                    <Mark />
-                    <span className="loading-lar">
-                        <span className="loading-lar-slide">ar</span>
-                    </span>
-                    <span className="loading-factory">Factory</span>
-                </div>
-                <p className="loading-line" role="status">
-                    <span className="loading-line-slot">
-                        {leaving && (
-                            <span key={leaving.id} className="loading-roll-out" aria-hidden>
-                                {leaving.text}
-                            </span>
-                        )}
-                        <span key={current.id} className={rolled ? 'loading-roll-in' : undefined}>
-                            {current.text}
-                        </span>
-                    </span>
-                </p>
-            </div>
-        </div>,
+        <Screen
+            mark={MARK}
+            product="Factory"
+            drawn={drawn}
+            leaving={phase === 'leaving'}
+            line={current}
+            {...(leaving && { leavingLine: leaving })}
+            rolled={rolled}
+        />,
         document.body,
     );
 }

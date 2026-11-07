@@ -3,14 +3,12 @@
 
 import { sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { RepoConfig, TicketCreationOptions, TicketOptions, VocabularyKey } from '@lar-factory/shared';
-import { Badge, Button, Popover } from '@lar-works/design-system';
+import { Badge, Button, buttonKind, Popover } from '@lar-works/design-system';
 import { ChevronDown } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { kind as buttonKind } from '@/shared/ui/buttons/ButtonKinds';
-import { LabelPicker } from '@/shared/ui/labels/LabelPicker';
-import { tint } from '@/shared/ui/labels/LabelTint';
+import { LabelPicker } from '@/shared/labels/LabelPicker';
 
 const has = (labels: readonly string[], name: string) => labels.some((label) => sameLabel(label, name));
 const without = (labels: readonly string[], gone: readonly string[]) => labels.filter((label) => !has(gone, label));
@@ -71,7 +69,7 @@ export function DraftLabels({
             ))}
             <span className="flex flex-wrap items-center gap-1">
                 {picked.map((name) => (
-                    <Badge key={name} data-label-chip className="max-w-full" style={tint(colorOf(read, name))}>
+                    <Badge key={name} data-label-chip className="max-w-full" labelColor={colorOf(read, name)}>
                         <span className="max-w-52 truncate" title={name}>
                             {name}
                         </span>

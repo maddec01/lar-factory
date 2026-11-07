@@ -168,19 +168,20 @@ test("in a browser, where nothing updates, there's no update pill", async () => 
     expect(controls()).toEqual(['brand', 'refreshed', 'counters', 'search', 'list', 'add item', 'divider', 'settings']);
 });
 
-test(`the brand reads "Lar Factory": the design system's BrandMark, then Factory on its baseline`, async () => {
+test(`the brand reads "Lar Factory": the design system's BrandMark with Factory as its product, hidden from screen readers`, async () => {
     await mountPage();
 
     const brand = $('.title-bar .brand')!;
 
     expect(text(brand)).toBe('arFactory');
-    expect(brand.className.split(' ')).toEqual(expect.arrayContaining(['inline-flex', 'items-baseline']));
+    expect(brand.getAttribute('aria-hidden')).toBe('true');
 
-    const [mark, factory] = [...brand.children];
+    const mark = brand.querySelector('[role="img"]')!;
 
-    expect(mark!.className.split(' ')).toContain('lar-brand-mark');
-    expect(mark!.querySelector('svg')).not.toBeNull();
-    expect(text(factory)).toBe('Factory');
+    expect(mark.getAttribute('aria-label')).toBe('Lar Factory');
+    expect(mark.className.split(' ')).toContain('lar-brand-mark');
+    expect(mark.querySelector('svg')).not.toBeNull();
+    expect(text(mark.lastElementChild)).toBe('Factory');
 });
 
 test('above the missing-t3 notice the bar holds only the brand and Settings, which opens', async () => {
@@ -307,7 +308,7 @@ test("the List modal's Scope board scopes the title bar too", async () => {
             .find((b) => b.querySelector('.name')?.textContent === 'lar-apple')!
             .click(),
     );
-    await settle(() => $<HTMLButtonElement>('[data-list-modal] .scope-board')!.click());
+    await settle(() => $<HTMLButtonElement>('[data-list-modal] [data-scope-board]')!.click());
     expect(field().getAttribute('aria-label')).toBe('Search, filtered by lar-apple');
 });
 

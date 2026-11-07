@@ -3,9 +3,8 @@
 
 import { labelsOnRow, sameLabel, trackerCapabilities } from '@lar-factory/shared';
 import type { Item, RepoConfig } from '@lar-factory/shared';
+import type { LabelChoice } from '@lar-works/design-system';
 import { useState } from 'react';
-
-import type { LabelChoice } from '@/shared/ui/labels/LabelPicker';
 
 export const KIND_FILTERS = ['bug', 'feature', 'improvement', 'concept', 'no-kind'] as const;
 export type KindFilter = (typeof KIND_FILTERS)[number];

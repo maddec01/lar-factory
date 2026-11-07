@@ -1,8 +1,7 @@
 // The board before its first repository is added.
-import { Button, BrandMark } from '@lar-works/design-system';
+import { BrandMark, Button, buttonKind } from '@lar-works/design-system';
 
 import { useWizardStore } from './WizardStore';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export function EmptyState() {
     const start = useWizardStore((s) => s.start);
@@ -15,7 +14,7 @@ export function EmptyState() {
                 <p className="text-base-700 m-0 text-sm">
                     Connect a Project to see its work and start agents from this board.
                 </p>
-                <Button {...kind('other')} onClick={() => start()} data-onboard>
+                <Button {...buttonKind('other')} onClick={() => start()} data-onboard>
                     Add a Project
                 </Button>
             </div>

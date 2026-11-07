@@ -1,9 +1,15 @@
 // Add item's New item pane: the draft's repository, kind, title and description, and whether to create its ticket.
 
 import { ITEM_KINDS } from '@lar-factory/shared';
-import { Fieldset } from '@lar-factory/ui/fieldset';
-import { FormSelect } from '@lar-factory/ui/form-select';
-import { Button, Modal } from '@lar-works/design-system';
+import {
+    Button,
+    buttonKind,
+    FormFieldset,
+    FormResult,
+    FormSelect,
+    MarkdownEditor,
+    Modal,
+} from '@lar-works/design-system';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -12,10 +18,7 @@ import type { DraftValues } from './AddItemStore';
 import { CreateIssueBox, IssueFields, PanelSection, ticketOptions } from './IssueFields';
 import { HINT, RepoSelect } from './RepoSelect';
 import { KIND_BADGES } from '@/features/items';
-import { FormResult } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { DescriptionEditor } from '@/shared/ui/description-editor/DescriptionEditor';
 
 const KIND_CHOICES = ITEM_KINDS.map((value) => {
     const { name, icon: Icon, hue } = KIND_BADGES[value]!;
@@ -105,9 +108,9 @@ export function AddItemForm() {
             {/* Narrower than 40rem, the side panel stacks under the editor, which grows with its text, and the two scroll as one;
           each row sizes to its content, so a long text pushes the panel down rather than running under it. */}
             <div className="@container flex min-h-0 flex-1 flex-col">
-                <Fieldset
+                <FormFieldset
                     id="item-fields"
-                    unstyled
+                    presentation="group"
                     disabled={locked}
                     className="border-base-300 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_16rem] border-t @max-[40rem]:auto-rows-max @max-[40rem]:grid-cols-[minmax(0,1fr)] @max-[40rem]:content-start @max-[40rem]:overflow-y-auto"
                 >
@@ -123,7 +126,7 @@ export function AddItemForm() {
                             placeholder="Title"
                             className="text-base-content w-full shrink-0 border-0 bg-transparent p-0 text-xl font-semibold tracking-tight outline-none placeholder:font-medium placeholder:text-(--muted-foreground)"
                         />
-                        <DescriptionEditor
+                        <MarkdownEditor
                             label="Description"
                             placeholder="Add a description… - for a list, 1. for steps, # for a heading"
                             value={kept?.description ?? ''}
@@ -162,7 +165,7 @@ export function AddItemForm() {
                             />
                         )}
                     </aside>
-                </Fieldset>
+                </FormFieldset>
             </div>
             <Modal.Footer
                 leading={
@@ -176,14 +179,14 @@ export function AddItemForm() {
                     )
                 }
             >
-                <Button {...kind('other')} id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>
+                <Button {...buttonKind('other')} id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>
                     New item
                 </Button>
-                <Button {...kind('other')} onClick={() => setOpen(false)}>
+                <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
                     Cancel
                 </Button>
                 <Button
-                    {...kind('main')}
+                    {...buttonKind('main')}
                     type="submit"
                     id="item-submit"
                     disabled={

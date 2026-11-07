@@ -4,7 +4,7 @@ import { GH_FLOOR, type CheckedTool, type ToolCheck } from '@lar-factory/shared'
 import type { ComponentProps, ReactNode } from 'react';
 
 import type { SettingsData } from './SettingsModel';
-import { ToolState } from '@/shared/ui/setting-rows/SettingControls';
+import { ToolState } from '@/shared/settings/SettingControls';
 
 /**
  * A command's state: the version it printed, else OK, noting scopes gh couldn't read; the problem its check found; or

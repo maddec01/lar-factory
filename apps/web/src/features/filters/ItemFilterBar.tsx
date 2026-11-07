@@ -3,19 +3,25 @@
 
 import { sameLabel } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Badge, Button, Checkbox, Popover } from '@lar-works/design-system';
-import { ChevronDown, CircleDashed } from '@lar-works/design-system/icons';
+import {
+    Badge,
+    Button,
+    buttonKind,
+    FilterBar,
+    FilterChip,
+    FilterChoice,
+    FilterChoices,
+    FilterLabelBadge,
+    FilterMenu,
+} from '@lar-works/design-system';
+import { CircleDashed } from '@lar-works/design-system/icons';
 import { useRef, type ReactNode } from 'react';
 
 import { KIND_FILTERS, filtering, headingOf, labelChoices, toggled } from './ItemFilters';
 import type { ItemFilters, KindFilter } from './ItemFilters';
 import { KIND_BADGES, KindBadge } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind as buttonKind } from '@/shared/ui/buttons/ButtonKinds';
-import { LabelPicker } from '@/shared/ui/labels/LabelPicker';
-import { tint } from '@/shared/ui/labels/LabelTint';
-
-const CHOICE = 'flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-(--accent)';
+import { LabelPicker } from '@/shared/labels/LabelPicker';
 
 export const kindName = (choice: KindFilter) => (choice === 'no-kind' ? 'No kind' : KIND_BADGES[choice]!.name);
 
@@ -27,47 +33,6 @@ function KindChoice({ choice, children }: { choice: KindFilter; children?: React
         </Badge>
     ) : (
         <KindBadge kind={choice}>{children}</KindBadge>
-    );
-}
-
-function FilterMenu({
-    which,
-    name,
-    picked,
-    children,
-}: {
-    which: string;
-    name: string;
-    picked: number;
-    children: ReactNode;
-}) {
-    return (
-        <Popover>
-            <Popover.Trigger asChild>
-                <Button {...buttonKind('other')} data-filter={which} rightIcon={<ChevronDown />}>
-                    {name}
-                    {picked > 0 && ` · ${picked}`}
-                </Button>
-            </Popover.Trigger>
-            <Popover.Content side="bottom" align="start">
-                {children}
-            </Popover.Content>
-        </Popover>
-    );
-}
-
-/** A chip that removes its choice. */
-function Chip({ name, onRemove, children }: { name: string; onRemove: () => void; children: ReactNode }) {
-    return (
-        <button
-            type="button"
-            data-filter-chip
-            aria-label={`Remove ${name}`}
-            title={`Remove ${name}`}
-            onClick={onRemove}
-        >
-            {children}
-        </button>
     );
 }
 
@@ -96,35 +61,36 @@ export function ItemFilterBar({
     };
 
     return (
-        <div ref={bar} data-item-filters className="flex flex-wrap items-center gap-1.5">
+        <FilterBar ref={bar}>
             <FilterMenu which="kind" name="Kind" picked={kinds.length}>
-                <div className="grid w-52 gap-0.5">
+                <FilterChoices>
                     {KIND_FILTERS.map((choice) => (
-                        <label key={choice} data-filter-choice className={CHOICE}>
-                            <Checkbox checked={kinds.includes(choice)} onChange={() => toggleKind(choice)} />
+                        <FilterChoice key={choice} checked={kinds.includes(choice)} onToggle={() => toggleKind(choice)}>
                             <KindChoice choice={choice} />
-                        </label>
+                        </FilterChoice>
                     ))}
-                </div>
+                </FilterChoices>
             </FilterMenu>
             <FilterMenu which="labels" name={heading} picked={labels.length}>
                 <LabelPicker heading={heading} choices={choices} picked={labels} onToggle={toggleLabel} />
             </FilterMenu>
             {kinds.map((choice) => (
-                <Chip key={choice} name={kindName(choice)} onRemove={() => thenFocusKind(() => toggleKind(choice))}>
+                <FilterChip
+                    key={choice}
+                    removeLabel={`Remove ${kindName(choice)}`}
+                    onRemove={() => thenFocusKind(() => toggleKind(choice))}
+                >
                     <KindChoice choice={choice}>{CROSS}</KindChoice>
-                </Chip>
+                </FilterChip>
             ))}
             {labels.map((label) => (
-                <Chip key={label} name={label} onRemove={() => thenFocusKind(() => toggleLabel(label))}>
-                    <Badge
-                        className="max-w-full"
-                        style={tint(choices.find(({ name }) => sameLabel(name, label))?.color)}
-                    >
-                        <span className="max-w-52 truncate">{label}</span>
-                        {CROSS}
-                    </Badge>
-                </Chip>
+                <FilterChip
+                    key={label}
+                    removeLabel={`Remove ${label}`}
+                    onRemove={() => thenFocusKind(() => toggleLabel(label))}
+                >
+                    <FilterLabelBadge label={label} color={choices.find(({ name }) => sameLabel(name, label))?.color} />
+                </FilterChip>
             ))}
             {filtering(filters) && (
                 <Button
@@ -135,6 +101,6 @@ export function ItemFilterBar({
                     Clear
                 </Button>
             )}
-        </div>
+        </FilterBar>
     );
 }

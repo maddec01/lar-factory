@@ -1,10 +1,10 @@
 // Onboarding's access step: what the board can do in the repository with your access.
 
 import { trackerCapabilities, type SetupDetection } from '@lar-factory/shared';
+import { HelpTip } from '@lar-works/design-system';
 
 import { useWizardStore, type Run } from './WizardStore';
 import { AccessList, accessRows, operationNames, type AccessRow } from '@/features/repositories';
-import { HelpTip } from '@/shared/ui/setting-rows/FieldRow';
 
 export function AccessStep({ detection }: { run: Run; detection: SetupDetection }) {
     const detect = useWizardStore((s) => s.detect);
@@ -32,7 +32,7 @@ export function AccessStep({ detection }: { run: Run; detection: SetupDetection 
             {detection.access['manage-labels'] !== 'allowed' && (
                 <p className="m-0 text-xs text-(--muted-foreground)">
                     New {labels} stay off until {names['manage-labels']} is allowed.
-                    <HelpTip title="label access">
+                    <HelpTip label="label access">
                         You can add this Project without it. Until it is allowed, Settings can't create, rename or
                         delete {labels}.
                     </HelpTip>
@@ -41,7 +41,7 @@ export function AccessStep({ detection }: { run: Run; detection: SetupDetection 
             {buildsShort && (
                 <p className="m-0 text-xs text-(--muted-foreground)">
                     Builds and docs need permission to push branches and open PRs.
-                    <HelpTip title="build access">
+                    <HelpTip label="build access">
                         You can shape issues now. Builds need permission to push branches and open pull requests.
                         {detection.provider === 'GitHub' && (
                             <>

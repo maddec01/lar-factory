@@ -1,6 +1,5 @@
 import { onAzure, trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
-import { FormSelect } from '@lar-factory/ui/form-select';
-import { Button, Input } from '@lar-works/design-system';
+import { Button, buttonKind, FormSelect, Input, InsetPanel } from '@lar-works/design-system';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 
 import { AccessList, AccessReason, accessRows } from './AccessList';
@@ -8,8 +7,7 @@ import { shownDrafts, useEditStore, type Drafts, type DraftSetting } from './Edi
 import { EditVocabulary } from './EditVocabulary';
 import { IssueDefaults } from './IssueDefaults';
 import { LabelsSection } from './LabelsSection';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { FIELD_GROUP, FieldRow } from '@/shared/ui/setting-rows/FieldRow';
+import { FieldRow } from '@/shared/settings/FieldRow';
 
 const PROJECT_SETTINGS = [
     { id: 'role', label: 'What this Project does' },
@@ -94,7 +92,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
     );
     const resetButton = (key: DraftSetting) =>
         setup.sources[key] === 'local' && (
-            <Button {...kind('other')} onClick={() => void reset(repo, key)}>
+            <Button {...buttonKind('other')} onClick={() => void reset(repo, key)}>
                 Reset
             </Button>
         );
@@ -103,7 +101,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
         <div data-project-page={repo} className="grid min-w-0 gap-7">
             <section className="grid min-w-0 gap-3">
                 <h3 className="m-0 text-[13px] font-semibold">Project</h3>
-                <div className={FIELD_GROUP}>
+                <InsetPanel presentation="settings">
                     <FieldRow
                         id="role"
                         label="What this Project does"
@@ -113,11 +111,11 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                         {text('role', 'What this Project does', 'role')}
                         {resetButton('role')}
                     </FieldRow>
-                </div>
+                </InsetPanel>
             </section>
             <section className="grid min-w-0 gap-3">
                 <h3 className="m-0 text-[13px] font-semibold">Work</h3>
-                <div className={FIELD_GROUP}>
+                <InsetPanel presentation="settings">
                     <FieldRow
                         id="itemSource"
                         label={onAzure(repo) ? 'Team' : 'Work to read'}
@@ -132,7 +130,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                             <span className="text-xs text-(--muted-foreground)">This repository's GitHub issues.</span>
                         )}
                     </FieldRow>
-                </div>
+                </InsetPanel>
                 <IssueDefaults
                     setup={{ ...setup, ...issueDrafts[repo] }}
                     onChange={(key, on) => void issueDefault(repo, key, on)}
@@ -145,7 +143,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
             <LabelsSection key={repo} repo={repo} setup={setup} />
             <section className="grid min-w-0 gap-3">
                 <h3 className="m-0 text-[13px] font-semibold">Docs and skills</h3>
-                <div className={FIELD_GROUP}>
+                <InsetPanel presentation="settings">
                     <FieldRow
                         id="domainDocs"
                         label="Glossary and decisions"
@@ -199,7 +197,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                         {text('skills', 'Project skills', 'skills')}
                         {resetButton('skills')}
                     </FieldRow>
-                </div>
+                </InsetPanel>
             </section>
             <section className="grid min-w-0 gap-3">
                 <h3 className="m-0 text-[13px] font-semibold">Access</h3>

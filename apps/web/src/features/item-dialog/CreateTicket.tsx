@@ -1,5 +1,5 @@
 import { writeAccessProblem, type Item } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 // Local work previews its authoritative outgoing text and reuses Add item's provider options.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
@@ -7,7 +7,6 @@ import { useCreateTicketStore, type TicketPreview } from './CreateTicketStore';
 import { TicketOptionFields, ticketOptions } from '@/features/add-item';
 import { useEditStore } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export function CreateTicket({ item }: { item: Item }) {
     const [open, setOpen] = useState(false);
@@ -63,7 +62,7 @@ export function CreateTicket({ item }: { item: Item }) {
         return (
             <Button
                 ref={trigger}
-                {...kind('other')}
+                {...buttonKind('other')}
                 data-create-ticket={item.id}
                 onClick={() => {
                     setRead(null);
@@ -91,7 +90,7 @@ export function CreateTicket({ item }: { item: Item }) {
             {reason && (
                 <div role="status">
                     <p>{reason}</p>
-                    <Button {...kind('other')} onClick={() => void useEditStore.getState().recheck(item.repo)}>
+                    <Button {...buttonKind('other')} onClick={() => void useEditStore.getState().recheck(item.repo)}>
                         Recheck access
                     </Button>
                 </div>
@@ -99,7 +98,7 @@ export function CreateTicket({ item }: { item: Item }) {
             {error && <p role="alert">{error}</p>}
             {!outgoing && !error && <p role="status">Reading outgoing issue text…</p>}
             {!outgoing && (
-                <Button {...kind('other')} className="justify-self-start" onClick={() => setOpen(false)}>
+                <Button {...buttonKind('other')} className="justify-self-start" onClick={() => setOpen(false)}>
                     Cancel
                 </Button>
             )}
@@ -124,11 +123,11 @@ export function CreateTicket({ item }: { item: Item }) {
                         </p>
                     )}
                     <div className="flex gap-2">
-                        <Button {...kind('other')} onClick={() => setOpen(false)}>
+                        <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
                         <Button
-                            {...kind('main')}
+                            {...buttonKind('main')}
                             type="submit"
                             disabled={!!reason || attempt?.phase === 'pending' || attempt?.phase === 'uncertain'}
                         >

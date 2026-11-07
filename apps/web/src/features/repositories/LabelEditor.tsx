@@ -1,13 +1,12 @@
 // The editor a label row opens: its name, colour and description, saving only what changed.
 
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
-import { Alert, Button, Input } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, Input, InsetPanel } from '@lar-works/design-system';
 import { useState, type FormEvent } from 'react';
 
 import { useEditStore, type LabelChange } from './EditStore';
 import { OTHER_MAPPINGS, ProblemText, capitalized } from './LabelParts';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { FieldRow, FIELD_GROUP } from '@/shared/ui/setting-rows/FieldRow';
+import { FieldRow } from '@/shared/settings/FieldRow';
 
 const SWATCHES = ['D73A4A', 'E99695', 'FBCA04', '0E8A16', 'C2E0C6', 'BFDADC', '1D76DB', '5319E7', 'D4C5F9', 'EDEDED'];
 
@@ -70,7 +69,7 @@ export function LabelEditor({
                     {capabilities.noun} follows the new name, in every repository of the project. {OTHER_MAPPINGS}
                 </Alert>
             )}
-            <div className={FIELD_GROUP}>
+            <InsetPanel presentation="settings">
                 <FieldRow label={`${Noun} name`}>
                     <Input
                         aria-label={`${Noun} name`}
@@ -120,14 +119,14 @@ export function LabelEditor({
                         />
                     </FieldRow>
                 )}
-            </div>
+            </InsetPanel>
             <ProblemText>{failure}</ProblemText>
             <span className="flex gap-2">
-                <Button {...kind('other')} type="button" disabled={running !== null} onClick={onDone}>
+                <Button {...buttonKind('other')} type="button" disabled={running !== null} onClick={onDone}>
                     Cancel
                 </Button>
                 <Button
-                    {...kind('other')}
+                    {...buttonKind('other')}
                     type="submit"
                     disabled={running !== null || !!problem || !!badColor || !Object.keys(update).length}
                     loading={running === 'labels'}

@@ -1,19 +1,18 @@
 import { ref, threadLink, abandonPrompt, closeTicketPrompt } from '@lar-factory/shared';
 import type { Item, StartedThread, Status } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { Button, buttonKind, useNotificationControls } from '@lar-works/design-system';
+import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 // What this page just did to an item, announced in a toast: added, moved or kept with View item,
 // abandoned or its ticket closed, started in T3, or a Queued card's action that failed.
 
-import { ToastFailure, ToastLifetime, clearToast, showToast } from './Toasts';
+import { clearToast, showToast } from './Toasts';
 import type { Toast } from './Toasts';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { useActionStore, useItemAction, TitleLink, LinkButton } from '@/features/items';
 import type { StartKind } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export type Notice =
     | { verb: 'Added' | 'Moved'; item: Item; to: Status }
@@ -38,7 +37,7 @@ function viewItem(itemId: string): void {
 }
 
 const viewButton = (item: Item) => (
-    <Button {...kind('other')} className="view-item" onClick={() => viewItem(item.id)}>
+    <Button {...buttonKind('other')} data-view-item onClick={() => viewItem(item.id)}>
         View item
     </Button>
 );
@@ -127,8 +126,7 @@ export function notify(notice: Notice): void {
 function AddedNotice({ item }: { item: Item }) {
     const current = useBoardStore((state) => state.data.items.find((value) => value.id === item.id));
     const action = useItemAction(item.id);
-    const hold = useContext(ToastLifetime);
-    const fail = useContext(ToastFailure);
+    const { hold, fail } = useNotificationControls();
     // 'added', 'pending', 'success', or the error that stopped it.
     const [result, setResult] = useState<string>('added');
     const mounted = useRef(true);
@@ -196,7 +194,7 @@ function AddedNotice({ item }: { item: Item }) {
             </span>{' '}
             <span ref={view}>{viewButton(item)}</span>{' '}
             {eligible && result !== 'success' && (
-                <Button ref={queue} {...kind('other')} aria-disabled={pending} onClick={() => void activate()}>
+                <Button ref={queue} {...buttonKind('other')} aria-disabled={pending} onClick={() => void activate()}>
                     {pending ? 'Queueing…' : 'Queue'}
                 </Button>
             )}

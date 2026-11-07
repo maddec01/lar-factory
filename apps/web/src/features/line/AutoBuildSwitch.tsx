@@ -9,7 +9,7 @@ import { flushSync } from 'react-dom';
 import { showToast } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { Switch } from '@/shared/ui/setting-rows/SettingControls';
+import { Switch } from '@/shared/settings/SettingControls';
 
 /** How many builds a pass would start now. */
 function wouldStart(pass: AutoBuildPass | undefined): string {

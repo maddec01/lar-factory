@@ -1037,7 +1037,7 @@ describe('updates', () => {
     const checked = () => text(select()).toLowerCase();
     const pick = (channel: UpdateChannel) => chooseOption(select(), channel === 'latest' ? 'Latest' : 'Nightly');
     const status = () => $('#update-status')!.textContent;
-    const checkNow = () => $<HTMLButtonElement>('.settings-body .check-now')!;
+    const checkNow = () => $<HTMLButtonElement>('.settings-body [data-check-now]')!;
 
     test('shows the channel the app is on, nightly and latest to choose from, and the version', async () => {
         stubChannel();
@@ -1157,7 +1157,7 @@ describe('updates', () => {
 
             await open('Updates');
             expect([status(), text(pill())]).toEqual([`${next} is available.`, 'Update available']);
-            expect($('.settings-body .check-now')).toBeNull();
+            expect($('.settings-body [data-check-now]')).toBeNull();
             await settle(() => action()!.click());
             expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
         });

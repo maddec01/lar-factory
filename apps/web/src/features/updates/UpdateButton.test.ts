@@ -117,7 +117,10 @@ describe('available', () => {
         await mountPage();
         expect(text(pill())).toBe('Update available');
         expect(pill()!.classList, "an App control's corners, not a pill").not.toContain('rounded-full');
-        expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')]).toEqual(['control', true]);
+        expect([pill()!.getAttribute('data-kind'), pill()!.classList.contains('text-primary')]).toEqual([
+            'control',
+            true,
+        ]);
         expect(icon('arrow-down-to-line')).not.toBeNull();
 
         const controls = [...pill()!.closest('.title-bar')!.querySelectorAll('button')];
@@ -215,7 +218,10 @@ describe('downloading', () => {
 
         expect(Number(ring.getAttribute('stroke-dashoffset'))).toBeCloseTo(circumference * (1 - 0.42));
         expect(text(pill())).toBe('Downloading 42%');
-        expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')]).toEqual(['control', true]);
+        expect([pill()!.getAttribute('data-kind'), pill()!.classList.contains('text-primary')]).toEqual([
+            'control',
+            true,
+        ]);
         expect(pill()!.tagName, 'nothing to click while it downloads').not.toBe('BUTTON');
         expect(
             ['role', 'aria-label', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow'].map((name) =>
@@ -245,10 +251,10 @@ describe('downloaded', () => {
 
         await mountPage();
         expect(text(pill())).toBe('Restart to update');
-        expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')], 'tinted, not filled').toEqual([
-            'control',
-            true,
-        ]);
+        expect(
+            [pill()!.getAttribute('data-kind'), pill()!.classList.contains('text-primary')],
+            'tinted, not filled',
+        ).toEqual(['control', true]);
         expect(pill()!.classList).not.toContain('bg-primary');
         expect(icon('rotate-ccw')).not.toBeNull();
         await click();

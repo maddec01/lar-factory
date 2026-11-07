@@ -3,13 +3,11 @@
 // writes it to Downloads as `lar-work export` does and names the files it wrote, or says why it couldn't.
 
 import { parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory/shared';
-import { RichText } from '@lar-factory/ui/rich-text';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind, RichText } from '@lar-works/design-system';
 import { useState, type ReactNode } from 'react';
 
 import { postAction } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { MarkdownDiagrams } from '@/shared/ui/diagrams/MarkdownDiagrams';
+import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 
 const TITLE: Record<RecordDetails['bodyKind'], string> = { brief: 'Brief', map: 'Map', decision: 'Decision' };
 
@@ -53,7 +51,7 @@ export function ExportMarkdown({
     };
 
     return (
-        <Button {...kind('other')} loading={exported.state === 'exporting'} onClick={() => void run()}>
+        <Button {...buttonKind('other')} loading={exported.state === 'exporting'} onClick={() => void run()}>
             Export markdown
         </Button>
     );
@@ -149,7 +147,9 @@ export function RecordText({
             {!spec && record.context && (
                 <details className="grid min-w-0 gap-2">
                     <summary className="cursor-pointer text-sm text-(--muted-foreground)">Initial context</summary>
-                    <RichText className="pt-2" text={record.context} format="markdown" />
+                    <div className="pt-2">
+                        <RichText text={record.context} format="markdown" />
+                    </div>
                 </details>
             )}
         </section>

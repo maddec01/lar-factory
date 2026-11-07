@@ -20,11 +20,12 @@
         "@effect/vitest": "4.0.5",
         "@electron/osx-sign": "2.7.0",
         "@lar-factory/shared": "workspace:*",
-        "@lar-factory/ui": "workspace:*",
         "@lar-works/design-system": "^0.2.0",
+        "@tailwindcss/node": "4.3.3",
         "@types/node": "^24.19.2",
         "electron": "44.9.3",
         "electron-builder": "26.16.1",
+        "tailwindcss": "4.3.3",
         "typescript": "^7.0.2",
         "vite-plus": "1.5.0"
     }

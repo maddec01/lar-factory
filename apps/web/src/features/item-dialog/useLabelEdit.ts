@@ -5,10 +5,10 @@
 
 import { sameLabel } from '@lar-factory/shared';
 import type { Item, TrackerLabel } from '@lar-factory/shared';
+import type { LabelChoice } from '@lar-works/design-system';
 import { useCallback, useRef, useState } from 'react';
 
 import { postAction, receive } from '@/services/board/board.service';
-import type { LabelChoice } from '@/shared/ui/labels/LabelPicker';
 
 const NOT_READ = 'Could not reach the board to read the labels.';
 

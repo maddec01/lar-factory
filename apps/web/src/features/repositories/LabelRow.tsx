@@ -1,11 +1,9 @@
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
-import { Badge, Button } from '@lar-works/design-system';
+import { Badge, Button, buttonKind } from '@lar-works/design-system';
 import { Lock, Pencil, Trash2 } from '@lar-works/design-system/icons';
 
 import { useEditStore, type LabelChange } from './EditStore';
 import { LabelEditor } from './LabelEditor';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { tint } from '@/shared/ui/labels/LabelTint';
 
 export function LabelRow({
     label,
@@ -42,7 +40,7 @@ export function LabelRow({
                     <Badge
                         data-label-chip
                         className="max-w-full min-w-0"
-                        style={tint(capabilities.color && label.color ? `#${label.color}` : undefined)}
+                        labelColor={capabilities.color && label.color ? `#${label.color}` : undefined}
                     >
                         <span className="inline-flex min-w-0 items-center gap-1">
                             {locked && <Lock className="size-3 shrink-0" aria-label="Factory-managed" />}
@@ -58,7 +56,7 @@ export function LabelRow({
                 {!locked && (
                     <span className="flex shrink-0 gap-1">
                         <Button
-                            {...kind('control')}
+                            {...buttonKind('control')}
                             data-icon-only=""
                             aria-label={`Edit ${label.name}`}
                             title={readOnly ?? `Edit ${label.name}`}
@@ -67,7 +65,7 @@ export function LabelRow({
                             onClick={() => onEdit(!editing)}
                         />
                         <Button
-                            {...kind('control')}
+                            {...buttonKind('control')}
                             data-icon-only=""
                             aria-label={`Delete ${label.name}`}
                             title={readOnly ?? `Delete ${label.name}`}

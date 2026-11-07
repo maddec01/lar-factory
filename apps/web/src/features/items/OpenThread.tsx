@@ -4,11 +4,11 @@
 
 import { isLiveThread, needsAnswer, openQuestionThread, threadLink } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
-import { Button, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
+import { Button, buttonKind, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
+import { ICON } from './ButtonIcons';
 import { LinkButton } from './LinkButton';
 import { useOnRow } from './RowActions';
-import { ICON, kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** A child question may belong to its nearest concept's thread before it has a thread of its own. */
 function conceptQuestionThread(item: Item, data: BoardData): ItemThread | undefined {
@@ -102,7 +102,7 @@ export function OpenThread({
             </LinkButton>
         ) : (
             <Button
-                {...kind('open')}
+                {...buttonKind('open')}
                 leftIcon={ICON.thread}
                 className={tooltip ? '' : 'disabled:pointer-events-auto'}
                 data-open-thread={item.id}

@@ -3,7 +3,7 @@
 
 import { HINTS, itemName, needsAnswer, onAzure, sameRepo, writeAccessProblem } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button, Modal } from '@lar-works/design-system';
+import { Button, buttonKind, Modal } from '@lar-works/design-system';
 
 import { ConceptParts } from './ConceptParts';
 import { ItemAside } from './ItemAside';
@@ -30,8 +30,7 @@ import {
 } from '@/features/items';
 import { ItemAgents } from '@/features/line';
 import { useEditStore } from '@/features/repositories';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { EXPANDED, ExpandButton } from '@/shared/ui/expand-dialog/ExpandDialog';
+import { ExpandButton } from '@/shared/dialogs/ExpandDialog';
 
 interface ContentProps {
     item: Item;
@@ -80,7 +79,7 @@ export function ItemDialogContent({
             title={`${itemName(item)}`}
             presentation="workspace"
             data-item-dialog
-            style={expanded ? EXPANDED : undefined}
+            expanded={expanded}
             focusFirstField={false}
             headerActions={
                 <>
@@ -112,7 +111,10 @@ export function ItemDialogContent({
                     {ticket && accessProblem && (
                         <div role="status">
                             <p>{accessProblem}</p>
-                            <Button {...kind('other')} onClick={() => void useEditStore.getState().recheck(item.repo)}>
+                            <Button
+                                {...buttonKind('other')}
+                                onClick={() => void useEditStore.getState().recheck(item.repo)}
+                            >
                                 Recheck access
                             </Button>
                         </div>

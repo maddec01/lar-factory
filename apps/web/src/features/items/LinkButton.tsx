@@ -3,9 +3,8 @@
 // button kind sets, and its primary and secondary recipes from @lar-works/design-system's Button; keep
 // them in step when that Button changes.
 
+import { buttonKind } from '@lar-works/design-system';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
-
-import { kind as kindOf } from '@/shared/ui/buttons/ButtonKinds';
 
 const base =
     'relative isolate inline-flex items-center justify-center gap-2 rounded-md border px-[11px] text-sm font-medium whitespace-nowrap transition-[background-color,box-shadow,scale,color] duration-150 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary focus-visible:outline-none [&_[data-slot=icon]>svg]:size-4';
@@ -25,7 +24,8 @@ export type LinkButtonProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 };
 
 export function LinkButton({ kind, leftIcon, className = '', children, ...props }: LinkButtonProps) {
-    const { variant, ...mark } = kindOf(kind);
+    // The kind's height and text size come from its `data-kind` mark (the design system's board.css).
+    const { variant, compact: _compact, ...mark } = buttonKind(kind);
 
     return (
         <a {...props} {...mark} data-slot="button" className={`${base} ${recipes[variant]} ${className}`}>

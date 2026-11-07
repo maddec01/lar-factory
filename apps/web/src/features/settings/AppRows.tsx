@@ -4,11 +4,10 @@
 // call did.
 
 import type { UpdateChannel } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind, FormResult } from '@lar-works/design-system';
 
 import { type SettingsResult, useSettingsStore } from './SettingsStore';
 import { InstallRecovery } from './TargetProgress';
-import { FormResult } from '@/features/notices';
 import {
     canCheckForUpdate,
     getUpdateDisabledReason,
@@ -19,8 +18,7 @@ import {
 } from '@/features/updates';
 import { useDriftStore } from '@/services/install/drift.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { SmallButton, Choice, Switch } from '@/shared/ui/setting-rows/SettingControls';
+import { SmallButton, Choice, Switch } from '@/shared/settings/SettingControls';
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
     { value: 'nightly', label: 'Nightly' },
@@ -161,7 +159,7 @@ function CheckNow() {
         : (getUpdateDisabledReason(state) ?? (state ? updateStatusText(state) : 'Reading the updater…'));
 
     return (
-        <SmallButton className="check-now" reason={reason} onClick={() => void check()}>
+        <SmallButton data-check-now reason={reason} onClick={() => void check()}>
             Check now
         </SmallButton>
     );
@@ -177,7 +175,7 @@ export function UpdateAction() {
     const busy = installing || pending || resolveUpdateButtonAction(state) === 'none';
 
     return (
-        <Button {...kind('other')} className="update-action" disabled={busy} onClick={() => void run()}>
+        <Button {...buttonKind('other')} className="update-action" disabled={busy} onClick={() => void run()}>
             {installing ? 'Installing…' : pill === 'ready' ? 'Restart to update' : 'Download'}
         </Button>
     );

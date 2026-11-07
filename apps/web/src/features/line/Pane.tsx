@@ -3,12 +3,12 @@
 
 import { readingScope } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
+import { Spinner } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useShownScope } from '@/features/filters';
 import { StatusGlyph } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { Loader } from '@/shared/ui/loading/Loader';
 
 export function Pane({
     id,
@@ -54,7 +54,7 @@ export function PaneEmpty({ filtered, none, children }: { filtered: boolean; non
 
     return (
         <p data-pane-empty className="m-0 px-3 py-3 text-[12px] text-(--muted-foreground)">
-            {reading ? <Loader label="Loading Projects…" /> : filtered ? children : none}
+            {reading ? <Spinner label="Loading Projects…" /> : filtered ? children : none}
         </p>
     );
 }

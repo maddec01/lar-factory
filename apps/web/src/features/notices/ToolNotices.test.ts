@@ -13,7 +13,7 @@ const withTools = (failed: Partial<ToolChecks>, fields: Partial<BoardData> = {})
 });
 const failed = { error: 'gh api graphql failed: HTTP 401' };
 const recheckButton = () => $<HTMLButtonElement>('[data-recheck]')!;
-const note = () => $('.recheck-note');
+const note = () => $('[data-recheck-note]');
 const rechecks = () => fetchMock.mock.calls.filter(([url]) => url === '/api/recheck');
 
 /** The next POST waits until the test answers it, so Checking… can be seen. */

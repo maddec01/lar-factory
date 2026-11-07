@@ -2,8 +2,7 @@
 // the description editor with Save and Cancel under it once Edit opens it.
 
 import type { ItemDetails, TextFormat } from '@lar-factory/shared';
-import { RichText } from '@lar-factory/ui/rich-text';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind, MarkdownEditor, RichText } from '@lar-works/design-system';
 import { Pencil } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
@@ -12,9 +11,7 @@ import { Heading, Placeholder } from './DetailsParts';
 import type { DescriptionEdit } from './useDescriptionEdit';
 import type { ItemDetailsRead } from './useItemDetails';
 import { postAction } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { DescriptionEditor } from '@/shared/ui/description-editor/DescriptionEditor';
-import { MarkdownDiagrams } from '@/shared/ui/diagrams/MarkdownDiagrams';
+import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 
 /** A fixed-width placeholder for the main column while the details load. */
 function Loading() {
@@ -43,7 +40,7 @@ function EditDescription({
     return (
         <>
             <div className={fill ? 'flex min-h-0 flex-col' : 'contents'}>
-                <DescriptionEditor
+                <MarkdownEditor
                     label="Description"
                     placeholder="Add a description…"
                     value={body}
@@ -66,10 +63,15 @@ function EditDescription({
                         {edit.dirty ? 'Unsaved changes' : 'No changes'}
                     </span>
                 )}
-                <Button {...kind('other')} disabled={edit.saving} onClick={edit.cancel}>
+                <Button {...buttonKind('other')} disabled={edit.saving} onClick={edit.cancel}>
                     Cancel
                 </Button>
-                <Button {...kind('main')} disabled={!edit.dirty} loading={edit.saving} onClick={() => void edit.save()}>
+                <Button
+                    {...buttonKind('main')}
+                    disabled={!edit.dirty}
+                    loading={edit.saving}
+                    onClick={() => void edit.save()}
+                >
                     Save
                 </Button>
             </div>
@@ -119,17 +121,17 @@ function SpecNotice({
                         <RichText text={spec.held.body} format="markdown" />
                     </details>
                     <div className="flex gap-2">
-                        <Button {...kind('other')} disabled={busy} onClick={() => void act('accept')}>
+                        <Button {...buttonKind('other')} disabled={busy} onClick={() => void act('accept')}>
                             Accept edit
                         </Button>
-                        <Button {...kind('other')} disabled={busy} onClick={() => void act('reject')}>
+                        <Button {...buttonKind('other')} disabled={busy} onClick={() => void act('reject')}>
                             Reject edit
                         </Button>
                     </div>
                 </>
             ) : (
                 (spec.pending || spec.error) && (
-                    <Button {...kind('other')} loading={busy} onClick={() => void act('retry')}>
+                    <Button {...buttonKind('other')} loading={busy} onClick={() => void act('retry')}>
                         Retry Spec sync
                     </Button>
                 )
@@ -209,7 +211,7 @@ export function ItemDescription({
                             </span>
                         )}
                         {editable && (
-                            <Button {...kind('other')} leftIcon={<Pencil />} onClick={edit.start}>
+                            <Button {...buttonKind('other')} leftIcon={<Pencil />} onClick={edit.start}>
                                 Edit
                             </Button>
                         )}

@@ -15,11 +15,12 @@ import {
     startProgressOf,
 } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-import { Badge, Button, DropdownMenu } from '@lar-works/design-system';
+import { Badge, Button, buttonKind, DropdownMenu, SpinnerIcon } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { useItemAction } from './ActionStore';
+import { ICON } from './ButtonIcons';
 import { writeState } from './ItemActions';
 import { ModelEntries, opensOnChecked } from './ModelEntries';
 import { OpenThread } from './OpenThread';
@@ -29,8 +30,6 @@ import type { StartKind } from './StartStore';
 import { notify, DismissButton, closeKeepingFocus } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { ICON, kind as buttonKind } from '@/shared/ui/buttons/ButtonKinds';
-import { Spinner } from '@/shared/ui/loading/Loader';
 
 /**
  * The T3 thread Start opened for the item, from this page, another one or the board server's Start after. The
@@ -201,7 +200,7 @@ export function StartControl({
                     <Button
                         {...buttonKind('start')}
                         aria-busy={pending || undefined}
-                        leftIcon={pending ? <Spinner spin="animate-spin" className="size-4" /> : !retry && ICON.play}
+                        leftIcon={pending ? <SpinnerIcon motion="always" className="size-4" /> : !retry && ICON.play}
                         data-start={item.id}
                         aria-label={`${verb} ${itemName(item)}`}
                         {...state}
@@ -264,7 +263,8 @@ export function StartMessage({ item, kind = 'refine' }: { item: Item; kind?: Sta
     return (
         <p className="start" ref={el} {...(uncertain && { tabIndex: -1, 'data-start-result': item.id })}>
             <span className="action-error">
-                <span role="alert">{message}</span> <DismissButton what={` error for ${ref(item)}`} onClick={close} />
+                <span role="alert">{message}</span>{' '}
+                <DismissButton inline what={` error for ${ref(item)}`} onClick={close} />
             </span>
         </p>
     );

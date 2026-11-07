@@ -1,10 +1,10 @@
 import { trackerCapabilities, type RepositorySetup } from '@lar-factory/shared';
+import { HelpTip, InsetPanel } from '@lar-works/design-system';
 
 import { useEditStore } from './EditStore';
 import { useVocabularyDiscovery } from './useVocabularyDiscovery';
 import { VocabularyFields, VocabularyRead } from './VocabularyEditor';
 import { KIND_NAMES, type VocabularyKind } from './VocabularyKinds';
-import { FIELD_GROUP, HelpTip } from '@/shared/ui/setting-rows/FieldRow';
 
 function VocabularySettings({ setup }: { setup: RepositorySetup }) {
     const { discovery, error, retry } = useVocabularyDiscovery(setup.repo);
@@ -15,7 +15,7 @@ function VocabularySettings({ setup }: { setup: RepositorySetup }) {
     return (
         <div className="grid min-w-0 gap-2">
             {error && <VocabularyRead repo={setup.repo} error={error} retry={retry} />}
-            <div className={FIELD_GROUP}>
+            <InsetPanel presentation="settings">
                 {(Object.keys(KIND_NAMES) as VocabularyKind[]).map((key) => {
                     const draft = vocabularyDrafts[setup.repo]?.[key];
 
@@ -38,7 +38,7 @@ function VocabularySettings({ setup }: { setup: RepositorySetup }) {
                         />
                     );
                 })}
-            </div>
+            </InsetPanel>
         </div>
     );
 }
@@ -48,7 +48,7 @@ export function EditVocabulary({ setup }: { setup: RepositorySetup }) {
         <section className="grid min-w-0 gap-3" aria-label="Kind vocabulary">
             <h3 className="m-0 flex items-center gap-1.5 text-[13px] font-semibold">
                 Kinds and {trackerCapabilities(setup.repo).heading.toLowerCase()}
-                <HelpTip title="kind mapping">
+                <HelpTip label="kind mapping">
                     Map bugs, features and improvements to existing{' '}
                     {trackerCapabilities(setup.repo).heading.toLowerCase()} and types. Suggestions are optional.
                 </HelpTip>

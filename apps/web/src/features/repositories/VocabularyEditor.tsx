@@ -1,13 +1,11 @@
 import { trackerCapabilities, type VocabularyTerm } from '@lar-factory/shared';
 import type { VocabularyDiscovery } from '@lar-factory/shared/vocabulary';
-import { FormSelect } from '@lar-factory/ui/form-select';
-import { Alert, Button, Badge } from '@lar-works/design-system';
+import { Alert, Badge, Button, buttonKind, FormSelect } from '@lar-works/design-system';
 
 import { AccessReason } from './AccessList';
 import { useVocabularyFields } from './useVocabularyFields';
 import type { VocabularyAccess, VocabularyKind } from './VocabularyKinds';
 import { VocabularyLabelPopover } from './VocabularyLabelPopover';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export function VocabularyRead({ repo, error, retry }: { repo: string; error: string | null; retry: () => void }) {
     return error ? (
@@ -15,7 +13,7 @@ export function VocabularyRead({ repo, error, retry }: { repo: string; error: st
             tone="danger"
             title="Could not read vocabulary"
             action={
-                <Button {...kind('other')} onClick={retry}>
+                <Button {...buttonKind('other')} onClick={retry}>
                     Retry
                 </Button>
             }
@@ -164,7 +162,7 @@ export function VocabularyFields({
             {value.type && (typesProblem || !types.includes(value.type)) && (
                 <span className="text-xs">
                     <Button
-                        {...kind('other')}
+                        {...buttonKind('other')}
                         className="h-auto min-h-8 max-w-full py-1 text-left wrap-anywhere whitespace-normal"
                         onClick={() => update({ ...value, type: null }, newLabels, true)}
                     >

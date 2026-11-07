@@ -6,6 +6,7 @@
 // settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
 
 import { failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
+import { BoardContent, BoardShell, Notifications, ReadingLine } from '@lar-works/design-system';
 
 import { LoadingScreen } from './shell/loading/LoadingScreen';
 import { TitleBar } from './shell/title-bar/TitleBar';
@@ -14,12 +15,11 @@ import { useShownScope } from '@/features/filters';
 import { ItemDialog } from '@/features/item-dialog';
 import { AbandonDialog } from '@/features/items';
 import { StageLayout } from '@/features/line';
-import { NotificationStack, T3Missing, Warnings } from '@/features/notices';
+import { T3Missing, Warnings } from '@/features/notices';
 import { EmptyState, OnboardingCards, WizardDialog } from '@/features/onboarding';
 import { SettingsDialog } from '@/features/settings';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { CopyStatus } from '@/shared/ui/copy/CopyButton';
-import { Loader } from '@/shared/ui/loading/Loader';
+import { CopyStatus } from '@/shared/copy/CopyButton';
 
 function Content() {
     const data = useBoardStore((state) => state.data);
@@ -28,17 +28,14 @@ function Content() {
     const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
 
     return (
-        // Everything under the title bar scrolls as one page, and nothing in it shrinks to fit.
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pt-3 pb-4 *:shrink-0">
+        <BoardContent>
             <OnboardingCards />
             {scope && !loaded && stillReading(data, scope) ? (
-                <p className="text-base-700 m-0 flex items-center justify-center gap-2 p-6 text-sm" data-reading>
-                    <Loader label="Loading Projects…" className="size-4" />
-                </p>
+                <ReadingLine label="Loading Projects…" />
             ) : (
                 <StageLayout items={items} desk={<Desk items={items} />} />
             )}
-        </div>
+        </BoardContent>
     );
 }
 
@@ -49,20 +46,24 @@ export function App() {
     const empty = useBoardStore((state) => noneOnboarded(state.data));
 
     return (
-        <div className="fixed inset-0 flex flex-col bg-(--background) text-(--foreground)">
-            <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <TitleBar />
-                <Warnings />
-                {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
-            </main>
-            {/* Outside main, so the announcement sits apart from the page. */}
-            <CopyStatus />
-            <NotificationStack />
-            <ItemDialog />
-            <SettingsDialog />
-            <AbandonDialog />
-            <WizardDialog />
-            <LoadingScreen />
-        </div>
+        <BoardShell
+            overlays={
+                <>
+                    <CopyStatus />
+                    {/* One stack on every screen, above every dialog. It portals outside the board, which is inert
+                        while the loading screen covers it. */}
+                    <Notifications presentation="stack" />
+                    <ItemDialog />
+                    <SettingsDialog />
+                    <AbandonDialog />
+                    <WizardDialog />
+                    <LoadingScreen />
+                </>
+            }
+        >
+            <TitleBar />
+            <Warnings />
+            {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
+        </BoardShell>
     );
 }

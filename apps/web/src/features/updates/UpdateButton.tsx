@@ -1,7 +1,6 @@
 // The title bar's update pill, a Port of T3 Code's update pill (apps/web/src/components/sidebar/SidebarUpdatePill.tsx
-// at d53873b) on the design system's Popover, Button and Tooltip, drawn as the board's other App controls are, tinted in
-// every state (shared/ui/buttons/ButtonKinds.tsx), instead of as T3's pill. With no update it
-// doesn't show; Settings › Updates checks. An available update reads "Update available", a download shows a progress
+// at d53873b), drawn by the design system's UpdatePill as the board's other App controls are, tinted in every state,
+// instead of as T3's pill. With no update it doesn't show; Settings › Updates checks. An available update reads "Update available", a download shows a progress
 // ring with the percentage, and a downloaded update reads "Restart to update". Clicking the pill runs that step, with
 // T3's toasts from the store; installing asks first in the app's native dialog, as T3 does. While the app installs,
 // the pill reads "Installing…", disabled.
@@ -12,170 +11,50 @@
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import { boardApp, type UpdateState } from '@lar-factory/shared';
-import { Button, Popover, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { ReleaseNotes, UpdateDownloading, UpdatePill } from '@lar-works/design-system';
+import { useEffect } from 'react';
 
 import { downloadPercent, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from './UpdateButtonLogic';
-import { UpdateStatusIcon } from './UpdateStatusIcon';
 import { useUpdateStore } from './UpdateStore';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-
-/** The pill's shape: an App control, with its corners and 28 px height, tinted in every state. */
-const PILL = 'update-button gap-1.5 font-medium';
-const CLOSE_DELAY_MS = 150;
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /** Each Release's changes, newest Release first, with what the app left out. */
-function ReleaseNotes({ state }: { state: UpdateState }) {
+function Notes({ state }: { state: UpdateState }) {
     return (
-        <>
-            {state.releaseNotes.map((note, index) => {
+        <ReleaseNotes
+            releases={state.releaseNotes.map((note, index) => {
                 const omitted = note.totalItems - note.items.length;
 
-                return (
-                    <section
-                        className="not-first:border-base-300 not-first:mt-3 not-first:border-t not-first:pt-3"
-                        key={note.version}
-                    >
-                        <h3 className="text-base-content m-0 text-xs leading-4 font-semibold">
-                            {index === 0 ? "What's changed" : `Changes in ${note.version}`}
-                        </h3>
-                        <ul className="text-base-700 m-0 mt-2 space-y-1.5 pl-4 text-xs leading-5">
-                            {note.items.map((item, i) => (
-                                <li className="list-disc break-words" key={i}>
-                                    {item}
-                                </li>
-                            ))}
-                        </ul>
-                        {omitted > 0 && (
-                            <p className="text-base-700 m-0 mt-2 text-xs leading-5">
-                                {plural(omitted, 'more change')} in this Release
-                            </p>
-                        )}
-                    </section>
-                );
+                return {
+                    version: note.version,
+                    title: index === 0 ? "What's changed" : `Changes in ${note.version}`,
+                    items: note.items,
+                    ...(omitted > 0 && { more: `${plural(omitted, 'more change')} in this Release` }),
+                };
             })}
-            {state.omittedReleaseCount > 0 && (
-                <p className="border-base-300 text-base-700 m-0 mt-3 border-t pt-3 text-xs leading-5">
-                    {plural(state.omittedReleaseCount, 'older Release')} not shown
-                </p>
-            )}
-        </>
-    );
-}
-
-/** Open while the pointer is on the pill or the changelog, and for 150 ms after it leaves both. */
-function useHoverOpen() {
-    const [open, setOpen] = useState(false);
-    const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-    useEffect(() => () => clearTimeout(timer.current), []);
-
-    const show = () => {
-        clearTimeout(timer.current);
-        setOpen(true);
-    };
-    const close = () => {
-        clearTimeout(timer.current);
-        setOpen(false);
-    };
-    const hover = {
-        // A touch has no hover: a tap runs the step.
-        onPointerEnter: (event: PointerEvent) => event.pointerType !== 'touch' && show(),
-        onPointerLeave: (event: PointerEvent) => {
-            if (event.pointerType === 'touch') return;
-
-            clearTimeout(timer.current);
-            timer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
-        },
-    };
-
-    return { open, show, close, hover };
-}
-
-/** The pill while the update downloads: nothing to click, a progress bar to screen readers, with the version in its
- *  tooltip. */
-function Downloading({ state }: { state: UpdateState }) {
-    const percent = downloadPercent(state);
-
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <span
-                    tabIndex={0}
-                    role="progressbar"
-                    aria-label={`Downloading ${state.availableVersion ?? 'the update'}`}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={percent}
-                    data-kind="control"
-                    data-tint
-                    className={`${PILL} focus-visible:ring-primary inline-flex items-center rounded-md px-[11px] outline-none focus-visible:ring-2`}
-                >
-                    <UpdateStatusIcon status="downloading" downloadPercent={percent} />
-                    Downloading <span className="w-7 tabular-nums">{percent}%</span>
-                </span>
-            </TooltipTrigger>
-            <TooltipPopup side="bottom">{updateStatusText(state)}</TooltipPopup>
-        </Tooltip>
+            {...(state.omittedReleaseCount > 0 && {
+                older: `${plural(state.omittedReleaseCount, 'older Release')} not shown`,
+            })}
+        />
     );
 }
 
 /** "Update available" or "Restart to update", with the changelog and the step's button. */
 function NextStep({ state, ready }: { state: UpdateState; ready: boolean }) {
     const { installing, pending, run } = useUpdateStore();
-    const { open, show, close, hover } = useHoverOpen();
     const disabled = installing || pending || resolveUpdateButtonAction(state) === 'none';
 
     return (
-        <Popover open={open} onOpenChange={(next) => !next && close()}>
-            <Popover.Trigger asChild>
-                <Button
-                    {...kind('control')}
-                    data-tint
-                    aria-disabled={disabled || undefined}
-                    className={`${PILL} ${disabled ? 'cursor-not-allowed' : ''}`}
-                    // The pill runs the step; the changelog opens on hover and focus, not on the click.
-                    onClick={(event) => {
-                        event.preventDefault();
-
-                        if (!disabled) void run();
-                    }}
-                    onFocus={(event) => event.currentTarget.matches(':focus-visible') && show()}
-                    {...hover}
-                >
-                    <UpdateStatusIcon status={ready ? 'downloaded' : 'available'} />
-                    {installing ? 'Installing…' : ready ? 'Restart to update' : 'Update available'}
-                </Button>
-            </Popover.Trigger>
-            <Popover.Content
-                side="bottom"
-                align="end"
-                onOpenAutoFocus={(event) => event.preventDefault()}
-                onCloseAutoFocus={(event) => event.preventDefault()}
-                {...hover}
-            >
-                <div className="grid w-80 max-w-full gap-3 text-left">
-                    <p className="update-heading text-base-content m-0 text-sm font-medium">
-                        {updateStatusText(state)}
-                    </p>
-                    {state.releaseNotes.length > 0 && (
-                        <div className="max-h-[min(28rem,calc(100vh-10rem))] overflow-y-auto">
-                            <ReleaseNotes state={state} />
-                        </div>
-                    )}
-                    <Button
-                        {...kind('main')}
-                        className="update-next justify-self-start"
-                        disabled={disabled}
-                        onClick={() => void run()}
-                    >
-                        {ready ? 'Restart now' : 'Download'}
-                    </Button>
-                </div>
-            </Popover.Content>
-        </Popover>
+        <UpdatePill
+            status={ready ? 'downloaded' : 'available'}
+            label={installing ? 'Installing…' : ready ? 'Restart to update' : 'Update available'}
+            heading={updateStatusText(state)}
+            notes={state.releaseNotes.length > 0 && <Notes state={state} />}
+            actionLabel={ready ? 'Restart now' : 'Download'}
+            disabled={disabled}
+            onRun={() => void run()}
+        />
     );
 }
 
@@ -188,7 +67,15 @@ export function UpdateButton() {
 
     if (!boardApp() || !state || pill === 'none') return null;
 
-    if (pill === 'downloading') return <Downloading state={state} />;
+    if (pill === 'downloading')
+        return (
+            <UpdateDownloading
+                percent={downloadPercent(state)}
+                text="Downloading"
+                label={`Downloading ${state.availableVersion ?? 'the update'}`}
+                tooltip={updateStatusText(state)}
+            />
+        );
 
     return <NextStep state={state} ready={pill === 'ready'} />;
 }

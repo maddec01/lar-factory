@@ -1,10 +1,9 @@
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { Warning } from './Warning';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 const titles = {
     unavailable: 'T3 Code is disconnected.',
@@ -45,7 +44,7 @@ export function T3AvailabilityWarning() {
             {source.availability === 'unsupported-version' ? (
                 'Use a supported T3 Code version.'
             ) : source.availability === 'renewal-required' ? (
-                <Button {...kind('other')} disabled={pending} onClick={() => void renew()}>
+                <Button {...buttonKind('other')} disabled={pending} onClick={() => void renew()}>
                     {pending ? 'Reauthorizing…' : 'Reauthorize T3'}
                 </Button>
             ) : (

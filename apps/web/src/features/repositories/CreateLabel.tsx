@@ -1,12 +1,11 @@
 import type { TrackerCapabilities } from '@lar-factory/shared';
-import { Button, Input } from '@lar-works/design-system';
+import { Button, buttonKind, Input, InsetPanel } from '@lar-works/design-system';
 import { Plus } from '@lar-works/design-system/icons';
 import { useState, type FormEvent } from 'react';
 
 import { useEditStore } from './EditStore';
 import { ProblemText } from './LabelParts';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { FieldRow, FIELD_GROUP } from '@/shared/ui/setting-rows/FieldRow';
+import { FieldRow } from '@/shared/settings/FieldRow';
 
 /** The field that creates a label. Its typing stays here, so a keystroke re-renders no row. */
 export function CreateLabel({
@@ -39,7 +38,7 @@ export function CreateLabel({
 
     return (
         <>
-            <div className={FIELD_GROUP}>
+            <InsetPanel presentation="settings">
                 <FieldRow label={`New ${noun}`}>
                     <form className="flex max-w-full min-w-0 flex-wrap gap-2" onSubmit={(event) => void create(event)}>
                         <Input
@@ -54,7 +53,7 @@ export function CreateLabel({
                             }}
                         />
                         <Button
-                            {...kind('other')}
+                            {...buttonKind('other')}
                             type="submit"
                             className="shrink-0"
                             leftIcon={<Plus />}
@@ -65,7 +64,7 @@ export function CreateLabel({
                         </Button>
                     </form>
                 </FieldRow>
-            </div>
+            </InsetPanel>
             {showUnavailable && <p className="text-base-700 m-0 text-xs">{createUnavailable}</p>}
             <ProblemText>{problem ?? failure}</ProblemText>
         </>

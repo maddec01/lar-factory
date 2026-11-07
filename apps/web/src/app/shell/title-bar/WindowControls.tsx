@@ -1,7 +1,8 @@
 // The window's top-left corner, from T3 Code: the traffic lights, with the title bar starting past them. In the Mac
 // app the lights are macOS's own (apps/desktop/src/window/WindowTitleBar.ts puts them 16 px in, centred in the 52 px
-// bar) and the brand sits 90 px in, past them; in a browser, grey stand-ins hold their place so the layout reads like
-// the app. In the Mac app's full screen macOS hides the lights, so the brand moves to the title bar's own padding.
+// bar) and the brand sits 90 px in, past them; in a browser, the design system's BoardTitleBar draws grey stand-ins in
+// their place so the layout reads like the app. In the Mac app's full screen macOS hides the lights, so the brand
+// moves to the title bar's own padding.
 
 import { boardApp, inMacApp } from '@lar-factory/shared';
 import { useSyncExternalStore } from 'react';
@@ -36,23 +37,4 @@ function readFullscreen(): boolean {
 }
 
 /** Whether macOS full screen hides the traffic lights; false outside the Mac app. */
-const useLightsHidden = () => useSyncExternalStore(subscribeToFullscreen, readFullscreen);
-
-/** The title bar's padding past the traffic lights or their stand-ins: with the design system's TitleBar's own 16 px, the
- *  brand starts 90 px in. None while full screen hides the lights. */
-export const useWindowControlsInset = () => (useLightsHidden() ? '' : 'pl-[74px]');
-
-/** In a browser, the traffic lights' grey stand-ins; in the Mac app, nothing, since macOS draws them. */
-export function TrafficLights() {
-    if (inMacApp()) return null;
-
-    return (
-        <div className="browser-window-controls pointer-events-none fixed top-0 left-0 z-50 flex h-13 items-center">
-            <span className="traffic-lights absolute left-4 flex gap-2" aria-hidden="true">
-                {['close', 'minimize', 'zoom'].map((light) => (
-                    <span key={light} className="size-3 rounded-full bg-(--traffic-stand-in)" />
-                ))}
-            </span>
-        </div>
-    );
-}
+export const useLightsHidden = () => useSyncExternalStore(subscribeToFullscreen, readFullscreen);

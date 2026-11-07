@@ -2,14 +2,13 @@ import { itemName } from '@lar-factory/shared';
 // Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
 // offers for it. Each choice asks in its confirmation first. Set aside is Abandon.
 import type { BoardData, Item, NeedsYouAction, NeedsYouOffer } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
 import { askAbandon } from './CardActions';
 import { writeState } from './ItemActions';
 import { NeedsYouDialog } from './NeedsYouDialog';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 const LABELS: Record<NeedsYouOffer, string> = {
     'start-again': 'Start again',
@@ -53,7 +52,7 @@ function Notice({
             <span className="flex flex-wrap gap-1.5">
                 {notice.offers.map((offer) => (
                     <Button
-                        {...kind('other')}
+                        {...buttonKind('other')}
                         key={offer}
                         {...state}
                         aria-label={`${LABELS[offer]}: ${itemName(item)}`}

@@ -4,12 +4,12 @@
 // onboarding or T3 has no project for its repository.
 
 import { buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 
+import { ICON } from './ButtonIcons';
 import { OpenThread, hasLiveThread } from './OpenThread';
 import { useOnRow } from './RowActions';
 import { StartOrAfter } from './StartAfter';
-import { ICON, kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** A dossier names it `label`; a row calls it Start. */
 export function StartBuild({
@@ -36,7 +36,13 @@ export function StartBuild({
 
     if (problem)
         return (
-            <Button {...kind('start')} leftIcon={ICON.play} disabled title={problem} data-build-unavailable={item.id}>
+            <Button
+                {...buttonKind('start')}
+                leftIcon={ICON.play}
+                disabled
+                title={problem}
+                data-build-unavailable={item.id}
+            >
                 {label}
             </Button>
         );

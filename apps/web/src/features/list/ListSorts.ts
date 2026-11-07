@@ -14,4 +14,5 @@ export const SORTS = {
 
 export type Sort = keyof typeof SORTS;
 
-export const isSort = (value: string): value is Sort => value in SORTS;
+/** The sorts, in the menu's order, as its options. */
+export const SORT_OPTIONS = (Object.keys(SORTS) as Sort[]).map((value) => ({ value, label: SORTS[value].label }));

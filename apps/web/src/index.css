@@ -1,30 +1,14 @@
-/* The board page's own styles. Tokens, base styles and the base components' styles come from the design
-   system (@lar-works/design-system), and the board's roles from packages/ui. Each feature folder holds its own
-   layout rules; all of them use only the design system's tokens and Tailwind's spacing scale. */
-@import '@lar-works/design-system/styles.css' source(none);
-@import '@lar-factory/ui/styles.css';
-@import './shared/ui/buttons/button-kinds.css';
+/* The board page's styles: the design system's board entry (@lar-works/design-system/board.css) brings Tailwind, the
+   tokens, the board's roles and base styles, and every component's styles. The feature folders that still style
+   themselves keep their sheets and their Tailwind sources here until they move into the design system. */
+@import '@lar-works/design-system/board.css' source(none);
 @import './features/items/items.css';
-@import './shared/motion/ambient-motion.css';
 @import './features/line/rows.css';
-@import './app/shell/loading/loading-screen.css';
-@import './features/notices/notices.css';
 @import './features/settings/settings.css';
-@import './app/shell/title-bar/title-bar.css';
-/* Tailwind scans only the files listed here, and the design system's components: the page's own class names
-   would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
+/* Tailwind scans only the files listed here, and the design system's components: the page's own class names would
+   otherwise turn on Tailwind utilities of the same name. */
 @source "./features/add-item";
-@source "./features/archive";
-@source "./app/App.tsx";
-@source "./features/board-search";
-@source "./shared/ui/copy/CopyButton.tsx";
-@source "./shared/ui/description-editor";
-@source "./features/desk";
-@source "./shared/ui/diagrams";
-@source "./shared/ui/expand-dialog";
-@source "./features/filters";
 @source "./features/item-dialog";
-@source "./shared/ui/labels/LabelPicker.tsx";
 @source "./features/items/AbandonDialog.tsx";
 @source "./features/items/CleanupChoices.tsx";
 @source "./features/items/ItemParts.tsx";
@@ -39,94 +23,6 @@
 @source "./features/items/StatusGlyph.tsx";
 @source "./features/items/SourceIcon.tsx";
 @source "./features/line";
-@source "./shared/ui/loading/Loader.tsx";
-@source "./features/list";
 @source "./features/onboarding";
 @source "./features/repositories";
-@source "./features/notices/Warning.tsx";
-@source "./features/notices/Warnings.tsx";
-@source "./features/notices/FormResult.tsx";
-@source "./features/notices/Toasts.tsx";
 @source "./features/settings";
-@source "./shared/ui/setting-rows";
-@source "./app/shell/title-bar";
-@source "./features/updates/UpdateButton.tsx";
-@source "./features/updates/UpdateStatusIcon.tsx";
-
-code {
-    font: var(--text-xs) var(--font-mono);
-}
-@layer base {
-    /* Tailwind's base styles take links' underline; these put it back. In the base layer, so a link styled as a
-       button keeps its button's text colour. */
-    a {
-        color: inherit;
-        text-decoration: underline;
-    }
-    a[data-slot='button'] {
-        text-decoration: none;
-    }
-    a:hover {
-        text-decoration-thickness: --spacing(0.5);
-    }
-    /* So a design-system control's outline-none wins and its own focus ring is the only one. */
-    :focus-visible {
-        outline: --spacing(0.5) solid var(--ring);
-        outline-offset: --spacing(0.5);
-        border-radius: var(--radius-sm);
-    }
-}
-.sr-only {
-    position: absolute;
-    width: --spacing(0.25);
-    height: --spacing(0.25);
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-}
-/* The design system's Button, ninna-ui's, takes no pointer events while disabled; one that says why keeps them, so its title shows. */
-button:disabled[title] {
-    pointer-events: auto;
-    cursor: not-allowed;
-}
-
-@keyframes activity-sweep {
-    from {
-        transform: translateX(-100%);
-    }
-    to {
-        transform: translateX(300%);
-    }
-}
-/* 30 updates/s lets the compositor skip unchanged frames on high-refresh displays. */
-.activity-sweep {
-    animation: activity-sweep 1.8s steps(54) infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-    .activity-sweep {
-        animation: none;
-    }
-}
-
-/* Each loop behind an open blurred overlay stops repainting that blur. Ninna-ui portals every overlay as a child of
-   body in opening order, so this covers the board and lower modals and leaves the topmost modal and anything opened
-   from it. The toaster mounts earlier but sits above every dialog. Named animations only: a one-shot entrance starts
-   at opacity 0, so pausing it would hide what it enters. The title bar's refreshed ping is the one one-shot here: it
-   starts visible at opacity 0.6 and repaints the blur for 1.2 s on each landed read, and it finishes once the modal
-   closes. */
-body
-    > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open'])
-    :is(
-        .status-spin,
-        .status-pulse,
-        .activity-sweep,
-        .animate-spin,
-        .motion-safe\:animate-spin,
-        .animate-pulse,
-        [data-ping]
-    ) {
-    animation-play-state: paused;
-}
-body > :not([data-slot='toaster']):has(~ [data-slot$='-overlay'][data-state='open']) .lar-skeleton::before {
-    animation-play-state: paused;
-}

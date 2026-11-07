@@ -8,12 +8,10 @@ import { defineConfig } from 'vite-plus';
 
 const lintConfig = lint({ apps: ['apps/web'] });
 
-/** Copies match their upstream byte for byte (UPSTREAM.md, packages/ui/UPSTREAM.md), so neither tool rewrites them. */
+/** Copies match their upstream byte for byte (UPSTREAM.md), so neither tool rewrites them. */
 const copies = [
     'skills/lar-build/skills/**',
     'skills/lar-build/references/**',
-    'packages/ui/src/search-dialog/useModalAutoFocus.ts',
-    'packages/ui/src/search-dialog/useScrollFade.ts',
     'apps/desktop/scripts/ensure-electron-runtime.mjs',
 ];
 
@@ -43,13 +41,6 @@ export default defineConfig({
     },
     test: {
         ...test,
-        projects: [
-            'packages/shared',
-            'packages/ui',
-            'packages/work-records',
-            'apps/server',
-            'apps/web',
-            'apps/desktop',
-        ],
+        projects: ['packages/shared', 'packages/work-records', 'apps/server', 'apps/web', 'apps/desktop'],
     },
 });

@@ -11,10 +11,10 @@ import {
     workingAgain,
 } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
+import { ambientMotion } from '@lar-works/design-system';
 
 import { PURPOSE, useStart } from './StartStore';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { ambientMotion } from '@/shared/motion/AmbientMotion';
 import { useClock } from '@/shared/time/useClock';
 
 export const useActivityUnavailable = () =>

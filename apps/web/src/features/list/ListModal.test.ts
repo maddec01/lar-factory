@@ -99,7 +99,7 @@ test("the List modal starts on the board's scope", async () => {
     await mountPage();
     await open();
     await settle(() => group('lar-apple').click());
-    await settle(() => $<HTMLButtonElement>('[data-list-modal] button.scope-board')!.click());
+    await settle(() => $<HTMLButtonElement>('[data-list-modal] button[data-scope-board]')!.click());
     await closeTop();
     await open();
     expect(active()).toEqual(['lar-apple']);
@@ -132,7 +132,7 @@ test('a repository whose items have not landed yet says it is reading, not that 
         'no count in the left pane',
     ).toEqual(['lar-apple', '']);
 
-    const header = () => text($('[data-list-modal] button.scope-board')!.parentElement);
+    const header = () => text($('[data-list-modal] button[data-scope-board]')!.parentElement);
 
     expect(header(), 'no count in the header').toBe('lar-appleScope boardRecently updated');
     await push({ ...sample, firstRead: { step: 'finishing', running: [], settled: true } });
@@ -206,7 +206,7 @@ test('Scope board scopes the board to the chosen repository, and is only there f
     await mountPage();
     await open();
 
-    const scope = () => $<HTMLButtonElement>('[data-list-modal] button.scope-board');
+    const scope = () => $<HTMLButtonElement>('[data-list-modal] button[data-scope-board]');
 
     expect(scope()).toBeNull();
     await settle(() => group('lar-apple').click());
@@ -225,7 +225,7 @@ test("Scope board is a toggle, so it keeps its own size, not the button kinds' 2
     await open();
     await settle(() => group('lar-apple').click());
 
-    const scope = $('[data-list-modal] button.scope-board')!;
+    const scope = $('[data-list-modal] button[data-scope-board]')!;
 
     expect([scope.getAttribute('data-kind'), scope.hasAttribute('data-toggle')]).toEqual(['other', true]);
 });
@@ -234,7 +234,7 @@ test('the sort menu reorders the items', async () => {
     await mountPage();
     await open();
 
-    const sort = $<HTMLButtonElement>('[data-list-modal] button.sort')!;
+    const sort = $<HTMLButtonElement>('[data-list-modal] .sort button')!;
 
     expect(text(sort)).toBe('Recently updated');
     await press(sort);
@@ -244,7 +244,7 @@ test('the sort menu reorders the items', async () => {
     expect(options.map(text)).toEqual(['Recently updated', 'Oldest', 'Title', 'Backlog priority']);
     await settle(() => options[1]!.click());
     expect(rows()).toEqual(['I_sample04', 'I_sample03', 'I_sample01', 'I_sample02']);
-    await press($('[data-list-modal] button.sort')!);
+    await press($('[data-list-modal] .sort button')!);
     await settle(() => $$<HTMLElement>('[role="menuitemradio"]')[2]!.click());
     expect(rows()).toEqual(['I_sample01', 'I_sample03', 'I_sample04', 'I_sample02']);
 });
@@ -254,7 +254,7 @@ test('an item opens the item dialog over the List modal, and closing it comes ba
     await open();
     await settle(() => group('lar-server').click());
     await type('a');
-    await press($('[data-list-modal] button.sort')!);
+    await press($('[data-list-modal] .sort button')!);
     await settle(() => $$<HTMLElement>('[role="menuitemradio"]')[2]!.click());
 
     const before = rows();
@@ -269,7 +269,7 @@ test('an item opens the item dialog over the List modal, and closing it comes ba
     expect($('[data-item-dialog]')).toBeNull();
     expect(active()).toEqual(['lar-server']);
     expect(search().value).toBe('a');
-    expect(text($('[data-list-modal] button.sort'))).toBe('Title');
+    expect(text($('[data-list-modal] .sort button'))).toBe('Title');
     expect(rows()).toEqual(before);
     expect(document.activeElement, 'focus goes back to the row').toBe(row);
 });
@@ -295,7 +295,7 @@ test("Add item looks as it does in the title bar: the List modal's Main action, 
     await mountPage();
     await open();
 
-    const add = $('[data-list-modal] button.add-item')!;
+    const add = $('[data-list-modal] button[data-add-item]')!;
 
     expect(add.getAttribute('data-kind')).toBe('main');
     expect(add.querySelector('svg')!.outerHTML).toBe($('.title-bar button.add-item svg')!.outerHTML);
@@ -306,7 +306,7 @@ test('Add item opens the Add item flow over the List modal, and closing it hands
     await open();
     await settle(() => group('lar-apple').click());
 
-    const add = $<HTMLButtonElement>('[data-list-modal] button.add-item')!;
+    const add = $<HTMLButtonElement>('[data-list-modal] button[data-add-item]')!;
 
     add.focus();
     await settle(() => add.click());
@@ -336,7 +336,7 @@ test('Azure List defaults to backlog priority and retains native work item field
 
     await mountPage(data);
     await open();
-    expect(text($('[data-list-modal] button.sort'))).toBe('Backlog priority');
+    expect(text($('[data-list-modal] .sort button'))).toBe('Backlog priority');
     expect(rows()).toEqual(['I_sample01', 'I_sample02']);
     expect(text($('[data-list-modal] [data-azure]'))).toBe('Product Backlog Item · Committed · Ana Silva');
 });
@@ -359,7 +359,7 @@ test('a child copies List size once and owns the expansion shortcut', async () =
         await mountPage();
         await open();
         await settle(() => $<HTMLButtonElement>('[data-list-modal] button[aria-label="Expand"]')!.click());
-        await settle(() => $<HTMLButtonElement>('[data-list-modal] button.add-item')!.click());
+        await settle(() => $<HTMLButtonElement>('[data-list-modal] button[data-add-item]')!.click());
 
         const dialogs = $$<HTMLElement>('[role="dialog"]');
         const child = dialogs.at(-1)!;
@@ -414,7 +414,7 @@ for (const match of [false, true]) {
                     const opener =
                         childKind === 'item'
                             ? '[data-list-modal] button[data-item]'
-                            : '[data-list-modal] button.add-item';
+                            : '[data-list-modal] button[data-add-item]';
 
                     await settle(() => $<HTMLButtonElement>(opener)!.click());
 

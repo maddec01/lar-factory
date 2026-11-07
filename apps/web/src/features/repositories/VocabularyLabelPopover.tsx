@@ -2,12 +2,11 @@
 
 import type { VocabularyTerm } from '@lar-factory/shared';
 import { emptyVocabularyTerm } from '@lar-factory/shared/vocabulary';
-import { Button, Input, Popover } from '@lar-works/design-system';
+import { Button, buttonKind, Input, Popover } from '@lar-works/design-system';
 
 import { AccessReason } from './AccessList';
 import type { useVocabularyFields } from './useVocabularyFields';
 import type { VocabularyKind } from './VocabularyKinds';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 // Ninna forwards Radix collision padding, though its public prop type omits it.
 const labelPopoverPosition = { collisionPadding: 16 };
@@ -55,7 +54,7 @@ export function VocabularyLabelPopover({
         <Popover open={open} onOpenChange={close}>
             <Popover.Trigger asChild>
                 <Button
-                    {...kind('control')}
+                    {...buttonKind('control')}
                     disabled={disabled}
                     className="ms-auto"
                     aria-label={`Choose ${title} ${plural}`}
@@ -127,7 +126,7 @@ export function VocabularyLabelPopover({
                     </ul>
                     {canCreate && (
                         <Button
-                            {...kind('other')}
+                            {...buttonKind('other')}
                             className="h-auto min-h-8 max-w-full min-w-0 py-1 text-left wrap-anywhere whitespace-normal"
                             disabled={!!createProblem || disabled}
                             onClick={() => {
@@ -145,10 +144,10 @@ export function VocabularyLabelPopover({
                         <AccessReason repo={repo} reason={createProblem} onRecheck={onRecheck} />
                     )}
                     <div className="flex justify-between gap-2 border-t border-(--border) pt-2">
-                        <Button {...kind('other')} onClick={() => update(emptyVocabularyTerm(), [])}>
+                        <Button {...buttonKind('other')} onClick={() => update(emptyVocabularyTerm(), [])}>
                             None
                         </Button>
-                        <Button {...kind('other')} onClick={() => close(false)}>
+                        <Button {...buttonKind('other')} onClick={() => close(false)}>
                             Done
                         </Button>
                     </div>

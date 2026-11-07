@@ -119,7 +119,7 @@ test('a saved repository in another case shows as the board names it', async () 
     await mountPage();
     expect(scopeLabel()).toBe(scoped('lar-apple'));
     await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
-    expect(text($('[data-list-modal] .scope-board'))).toBe('Board scoped');
+    expect(text($('[data-list-modal] [data-scope-board]'))).toBe('Board scoped');
 });
 
 test('the List modal starts on the shown Scope, and Scope board writes the saved one', async () => {
@@ -134,13 +134,13 @@ test('the List modal starts on the shown Scope, and Scope board writes the saved
             .filter((b) => b.getAttribute('aria-current') === 'page')
             .map((b) => text(b.querySelector('.name'))),
     ).toEqual(['All Projects']);
-    expect($('[data-list-modal] .scope-board')).toBeNull();
+    expect($('[data-list-modal] [data-scope-board]')).toBeNull();
     await settle(() =>
         nav()
             .find((b) => b.textContent?.includes('lar-apple'))!
             .click(),
     );
-    await settle(() => $<HTMLButtonElement>('[data-list-modal] .scope-board')!.click());
+    await settle(() => $<HTMLButtonElement>('[data-list-modal] [data-scope-board]')!.click());
     expect(localStorage.getItem(SCOPE_KEY)).toBe('maddec01/lar-apple');
     expect(scopeLabel()).toBe(scoped('lar-apple'));
 });

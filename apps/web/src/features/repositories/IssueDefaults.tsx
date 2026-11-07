@@ -1,8 +1,9 @@
 import { effectiveIssueSettings } from '@lar-factory/shared';
+import { InsetPanel } from '@lar-works/design-system';
 
 import { AccessReason, accessExplanation } from './AccessList';
-import { FIELD_GROUP, FieldRow } from '@/shared/ui/setting-rows/FieldRow';
-import { Switch } from '@/shared/ui/setting-rows/SettingControls';
+import { FieldRow } from '@/shared/settings/FieldRow';
+import { Switch } from '@/shared/settings/SettingControls';
 
 const LABELS = {
     createIssuesFromAddItem: 'Create issues from Add item',
@@ -31,7 +32,7 @@ export function IssueDefaults({
     const effective = effectiveIssueSettings(setup);
 
     return (
-        <div className={FIELD_GROUP}>
+        <InsetPanel presentation="settings">
             {(Object.keys(LABELS) as IssueSetting[]).map((key) => {
                 const reason = key === 'writeRefinedSpec' ? effective.specReason : effective.createReason;
 
@@ -62,6 +63,6 @@ export function IssueDefaults({
                     </FieldRow>
                 );
             })}
-        </div>
+        </InsetPanel>
     );
 }

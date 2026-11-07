@@ -1,7 +1,7 @@
 // Onboarding's first step: the T3 project to add.
 
 import { isOnboarding, type ProjectChoice } from '@lar-factory/shared';
-import { Badge, Alert, Button, Input, RadioGroup } from '@lar-works/design-system';
+import { Alert, Badge, Button, buttonKind, Input, InsetPanel, RadioGroup } from '@lar-works/design-system';
 import { FolderPlus } from '@lar-works/design-system/icons';
 
 import { Pending } from './Pending';
@@ -9,8 +9,7 @@ import { Choice } from './SetupFields';
 import { unpickable, useWizardStore, type Run } from './WizardStore';
 import { ProjectChoiceIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { FIELD_GROUP, FieldRow } from '@/shared/ui/setting-rows/FieldRow';
+import { FieldRow } from '@/shared/settings/FieldRow';
 
 export function ProjectStep({ run }: { run: Run }) {
     const { projects, creating, pick, chooseNew, loadProjects, setFolder, createProject } = useWizardStore();
@@ -24,7 +23,7 @@ export function ProjectStep({ run }: { run: Run }) {
                 tone="danger"
                 title="Could not load Projects"
                 action={
-                    <Button {...kind('other')} onClick={() => void loadProjects()}>
+                    <Button {...buttonKind('other')} onClick={() => void loadProjects()}>
                         Retry
                     </Button>
                 }
@@ -39,7 +38,7 @@ export function ProjectStep({ run }: { run: Run }) {
 
     return (
         <>
-            <div className={FIELD_GROUP}>
+            <InsetPanel presentation="settings">
                 <FieldRow
                     label="T3 project"
                     below={
@@ -86,7 +85,7 @@ export function ProjectStep({ run }: { run: Run }) {
                                     </FieldRow>
                                     <span>
                                         <Button
-                                            {...kind('other')}
+                                            {...buttonKind('other')}
                                             leftIcon={<FolderPlus />}
                                             disabled={!creating.folder.trim()}
                                             loading={creating.adding}
@@ -105,7 +104,7 @@ export function ProjectStep({ run }: { run: Run }) {
                         </>
                     }
                 />
-            </div>
+            </InsetPanel>
             <ProjectSection name="added" title="Already added" count={added.length}>
                 {added.map(({ project }) => (
                     <li key={project.id} className="flex min-w-0">

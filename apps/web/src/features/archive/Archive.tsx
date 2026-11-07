@@ -4,7 +4,18 @@
 // read Archive again.
 
 import { clock, day, type Item, type RetentionState } from '@lar-factory/shared';
-import { Button, Input } from '@lar-works/design-system';
+import {
+    ActionStack,
+    BoardNote,
+    Button,
+    buttonKind,
+    FormUnit,
+    Input,
+    InsetPanel,
+    SettingConfirm,
+    SettingLastRun,
+    Stack,
+} from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -12,9 +23,8 @@ import { ExportedLine, ExportMarkdown, type Exported } from '@/features/item-dia
 import { useAbandonStore } from '@/features/items';
 import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { postAction, receive } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { FieldRow, FIELD_GROUP } from '@/shared/ui/setting-rows/FieldRow';
-import { Choice } from '@/shared/ui/setting-rows/SettingControls';
+import { FieldRow } from '@/shared/settings/FieldRow';
+import { Choice } from '@/shared/settings/SettingControls';
 
 /** Where the work stands in Archive: set aside, or finished on its day. */
 export function archivedAs(item: Item): string {
@@ -46,36 +56,28 @@ export function ArchiveActions({ item }: { item: Item }) {
     };
 
     return (
-        <span className="flex flex-col items-end gap-1">
-            <span className="flex flex-wrap items-center gap-2">
-                <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
-                {closeable && (
-                    <Button
-                        {...kind('other')}
-                        data-archive-close={item.id}
-                        onClick={() => useAbandonStore.getState().askClose(item)}
-                    >
-                        Close ticket
-                    </Button>
-                )}
-                {item.archived?.setAside && (
-                    <Button
-                        {...kind('other')}
-                        data-restore={item.id}
-                        loading={restoring}
-                        onClick={() => void restore()}
-                    >
-                        Restore
-                    </Button>
-                )}
-            </span>
-            <ExportedLine exported={exported} />
-            {error && (
-                <p className="m-0 text-xs text-(--error-foreground)" role="alert">
-                    {error}
-                </p>
+        <ActionStack below={<ExportedLine exported={exported} />} error={error}>
+            <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
+            {closeable && (
+                <Button
+                    {...buttonKind('other')}
+                    data-archive-close={item.id}
+                    onClick={() => useAbandonStore.getState().askClose(item)}
+                >
+                    Close ticket
+                </Button>
             )}
-        </span>
+            {item.archived?.setAside && (
+                <Button
+                    {...buttonKind('other')}
+                    data-restore={item.id}
+                    loading={restoring}
+                    onClick={() => void restore()}
+                >
+                    Restore
+                </Button>
+            )}
+        </ActionStack>
     );
 }
 
@@ -94,21 +96,10 @@ function wholeDays(text: string): number | null {
 /** What the last timed delete did, naming each piece of work it kept and why. */
 function LastDelete({ lastDelete }: { lastDelete: NonNullable<RetentionState['lastDelete']> }) {
     return (
-        <div className="grid gap-1 text-xs text-(--muted-foreground)" data-last-delete>
-            <p className="m-0">
-                The last timed delete, {day(lastDelete.at, undefined)} at {clock(lastDelete.at, undefined)}, deleted{' '}
-                {lastDelete.deleted.length} {lastDelete.deleted.length === 1 ? 'record' : 'records'}.
-            </p>
-            {lastDelete.kept.length > 0 && (
-                <ul className="m-0 grid gap-0.5 pl-4">
-                    {lastDelete.kept.map((k) => (
-                        <li key={k.workId}>
-                            Kept {k.workId}. {k.reason}
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
+        <SettingLastRun
+            summary={`The last timed delete, ${day(lastDelete.at, undefined)} at ${clock(lastDelete.at, undefined)}, deleted ${lastDelete.deleted.length} ${lastDelete.deleted.length === 1 ? 'record' : 'records'}.`}
+            kept={lastDelete.kept.map((k) => `Kept ${k.workId}. ${k.reason}`)}
+        />
     );
 }
 
@@ -155,26 +146,24 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
 
     if (retention.problem)
         return (
-            <p className="m-0 text-xs text-(--error-foreground)" role="alert">
+            <BoardNote tone="error" role="alert">
                 {retention.problem} The board keeps and shows all work until the setting can be read.
-            </p>
+            </BoardNote>
         );
 
     return (
-        <div className="grid gap-3" data-retention>
-            <div className={FIELD_GROUP}>
+        <Stack space="group" data-retention>
+            <InsetPanel presentation="settings">
                 <FieldRow label="Hide finished and set-aside work after">
-                    <span className="flex items-center gap-2 text-sm">
+                    <FormUnit unit="days">
                         <Input
-                            className="w-20"
                             inputMode="numeric"
                             aria-label="Days before hiding"
                             value={hide}
                             disabled={saving}
                             onChange={(e) => setHide(e.target.value)}
                         />
-                        days
-                    </span>
+                    </FormUnit>
                 </FieldRow>
                 <FieldRow label="Delete hidden work">
                     <Choice
@@ -191,9 +180,8 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                         ]}
                     />
                     {deleting && (
-                        <span className="flex items-center gap-2 text-sm">
+                        <FormUnit unit="days">
                             <Input
-                                className="w-20"
                                 inputMode="numeric"
                                 aria-label="Days before deleting"
                                 value={deleteAfter}
@@ -203,48 +191,39 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                                     setDue(null);
                                 }}
                             />
-                            days
-                        </span>
+                        </FormUnit>
                     )}
                 </FieldRow>
-            </div>
+            </InsetPanel>
             {due ? (
-                <div
-                    className="grid gap-2 rounded-lg border border-(--border) p-3 text-sm"
-                    role="alertdialog"
-                    aria-label="Turn on timed delete"
-                    data-delete-confirm
-                >
-                    <p className="m-0">
-                        {due.length
+                <SettingConfirm
+                    label="Turn on timed delete"
+                    message={
+                        due.length
                             ? `Turning on timed delete deletes this work now, with its brief, threads and reviews. Export or restore it below first.`
-                            : `Nothing is old enough to delete now. Work will be deleted ${days(deleteDays ?? 0)} after it's finished or set aside.`}
-                    </p>
-                    {due.length > 0 && (
-                        <ul className="m-0 grid gap-0.5 pl-4">
-                            {due.map((d) => (
-                                <li key={d.workId}>{d.title || d.workId}</li>
-                            ))}
-                        </ul>
-                    )}
-                    <span className="flex gap-2">
-                        <Button {...kind('other')} onClick={() => setDue(null)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            {...kind('main', 'danger')}
-                            loading={saving}
-                            data-confirm-delete
-                            onClick={() => void save(true)}
-                        >
-                            {due.length ? `Delete ${due.length} now` : 'Turn on timed delete'}
-                        </Button>
-                    </span>
-                </div>
+                            : `Nothing is old enough to delete now. Work will be deleted ${days(deleteDays ?? 0)} after it's finished or set aside.`
+                    }
+                    items={due.map((d) => d.title || d.workId)}
+                    actions={
+                        <>
+                            <Button {...buttonKind('other')} onClick={() => setDue(null)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                {...buttonKind('main', 'danger')}
+                                loading={saving}
+                                data-confirm-delete
+                                onClick={() => void save(true)}
+                            >
+                                {due.length ? `Delete ${due.length} now` : 'Turn on timed delete'}
+                            </Button>
+                        </>
+                    }
+                />
             ) : (
                 <span>
                     <Button
-                        {...kind('other')}
+                        {...buttonKind('other')}
                         disabled={invalid}
                         loading={saving}
                         data-save-retention
@@ -254,16 +233,13 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                     </Button>
                 </span>
             )}
-            {invalid && <p className="m-0 text-xs text-(--error-foreground)">Enter whole days from 0.</p>}
+            {invalid && <BoardNote tone="error">Enter whole days from 0.</BoardNote>}
             {message && (
-                <p
-                    className={`m-0 text-xs ${message.error ? 'text-(--error-foreground)' : 'text-(--muted-foreground)'}`}
-                    role={message.error ? 'alert' : 'status'}
-                >
+                <BoardNote tone={message.error ? 'error' : 'muted'} role={message.error ? 'alert' : 'status'}>
                     {message.text}
-                </p>
+                </BoardNote>
             )}
             {retention.lastDelete && <LastDelete lastDelete={retention.lastDelete} />}
-        </div>
+        </Stack>
     );
 }

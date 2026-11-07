@@ -192,7 +192,7 @@ test('confirming Abandon holds Queue without relabelling it, and announces the c
 
     await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample01') } });
     expect(text($('.title-bar .list-button')), 'it leaves the List').toBe('List3');
-    expect(toast()!.querySelector('a, .view-item'), 'the toast gives the result').toBeNull();
+    expect(toast()!.querySelector('a, [data-view-item]'), 'the toast gives the result').toBeNull();
     expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
 });
 

@@ -3,12 +3,9 @@
 // the item dialog attaches one to captured work.
 
 import type { TicketMatch } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind, FormResult } from '@lar-works/design-system';
 import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
-
-import { FormResult } from '@/features/notices';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 type Phase = 'idle' | 'searching' | 'found' | 'picking';
 
@@ -96,7 +93,7 @@ export function TicketPicker({
                     className="border-base-300 bg-base-100 focus-visible:ring-primary h-8 min-w-0 flex-1 rounded-md border px-2.5 text-sm outline-none focus-visible:ring-2"
                 />
                 <Button
-                    {...kind('other')}
+                    {...buttonKind('other')}
                     id={`${id}-search`}
                     disabled={disabled || busy}
                     onClick={() => void search()}

@@ -4,7 +4,7 @@
 
 import { boardSections, deskItems, inRepo, repoName, sameLabel, sameRepo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import type { SearchDialogToken } from '@lar-factory/ui/search-dialog';
+import { ColorDot, type CommandPaletteToken } from '@lar-works/design-system';
 import { CircleDashed, Layers } from '@lar-works/design-system/icons';
 import { useMemo } from 'react';
 
@@ -24,7 +24,7 @@ import { stageRows } from '@/features/line';
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 
-export interface FilterToken extends SearchDialogToken {
+export interface FilterToken extends CommandPaletteToken {
     /** A kind's hue, which colours the closed field's token. */
     hue?: number;
 }
@@ -32,17 +32,11 @@ export interface FilterToken extends SearchDialogToken {
 export function KindIcon({ choice }: { choice: KindFilter }) {
     const Icon = choice === 'no-kind' ? CircleDashed : KIND_BADGES[choice]!.icon;
 
-    return <Icon aria-hidden="true" className="size-3.5" />;
+    return <Icon aria-hidden="true" />;
 }
 
 function LabelDot({ color }: { color: string | undefined }) {
-    return (
-        <span
-            aria-hidden="true"
-            className="bg-base-400 size-2 shrink-0 rounded-full"
-            style={color ? { background: color } : undefined}
-        />
-    );
+    return <ColorDot color={color} />;
 }
 
 /** The colour any item on the board gives each picked label, which a label no item in view shows still has. */
@@ -144,7 +138,7 @@ export function useFilterGroups(): SearchGroup[] {
                     {
                         value: 'repo:',
                         name: 'All Projects',
-                        icon: <Layers aria-hidden="true" className="size-3.5" />,
+                        icon: <Layers aria-hidden="true" />,
                         on: !scope,
                         select: () => setScope(null),
                     },

@@ -6,8 +6,7 @@ import {
     type TicketCreationOptions,
     type TicketOptions,
 } from '@lar-factory/shared';
-import { FormSelect } from '@lar-factory/ui/form-select';
-import { Checkbox } from '@lar-works/design-system';
+import { Checkbox, FormSelect } from '@lar-works/design-system';
 // Add item's Create issue checkbox follows the repository's default until this item changes it, and shows the optional provider fields.
 import { useEffect, useState, type ReactNode } from 'react';
 

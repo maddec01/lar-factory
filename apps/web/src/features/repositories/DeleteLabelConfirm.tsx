@@ -1,10 +1,9 @@
 import type { TrackerCapabilities } from '@lar-factory/shared';
-import { Alert, Button, Modal, Text } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, Modal, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { useEditStore } from './EditStore';
 import { OTHER_MAPPINGS, ProblemText } from './LabelParts';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export function DeleteConfirm({
     name,
@@ -54,10 +53,14 @@ export function DeleteConfirm({
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button {...kind('other')} disabled={running !== null} onClick={onClose}>
+                    <Button {...buttonKind('other')} disabled={running !== null} onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button {...kind('main', 'danger')} loading={running === 'labels'} onClick={() => void confirm()}>
+                    <Button
+                        {...buttonKind('main', 'danger')}
+                        loading={running === 'labels'}
+                        onClick={() => void confirm()}
+                    >
                         Delete {capabilities.noun}
                     </Button>
                 </Modal.Footer>

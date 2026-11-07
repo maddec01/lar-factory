@@ -2,15 +2,13 @@
 
 import { SWAP_KINDS, kindCanChange } from '@lar-factory/shared';
 import type { Item, SwapKind } from '@lar-factory/shared';
-import { FormSelect } from '@lar-factory/ui/form-select';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind, FormSelect } from '@lar-works/design-system';
 import { useEffect, useRef } from 'react';
 
 import { Fact } from './DetailsParts';
 import { OPEN_ITEM_DIALOG } from './ItemDialogStore';
 import { useKindChangeStore } from './KindChangeStore';
 import { KIND_BADGES } from '@/features/items';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 const KIND_CHOICES = SWAP_KINDS.map((value) => {
     const { name, icon: Icon } = KIND_BADGES[value]!;
@@ -75,7 +73,11 @@ export function ItemKindControl({ item }: { item: Item }) {
                             ? `Changed on the ticket so far: ${change.line}`
                             : 'Nothing changed on the ticket.'}
                     </p>
-                    <Button {...kind('other')} loading={change.saving} onClick={() => void start(item.id, change.kind)}>
+                    <Button
+                        {...buttonKind('other')}
+                        loading={change.saving}
+                        onClick={() => void start(item.id, change.kind)}
+                    >
                         Retry
                     </Button>
                 </div>

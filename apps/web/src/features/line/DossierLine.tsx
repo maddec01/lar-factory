@@ -2,7 +2,7 @@
 
 import { itemActivityStill, itemName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Badge } from '@lar-works/design-system';
+import { ambientMotion, Badge } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { Figures, ROW_ACTION, RowSecondLine, figuresOf } from './Columns';
@@ -23,7 +23,6 @@ import {
     STATUS_COLOR,
 } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { ambientMotion } from '@/shared/motion/AmbientMotion';
 
 /** Every part as a segment in its status colour, done first, so the bar fills left to right; a dashed one per part the board doesn't read. */
 function PartsBar({ m }: { m: Moving }) {

@@ -2,14 +2,12 @@
 
 import type { ItemComment } from '@lar-factory/shared';
 import { shortAgo } from '@lar-factory/shared';
-import { RichText } from '@lar-factory/ui/rich-text';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind, RichText } from '@lar-works/design-system';
 
 import type { DetailsEntry } from './DetailsCache';
 import { Avatar, Heading } from './DetailsParts';
 import type { ItemDetailsRead } from './useItemDetails';
 import { useOlderComments } from './useOlderComments';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 function Comment({ comment, now }: { comment: ItemComment; now: number }) {
     return (
@@ -26,7 +24,9 @@ function Comment({ comment, now }: { comment: ItemComment; now: number }) {
                         {shortAgo(comment.createdAt, now)}
                     </time>
                 </div>
-                <RichText className="px-3 py-2" text={comment.body} format={comment.format} />
+                <div className="px-3 py-2">
+                    <RichText text={comment.body} format={comment.format} />
+                </div>
             </div>
         </li>
     );
@@ -66,7 +66,7 @@ function Comments({
             )}
             {older.hasMore && (
                 <div className="flex flex-wrap items-center gap-3">
-                    <Button {...kind('other')} loading={older.loading} onClick={older.loadMore}>
+                    <Button {...buttonKind('other')} loading={older.loading} onClick={older.loadMore}>
                         Load older comments
                     </Button>
                     {older.error && (

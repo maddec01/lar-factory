@@ -2,12 +2,11 @@
 // the merge, and Resume, which reopens the onboarding dialog there.
 
 import { shownRepo } from '@lar-factory/shared';
-import { Button, Badge, NoticeCard } from '@lar-works/design-system';
+import { Badge, Button, buttonKind, NoticeCard } from '@lar-works/design-system';
 
 import { stoppedAt, useWizardStore } from './WizardStore';
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export function OnboardingCards() {
     const onboarding = useBoardStore((state) => state.data.onboarding);
@@ -29,7 +28,7 @@ export function OnboardingCards() {
                             badge={<Badge tone="warning">Setting up</Badge>}
                             description={`${where[0]!.toUpperCase()}${where.slice(1)}`}
                             actions={
-                                <Button {...kind('other')} onClick={() => resume(repo)} data-resume>
+                                <Button {...buttonKind('other')} onClick={() => resume(repo)} data-resume>
                                     Resume
                                 </Button>
                             }

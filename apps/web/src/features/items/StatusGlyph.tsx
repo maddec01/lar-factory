@@ -8,6 +8,7 @@ import {
     itemActivityThread,
 } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
+import { ambientMotion, SpinnerIcon } from '@lar-works/design-system';
 import {
     Check,
     Circle,
@@ -23,9 +24,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { useStartStore } from './StartStore';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { ambientMotion } from '@/shared/motion/AmbientMotion';
 import { useClock } from '@/shared/time/useClock';
-import { Spinner } from '@/shared/ui/loading/Loader';
 
 export const STATUS_COLOR: Record<Status, string> = {
     List: 'var(--st-idle)',
@@ -65,7 +64,7 @@ export function StatusGlyph({
         case 'Verify':
             return <CircleDot {...props} />;
         case 'In progress':
-            return running ? <Spinner spin="status-spin" {...props} /> : <Circle {...props} />;
+            return running ? <SpinnerIcon motion="status" {...props} /> : <Circle {...props} />;
         case 'Ready':
             return <CircleArrowRight {...props} />;
         case 'Shaping':

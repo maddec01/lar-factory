@@ -2,13 +2,12 @@
 // gives here; a number is a whole number from 1, saved with its own button or Enter.
 
 import type { HeavyCommandLimit, HeavyCommandLimitState } from '@lar-factory/shared';
-import { Button, Input } from '@lar-works/design-system';
+import { Button, buttonKind, Input } from '@lar-works/design-system';
 import { useId, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
 import { postAction, receive } from '@/services/board/board.service';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { Choice } from '@/shared/ui/setting-rows/SettingControls';
+import { Choice } from '@/shared/settings/SettingControls';
 
 function wholeFromOne(text: string): number | null {
     const n = Number(text);
@@ -107,7 +106,7 @@ export function LimitSetting({
                         aria-describedby={invalid ? hint : undefined}
                     />
                     <Button
-                        {...kind('other')}
+                        {...buttonKind('other')}
                         type="submit"
                         disabled={number === null}
                         aria-disabled={held || undefined}

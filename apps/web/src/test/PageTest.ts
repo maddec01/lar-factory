@@ -14,7 +14,8 @@ import type {
 import sampleDetailsJson from '@lar-factory/shared/test/sample-details.json' with { type: 'json' };
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { afterEach, beforeAll, beforeEach, vi } from 'vite-plus/test';
 
@@ -329,16 +330,54 @@ export function fullScreen(on: boolean) {
     return { bridge, set };
 }
 
-/** src/index.css with the feature folders' sheets it imports in their place. */
-const src = join(import.meta.dirname, '..');
-const pageCss = () =>
-    readFileSync(join(src, 'index.css'), 'utf8').replace(/@import ['"]\.\/(.+?)['"];/g, (_line, path: string) =>
-        readFileSync(join(src, path), 'utf8'),
+/** The design system's board entry, which src/index.css imports. */
+const boardCss = fileURLToPath(import.meta.resolve('@lar-works/design-system/board.css'));
+
+/** Drops the Tailwind-only blocks (@theme, @utility, @custom-variant) jsdom's CSS parser doesn't know. */
+function withoutTailwindBlocks(css: string): string {
+    let out = '';
+    let at = 0;
+
+    for (const match of css.matchAll(/@(theme|utility|custom-variant)\b[^{;]*\{/g)) {
+        if (match.index < at) continue;
+
+        out += css.slice(at, match.index);
+
+        let depth = 0;
+        let end = match.index;
+
+        for (; end < css.length; end++) {
+            if (css[end] === '{') depth++;
+            else if (css[end] === '}' && --depth === 0) break;
+        }
+
+        at = end + 1;
+    }
+
+    return out + css.slice(at);
+}
+
+/** A sheet with the relative sheets it imports in their place, and the package imports (Tailwind's, ninna-ui's) left
+ *  out; src/index.css's import of the design system's board.css brings the board's sheets in. */
+function inlined(file: string): string {
+    return withoutTailwindBlocks(readFileSync(file, 'utf8')).replace(
+        /@import ['"](.+?)['"][^;]*;/g,
+        (_line, path: string) =>
+            path === '@lar-works/design-system/board.css'
+                ? inlined(boardCss)
+                : path.startsWith('.')
+                  ? inlined(join(dirname(file), path))
+                  : '',
     );
+}
+
+/** src/index.css with the sheets it imports in their place. */
+const src = join(import.meta.dirname, '..');
+const pageCss = () => inlined(join(src, 'index.css'));
 
 /** Puts src/index.css on the page. jsdom has no layout but cascades its rules into getComputedStyle; it can't apply
- *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheets' text, the page's
- *  and the design system's, and from Tailwind's arbitrary no-drag class. */
+ *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheets' text and from
+ *  Tailwind's arbitrary no-drag class. */
 export function addStylesheet(): { noDrag: (el: Element) => boolean } {
     const css = pageCss();
     const style = document.createElement('style');
@@ -346,8 +385,7 @@ export function addStylesheet(): { noDrag: (el: Element) => boolean } {
     style.textContent = css;
     document.head.append(style);
 
-    const all = css + readFileSync(join(import.meta.dirname, '../../../../packages/ui/src/styles.css'), 'utf8');
-    const selectors = [...all.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) =>
+    const selectors = [...css.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) =>
         rule[1]!.replace(/\/\*[^]*?\*\//g, ''),
     );
 

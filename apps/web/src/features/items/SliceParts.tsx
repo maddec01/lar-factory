@@ -2,10 +2,10 @@
 
 import { itemName } from '@lar-factory/shared';
 import type { Item, SliceProgress } from '@lar-factory/shared';
+import { ambientMotion } from '@lar-works/design-system';
 import { Check } from '@lar-works/design-system/icons';
 
 import { SourceIcon } from './SourceIcon';
-import { ambientMotion } from '@/shared/motion/AmbientMotion';
 
 const SLICE_COLOR: Record<SliceProgress, string> = {
     done: 'var(--st-done)',

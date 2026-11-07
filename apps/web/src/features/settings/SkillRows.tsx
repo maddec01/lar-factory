@@ -9,7 +9,7 @@ import { TargetSwitch, TargetsNote } from './AppRows';
 import { custom, type Group, type PagesInput, type Row } from './SettingsModel';
 import { TargetProgress } from './TargetProgress';
 import { TargetReaders } from './TargetReaders';
-import { ToolState } from '@/shared/ui/setting-rows/SettingControls';
+import { ToolState } from '@/shared/settings/SettingControls';
 
 const ONLY_APP_TARGETS = 'Only the board app installs skills into agent folders.';
 

@@ -1,11 +1,10 @@
 // Skill work and retained results, with recovery through the desktop-owned installer.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Button } from '@lar-works/design-system';
+import { Button, buttonKind } from '@lar-works/design-system';
 
 import { useSettingsStore } from './SettingsStore';
 import { useDriftStore } from '@/services/install/drift.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** Desktop commands operate across active targets, including recovery after a first install failed. */
 export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boolean }) {
@@ -23,7 +22,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
             <div className="flex flex-wrap gap-2">
                 {failed && (
                     <Button
-                        {...kind('other')}
+                        {...buttonKind('other')}
                         data-retry-install
                         aria-label="Retry installation in all active targets"
                         disabled={busy}
@@ -34,7 +33,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
                 )}
                 {drift && (
                     <Button
-                        {...kind('other')}
+                        {...buttonKind('other')}
                         data-replace-drift
                         aria-label="Restore bundled skills in all active targets"
                         disabled={busy}

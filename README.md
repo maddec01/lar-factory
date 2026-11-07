@@ -258,7 +258,6 @@ apps/server/          local board server and provider adapters
 apps/web/             board UI
 apps/desktop/         Electron app
 packages/shared/      shared model and local settings
-packages/ui/          board UI on @lar-works/design-system
 packages/work-records/ local work records and lar-work command
 scripts/              assembly, workspace setup and release tools
 ```
@@ -270,8 +269,8 @@ MIT, see [LICENSE](LICENSE). The copied skills and code come from:
 - [Matt Pocock](https://github.com/mattpocock/skills): most of the copied skills.
 - [Addy Osmani](https://github.com/addyosmani/agent-skills): the review and hardening checklists bundled inside `lar-build`.
 - [Lauren Tan](https://github.com/cursor/plugins/tree/main/pstack): `unslop`, from `pstack` in cursor/plugins.
-- [T3 Tools](https://github.com/pingdotgg/t3code): T3 Code's desktop app, ported into the board app, and the base components in `packages/ui`.
-- [coss](https://github.com/cosscom/ui): the toast in `packages/ui`, and the registry T3's base components derive from.
+- [T3 Tools](https://github.com/pingdotgg/t3code): T3 Code's desktop app, ported into the board app.
+- [coss](https://github.com/cosscom/ui): the registry T3's base components derive from.
 
 All five are MIT; their notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 The factory idea draws on ZazenCodes'

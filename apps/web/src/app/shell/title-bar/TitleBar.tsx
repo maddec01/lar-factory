@@ -11,35 +11,23 @@
 
 import { clock, failedCheck, inMacApp, isStale, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
-import { BrandMark, TitleBar as LarTitleBar, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
+import {
+    BoardBrand,
+    BoardTitleBar,
+    type RefreshHealth,
+    RefreshIndicator,
+    TitleBarDivider,
+} from '@lar-works/design-system';
 import { useEffect, useRef, useState } from 'react';
 
 import { Counters } from './Counters';
-import { TrafficLights, useWindowControlsInset } from './WindowControls';
+import { useLightsHidden } from './WindowControls';
 import { AddItem } from '@/features/add-item';
 import { BoardSearch } from '@/features/board-search';
 import { ListButton } from '@/features/list';
 import { SettingsButton } from '@/features/settings';
 import { UpdateButton } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
-
-/** "Lar Factory": the design system's BrandMark, the mark as the L and "ar", then a muted "Factory" on the same baseline, in
- *  BrandMark's size and type. Screen readers skip it: the page's hidden h1 names the page. */
-function Brand() {
-    return (
-        <span
-            className="brand lar-brand-mark inline-flex shrink-0 items-baseline text-xl leading-none"
-            aria-hidden="true"
-        >
-            <BrandMark label="Lar" />
-            <span className="text-base-700 ml-[0.24em] font-medium tracking-[-0.02em]">Factory</span>
-        </span>
-    );
-}
-
-type Health = 'waiting' | 'live' | 'stale' | 'disconnected';
-
-const DOT = { waiting: 'bg-base-500', live: 'bg-success', stale: 'bg-amber-500', disconnected: 'bg-danger' } as const;
 
 /** How many reads landed after this page opened: a newer `fetchedAt` than the one shown. */
 function useLandedReads(fetchedAt: string | null) {
@@ -57,28 +45,8 @@ function useLandedReads(fetchedAt: string | null) {
     return landed;
 }
 
-function RefreshDetails({ data, now, clientError }: { data: BoardData; now: number; clientError: string | null }) {
-    return (
-        <span className="flex flex-col gap-0.5">
-            <span data-line>
-                {data.fetchedAt
-                    ? `Updated ${shortAgo(data.fetchedAt, now)} · ${clock(data.fetchedAt, undefined)}`
-                    : 'Not read yet'}
-            </span>
-            <span data-line className="text-base-700">
-                {clientError
-                    ? `Board disconnected: ${clientError}`
-                    : data.error
-                      ? `Last read failed: ${data.error.split('\n')[0]}`
-                      : `Checks GitHub for changes every 5s, reads everything every ${data.refreshSeconds}s`}
-            </span>
-        </span>
-    );
-}
-
-/** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. A tab stop, so
- *  keyboard users reach its tooltip. Only the dot changes colour (amber when stale, red while the page has lost the
- *  board server) and only the dot pings. */
+/** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. Only the dot
+ *  changes colour (amber when stale, red while the page has lost the board server) and only the dot pings. */
 function Refreshed({ data }: { data: BoardData }) {
     const { fetchedAt } = data;
     const clientError = useBoardStore((state) => state.clientError);
@@ -107,7 +75,7 @@ function Refreshed({ data }: { data: BoardData }) {
     const landed = useLandedReads(fetchedAt);
     // A repository whose items haven't landed would show as empty, so the board says it still reads instead.
     const reading = data.firstRead.waiting ?? [];
-    const health: Health = clientError
+    const health: RefreshHealth = clientError
         ? 'disconnected'
         : reading.length
           ? 'waiting'
@@ -119,95 +87,64 @@ function Refreshed({ data }: { data: BoardData }) {
     const ago = fetchedAt ? shortAgo(fetchedAt, now) : null;
 
     return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <span
-                    tabIndex={0}
-                    className="refreshed text-base-700 focus-visible:ring-primary inline-flex h-6 shrink-0 items-center gap-1.5 rounded-sm px-1 text-xs whitespace-nowrap tabular-nums outline-none focus-visible:ring-2 @max-[40rem]:hidden @min-[48rem]:min-w-30"
-                >
-                    <span className="relative grid size-2 place-items-center">
-                        {landed > 0 && health === 'live' && (
-                            <span
-                                key={landed}
-                                data-ping
-                                className="bg-success absolute size-1.5 rounded-full motion-safe:animate-[refreshed-ping_1.2s_ease-out_forwards]"
-                            />
-                        )}
-                        <span data-dot className={`size-1.5 rounded-full ${DOT[health]}`} />
-                    </span>
-                    <span className="@max-[48rem]:sr-only">
-                        {health === 'disconnected' ? (
-                            fetchedAt ? (
-                                <time dateTime={fetchedAt}>Disconnected · {ago}</time>
-                            ) : (
-                                'Disconnected'
-                            )
-                        ) : reading.length ? (
-                            'Loading Projects'
-                        ) : !fetchedAt ? (
-                            'Not read yet'
-                        ) : (
-                            <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>
-                        )}
-                    </span>
-                </span>
-            </TooltipTrigger>
-            <TooltipPopup side="bottom">
-                <RefreshDetails data={data} now={now} clientError={clientError} />
-            </TooltipPopup>
-        </Tooltip>
+        <RefreshIndicator
+            health={health}
+            landed={landed}
+            label={
+                health === 'disconnected' ? (
+                    fetchedAt ? (
+                        <time dateTime={fetchedAt}>Disconnected · {ago}</time>
+                    ) : (
+                        'Disconnected'
+                    )
+                ) : reading.length ? (
+                    'Loading Projects'
+                ) : !fetchedAt ? (
+                    'Not read yet'
+                ) : (
+                    <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>
+                )
+            }
+            detail={fetchedAt ? `Updated ${shortAgo(fetchedAt, now)} · ${clock(fetchedAt, undefined)}` : 'Not read yet'}
+            secondaryDetail={
+                clientError
+                    ? `Board disconnected: ${clientError}`
+                    : data.error
+                      ? `Last read failed: ${data.error.split('\n')[0]}`
+                      : `Checks GitHub for changes every 5s, reads everything every ${data.refreshSeconds}s`
+            }
+        />
     );
 }
-
-/** The window drags from the bar, but never from a control in it. */
-const DRAG = '[-webkit-app-region:drag] [&_:is(button,a,[tabindex])]:[-webkit-app-region:no-drag]';
 
 export function TitleBar() {
     const board = useBoardStore((state) => failedCheck(state.data.tools, 't3')?.result !== 'missing');
     const data = useBoardStore((state) => state.data);
-    const inset = useWindowControlsInset();
+    const lightsHidden = useLightsHidden();
 
     return (
-        <div
-            data-native-window={inMacApp() || undefined}
-            className={`title-bar border-base-300 shrink-0 border-b select-none ${inset} ${DRAG}`}
-        >
-            <TrafficLights />
-            {/* The brand is hidden from screen readers, so the page's heading is here, for them only. A closing dialog whose
-          opener went away puts focus on it. The missing-t3 notice has its own. */}
-            {board && (
-                <h1 className="sr-only" tabIndex={-1}>
-                    Lar Factory
-                </h1>
-            )}
-            <LarTitleBar
-                brand={<Brand />}
-                title={
-                    board && (
+        <BoardTitleBar
+            nativeWindow={inMacApp()}
+            pastLights={!lightsHidden}
+            brand={<BoardBrand product="Factory" />}
+            // The missing-t3 notice has its own heading.
+            heading={board ? 'Lar Factory' : undefined}
+            refreshed={board && <Refreshed data={data} />}
+            counters={board && <Counters />}
+            search={board && <BoardSearch />}
+            actions={
+                <>
+                    {board && (
                         <>
-                            <div className="status-strip border-base-300 bg-base-200/60 flex shrink-0 items-center gap-0.5 rounded-lg border pr-0.5 pl-1.5">
-                                <Refreshed data={data} />
-                                <span aria-hidden="true" className="bg-base-300 mx-0.5 h-4 w-px @max-[40rem]:hidden" />
-                                <Counters />
-                            </div>
-                            <BoardSearch />
+                            <ListButton />
+                            <AddItem />
+                            <TitleBarDivider />
+                            <UpdateButton />
                         </>
-                    )
-                }
-                actions={
-                    <>
-                        {board && (
-                            <>
-                                <ListButton />
-                                <AddItem />
-                                <span aria-hidden="true" className="app-divider bg-base-300 mx-1 h-5 w-px shrink-0" />
-                                <UpdateButton />
-                            </>
-                        )}
-                        <SettingsButton />
-                    </>
-                }
-            />
-        </div>
+                    )}
+                    <SettingsButton />
+                </>
+            }
+        />
     );
 }

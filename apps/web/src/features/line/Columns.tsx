@@ -3,6 +3,7 @@
 
 import { duration, formatTokens, formatUsd, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats, LinkedPr } from '@lar-factory/shared';
+import { Spinner } from '@lar-works/design-system';
 import { GitPullRequest } from '@lar-works/design-system/icons';
 import type { MouseEvent, ReactNode } from 'react';
 
@@ -11,7 +12,6 @@ import { statsOf } from './StageTrack';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { hasFigures, INCOMPLETE_TOTAL, useLastKnown, usageLoading } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { Loader } from '@/shared/ui/loading/Loader';
 
 /** What a row's action slot holds, centred and against its right edge. */
 export const ROW_ACTION =
@@ -81,7 +81,7 @@ export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; t
         (!!total && itemMembers(item, data.items).some((member) => usageLoading(member, data)));
 
     if (!s || (!hasFigures(s) && (loading || !s.incomplete)))
-        return loading ? <Loader label="Loading usage" still={still} /> : <span />;
+        return loading ? <Spinner label="Loading usage" still={still} /> : <span />;
 
     const cost = s.costUsd !== undefined ? formatUsd(s.costUsd) : null;
     const all = hasFigures(s) ? [duration(s.agentMs), formatTokens(s.tokens), cost].filter(Boolean).join(' · ') : null;
@@ -102,7 +102,7 @@ export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; t
             className="flex min-w-0 items-center justify-end gap-1 text-(--muted-foreground) tabular-nums"
             title={title}
         >
-            {loading && <Loader title={UPDATING} still={still} />}
+            {loading && <Spinner title={UPDATING} still={still} />}
             {text && <span className="truncate">{text}</span>}
             {s.incomplete &&
                 (text ? (

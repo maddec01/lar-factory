@@ -13,7 +13,7 @@
 // or opening a part with unsaved edits asks "Discard changes?" first.
 
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button, Modal } from '@lar-works/design-system';
+import { Button, buttonKind, Modal } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { ItemDialogContent } from './ItemDialogContent';
@@ -21,8 +21,7 @@ import { useItemDialogStore } from './ItemDialogStore';
 import { useDescriptionEdit } from './useDescriptionEdit';
 import { useItemDetails } from './useItemDetails';
 import { useBoardStore } from '@/services/board/board.hooks';
-import { kind } from '@/shared/ui/buttons/ButtonKinds';
-import { useExpand } from '@/shared/ui/expand-dialog/ExpandDialog';
+import { useExpand } from '@/shared/dialogs/ExpandDialog';
 
 /** Asks before closing the dialog drops unsaved edits to the description. */
 function DiscardPrompt({ keep, discard }: { keep: () => void; discard: () => void }) {
@@ -30,10 +29,10 @@ function DiscardPrompt({ keep, discard }: { keep: () => void; discard: () => voi
         <Modal onClose={keep}>
             <Modal.Content title="Discard changes?" description="Your edits to the description haven't been saved.">
                 <Modal.Footer>
-                    <Button {...kind('other')} onClick={keep}>
+                    <Button {...buttonKind('other')} onClick={keep}>
                         Keep editing
                     </Button>
-                    <Button {...kind('main', 'danger')} onClick={discard}>
+                    <Button {...buttonKind('main', 'danger')} onClick={discard}>
                         Discard
                     </Button>
                 </Modal.Footer>

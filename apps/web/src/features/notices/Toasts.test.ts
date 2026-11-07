@@ -38,7 +38,7 @@ test('a success toast clears itself after 5 s', async () => {
 test('a toast with focus stays, then gets a full 5 s once focus leaves', async () => {
     await mountPage();
     await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
-    await settle(() => toast()!.querySelector<HTMLElement>('.view-item')!.focus());
+    await settle(() => toast()!.querySelector<HTMLElement>('[data-view-item]')!.focus());
     await settle(() => vi.advanceTimersByTime(8_000));
     expect(toast(), 'still being used').not.toBeNull();
     await settle(() => (document.activeElement as HTMLElement).blur());
@@ -57,7 +57,7 @@ test.each(['focus', 'hover'])('even a brief %s interaction gives a success anoth
     await settle(() => vi.advanceTimersByTime(1_000));
     await settle(() =>
         interaction === 'focus'
-            ? entry.querySelector<HTMLElement>('.view-item')!.focus()
+            ? entry.querySelector<HTMLElement>('[data-view-item]')!.focus()
             : entry.dispatchEvent(new MouseEvent('mouseenter')),
     );
     await settle(() => vi.advanceTimersByTime(1_000));
@@ -81,7 +81,7 @@ test('a success waits for both hover and focus to leave, including focus moving 
     await settle(() => entry.dispatchEvent(new MouseEvent('mouseenter')));
     await settle(() => vi.advanceTimersByTime(8_000));
     expect(toast(), 'still hovered').not.toBeNull();
-    await settle(() => entry.querySelector<HTMLElement>('.view-item')!.focus());
+    await settle(() => entry.querySelector<HTMLElement>('[data-view-item]')!.focus());
     await settle(() => entry.dispatchEvent(new MouseEvent('mouseleave')));
     await settle(() => vi.advanceTimersByTime(8_000));
     expect(toast(), 'still focused').not.toBeNull();
@@ -375,7 +375,7 @@ test.each<{ screen: string; data: BoardData; selector: string }>([
 test('View item opens the item in the item dialog and closes the toast', async () => {
     await mountPage();
     await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
-    await settle(() => toast()!.querySelector<HTMLButtonElement>('.view-item')!.click());
+    await settle(() => toast()!.querySelector<HTMLButtonElement>('[data-view-item]')!.click());
 
     const { useItemDialogStore } = await import('@/features/item-dialog/ItemDialogStore');
 
@@ -387,7 +387,7 @@ test('View item opens the item in the item dialog and closes the toast', async (
 test('View item does nothing once the item has left the board', async () => {
     await mountPage();
     await notify({ verb: 'Added', item: { ...sample.items[0]!, id: 'I_gone' }, to: 'List' });
-    await settle(() => toast()!.querySelector<HTMLButtonElement>('.view-item')!.click());
+    await settle(() => toast()!.querySelector<HTMLButtonElement>('[data-view-item]')!.click());
     expect($('[data-item-dialog]')).toBeNull();
     expect(toast(), 'the toast stays').not.toBeNull();
 });

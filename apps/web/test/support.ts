@@ -321,7 +321,7 @@ export function fullScreen(on: boolean) {
 /** src/index.css with the feature folders' sheets it imports in their place. */
 const src = join(import.meta.dirname, '../src');
 const pageCss = () =>
-    readFileSync(join(src, 'index.css'), 'utf8').replace(/@import "\.\/(.+?)";/g, (_line, path: string) =>
+    readFileSync(join(src, 'index.css'), 'utf8').replace(/@import ['"]\.\/(.+?)['"];/g, (_line, path: string) =>
         readFileSync(join(src, path), 'utf8'),
     );
 

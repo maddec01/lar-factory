@@ -19,7 +19,7 @@ test("the board's focus outline sits in the base layer, so a design-system contr
 });
 
 test("the board's link rules sit in the base layer, so a link styled as a button keeps its button's colours", () => {
-    expect(baseLayer()).toMatch(/^\s*a \{ color: inherit;/m);
+    expect(baseLayer()).toMatch(/^\s*a \{\s*color: inherit;/m);
 });
 
 // A feature folder with no sheet of its own has no page class names, so its class names are all Tailwind utilities.

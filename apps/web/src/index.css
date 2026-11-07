@@ -53,7 +53,7 @@ code {
 }
 @layer base {
     /* Tailwind's base styles take links' underline; these put it back. In the base layer, so a link styled as a
-     button keeps its button's text colour. */
+       button keeps its button's text colour. */
     a {
         color: inherit;
         text-decoration: underline;

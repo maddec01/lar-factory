@@ -86,7 +86,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
     /* "Home first" (lar-brand preview/prototype-startup.html, variant C): the block, the room, appears first; the L wraps
-     around it as wall and floor in one trace; then "ar" slides out from behind the mark and the product fades in. */
+       around it as wall and floor in one trace; then "ar" slides out from behind the mark and the product fades in. */
     .loading-screen:not(.is-drawn) .loading-mark-block {
         opacity: 0;
         transform: scale(0.3);
@@ -102,7 +102,7 @@
         animation: loading-trace 700ms cubic-bezier(0.42, 0, 0.58, 1) 420ms forwards;
     }
     /* The filled L replaces the trace once it ends; the stroke covers the same outline but for its
-     3-unit outer corner, which it draws square, too small for the swap to show. */
+       3-unit outer corner, which it draws square, too small for the swap to show. */
     .loading-screen:not(.is-drawn) .loading-mark-fill {
         opacity: 0;
         animation: loading-show 0ms linear 1120ms forwards;

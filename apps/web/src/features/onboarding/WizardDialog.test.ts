@@ -280,7 +280,9 @@ async function labelPicker(key: 'bug' | 'feature' | 'improvement' = 'bug') {
     );
     await settle(() => vi.advanceTimersByTime(50));
 
-    return document.querySelector<HTMLElement>(`[data-label-picker="${key}"]`)!;
+    return document
+        .querySelector<HTMLElement>(`[data-label-picker="${key}"]`)!
+        .closest('[data-slot="popover-content"]')!;
 }
 
 async function type(input: HTMLInputElement, value: string) {
@@ -357,7 +359,7 @@ test('onboarding refuses linked-work typed as a new label without changing its d
 
     await type(popover.querySelector('input')!, 'linked-work');
     expect(text(popover)).toContain("linked-work is reserved for the factory's saved links.");
-    expect(inPicker(popover, 'Create "linked-work" when you add the Project').disabled).toBe(true);
+    expect(inPicker(popover, 'Create "linked-work" when you add the Project')).toBeUndefined();
     expect(posted('/api/onboarding/setup')).toEqual([]);
 });
 
@@ -602,7 +604,7 @@ test.each(['push-branch', 'open-pr'] as const)(
     },
 );
 
-test('onboarding finds one of 150 labels by keyboard and keeps every edit local until add', async () => {
+test('onboarding finds one of 150 labels with checkboxes and keeps every edit local until add', async () => {
     const labels = Array.from({ length: 150 }, (_, i) => `label-${i}`);
 
     await openOnboarding([project('app', { repo: 'team/app' })], {
@@ -619,12 +621,10 @@ test('onboarding finds one of 150 labels by keyboard and keeps every edit local 
     const input = popover.querySelector<HTMLInputElement>('input')!;
 
     await type(input, 'label-149');
-    expect([...popover.querySelectorAll('[role="option"]')].map(text)).toEqual(['label-149']);
-    await settle(() =>
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })),
-    );
+    expect([...popover.querySelectorAll('[data-label-choice]')].map(text)).toEqual(['label-149']);
+    await settle(() => popover.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
     await type(input, 'no-match');
-    expect(text(popover)).toContain('No labels match "no-match".');
+    expect(text(popover)).toContain('Create "no-match" when you add the Project');
     await settle(() => inPicker(popover, 'Done').click());
     expect(text(kindRow('bug'))).toContain('label-149');
     expect(posted('/api/onboarding/setup')).toEqual([]);

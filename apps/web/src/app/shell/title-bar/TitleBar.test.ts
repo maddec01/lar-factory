@@ -46,10 +46,7 @@ const tooltip = async () => {
     await settle(() => refreshed().focus());
     await settle(() => vi.advanceTimersByTime(1000));
 
-    // Radix repeats the tooltip, hidden, as the trigger's description; this reads the one shown.
-    return $$('[data-radix-popper-content-wrapper] [data-line]')
-        .filter((line) => !line.closest('[role="tooltip"]'))
-        .map(text);
+    return $$('[role="tooltip"] [data-line]').map(text);
 };
 
 /** The title bar's controls, left to right, by name. */

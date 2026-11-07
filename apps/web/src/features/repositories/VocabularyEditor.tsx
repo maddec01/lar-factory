@@ -144,7 +144,6 @@ export function VocabularyFields({
                     newLabels={newLabels}
                     disabled={disabled}
                     onCommit={onCommit}
-                    onRecheck={onRecheck}
                     fields={fields}
                 />
             }

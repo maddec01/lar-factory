@@ -1,11 +1,9 @@
-// What one kind's vocabulary fields hold while they're edited: the label search, the pending change a close commits,
-// and what the tracker allows.
+// One kind's vocabulary draft, the pending change a close commits, and what the tracker allows.
 
 import {
     kindMappingOffers,
     newLabelProblem,
     trackerCapabilities,
-    typedLabelsProblem,
     writeAccessProblem,
     type VocabularyTerm,
 } from '@lar-factory/shared';
@@ -48,8 +46,6 @@ export function useVocabularyFields({
     onCommit?: ((value: VocabularyTerm, newLabels: string[]) => void) | undefined;
 }) {
     const [open, setOpen] = useState(false);
-    const [query, setQuery] = useState('');
-    const [active, setActive] = useState(0);
     const changed = useRef(false);
     const latest = useRef({ value, newLabels, onCommit });
 
@@ -81,11 +77,6 @@ export function useVocabularyFields({
     const offered = [...new Set([...suggestions, ...chosen, ...labels])].filter(
         (label) => chosen.includes(label) || labels.includes(label),
     );
-    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const matches = offered.filter((label) => words.every((word) => label.toLowerCase().includes(word)));
-    const typed = query.trim();
-    const canCreate = !!typed && !offered.some((label) => label.toLowerCase() === typed.toLowerCase());
-    const createProblem = labelsProblem ?? access.newLabels ?? typedLabelsProblem(setup.repo, [typed]);
     const update = (term: VocabularyTerm, fresh = newLabels, commit = !open) => {
         onChange(term, fresh);
 
@@ -117,20 +108,12 @@ export function useVocabularyFields({
         }
 
         if (next) {
-            setQuery('');
-            setActive(0);
             changed.current = false;
         }
     };
     const choose = (label: string | undefined) => {
         if (label && (!labelsProblem || chosen.includes(label))) toggle(label);
     };
-    const at = Math.min(active, Math.max(0, matches.length - 1));
-
-    useEffect(() => {
-        if (open) document.getElementById(`label-${name}-${at}`)?.scrollIntoView({ block: 'nearest' });
-    }, [open, name, at, query]);
-
     const gone = (label: string) =>
         discovery.labels.state === 'available' &&
         !discovery.labels.choices.includes(label) &&
@@ -144,9 +127,6 @@ export function useVocabularyFields({
 
     return {
         open,
-        query,
-        setQuery,
-        setActive,
         retryCommit,
         access,
         labelsProblem,
@@ -158,15 +138,11 @@ export function useVocabularyFields({
         title,
         chosen,
         suggested,
-        matches,
-        typed,
-        canCreate,
-        createProblem,
+        offered,
         update,
         toggle,
         close,
         choose,
-        at,
         gone,
     };
 }

@@ -26,9 +26,9 @@ const MODEL_CHOICES: ModelGroup[] = [
 const withChoices: BoardData = { ...sample, capture: { session: 's1', enabled: true }, modelChoices: MODEL_CHOICES };
 const CHOICE_KEY = 'lar-board:model-choice';
 
-const queue = () => $('.queue')!;
-const rows = () => $$<HTMLLIElement>('.queue ol > li');
-const row = (id: string) => $<HTMLLIElement>(`.queue li[data-item="${id}"]`)!;
+const queue = () => $('[data-stage="queue"]')!;
+const rows = () => $$<HTMLLIElement>('[data-stage="queue"] ol > li');
+const row = (id: string) => $<HTMLLIElement>(`[data-stage="queue"] li[data-item="${id}"]`)!;
 const start = (id = 'I_sample05') => row(id).querySelector<HTMLButtonElement>(`[data-start="${id}"]`)!;
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
@@ -215,7 +215,7 @@ test('the Queue has no Auto-start and never mentions a build slot, and its Start
 
 test('Shape issue sits on Queued issues, one Start on every row, and none in the Queue header', async () => {
     await mountPage();
-    expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual([
+    expect($$('[data-stage="queue"] li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual([
         'I_sample05',
         'I_sample06',
         'I_sample21',
@@ -323,7 +323,7 @@ test('a Start that may have run hides Shape issue; closing its message leaves a 
     const moved = () => $<HTMLLIElement>('[data-stage="shaping"] li[data-item="I_sample05"]')!;
 
     expect(
-        [$('.queue li[data-item="I_sample05"]'), moved().querySelector('[data-start]')],
+        [$('[data-stage="queue"] li[data-item="I_sample05"]'), moved().querySelector('[data-start]')],
         'a start in flight moves the row to Shaping',
     ).toEqual([null, null]);
 

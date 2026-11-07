@@ -2,6 +2,7 @@
 // on it succeeds or a new gate passes, or, with the switch on, that it waits for its concept's Refinement.
 
 import type { BoardData, Item } from '@lar-factory/shared';
+import { ActionError, StartLine } from '@lar-works/design-system';
 
 export function AutoBuildNote({ item, data }: { item: Item; data: BoardData }) {
     const pass = data.autoBuildPass;
@@ -9,19 +10,13 @@ export function AutoBuildNote({ item, data }: { item: Item; data: BoardData }) {
 
     if (paused)
         return (
-            <p className="start" data-auto-build-paused={item.id}>
-                <span className="action-error" role="alert">
-                    Auto-build paused: {paused}
-                </span>
-            </p>
+            <StartLine data-auto-build-paused={item.id}>
+                <ActionError role="alert">Auto-build paused: {paused}</ActionError>
+            </StartLine>
         );
 
     if (data.autoBuild?.on && pass?.waitsForRefinement.includes(item.id))
-        return (
-            <p className="start" data-auto-build-waits={item.id}>
-                Auto-build waits for Refinement
-            </p>
-        );
+        return <StartLine data-auto-build-waits={item.id}>Auto-build waits for Refinement</StartLine>;
 
     return null;
 }

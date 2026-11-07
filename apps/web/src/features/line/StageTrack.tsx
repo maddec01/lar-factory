@@ -3,6 +3,7 @@
 
 import { clock, currentBuildThread, delegatedWorkRunning } from '@lar-factory/shared';
 import type { Item, ItemStats, ItemThread, Status, ThreadState } from '@lar-factory/shared';
+import { OnYourDesk as DesignOnYourDesk, StageTrack } from '@lar-works/design-system';
 
 import { STATUS_COLOR, StatusGlyph } from '@/features/items';
 
@@ -17,11 +18,6 @@ const STAGES: { name: string; statuses: Status[] }[] = [
 /** Done follows the active stages; List and Queued sit before them. */
 export const stageOf = (s: Status) =>
     s === 'Done' ? STAGES.length : STAGES.findIndex((st) => st.statuses.includes(s));
-export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
-/** A row's own buttons draw their focus ring inside the pane that clips them. */
-export const ROW_OPENS = 'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--primary)';
-
-const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
 /** The desk's statuses a row takes no action on. */
 export const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
@@ -62,7 +58,7 @@ export const lastSeen = (thread: ItemThread): string =>
 
 /** Where to act on an item that waits on you. */
 export function OnYourDesk() {
-    return <span className="text-(--warning-foreground)">on your desk</span>;
+    return <DesignOnYourDesk>on your desk</DesignOnYourDesk>;
 }
 
 export const statsOf = (item: Item): ItemStats | null =>
@@ -82,38 +78,17 @@ export function Track({
 }) {
     const at = stageOf(status);
 
-    if (status === 'Done')
-        return (
-            <span className="flex h-5 items-center" title="Complete">
-                <StatusGlyph status="Done" />
-            </span>
-        );
-
-    if (at < 0) return null;
+    if (status !== 'Done' && at < 0) return null;
 
     return (
-        <ol className="m-0 grid list-none grid-cols-5 gap-px p-0" title={`${label}${waiting ? ', waiting' : ''}`}>
-            {STAGES.map((st, n) => (
-                <li key={st.name} className="relative flex h-5 items-center justify-center">
-                    <span
-                        className={`absolute inset-x-0 h-1.5 ${n === 0 ? 'rounded-l-full' : ''} ${n === STAGES.length - 1 ? 'rounded-r-full' : ''}`}
-                        style={{ background: n < at ? PAST : 'var(--soft)' }}
-                    />
-                    {n === at && (
-                        <>
-                            <span
-                                className={`absolute right-1/2 left-0 h-1.5 ${n === 0 ? 'rounded-l-full' : ''}`}
-                                style={{ background: STATUS_COLOR[status], opacity: waiting ? 0.35 : 1 }}
-                            />
-                            <span
-                                className={`relative grid size-5 place-items-center rounded-full bg-(--card) ${waiting ? 'border border-dashed border-(--muted-foreground)' : ''}`}
-                            >
-                                <StatusGlyph status={status} running={running} />
-                            </span>
-                        </>
-                    )}
-                </li>
-            ))}
-        </ol>
+        <StageTrack
+            stages={STAGES.map((st) => st.name)}
+            at={at}
+            color={STATUS_COLOR[status]}
+            glyph={<StatusGlyph status={status} running={status !== 'Done' && running} />}
+            title={status === 'Done' ? 'Complete' : `${label}${waiting ? ', waiting' : ''}`}
+            waiting={waiting}
+            complete={status === 'Done'}
+        />
     );
 }

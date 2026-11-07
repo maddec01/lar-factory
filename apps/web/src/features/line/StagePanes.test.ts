@@ -733,9 +733,10 @@ test('Start build is disabled with the hint while T3 has no project for the repo
         repositoryProjects: { 'maddec01/lar-server': hint, 'maddec01/lar-apple': null },
     });
     expect([startBuild().disabled, startBuild().title, startBuild().dataset.kind]).toEqual([true, hint, 'start']);
-    expect(startBuild().className, 'pointer events stay on, so the title shows').toContain(
-        'disabled:pointer-events-auto',
-    );
+    expect(
+        startBuild().matches('button:disabled[title]'),
+        "pointer events stay on (the board's base styles keep them on a disabled button with a title), so the title shows",
+    ).toBe(true);
     await settle(async () =>
         (await import('@/services/board/board.hooks')).useBoardStore
             .getState()

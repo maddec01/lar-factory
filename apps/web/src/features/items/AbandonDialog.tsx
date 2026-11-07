@@ -9,7 +9,7 @@ import {
     closesTicketOnAbandon,
     hasClosedPr,
 } from '@lar-factory/shared';
-import { Alert, Button, buttonKind, Modal, Text } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, Modal, Stack, Text } from '@lar-works/design-system';
 import { useEffect, useState, useRef } from 'react';
 
 import { useAbandonStore } from './AbandonStore';
@@ -212,7 +212,7 @@ export function AbandonDialog() {
                 data-abandon-step={step}
             >
                 <Modal.Body>
-                    <div className="grid gap-2">
+                    <Stack space="related">
                         <Text id="abandon-detail" tone="muted">
                             {prompt.detail}
                         </Text>
@@ -231,7 +231,7 @@ export function AbandonDialog() {
                             </Alert>
                         )}
                         {error && <Alert tone="danger">{error}</Alert>}
-                    </div>
+                    </Stack>
                 </Modal.Body>
                 <Modal.Footer>
                     <Button {...buttonKind('other')} disabled={pending || unknown} onClick={dismiss}>

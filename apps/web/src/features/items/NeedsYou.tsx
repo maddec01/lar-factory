@@ -2,7 +2,7 @@ import { itemName } from '@lar-factory/shared';
 // Why the work waits on the user, from its work record, in the item dialog: the reason and the choices the board
 // offers for it. Each choice asks in its confirmation first. Set aside is Abandon.
 import type { BoardData, Item, NeedsYouAction, NeedsYouOffer } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import { Button, buttonKind, NeedsYouNotice, NeedsYouResult } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
@@ -24,7 +24,7 @@ const LABELS: Record<NeedsYouOffer, string> = {
 export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
     const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
 
-    if (!item.needsYou) return cleanupResult ? <p role="alert">{cleanupResult}</p> : null;
+    if (!item.needsYou) return cleanupResult ? <NeedsYouResult>{cleanupResult}</NeedsYouResult> : null;
 
     return <Notice item={item} notice={item.needsYou} data={data} cleanupResult={cleanupResult} />;
 }
@@ -44,27 +44,23 @@ function Notice({
     const state = writeState(data, useItemAction(item.id));
 
     return (
-        <div
-            className="grid gap-2 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5"
-            data-needs-you-reason
+        <NeedsYouNotice
+            reason={`Needs you: ${notice.reason}`}
+            actions={notice.offers.map((offer) => (
+                <Button
+                    {...buttonKind('other')}
+                    key={offer}
+                    {...state}
+                    aria-label={`${LABELS[offer]}: ${itemName(item)}`}
+                    {...(offer === 'set-aside'
+                        ? { 'data-abandon': item.id, onClick: () => askAbandon(item.id) }
+                        : { 'data-needs-you': item.id, onClick: () => setAsking(offer) })}
+                >
+                    {LABELS[offer]}
+                </Button>
+            ))}
         >
-            <p className="m-0 font-medium text-(--warning-foreground)">Needs you: {notice.reason}</p>
-            <span className="flex flex-wrap gap-1.5">
-                {notice.offers.map((offer) => (
-                    <Button
-                        {...buttonKind('other')}
-                        key={offer}
-                        {...state}
-                        aria-label={`${LABELS[offer]}: ${itemName(item)}`}
-                        {...(offer === 'set-aside'
-                            ? { 'data-abandon': item.id, onClick: () => askAbandon(item.id) }
-                            : { 'data-needs-you': item.id, onClick: () => setAsking(offer) })}
-                    >
-                        {LABELS[offer]}
-                    </Button>
-                ))}
-            </span>
-            {cleanupResult && <p role="alert">{cleanupResult}</p>}
+            {cleanupResult && <NeedsYouResult>{cleanupResult}</NeedsYouResult>}
             {asking && notice.offers.includes(asking) && (
                 <NeedsYouDialog
                     item={item}
@@ -74,6 +70,6 @@ function Notice({
                     onClose={() => setAsking(null)}
                 />
             )}
-        </div>
+        </NeedsYouNotice>
     );
 }

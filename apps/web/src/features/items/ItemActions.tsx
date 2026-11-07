@@ -3,7 +3,7 @@
 
 import { canAbandon, itemName, ref } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import { ActionError as DesignActionError, Button, buttonKind, ItemNote } from '@lar-works/design-system';
 import { useId, useRef } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
@@ -47,7 +47,7 @@ export function BackToListButton({ item, data }: { item: Item; data: BoardData }
     return (
         <Button
             {...buttonKind('other')}
-            className="link-action"
+            pendingLook
             data-back-to-list={item.id}
             aria-label={`${moving ? 'Moving' : 'Move to List'} ${itemName(item)}`}
             {...writeState(data, action)}
@@ -75,7 +75,7 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
         <>
             <Button
                 {...buttonKind('other')}
-                className="link-action disabled:pointer-events-auto"
+                pendingLook
                 data-abandon={item.id}
                 aria-label={`${verb} ${itemName(item)}`}
                 {...state}
@@ -84,9 +84,9 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
                 {verb}
             </Button>
             {refusal && (
-                <span id={reason} className="text-base-700" data-abandon-refusal>
+                <ItemNote id={reason} data-abandon-refusal>
                     {refusal}
-                </span>
+                </ItemNote>
             )}
         </>
     );
@@ -105,9 +105,9 @@ export function ActionError({ item }: { item: Item }) {
         ]);
 
     return (
-        <span className="action-error" ref={el}>
+        <DesignActionError ref={el}>
             <span role="alert">{action.message}</span>{' '}
             <DismissButton inline what={` error for ${ref(item)}`} onClick={close} />
-        </span>
+        </DesignActionError>
     );
 }

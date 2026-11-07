@@ -111,11 +111,7 @@ export function ItemMeta({
                 </Fact>
             )}
             <AgentWorkNote item={item} />
-            {item.kind === 'concept' ? (
-                <ConceptWork item={item} />
-            ) : (
-                <AgentWork item={item} className="@min-[40rem]:hidden" />
-            )}
+            {item.kind === 'concept' ? <ConceptWork item={item} /> : <AgentWork item={item} only="narrow" />}
             {item.kind === 'build' && <ItemChecksSection key={item.id} itemId={item.id} />}
             <KindNotice key={`${item.id} notice`} item={item} read={read} refresh={refresh} />
         </div>

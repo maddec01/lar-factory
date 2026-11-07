@@ -2,9 +2,9 @@
 
 import { needsAnswer, openQuestionThread, itemName, ref, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Ban, Check, CircleHelp } from '@lar-works/design-system/icons';
+import { AttentionEntry as Entry, AttentionMark, EntryButton, ItemTitle, RefButton } from '@lar-works/design-system';
 
-import { Refs, PartLink, Entry } from './DossierEntries';
+import { Refs, PartLink } from './DossierEntries';
 import { open, waitsOn } from './DossierHelpers';
 import type { FindRef } from './DossierHelpers';
 import { DECISION_KINDS, isDone, openWaits, partLabel } from './DossierParts';
@@ -37,13 +37,13 @@ export function useAttentionRows(
         {
             key: 'you',
             label: 'Needs you',
-            tone: 'text-(--warning-foreground)',
+            tone: 'yours' as const,
             entries: [
                 ...(needsAnswer(parent)
                     ? [
                           <Entry
                               key={parent.id}
-                              main={<button onClick={() => open(parent)}>{itemName(parent)}</button>}
+                              main={<EntryButton onOpen={() => open(parent)}>{itemName(parent)}</EntryButton>}
                               side={
                                   <OpenThread
                                       item={parent}
@@ -76,7 +76,7 @@ export function useAttentionRows(
         {
             key: 'verify',
             label: 'To verify or merge',
-            tone: 'text-(--warning-foreground)',
+            tone: 'yours' as const,
             entries: ahead
                 .filter(
                     (p) =>
@@ -88,7 +88,7 @@ export function useAttentionRows(
         {
             key: 'decisions',
             label: 'Open decisions',
-            tone: 'text-(--primary)',
+            tone: 'decision' as const,
             entries: ahead
                 .filter((p) => DECISION_KINDS.includes(p.kind))
                 .map((p) => (
@@ -102,36 +102,24 @@ export function useAttentionRows(
         {
             key: 'blocked',
             label: 'Blocked slices',
-            tone: 'text-(--st-review)',
+            tone: 'blocked' as const,
             entries: blocked.map(({ part, slice }, i) => (
                 <Entry
                     key={i}
                     main={
-                        <span className="flex min-w-0 items-start gap-1.5 text-[13px]">
-                            <Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" />
-                            <span className="line-clamp-2">
-                                {slice.number > 0 && (
-                                    <>
-                                        <span className="text-(--muted-foreground) tabular-nums">
-                                            #{slice.number}
-                                        </span>{' '}
-                                    </>
-                                )}
-                                {slice.title}
-                            </span>
-                        </span>
+                        <AttentionMark mark="blocked" clamp>
+                            <ItemTitle
+                                reference={slice.number > 0 ? `#${slice.number}` : undefined}
+                                title={slice.title}
+                            />
+                        </AttentionMark>
                     }
                     side={
                         <>
                             slice of{' '}
-                            <button
-                                type="button"
-                                onClick={() => open(part.item)}
-                                title={part.item.title}
-                                className="rounded px-0.5 font-medium text-(--primary) tabular-nums hover:bg-(--accent)"
-                            >
+                            <RefButton title={part.item.title} onOpen={() => open(part.item)}>
                                 {ref(part.item)}
-                            </button>{' '}
+                            </RefButton>{' '}
                             · waits on a re-slice
                         </>
                     }
@@ -141,7 +129,7 @@ export function useAttentionRows(
         {
             key: 'waiting',
             label: 'Waiting',
-            tone: 'text-(--muted-foreground)',
+            tone: 'waiting' as const,
             entries: ahead
                 .filter((p) => openWaits(p).length && !needsAnswer(p.item))
                 .map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={waitsOn(p)} />),
@@ -149,7 +137,7 @@ export function useAttentionRows(
         {
             key: 'ready',
             label: 'Ready to start',
-            tone: 'text-(--st-now)',
+            tone: 'ready' as const,
             entries: ahead
                 .filter(startable)
                 .map((p) => (
@@ -163,37 +151,25 @@ export function useAttentionRows(
         {
             key: 'dependencies',
             label: 'Dependencies',
-            tone: 'text-(--st-review)',
+            tone: 'blocked' as const,
             entries: [
                 ...holds.map(({ part, hold }) => (
                     <Entry
                         key={`${part.item.id} ${hold.dependencyId}`}
                         main={
-                            <span
-                                className="flex items-start gap-1.5 text-[13px]"
+                            <AttentionMark
+                                mark={hold.met ? 'met' : 'blocked'}
                                 data-dependency-state={hold.met ? 'met' : 'unmet'}
                             >
-                                {hold.met ? (
-                                    <Check className="mt-0.5 size-3.5 shrink-0 text-(--st-done)" />
-                                ) : (
-                                    <Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" />
-                                )}
-                                <span>
-                                    {hold.owner}: {hold.need}
-                                </span>
-                            </span>
+                                {hold.owner}: {hold.need}
+                            </AttentionMark>
                         }
                         side={
                             <>
                                 {hold.met ? 'met' : 'not met'} · holds{' '}
-                                <button
-                                    type="button"
-                                    onClick={() => open(part.item)}
-                                    title={part.item.title}
-                                    className="rounded px-0.5 font-medium text-(--primary) tabular-nums hover:bg-(--accent)"
-                                >
+                                <RefButton title={part.item.title} onOpen={() => open(part.item)}>
                                     {ref(part.item)}
-                                </button>
+                                </RefButton>
                             </>
                         }
                     />
@@ -202,12 +178,9 @@ export function useAttentionRows(
                     <Entry
                         key={d}
                         main={
-                            <span className="flex items-start gap-1.5 text-[13px]">
-                                <Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" />
-                                <span>
-                                    <Refs text={d} find={find} />
-                                </span>
-                            </span>
+                            <AttentionMark mark="blocked">
+                                <Refs text={d} find={find} />
+                            </AttentionMark>
                         }
                     />
                 )),
@@ -216,17 +189,14 @@ export function useAttentionRows(
         {
             key: 'fog',
             label: 'Fog',
-            tone: 'text-(--st-amber)',
+            tone: 'fog' as const,
             entries: (parent.map?.fog ?? []).map((q) => (
                 <Entry
                     key={q}
                     main={
-                        <span className="flex items-start gap-1.5 text-[13px]">
-                            <CircleHelp className="mt-0.5 size-3.5 shrink-0 text-(--st-amber)" />
-                            <span>
-                                <Refs text={q} find={find} />
-                            </span>
-                        </span>
+                        <AttentionMark mark="fog">
+                            <Refs text={q} find={find} />
+                        </AttentionMark>
                     }
                 />
             )),

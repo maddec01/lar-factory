@@ -11,7 +11,7 @@ import {
     workingAgain,
 } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
-import { ambientMotion } from '@lar-works/design-system';
+import { ActivityLabel, ActivityTrack } from '@lar-works/design-system';
 
 import { PURPOSE, useStart } from './StartStore';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -63,22 +63,7 @@ export function ActivityFeedback({
     feedback: ReturnType<typeof buildActivity>;
     labelOnly?: boolean;
 }) {
-    if (labelOnly)
-        return (
-            <span className="block h-4 text-[11px] leading-4 whitespace-nowrap text-(--muted-foreground)">
-                {feedback.label}
-            </span>
-        );
+    if (labelOnly) return <ActivityLabel>{feedback.label}</ActivityLabel>;
 
-    return (
-        <div
-            role="img"
-            aria-label={feedback.label}
-            className="activity-track h-1.5 overflow-hidden rounded-full bg-(--soft)"
-        >
-            {feedback.running && (
-                <span ref={ambientMotion} className="activity-sweep block h-1.5 w-1/3 rounded-full bg-(--st-now)" />
-            )}
-        </div>
-    );
+    return <ActivityTrack label={feedback.label} running={feedback.running} />;
 }

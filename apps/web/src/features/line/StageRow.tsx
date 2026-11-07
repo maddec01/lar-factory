@@ -5,17 +5,35 @@
 
 import { ACTIVITY_WORD, blockedText, canRetryBuild, currentBuildThread, itemName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Badge } from '@lar-works/design-system';
-import { ChevronDown, ChevronRight } from '@lar-works/design-system/icons';
+import {
+    QueueAge,
+    QueuePlace,
+    RowBlocked,
+    RowFirst,
+    RowFoot,
+    RowGlyph,
+    RowKindCell,
+    RowOpen,
+    RowPartOf,
+    RowSide,
+    RowSliceNote,
+    RowSliceToggle,
+    RowSlices,
+    RowState,
+    RowStateCell,
+    RowTitle,
+    RowTitleCell,
+    StageRowItem,
+} from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { ActivityLine, useActivityState, useActivityStill } from './ActivityLine';
 import { AutoBuildNote } from './AutoBuildNote';
-import { Figures, ROW_ACTION, ROW_RULE, RowSecondLine, figuresOf, opensItem } from './Columns';
+import { Figures, RowSecondLine, figuresOf, opensItem } from './Columns';
 import { threadAtWork, threadsOf } from './DossierParts';
 import { RowKind, RowSource } from './RowIdentity';
 import type { StageRow as Row } from './StageRows';
-import { OnYourDesk, YOURS, ROW_OPENS, picked, threadText } from './StageTrack';
+import { OnYourDesk, YOURS, threadText } from './StageTrack';
 import { useItemDialogStore } from '@/features/item-dialog';
 import {
     ActivityFeedback,
@@ -74,8 +92,8 @@ const sliceNote = (item: Item) => {
     const a = item.slices.filter((s) => s.progress === 'active');
 
     return [
-        ...b.map((s) => ({ s, word: 'blocked', tone: 'text-(--st-review)' })),
-        ...a.map((s) => ({ s, word: 'active', tone: 'text-(--st-now)' })),
+        ...b.map((s) => ({ s, word: 'blocked', tone: 'blocked' as const })),
+        ...a.map((s) => ({ s, word: 'active', tone: 'active' as const })),
     ];
 };
 
@@ -83,15 +101,7 @@ const sliceNote = (item: Item) => {
 function PartOf({ concept }: { concept: Item }) {
     const text = `${concept.kind === 'concept' ? 'Concept' : 'Part of'}: ${concept.title}`;
 
-    return (
-        <span
-            data-concept
-            title={text}
-            className="max-w-44 min-w-16 shrink-[100] truncate rounded bg-(--muted) px-1.5 text-(--muted-foreground)"
-        >
-            {text}
-        </span>
-    );
+    return <RowPartOf>{text}</RowPartOf>;
 }
 
 /** The row's state, once: Working for a run known to be running, whatever telemetry it lacks; a running build's phase; a start's progress only where nothing else on the row says it. */
@@ -148,58 +158,42 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
         blocked;
 
     return (
-        <li data-item={item.id} className={`@container py-2 ${ROW_RULE} hover:bg-(--accent) ${picked(isPicked)}`}>
-            <div className="row-first">
-                <button
-                    type="button"
-                    data-row-open
-                    data-meta
-                    onClick={() => useItemDialogStore.getState().open(item.id)}
-                    className={`row-cols ${ROW_OPENS}`}
-                >
+        <StageRowItem item={item.id} picked={isPicked}>
+            <RowFirst>
+                <RowOpen onOpen={() => useItemDialogStore.getState().open(item.id)}>
                     {n === undefined ? (
-                        <span className="grid size-6 place-items-center" data-glyph>
+                        <RowGlyph>
                             <ItemStatusGlyph item={item} />
-                        </span>
+                        </RowGlyph>
                     ) : (
-                        <span className="queue-n text-center font-medium tabular-nums">{n + 1}</span>
+                        <QueuePlace>{n + 1}</QueuePlace>
                     )}
                     <RowSource item={item} />
-                    <span className="flex min-w-0 items-center" data-kind>
+                    <RowKindCell>
                         <RowKind item={item} />
-                    </span>
-                    <span className="flex min-w-0 items-center gap-2" data-title-cell>
-                        <span
-                            className="min-w-0 truncate text-sm leading-7 font-medium text-(--foreground)"
-                            title={itemName(item)}
-                            data-title
-                        >
+                    </RowKindCell>
+                    <RowTitleCell>
+                        <RowTitle name={itemName(item)}>
                             <ItemTitle item={item} />
-                        </span>
+                        </RowTitle>
                         {concept && <PartOf concept={concept} />}
-                    </span>
-                    <span className="flex min-w-0 items-center gap-1.5 overflow-hidden" data-col="state">
+                    </RowTitleCell>
+                    <RowStateCell>
                         {n === undefined ? (
-                            <span
-                                className="max-w-full shrink-0 truncate"
-                                title={threadText(item, shown.working)}
-                                data-state
-                            >
-                                {state}
-                            </span>
+                            <RowState title={threadText(item, shown.working)}>{state}</RowState>
                         ) : (
-                            <span className="queue-age shrink-0 tabular-nums" data-state>
+                            <QueueAge>
                                 <Age at={item.updatedAt} />
-                            </span>
+                            </QueueAge>
                         )}
                         <KindMarker item={item} />
                         <AzureFields azure={item.azure} />
-                    </span>
-                </button>
-                <span data-col="side" className={`row-side ${ROW_ACTION}`}>
+                    </RowStateCell>
+                </RowOpen>
+                <RowSide>
                     <Side item={item} data={data} />
-                </span>
-            </div>
+                </RowSide>
+            </RowFirst>
             {hasSecondLine && (
                 <RowSecondLine
                     onClick={opensItem(item)}
@@ -214,59 +208,43 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
                     }
                     count={
                         item.slices.length > 0 && (
-                            <button
-                                type="button"
-                                aria-expanded={slices}
-                                aria-label={slices ? 'Hide slices' : 'Show slices'}
-                                onClick={() => setSlices(!slices)}
-                                data-col="count"
-                                className={`flex h-4 items-center gap-1 justify-self-start rounded tabular-nums hover:text-(--foreground) ${ROW_OPENS}`}
+                            <RowSliceToggle
+                                open={slices}
+                                label={slices ? 'Hide slices' : 'Show slices'}
+                                onToggle={() => setSlices(!slices)}
                             >
                                 {done}/{item.slices.length} slices
-                                {slices ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-                            </button>
+                            </RowSliceToggle>
                         )
                     }
                 >
-                    {blocked && (
-                        <Badge tone="danger" className="min-w-0" title={blocked} data-blocked>
-                            <span className="truncate">{blocked}</span>
-                        </Badge>
-                    )}
+                    {blocked && <RowBlocked>{blocked}</RowBlocked>}
                     {showsActivity ? (
                         <ActivityLine item={item} />
                     ) : (
                         (note[0] || implemented) && (
-                            <span
-                                data-note
-                                className="min-w-0 truncate"
+                            <RowSliceNote
                                 title={note.map(({ s, word }) => `${word} ${itemName(s)}`).join('\n') || undefined}
-                            >
-                                {note[0] && (
-                                    <>
-                                        <span className={`font-medium ${note[0].tone}`}>{note[0].word}</span>{' '}
-                                        <span className="text-(--foreground)">{note[0].s.title}</span>
-                                        {note.length > 1 && ` +${note.length - 1} more`}
-                                    </>
-                                )}
-                                {implemented && <span>All slices implemented</span>}
-                            </span>
+                                first={note[0] && { word: note[0].word, tone: note[0].tone, title: note[0].s.title }}
+                                more={note.length > 1 ? ` +${note.length - 1} more` : undefined}
+                                after={implemented ? 'All slices implemented' : undefined}
+                            />
                         )
                     )}
                 </RowSecondLine>
             )}
             {['Queued', 'Ready', 'In progress'].includes(item.status) && (
-                <div className="pt-1 pr-3 pl-12 empty:hidden">
+                <RowFoot>
                     <StartMessage item={item} kind={item.status === 'Queued' ? 'refine' : 'build'} />
                     <StartAfterError item={item} data={data} />
                     <AutoBuildNote item={item} data={data} />
-                </div>
+                </RowFoot>
             )}
             {slices && (
-                <div className="pt-1 pr-3 pl-10" data-slices>
+                <RowSlices>
                     <SliceList item={item} still={still} />
-                </div>
+                </RowSlices>
             )}
-        </li>
+        </StageRowItem>
     );
 }

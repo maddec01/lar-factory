@@ -3,6 +3,7 @@
 // switch shows off and disabled there.
 
 import type { AutoBuildPass } from '@lar-factory/shared';
+import { HeaderSwitch } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -58,23 +59,19 @@ export function AutoBuildSwitch() {
     const hold = state?.on && pass?.hold;
 
     return (
-        <span
-            className="auto-build inline-flex min-w-0 items-center gap-1.5 text-[11px] whitespace-nowrap text-(--muted-foreground)"
+        <HeaderSwitch
+            label="Auto-build"
             title={why}
-        >
-            {hold && (
-                <span className="min-w-0 truncate" title={hold} data-auto-build-hold>
-                    {hold}
-                </span>
-            )}
-            <span aria-hidden="true">Auto-build</span>
-            <Switch
-                label="Auto-build"
-                on={saving ?? state?.on ?? false}
-                disabled={!state}
-                busy={saving !== null}
-                onChange={(on) => void save(on)}
-            />
-        </span>
+            hold={hold || undefined}
+            control={
+                <Switch
+                    label="Auto-build"
+                    on={saving ?? state?.on ?? false}
+                    disabled={!state}
+                    busy={saving !== null}
+                    onChange={(on) => void save(on)}
+                />
+            }
+        />
     );
 }

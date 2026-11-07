@@ -13,7 +13,7 @@ import {
     startRequest,
 } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-import { Button, buttonKind, DropdownMenu } from '@lar-works/design-system';
+import { ActionError, Button, buttonKind, DropdownMenu, StartLine } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -28,9 +28,6 @@ import { postAction, receive } from '@/services/board/board.service';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */
 const startsAfter = (item: Item, short = false): string | null => openBlockerRefs(item, short).at(-1) ?? null;
-
-/** Lets a Start after button shrink inside its row, its label truncating while its mark stays. */
-const SHRINKS = 'min-w-0 max-w-full shrink';
 
 /** What the title says Start after waits for: every open blocker's work, and the user's mark on each unmet Dependency. */
 function waitsFor(item: Item): string {
@@ -84,7 +81,8 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
             <Button
                 {...buttonKind('start')}
                 leftIcon={ICON.play}
-                className={SHRINKS}
+                shrinks
+                mark="✓"
                 data-start-after={item.id}
                 aria-pressed
                 aria-label={`Starts after ${after}`}
@@ -92,7 +90,7 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
                 {...writes}
                 onClick={() => !held && void run(null)}
             >
-                <span className="truncate">Starts after{namesBlocker && ` ${label}`}</span> ✓
+                Starts after{namesBlocker && ` ${label}`}
             </Button>
         );
     }
@@ -109,13 +107,14 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
                 <Button
                     {...buttonKind('start')}
                     leftIcon={ICON.play}
-                    className={SHRINKS}
+                    shrinks
+                    mark="▾"
                     data-start-after={item.id}
                     aria-label={`Start ${itemName(item)} after ${after}`}
                     title={`Pick a model to start it once ${waitsFor(item)}`}
                     {...(data.capture?.enabled === false ? {} : writes)}
                 >
-                    <span className="truncate">Start after{namesBlocker && ` ${label}`}</span> ▾
+                    Start after{namesBlocker && ` ${label}`}
                 </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} after ${after} with`} {...opensOnChecked}>
@@ -160,14 +159,7 @@ export function StartOrAfter({
 
     // Pointer events stay on while it's disabled, so its title says why.
     return (
-        <Button
-            {...buttonKind('start')}
-            leftIcon={ICON.play}
-            className="disabled:pointer-events-auto"
-            data-start={item.id}
-            disabled
-            title={hold}
-        >
+        <Button {...buttonKind('start')} leftIcon={ICON.play} data-start={item.id} disabled title={hold}>
             {label}
         </Button>
     );
@@ -188,11 +180,11 @@ export function StartAfterError({ item, data }: { item: Item; data: BoardData })
         ]);
 
     return (
-        <p className="start" ref={el} data-start-after-error={item.id}>
-            <span className="action-error">
+        <StartLine ref={el} data-start-after-error={item.id}>
+            <ActionError>
                 <span role="alert">Start after failed: {error}</span>{' '}
                 <DismissButton inline what={` Start after error for ${ref(item)}`} onClick={close} />
-            </span>
-        </p>
+            </ActionError>
+        </StartLine>
     );
 }

@@ -2,27 +2,11 @@
    tokens, the board's roles and base styles, and every component's styles. The feature folders that still style
    themselves keep their sheets and their Tailwind sources here until they move into the design system. */
 @import '@lar-works/design-system/board.css' source(none);
-@import './features/items/items.css';
-@import './features/line/rows.css';
 @import './features/settings/settings.css';
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names would
    otherwise turn on Tailwind utilities of the same name. */
 @source "./features/add-item";
 @source "./features/item-dialog";
-@source "./features/items/AbandonDialog.tsx";
-@source "./features/items/CleanupChoices.tsx";
-@source "./features/items/ItemParts.tsx";
-@source "./features/items/ActivityFeedback.tsx";
-@source "./features/items/AgentWork.tsx";
-@source "./features/items/PrList.tsx";
-@source "./features/items/SliceParts.tsx";
-@source "./features/items/NeedsYouDialog.tsx";
-@source "./features/items/OpenThread.tsx";
-@source "./features/items/StartBuild.tsx";
-@source "./features/items/StartControl.tsx";
-@source "./features/items/StatusGlyph.tsx";
-@source "./features/items/SourceIcon.tsx";
-@source "./features/line";
 @source "./features/onboarding";
 @source "./features/repositories";
 @source "./features/settings";

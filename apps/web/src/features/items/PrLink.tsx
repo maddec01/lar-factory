@@ -3,21 +3,19 @@
 
 import { itemPr } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import { Button, ButtonLink, buttonKind } from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
-import { LinkButton } from './LinkButton';
 
 export function PrLink({ item, label }: { item: Item; label: string }) {
     const url = itemPr(item)?.url;
 
-    // Pointer events stay on while it's disabled, so its title says why.
+    // Pointer events stay on while it's disabled (the board's base styles), so its title says why.
     if (!url)
         return (
             <Button
                 {...buttonKind('open')}
                 leftIcon={ICON.pr}
-                className="disabled:pointer-events-auto"
                 data-pr-link={item.id}
                 disabled
                 title="No pull request is linked to this item yet"
@@ -27,8 +25,15 @@ export function PrLink({ item, label }: { item: Item; label: string }) {
         );
 
     return (
-        <LinkButton kind="open" leftIcon={ICON.pr} data-pr-link={item.id} href={url} target="_blank" rel="noopener">
+        <ButtonLink
+            {...buttonKind('open')}
+            icon={ICON.pr}
+            data-pr-link={item.id}
+            href={url}
+            target="_blank"
+            rel="noopener"
+        >
             {label}
-        </LinkButton>
+        </ButtonLink>
     );
 }

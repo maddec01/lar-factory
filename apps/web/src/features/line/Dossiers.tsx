@@ -10,12 +10,16 @@
 
 import { plural, itemName, repoKey } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { ChevronRight } from '@lar-works/design-system/icons';
+import {
+    BoardNote,
+    DossierBody as Body,
+    DossierList,
+    DossierRow as Row,
+    DossierToggle,
+} from '@lar-works/design-system';
 import type { MouseEvent } from 'react';
 
 import { Attention } from './Attention';
-import { ROW_RULE } from './Columns';
-import { stop } from './DossierHelpers';
 import type { FindRef } from './DossierHelpers';
 import { DossierLine } from './DossierLine';
 import type { DossierItems, Part } from './DossierParts';
@@ -23,7 +27,6 @@ import { NO_DELIVERY, noDelivery } from './DossierSummary';
 import { ViewToggle, LocalPlanning } from './DossierTools';
 import { Pane } from './Pane';
 import { PartsList } from './PartsList';
-import { ROW_OPENS } from './StageTrack';
 import { OPEN, VIEW, useStored } from './useStored';
 import type { View } from './useStored';
 import { WorkMap } from './WorkMap';
@@ -43,16 +46,12 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
     const { sync: _, ...unsynced } = parent;
 
     return (
-        <div className="grid gap-3 border-t border-(--border) p-3" data-dossier-body>
-            {noDelivery(parent) && (
-                <p className="m-0 text-xs text-(--muted-foreground)" data-no-delivery>
-                    {NO_DELIVERY}
-                </p>
-            )}
+        <Body>
+            {noDelivery(parent) && <BoardNote data-no-delivery>{NO_DELIVERY}</BoardNote>}
             {missing > 0 && (
-                <p className="m-0 text-xs text-(--muted-foreground)" data-unread-parts>
+                <BoardNote data-unread-parts>
                     {plural(missing, 'part')} the board doesn't read. A Project may no longer be on the board.
-                </p>
+                </BoardNote>
             )}
             <StructureSync item={unsynced} />
             {view === 'map' ? (
@@ -67,7 +66,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
                     <PartsList parts={parts} data={data} home={repoKey(parent)} />
                 </>
             )}
-        </div>
+        </Body>
     );
 }
 
@@ -84,35 +83,26 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
         setOn(!on);
     };
     const lead = (
-        <button
-            type="button"
-            data-dossier-open
-            aria-expanded={on}
-            aria-label={`${on ? 'Collapse' : 'Expand'} ${itemName(parent)}`}
-            onClick={(e) => {
-                stop(e);
-                setOn(!on);
-            }}
-            className={`grid size-6 shrink-0 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground) ${ROW_OPENS}`}
-        >
-            <ChevronRight className={`size-4 ${on ? 'rotate-90' : ''}`} />
-        </button>
+        <DossierToggle
+            open={on}
+            label={`${on ? 'Collapse' : 'Expand'} ${itemName(parent)}`}
+            onToggle={() => setOn(!on)}
+        />
     );
 
     return (
-        <article className={`@container ${ROW_RULE}`} data-dossier={parent.id} aria-label={itemName(parent)}>
+        <Row id={parent.id} label={itemName(parent)}>
             <DossierLine
                 parent={parent}
                 parts={parts}
                 data={data}
                 lead={lead}
                 onClick={toggle}
-                className="cursor-pointer hover:bg-(--accent)"
                 note={on && <LocalPlanning item={parent} />}
                 tools={on && <ViewToggle view={view} onView={setView} />}
             />
             {on && <DossierBody parent={parent} parts={parts} data={data} view={view} />}
-        </article>
+        </Row>
     );
 }
 
@@ -124,11 +114,11 @@ export function Dossiers({ dossiers }: { dossiers: DossierItems[] }) {
 
     return (
         <Pane id="dock" title="Concepts and linked work" count={dossiers.length}>
-            <div data-dossiers>
+            <DossierList>
                 {dossiers.map(({ parent, parts }) => (
                     <DossierRow key={parent.id} parent={parent} parts={parts} data={data} />
                 ))}
-            </div>
+            </DossierList>
         </Pane>
     );
 }

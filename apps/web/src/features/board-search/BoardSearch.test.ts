@@ -70,7 +70,7 @@ const choose = (name: string) => settle(() => option(name).click());
 const removes = () => $$('[data-command-palette] li button').map((button) => button.getAttribute('aria-label'));
 const clear = () => settle(() => $<HTMLButtonElement>('[data-search-clear]')!.click());
 const saved = () => JSON.parse(localStorage.getItem(FILTERS_KEY)!) as unknown;
-const queue = () => $$<HTMLLIElement>('.queue ol > li').map((row) => row.dataset.item);
+const queue = () => $$<HTMLLIElement>('[data-stage="queue"] ol > li').map((row) => row.dataset.item);
 const scopes = async () => (await import('@/features/filters/ScopeStore')).useScopeStore.getState();
 
 /** Gives the field `room` pixels, each token `width` and the title bar `bar`: jsdom lays nothing out. */

@@ -3,35 +3,46 @@
 
 import { placementOf } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+
 import { dossiersOf } from './dossier-parts.ts';
 import type { DossierItems } from './dossier-parts.ts';
 import { stageOf } from './stage-track.tsx';
 
 export interface StageRow {
-  item: Item;
-  /** The dossier a part's row names. */
-  concept: Item | undefined;
+    item: Item;
+    /** The dossier a part's row names. */
+    concept: Item | undefined;
 }
 
 export interface StageRows {
-  queue: StageRow[];
-  shaping: StageRow[];
-  ready: StageRow[];
-  /** Furthest along first. */
-  build: StageRow[];
-  dock: DossierItems[];
+    queue: StageRow[];
+    shaping: StageRow[];
+    ready: StageRow[];
+    /** Furthest along first. */
+    build: StageRow[];
+    dock: DossierItems[];
 }
 
 export function stageRows(items: readonly Item[], data: BoardData, unavailable: boolean): StageRows {
-  const placed = (item: Item) => placementOf(item, { starts: data.startProgress?.[item.id], unavailable, all: data.items });
-  const rows: Pick<StageRows, 'queue' | 'shaping' | 'ready' | 'build'> = { queue: [], shaping: [], ready: [], build: [] };
-  for (const item of items) {
-    const { sections, concept } = placed(item);
-    for (const section of sections) if (section !== 'desk' && section !== 'dock') rows[section].push({ item, concept });
-  }
-  return {
-    ...rows,
-    build: rows.build.sort((a, b) => stageOf(b.item.status) - stageOf(a.item.status)),
-    dock: dossiersOf(items, data.items).filter(({ parent }) => placed(parent).sections.includes('dock')),
-  };
+    const placed = (item: Item) =>
+        placementOf(item, { starts: data.startProgress?.[item.id], unavailable, all: data.items });
+    const rows: Pick<StageRows, 'queue' | 'shaping' | 'ready' | 'build'> = {
+        queue: [],
+        shaping: [],
+        ready: [],
+        build: [],
+    };
+
+    for (const item of items) {
+        const { sections, concept } = placed(item);
+
+        for (const section of sections)
+            if (section !== 'desk' && section !== 'dock') rows[section].push({ item, concept });
+    }
+
+    return {
+        ...rows,
+        build: rows.build.sort((a, b) => stageOf(b.item.status) - stageOf(a.item.status)),
+        dock: dossiersOf(items, data.items).filter(({ parent }) => placed(parent).sections.includes('dock')),
+    };
 }

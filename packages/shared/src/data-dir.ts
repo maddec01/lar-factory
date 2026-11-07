@@ -14,9 +14,11 @@ export const DATA_DIR_ENV = 'LAR_FACTORY_DATA_DIR';
  * `home` when given, else the absolute folder `env` names in DATA_DIR_ENV, else in `env`'s HOME.
  */
 export function boardDataDir(home?: string, env: Readonly<Record<string, string | undefined>> = process.env): string {
-  const named = env[DATA_DIR_ENV];
-  if (home === undefined && named && isAbsolute(named)) return named;
-  return join(home ?? (env.HOME || homedir()), 'Library/Application Support/Lar Factory');
+    const named = env[DATA_DIR_ENV];
+
+    if (home === undefined && named && isAbsolute(named)) return named;
+
+    return join(home ?? (env.HOME || homedir()), 'Library/Application Support/Lar Factory');
 }
 
 /**

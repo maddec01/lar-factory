@@ -2,16 +2,23 @@
 // a window. It is the loading screen apps/web/src/loading draws on the board page: the L draws itself once, here,
 // and the board page opens on it finished (boardUrl). The main process sends each step and a failed start's error
 // to the open page without reloading it, so the mark never redraws.
-import { BRAND_BLOCK_COLOR, BRAND_MARK_BAR, BRAND_MARK_BLOCK, BRAND_MARK_CENTRE_LINE, BRAND_MARK_L, BRAND_MARK_VIEWBOX } from "@lar-factory/shared";
+import {
+    BRAND_BLOCK_COLOR,
+    BRAND_MARK_BAR,
+    BRAND_MARK_BLOCK,
+    BRAND_MARK_CENTRE_LINE,
+    BRAND_MARK_L,
+    BRAND_MARK_VIEWBOX,
+} from '@lar-factory/shared';
 
-import css from "./starting-page.css?compiled";
+import css from './starting-page.css?compiled';
 
 /** The launch's steps in order; the board page's loading screen names the steps after these. */
 export const STEPS = {
-  shell: "Reading the shell environment",
-  server: "Starting the board server",
-  healthz: "Waiting for the board server",
-  tools: "Checking gh and tools",
+    shell: 'Reading the shell environment',
+    server: 'Starting the board server',
+    healthz: 'Waiting for the board server',
+    tools: 'Checking gh and tools',
 } as const;
 
 /** How long the old line rolls out, as the board page's (apps/web/src/loading/loading-screen.tsx). */
@@ -49,7 +56,7 @@ const script = `(() => {
 
 /** A data: URL for the starting page, which opens on the first step. */
 export const url = (): string => {
-  const html = `<!doctype html>
+    const html = `<!doctype html>
 <html lang="en" data-theme="minimal"><head><meta charset="utf-8"><title>Lar Factory</title>
 <style>${css}</style></head>
 <body><main class="loading-lockup" role="status">
@@ -61,7 +68,8 @@ export const url = (): string => {
 <p class="loading-line" id="step"><span class="loading-line-slot" id="slot"><span>${STEPS.shell}</span></span></p>
 <p class="loading-line loading-error" id="error" hidden></p>
 </main><script>${script}</script></body></html>`;
-  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+
+    return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 };
 
 // A message runs in the page, which may be another page by then (the board's): `?.` leaves that one alone.
@@ -70,7 +78,7 @@ export const stepScript = (step: string): string => `window.larLoading?.step(${J
 
 /** The script that shows why the last start failed on the open starting page, in place of the step line. */
 export const errorScript = (reason: string): string =>
-  `window.larLoading?.error(${JSON.stringify(`The board server didn't start: ${reason}. Trying again.`)})`;
+    `window.larLoading?.error(${JSON.stringify(`The board server didn't start: ${reason}. Trying again.`)})`;
 
 /** How long the mark takes to draw, as the board page's (apps/web/src/loading/loading-screen.tsx). */
 export const DRAW_MS = 1750;
@@ -80,11 +88,13 @@ export const DRAW_MS = 1750;
  * page showed (`shownAt`, undefined until it has loaded), so the mark never jumps to finished.
  */
 export const drawWait = (shownAt: number | undefined, now: number): number =>
-  shownAt === undefined ? DRAW_MS : Math.min(DRAW_MS, Math.max(0, shownAt + DRAW_MS - now));
+    shownAt === undefined ? DRAW_MS : Math.min(DRAW_MS, Math.max(0, shownAt + DRAW_MS - now));
 
 /** The board's page, told by the flag that this page drew the mark already, so it opens on the finished mark. */
 export const boardUrl = (board: URL): string => {
-  const url = new URL(board);
-  url.searchParams.set("loading", "drawn");
-  return url.href;
+    const url = new URL(board);
+
+    url.searchParams.set('loading', 'drawn');
+
+    return url.href;
 };

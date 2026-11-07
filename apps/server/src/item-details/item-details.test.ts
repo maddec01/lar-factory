@@ -1,236 +1,440 @@
+import { effectiveVocabulary, kindDisagreement } from '@lar-factory/shared';
+import type { Item, ItemDetails, RepositorySetup, TicketKinds, TrackerLabels } from '@lar-factory/shared';
+import { trackerLabels } from '@lar-factory/shared/tracker-labels';
+import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
+import { exportMarkdown } from '@lar-factory/work-records/export';
+import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'vite-plus/test';
-import assert from 'node:assert/strict';
-import { effectiveVocabulary, kindDisagreement } from '@lar-factory/shared';
-import type { Item, ItemDetails, RepositorySetup, TicketKinds, TrackerLabels } from '@lar-factory/shared';
-import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
-import { exportMarkdown } from '@lar-factory/work-records/export';
-import { trackerLabels } from '@lar-factory/shared/tracker-labels';
+
 import { fakeAz, type WorkItem } from '../azure/fake-az.ts';
 import { createItemDetails } from './item-details.ts';
 
 const opened: string[] = [];
+
 afterEach(() => {
-  for (const dir of opened.splice(0)) rmSync(dir, { recursive: true, force: true });
+    for (const dir of opened.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
 /** Work records in a fresh folder, as lar-work writes them, and an empty export folder beside them. */
 async function recordsOn(): Promise<{ records: WorkRecords; dir: string; exportFolder: string }> {
-  const dir = mkdtempSync(join(tmpdir(), 'item-details-'));
-  opened.push(dir);
-  const records = await openWorkRecords(join(dir, 'work-records.db'));
-  const exportFolder = join(dir, 'Downloads');
-  mkdirSync(exportFolder);
-  return { records, dir, exportFolder };
+    const dir = mkdtempSync(join(tmpdir(), 'item-details-'));
+
+    opened.push(dir);
+
+    const records = await openWorkRecords(join(dir, 'work-records.db'));
+    const exportFolder = join(dir, 'Downloads');
+
+    mkdirSync(exportFolder);
+
+    return { records, dir, exportFolder };
 }
 
 const WEB = 'maddec01/lar-web';
 /** The board item a record shows as: its work ID, and no ticket. */
-const boardItem = (workId: string) => ({ id: workId, content: 'ticket', revision: 0, kind: 'build', parentId: null, repo: WEB, number: 0 }) as Item;
+const boardItem = (workId: string) =>
+    ({ id: workId, content: 'ticket', revision: 0, kind: 'build', parentId: null, repo: WEB, number: 0 }) as Item;
 
-const workItem = { id: 'azure:contoso/5', content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo: 'contoso/Fabrikam%20Fiber/lar-api', number: 5 } as Item;
+const workItem = {
+    id: 'azure:contoso/5',
+    content: 'ticket',
+    revision: 0,
+    kind: 'issue',
+    parentId: null,
+    repo: 'contoso/Fabrikam%20Fiber/lar-api',
+    number: 5,
+} as Item;
 
 test('an Azure DevOps save without the field and revision its details gave is refused before az runs', async () => {
-  const { saveDescription } = createItemDetails(null, (item) => item);
-  const refused = { status: 400, error: 'Send the field and revision the work item\'s details gave.' };
-  assert.deepEqual(await saveDescription(workItem, { body: 'x' }), refused);
-  assert.deepEqual(await saveDescription(workItem, { body: 'x', bodyField: 'System.Description' }), refused);
-  assert.deepEqual(await saveDescription(workItem, { body: 'x', revision: 3 }), refused);
+    const { saveDescription } = createItemDetails(null, (item) => item);
+    const refused = { status: 400, error: "Send the field and revision the work item's details gave." };
+
+    assert.deepEqual(await saveDescription(workItem, { body: 'x' }), refused);
+    assert.deepEqual(await saveDescription(workItem, { body: 'x', bodyField: 'System.Description' }), refused);
+    assert.deepEqual(await saveDescription(workItem, { body: 'x', revision: 3 }), refused);
 });
 
 test('sample mode saves no description', async () => {
-  assert.deepEqual(await createItemDetails('unused.json', (item) => item).saveDescription(workItem, { body: 'x' }), { status: 403, error: 'Saving descriptions is disabled in sample mode.' });
+    assert.deepEqual(await createItemDetails('unused.json', (item) => item).saveDescription(workItem, { body: 'x' }), {
+        status: 403,
+        error: 'Saving descriptions is disabled in sample mode.',
+    });
 });
 
 test('work with no ticket has no details and saves no description', async () => {
-  const { details, saveDescription } = createItemDetails(null, () => undefined);
-  assert.equal((await details(workItem) as { body: string }).body, '');
-  assert.deepEqual(await saveDescription(workItem, { body: 'x' }), { status: 409, error: 'This work has no ticket the board has read.' });
+    const { details, saveDescription } = createItemDetails(null, () => undefined);
+
+    assert.equal(((await details(workItem)) as { body: string }).body, '');
+    assert.deepEqual(await saveDescription(workItem, { body: 'x' }), {
+        status: 409,
+        error: 'This work has no ticket the board has read.',
+    });
 });
 
 const taggedWork = (labels?: string) => {
-  const items: WorkItem[] = [{ id: 5, rev: 2, type: 'User Story', state: 'New', ...labels !== undefined && { tags: labels } }];
-  return { items, az: fakeAz({ items, tags: ['area-ui', 'bug', 'docs'] }) };
+    const items: WorkItem[] = [
+        { id: 5, rev: 2, type: 'User Story', state: 'New', ...(labels !== undefined && { tags: labels }) },
+    ];
+
+    return { items, az: fakeAz({ items, tags: ['area-ui', 'bug', 'docs'] }) };
 };
-const onAzureFake = (az: ReturnType<typeof fakeAz>) => createItemDetails(null, (item) => item, { records: null, labelsOf: (repo) => trackerLabels(repo, { az: az.run, gh: async () => { throw new Error('gh is not for this repository'); } }) });
+const onAzureFake = (az: ReturnType<typeof fakeAz>) =>
+    createItemDetails(null, (item) => item, {
+        records: null,
+        labelsOf: (repo) =>
+            trackerLabels(repo, {
+                az: az.run,
+                gh: async () => {
+                    throw new Error('gh is not for this repository');
+                },
+            }),
+    });
 
 test('on the fake Azure a tag goes on and off the work item, keeping the others', async () => {
-  const { items, az } = taggedWork('docs');
-  const { changeLabels } = onAzureFake(az);
-  assert.equal(await changeLabels(workItem, { label: 'area-ui', action: 'add' }), null);
-  assert.equal(items[0]!.tags, 'docs; area-ui');
-  assert.equal(await changeLabels(workItem, { label: 'docs', action: 'remove' }), null);
-  assert.equal(items[0]!.tags, 'area-ui');
+    const { items, az } = taggedWork('docs');
+    const { changeLabels } = onAzureFake(az);
+
+    assert.equal(await changeLabels(workItem, { label: 'area-ui', action: 'add' }), null);
+    assert.equal(items[0]!.tags, 'docs; area-ui');
+    assert.equal(await changeLabels(workItem, { label: 'docs', action: 'remove' }), null);
+    assert.equal(items[0]!.tags, 'area-ui');
 });
 
-test('on the fake Azure a failed tag write leaves the tags and says why, in the tracker\'s word', async () => {
-  const items: WorkItem[] = [{ id: 5, type: 'User Story', state: 'New', tags: 'docs' }];
-  const az = fakeAz({ items, fail: (args) => (args[0] === 'rest' ? new Error('az rest failed: TF237111: no permission') : undefined) });
-  assert.deepEqual(await onAzureFake(az).changeLabels(workItem, { label: 'area-ui', action: 'add' }), { status: 502, error: 'Could not change the tags on #5. az rest failed: TF237111: no permission' });
-  assert.equal(items[0]!.tags, 'docs');
+test("on the fake Azure a failed tag write leaves the tags and says why, in the tracker's word", async () => {
+    const items: WorkItem[] = [{ id: 5, type: 'User Story', state: 'New', tags: 'docs' }];
+    const az = fakeAz({
+        items,
+        fail: (args) => (args[0] === 'rest' ? new Error('az rest failed: TF237111: no permission') : undefined),
+    });
+
+    assert.deepEqual(await onAzureFake(az).changeLabels(workItem, { label: 'area-ui', action: 'add' }), {
+        status: 502,
+        error: 'Could not change the tags on #5. az rest failed: TF237111: no permission',
+    });
+    assert.equal(items[0]!.tags, 'docs');
 });
 
-test('the fake Azure\'s tags reach the picker without the managed ones', async () => {
-  const { az } = taggedWork();
-  assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'area-ui' }, { name: 'docs' }] });
+test("the fake Azure's tags reach the picker without the managed ones", async () => {
+    const { az } = taggedWork();
+
+    assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'area-ui' }, { name: 'docs' }] });
 });
 
 test("the picker leaves out Azure's repo- tags, and a GitHub picker keeps a repo- label", async () => {
-  const az = fakeAz({ items: [], tags: ['repo-lar-api', 'Repo-Other', 'docs'] });
-  assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'docs' }] });
-  const github = createItemDetails(null, (item) => item, { records: null, labelsOf: () => ({ list: async () => [{ name: 'repo-web' }, { name: 'bug' }] }) as unknown as TrackerLabels });
-  assert.deepEqual(await github.labels({ ...workItem, repo: WEB }), { labels: [{ name: 'repo-web' }] });
+    const az = fakeAz({ items: [], tags: ['repo-lar-api', 'Repo-Other', 'docs'] });
+
+    assert.deepEqual(await onAzureFake(az).labels(workItem), { labels: [{ name: 'docs' }] });
+
+    const github = createItemDetails(null, (item) => item, {
+        records: null,
+        labelsOf: () => ({ list: async () => [{ name: 'repo-web' }, { name: 'bug' }] }) as unknown as TrackerLabels,
+    });
+
+    assert.deepEqual(await github.labels({ ...workItem, repo: WEB }), { labels: [{ name: 'repo-web' }] });
 });
 
-for (const label of ['foo; linked-work', 'foo, linked-work']) test(`a tag named "${label}" is refused on Azure, and writes no tag`, async () => {
-  const { items, az } = taggedWork('docs');
-  assert.deepEqual(await onAzureFake(az).changeLabels(workItem, { label, action: 'add' }), { status: 422, error: 'Use a tag name without commas or semicolons.' });
-  assert.equal(items[0]!.tags, 'docs');
-  assert.deepEqual(az.patches, []);
-});
+for (const label of ['foo; linked-work', 'foo, linked-work'])
+    test(`a tag named "${label}" is refused on Azure, and writes no tag`, async () => {
+        const { items, az } = taggedWork('docs');
+
+        assert.deepEqual(await onAzureFake(az).changeLabels(workItem, { label, action: 'add' }), {
+            status: 422,
+            error: 'Use a tag name without commas or semicolons.',
+        });
+        assert.equal(items[0]!.tags, 'docs');
+        assert.deepEqual(az.patches, []);
+    });
 
 test('a failed read of the tags says why', async () => {
-  const az = fakeAz({ items: [], fail: (args) => (args.includes('tags') ? new Error('az devops invoke failed: TF400813') : undefined) });
-  assert.deepEqual(await onAzureFake(az).labels(workItem), { status: 502, error: 'Could not read the tags. az devops invoke failed: TF400813' });
+    const az = fakeAz({
+        items: [],
+        fail: (args) => (args.includes('tags') ? new Error('az devops invoke failed: TF400813') : undefined),
+    });
+
+    assert.deepEqual(await onAzureFake(az).labels(workItem), {
+        status: 502,
+        error: 'Could not read the tags. az devops invoke failed: TF400813',
+    });
 });
 
 test('work with no ticket has no labels to read or change', async () => {
-  const { labels, changeLabels } = createItemDetails(null, () => undefined);
-  const refused = { status: 409, error: 'This work has no ticket the board has read.' };
-  assert.deepEqual(await labels(workItem), refused);
-  assert.deepEqual(await changeLabels(workItem, { label: 'docs', action: 'add' }), refused);
+    const { labels, changeLabels } = createItemDetails(null, () => undefined);
+    const refused = { status: 409, error: 'This work has no ticket the board has read.' };
+
+    assert.deepEqual(await labels(workItem), refused);
+    assert.deepEqual(await changeLabels(workItem, { label: 'docs', action: 'add' }), refused);
 });
 
-test('details serve what a kind update writes, less a type the team\'s backlog doesn\'t show, and why', async () => {
-  const { records, exportFolder } = await recordsOn();
-  const repo = workItem.repo;
-  const { workId } = records.importTicket({ title: 'T', repository: repo, kind: 'bug', ticket: `${repo}#5` }).record;
-  const setup = { repo, access: { 'tag-ticket': 'allowed', 'type-ticket': 'refused' }, vocabulary: effectiveVocabulary({ bug: { type: 'Bug', labels: [] } }).vocabulary, itemSource: { kind: 'azure-board', team: 'Web' } } as unknown as RepositorySetup;
-  const kinds: TicketKinds = { read: async () => ({ labels: ['feature'], type: 'User Story' }), setType: async () => {}, boardTypes: async () => ['User Story'] };
-  const { swap } = kindDisagreement(records.read(workId), { labels: ['feature'], type: 'User Story' }, setup.vocabulary)!;
-  assert.deepEqual(swap.type, { from: 'User Story', to: 'Bug' });
-  const work = { ...boardItem(workId), repo, kindDisagreement: { ticketKind: 'feature', changed: 'item', kept: false, swap } } as Item;
-  const reader = createItemDetails(null, () => undefined, { records, exportFolder, setupOf: () => setup, kindsOf: () => kinds });
-  const read = await reader.details(work) as ItemDetails;
-  assert.deepEqual(read.kindPlan, { itemKind: 'bug', ticketKind: 'feature', swap: { add: [], remove: ['feature'], type: null }, note: " The type stays User Story, because the team's backlog doesn't show Bug." });
-  const failing = createItemDetails(null, () => undefined, { records, exportFolder, setupOf: () => setup, kindsOf: () => ({ ...kinds, read: async () => { throw new Error('refused'); } }) });
-  assert.equal((await failing.details(work) as ItemDetails).kindPlan, undefined);
-  assert.equal((await reader.details(boardItem(workId)) as ItemDetails).kindPlan, undefined, 'no disagreement, no read');
+test("details serve what a kind update writes, less a type the team's backlog doesn't show, and why", async () => {
+    const { records, exportFolder } = await recordsOn();
+    const repo = workItem.repo;
+    const { workId } = records.importTicket({ title: 'T', repository: repo, kind: 'bug', ticket: `${repo}#5` }).record;
+    const setup = {
+        repo,
+        access: { 'tag-ticket': 'allowed', 'type-ticket': 'refused' },
+        vocabulary: effectiveVocabulary({ bug: { type: 'Bug', labels: [] } }).vocabulary,
+        itemSource: { kind: 'azure-board', team: 'Web' },
+    } as unknown as RepositorySetup;
+    const kinds: TicketKinds = {
+        read: async () => ({ labels: ['feature'], type: 'User Story' }),
+        setType: async () => {},
+        boardTypes: async () => ['User Story'],
+    };
+    const { swap } = kindDisagreement(
+        records.read(workId),
+        { labels: ['feature'], type: 'User Story' },
+        setup.vocabulary,
+    )!;
+
+    assert.deepEqual(swap.type, { from: 'User Story', to: 'Bug' });
+
+    const work = {
+        ...boardItem(workId),
+        repo,
+        kindDisagreement: { ticketKind: 'feature', changed: 'item', kept: false, swap },
+    } as Item;
+    const reader = createItemDetails(null, () => undefined, {
+        records,
+        exportFolder,
+        setupOf: () => setup,
+        kindsOf: () => kinds,
+    });
+    const read = (await reader.details(work)) as ItemDetails;
+
+    assert.deepEqual(read.kindPlan, {
+        itemKind: 'bug',
+        ticketKind: 'feature',
+        swap: { add: [], remove: ['feature'], type: null },
+        note: " The type stays User Story, because the team's backlog doesn't show Bug.",
+    });
+
+    const failing = createItemDetails(null, () => undefined, {
+        records,
+        exportFolder,
+        setupOf: () => setup,
+        kindsOf: () => ({
+            ...kinds,
+            read: async () => {
+                throw new Error('refused');
+            },
+        }),
+    });
+
+    assert.equal(((await failing.details(work)) as ItemDetails).kindPlan, undefined);
+    assert.equal(
+        ((await reader.details(boardItem(workId))) as ItemDetails).kindPlan,
+        undefined,
+        'no disagreement, no read',
+    );
 });
 
 test("a build's details hold its brief, initial context, build phase and review rounds from its record", async () => {
-  const { records, exportFolder } = await recordsOn();
-  let build = records.create({ title: 'Owner accounts', context: 'Owners sign up.', repository: WEB, kind: 'build' });
-  build = records.setBody(build.workId, build.revision, 'brief', '# Owner accounts\n\nAdd an owner table.');
-  build = records.setBuildPhase(build.workId, build.revision, 'review');
-  records.recordReviewRound(build.workId, build.revision, { base: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', reviewers: [
-    { axis: 'code', verdict: 'changes', findings: [{ severity: 'should', summary: 'Name the table.', disposition: 'open' }, { severity: 'nit', summary: 'Typo.', disposition: 'fixed' }] },
-    { axis: 'security', verdict: 'approve', findings: [] },
-  ] });
-  const read = await createItemDetails(null, () => undefined, { records, exportFolder }).details(boardItem(build.workId));
-  const { recordedAt, ...round } = (read as { record: { reviewRounds: { recordedAt: string }[] } }).record.reviewRounds[0]!;
-  assert.match(recordedAt, /^\d{4}-/);
-  assert.deepEqual({ ...(read as { record: object }).record, reviewRounds: [round] }, {
-    bodyKind: 'brief', body: '# Owner accounts\n\nAdd an owner table.', context: 'Owners sign up.', buildPhase: 'review',
-    reviewRounds: [{ round: 1, reviewers: [{ axis: 'code', verdict: 'changes', findings: 2, open: 1 }, { axis: 'security', verdict: 'approve', findings: 0, open: 0 }] }],
-  });
+    const { records, exportFolder } = await recordsOn();
+    let build = records.create({ title: 'Owner accounts', context: 'Owners sign up.', repository: WEB, kind: 'build' });
+
+    build = records.setBody(build.workId, build.revision, 'brief', '# Owner accounts\n\nAdd an owner table.');
+    build = records.setBuildPhase(build.workId, build.revision, 'review');
+    records.recordReviewRound(build.workId, build.revision, {
+        base: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+        reviewers: [
+            {
+                axis: 'code',
+                verdict: 'changes',
+                findings: [
+                    { severity: 'should', summary: 'Name the table.', disposition: 'open' },
+                    { severity: 'nit', summary: 'Typo.', disposition: 'fixed' },
+                ],
+            },
+            { axis: 'security', verdict: 'approve', findings: [] },
+        ],
+    });
+
+    const read = await createItemDetails(null, () => undefined, { records, exportFolder }).details(
+        boardItem(build.workId),
+    );
+    const { recordedAt, ...round } = (read as { record: { reviewRounds: { recordedAt: string }[] } }).record
+        .reviewRounds[0]!;
+
+    assert.match(recordedAt, /^\d{4}-/);
+    assert.deepEqual(
+        { ...(read as { record: object }).record, reviewRounds: [round] },
+        {
+            bodyKind: 'brief',
+            body: '# Owner accounts\n\nAdd an owner table.',
+            context: 'Owners sign up.',
+            buildPhase: 'review',
+            reviewRounds: [
+                {
+                    round: 1,
+                    reviewers: [
+                        { axis: 'code', verdict: 'changes', findings: 2, open: 1 },
+                        { axis: 'security', verdict: 'approve', findings: 0, open: 0 },
+                    ],
+                },
+            ],
+        },
+    );
 });
 
 test("a concept's details hold its map and a decision's its text, each empty until written", async () => {
-  const { records, exportFolder } = await recordsOn();
-  const reader = createItemDetails(null, () => undefined, { records, exportFolder });
-  const concept = records.create({ title: 'Cloud', repository: WEB, kind: 'concept' });
-  const decision = records.create({ title: 'Relay', repository: WEB, kind: 'decision' });
-  const recordOf = async (workId: string) => ((await reader.details(boardItem(workId))) as { record: { bodyKind: string; body: string } }).record;
-  assert.deepEqual([(await recordOf(concept.workId)).bodyKind, (await recordOf(concept.workId)).body], ['map', '']);
-  records.setBody(concept.workId, concept.revision, 'map', '## Destination\n\nStream anywhere.');
-  records.setBody(decision.workId, decision.revision, 'decision', '# Relay\n\nBroker only?');
-  assert.deepEqual([await recordOf(concept.workId), await recordOf(decision.workId)].map((r) => [r.bodyKind, r.body]),
-    [['map', '## Destination\n\nStream anywhere.'], ['decision', '# Relay\n\nBroker only?']]);
-  records.setBody(decision.workId, records.read(decision.workId).revision, 'answer', 'Use a relay broker.');
-  assert.equal((await reader.details(boardItem(decision.workId)) as ItemDetails).record?.answer, 'Use a relay broker.');
+    const { records, exportFolder } = await recordsOn();
+    const reader = createItemDetails(null, () => undefined, { records, exportFolder });
+    const concept = records.create({ title: 'Cloud', repository: WEB, kind: 'concept' });
+    const decision = records.create({ title: 'Relay', repository: WEB, kind: 'decision' });
+    const recordOf = async (workId: string) =>
+        ((await reader.details(boardItem(workId))) as { record: { bodyKind: string; body: string } }).record;
+
+    assert.deepEqual([(await recordOf(concept.workId)).bodyKind, (await recordOf(concept.workId)).body], ['map', '']);
+    records.setBody(concept.workId, concept.revision, 'map', '## Destination\n\nStream anywhere.');
+    records.setBody(decision.workId, decision.revision, 'decision', '# Relay\n\nBroker only?');
+    assert.deepEqual(
+        [await recordOf(concept.workId), await recordOf(decision.workId)].map((r) => [r.bodyKind, r.body]),
+        [
+            ['map', '## Destination\n\nStream anywhere.'],
+            ['decision', '# Relay\n\nBroker only?'],
+        ],
+    );
+    records.setBody(decision.workId, records.read(decision.workId).revision, 'answer', 'Use a relay broker.');
+    assert.equal(
+        ((await reader.details(boardItem(decision.workId))) as ItemDetails).record?.answer,
+        'Use a relay broker.',
+    );
 });
 
 test('export writes the files lar-work export writes, into the export folder', async () => {
-  const { records, dir, exportFolder } = await recordsOn();
-  const concept = records.create({ title: 'Cloud', repository: WEB, kind: 'concept' });
-  records.setBody(concept.workId, concept.revision, 'map', '# Cloud map\n\nStream anywhere.');
-  let decision = records.create({ title: 'Relay', repository: WEB, kind: 'decision' });
-  decision = records.setBody(decision.workId, decision.revision, 'decision', '# Relay\n\nBroker only?');
-  records.setParent(decision.workId, decision.revision, concept.workId);
-  const command = join(dir, 'command');
-  mkdirSync(command);
-  exportMarkdown(records, concept.workId, command);
+    const { records, dir, exportFolder } = await recordsOn();
+    const concept = records.create({ title: 'Cloud', repository: WEB, kind: 'concept' });
 
-  const exported = await createItemDetails(null, () => undefined, { records, exportFolder }).exportMarkdown(boardItem(concept.workId));
-  const files = (folder: string) => readdirSync(folder).sort().map((name) => [name, readFileSync(join(folder, name), 'utf8')]);
-  assert.deepEqual((exported as { paths: string[] }).paths.sort(), readdirSync(command).sort().map((name) => join(exportFolder, name)));
-  assert.deepEqual(files(exportFolder), files(command));
-  assert.equal(files(exportFolder).length, 2);
+    records.setBody(concept.workId, concept.revision, 'map', '# Cloud map\n\nStream anywhere.');
+
+    let decision = records.create({ title: 'Relay', repository: WEB, kind: 'decision' });
+
+    decision = records.setBody(decision.workId, decision.revision, 'decision', '# Relay\n\nBroker only?');
+    records.setParent(decision.workId, decision.revision, concept.workId);
+
+    const command = join(dir, 'command');
+
+    mkdirSync(command);
+    exportMarkdown(records, concept.workId, command);
+
+    const exported = await createItemDetails(null, () => undefined, { records, exportFolder }).exportMarkdown(
+        boardItem(concept.workId),
+    );
+    const files = (folder: string) =>
+        readdirSync(folder)
+            .sort()
+            .map((name) => [name, readFileSync(join(folder, name), 'utf8')]);
+
+    assert.deepEqual(
+        (exported as { paths: string[] }).paths.sort(),
+        readdirSync(command)
+            .sort()
+            .map((name) => join(exportFolder, name)),
+    );
+    assert.deepEqual(files(exportFolder), files(command));
+    assert.equal(files(exportFolder).length, 2);
 });
 
 test('export refuses work with nothing written, a second export of the same files and sample mode', async () => {
-  const { records, exportFolder } = await recordsOn();
-  const reader = createItemDetails(null, () => undefined, { records, exportFolder });
-  const build = records.create({ title: 'Owner accounts', repository: WEB, kind: 'build' });
-  const empty = await reader.exportMarkdown(boardItem(build.workId));
-  assert.deepEqual(empty, { status: 409, error: `The work record ${build.workId} has nothing to export: no brief, decision, map or Dependency.` });
-  records.setBody(build.workId, build.revision, 'brief', '# Owner accounts');
-  assert.ok('paths' in await reader.exportMarkdown(boardItem(build.workId)));
-  const again = await reader.exportMarkdown(boardItem(build.workId));
-  assert.equal((again as { status: number }).status, 409);
-  assert.match((again as { error: string }).error, /already exists/);
-  assert.deepEqual(await createItemDetails('unused.json', (item) => item).exportMarkdown(boardItem(build.workId)), { status: 403, error: 'Exporting is disabled in sample mode.' });
+    const { records, exportFolder } = await recordsOn();
+    const reader = createItemDetails(null, () => undefined, { records, exportFolder });
+    const build = records.create({ title: 'Owner accounts', repository: WEB, kind: 'build' });
+    const empty = await reader.exportMarkdown(boardItem(build.workId));
+
+    assert.deepEqual(empty, {
+        status: 409,
+        error: `The work record ${build.workId} has nothing to export: no brief, decision, map or Dependency.`,
+    });
+    records.setBody(build.workId, build.revision, 'brief', '# Owner accounts');
+    assert.ok('paths' in (await reader.exportMarkdown(boardItem(build.workId))));
+
+    const again = await reader.exportMarkdown(boardItem(build.workId));
+
+    assert.equal((again as { status: number }).status, 409);
+    assert.match((again as { error: string }).error, /already exists/);
+    assert.deepEqual(await createItemDetails('unused.json', (item) => item).exportMarkdown(boardItem(build.workId)), {
+        status: 403,
+        error: 'Exporting is disabled in sample mode.',
+    });
 });
 
 test('a failed first Spec write shows local Spec, collapsed Original and durable retry; Save approves exact text and keeps Ready', async () => {
-  const { records } = await recordsOn();
-  const repository = 'example/widget';
-  const setup = { repo: repository, writeRefinedSpec: true, access: { 'edit-ticket': 'allowed' } } as unknown as import('@lar-factory/shared').RepositorySetup;
-  let body = 'Authored Original.';
-  let offline = true;
-  const provider = {
-    readSpec: async () => ({ repository, number: 7, title: 'Work', body, version: '1', editorWrite: true }),
-    replaceSpec: async (_ticket: unknown, next: string) => { if (offline) throw Error('Offline'); body = next; return { repository, number: 7, title: 'Work', body, version: '2' }; },
-  } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
-  const specSync = { setups: [setup], provider };
-  const { syncSpecs } = await import('@lar-factory/work-records/spec-sync');
-  let record = records.create({ title: 'Work', kind: 'feature', repository, ticket: `${repository}#7` });
-  record = records.setBody(record.workId, record.revision, 'brief', 'Whole brief.');
-  records.recordGate(record.workId, record.revision, { briefDigest: records.gate(record.workId).briefDigest!, approvedBy: 'user', evidence: 'Passed' });
-  record = records.update(record.workId, record.revision, { status: 'Ready' });
-  await syncSpecs(records, specSync);
-  const work = { ...boardItem(record.workId), repo: repository, number: 7 };
-  const reader = createItemDetails(null, () => undefined, { records, specSync });
-  const read = await reader.details(work);
-  if ('error' in read) throw Error(read.error);
-  assert.equal(read.body, 'Whole brief.');
-  assert.equal(read.spec?.pending, true);
-  assert.equal(read.spec?.original, 'Authored Original.');
-  assert.equal(read.spec?.error, 'Offline');
-  offline = false;
-  await reader.specAction!(work, read.spec!.generation, 'retry');
-  assert.equal(records.specState(record.workId).pending, null);
-  const writer = createItemDetails(null, item => item, { records, specSync });
-  assert.equal(await writer.saveDescription(work, { body: 'Exact approved text.  \n' }), null);
-  assert.equal(records.body(record.workId, 'brief'), 'Exact approved text.  \n');
-  assert.equal(records.read(record.workId).status, 'Ready');
-  assert.equal(records.gate(record.workId).current, true);
-  assert.equal(records.gate(record.workId).evidence.at(-1)?.source, 'user');
-  assert.match(body, /Exact approved text\./);
-  records.close();
+    const { records } = await recordsOn();
+    const repository = 'example/widget';
+    const setup = {
+        repo: repository,
+        writeRefinedSpec: true,
+        access: { 'edit-ticket': 'allowed' },
+    } as unknown as import('@lar-factory/shared').RepositorySetup;
+    let body = 'Authored Original.';
+    let offline = true;
+    const provider = {
+        readSpec: async () => ({ repository, number: 7, title: 'Work', body, version: '1', editorWrite: true }),
+        replaceSpec: async (_ticket: unknown, next: string) => {
+            if (offline) throw Error('Offline');
+
+            body = next;
+
+            return { repository, number: 7, title: 'Work', body, version: '2' };
+        },
+    } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
+    const specSync = { setups: [setup], provider };
+    const { syncSpecs } = await import('@lar-factory/work-records/spec-sync');
+    let record = records.create({ title: 'Work', kind: 'feature', repository, ticket: `${repository}#7` });
+
+    record = records.setBody(record.workId, record.revision, 'brief', 'Whole brief.');
+    records.recordGate(record.workId, record.revision, {
+        briefDigest: records.gate(record.workId).briefDigest!,
+        approvedBy: 'user',
+        evidence: 'Passed',
+    });
+    record = records.update(record.workId, record.revision, { status: 'Ready' });
+    await syncSpecs(records, specSync);
+
+    const work = { ...boardItem(record.workId), repo: repository, number: 7 };
+    const reader = createItemDetails(null, () => undefined, { records, specSync });
+    const read = await reader.details(work);
+
+    if ('error' in read) throw Error(read.error);
+
+    assert.equal(read.body, 'Whole brief.');
+    assert.equal(read.spec?.pending, true);
+    assert.equal(read.spec?.original, 'Authored Original.');
+    assert.equal(read.spec?.error, 'Offline');
+    offline = false;
+    await reader.specAction!(work, read.spec!.generation, 'retry');
+    assert.equal(records.specState(record.workId).pending, null);
+
+    const writer = createItemDetails(null, (item) => item, { records, specSync });
+
+    assert.equal(await writer.saveDescription(work, { body: 'Exact approved text.  \n' }), null);
+    assert.equal(records.body(record.workId, 'brief'), 'Exact approved text.  \n');
+    assert.equal(records.read(record.workId).status, 'Ready');
+    assert.equal(records.gate(record.workId).current, true);
+    assert.equal(records.gate(record.workId).evidence.at(-1)?.source, 'user');
+    assert.match(body, /Exact approved text\./);
+    records.close();
 });
 
 test('checks reads the validation record separately from ordinary details', async () => {
-  const { records } = await recordsOn();
-  const build = records.create({ title: 'Checks', repository: WEB, kind: 'build' });
-  const run = records.startCheck(build.workId, { command: ['pnpm', 'test'], folder: '.', role: 'implementer', tree: null, reason: 'Changed tests' });
-  records.finishCheck(run.checkId, { tree: null, exitStatus: 1, interrupted: false, log: null });
-  records.describeFailure(run.checkId, { tests: ['renders checks'], diagnosis: 'Missing section' });
-  const reader = createItemDetails(null, () => undefined, { records });
-  assert.deepEqual(await reader.checks!(boardItem(build.workId)), records.checks(build.workId));
-  assert.equal('checks' in await reader.details(boardItem(build.workId)), false);
-  records.close();
+    const { records } = await recordsOn();
+    const build = records.create({ title: 'Checks', repository: WEB, kind: 'build' });
+    const run = records.startCheck(build.workId, {
+        command: ['pnpm', 'test'],
+        folder: '.',
+        role: 'implementer',
+        tree: null,
+        reason: 'Changed tests',
+    });
+
+    records.finishCheck(run.checkId, { tree: null, exitStatus: 1, interrupted: false, log: null });
+    records.describeFailure(run.checkId, { tests: ['renders checks'], diagnosis: 'Missing section' });
+
+    const reader = createItemDetails(null, () => undefined, { records });
+
+    assert.deepEqual(await reader.checks!(boardItem(build.workId)), records.checks(build.workId));
+    assert.equal('checks' in (await reader.details(boardItem(build.workId))), false);
+    records.close();
 });

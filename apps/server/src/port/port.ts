@@ -7,14 +7,17 @@ export const BOARD_PORTS: readonly number[] = Array.from({ length: 100 }, (_, i)
 
 /** Listens on the first available port and returns the bound port; zero asks the OS to assign one. */
 export async function listenOnFreePort(server: Server, host: string, ports: readonly number[]): Promise<number | null> {
-  for (const port of ports) {
-    if (await listen(server, host, port)) {
-      const address = server.address();
-      if (!address || typeof address === 'string') throw new Error('Expected a listening TCP port');
-      return address.port;
+    for (const port of ports) {
+        if (await listen(server, host, port)) {
+            const address = server.address();
+
+            if (!address || typeof address === 'string') throw new Error('Expected a listening TCP port');
+
+            return address.port;
+        }
     }
-  }
-  return null;
+
+    return null;
 }
 
 /** What a board sends the process that started it with an IPC channel, such as the board app. */
@@ -22,24 +25,28 @@ export type ParentMessage = { type: 'listening'; port: number };
 
 /** Tells the parent process, when there is one with an IPC channel, that the board listens on `port`. */
 export function reportListening(port: number): void {
-  if (!process.send || !process.connected) return;
-  const message: ParentMessage = { type: 'listening', port };
-  process.send(message);
+    if (!process.send || !process.connected) return;
+
+    const message: ParentMessage = { type: 'listening', port };
+
+    process.send(message);
 }
 
 function listen(server: Server, host: string, port: number): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    const failed = (error: NodeJS.ErrnoException) => {
-      server.off('listening', listening);
-      if (error.code === 'EADDRINUSE') resolve(false);
-      else reject(error);
-    };
-    const listening = () => {
-      server.off('error', failed);
-      resolve(true);
-    };
-    server.once('error', failed);
-    server.once('listening', listening);
-    server.listen(port, host);
-  });
+    return new Promise((resolve, reject) => {
+        const failed = (error: NodeJS.ErrnoException) => {
+            server.off('listening', listening);
+
+            if (error.code === 'EADDRINUSE') resolve(false);
+            else reject(error);
+        };
+        const listening = () => {
+            server.off('error', failed);
+            resolve(true);
+        };
+
+        server.once('error', failed);
+        server.once('listening', listening);
+        server.listen(port, host);
+    });
 }

@@ -1,35 +1,35 @@
 {
-  "name": "@lar-factory/shared",
-  "private": true,
-  "version": "0.1.0",
-  "description": "What the board's apps share: the item and board model and rules, the desktop bridge contract, and the skill installer.",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./publication": "./src/publication.ts",
-    "./vocabulary": "./src/vocabulary.ts",
-    "./provider-command": "./src/provider-command.ts",
-    "./azure-safety": "./src/azure-safety.ts",
-    "./data-dir": "./src/data-dir.ts",
-    "./install-skills": "./src/install-skills.ts",
-    "./install-targets": "./src/install-targets.ts",
-    "./test/sample.json": "./test/sample.json",
-    "./test/sample-details.json": "./test/sample-details.json",
-    "./test/raw-items": "./test/raw-items.ts",
-    "./repository-settings": "./src/repository-settings.ts",
-    "./publication-settings": "./src/publication-settings.ts",
-    "./tracker-labels": "./src/tracker-labels.ts"
-  },
-  "scripts": {
-    "test": "vp test run",
-    "typecheck": "tsc --noEmit -p ."
-  },
-  "devDependencies": {
-    "@types/node": "^24.19.2",
-    "typescript": "^7.0.2",
-    "vite-plus": "1.3.0"
-  },
-  "dependencies": {
-    "marked": "^18.1.2"
-  }
+    "name": "@lar-factory/shared",
+    "private": true,
+    "version": "0.1.0",
+    "description": "What the board's apps share: the item and board model and rules, the desktop bridge contract, and the skill installer.",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./publication": "./src/publication.ts",
+        "./vocabulary": "./src/vocabulary.ts",
+        "./provider-command": "./src/provider-command.ts",
+        "./azure-safety": "./src/azure-safety.ts",
+        "./data-dir": "./src/data-dir.ts",
+        "./install-skills": "./src/install-skills.ts",
+        "./install-targets": "./src/install-targets.ts",
+        "./test/sample.json": "./test/sample.json",
+        "./test/sample-details.json": "./test/sample-details.json",
+        "./test/raw-items": "./test/raw-items.ts",
+        "./repository-settings": "./src/repository-settings.ts",
+        "./publication-settings": "./src/publication-settings.ts",
+        "./tracker-labels": "./src/tracker-labels.ts"
+    },
+    "scripts": {
+        "test": "vp test run",
+        "typecheck": "tsc --noEmit -p ."
+    },
+    "devDependencies": {
+        "@types/node": "^24.19.2",
+        "typescript": "^7.0.2",
+        "vite-plus": "1.5.0"
+    },
+    "dependencies": {
+        "marked": "^18.1.2"
+    }
 }

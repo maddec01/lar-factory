@@ -83,7 +83,6 @@ The board skips it only while every recorded thread is in the active shells. Any
 recorded thread missing from them, such as an archived thread, starts a read every 30
 seconds for the server's life.
 
-
 Stats coverage (#709): `execution-stats.ts` maps providerTurns to turn intervals,
 runtimeRequests to user waits, subagents to child intervals, messages to first-user
 association and last-message bounds, and providerThreads to active IDs and native

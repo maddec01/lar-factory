@@ -2,9 +2,9 @@ name: Feature request
 description: An idea for the factory, its skills or the board
 labels: [feature]
 body:
-  - type: textarea
-    attributes:
-      label: What you'd like
-      description: The problem it solves and how you'd use it.
-    validations:
-      required: true
+    - type: textarea
+      attributes:
+          label: What you'd like
+          description: The problem it solves and how you'd use it.
+      validations:
+          required: true

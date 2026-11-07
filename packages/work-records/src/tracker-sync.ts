@@ -1,268 +1,695 @@
+import {
+    formatTicketSpec,
+    readTicketSpec,
+    trackerMarkdownHtml,
+    type TicketOptions,
+    mapConcurrent,
+    STRUCTURE_LABEL,
+    trackerKind,
+    readTrackerStructure,
+    sameRepo,
+    trackerReference,
+    writeTrackerStructure,
+    type Kind,
+    type RepositorySetup,
+    type TrackerStructure,
+} from '@lar-factory/shared';
+import { providerCommand } from '@lar-factory/shared/provider-command';
 // One durable structural writer. A manifest commits only after every immutable chunk is readable.
 import { createHash } from 'node:crypto';
-import { gunzipSync } from 'node:zlib';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { formatTicketSpec, readTicketSpec, trackerMarkdownHtml, type TicketOptions, mapConcurrent, STRUCTURE_LABEL, trackerKind, readTrackerStructure, stripTrackerStructure, sameRepo, trackerReference, writeTrackerStructure, type Kind, type RepositorySetup, type TrackerPart, type TrackerStructure } from '@lar-factory/shared';
-import { providerCommand } from '@lar-factory/shared/provider-command';
-import type { WorkRecords } from './work-records.ts';
-import { validateTrackerSnapshot } from './tracker-snapshot.ts';
-import { type TrackerSnapshot } from './tracker-cache.ts';
+import { gunzipSync } from 'node:zlib';
 
-export interface StructureTicket { repository: string; number: number; body: string; version: string; title?: string; kind?:Kind; bodyField?: 'System.Description' | 'Microsoft.VSTS.TCM.ReproSteps'; editorWrite?: boolean; titleEditorWrite?: boolean }
-export interface StructureProvider {
-  readSpec?(repository: string, number: number, previous?: Pick<StructureTicket, 'body' | 'title'>): Promise<StructureTicket>;
-  replaceSpec?(ticket: StructureTicket, body: string): Promise<StructureTicket>;
-  read(repository: string, number: number): Promise<StructureTicket>;
-  find(repository: string, identity: string): Promise<StructureTicket[]>;
-  create(repository: string, title: string, body: string, type?: string, areaPath?: string, options?: TicketOptions): Promise<StructureTicket>;
-  creationTarget?(repository: string, team: string): Promise<{type:string;areaPath:string}>;
-  comment(ticket: StructureTicket, body: string): Promise<string>;
-  readComment(ticket: StructureTicket, id: string): Promise<string>;
-  replace(ticket: StructureTicket, body: string): Promise<void>;
+import { type TrackerSnapshot } from './tracker-cache.ts';
+import { validateTrackerSnapshot } from './tracker-snapshot.ts';
+import type { WorkRecords } from './work-records.ts';
+
+export interface StructureTicket {
+    repository: string;
+    number: number;
+    body: string;
+    version: string;
+    title?: string;
+    kind?: Kind;
+    bodyField?: 'System.Description' | 'Microsoft.VSTS.TCM.ReproSteps';
+    editorWrite?: boolean;
+    titleEditorWrite?: boolean;
 }
+export interface StructureProvider {
+    readSpec?: (
+        repository: string,
+        number: number,
+        previous?: Pick<StructureTicket, 'body' | 'title'>,
+    ) => Promise<StructureTicket>;
+    replaceSpec?: (ticket: StructureTicket, body: string) => Promise<StructureTicket>;
+    read: (repository: string, number: number) => Promise<StructureTicket>;
+    find(repository: string, identity: string): Promise<StructureTicket[]>;
+    create(
+        repository: string,
+        title: string,
+        body: string,
+        type?: string,
+        areaPath?: string,
+        options?: TicketOptions,
+    ): Promise<StructureTicket>;
+    creationTarget?(repository: string, team: string): Promise<{ type: string; areaPath: string }>;
+    comment(ticket: StructureTicket, body: string): Promise<string>;
+    readComment(ticket: StructureTicket, id: string): Promise<string>;
+    replace(ticket: StructureTicket, body: string): Promise<void>;
+}
+
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
-const fail = (error: unknown) => error instanceof Error ? error.message : String(error);
+const fail = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const numberOf = (reference: string) => Number(reference.slice(reference.lastIndexOf('#') + 1));
-export const structureIssueUrl = (repository: string, number: number) => repository.split('/').length === 2
-  ? `https://github.com/${repository}/issues/${number}` : `https://dev.azure.com/${repository.split('/')[0]}/${repository.split('/')[1]}/_workitems/edit/${number}`;
+/** A text field of a GitHub or Azure DevOps reply; anything but text reads as empty. */
+const textField = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+export const structureIssueUrl = (repository: string, number: number) =>
+    repository.split('/').length === 2
+        ? `https://github.com/${repository}/issues/${number}`
+        : `https://dev.azure.com/${repository.split('/')[0]}/${repository.split('/')[1]}/_workitems/edit/${number}`;
+
 const repoFromUrl = (url: string, setups: readonly RepositorySetup[], hint?: string) => {
-  const reference = trackerReference(url);
-  if (!reference) throw Error('The saved structure links to an unsupported issue URL.');
-  if (url.includes('github.com')) return { ...reference };
-  const repository = hint ?? setups.find(setup => setup.repo.toLowerCase().startsWith(`${reference.repository.toLowerCase()}/`))?.repo;
-  if (!repository || !repository.toLowerCase().startsWith(`${reference.repository.toLowerCase()}/`)) throw Error('Add the Azure repository before loading its saved structure.');
-  return { repository, number: reference.number };
+    const reference = trackerReference(url);
+
+    if (!reference) throw Error('The saved structure links to an unsupported issue URL.');
+
+    if (url.includes('github.com')) return { ...reference };
+
+    const repository =
+        hint ??
+        setups.find((setup) => setup.repo.toLowerCase().startsWith(`${reference.repository.toLowerCase()}/`))?.repo;
+
+    if (!repository || !repository.toLowerCase().startsWith(`${reference.repository.toLowerCase()}/`))
+        throw Error('Add the Azure repository before loading its saved structure.');
+
+    return { repository, number: reference.number };
 };
 
-const githubCommentPages = new Map<string,{etag?:string;comments:{body:string}[]}>();
+const githubCommentPages = new Map<string, { etag?: string; comments: { body: string }[] }>();
 
 /** Local CLI login transport, with Azure safety enforced in providerCommand before execution. */
 export function structureProvider(): StructureProvider {
-  const github = async (path: string, method = 'GET', body?: unknown) => JSON.parse(await providerCommand('gh', ['api', path, '--method', method,
-    ...(body === undefined ? [] : ['--input', '-'])], body === undefined ? undefined : JSON.stringify(body))) as Record<string, unknown>;
-  const pageCache = githubCommentPages;
-  const commentPage = async (path:string):Promise<{body:string}[]> => {
-    const cacheKey=`${process.env.GH_PATH ?? 'gh'}:${path}`;
-    const cached=pageCache.get(cacheKey);
-    let raw:string;
-    try {raw=await providerCommand('gh',['api','-i',path,'--method','GET',...(cached?.etag ? ['-H',`If-None-Match: ${cached.etag}`]:[])]);}
-    catch(error){if(cached&&/\b304\b/.test(fail(error)))return cached.comments;throw error;}
-    const split=/\r?\n\r?\n/.exec(raw);const headers=split ? raw.slice(0,split.index):'';
-    const comments=JSON.parse(split ? raw.slice(split.index+split[0].length):raw) as {body:string}[];
-    pageCache.set(cacheKey,{etag:/^etag:\s*(.+?)\s*$/im.exec(headers)?.[1],comments});return comments;
-  };
-  const latestMetadata = async (repository:string,number:number,count:number,original:string) => {
-    const ownUrl=structureIssueUrl(repository,number);
-    const managed:TrackerStructure[]=[];
-    for(let page=Math.max(1,Math.ceil(count/100));page>=1;page--){
-      const comments=await commentPage(`repos/${repository}/issues/${number}/comments?per_page=100&page=${page}`);
-      for(const comment of [...comments].reverse()){
-        if(!comment.body.trimStart().startsWith('<!-- lar-factory:structure'))continue;
-        const metadata=readTrackerStructure(comment.body);if(!metadata)continue;managed.push(metadata);
-        const latest=managed[0]!;
-        if(managed.length>1){
-          const before=metadata.snapshot;const after=latest.snapshot;
-          if(after&&after.root===ownUrl&&before&&before.root===ownUrl&&after.digest!==before.digest&&after.previous!==before.digest)throw Error('This concept has concurrent tracker versions. Both versions were kept; resolve the structural conflict before continuing.');
-          return latest;
+    const github = async (path: string, method = 'GET', body?: unknown) =>
+        JSON.parse(
+            await providerCommand(
+                'gh',
+                ['api', path, '--method', method, ...(body === undefined ? [] : ['--input', '-'])],
+                body === undefined ? undefined : JSON.stringify(body),
+            ),
+        ) as Record<string, unknown>;
+    const pageCache = githubCommentPages;
+    const commentPage = async (path: string): Promise<{ body: string }[]> => {
+        const cacheKey = `${process.env.GH_PATH ?? 'gh'}:${path}`;
+        const cached = pageCache.get(cacheKey);
+        let raw: string;
+
+        try {
+            raw = await providerCommand('gh', [
+                'api',
+                '-i',
+                path,
+                '--method',
+                'GET',
+                ...(cached?.etag ? ['-H', `If-None-Match: ${cached.etag}`] : []),
+            ]);
+        } catch (error) {
+            if (cached && /\b304\b/.test(fail(error))) return cached.comments;
+
+            throw error;
         }
-        if(!latest.snapshot || latest.snapshot.root!==ownUrl)return latest;
-      }
-    }
-    const latest=managed[0];const before=readTrackerStructure(original)?.snapshot;
-    if(latest?.snapshot&&latest.snapshot.root===ownUrl&&before&&before.root===ownUrl&&latest.snapshot.digest!==before.digest&&latest.snapshot.previous!==before.digest)throw Error('This concept has concurrent tracker versions. Both versions were kept.');
-    return latest;
-  };
-  const labelRepos = new Set<string>();
-  const markStructural = async (repository:string,number:number) => {
-    if(!labelRepos.has(repository)){
-      try{await github(`repos/${repository}/labels/${STRUCTURE_LABEL}`);}catch(error){if(!/404/.test(fail(error)))throw error;try{await github(`repos/${repository}/labels`,'POST',{name:STRUCTURE_LABEL,color:'6F42C1',description:'Concept and cross-repository relationships'});}catch(createError){if(!/422/.test(fail(createError)))throw createError;}}
-      labelRepos.add(repository);
-    }
-    await github(`repos/${repository}/issues/${number}/labels`,'POST',{labels:[STRUCTURE_LABEL]});
-  };
-  const azure = async (repository: string, resource: string, route: string[] = [], body?: unknown, method = body === undefined ? 'GET' : 'POST') => {
-    const [org, project] = repository.split('/');
-    let folder: string | undefined;
-    try {
-      const flags = ['devops', 'invoke', '--area', 'wit', '--resource', resource, '--organization', `https://dev.azure.com/${org}`,
-        '--route-parameters', `project=${decodeURIComponent(project!)}`, ...route, '--http-method', method, '--api-version', resource === 'comments' ? '7.1-preview.4' : '7.1', '--output', 'json'];
-      if (resource === 'comments' && method === 'POST') flags.push('--query-parameters','format=markdown');
-      if (body !== undefined) {
-        folder = await mkdtemp(join(tmpdir(), 'factory-structure-'));
-        const file = join(folder, 'body.json'); await writeFile(file, JSON.stringify(body), { mode: 0o600 });
-        flags.push('--in-file', file);
-        if (resource === 'workitems') flags.push('--media-type', 'application/json-patch+json');
-      }
-      return JSON.parse(await providerCommand('az', flags)) as Record<string, unknown>;
-    } finally { if (folder) await rm(folder, { recursive: true, force: true }); }
-  };
-  const asTicket = (repository: string, raw: Record<string, unknown>, spec = false): StructureTicket => {
-    const azure = repository.split('/').length !== 2;
-    return { repository, number: Number(raw[azure ? 'id' : 'number']), body: azure ? String((raw.fields as Record<string, unknown>)[spec && String((raw.fields as Record<string, unknown>)['System.WorkItemType']).toLowerCase() === 'bug' ? 'Microsoft.VSTS.TCM.ReproSteps' : 'System.Description'] ?? '') : String(raw.body ?? ''),
-      ...(azure ? { bodyField: spec && String((raw.fields as Record<string, unknown>)['System.WorkItemType']).toLowerCase() === 'bug' ? 'Microsoft.VSTS.TCM.ReproSteps' as const : 'System.Description' as const } : {}),
-      title:azure ? String((raw.fields as Record<string,unknown>)['System.Title'] ?? '') : String(raw.title ?? ''),
-      kind:azure ? trackerKind([],String((raw.fields as Record<string,unknown>)['System.WorkItemType'] ?? '')) : trackerKind((raw.labels as {name:string}[] ?? []).map(label=>label.name),String((raw.type as {name?:string}|undefined)?.name ?? '')),
-      version: String(raw[azure ? 'rev' : 'updated_at']) };
-  };
-  const read = async (repository: string, number: number) => {
-    if (repository.split('/').length === 2){
-      const raw=await github(`repos/${repository}/issues/${number}`);const ticket=asTicket(repository,raw);
-      if((raw.labels as {name:string}[] | undefined)?.some(label=>label.name===STRUCTURE_LABEL)){
-        const metadata=await latestMetadata(repository,number,Number(raw.comments ?? 0),ticket.body);
-        if(metadata){ticket.body=writeTrackerStructure(ticket.body,metadata);ticket.kind=metadata.kind;}
-      }
-      return ticket;
-    }
-    // invoke's workitems discovery route selects {type}, so numeric reads use the unambiguous batch resource.
-    const batch=await azure(repository,'workitemsbatch',[],{ids:[number],$expand:'None',errorPolicy:'Fail'});
-    const raw=(batch.value as Record<string,unknown>[])[0];
-    if(!raw) throw Error('Azure did not return the saved work item.');
-    return asTicket(repository,raw);
-  };
-  const readSpec = async (repository: string, number: number, previous?: Pick<StructureTicket, 'body' | 'title'>): Promise<StructureTicket> => {
-    if (repository.split('/').length !== 2) {
-      const batch = await azure(repository, 'workitemsbatch', [], { ids: [number], $expand: 'None', errorPolicy: 'Fail' });
-      const raw = (batch.value as Record<string, unknown>[])[0];
-      if (!raw) throw Error('Azure did not return the saved work item.');
-      return asTicket(repository, raw, true);
-    }
-    // Read the issue's own body, never the structure metadata projected from comments.
-    const ticket = asTicket(repository, await github(`repos/${repository}/issues/${number}`));
-    if (previous && ticket.body === previous.body && ticket.title === previous.title) return ticket;
-    try {
-      const [owner, name] = repository.split('/');
-      const result = await github('graphql', 'POST', { query: `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){body title editor{login} timelineItems(last:1,itemTypes:[RENAMED_TITLE_EVENT]){nodes{... on RenamedTitleEvent{actor{login}}}}}}}`, variables: { owner, name, number } });
-      const issue = (result.data as { repository?: { issue?: { body: string; title: string; editor?: { login: string }; timelineItems: { nodes: { actor?: { login: string } }[] } } } })?.repository?.issue;
-      const permissions = new Map<string, Promise<boolean | undefined>>();
-      const readPermission = async (login: string) => {
-        try { const raw = await github(`repos/${repository}/collaborators/${encodeURIComponent(login)}/permission`); return ['admin', 'maintain', 'write'].includes(String(raw.permission)); }
-        catch { return undefined; }
-      };
-      const canWrite = (login?: string) => {
-        if (!login) return Promise.resolve(undefined);
-        let permission = permissions.get(login);
-        if (!permission) { permission = readPermission(login); permissions.set(login, permission); }
-        return permission;
-      };
-      // A history read racing a body/title read cannot attest to the earlier bytes.
-      if (issue?.body === ticket.body && issue.title === ticket.title) {
-        [ticket.editorWrite, ticket.titleEditorWrite] = await Promise.all([canWrite(issue.editor?.login), canWrite(issue.timelineItems.nodes[0]?.actor?.login)]);
-      }
-    } catch { /* Missing edit history is unknown provenance, so the sync holds the edit. */ }
-    return ticket;
-  };
-  const patchAzure = async (ticket: StructureTicket, body: string, field = 'System.Description') => {
-    const [org, project] = ticket.repository.split('/');
-    const folder = await mkdtemp(join(tmpdir(), 'factory-spec-patch-'));
-    try {
-      const file = join(folder, 'patch.json');
-      await writeFile(file, JSON.stringify([{ op: 'test', path: '/rev', value: Number(ticket.version) }, { op: 'add', path: `/fields/${field}`, value: body }]), { mode: 0o600 });
-      return asTicket(ticket.repository, JSON.parse(await providerCommand('az', ['rest', '--method', 'patch', '--resource', '499b84ac-1321-427f-aa17-267ca6975798',
-        '--url', `https://dev.azure.com/${org}/${encodeURIComponent(decodeURIComponent(project!))}/_apis/wit/workitems/${ticket.number}?api-version=7.1`,
-        '--headers', 'Content-Type=application/json-patch+json', '--body', `@${file}`, '--output', 'json'])), field === 'Microsoft.VSTS.TCM.ReproSteps');
-    } finally { await rm(folder, { recursive: true, force: true }); }
-  };
-  return {
-    readSpec,
-    replaceSpec: async (ticket, body) => {
-      const fresh = await readSpec(ticket.repository, ticket.number, ticket);
-      if (fresh.body !== ticket.body || fresh.title !== ticket.title || ticket.repository.split('/').length !== 2 && fresh.version !== ticket.version) throw Error('The ticket changed before the Spec write. Retry to read its latest text.');
-      // GitHub has no conditional body PATCH; the small remaining read/write window is unavoidable.
-      return ticket.repository.split('/').length === 2
-        ? asTicket(ticket.repository, await github(`repos/${ticket.repository}/issues/${ticket.number}`, 'PATCH', { body }))
-        : patchAzure(ticket, body, ticket.bodyField);
-    },
-    read,
-    find: async (repository, identity) => {
-      if (repository.split('/').length === 2) {
-        const pages = JSON.parse(await providerCommand('gh', ['api', `repos/${repository}/issues?state=all&per_page=100`, '--paginate', '--slurp'])) as Record<string, unknown>[][];
-        return pages.flat().filter(raw => !raw.pull_request && String(raw.body ?? '').includes(`"identity":"${identity}"`)).map(raw => asTicket(repository, raw));
-      }
-      // A lost Azure create never triggers another create automatically. Query recent descriptions by durable identity.
-      const project = decodeURIComponent(repository.split('/')[1]!);
-      const raw = await azure(repository, 'wiql', [], { query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project.replaceAll("'", "''")}' AND ([System.Description] CONTAINS '${identity.replaceAll("'", "''")}' OR [Microsoft.VSTS.TCM.ReproSteps] CONTAINS '${identity.replaceAll("'", "''")}')` });
-      return mapConcurrent(raw.workItems as {id:number}[] ?? [], async item => {
-        const ticket = await readSpec(repository, item.id);
-        return ticket.body.includes(identity) ? ticket : read(repository, item.id);
-      });
-    },
-    creationTarget: async (repository,team) => {
-      const [org,project] = repository.split('/');
-      const invoke=async(resource:string)=>JSON.parse(await providerCommand('az',['devops','invoke','--area','work','--resource',resource,'--organization',`https://dev.azure.com/${org}`,'--route-parameters',`project=${decodeURIComponent(project!)}`,`team=${team}`,'--http-method','GET','--api-version','7.1','--output','json']));
-      const [backlog,fields]=await Promise.all([invoke('backlogconfiguration'),invoke('teamfieldvalues')]);
-      const type=backlog.requirementBacklog?.workItemTypes?.[0]?.name;
-      if(typeof type!=='string' || typeof fields.defaultValue!=='string') throw Error('The Azure team has no readable issue type or default area. Check its list source.');
-      return {type,areaPath:fields.defaultValue};
-    },
-    create: async (repository, title, body, type, areaPath, options = {}) => {
-      if (repository.split('/').length !== 2 && !type) throw Error('The Azure team has no verified issue type for concept parts.');
-      const parsed = readTicketSpec(body.replace(/\s*<!-- lar-factory:create [^\n]*? -->\s*$/, ''));
-      const marker = /<!-- lar-factory:create [^\n]*? -->/.exec(body)?.[0];
-      const html = parsed.marked ? formatTicketSpec(parsed.spec, parsed.original ?? '', { format: 'html' }) + (marker ? `\n${marker}` : '') : trackerMarkdownHtml(body);
-      const raw = repository.split('/').length === 2 ? await github(`repos/${repository}/issues`, 'POST', { title, body, ...(type ? { type } : {}), ...(options.labels?.length ? { labels: options.labels } : {}), ...(options.assignee ? { assignees: [options.assignee] } : {}), ...(options.milestone ? { milestone: Number(options.milestone) } : {}) })
-        : await azure(repository, 'workitems', [`type=${type}`], [
-          { op: 'add', path: '/fields/System.Title', value: title }, { op: 'add', path: type?.toLowerCase() === 'bug' ? '/fields/Microsoft.VSTS.TCM.ReproSteps' : '/fields/System.Description', value: html },
-          ...(options.labels?.length ? [{ op: 'add', path: '/fields/System.Tags', value: options.labels.join('; ') }] : []),
-          ...(options.assignee ? [{ op: 'add', path: '/fields/System.AssignedTo', value: options.assignee }] : []),
-          ...(options.iteration ? [{ op: 'add', path: '/fields/System.IterationPath', value: options.iteration }] : []),
-          ...(areaPath ? [{op:'add',path:'/fields/System.AreaPath',value:areaPath}] : []),
-        ]);
-      return asTicket(repository, raw, true);
-    },
-    comment: async (ticket, body) => {
-      const raw = ticket.repository.split('/').length === 2 ? await github(`repos/${ticket.repository}/issues/${ticket.number}/comments`, 'POST', { body })
-        : await azure(ticket.repository, 'comments', [`workItemId=${ticket.number}`], { text: body });
-      return String(raw.id);
-    },
-    readComment: async (ticket, id) => {
-      const raw = ticket.repository.split('/').length === 2 ? await github(`repos/${ticket.repository}/issues/comments/${id}`)
-        : await azure(ticket.repository, 'comments', [`workItemId=${ticket.number}`, `commentId=${id}`]);
-      return String(raw[ticket.repository.split('/').length === 2 ? 'body' : 'text'] ?? '');
-    },
-    replace: async (ticket, body) => {
-      const fresh = await read(ticket.repository, ticket.number);
-      if (ticket.repository.split('/').length === 2){
-        if(JSON.stringify(readTrackerStructure(fresh.body))!==JSON.stringify(readTrackerStructure(ticket.body)))throw Error('The issue structure changed while saving. The pending save will recheck it.');
-        const metadata=readTrackerStructure(body);if(!metadata)throw Error('The structural update has no metadata.');
-        await markStructural(ticket.repository,ticket.number);
-        // Structure uses comments to preserve authored bytes. replaceSpec separately writes gated text with Original.
-        await github(`repos/${ticket.repository}/issues/${ticket.number}/comments`,'POST',{body:writeTrackerStructure('',metadata).trim()});
-      } else {
-        if (fresh.version !== ticket.version || fresh.body !== ticket.body) throw Error('The issue changed while saving its structure. The pending save will recheck it.');
-        await patchAzure(ticket,body);
-      }
-    },
-  };
+
+        const split = /\r?\n\r?\n/.exec(raw);
+        const headers = split ? raw.slice(0, split.index) : '';
+        const comments = JSON.parse(split ? raw.slice(split.index + split[0].length) : raw) as { body: string }[];
+
+        pageCache.set(cacheKey, { etag: /^etag:\s*(.+?)\s*$/im.exec(headers)?.[1], comments });
+
+        return comments;
+    };
+    const latestMetadata = async (repository: string, number: number, count: number, original: string) => {
+        const ownUrl = structureIssueUrl(repository, number);
+        const managed: TrackerStructure[] = [];
+
+        for (let page = Math.max(1, Math.ceil(count / 100)); page >= 1; page--) {
+            const comments = await commentPage(
+                `repos/${repository}/issues/${number}/comments?per_page=100&page=${page}`,
+            );
+
+            for (const comment of [...comments].reverse()) {
+                if (!comment.body.trimStart().startsWith('<!-- lar-factory:structure')) continue;
+
+                const metadata = readTrackerStructure(comment.body);
+
+                if (!metadata) continue;
+
+                managed.push(metadata);
+
+                const latest = managed[0]!;
+
+                if (managed.length > 1) {
+                    const before = metadata.snapshot;
+                    const after = latest.snapshot;
+
+                    if (
+                        after &&
+                        after.root === ownUrl &&
+                        before &&
+                        before.root === ownUrl &&
+                        after.digest !== before.digest &&
+                        after.previous !== before.digest
+                    )
+                        throw Error(
+                            'This concept has concurrent tracker versions. Both versions were kept; resolve the structural conflict before continuing.',
+                        );
+
+                    return latest;
+                }
+
+                if (!latest.snapshot || latest.snapshot.root !== ownUrl) return latest;
+            }
+        }
+
+        const latest = managed[0];
+        const before = readTrackerStructure(original)?.snapshot;
+
+        if (
+            latest?.snapshot &&
+            latest.snapshot.root === ownUrl &&
+            before &&
+            before.root === ownUrl &&
+            latest.snapshot.digest !== before.digest &&
+            latest.snapshot.previous !== before.digest
+        )
+            throw Error('This concept has concurrent tracker versions. Both versions were kept.');
+
+        return latest;
+    };
+    const labelRepos = new Set<string>();
+    const markStructural = async (repository: string, number: number) => {
+        if (!labelRepos.has(repository)) {
+            try {
+                await github(`repos/${repository}/labels/${STRUCTURE_LABEL}`);
+            } catch (error) {
+                if (!/404/.test(fail(error))) throw error;
+
+                try {
+                    await github(`repos/${repository}/labels`, 'POST', {
+                        name: STRUCTURE_LABEL,
+                        color: '6F42C1',
+                        description: 'Concept and cross-repository relationships',
+                    });
+                } catch (createError) {
+                    if (!/422/.test(fail(createError))) throw createError;
+                }
+            }
+
+            labelRepos.add(repository);
+        }
+
+        await github(`repos/${repository}/issues/${number}/labels`, 'POST', { labels: [STRUCTURE_LABEL] });
+    };
+    const azure = async (
+        repository: string,
+        resource: string,
+        route: string[] = [],
+        body?: unknown,
+        method = body === undefined ? 'GET' : 'POST',
+    ) => {
+        const [org, project] = repository.split('/');
+        let folder: string | undefined;
+
+        try {
+            const flags = [
+                'devops',
+                'invoke',
+                '--area',
+                'wit',
+                '--resource',
+                resource,
+                '--organization',
+                `https://dev.azure.com/${org}`,
+                '--route-parameters',
+                `project=${decodeURIComponent(project!)}`,
+                ...route,
+                '--http-method',
+                method,
+                '--api-version',
+                resource === 'comments' ? '7.1-preview.4' : '7.1',
+                '--output',
+                'json',
+            ];
+
+            if (resource === 'comments' && method === 'POST') flags.push('--query-parameters', 'format=markdown');
+
+            if (body !== undefined) {
+                folder = await mkdtemp(join(tmpdir(), 'factory-structure-'));
+
+                const file = join(folder, 'body.json');
+
+                await writeFile(file, JSON.stringify(body), { mode: 0o600 });
+                flags.push('--in-file', file);
+
+                if (resource === 'workitems') flags.push('--media-type', 'application/json-patch+json');
+            }
+
+            return JSON.parse(await providerCommand('az', flags)) as Record<string, unknown>;
+        } finally {
+            if (folder) await rm(folder, { recursive: true, force: true });
+        }
+    };
+    const asTicket = (repository: string, raw: Record<string, unknown>, spec = false): StructureTicket => {
+        const azure = repository.split('/').length !== 2;
+
+        return {
+            repository,
+            number: Number(raw[azure ? 'id' : 'number']),
+            body: azure
+                ? textField(
+                      (raw.fields as Record<string, unknown>)[
+                          spec &&
+                          String((raw.fields as Record<string, unknown>)['System.WorkItemType']).toLowerCase() === 'bug'
+                              ? 'Microsoft.VSTS.TCM.ReproSteps'
+                              : 'System.Description'
+                      ],
+                  )
+                : textField(raw.body),
+            ...(azure
+                ? {
+                      bodyField:
+                          spec &&
+                          String((raw.fields as Record<string, unknown>)['System.WorkItemType']).toLowerCase() === 'bug'
+                              ? ('Microsoft.VSTS.TCM.ReproSteps' as const)
+                              : ('System.Description' as const),
+                  }
+                : {}),
+            title: azure ? textField((raw.fields as Record<string, unknown>)['System.Title']) : textField(raw.title),
+            kind: azure
+                ? trackerKind([], textField((raw.fields as Record<string, unknown>)['System.WorkItemType']))
+                : trackerKind(
+                      ((raw.labels as { name: string }[]) ?? []).map((label) => label.name),
+                      String((raw.type as { name?: string } | undefined)?.name ?? ''),
+                  ),
+            version: String(raw[azure ? 'rev' : 'updated_at']),
+        };
+    };
+    const read = async (repository: string, number: number) => {
+        if (repository.split('/').length === 2) {
+            const raw = await github(`repos/${repository}/issues/${number}`);
+            const ticket = asTicket(repository, raw);
+
+            if ((raw.labels as { name: string }[] | undefined)?.some((label) => label.name === STRUCTURE_LABEL)) {
+                const metadata = await latestMetadata(repository, number, Number(raw.comments ?? 0), ticket.body);
+
+                if (metadata) {
+                    ticket.body = writeTrackerStructure(ticket.body, metadata);
+                    ticket.kind = metadata.kind;
+                }
+            }
+
+            return ticket;
+        }
+
+        // invoke's workitems discovery route selects {type}, so numeric reads use the unambiguous batch resource.
+        const batch = await azure(repository, 'workitemsbatch', [], {
+            ids: [number],
+            $expand: 'None',
+            errorPolicy: 'Fail',
+        });
+        const raw = (batch.value as Record<string, unknown>[])[0];
+
+        if (!raw) throw Error('Azure did not return the saved work item.');
+
+        return asTicket(repository, raw);
+    };
+    const readSpec = async (
+        repository: string,
+        number: number,
+        previous?: Pick<StructureTicket, 'body' | 'title'>,
+    ): Promise<StructureTicket> => {
+        if (repository.split('/').length !== 2) {
+            const batch = await azure(repository, 'workitemsbatch', [], {
+                ids: [number],
+                $expand: 'None',
+                errorPolicy: 'Fail',
+            });
+            const raw = (batch.value as Record<string, unknown>[])[0];
+
+            if (!raw) throw Error('Azure did not return the saved work item.');
+
+            return asTicket(repository, raw, true);
+        }
+
+        // Read the issue's own body, never the structure metadata projected from comments.
+        const ticket = asTicket(repository, await github(`repos/${repository}/issues/${number}`));
+
+        if (previous && ticket.body === previous.body && ticket.title === previous.title) return ticket;
+
+        try {
+            const [owner, name] = repository.split('/');
+            const result = await github('graphql', 'POST', {
+                query: `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){body title editor{login} timelineItems(last:1,itemTypes:[RENAMED_TITLE_EVENT]){nodes{... on RenamedTitleEvent{actor{login}}}}}}}`,
+                variables: { owner, name, number },
+            });
+            const issue = (
+                result.data as {
+                    repository?: {
+                        issue?: {
+                            body: string;
+                            title: string;
+                            editor?: { login: string };
+                            timelineItems: { nodes: { actor?: { login: string } }[] };
+                        };
+                    };
+                }
+            )?.repository?.issue;
+            const permissions = new Map<string, Promise<boolean | undefined>>();
+            const readPermission = async (login: string) => {
+                try {
+                    const raw = await github(
+                        `repos/${repository}/collaborators/${encodeURIComponent(login)}/permission`,
+                    );
+
+                    return ['admin', 'maintain', 'write'].includes(String(raw.permission));
+                } catch {
+                    return undefined;
+                }
+            };
+            const canWrite = (login?: string) => {
+                if (!login) return Promise.resolve(undefined);
+
+                let permission = permissions.get(login);
+
+                if (!permission) {
+                    permission = readPermission(login);
+                    permissions.set(login, permission);
+                }
+
+                return permission;
+            };
+
+            // A history read racing a body/title read cannot attest to the earlier bytes.
+            if (issue?.body === ticket.body && issue.title === ticket.title) {
+                [ticket.editorWrite, ticket.titleEditorWrite] = await Promise.all([
+                    canWrite(issue.editor?.login),
+                    canWrite(issue.timelineItems.nodes[0]?.actor?.login),
+                ]);
+            }
+        } catch {
+            /* Missing edit history is unknown provenance, so the sync holds the edit. */
+        }
+
+        return ticket;
+    };
+    const patchAzure = async (ticket: StructureTicket, body: string, field = 'System.Description') => {
+        const [org, project] = ticket.repository.split('/');
+        const folder = await mkdtemp(join(tmpdir(), 'factory-spec-patch-'));
+
+        try {
+            const file = join(folder, 'patch.json');
+
+            await writeFile(
+                file,
+                JSON.stringify([
+                    { op: 'test', path: '/rev', value: Number(ticket.version) },
+                    { op: 'add', path: `/fields/${field}`, value: body },
+                ]),
+                { mode: 0o600 },
+            );
+
+            return asTicket(
+                ticket.repository,
+                JSON.parse(
+                    await providerCommand('az', [
+                        'rest',
+                        '--method',
+                        'patch',
+                        '--resource',
+                        '499b84ac-1321-427f-aa17-267ca6975798',
+                        '--url',
+                        `https://dev.azure.com/${org}/${encodeURIComponent(decodeURIComponent(project!))}/_apis/wit/workitems/${ticket.number}?api-version=7.1`,
+                        '--headers',
+                        'Content-Type=application/json-patch+json',
+                        '--body',
+                        `@${file}`,
+                        '--output',
+                        'json',
+                    ]),
+                ),
+                field === 'Microsoft.VSTS.TCM.ReproSteps',
+            );
+        } finally {
+            await rm(folder, { recursive: true, force: true });
+        }
+    };
+
+    return {
+        readSpec,
+        replaceSpec: async (ticket, body) => {
+            const fresh = await readSpec(ticket.repository, ticket.number, ticket);
+
+            if (
+                fresh.body !== ticket.body ||
+                fresh.title !== ticket.title ||
+                (ticket.repository.split('/').length !== 2 && fresh.version !== ticket.version)
+            )
+                throw Error('The ticket changed before the Spec write. Retry to read its latest text.');
+
+            // GitHub has no conditional body PATCH; the small remaining read/write window is unavoidable.
+            return ticket.repository.split('/').length === 2
+                ? asTicket(
+                      ticket.repository,
+                      await github(`repos/${ticket.repository}/issues/${ticket.number}`, 'PATCH', { body }),
+                  )
+                : patchAzure(ticket, body, ticket.bodyField);
+        },
+        read,
+        find: async (repository, identity) => {
+            if (repository.split('/').length === 2) {
+                const pages = JSON.parse(
+                    await providerCommand('gh', [
+                        'api',
+                        `repos/${repository}/issues?state=all&per_page=100`,
+                        '--paginate',
+                        '--slurp',
+                    ]),
+                ) as Record<string, unknown>[][];
+
+                return pages
+                    .flat()
+                    .filter((raw) => !raw.pull_request && textField(raw.body).includes(`"identity":"${identity}"`))
+                    .map((raw) => asTicket(repository, raw));
+            }
+
+            // A lost Azure create never triggers another create automatically. Query recent descriptions by durable identity.
+            const project = decodeURIComponent(repository.split('/')[1]!);
+            const raw = await azure(repository, 'wiql', [], {
+                query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project.replaceAll("'", "''")}' AND ([System.Description] CONTAINS '${identity.replaceAll("'", "''")}' OR [Microsoft.VSTS.TCM.ReproSteps] CONTAINS '${identity.replaceAll("'", "''")}')`,
+            });
+
+            return mapConcurrent((raw.workItems as { id: number }[]) ?? [], async (item) => {
+                const ticket = await readSpec(repository, item.id);
+
+                return ticket.body.includes(identity) ? ticket : read(repository, item.id);
+            });
+        },
+        creationTarget: async (repository, team) => {
+            const [org, project] = repository.split('/');
+            const invoke = async (resource: string) =>
+                JSON.parse(
+                    await providerCommand('az', [
+                        'devops',
+                        'invoke',
+                        '--area',
+                        'work',
+                        '--resource',
+                        resource,
+                        '--organization',
+                        `https://dev.azure.com/${org}`,
+                        '--route-parameters',
+                        `project=${decodeURIComponent(project!)}`,
+                        `team=${team}`,
+                        '--http-method',
+                        'GET',
+                        '--api-version',
+                        '7.1',
+                        '--output',
+                        'json',
+                    ]),
+                );
+            const [backlog, fields] = await Promise.all([invoke('backlogconfiguration'), invoke('teamfieldvalues')]);
+            const type = backlog.requirementBacklog?.workItemTypes?.[0]?.name;
+
+            if (typeof type !== 'string' || typeof fields.defaultValue !== 'string')
+                throw Error('The Azure team has no readable issue type or default area. Check its list source.');
+
+            return { type, areaPath: fields.defaultValue };
+        },
+        create: async (repository, title, body, type, areaPath, options = {}) => {
+            if (repository.split('/').length !== 2 && !type)
+                throw Error('The Azure team has no verified issue type for concept parts.');
+
+            const parsed = readTicketSpec(body.replace(/\s*<!-- lar-factory:create [^\n]*? -->\s*$/, ''));
+            const marker = /<!-- lar-factory:create [^\n]*? -->/.exec(body)?.[0];
+            const html = parsed.marked
+                ? formatTicketSpec(parsed.spec, parsed.original ?? '', { format: 'html' }) +
+                  (marker ? `\n${marker}` : '')
+                : trackerMarkdownHtml(body);
+            const raw =
+                repository.split('/').length === 2
+                    ? await github(`repos/${repository}/issues`, 'POST', {
+                          title,
+                          body,
+                          ...(type ? { type } : {}),
+                          ...(options.labels?.length ? { labels: options.labels } : {}),
+                          ...(options.assignee ? { assignees: [options.assignee] } : {}),
+                          ...(options.milestone ? { milestone: Number(options.milestone) } : {}),
+                      })
+                    : await azure(
+                          repository,
+                          'workitems',
+                          [`type=${type}`],
+                          [
+                              { op: 'add', path: '/fields/System.Title', value: title },
+                              {
+                                  op: 'add',
+                                  path:
+                                      type?.toLowerCase() === 'bug'
+                                          ? '/fields/Microsoft.VSTS.TCM.ReproSteps'
+                                          : '/fields/System.Description',
+                                  value: html,
+                              },
+                              ...(options.labels?.length
+                                  ? [{ op: 'add', path: '/fields/System.Tags', value: options.labels.join('; ') }]
+                                  : []),
+                              ...(options.assignee
+                                  ? [{ op: 'add', path: '/fields/System.AssignedTo', value: options.assignee }]
+                                  : []),
+                              ...(options.iteration
+                                  ? [{ op: 'add', path: '/fields/System.IterationPath', value: options.iteration }]
+                                  : []),
+                              ...(areaPath ? [{ op: 'add', path: '/fields/System.AreaPath', value: areaPath }] : []),
+                          ],
+                      );
+
+            return asTicket(repository, raw, true);
+        },
+        comment: async (ticket, body) => {
+            const raw =
+                ticket.repository.split('/').length === 2
+                    ? await github(`repos/${ticket.repository}/issues/${ticket.number}/comments`, 'POST', { body })
+                    : await azure(ticket.repository, 'comments', [`workItemId=${ticket.number}`], { text: body });
+
+            return String(raw.id);
+        },
+        readComment: async (ticket, id) => {
+            const raw =
+                ticket.repository.split('/').length === 2
+                    ? await github(`repos/${ticket.repository}/issues/comments/${id}`)
+                    : await azure(ticket.repository, 'comments', [`workItemId=${ticket.number}`, `commentId=${id}`]);
+
+            return textField(raw[ticket.repository.split('/').length === 2 ? 'body' : 'text']);
+        },
+        replace: async (ticket, body) => {
+            const fresh = await read(ticket.repository, ticket.number);
+
+            if (ticket.repository.split('/').length === 2) {
+                if (
+                    JSON.stringify(readTrackerStructure(fresh.body)) !==
+                    JSON.stringify(readTrackerStructure(ticket.body))
+                )
+                    throw Error('The issue structure changed while saving. The pending save will recheck it.');
+
+                const metadata = readTrackerStructure(body);
+
+                if (!metadata) throw Error('The structural update has no metadata.');
+
+                await markStructural(ticket.repository, ticket.number);
+                // Structure uses comments to preserve authored bytes. replaceSpec separately writes gated text with Original.
+                await github(`repos/${ticket.repository}/issues/${ticket.number}/comments`, 'POST', {
+                    body: writeTrackerStructure('', metadata).trim(),
+                });
+            } else {
+                if (fresh.version !== ticket.version || fresh.body !== ticket.body)
+                    throw Error('The issue changed while saving its structure. The pending save will recheck it.');
+
+                await patchAzure(ticket, body);
+            }
+        },
+    };
 }
 
-export async function readStructureSnapshot(ticket: StructureTicket, metadata: TrackerStructure, provider: StructureProvider, setups: readonly RepositorySetup[]): Promise<{ snapshot: TrackerSnapshot; digest: string }> {
-  if (!metadata.snapshot) throw Error('This issue has no saved concept structure yet.');
-  const rootRef = repoFromUrl(metadata.snapshot.root, setups, metadata.snapshot.repository);
-  if(!setups.some(setup=>sameRepo(setup.repo,rootRef.repository)))throw Error(`Add ${rootRef.repository} before loading this saved structure.`);
-  const root = rootRef.repository === ticket.repository && rootRef.number === ticket.number ? ticket : await provider.read(rootRef.repository, rootRef.number);
-  const manifest = readTrackerStructure(root.body)?.snapshot;
-  if (!manifest || manifest.root !== structureIssueUrl(root.repository, root.number)) throw Error('The concept has no committed structure manifest.');
-  if (!manifest.chunks.length) throw Error('The saved concept structure has no chunks.');
-  const chunks = await mapConcurrent(manifest.chunks,async ({ id, digest }, index) => {
-    const body = await provider.readComment(root, id);
-    const match = /^<!-- lar-factory:chunk ([a-f0-9-]{36}) (\d+)\n([A-Za-z0-9+/=]+)\n-->$/.exec(body);
-    if (!match || match[1] !== manifest.generation || Number(match[2]) !== index || sha(match[3]!) !== digest) throw Error('A saved concept structure chunk is missing or changed.');
-    return match[3]!;
-  });
-  const text = gunzipSync(Buffer.from(chunks.join(''), 'base64'), { maxOutputLength: 16 * 1024 * 1024 }).toString('utf8');
-  if (sha(text) !== manifest.digest) throw Error('The saved concept structure checksum does not match.');
-  const snapshot=validateTrackerSnapshot(JSON.parse(text));
-  for(const node of snapshot.nodes)if(!setups.some(setup=>sameRepo(setup.repo,node.repository)))throw Error(`Add ${node.repository} before loading this saved structure.`);
-  const rootNode=snapshot.nodes.find(node=>node.key===snapshot.root)!;
-  if(rootNode.repository!==root.repository || !rootNode.ticket || numberOf(rootNode.ticket)!==root.number)throw Error('The saved structure root does not match its manifest.');
-  if(!snapshot.nodes.some(node=>sameRepo(node.repository,ticket.repository)&&node.ticket&&numberOf(node.ticket)===ticket.number))throw Error('The saved structure does not contain this issue.');
-  return { snapshot, digest: manifest.digest };
+export async function readStructureSnapshot(
+    ticket: StructureTicket,
+    metadata: TrackerStructure,
+    provider: StructureProvider,
+    setups: readonly RepositorySetup[],
+): Promise<{ snapshot: TrackerSnapshot; digest: string }> {
+    if (!metadata.snapshot) throw Error('This issue has no saved concept structure yet.');
+
+    const rootRef = repoFromUrl(metadata.snapshot.root, setups, metadata.snapshot.repository);
+
+    if (!setups.some((setup) => sameRepo(setup.repo, rootRef.repository)))
+        throw Error(`Add ${rootRef.repository} before loading this saved structure.`);
+
+    const root =
+        rootRef.repository === ticket.repository && rootRef.number === ticket.number
+            ? ticket
+            : await provider.read(rootRef.repository, rootRef.number);
+    const manifest = readTrackerStructure(root.body)?.snapshot;
+
+    if (!manifest || manifest.root !== structureIssueUrl(root.repository, root.number))
+        throw Error('The concept has no committed structure manifest.');
+
+    if (!manifest.chunks.length) throw Error('The saved concept structure has no chunks.');
+
+    const chunks = await mapConcurrent(manifest.chunks, async ({ id, digest }, index) => {
+        const body = await provider.readComment(root, id);
+        const match = /^<!-- lar-factory:chunk ([a-f0-9-]{36}) (\d+)\n([A-Za-z0-9+/=]+)\n-->$/.exec(body);
+
+        if (!match || match[1] !== manifest.generation || Number(match[2]) !== index || sha(match[3]!) !== digest)
+            throw Error('A saved concept structure chunk is missing or changed.');
+
+        return match[3]!;
+    });
+    const text = gunzipSync(Buffer.from(chunks.join(''), 'base64'), { maxOutputLength: 16 * 1024 * 1024 }).toString(
+        'utf8',
+    );
+
+    if (sha(text) !== manifest.digest) throw Error('The saved concept structure checksum does not match.');
+
+    const snapshot = validateTrackerSnapshot(JSON.parse(text));
+
+    for (const node of snapshot.nodes)
+        if (!setups.some((setup) => sameRepo(setup.repo, node.repository)))
+            throw Error(`Add ${node.repository} before loading this saved structure.`);
+
+    const rootNode = snapshot.nodes.find((node) => node.key === snapshot.root)!;
+
+    if (rootNode.repository !== root.repository || !rootNode.ticket || numberOf(rootNode.ticket) !== root.number)
+        throw Error('The saved structure root does not match its manifest.');
+
+    if (
+        !snapshot.nodes.some(
+            (node) =>
+                sameRepo(node.repository, ticket.repository) && node.ticket && numberOf(node.ticket) === ticket.number,
+        )
+    )
+        throw Error('The saved structure does not contain this issue.');
+
+    return { snapshot, digest: manifest.digest };
 }
 
-export interface StructureSyncOptions { provider?: StructureProvider; setups?: RepositorySetup[]; dir?: string; workId?: string; confirmedMissingIssue?: string }
+export interface StructureSyncOptions {
+    provider?: StructureProvider;
+    setups?: RepositorySetup[];
+    dir?: string;
+    workId?: string;
+    confirmedMissingIssue?: string;
+}
 /** Structural publication is suspended. Keep all journals intact for recovery. */
 export function syncStructures(_records: WorkRecords, _options: StructureSyncOptions = {}): Promise<void> {
-  return Promise.resolve();
+    return Promise.resolve();
 }

@@ -1,11 +1,24 @@
-import { structureProvider } from '@lar-factory/work-records/tracker-sync';
+import {
+    LABEL_LIMIT,
+    mapConcurrent,
+    STRUCTURE_LABEL,
+    DONE_WINDOW_MS,
+    buildSubIssueSearches,
+    readTrackerStructure,
+    trackerKind,
+    normalizeItems,
+    readBuilds,
+    rawBuildPrs,
+    rawDossiers,
+    refKey,
+} from '@lar-factory/shared';
 // Reads repository issues and linked PRs through the local `gh` CLI (`gh api graphql`).
-
+import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
+import { structureProvider } from '@lar-factory/work-records/tracker-sync';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { LABEL_LIMIT, mapConcurrent, STRUCTURE_LABEL, DONE_WINDOW_MS, buildSubIssueSearches, readTrackerStructure, trackerKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey } from '@lar-factory/shared';
-import type { Item, PickedTicket, RawItem, RawLinkedPr, Searched, TicketMatch } from '@lar-factory/shared';
+
 import { AccessLost, NotFound, type TicketObservation } from '../items/item-source.ts';
 import { loopTrace } from '../startup/loop-trace.ts';
 import { createCooldown } from '../tools/cooldown.ts';
@@ -118,23 +131,23 @@ export const PR_BODIES_QUERY = `query($ids: [ID!]!) {
 // ---------- raw GraphQL shapes ----------
 
 interface PageInfo {
-  hasNextPage: boolean;
-  endCursor: string | null;
+    hasNextPage: boolean;
+    endCursor: string | null;
 }
 
 /** An issue as ISSUE_SEARCH_QUERY reads it. */
 interface SearchedIssue {
-  number?: number;
-  repository?: { nameWithOwner: string };
+    number?: number;
+    repository?: { nameWithOwner: string };
 }
 
 /** A closed issue as CLOSED_SEARCH_QUERY and RECENT_CLOSED_QUERY read it. */
 interface LightIssue {
-  id: string;
-  closedAt: string | null;
-  stateReason: string | null;
-  labels: { nodes: { name: string }[] };
-  parent: { id: string; labels: { nodes: { name: string }[] } } | null;
+    id: string;
+    closedAt: string | null;
+    stateReason: string | null;
+    labels: { nodes: { name: string }[] };
+    parent: { id: string; labels: { nodes: { name: string }[] } } | null;
 }
 
 // ---------- gh ----------
@@ -142,133 +155,207 @@ interface LightIssue {
 type RateLimits = Record<string, { limit: number; remaining: number; reset: number }>;
 
 /** GitHub's rate limits by resource, from its rate_limit endpoint, which costs no quota. */
-const rateLimits = async (): Promise<RateLimits> => (JSON.parse(await gh(['api', 'rate_limit'], undefined, false)) as { resources: RateLimits }).resources;
+const rateLimits = async (): Promise<RateLimits> =>
+    (JSON.parse(await gh(['api', 'rate_limit'], undefined, false)) as { resources: RateLimits }).resources;
 
 /** When the exhausted rate limit resets, in ms since the epoch; null when none is exhausted, as after a secondary limit. */
 async function ghReset(): Promise<number | null> {
-  const resets = Object.values(await rateLimits()).filter((r) => r.remaining === 0).map((r) => r.reset * 1000);
-  return resets.length ? Math.max(...resets) : null;
+    const resets = Object.values(await rateLimits())
+        .filter((r) => r.remaining === 0)
+        .map((r) => r.reset * 1000);
+
+    return resets.length ? Math.max(...resets) : null;
 }
 
 /** Whether less than a fifth of gh's REST or GraphQL quota is left, so the board keeps every source at its idle pace. */
 export async function ghQuotaLow(): Promise<boolean> {
-  const limits = await rateLimits();
-  return ['core', 'graphql'].some((name) => limits[name] !== undefined && limits[name].remaining < limits[name].limit / 5);
+    const limits = await rateLimits();
+
+    return ['core', 'graphql'].some(
+        (name) => limits[name] !== undefined && limits[name].remaining < limits[name].limit / 5,
+    );
 }
 
 /** gh's cooldown: once GitHub answers with a rate limit, every gh call fails at once until the limit resets. */
 export const ghCooldown = createCooldown('gh', ghReset);
 
 async function gh(args: string[], input?: string, cools = true): Promise<string> {
-  const command = toolCommand('gh');
-  if (!command) throw new Error(`${missingTool('gh')}. Install it with \`brew install gh\` or set GH_PATH.`);
-  if (cools) ghCooldown.check();
-  const result = await runTool(command.file, args, { env: command.env, input, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
-  if (result.code !== 0) {
-    if (cools) await ghCooldown.failed(result.stderr || result.detail);
-    throw new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${result.detail}`);
-  }
-  if (cools) ghCooldown.succeeded();
-  return result.stdout;
+    const command = toolCommand('gh');
+
+    if (!command) throw new Error(`${missingTool('gh')}. Install it with \`brew install gh\` or set GH_PATH.`);
+
+    if (cools) ghCooldown.check();
+
+    const result = await runTool(command.file, args, {
+        env: command.env,
+        input,
+        timeout: 30_000,
+        maxBuffer: 32 * 1024 * 1024,
+    });
+
+    if (result.code !== 0) {
+        if (cools) await ghCooldown.failed(result.stderr || result.detail);
+
+        throw new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${result.detail}`);
+    }
+
+    if (cools) ghCooldown.succeeded();
+
+    return result.stdout;
 }
 
-export async function graphql<T>(query: string, vars: Record<string, string | number | string[] | null>, run: (args: string[]) => Promise<string> = gh): Promise<T> {
-  const args = ['api', 'graphql', '-f', `query=${query}`];
-  for (const [key, value] of Object.entries(vars)) {
-    if (value === null) continue;
-    if (Array.isArray(value)) args.push(...value.flatMap((v) => ['-f', `${key}[]=${v}`]));
-    else args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`);
-  }
-  const out = await run(args);
-  return loopTrace.span('gh parse', () => JSON.parse(out)) as T;
+export async function graphql<T>(
+    query: string,
+    vars: Record<string, string | number | string[] | null>,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<T> {
+    const args = ['api', 'graphql', '-f', `query=${query}`];
+
+    for (const [key, value] of Object.entries(vars)) {
+        if (value === null) continue;
+
+        if (Array.isArray(value)) args.push(...value.flatMap((v) => ['-f', `${key}[]=${v}`]));
+        else args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`);
+    }
+
+    const out = await run(args);
+
+    return loopTrace.span('gh parse', () => JSON.parse(out)) as T;
 }
 
 /** How far before its `since` a change check looks, so a clock behind GitHub's misses no change. */
 const CLOCK_SKEW_MS = 30_000;
+
 /** Whether something updated at `at`, as GitHub dates it, changed since `since`, in ms since the epoch. */
 export const changedSince = (at: string, since: number) => Date.parse(at) >= since - CLOCK_SKEW_MS;
 
 /** A REST answer and the ETag to ask for it again with. */
 export interface Tagged<T> {
-  etag: string | undefined;
-  body: T;
+    etag: string | undefined;
+    body: T;
 }
 
 /**
  * The JSON at a REST path, or null when it's unchanged since the answer `etag` tagged. GitHub answers an unchanged path
  * with a 304, which costs no quota, so a change check can ask every few seconds.
  */
-export async function getIfChanged<T>(path: string, etag: string | undefined, run: (args: string[]) => Promise<string> = gh): Promise<Tagged<T> | null> {
-  let out: string;
-  try {
-    out = await run(['api', '-i', ...(etag ? ['-H', `If-None-Match: ${etag}`] : []), path]);
-  } catch (err) {
-    if (/\b304\b/.test(message(err))) return null;
-    throw err;
-  }
-  const split = /\r?\n\r?\n/.exec(out);
-  const head = split ? out.slice(0, split.index) : '';
-  return { etag: /^etag:\s*(.+?)\s*$/im.exec(head)?.[1], body: loopTrace.span('gh parse', () => JSON.parse(split ? out.slice(split.index + split[0].length) : out)) as T };
+export async function getIfChanged<T>(
+    path: string,
+    etag: string | undefined,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<Tagged<T> | null> {
+    let out: string;
+
+    try {
+        out = await run(['api', '-i', ...(etag ? ['-H', `If-None-Match: ${etag}`] : []), path]);
+    } catch (err) {
+        if (/\b304\b/.test(message(err))) return null;
+
+        throw err;
+    }
+
+    const split = /\r?\n\r?\n/.exec(out);
+    const head = split ? out.slice(0, split.index) : '';
+
+    return {
+        etag: /^etag:\s*(.+?)\s*$/im.exec(head)?.[1],
+        body: loopTrace.span('gh parse', () => JSON.parse(split ? out.slice(split.index + split[0].length) : out)) as T,
+    };
 }
 
 /** Check list access without loading issue bodies, history or PR evidence. */
 export async function checkIssueListAccess(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['api', `repos/${repo}/issues?state=open&per_page=1`, '--jq', 'length']);
+    await run(['api', `repos/${repo}/issues?state=open&per_page=1`, '--jq', 'length']);
 }
 
 /** Repository role and separate evidence of the authenticated token's write scopes. */
 export interface RepositoryAccess {
-  push: boolean;
-  triage: boolean;
-  issues: boolean;
-  /** Undefined for tokens whose fine-grained permissions this read cannot establish. */
-  tokenWrites?: boolean;
+    push: boolean;
+    triage: boolean;
+    issues: boolean;
+    /** Undefined for tokens whose fine-grained permissions this read cannot establish. */
+    tokenWrites?: boolean;
 }
 
 /** A user's repository role does not establish the scopes granted to their token. */
-export async function repositoryAccess(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<RepositoryAccess> {
-  const out = await run(['api', `repos/${repo}`, '--include', '--jq', '{push: .permissions.push, triage: .permissions.triage, issues: .has_issues, private: .private}']);
-  const split = /\r?\n\r?\n/.exec(out);
-  const headers = split ? out.slice(0, split.index) : '';
-  const raw = JSON.parse(split ? out.slice(split.index + split[0].length) : out) as Record<string, unknown>;
-  const scopeHeader = /^x-oauth-scopes:[ \t]*([^\r\n]*)/im.exec(headers)?.[1]?.trim();
-  // Classic OAuth scopes are exposed by GitHub. Fine-grained PATs and apps do not expose equivalent proof here.
-  // https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
-  const scopes = scopeHeader ? scopeHeader.split(',').map((scope) => scope.trim()) : null;
-  const tokenWrites = scopes ? scopes.includes('repo') || raw.private === false && scopes.includes('public_repo') : undefined;
-  return { push: raw.push === true, triage: raw.triage === true, issues: raw.issues === true,
-    ...tokenWrites !== undefined && { tokenWrites } };
+export async function repositoryAccess(
+    repo: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<RepositoryAccess> {
+    const out = await run([
+        'api',
+        `repos/${repo}`,
+        '--include',
+        '--jq',
+        '{push: .permissions.push, triage: .permissions.triage, issues: .has_issues, private: .private}',
+    ]);
+    const split = /\r?\n\r?\n/.exec(out);
+    const headers = split ? out.slice(0, split.index) : '';
+    const raw = JSON.parse(split ? out.slice(split.index + split[0].length) : out) as Record<string, unknown>;
+    const scopeHeader = /^x-oauth-scopes:[ \t]*([^\r\n]*)/im.exec(headers)?.[1]?.trim();
+    // Classic OAuth scopes are exposed by GitHub. Fine-grained PATs and apps do not expose equivalent proof here.
+    // https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
+    const scopes = scopeHeader ? scopeHeader.split(',').map((scope) => scope.trim()) : null;
+    const tokenWrites = scopes
+        ? scopes.includes('repo') || (raw.private === false && scopes.includes('public_repo'))
+        : undefined;
+
+    return {
+        push: raw.push === true,
+        triage: raw.triage === true,
+        issues: raw.issues === true,
+        ...(tokenWrites !== undefined && { tokenWrites }),
+    };
 }
 
 /** Reads up to `maxPages` pages, each after the cursor the one before ended at; throws `tooMany` when there are more. */
-async function readPages(maxPages: number, tooMany: string, readPage: (after: string | null) => Promise<PageInfo>): Promise<void> {
-  let after: string | null = null;
-  for (let page = 0; page < maxPages; page++) {
-    const pageInfo = await readPage(after);
-    if (!pageInfo.hasNextPage) return;
-    after = pageInfo.endCursor;
-  }
-  throw new Error(tooMany);
+async function readPages(
+    maxPages: number,
+    tooMany: string,
+    readPage: (after: string | null) => Promise<PageInfo>,
+): Promise<void> {
+    let after: string | null = null;
+
+    for (let page = 0; page < maxPages; page++) {
+        const pageInfo = await readPage(after);
+
+        if (!pageInfo.hasNextPage) return;
+
+        after = pageInfo.endCursor;
+    }
+    throw new Error(tooMany);
 }
 
 /** Each issue an issue search finds, across its pages. */
 async function searchPages<T>(q: string, query = ISSUE_SEARCH_QUERY): Promise<T[]> {
-  const nodes: T[] = [];
-  await readPages(MAX_SEARCH_PAGES, `Issue search "${q}" has more than ${SEARCH_PAGE_SIZE * MAX_SEARCH_PAGES} results; stopped paging`, async (after) => {
-    const { search } = (await graphql<{ data: { search: { pageInfo: PageInfo; nodes: T[] } } }>(query, { q, after })).data;
-    nodes.push(...search.nodes);
-    return search.pageInfo;
-  });
-  return nodes;
+    const nodes: T[] = [];
+
+    await readPages(
+        MAX_SEARCH_PAGES,
+        `Issue search "${q}" has more than ${SEARCH_PAGE_SIZE * MAX_SEARCH_PAGES} results; stopped paging`,
+        async (after) => {
+            const { search } = (
+                await graphql<{ data: { search: { pageInfo: PageInfo; nodes: T[] } } }>(query, { q, after })
+            ).data;
+
+            nodes.push(...search.nodes);
+
+            return search.pageInfo;
+        },
+    );
+
+    return nodes;
 }
 
 /** The `repo#number` keys of the issues a search finds. */
 async function searchIssues(q: string): Promise<Set<string>> {
-  const keys = new Set<string>();
-  for (const n of await searchPages<SearchedIssue>(q)) {
-    if (n.repository && n.number) keys.add(refKey(n.repository.nameWithOwner, n.number));
-  }
-  return keys;
+    const keys = new Set<string>();
+
+    for (const n of await searchPages<SearchedIssue>(q)) {
+        if (n.repository && n.number) keys.add(refKey(n.repository.nameWithOwner, n.number));
+    }
+
+    return keys;
 }
 
 /** The `repo#number` keys the issue searches find together, each search in one repository; none for no search. */
@@ -279,19 +366,25 @@ type LabelSearch = (searches: readonly string[]) => Promise<Set<string>>;
  * them when its items are all read.
  */
 function searchOnce(): LabelSearch {
-  const runs = new Map<string, Promise<Set<string>>>();
-  return async (searches) => {
-    const found = await Promise.all(searches.map((q) => {
-      let run = runs.get(q);
-      if (!run) {
-        runs.set(q, (run = searchIssues(q)));
-        // A search started early may fail before anything waits on it; the read that uses it fails then.
-        run.catch(() => {});
-      }
-      return run;
-    }));
-    return new Set(found.flatMap((keys) => [...keys]));
-  };
+    const runs = new Map<string, Promise<Set<string>>>();
+
+    return async (searches) => {
+        const found = await Promise.all(
+            searches.map((q) => {
+                let run = runs.get(q);
+
+                if (!run) {
+                    runs.set(q, (run = searchIssues(q)));
+                    // A search started early may fail before anything waits on it; the read that uses it fails then.
+                    run.catch(() => {});
+                }
+
+                return run;
+            }),
+        );
+
+        return new Set(found.flatMap((keys) => [...keys]));
+    };
 }
 
 /**
@@ -299,7 +392,7 @@ function searchOnce(): LabelSearch {
  * no slice progress from tickets: a work record holds its slices' progress.
  */
 async function searchBuilds(raws: RawItem[], search: LabelSearch): Promise<Searched> {
-  return { builds: new Set([...readBuilds(raws), ...await search(buildSubIssueSearches(raws))]) };
+    return { builds: new Set([...readBuilds(raws), ...(await search(buildSubIssueSearches(raws)))]) };
 }
 
 /**
@@ -308,27 +401,43 @@ async function searchBuilds(raws: RawItem[], search: LabelSearch): Promise<Searc
  * dossiers alone.
  */
 async function readDossierBodies(raws: RawItem[], searched: Promise<Searched>): Promise<void> {
-  if (raws.every(raw => !raw.content || raw.content.body !== undefined)) return;
-  const contentOf = (dossiers: RawItem[]) => new Map(dossiers.flatMap((raw) => (raw.content ? [[raw.content.id, raw.content]] : [])));
-  const everySubIssue = new Set(raws.flatMap((raw) => raw.content?.subIssues?.nodes ?? []).map((s) => refKey(s.repository.nameWithOwner, s.number)));
-  const [bodies, found] = await Promise.all([
-    fetchNodes<{ id?: string; body?: string }>(DOSSIER_BODIES_QUERY, [...contentOf(rawDossiers(raws, { builds: everySubIssue })).keys()]),
-    searched,
-  ]);
-  const dossiers = contentOf(rawDossiers(raws, found));
-  for (const node of bodies) {
-    const content = node.id ? dossiers.get(node.id) : undefined;
-    if (content) content.body = node.body ?? '';
-  }
+    if (raws.every((raw) => !raw.content || raw.content.body !== undefined)) return;
+
+    const contentOf = (dossiers: RawItem[]) =>
+        new Map(dossiers.flatMap((raw) => (raw.content ? [[raw.content.id, raw.content]] : [])));
+    const everySubIssue = new Set(
+        raws
+            .flatMap((raw) => raw.content?.subIssues?.nodes ?? [])
+            .map((s) => refKey(s.repository.nameWithOwner, s.number)),
+    );
+    const [bodies, found] = await Promise.all([
+        fetchNodes<{ id?: string; body?: string }>(DOSSIER_BODIES_QUERY, [
+            ...contentOf(rawDossiers(raws, { builds: everySubIssue })).keys(),
+        ]),
+        searched,
+    ]);
+    const dossiers = contentOf(rawDossiers(raws, found));
+
+    for (const node of bodies) {
+        const content = node.id ? dossiers.get(node.id) : undefined;
+
+        if (content) content.body = node.body ?? '';
+    }
 }
 
 /** Puts each build's linked PRs' body and merge time on them, for the build's merged stats and its stats write-back. */
 async function readBuildPrBodies(raws: RawItem[]): Promise<void> {
-  // Two builds can link the same PR; it's read once.
-  const prs = new Map<string, RawLinkedPr[]>();
-  for (const pr of rawBuildPrs(raws)) if (pr.id) prs.set(pr.id, [...prs.get(pr.id) ?? [], pr]);
-  const read = await fetchNodes<Pick<RawLinkedPr, 'body' | 'mergedAt'> & { id: string }>(PR_BODIES_QUERY, [...prs.keys()]);
-  for (const { id, body, mergedAt } of read) for (const pr of prs.get(id) ?? []) Object.assign(pr, { body, mergedAt });
+    // Two builds can link the same PR; it's read once.
+    const prs = new Map<string, RawLinkedPr[]>();
+
+    for (const pr of rawBuildPrs(raws)) if (pr.id) prs.set(pr.id, [...(prs.get(pr.id) ?? []), pr]);
+
+    const read = await fetchNodes<Pick<RawLinkedPr, 'body' | 'mergedAt'> & { id: string }>(PR_BODIES_QUERY, [
+        ...prs.keys(),
+    ]);
+
+    for (const { id, body, mergedAt } of read)
+        for (const pr of prs.get(id) ?? []) Object.assign(pr, { body, mergedAt });
 }
 
 /**
@@ -336,43 +445,78 @@ async function readBuildPrBodies(raws: RawItem[]): Promise<void> {
  * does on any GraphQL error.
  */
 async function fetchNodes<T extends object>(query: string, ids: readonly string[], size = PAGE_SIZE): Promise<T[]> {
-  const chunks = Array.from({ length: Math.ceil(ids.length / size) }, (_, i) => ids.slice(i * size, (i + 1) * size));
-  const read = await Promise.all(chunks.map(async (chunk) => (await graphql<{ data: { nodes: (T | null)[] } }>(query, { ids: chunk })).data.nodes));
-  return read.flat().filter((node): node is T => node !== null && Object.keys(node).length > 0);
+    const chunks = Array.from({ length: Math.ceil(ids.length / size) }, (_, i) => ids.slice(i * size, (i + 1) * size));
+    const read = await Promise.all(
+        chunks.map(
+            async (chunk) => (await graphql<{ data: { nodes: (T | null)[] } }>(query, { ids: chunk })).data.nodes,
+        ),
+    );
+
+    return read.flat().filter((node): node is T => node !== null && Object.keys(node).length > 0);
 }
 
 /** The issues with these node ids, read afresh, each placed by its `status-<name>` labels. */
 export async function fetchIssues(ids: readonly string[]): Promise<Item[]> {
-  const issues = await fetchNodes<NonNullable<RawItem['content']>>(ISSUES_BY_ID_QUERY, ids);
-  return boardItems(issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, content })));
+    const issues = await fetchNodes<NonNullable<RawItem['content']>>(ISSUES_BY_ID_QUERY, ids);
+
+    return boardItems(issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, content })));
 }
 
 /** The board's items from raw items, once all are read, without slices and with each dossier's map. */
 async function boardItems(raws: RawItem[], search = searchOnce()): Promise<Item[]> {
-  await mapConcurrent(raws.filter(raw=>raw.content?.labels?.nodes.some(label=>label.name===STRUCTURE_LABEL)),async raw=>{
-    const content=raw.content!;
-    try {content.body=(await structureProvider().read(content.repository.nameWithOwner,content.number)).body;}
-    catch(error){content.trackerError=message(error);}
-  });
-  // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
-  // decide which sub-issues are slices, so the dossiers, items with sub-issues on the board, are known once they land.
-  const searching = searchBuilds(raws, search);
-  const [searched] = await Promise.all([searching, readDossierBodies(raws, searching), readBuildPrBodies(raws)]);
-  return normalizeItems(raws, searched);
+    await mapConcurrent(
+        raws.filter((raw) => raw.content?.labels?.nodes.some((label) => label.name === STRUCTURE_LABEL)),
+        async (raw) => {
+            const content = raw.content!;
+
+            try {
+                content.body = (await structureProvider().read(content.repository.nameWithOwner, content.number)).body;
+            } catch (error) {
+                content.trackerError = message(error);
+            }
+        },
+    );
+
+    // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
+    // decide which sub-issues are slices, so the dossiers, items with sub-issues on the board, are known once they land.
+    const searching = searchBuilds(raws, search);
+    const [searched] = await Promise.all([searching, readDossierBodies(raws, searching), readBuildPrBodies(raws)]);
+
+    return normalizeItems(raws, searched);
 }
 
 /** Each page of a repository's issues the query reads, after the cursor the one before ended at. */
-async function readRepoPages<T>(repo: string, what: string, query: string, vars: Record<string, string> = {}): Promise<T[]> {
-  const [owner, name] = repo.split('/');
-  const nodes: T[] = [];
-  await readPages(MAX_PAGES, `${repo} has more than ${PAGE_SIZE * MAX_PAGES} ${what} to show; stopped paging`, async (after) => {
-    const page = (await graphql<{ data: { repository: { issues: { pageInfo: PageInfo; nodes: T[] } } | null } }>(query,
-      { owner: owner!, name: name!, ...vars, after })).data.repository?.issues;
-    if (!page) throw new Error(`Repository ${repo} not found`);
-    nodes.push(...page.nodes);
-    return page.pageInfo;
-  });
-  return nodes;
+async function readRepoPages<T>(
+    repo: string,
+    what: string,
+    query: string,
+    vars: Record<string, string> = {},
+): Promise<T[]> {
+    const [owner, name] = repo.split('/');
+    const nodes: T[] = [];
+
+    await readPages(
+        MAX_PAGES,
+        `${repo} has more than ${PAGE_SIZE * MAX_PAGES} ${what} to show; stopped paging`,
+        async (after) => {
+            const page = (
+                await graphql<{ data: { repository: { issues: { pageInfo: PageInfo; nodes: T[] } } | null } }>(query, {
+                    owner: owner!,
+                    name: name!,
+                    ...vars,
+                    after,
+                })
+            ).data.repository?.issues;
+
+            if (!page) throw new Error(`Repository ${repo} not found`);
+
+            nodes.push(...page.nodes);
+
+            return page.pageInfo;
+        },
+    );
+
+    return nodes;
 }
 
 const hasLabel = (labels: { nodes: { name: string }[] }, name: string) => labels.nodes.some((l) => l.name === name);
@@ -385,16 +529,25 @@ const notPlanned = (issue: LightIssue) => issue.stateReason === 'NOT_PLANNED' ||
  * `build` of a `build` issue is a slice when its build is in the same read, which only the whole read tells: undefined.
  */
 function keeps(issue: LightIssue, since: number): boolean | undefined {
-  if (!issue.closedAt || Date.parse(issue.closedAt) < since) return false;
-  const build = hasLabel(issue.labels, 'build');
-  if (!build && issue.parent !== null && hasLabel(issue.parent.labels, 'build')) return undefined;
-  return build || !notPlanned(issue);
+    if (!issue.closedAt || Date.parse(issue.closedAt) < since) return false;
+
+    const build = hasLabel(issue.labels, 'build');
+
+    if (!build && issue.parent !== null && hasLabel(issue.parent.labels, 'build')) return undefined;
+
+    return build || !notPlanned(issue);
 }
 
 /** The closed issues the board keeps, by id, once the read is whole: a slice whose build wasn't read stays. */
 function keptClosed(closed: LightIssue[], openIds: ReadonlySet<string>, since: number): string[] {
-  const read = new Set([...openIds, ...closed.filter((issue) => keeps(issue, since) !== false).map((issue) => issue.id)]);
-  return closed.filter((issue) => keeps(issue, since) ?? (!read.has(issue.parent!.id) && !notPlanned(issue))).map((issue) => issue.id);
+    const read = new Set([
+        ...openIds,
+        ...closed.filter((issue) => keeps(issue, since) !== false).map((issue) => issue.id),
+    ]);
+
+    return closed
+        .filter((issue) => keeps(issue, since) ?? (!read.has(issue.parent!.id) && !notPlanned(issue)))
+        .map((issue) => issue.id);
 }
 
 /** Issues read in full by id a call: a full issue is heavy, so 100 take about 4 s and four calls of 25 at once about 1 s. */
@@ -411,26 +564,48 @@ const searchTime = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$
  * read, searches the ranges alongside the page instead of waiting to see whether it's full. `onRead` gets each
  * search's issues, and the page's, as each lands.
  */
-async function readClosed(repo: string, since: number, now: number, onRead: (issues: LightIssue[]) => void, atOnce: boolean): Promise<LightIssue[]> {
-  const [owner, name] = repo.split('/');
-  const step = (now - since) / CLOSED_RANGES;
-  const ranges = Array.from({ length: CLOSED_RANGES }, (_, i) => {
-    const from = searchTime(since + i * step);
-    return i === CLOSED_RANGES - 1 ? `>=${from}` : `${from}..${searchTime(since + (i + 1) * step)}`;
-  });
-  const searchRanges = () => Promise.all(ranges.map((range) => searchPages<LightIssue>(`repo:${repo} is:issue is:closed closed:${range}`, CLOSED_SEARCH_QUERY)
-    .then((issues) => (onRead(issues), issues))));
-  const searching = atOnce ? searchRanges() : undefined;
-  // A search started at once may fail while the page is read; the read fails once it waits on it.
-  searching?.catch(() => {});
-  const { data } = await graphql<{ data: { repository: { issues: { nodes: LightIssue[] } } | null } }>(RECENT_CLOSED_QUERY,
-    { owner: owner!, name: name!, since: searchTime(since) });
-  if (!data.repository) throw new Error(`Repository ${repo} not found`);
-  const recent = data.repository.issues.nodes;
-  onRead(recent);
-  const searched = searching ?? (recent.length < PAGE_SIZE ? undefined : searchRanges());
-  // Ranges share their ends, so an issue closed on one is found twice.
-  return [...new Map([...recent, ...(await searched ?? []).flat()].map((issue) => [issue.id, issue])).values()];
+async function readClosed(
+    repo: string,
+    since: number,
+    now: number,
+    onRead: (issues: LightIssue[]) => void,
+    atOnce: boolean,
+): Promise<LightIssue[]> {
+    const [owner, name] = repo.split('/');
+    const step = (now - since) / CLOSED_RANGES;
+    const ranges = Array.from({ length: CLOSED_RANGES }, (_, i) => {
+        const from = searchTime(since + i * step);
+
+        return i === CLOSED_RANGES - 1 ? `>=${from}` : `${from}..${searchTime(since + (i + 1) * step)}`;
+    });
+    const searchRanges = () =>
+        Promise.all(
+            ranges.map((range) =>
+                searchPages<LightIssue>(`repo:${repo} is:issue is:closed closed:${range}`, CLOSED_SEARCH_QUERY).then(
+                    (issues) => (onRead(issues), issues),
+                ),
+            ),
+        );
+    const searching = atOnce ? searchRanges() : undefined;
+
+    // A search started at once may fail while the page is read; the read fails once it waits on it.
+    searching?.catch(() => {});
+
+    const { data } = await graphql<{ data: { repository: { issues: { nodes: LightIssue[] } } | null } }>(
+        RECENT_CLOSED_QUERY,
+        { owner: owner!, name: name!, since: searchTime(since) },
+    );
+
+    if (!data.repository) throw new Error(`Repository ${repo} not found`);
+
+    const recent = data.repository.issues.nodes;
+
+    onRead(recent);
+
+    const searched = searching ?? (recent.length < PAGE_SIZE ? undefined : searchRanges());
+
+    // Ranges share their ends, so an issue closed on one is found twice.
+    return [...new Map([...recent, ...((await searched) ?? []).flat()].map((issue) => [issue.id, issue])).values()];
 }
 
 /**
@@ -439,102 +614,160 @@ async function readClosed(repo: string, since: number, now: number, onRead: (iss
  * the source's first read, searches the closed issues' ranges at once, as readClosed's `atOnce` says.
  */
 export async function fetchRepoIssues(repo: string, now = Date.now(), { searchRanges = false } = {}): Promise<Item[]> {
-  type Content = NonNullable<RawItem['content']>;
-  const asRaws = (issues: Content[]) => issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, content }));
-  const since = now - DONE_WINDOW_MS;
-  const search = searchOnce();
-  // Each closed issue the board keeps whatever else the read holds is read in full as soon as its search lands.
-  const asked = new Set<string>();
-  const reads: Promise<Content[]>[] = [];
-  const readInFull = (ids: string[]) => {
-    for (const id of ids) asked.add(id);
-    const read = fetchNodes<Content>(ISSUES_BY_ID_QUERY, ids, FULL_ISSUES_SIZE);
-    // A read that fails before the closed ones are all read fails the read once it's waited on.
-    read.catch(() => {});
-    reads.push(read);
-  };
-  const [open, closed] = await Promise.all([
-    // The open issues name most of the searches the read needs, so those start while the closed ones are read.
-    readRepoPages<Content>(repo, 'open issues', OPEN_ISSUES_QUERY).then((issues) => {
-      void searchBuilds(asRaws(issues), search).catch(() => {});
-      return issues;
-    }),
-    readClosed(repo, since, now, (issues) => readInFull(issues.filter((issue) => keeps(issue, since) && !asked.has(issue.id)).map((issue) => issue.id)), searchRanges),
-  ]);
-  readInFull(keptClosed(closed, new Set(open.map((issue) => issue.id)), since).filter((id) => !asked.has(id)));
-  const kept = (await Promise.all(reads)).flat();
-  // One normalization over open and closed together, so a closed dossier keeps its map and a closed build drops its slices.
-  return boardItems(asRaws([...open, ...kept]), search);
+    type Content = NonNullable<RawItem['content']>;
+
+    const asRaws = (issues: Content[]) =>
+        issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, content }));
+    const since = now - DONE_WINDOW_MS;
+    const search = searchOnce();
+    // Each closed issue the board keeps whatever else the read holds is read in full as soon as its search lands.
+    const asked = new Set<string>();
+    const reads: Promise<Content[]>[] = [];
+    const readInFull = (ids: string[]) => {
+        for (const id of ids) asked.add(id);
+
+        const read = fetchNodes<Content>(ISSUES_BY_ID_QUERY, ids, FULL_ISSUES_SIZE);
+
+        // A read that fails before the closed ones are all read fails the read once it's waited on.
+        read.catch(() => {});
+        reads.push(read);
+    };
+    const [open, closed] = await Promise.all([
+        // The open issues name most of the searches the read needs, so those start while the closed ones are read.
+        readRepoPages<Content>(repo, 'open issues', OPEN_ISSUES_QUERY).then((issues) => {
+            void searchBuilds(asRaws(issues), search).catch(() => {});
+
+            return issues;
+        }),
+        readClosed(
+            repo,
+            since,
+            now,
+            (issues) =>
+                readInFull(
+                    issues.filter((issue) => keeps(issue, since) && !asked.has(issue.id)).map((issue) => issue.id),
+                ),
+            searchRanges,
+        ),
+    ]);
+
+    readInFull(keptClosed(closed, new Set(open.map((issue) => issue.id)), since).filter((id) => !asked.has(id)));
+
+    const kept = (await Promise.all(reads)).flat();
+
+    // One normalization over open and closed together, so a closed dossier keeps its map and a closed build drops its slices.
+    return boardItems(asRaws([...open, ...kept]), search);
 }
 
 /** An error's message, for a write's error text. */
 export const message = (err: unknown) => (err instanceof Error ? err.message : 'GitHub request failed.');
 
 /** Replaces an issue's body, written to a file for gh's --body-file. */
-export async function editIssueBody(repo: string, number: number, body: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), 'lar-body-'));
-  try {
-    const file = join(dir, 'body.md');
-    await writeFile(file, body);
-    await run(['issue', 'edit', String(number), '-R', repo, '--body-file', file]);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+export async function editIssueBody(
+    repo: string,
+    number: number,
+    body: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), 'lar-body-'));
+
+    try {
+        const file = join(dir, 'body.md');
+
+        await writeFile(file, body);
+        await run(['issue', 'edit', String(number), '-R', repo, '--body-file', file]);
+    } finally {
+        await rm(dir, { recursive: true, force: true });
+    }
 }
 
 /** A PR's REST path, `repos/<owner>/<repo>/pulls/<n>`, from its URL. */
 function pullPath(url: string): string {
-  const match = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/.exec(url);
-  if (!match) throw new Error(`Not a pull request URL: ${url}`);
-  return `repos/${match[1]}/pulls/${match[2]}`;
+    const match = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/.exec(url);
+
+    if (!match) throw new Error(`Not a pull request URL: ${url}`);
+
+    return `repos/${match[1]}/pulls/${match[2]}`;
 }
 
 /** A PR's description as it is now, by the PR's URL; empty when it has none. */
 export async function readPrBody(url: string, run: (args: string[]) => Promise<string> = gh): Promise<string> {
-  const pr = JSON.parse(await run(['api', pullPath(url)])) as { body?: string | null };
-  return pr.body ?? '';
+    const pr = JSON.parse(await run(['api', pullPath(url)])) as { body?: string | null };
+
+    return pr.body ?? '';
 }
 
 /** Replaces a PR's description, by the PR's URL. */
-export async function editPrBody(url: string, body: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  // -f sends the body as a string as is; -F would read a body starting with @ as a file.
-  await run(['api', '--method', 'PATCH', pullPath(url), '-f', `body=${body}`]);
+export async function editPrBody(
+    url: string,
+    body: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<void> {
+    // -f sends the body as a string as is; -F would read a body starting with @ as a file.
+    await run(['api', '--method', 'PATCH', pullPath(url), '-f', `body=${body}`]);
 }
 
 /** The repository's default branch and the commit at its head. */
-export async function defaultBranchHead(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<{ branch: string; sha: string }> {
-  const branch = (await run(['api', `repos/${repo}`, '--jq', '.default_branch'])).trim();
-  const sha = (await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha'])).trim();
-  return { branch, sha };
+export async function defaultBranchHead(
+    repo: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<{ branch: string; sha: string }> {
+    const branch = (await run(['api', `repos/${repo}`, '--jq', '.default_branch'])).trim();
+    const sha = (await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha'])).trim();
+
+    return { branch, sha };
 }
 
 /** A commit's tree: its own SHA, and each file's mode and blob SHA by path. */
 export interface CommitTree {
-  sha: string;
-  files: Map<string, { mode: string; sha: string }>;
+    sha: string;
+    files: Map<string, { mode: string; sha: string }>;
 }
 
 /** Every file in the commit's tree; throws when GitHub lists only part of them. */
-export async function commitTree(repo: string, commit: string, run: (args: string[]) => Promise<string> = gh): Promise<CommitTree> {
-  const { sha, truncated, tree } = JSON.parse(await run(['api', `repos/${repo}/git/trees/${commit}?recursive=1`])) as
-    { sha: string; truncated: boolean; tree: { path: string; mode: string; type: string; sha: string }[] };
-  if (truncated) throw new Error('GitHub listed only part of its files, since it has too many.');
-  return { sha, files: new Map(tree.filter((entry) => entry.type === 'blob').map((entry) => [entry.path, { mode: entry.mode, sha: entry.sha }])) };
+export async function commitTree(
+    repo: string,
+    commit: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<CommitTree> {
+    const { sha, truncated, tree } = JSON.parse(
+        await run(['api', `repos/${repo}/git/trees/${commit}?recursive=1`]),
+    ) as { sha: string; truncated: boolean; tree: { path: string; mode: string; type: string; sha: string }[] };
+
+    if (truncated) throw new Error('GitHub listed only part of its files, since it has too many.');
+
+    return {
+        sha,
+        files: new Map(
+            tree
+                .filter((entry) => entry.type === 'blob')
+                .map((entry) => [entry.path, { mode: entry.mode, sha: entry.sha }]),
+        ),
+    };
 }
 
 /** The commit at the head of the repository's branch on GitHub, or null when it has no such branch. */
-async function branchHead(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  try {
-    return (await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha'])).trim();
-  } catch (err) {
-    if (/HTTP 404/.test(message(err))) return null;
-    throw err;
-  }
+async function branchHead(
+    repo: string,
+    branch: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<string | null> {
+    try {
+        return (await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha'])).trim();
+    } catch (err) {
+        if (/HTTP 404/.test(message(err))) return null;
+
+        throw err;
+    }
 }
 
 /** Whether the repository has the branch on GitHub. */
-export async function branchExists(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<boolean> {
-  return await branchHead(repo, branch, run) !== null;
+export async function branchExists(
+    repo: string,
+    branch: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<boolean> {
+    return (await branchHead(repo, branch, run)) !== null;
 }
 
 /**
@@ -542,91 +775,186 @@ export async function branchExists(repo: string, branch: string, run: (args: str
  * resolve, or as it is. A repository it can't resolve may be deleted or hidden, so that error stays as it is.
  */
 function refusalOf(err: unknown): unknown {
-  const text = message(err);
-  if (/HTTP 40[13]\b|Resource not accessible|SAML enforcement/i.test(text)) return new AccessLost(text);
-  if (/Could not resolve to a PullRequest/i.test(text)) return new NotFound(text);
-  return err;
+    const text = message(err);
+
+    if (/HTTP 40[13]\b|Resource not accessible|SAML enforcement/i.test(text)) return new AccessLost(text);
+
+    if (/Could not resolve to a PullRequest/i.test(text)) return new NotFound(text);
+
+    return err;
 }
 
 /** Whether a PR, by its URL, is open, merged or closed without merging. Throws NotFound or AccessLost when GitHub says so. */
-export async function prState(url: string, run: (args: string[]) => Promise<string> = gh): Promise<'OPEN' | 'MERGED' | 'CLOSED'> {
-  let state: string;
-  try { state = (await run(['pr', 'view', url, '--json', 'state', '--jq', '.state'])).trim(); }
-  catch (err) { throw refusalOf(err); }
-  if (state !== 'OPEN' && state !== 'MERGED' && state !== 'CLOSED') throw new Error(`gh pr view sent no PR state for ${url}: ${state}`);
-  return state;
+export async function prState(
+    url: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<'OPEN' | 'MERGED' | 'CLOSED'> {
+    let state: string;
+
+    try {
+        state = (await run(['pr', 'view', url, '--json', 'state', '--jq', '.state'])).trim();
+    } catch (err) {
+        throw refusalOf(err);
+    }
+
+    if (state !== 'OPEN' && state !== 'MERGED' && state !== 'CLOSED')
+        throw new Error(`gh pr view sent no PR state for ${url}: ${state}`);
+
+    return state;
 }
 
 /** Closes a PR, by its URL, with a comment that says why. */
-export async function closePr(url: string, comment: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['pr', 'close', url, '--comment', comment]);
+export async function closePr(
+    url: string,
+    comment: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<void> {
+    await run(['pr', 'close', url, '--comment', comment]);
 }
 
 /** Reopens a PR, by its URL, that closed without merging. */
 export async function reopenPr(url: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['pr', 'reopen', url]);
+    await run(['pr', 'reopen', url]);
 }
 
 /** Closes an issue as not planned; returns the error, or null when GitHub accepted it. */
 export async function abandonIssue(item: Item, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  try {
-    await run(['issue', 'close', String(item.number), '-R', item.repo!, '--reason', 'not planned']);
-    return null;
-  } catch (err) {
-    return `Could not abandon #${item.number}. ${message(err)}`;
-  }
+    try {
+        await run(['issue', 'close', String(item.number), '-R', item.repo!, '--reason', 'not planned']);
+
+        return null;
+    } catch (err) {
+        return `Could not abandon #${item.number}. ${message(err)}`;
+    }
 }
 
 /** The open issues of `repo` whose words match `query`, as gh's issue search finds them, or the latest open ones for no words. */
-export async function findIssues(repo: string, query: string, limit: number, run: (args: string[]) => Promise<string> = gh): Promise<TicketMatch[]> {
-  const words = query.trim();
-  const issues = JSON.parse(await run(['issue', 'list', '-R', repo, '--state', 'open', '--limit', String(limit), '--json', 'number,title,url',
-    ...words ? ['--search', words] : []])) as TicketMatch[];
-  return issues.map(({ number, title, url }) => ({ number, title, url }));
+export async function findIssues(
+    repo: string,
+    query: string,
+    limit: number,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<TicketMatch[]> {
+    const words = query.trim();
+    const issues = JSON.parse(
+        await run([
+            'issue',
+            'list',
+            '-R',
+            repo,
+            '--state',
+            'open',
+            '--limit',
+            String(limit),
+            '--json',
+            'number,title,url',
+            ...(words ? ['--search', words] : []),
+        ]),
+    ) as TicketMatch[];
+
+    return issues.map(({ number, title, url }) => ({ number, title, url }));
 }
 
 /** An open issue's title, body and kind; null when `repo` has no issue `number` or it is closed. */
-export async function readIssue(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<PickedTicket | null> {
-  let issue: { number: number; title: string; url: string; html_url?: string; body: string; labels: { name: string }[]; state: string; type?: {name: string} | null };
-  try {
-    issue = JSON.parse(await run(['api', `repos/${repo}/issues/${number}`]));
-  } catch (err) {
-    if (/Could not resolve to an issue/.test(message(err))) return null;
-    throw err;
-  }
-  if (issue.state.toUpperCase() !== 'OPEN') return null;
-  if(issue.labels.some(label=>label.name===STRUCTURE_LABEL))issue.body=(await structureProvider().read(repo,number)).body;
-  const tracker = readTrackerStructure(issue.body ?? '');
-  return { number: issue.number, title: issue.title, url: issue.html_url ?? issue.url, text: issue.body ?? '', kind: tracker?.kind ?? trackerKind(issue.labels.map((l) => l.name), issue.type?.name), ...(tracker && { tracker }) };
+export async function readIssue(
+    repo: string,
+    number: number,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<PickedTicket | null> {
+    let issue: {
+        number: number;
+        title: string;
+        url: string;
+        html_url?: string;
+        body: string;
+        labels: { name: string }[];
+        state: string;
+        type?: { name: string } | null;
+    };
+
+    try {
+        issue = JSON.parse(await run(['api', `repos/${repo}/issues/${number}`]));
+    } catch (err) {
+        if (/Could not resolve to an issue/.test(message(err))) return null;
+
+        throw err;
+    }
+
+    if (issue.state.toUpperCase() !== 'OPEN') return null;
+
+    if (issue.labels.some((label) => label.name === STRUCTURE_LABEL))
+        issue.body = (await structureProvider().read(repo, number)).body;
+
+    const tracker = readTrackerStructure(issue.body ?? '');
+
+    return {
+        number: issue.number,
+        title: issue.title,
+        url: issue.html_url ?? issue.url,
+        text: issue.body ?? '',
+        kind:
+            tracker?.kind ??
+            trackerKind(
+                issue.labels.map((l) => l.name),
+                issue.type?.name,
+            ),
+        ...(tracker && { tracker }),
+    };
 }
 
 /** An issue's state and assignees as a work record observes them; not-found when `repo` has no issue `number`. */
-export async function observeIssue(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<TicketObservation> {
-  let issue: { state: string; assignees: { login: string }[] };
-  try {
-    issue = JSON.parse(await run(['issue', 'view', String(number), '-R', repo, '--json', 'state,assignees']));
-  } catch (err) {
-    if (/Could not resolve to an issue/.test(message(err))) return { state: 'not-found' };
-    throw refusalOf(err);
-  }
-  const assignee = issue.assignees.map((a) => a.login).sort().join(', ');
-  return { state: issue.state === 'OPEN' ? 'open' : 'closed', ...assignee && { assignee } };
+export async function observeIssue(
+    repo: string,
+    number: number,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<TicketObservation> {
+    let issue: { state: string; assignees: { login: string }[] };
+
+    try {
+        issue = JSON.parse(await run(['issue', 'view', String(number), '-R', repo, '--json', 'state,assignees']));
+    } catch (err) {
+        if (/Could not resolve to an issue/.test(message(err))) return { state: 'not-found' };
+
+        throw refusalOf(err);
+    }
+
+    const assignee = issue.assignees
+        .map((a) => a.login)
+        .sort()
+        .join(', ');
+
+    return { state: issue.state === 'OPEN' ? 'open' : 'closed', ...(assignee && { assignee }) };
 }
 
 /** Finds an open PR whose head is exactly branch. Provider failures propagate. */
-export async function openPrByHead(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  const prs = JSON.parse(await run(['pr', 'list', '--repo', repo, '--state', 'open', '--head', branch, '--json', 'headRefName,url'])) as { headRefName: string; url: string }[];
-  return prs.find(pr => pr.headRefName === branch)?.url ?? null;
+export async function openPrByHead(
+    repo: string,
+    branch: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<string | null> {
+    const prs = JSON.parse(
+        await run(['pr', 'list', '--repo', repo, '--state', 'open', '--head', branch, '--json', 'headRefName,url']),
+    ) as { headRefName: string; url: string }[];
+
+    return prs.find((pr) => pr.headRefName === branch)?.url ?? null;
 }
 
 /** Caller verifies ownership, default branch, live work, open PRs and write access before deletion. */
-export async function deleteRemoteBranch(repo: string, branch: string, expectedHead?: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  const ref = `repos/${repo}/git/refs/heads/${encodeURIComponent(branch)}`;
-  if (expectedHead !== undefined) {
-    const current = (await run(['api', ref, '--jq', '.object.sha'])).trim();
-    if (current !== expectedHead) throw new Error('GitHub branch changed. Inspect and confirm again.');
-  }
-  // GitHub's delete-ref API has no expected-object-ID precondition. Recheck through
-  // the same authenticated provider immediately before deletion; Azure uses a CAS.
-  await run(['api', '--method', 'DELETE', ref]);
+export async function deleteRemoteBranch(
+    repo: string,
+    branch: string,
+    expectedHead?: string,
+    run: (args: string[]) => Promise<string> = gh,
+): Promise<void> {
+    const ref = `repos/${repo}/git/refs/heads/${encodeURIComponent(branch)}`;
+
+    if (expectedHead !== undefined) {
+        const current = (await run(['api', ref, '--jq', '.object.sha'])).trim();
+
+        if (current !== expectedHead) throw new Error('GitHub branch changed. Inspect and confirm again.');
+    }
+
+    // GitHub's delete-ref API has no expected-object-ID precondition. Recheck through
+    // the same authenticated provider immediately before deletion; Azure uses a CAS.
+    await run(['api', '--method', 'DELETE', ref]);
 }

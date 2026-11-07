@@ -1,92 +1,177 @@
 /* The starting page's styles, compiled with the design system's tokens and base styles at build time
    (packages/ui's compiledCss), since the page is a data: URL that loads nothing. The lockup, the draw and the roll
    copy apps/web/src/loading/loading-screen.css, so the board page's loading screen carries on from this one. */
-@import "@lar-factory/ui/styles.css";
+@import '@lar-works/design-system/styles.css' source(none);
+@import '@lar-factory/ui/styles.css';
 
-html, body { @apply h-full; }
+html,
 body {
-  @apply grid place-items-center select-none;
-  padding: --spacing(13) --spacing(6) --spacing(6); /* the title bar's height on top */
-  background: var(--background);
-  color: var(--foreground);
-  -webkit-app-region: drag; /* nothing here is a control, so the window moves by it */
+    @apply h-full;
+}
+body {
+    @apply grid place-items-center select-none;
+    padding: --spacing(13) --spacing(6) --spacing(6); /* the title bar's height on top */
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-app-region: drag; /* nothing here is a control, so the window moves by it */
 }
 
 /* --- The lockup: the title bar Brand's, scaled up. The mark is 0.705em, the cap height, and sits on the baseline, so
    it stands in for the "L" of "Lar"; the box is trimmed to cap height and baseline, so the page centres the lockup
    on what you see, not on the font's line box. "ar" bold, "Factory" medium in the muted colour. --------------------- */
 
-.loading-lockup { --lockup: clamp(2.5rem, 9vw, 4rem); position: relative; font-size: var(--lockup); }
-.loading-wordmark { width: max-content; line-height: 1; text-box: trim-both cap alphabetic; }
-.loading-mark { display: inline; overflow: visible; width: 0.705em; height: 0.705em; vertical-align: baseline; }
-.loading-lar { display: inline-block; margin-left: 0.07em; font-weight: 700; letter-spacing: -0.03em; clip-path: inset(-0.5em -1em -0.5em 0); } /* clipped at its left edge, so "ar" can slide out from behind the mark */
-.loading-lar-slide { display: inline-block; }
-.loading-factory { margin-left: 0.26em; font-weight: 500; color: var(--muted-foreground); }
+.loading-lockup {
+    --lockup: clamp(2.5rem, 9vw, 4rem);
+    position: relative;
+    font-size: var(--lockup);
+}
+.loading-wordmark {
+    width: max-content;
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
+}
+.loading-mark {
+    display: inline;
+    overflow: visible;
+    width: 0.705em;
+    height: 0.705em;
+    vertical-align: baseline;
+}
+.loading-lar {
+    display: inline-block;
+    margin-left: 0.07em;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    clip-path: inset(-0.5em -1em -0.5em 0);
+} /* clipped at its left edge, so "ar" can slide out from behind the mark */
+.loading-lar-slide {
+    display: inline-block;
+}
+.loading-factory {
+    margin-left: 0.26em;
+    font-weight: 500;
+    color: var(--muted-foreground);
+}
 
 /* The step line hangs below the baseline by half the lockup's size, clear of the "y", under the lockup's middle,
    without moving the lockup off centre. Its slot stacks the old text and the new, so the line stays centred. */
 .loading-line {
-  position: absolute;
-  top: calc(100% + var(--lockup) * 0.5);
-  left: 50%;
-  translate: -50% 0;
-  font-size: var(--text-sm);
-  line-height: --spacing(5);
-  width: max-content; /* as wide as the text, up to the window, then it wraps */
-  max-width: min(36rem, calc(100vw - --spacing(12)));
-  text-align: center;
-  overflow-wrap: anywhere;
-  color: var(--muted-foreground);
+    position: absolute;
+    top: calc(100% + var(--lockup) * 0.5);
+    left: 50%;
+    translate: -50% 0;
+    font-size: var(--text-sm);
+    line-height: --spacing(5);
+    width: max-content; /* as wide as the text, up to the window, then it wraps */
+    max-width: min(36rem, calc(100vw - --spacing(12)));
+    text-align: center;
+    overflow-wrap: anywhere;
+    color: var(--muted-foreground);
 }
-.loading-line-slot { display: grid; justify-items: center; }
-.loading-line-slot > span { grid-area: 1 / 1; }
+.loading-line-slot {
+    display: grid;
+    justify-items: center;
+}
+.loading-line-slot > span {
+    grid-area: 1 / 1;
+}
 
 /* A failed start's error takes the step line's place, and stays selectable so it can be copied. */
 .loading-error {
-  user-select: text;
-  -webkit-app-region: no-drag;
+    user-select: text;
+    -webkit-app-region: no-drag;
 }
-.loading-line[hidden] { display: none; }
+.loading-line[hidden] {
+    display: none;
+}
 
 /* The mark's finished state is the base: the filled L, the block and the words, with no trace. Unless the user
    prefers reduced motion, the page plays the draw from its first paint, and the board page carries on from it. */
-.loading-mark-trace { display: none; }
+.loading-mark-trace {
+    display: none;
+}
 
 @media (prefers-reduced-motion: no-preference) {
-  /* "Home first" (lar-brand preview/prototype-startup.html, variant C): the block, the room, appears first; the L wraps
-     around it as wall and floor in one trace; then "ar" slides out from behind the mark and the product fades in. */
-  .loading-mark-block {
-    opacity: 0;
-    transform: scale(0.3);
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: loading-settle 480ms cubic-bezier(0.34, 1.45, 0.64, 1) 100ms forwards; /* a small overshoot */
-  }
-  .loading-mark-trace {
-    display: inline;
-    stroke-dasharray: 1 2; /* a gap longer than the path, so only the drawn length shows */
-    stroke-dashoffset: 1;
-    opacity: 0;
-    animation: loading-trace 700ms cubic-bezier(0.42, 0, 0.58, 1) 420ms forwards;
-  }
-  /* The filled L replaces the trace once it ends; the stroke covers the same outline but for its
-     3-unit outer corner, which it draws square, too small for the swap to show. */
-  .loading-mark-fill { opacity: 0; animation: loading-show 0ms linear 1120ms forwards; }
-  .loading-lar-slide { translate: -1.25em 0; animation: loading-slide 520ms cubic-bezier(0.16, 1, 0.3, 1) 1000ms forwards; }
-  .loading-factory { opacity: 0; animation: loading-show 450ms ease-out 1300ms forwards; }
+    /* "Home first" (lar-brand preview/prototype-startup.html, variant C): the block, the room, appears first; the L wraps
+       around it as wall and floor in one trace; then "ar" slides out from behind the mark and the product fades in. */
+    .loading-mark-block {
+        opacity: 0;
+        transform: scale(0.3);
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: loading-settle 480ms cubic-bezier(0.34, 1.45, 0.64, 1) 100ms forwards; /* a small overshoot */
+    }
+    .loading-mark-trace {
+        display: inline;
+        stroke-dasharray: 1 2; /* a gap longer than the path, so only the drawn length shows */
+        stroke-dashoffset: 1;
+        opacity: 0;
+        animation: loading-trace 700ms cubic-bezier(0.42, 0, 0.58, 1) 420ms forwards;
+    }
+    /* The filled L replaces the trace once it ends; the stroke covers the same outline but for its
+       3-unit outer corner, which it draws square, too small for the swap to show. */
+    .loading-mark-fill {
+        opacity: 0;
+        animation: loading-show 0ms linear 1120ms forwards;
+    }
+    .loading-lar-slide {
+        translate: -1.25em 0;
+        animation: loading-slide 520ms cubic-bezier(0.16, 1, 0.3, 1) 1000ms forwards;
+    }
+    .loading-factory {
+        opacity: 0;
+        animation: loading-show 450ms ease-out 1300ms forwards;
+    }
 
-  /* A step change: the old line rolls up and out with a slight blur while the new one rolls in from below. */
-  .loading-roll-in { animation: loading-roll-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-  .loading-roll-out { animation: loading-roll-out 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    /* A step change: the old line rolls up and out with a slight blur while the new one rolls in from below. */
+    .loading-roll-in {
+        animation: loading-roll-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+    .loading-roll-out {
+        animation: loading-roll-out 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
 }
 
 @keyframes loading-trace {
-  0% { opacity: 0; stroke-dashoffset: 1; }
-  1% { opacity: 1; }
-  100% { opacity: 1; stroke-dashoffset: 0; }
+    0% {
+        opacity: 0;
+        stroke-dashoffset: 1;
+    }
+    1% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 1;
+        stroke-dashoffset: 0;
+    }
 }
-@keyframes loading-settle { to { opacity: 1; transform: scale(1); } }
-@keyframes loading-show { to { opacity: 1; } }
-@keyframes loading-slide { to { translate: 0 0; } }
-@keyframes loading-roll-in { from { opacity: 0; translate: 0 0.75em; filter: blur(--spacing(0.75)); } }
-@keyframes loading-roll-out { to { opacity: 0; translate: 0 -0.75em; filter: blur(--spacing(0.75)); } }
+@keyframes loading-settle {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+@keyframes loading-show {
+    to {
+        opacity: 1;
+    }
+}
+@keyframes loading-slide {
+    to {
+        translate: 0 0;
+    }
+}
+@keyframes loading-roll-in {
+    from {
+        opacity: 0;
+        translate: 0 0.75em;
+        filter: blur(--spacing(0.75));
+    }
+}
+@keyframes loading-roll-out {
+    to {
+        opacity: 0;
+        translate: 0 -0.75em;
+        filter: blur(--spacing(0.75));
+    }
+}

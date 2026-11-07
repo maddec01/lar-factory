@@ -6,19 +6,21 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
-import * as NodeChildProcess from "node:child_process";
-import * as NodePath from "node:path";
-
-import * as Data from "effect/Data";
-import * as Duration from "effect/Duration";
-import * as Effect from "effect/Effect";
-import * as Schedule from "effect/Schedule";
-import type * as Scope from "effect/Scope";
-import { HttpClient, HttpClientRequest } from "effect/http";
-
 import {
-  SKILL_CHECK_ENV, isSkillCheckRequest, type DriftChoice, type SkillCheckAnswer, type SkillCheckOutcome,
-} from "@lar-factory/shared";
+    SKILL_CHECK_ENV,
+    isSkillCheckRequest,
+    type DriftChoice,
+    type SkillCheckAnswer,
+    type SkillCheckOutcome,
+} from '@lar-factory/shared';
+import * as Data from 'effect/Data';
+import * as Duration from 'effect/Duration';
+import * as Effect from 'effect/Effect';
+import { HttpClient, HttpClientRequest } from 'effect/http';
+import * as Schedule from 'effect/Schedule';
+import type * as Scope from 'effect/Scope';
+import * as NodeChildProcess from 'node:child_process';
+import * as NodePath from 'node:path';
 
 const DEFAULT_PORT_TIMEOUT = Duration.seconds(30);
 const READINESS_TIMEOUT = Duration.minutes(1);
@@ -27,36 +29,36 @@ const READINESS_REQUEST_TIMEOUT = Duration.seconds(1);
 const TERMINATE_GRACE = Duration.seconds(5);
 /** How long a drain may wait for running writes; a Start runs T3 Code's CLI, which takes seconds. */
 const DRAIN_TIMEOUT = Duration.minutes(2);
-const HOST = "127.0.0.1";
+const HOST = '127.0.0.1';
 
 /** How to run the board server: the program, its arguments, directory and full environment. */
 export interface StartConfig {
-  readonly executablePath: string;
-  readonly args: ReadonlyArray<string>;
-  readonly cwd: string;
-  readonly env: Readonly<Record<string, string | undefined>>;
+    readonly executablePath: string;
+    readonly args: ReadonlyArray<string>;
+    readonly cwd: string;
+    readonly env: Readonly<Record<string, string | undefined>>;
 }
 
 /** A running board server, the address of its page and how it ended. */
 export interface RunningBoard {
-  readonly pid: number;
-  readonly url: URL;
-  /** Succeeds with the exit code or signal once the server exits. */
-  readonly exited: Effect.Effect<string>;
+    readonly pid: number;
+    readonly url: URL;
+    /** Succeeds with the exit code or signal once the server exits. */
+    readonly exited: Effect.Effect<string>;
 }
 
-export class BoardServerError extends Data.TaggedError("BoardServerError")<{
-  readonly message: string;
+export class BoardServerError extends Data.TaggedError('BoardServerError')<{
+    readonly message: string;
 }> {}
 
 /** Where the board server sits beside the app: in the checkout, or in the packaged app's Resources. */
 export interface BoardLocation {
-  /** The server's working directory. */
-  readonly serverDir: string;
-  /** The file Node runs. */
-  readonly serverFile: string;
-  /** The packaged app's skills bundle, which the server credits in Settings; the checkout's root otherwise. */
-  readonly bundleDir?: string;
+    /** The server's working directory. */
+    readonly serverDir: string;
+    /** The file Node runs. */
+    readonly serverFile: string;
+    /** The packaged app's skills bundle, which the server credits in Settings; the checkout's root otherwise. */
+    readonly bundleDir?: string;
 }
 
 /**
@@ -67,17 +69,18 @@ export interface BoardLocation {
  * `Resources/web/dist`; the skills bundle sits in `Resources/`.
  */
 export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
-  const serverDir = NodePath.resolve(appPath, "../server");
-  return isPackaged
-    ? {
-        serverDir,
-        serverFile: NodePath.join(serverDir, "dist/server.mjs"),
-        bundleDir: NodePath.resolve(appPath, "../bundle"),
-      }
-    : {
-        serverDir,
-        serverFile: NodePath.join(serverDir, "src/server.ts"),
-      };
+    const serverDir = NodePath.resolve(appPath, '../server');
+
+    return isPackaged
+        ? {
+              serverDir,
+              serverFile: NodePath.join(serverDir, 'dist/server.mjs'),
+              bundleDir: NodePath.resolve(appPath, '../bundle'),
+          }
+        : {
+              serverDir,
+              serverFile: NodePath.join(serverDir, 'src/server.ts'),
+          };
 };
 
 /**
@@ -86,163 +89,196 @@ export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
  * The server reads `bundleDir`, and refuses guarded writes that don't carry `secret`.
  * With `checksSkills` it asks the app to check the installed skills before each Start build.
  */
-export const makeStartConfig = (input: BoardLocation & {
-  readonly executablePath: string;
-  readonly env: Readonly<Record<string, string | undefined>>;
-  readonly secret: string;
-  readonly checksSkills?: boolean;
-}): StartConfig => ({
-  executablePath: input.executablePath,
-  args: ["--disable-warning=ExperimentalWarning", input.serverFile],
-  cwd: input.serverDir,
-  env: {
-    ...input.env,
-    ELECTRON_RUN_AS_NODE: "1",
-    BOARD_APP_SECRET: input.secret,
-    ...(input.bundleDir && { BOARD_BUNDLE_DIR: input.bundleDir }),
-    ...(input.checksSkills && { [SKILL_CHECK_ENV]: "1" }),
-  },
+export const makeStartConfig = (
+    input: BoardLocation & {
+        readonly executablePath: string;
+        readonly env: Readonly<Record<string, string | undefined>>;
+        readonly secret: string;
+        readonly checksSkills?: boolean;
+    },
+): StartConfig => ({
+    executablePath: input.executablePath,
+    args: ['--disable-warning=ExperimentalWarning', input.serverFile],
+    cwd: input.serverDir,
+    env: {
+        ...input.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        BOARD_APP_SECRET: input.secret,
+        ...(input.bundleDir && { BOARD_BUNDLE_DIR: input.bundleDir }),
+        ...(input.checksSkills && { [SKILL_CHECK_ENV]: '1' }),
+    },
 });
 
 /** What `start` is doing: "starting" spawns the server and waits for its port, "healthz" polls until it answers. */
-export type StartStep = "starting" | "healthz";
+export type StartStep = 'starting' | 'healthz';
 
 /**
  * Starts the server, reads the port it reports and waits for `/healthz` to answer, calling `progress` as each step
  * begins. `checkSkills` answers each skill check the server asks for, given its Drift choice, with what it found; if
  * it rejects, the answer is that reason. Closing the scope stops the server: SIGTERM, then SIGKILL after a grace period.
  */
-export const start = Effect.fn("BoardServer.start")(function* (
-  config: StartConfig,
-  options?: {
-    readonly portTimeout?: Duration.Input;
-    readonly checkSkills?: ((drift?: DriftChoice) => Promise<SkillCheckOutcome>) | undefined;
-    readonly progress?: ((step: StartStep) => void) | undefined;
-  },
+export const start = Effect.fn('BoardServer.start')(function* (
+    config: StartConfig,
+    options?: {
+        readonly portTimeout?: Duration.Input;
+        readonly checkSkills?: ((drift?: DriftChoice) => Promise<SkillCheckOutcome>) | undefined;
+        readonly progress?: ((step: StartStep) => void) | undefined;
+    },
 ): Effect.fn.Return<RunningBoard, BoardServerError, Scope.Scope | HttpClient.HttpClient> {
-  options?.progress?.("starting");
-  const child = yield* Effect.acquireRelease(spawn(config), stop);
-  if (options?.checkSkills) answerSkillChecks(child, options.checkSkills);
-  const port = yield* reportedPort(child, options?.portTimeout ?? DEFAULT_PORT_TIMEOUT);
-  const url = new URL(`http://${HOST}:${port}/`);
-  options?.progress?.("healthz");
-  yield* waitForHealthz(url);
-  return { pid: child.pid!, url, exited: exitReason(child) };
+    options?.progress?.('starting');
+
+    const child = yield* Effect.acquireRelease(spawn(config), stop);
+
+    if (options?.checkSkills) answerSkillChecks(child, options.checkSkills);
+
+    const port = yield* reportedPort(child, options?.portTimeout ?? DEFAULT_PORT_TIMEOUT);
+    const url = new URL(`http://${HOST}:${port}/`);
+
+    options?.progress?.('healthz');
+    yield* waitForHealthz(url);
+
+    return { pid: child.pid!, url, exited: exitReason(child) };
 });
 
 /**
  * Asks the server at `url` to refuse new writes and succeeds once its running ones
  * finish, so it can stop without cutting one off. Only the launch `secret` is let through.
  */
-export const drain = Effect.fn("BoardServer.drain")(function* (url: URL, secret: string) {
-  const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
-  // The server takes writes only from its own origin.
-  const request = HttpClientRequest.post(new URL("/api/drain", url)).pipe(
-    HttpClientRequest.setHeaders({ Origin: url.origin, "X-Board-Secret": secret }),
-  );
-  yield* client.execute(request).pipe(
-    Effect.flatMap((response) => response.text),
-    Effect.timeout(DRAIN_TIMEOUT),
-    Effect.mapError((cause) => new BoardServerError({ message: `could not drain the board's writes: ${String(cause)}` })),
-  );
+export const drain = Effect.fn('BoardServer.drain')(function* (url: URL, secret: string) {
+    const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
+    // The server takes writes only from its own origin.
+    const request = HttpClientRequest.post(new URL('/api/drain', url)).pipe(
+        HttpClientRequest.setHeaders({ Origin: url.origin, 'X-Board-Secret': secret }),
+    );
+
+    yield* client.execute(request).pipe(
+        Effect.flatMap((response) => response.text),
+        Effect.timeout(DRAIN_TIMEOUT),
+        Effect.mapError(
+            (cause) => new BoardServerError({ message: `could not drain the board's writes: ${String(cause)}` }),
+        ),
+    );
 });
 
 const spawn = (config: StartConfig) =>
-  Effect.try({
-    try: () =>
-      NodeChildProcess.spawn(config.executablePath, config.args, {
-        cwd: config.cwd,
-        env: config.env,
-        stdio: ["ignore", "inherit", "inherit", "ipc"],
-      }),
-    catch: (cause) => new BoardServerError({ message: `could not start the board server: ${String(cause)}` }),
-  });
-
-const answerSkillChecks = (child: NodeChildProcess.ChildProcess, checkSkills: (drift?: DriftChoice) => Promise<SkillCheckOutcome>) =>
-  child.on("message", (message) => {
-    if (!isSkillCheckRequest(message)) return;
-    // A check that throws refuses the build too, so Start build never waits for an answer that won't come.
-    void checkSkills(message.drift).catch((cause: unknown): SkillCheckOutcome => ({
-      refusal: `Lar Factory couldn't check its skills, so the build can't start: ${cause instanceof Error ? cause.message : String(cause)}`,
-    })).then((outcome) => {
-      // A server that exited meanwhile has no one to read the answer.
-      if (child.connected) child.send({ type: "skills-checked", id: message.id, ...outcome } satisfies SkillCheckAnswer);
+    Effect.try({
+        try: () =>
+            NodeChildProcess.spawn(config.executablePath, config.args, {
+                cwd: config.cwd,
+                env: config.env,
+                stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+            }),
+        catch: (cause) => new BoardServerError({ message: `could not start the board server: ${String(cause)}` }),
     });
-  });
 
-const exited = (child: NodeChildProcess.ChildProcess) =>
-  child.exitCode !== null || child.signalCode !== null;
+const answerSkillChecks = (
+    child: NodeChildProcess.ChildProcess,
+    checkSkills: (drift?: DriftChoice) => Promise<SkillCheckOutcome>,
+) =>
+    child.on('message', (message) => {
+        if (!isSkillCheckRequest(message)) return;
+
+        // A check that throws refuses the build too, so Start build never waits for an answer that won't come.
+        void checkSkills(message.drift)
+            .catch((cause: unknown): SkillCheckOutcome => ({
+                refusal: `Lar Factory couldn't check its skills, so the build can't start: ${cause instanceof Error ? cause.message : String(cause)}`,
+            }))
+            .then((outcome) => {
+                // A server that exited meanwhile has no one to read the answer.
+                if (child.connected)
+                    child.send({ type: 'skills-checked', id: message.id, ...outcome } satisfies SkillCheckAnswer);
+            });
+    });
+
+const exited = (child: NodeChildProcess.ChildProcess) => child.exitCode !== null || child.signalCode !== null;
 
 const describeExit = (code: number | null, signal: NodeJS.Signals | null) =>
-  signal ? `on ${signal}` : `with code ${code}`;
+    signal ? `on ${signal}` : `with code ${code}`;
 
 const exitReason = (child: NodeChildProcess.ChildProcess) =>
-  Effect.callback<string>((resume) => {
-    if (exited(child)) return resume(Effect.succeed(describeExit(child.exitCode, child.signalCode)));
-    const onExit = (code: number | null, signal: NodeJS.Signals | null) =>
-      resume(Effect.succeed(describeExit(code, signal)));
-    child.once("exit", onExit);
-    return Effect.sync(() => child.off("exit", onExit));
-  });
+    Effect.callback<string>((resume) => {
+        if (exited(child)) return resume(Effect.succeed(describeExit(child.exitCode, child.signalCode)));
+
+        const onExit = (code: number | null, signal: NodeJS.Signals | null) =>
+            resume(Effect.succeed(describeExit(code, signal)));
+
+        child.once('exit', onExit);
+
+        return Effect.sync(() => child.off('exit', onExit));
+    });
 
 const stop = (child: NodeChildProcess.ChildProcess) =>
-  Effect.callback<void>((resume) => {
-    if (exited(child)) return resume(Effect.void);
-    const forceKill = setTimeout(() => child.kill("SIGKILL"), Duration.toMillis(TERMINATE_GRACE));
-    child.once("exit", () => {
-      clearTimeout(forceKill);
-      resume(Effect.void);
+    Effect.callback<void>((resume) => {
+        if (exited(child)) return resume(Effect.void);
+
+        const forceKill = setTimeout(() => child.kill('SIGKILL'), Duration.toMillis(TERMINATE_GRACE));
+
+        child.once('exit', () => {
+            clearTimeout(forceKill);
+            resume(Effect.void);
+        });
+        child.kill('SIGTERM');
     });
-    child.kill("SIGTERM");
-  });
 
 const reportedPort = (child: NodeChildProcess.ChildProcess, timeout: Duration.Input) =>
-  Effect.callback<number, BoardServerError>((resume) => {
-    const onMessage = (message: unknown) => {
-      if (isListening(message)) resume(Effect.succeed(message.port));
-    };
-    const onExit = (code: number | null, signal: NodeJS.Signals | null) =>
-      resume(Effect.fail(new BoardServerError({
-        message: `the board server exited ${describeExit(code, signal)} before it reported a port`,
-      })));
-    child.on("message", onMessage);
-    child.once("exit", onExit);
-    return Effect.sync(() => {
-      child.off("message", onMessage);
-      child.off("exit", onExit);
-    });
-  }).pipe(
-    Effect.timeoutOrElse({
-      duration: timeout,
-      orElse: () =>
-        Effect.fail(new BoardServerError({
-          message: `the board server reported no port within ${Duration.format(Duration.fromInputUnsafe(timeout))}`,
-        })),
-    }),
-  );
+    Effect.callback<number, BoardServerError>((resume) => {
+        const onMessage = (message: unknown) => {
+            if (isListening(message)) resume(Effect.succeed(message.port));
+        };
+        const onExit = (code: number | null, signal: NodeJS.Signals | null) =>
+            resume(
+                Effect.fail(
+                    new BoardServerError({
+                        message: `the board server exited ${describeExit(code, signal)} before it reported a port`,
+                    }),
+                ),
+            );
+
+        child.on('message', onMessage);
+        child.once('exit', onExit);
+
+        return Effect.sync(() => {
+            child.off('message', onMessage);
+            child.off('exit', onExit);
+        });
+    }).pipe(
+        Effect.timeoutOrElse({
+            duration: timeout,
+            orElse: () =>
+                Effect.fail(
+                    new BoardServerError({
+                        message: `the board server reported no port within ${Duration.format(Duration.fromInputUnsafe(timeout))}`,
+                    }),
+                ),
+        }),
+    );
 
 /** The message apps/server/src/port/port.ts sends once the server listens. */
-const isListening = (message: unknown): message is { type: "listening"; port: number } =>
-  typeof message === "object" && message !== null &&
-  (message as { type?: unknown }).type === "listening" &&
-  Number.isInteger((message as { port?: unknown }).port);
+const isListening = (message: unknown): message is { type: 'listening'; port: number } =>
+    typeof message === 'object' &&
+    message !== null &&
+    (message as { type?: unknown }).type === 'listening' &&
+    Number.isInteger((message as { port?: unknown }).port);
 
-const waitForHealthz = Effect.fn("BoardServer.waitForHealthz")(function* (url: URL) {
-  // Read every body, a 503's too, so undici frees the connection for the next try.
-  const client = (yield* HttpClient.HttpClient).pipe(
-    HttpClient.tap((response) => response.text.pipe(Effect.ignore)),
-    HttpClient.filterStatusOk,
-  );
-  yield* client.execute(HttpClientRequest.get(new URL("/healthz", url))).pipe(
-    Effect.timeout(READINESS_REQUEST_TIMEOUT),
-    Effect.retry(Schedule.spaced(READINESS_INTERVAL)),
-    Effect.mapError((cause) => new BoardServerError({ message: `${url.href}healthz failed: ${String(cause)}` })),
-    Effect.timeoutOrElse({
-      duration: READINESS_TIMEOUT,
-      orElse: () =>
-        Effect.fail(new BoardServerError({
-          message: `${url.href}healthz did not answer within ${Duration.format(READINESS_TIMEOUT)}`,
-        })),
-    }),
-  );
+const waitForHealthz = Effect.fn('BoardServer.waitForHealthz')(function* (url: URL) {
+    // Read every body, a 503's too, so undici frees the connection for the next try.
+    const client = (yield* HttpClient.HttpClient).pipe(
+        HttpClient.tap((response) => response.text.pipe(Effect.ignore)),
+        HttpClient.filterStatusOk,
+    );
+
+    yield* client.execute(HttpClientRequest.get(new URL('/healthz', url))).pipe(
+        Effect.timeout(READINESS_REQUEST_TIMEOUT),
+        Effect.retry(Schedule.spaced(READINESS_INTERVAL)),
+        Effect.mapError((cause) => new BoardServerError({ message: `${url.href}healthz failed: ${String(cause)}` })),
+        Effect.timeoutOrElse({
+            duration: READINESS_TIMEOUT,
+            orElse: () =>
+                Effect.fail(
+                    new BoardServerError({
+                        message: `${url.href}healthz did not answer within ${Duration.format(READINESS_TIMEOUT)}`,
+                    }),
+                ),
+        }),
+    );
 });

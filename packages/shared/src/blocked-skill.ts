@@ -5,11 +5,14 @@ import type { BlockingPath } from './install-skills.ts';
 
 /** Where a blocking path leaves its skill missing, by where the path is, and for a profile what else clears it. */
 export function blockedPathNote(blocking: BlockingPath): string {
-  switch (blocking.place) {
-    case 'agents': return "the skill isn't installed";
-    case 'antigravity': return "the skill isn't installed for Antigravity";
-    case 'profile': return `the skill isn't linked into ~/${blocking.profile}; unticking the profile also clears it`;
-  }
+    switch (blocking.place) {
+        case 'agents':
+            return "the skill isn't installed";
+        case 'antigravity':
+            return "the skill isn't installed for Antigravity";
+        case 'profile':
+            return `the skill isn't linked into ~/${blocking.profile}; unticking the profile also clears it`;
+    }
 }
 
 /**
@@ -18,11 +21,15 @@ export function blockedPathNote(blocking: BlockingPath): string {
  * for plain text.
  */
 export function blockedBy<Path = string>(
-  paths: readonly BlockingPath[],
-  render: (path: string) => Path = (path) => path as Path,
+    paths: readonly BlockingPath[],
+    render: (path: string) => Path = (path) => path as Path,
 ): [string, ...(string | Path)[]] {
-  return [
-    `blocked by ${paths.length === 1 ? 'a path' : 'paths'} Lar Factory didn't install: `,
-    ...paths.flatMap((blocking, index) => [...index > 0 ? [', '] : [], render(blocking.path), ` (${blockedPathNote(blocking)})`]),
-  ];
+    return [
+        `blocked by ${paths.length === 1 ? 'a path' : 'paths'} Lar Factory didn't install: `,
+        ...paths.flatMap((blocking, index) => [
+            ...(index > 0 ? [', '] : []),
+            render(blocking.path),
+            ` (${blockedPathNote(blocking)})`,
+        ]),
+    ];
 }

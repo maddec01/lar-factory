@@ -11,14 +11,17 @@ the flow and `docs/plan.md` for how it was set up.
   in the Copy's "Overridden in" column of `UPSTREAM.md`.
 - The board is a root pnpm workspace laid out like T3 Code's monorepo:
   `apps/server`, `apps/web`, `apps/desktop` (the Electron board app),
-  `packages/shared`, `packages/ui` (the design system) and `packages/work-records`
+  `packages/shared`, `packages/ui` (the board's own UI on the design system) and `packages/work-records`
   (the work-record database and its `lar-work` command, which browser code never
   imports). Apps import only packages, never each other. Code sits in feature folders (`src/github/`,
   `src/items/`) with no wrapper folders such as `services/`. File names are
   kebab-case, except Copies and code Ports, which keep their source's names. Skill-text Ports use kebab-case names for their lar step. Unit
   tests sit next to the file they test.
-- `packages/ui` holds Copies of lar-server's design system, listed in its `UPSTREAM.md`.
-  Never edit one: take a fresh copy from upstream and update its row.
+- Components, tokens and styles come from `@lar-works/design-system` (lar-web); import icons from
+  `@lar-works/design-system/icons`, never from `lucide-react` (only `DynamicIcon`, which it doesn't re-export, comes
+  from `lucide-react/dynamic`). `packages/ui` holds the board's own UI on top of it
+  and two Copies from lar-web, listed in its `UPSTREAM.md`. Never edit one: take a fresh copy from upstream and
+  update its row.
 - Repository settings live only in the local app data folder. The factory never
   reads, writes, detects or offers repository configuration or guidance files.
   Nothing secret goes in this public repo. Provider access uses local logins.
@@ -29,7 +32,9 @@ the flow and `docs/plan.md` for how it was set up.
   The user merges every PR.
 - Board changes: run `pnpm test` in each of `apps/server`, `apps/web`,
   `apps/desktop`, `packages/shared`, `packages/ui` and `packages/work-records` that changed (`pnpm test` at
-  the root runs them all), then `pnpm run typecheck` and `pnpm run knip` at the root.
+  the root runs them all), then `pnpm run typecheck`, `pnpm run knip` and `pnpm run check` at the root.
+  `pnpm run check` checks formatting, lint and types with Lar's shared rules (`@lar-works/config`, set up in the
+  root `vite.config.ts`); `pnpm run fix` formats and applies the lint fixes. Copies and skill text stay unformatted.
   `pnpm run dev` at the root opens the board app's window.
 - Sample board: `BOARD_PORT=<port> pnpm run sample` in `apps/server`, on a port where
   `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing (the board app's board

@@ -5,219 +5,224 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+    pull_request:
+        branches: [main]
+    push:
+        branches: [main]
 
 permissions:
-  contents: read
+    contents: read
 
 # A PR's newer run cancels its older one. Each push to main gets its own group,
 # so every commit on main keeps a finished run and a later push never cancels an
 # earlier one.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.sha) }}
-  cancel-in-progress: true
+    group: ci-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.sha) }}
+    cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: Typecheck and knip
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          # No step pushes; keep the token out of .git/config.
-          persist-credentials: false
+    typecheck:
+        name: Typecheck and knip
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v6
+              with:
+                  # No step pushes; keep the token out of .git/config.
+                  persist-credentials: false
 
-      - name: Set up workspace
-        id: install
-        uses: ./.github/actions/setup-workspace
+            - name: Set up workspace
+              id: install
+              uses: ./.github/actions/setup-workspace
 
-      - name: Shared typecheck
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: packages/shared
-        run: pnpm run typecheck
+            - name: Shared typecheck
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: packages/shared
+              run: pnpm run typecheck
 
-      - name: UI typecheck
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: packages/ui
-        run: pnpm run typecheck
+            - name: UI typecheck
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: packages/ui
+              run: pnpm run typecheck
 
-      - name: Work-records typecheck
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: packages/work-records
-        run: pnpm run typecheck
+            - name: Work-records typecheck
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: packages/work-records
+              run: pnpm run typecheck
 
-      - name: Server typecheck
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: apps/server
-        run: pnpm run typecheck
+            - name: Server typecheck
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: apps/server
+              run: pnpm run typecheck
 
-      - name: Web typecheck
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: apps/web
-        run: pnpm run typecheck
+            - name: Web typecheck
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: apps/web
+              run: pnpm run typecheck
 
-      - name: Desktop typecheck
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: apps/desktop
-        run: pnpm run typecheck
+            - name: Desktop typecheck
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: apps/desktop
+              run: pnpm run typecheck
 
-      - name: Knip
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm run knip
+            - name: Knip
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              run: pnpm run knip
 
-  packages:
-    name: Shared, UI and work-records tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Set git's default branch
-        run: git config --global init.defaultBranch main
+            # Formatting, lint and type checks, with @lar-works/config's rules (the root vite.config.ts).
+            - name: Format and lint
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              run: pnpm run check
 
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
+    packages:
+        name: Shared, UI and work-records tests
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - name: Set git's default branch
+              run: git config --global init.defaultBranch main
 
-      - name: Set up workspace
-        id: install
-        uses: ./.github/actions/setup-workspace
+            - name: Check out repository
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
 
-      - name: Shared tests
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: packages/shared
-        run: pnpm test
+            - name: Set up workspace
+              id: install
+              uses: ./.github/actions/setup-workspace
 
-      - name: UI tests
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: packages/ui
-        run: pnpm test
+            - name: Shared tests
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: packages/shared
+              run: pnpm test
 
-      - name: Work-records tests
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: packages/work-records
-        run: pnpm test
+            - name: UI tests
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: packages/ui
+              run: pnpm test
 
-  shards:
-    name: ${{ matrix.app.label }} tests ${{ matrix.shard }}/2
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        app:
-          - { dir: server, label: Server }
-          - { dir: web, label: Web }
-        shard: [1, 2]
-    steps:
-      - name: Set git's default branch
-        run: git config --global init.defaultBranch main
+            - name: Work-records tests
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: packages/work-records
+              run: pnpm test
 
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
+    shards:
+        name: ${{ matrix.app.label }} tests ${{ matrix.shard }}/2
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        strategy:
+            fail-fast: false
+            matrix:
+                app:
+                    - { dir: server, label: Server }
+                    - { dir: web, label: Web }
+                shard: [1, 2]
+        steps:
+            - name: Set git's default branch
+              run: git config --global init.defaultBranch main
 
-      - name: Set up workspace
-        uses: ./.github/actions/setup-workspace
+            - name: Check out repository
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
 
-      # pnpm appends the flag to the test script, so it reaches `vp test run`.
-      - name: Tests
-        working-directory: apps/${{ matrix.app.dir }}
-        run: pnpm test --shard=${{ matrix.shard }}/2
+            - name: Set up workspace
+              uses: ./.github/actions/setup-workspace
 
-  scripts:
-    name: Script tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # These tests need bash, git, jq and Node. The shared scripts run lar-work,
-    # which needs the workspace installed.
-    steps:
-      - name: Set git's default branch
-        run: git config --global init.defaultBranch main
+            # pnpm appends the flag to the test script, so it reaches `vp test run`.
+            - name: Tests
+              working-directory: apps/${{ matrix.app.dir }}
+              run: pnpm test --shard=${{ matrix.shard }}/2
 
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
+    scripts:
+        name: Script tests
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        # These tests need bash, git, jq and Node. The shared scripts run lar-work,
+        # which needs the workspace installed.
+        steps:
+            - name: Set git's default branch
+              run: git config --global init.defaultBranch main
 
-      - name: Set up workspace
-        uses: ./.github/actions/setup-workspace
+            - name: Check out repository
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
 
-      - name: Shared slice tests
-        if: ${{ !cancelled() }}
-        run: bash skills/shared/scripts/slice.test.sh
+            - name: Set up workspace
+              uses: ./.github/actions/setup-workspace
 
-      - name: Shared slice worktree removal tests
-        if: ${{ !cancelled() }}
-        run: bash skills/shared/scripts/remove-slice-worktree.test.sh
+            - name: Shared slice tests
+              if: ${{ !cancelled() }}
+              run: bash skills/shared/scripts/slice.test.sh
 
-      - name: Shared status tests
-        if: ${{ !cancelled() }}
-        run: bash skills/shared/scripts/status.test.sh
+            - name: Shared slice worktree removal tests
+              if: ${{ !cancelled() }}
+              run: bash skills/shared/scripts/remove-slice-worktree.test.sh
 
-      - name: Shared repo config tests
-        if: ${{ !cancelled() }}
-        run: bash skills/shared/scripts/repo-config.test.sh
+            - name: Shared status tests
+              if: ${{ !cancelled() }}
+              run: bash skills/shared/scripts/status.test.sh
 
-      - name: skill-sync tests
-        if: ${{ !cancelled() }}
-        run: for test in .agents/skills/skill-sync/scripts/*.test.sh; do bash "$test" || exit 1; done
+            - name: Shared repo config tests
+              if: ${{ !cancelled() }}
+              run: bash skills/shared/scripts/repo-config.test.sh
 
-      - name: Release plan tests
-        if: ${{ !cancelled() }}
-        run: node --test --test-reporter=spec .github/scripts/release-plan.test.cjs
+            - name: skill-sync tests
+              if: ${{ !cancelled() }}
+              run: for test in .agents/skills/skill-sync/scripts/*.test.sh; do bash "$test" || exit 1; done
 
-      - name: Release secrets wizard tests
-        if: ${{ !cancelled() }}
-        run: bash scripts/release-secrets.test.sh
+            - name: Release plan tests
+              if: ${{ !cancelled() }}
+              run: node --test --test-reporter=spec .github/scripts/release-plan.test.cjs
 
-  macos:
-    name: macOS tests
-    # The desktop tests need macOS, and the worktree setup test reads file times
-    # with BSD `stat -f`, which GNU stat runs without error and without output.
-    runs-on: macos-latest
-    timeout-minutes: 15
-    steps:
-      - name: Set git's default branch
-        run: git config --global init.defaultBranch main
+            - name: Release secrets wizard tests
+              if: ${{ !cancelled() }}
+              run: bash scripts/release-secrets.test.sh
 
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
+    macos:
+        name: macOS tests
+        # The desktop tests need macOS, and the worktree setup test reads file times
+        # with BSD `stat -f`, which GNU stat runs without error and without output.
+        runs-on: macos-latest
+        timeout-minutes: 15
+        steps:
+            - name: Set git's default branch
+              run: git config --global init.defaultBranch main
 
-      - name: Set up workspace
-        id: install
-        uses: ./.github/actions/setup-workspace
+            - name: Check out repository
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
 
-      - name: Desktop tests
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: apps/desktop
-        run: pnpm test
+            - name: Set up workspace
+              id: install
+              uses: ./.github/actions/setup-workspace
 
-      - name: Worktree setup tests
-        if: ${{ !cancelled() }}
-        run: bash scripts/setup-worktree.test.sh
+            - name: Desktop tests
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              working-directory: apps/desktop
+              run: pnpm test
 
-  tests:
-    name: Tests
-    needs: [typecheck, packages, shards, scripts, macos]
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Check every job passed
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          failed=$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key) \(.value.result)"' <<<"$NEEDS")
-          [[ -z $failed ]] && exit 0
-          while read -r job result; do
-            echo "::error::$job $result"
-          done <<<"$failed"
-          exit 1
+            - name: Worktree setup tests
+              if: ${{ !cancelled() }}
+              run: bash scripts/setup-worktree.test.sh
+
+    tests:
+        name: Tests
+        needs: [typecheck, packages, shards, scripts, macos]
+        if: ${{ always() }}
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - name: Check every job passed
+              env:
+                  NEEDS: ${{ toJSON(needs) }}
+              run: |
+                  failed=$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key) \(.value.result)"' <<<"$NEEDS")
+                  [[ -z $failed ]] && exit 0
+                  while read -r job result; do
+                    echo "::error::$job $result"
+                  done <<<"$failed"
+                  exit 1

@@ -15,29 +15,32 @@ const MIN_WIDTH = 224;
 const NARROWEST_BAR = 340;
 
 interface FieldRoom {
-  /** What the field may fill. */
-  field: number;
-  /** The title bar's width. */
-  bar: number;
+    /** What the field may fill. */
+    field: number;
+    /** The title bar's width. */
+    bar: number;
 }
 
 export interface FieldFit {
-  /** How many tokens show; the rest are in the count. */
-  shown: number;
-  keyHint: boolean;
-  folded: boolean;
-  width: number;
+    /** How many tokens show; the rest are in the count. */
+    shown: number;
+    keyHint: boolean;
+    folded: boolean;
+    width: number;
 }
 
 export function fitField({ field: room, bar }: FieldRoom, tokenWidths: readonly number[]): FieldFit {
-  const tokens = (count: number) => tokenWidths.slice(0, count).reduce((sum, width) => sum + width + GAP, 0);
-  const used = (count: number) => CHROME + SEARCH_WORD + tokens(count) + (count < tokenWidths.length ? COUNT + GAP : 0);
-  let shown = tokenWidths.length;
-  while (shown > 0 && used(shown) > room) shown--;
-  return {
-    shown,
-    keyHint: shown === tokenWidths.length && used(shown) + KEY_HINT + GAP <= room,
-    folded: bar <= NARROWEST_BAR || used(shown) > room,
-    width: Math.min(room, Math.max(MIN_WIDTH, used(tokenWidths.length) + KEY_HINT + GAP)),
-  };
+    const tokens = (count: number) => tokenWidths.slice(0, count).reduce((sum, width) => sum + width + GAP, 0);
+    const used = (count: number) =>
+        CHROME + SEARCH_WORD + tokens(count) + (count < tokenWidths.length ? COUNT + GAP : 0);
+    let shown = tokenWidths.length;
+
+    while (shown > 0 && used(shown) > room) shown--;
+
+    return {
+        shown,
+        keyHint: shown === tokenWidths.length && used(shown) + KEY_HINT + GAP <= room,
+        folded: bar <= NARROWEST_BAR || used(shown) > room,
+        width: Math.min(room, Math.max(MIN_WIDTH, used(tokenWidths.length) + KEY_HINT + GAP)),
+    };
 }

@@ -2,13 +2,13 @@ name: Bug report
 description: Something in a skill, an agent prompt or the board doesn't work
 labels: [bug]
 body:
-  - type: textarea
-    attributes:
-      label: What happened
-      description: What you ran, what you expected, and what happened instead.
-    validations:
-      required: true
-  - type: input
-    attributes:
-      label: Skill or part
-      placeholder: lar-shape, lar-build, board, ...
+    - type: textarea
+      attributes:
+          label: What happened
+          description: What you ran, what you expected, and what happened instead.
+      validations:
+          required: true
+    - type: input
+      attributes:
+          label: Skill or part
+          placeholder: lar-shape, lar-build, board, ...

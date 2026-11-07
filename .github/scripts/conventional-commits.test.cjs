@@ -3,13 +3,25 @@ const { test } = require('node:test');
 const { headerProblem, findProblems, commitMessageProblem } = require('./conventional-commits.cjs');
 
 test('accepts conventional headers', () => {
-    for (const header of ['feat: add rails', 'fix(video): keep depth', 'refactor(lar-db)!: drop table', 'ci: check commits']) {
+    for (const header of [
+        'feat: add rails',
+        'fix(video): keep depth',
+        'refactor(lar-db)!: drop table',
+        'ci: check commits',
+    ]) {
         assert.equal(headerProblem(header), null, header);
     }
 });
 
 test('rejects other headers', () => {
-    for (const header of ['Keep converted FLAC at depth', 'feature: x', 'fix(Video): x', 'fix:x', 'fix: ', `fix: ${'x'.repeat(100)}`]) {
+    for (const header of [
+        'Keep converted FLAC at depth',
+        'feature: x',
+        'fix(Video): x',
+        'fix:x',
+        'fix: ',
+        `fix: ${'x'.repeat(100)}`,
+    ]) {
         assert.notEqual(headerProblem(header), null, header);
     }
 });
@@ -24,6 +36,7 @@ test('rejects merge, fixup and non-conventional commits and a bad title', () => 
             { sha: 'd'.repeat(40), message: 'Retry titles', parents: 1 },
         ],
     });
+
     assert.equal(problems.length, 4);
     assert.match(problems[0], /^PR title/);
     assert.match(problems[1], /^bbbbbbbb .*rebase/);
@@ -32,7 +45,11 @@ test('rejects merge, fixup and non-conventional commits and a bad title', () => 
 });
 
 test('commit-msg hook accepts conventional and fixup messages, skipping comments', () => {
-    for (const message of ['# Please enter\nfix(video): retry titles\n\nbody', 'fixup! fix(video): retry titles', 'amend! fix(video): x\n\nfix(video): y']) {
+    for (const message of [
+        '# Please enter\nfix(video): retry titles\n\nbody',
+        'fixup! fix(video): retry titles',
+        'amend! fix(video): x\n\nfix(video): y',
+    ]) {
         assert.equal(commitMessageProblem(message), null, message);
     }
     assert.match(commitMessageProblem('Retry titles\n'), /^"Retry titles": /);

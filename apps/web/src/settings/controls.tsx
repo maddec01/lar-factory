@@ -1,53 +1,105 @@
 // The settings rows' working controls, on the design system's Switch, Select and Button.
 
-import type { ReactNode } from 'react';
-import { Button } from '@lar-factory/ui/design-system/Button';
 import { FormSelect } from '@lar-factory/ui/form-select';
-import { Switch as DesignSwitch } from '@lar-factory/ui/design-system/Switch';
+import { Button, Switch as DesignSwitch } from '@lar-works/design-system';
+import type { ReactNode } from 'react';
+
 import { kind } from '../buttons/button-kinds.tsx';
 
 /** A working row renders its control. Unbuilt settings carry no value. */
 export type Control = { type: 'unavailable' } | { type: 'custom'; render: () => ReactNode };
 
-export function Switch({ on, onChange, disabled, busy, label, description }: {
-  on: boolean;
-  onChange?: (on: boolean) => void;
-  disabled?: boolean;
-  /** Busy rather than disabled, so focus stays on the switch just pressed. */
-  busy?: boolean;
-  label?: string;
-  description?: string;
+export function Switch({
+    on,
+    onChange,
+    disabled,
+    busy,
+    label,
+    description,
+}: {
+    on: boolean;
+    onChange?: (on: boolean) => void;
+    disabled?: boolean;
+    /** Busy rather than disabled, so focus stays on the switch just pressed. */
+    busy?: boolean;
+    label?: string;
+    description?: string;
 }) {
-  return <DesignSwitch checked={on} aria-label={label} aria-description={description} disabled={disabled} aria-disabled={busy} className="aria-disabled:cursor-progress"
-    onCheckedChange={(next) => !busy && onChange?.(next)} />;
+    return (
+        <DesignSwitch
+            checked={on}
+            aria-label={label}
+            aria-description={description}
+            disabled={disabled}
+            aria-disabled={busy}
+            className="aria-disabled:cursor-progress"
+            onCheckedChange={(next) => !busy && onChange?.(next)}
+        />
+    );
 }
 
 /** A choice of a few options, in a dropdown. */
-export function Choice({ label, options, value, onChange, disabled, busy }: {
-  label: string;
-  options: { value: string; label: string }[];
-  value: string | null;
-  onChange?: (value: string) => void;
-  disabled?: boolean;
-  /** Busy rather than disabled, so focus stays on the choice just pressed. */
-  busy?: boolean;
+export function Choice({
+    label,
+    options,
+    value,
+    onChange,
+    disabled,
+    busy,
+}: {
+    label: string;
+    options: { value: string; label: string }[];
+    value: string | null;
+    onChange?: (value: string) => void;
+    disabled?: boolean;
+    /** Busy rather than disabled, so focus stays on the choice just pressed. */
+    busy?: boolean;
 }) {
-  return (
-    <span className="block w-44 max-w-full"><FormSelect aria-label={label} writesOnPick placeholder="Choose" value={value ?? ''} disabled={disabled} aria-disabled={busy}
-      onChange={(next) => !busy && onChange?.(next)} choices={options.map((option) => ({ value: option.value, name: option.label }))} /></span>
-  );
+    return (
+        <span className="block w-44 max-w-full">
+            <FormSelect
+                aria-label={label}
+                writesOnPick
+                placeholder="Choose"
+                value={value ?? ''}
+                disabled={disabled}
+                aria-disabled={busy}
+                onChange={(next) => !busy && onChange?.(next)}
+                choices={options.map((option) => ({ value: option.value, name: option.label }))}
+            />
+        </span>
+    );
 }
 
 /** lar-server's secondary button, disabled with `reason` as its tooltip when it doesn't work here. */
-export function SmallButton({ children, reason, onClick, className }: { children: ReactNode; reason?: string; onClick?: () => void; className?: string }) {
-  return <Button {...kind('other')} className={className} disabled={!!reason} title={reason} onClick={onClick}>{children}</Button>;
+export function SmallButton({
+    children,
+    reason,
+    onClick,
+    className,
+}: {
+    children: ReactNode;
+    reason?: string;
+    onClick?: () => void;
+    className?: string;
+}) {
+    return (
+        <Button {...kind('other')} className={className} disabled={!!reason} title={reason} onClick={onClick}>
+            {children}
+        </Button>
+    );
 }
 
 /** A state's colour; muted for a check that didn't run. */
 type ToolTone = 'success' | 'warning' | 'error' | 'muted';
 
 export function ToolState({ text, tone }: { text: string; tone: ToolTone }) {
-  const color = { success: 'text-(--success-foreground)', warning: 'text-(--warning-foreground)', error: 'text-(--destructive-foreground)',
-    muted: 'text-(--muted-foreground)' }[tone];
-  return <span className={`tool-state whitespace-nowrap text-xs font-medium ${color}`}>● {text}</span>;
+    const color = {
+        success: 'text-(--success-foreground)',
+        warning: 'text-(--warning-foreground)',
+        error: 'text-(--destructive-foreground)',
+        muted: 'text-(--muted-foreground)',
+    }[tone];
+
+    return <span className={`tool-state text-xs font-medium whitespace-nowrap ${color}`}>● {text}</span>;
 }

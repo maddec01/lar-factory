@@ -11,8 +11,9 @@ export type SavedHeavyCommandLimit = SavedLimit;
  * `os.availableParallelism()` and `os.totalmem()`.
  */
 export function automaticHeavyCommandLimit(cpus: number, totalMemoryBytes: number): number {
-  const gb = Math.round(totalMemoryBytes / 2 ** 30);
-  return Math.max(1, Math.floor(Math.min(cpus / 4, gb / 8)));
+    const gb = Math.round(totalMemoryBytes / 2 ** 30);
+
+    return Math.max(1, Math.floor(Math.min(cpus / 4, gb / 8)));
 }
 
 export const heavyCommandLimitSetting = limitSetting('heavy-command-limit.json', 'heavy command limit');

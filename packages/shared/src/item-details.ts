@@ -14,109 +14,114 @@ export type AzureBodyField = 'System.Description' | 'Microsoft.VSTS.TCM.ReproSte
 
 /** A description to save, as markdown, on the item the board holds under `itemId`. */
 export interface DescriptionSave {
-  itemId: string;
-  body: string;
-  /** On Azure DevOps, the `bodyField` and `revision` its details gave; absent on GitHub. */
-  bodyField?: AzureBodyField;
-  revision?: number;
+    itemId: string;
+    body: string;
+    /** On Azure DevOps, the `bodyField` and `revision` its details gave; absent on GitHub. */
+    bodyField?: AzureBodyField;
+    revision?: number;
 }
 
 export interface ItemComment {
-  id: string;
-  author: string;
-  createdAt: string;
-  body: string;
-  format: TextFormat;
+    id: string;
+    author: string;
+    createdAt: string;
+    body: string;
+    format: TextFormat;
 }
 
 /** A review round as the item dialog shows it: each reviewer's verdict and how many of its findings are still open. */
 export interface RecordReviewRound {
-  round: number;
-  recordedAt: string;
-  reviewers: { axis: string; verdict: string; findings: number; open: number }[];
+    round: number;
+    recordedAt: string;
+    reviewers: { axis: string; verdict: string; findings: number; open: number }[];
 }
 
 /** The work record's text and local progress; trusted Spec edits can update its brief. */
 export interface RecordDetails {
-  /** Which body the record holds: a concept's map, a decision's text, or any other record's brief. */
-  bodyKind: 'map' | 'decision' | 'brief';
-  /** That body's markdown; empty while none is written. */
-  body: string;
-  /** The saved decision outcome; absent for other records or before an answer is recorded. */
-  answer?: string;
-  /** The markdown the work began with, such as the picked ticket's text then; empty when it began with none. */
-  context: string;
-  /** Where its build stands, as lar-build names the phase, or null before it starts. */
-  buildPhase: string | null;
-  /** The build's review rounds, oldest first. */
-  reviewRounds: RecordReviewRound[];
+    /** Which body the record holds: a concept's map, a decision's text, or any other record's brief. */
+    bodyKind: 'map' | 'decision' | 'brief';
+    /** That body's markdown; empty while none is written. */
+    body: string;
+    /** The saved decision outcome; absent for other records or before an answer is recorded. */
+    answer?: string;
+    /** The markdown the work began with, such as the picked ticket's text then; empty when it began with none. */
+    context: string;
+    /** Where its build stands, as lar-build names the phase, or null before it starts. */
+    buildPhase: string | null;
+    /** The build's review rounds, oldest first. */
+    reviewRounds: RecordReviewRound[];
 }
 
 export interface ItemDetails {
-  /** The work record's text and progress; absent in sample mode and for an item with no record. */
-  record?: RecordDetails;
-  spec?: {
-    generation: number;
-    pending: boolean;
-    error: string | null;
-    warning: string | null;
-    original: string | null;
-    originalFormat: TextFormat;
-    held: { title: string; body: string } | null;
-  };
-  /** What updating the ticket to the item's kind writes now, for a disagreement where the item changed, what it leaves alone and why, and the two kinds it was read for. */
-  kindPlan?: { itemKind: SwapKind; ticketKind: SwapKind | null; swap: KindTicketSwap; note: string };
-  /** The ticket's description; empty when there is none. */
-  body: string;
-  format: TextFormat;
-  /** On Azure DevOps, the field the description was read from, which a save writes back; absent on GitHub. */
-  bodyField?: AzureBodyField;
-  /** On Azure DevOps, the work item's revision as read; a save fails if someone changed it since. Absent on GitHub. */
-  revision?: number;
-  /** Additional type-specific description fields, each with its own format. */
-  sections?: { title: string; body: string; format: TextFormat }[];
-  /** The person who opened it; null when the provider doesn't say. */
-  author: string | null;
-  assignees: string[];
-  createdAt: string | null;
-  /** GitHub's milestone; absent on Azure DevOps. */
-  milestone?: string;
-  /** Azure DevOps's iteration and area; absent on GitHub. */
-  iteration?: string;
-  area?: string;
-  /** Its sub-issues or child work items. */
-  subTickets: IssueRef[];
-  /** Named Azure attachments open in Azure DevOps; their contents are never downloaded by the board. */
-  attachments?: { name: string; url: string }[];
-  related?: IssueRef[];
-  blockers?: IssueRef[];
-  /** A failed relations read leaves the main details intact. */
-  relationsError?: string;
-  /** The latest comments, newest first. */
-  comments: ItemComment[];
-  /** Whether older comments exist than the ones listed. */
-  hasOlderComments: boolean;
-  /** Where the next 10 older comments start; null when there are none. */
-  olderCursor: string | null;
+    /** The work record's text and progress; absent in sample mode and for an item with no record. */
+    record?: RecordDetails;
+    spec?: {
+        generation: number;
+        pending: boolean;
+        error: string | null;
+        warning: string | null;
+        original: string | null;
+        originalFormat: TextFormat;
+        held: { title: string; body: string } | null;
+    };
+    /** What updating the ticket to the item's kind writes now, for a disagreement where the item changed, what it leaves alone and why, and the two kinds it was read for. */
+    kindPlan?: { itemKind: SwapKind; ticketKind: SwapKind | null; swap: KindTicketSwap; note: string };
+    /** The ticket's description; empty when there is none. */
+    body: string;
+    format: TextFormat;
+    /** On Azure DevOps, the field the description was read from, which a save writes back; absent on GitHub. */
+    bodyField?: AzureBodyField;
+    /** On Azure DevOps, the work item's revision as read; a save fails if someone changed it since. Absent on GitHub. */
+    revision?: number;
+    /** Additional type-specific description fields, each with its own format. */
+    sections?: { title: string; body: string; format: TextFormat }[];
+    /** The person who opened it; null when the provider doesn't say. */
+    author: string | null;
+    assignees: string[];
+    createdAt: string | null;
+    /** GitHub's milestone; absent on Azure DevOps. */
+    milestone?: string;
+    /** Azure DevOps's iteration and area; absent on GitHub. */
+    iteration?: string;
+    area?: string;
+    /** Its sub-issues or child work items. */
+    subTickets: IssueRef[];
+    /** Named Azure attachments open in Azure DevOps; their contents are never downloaded by the board. */
+    attachments?: { name: string; url: string }[];
+    related?: IssueRef[];
+    blockers?: IssueRef[];
+    /** A failed relations read leaves the main details intact. */
+    relationsError?: string;
+    /** The latest comments, newest first. */
+    comments: ItemComment[];
+    /** Whether older comments exist than the ones listed. */
+    hasOlderComments: boolean;
+    /** Where the next 10 older comments start; null when there are none. */
+    olderCursor: string | null;
 }
 
 /** One page of older comments, newest first. */
 export interface ItemCommentsPage {
-  comments: ItemComment[];
-  /** Where the next 10 older comments start; null when this page reached the oldest. */
-  olderCursor: string | null;
+    comments: ItemComment[];
+    /** Where the next 10 older comments start; null when this page reached the oldest. */
+    olderCursor: string | null;
 }
 
 /** Validation data read only when a build's Checks section opens. */
 export interface ItemChecks {
-  workId: string;
-  list: { command: string[]; folder: string }[];
-  runs: {
-    checkId: string; command: string[]; folder: string; role: string;
-    reason: string | null; outcome: 'unfinished' | 'interrupted' | 'failed' | 'expired' | 'passed';
-    eligible: boolean; snapshotState: 'unfinished' | 'missing' | 'changed' | 'stable';
-    failureState: 'open' | 'resolved' | null;
-    failure: { tests: string[]; diagnosis: string } | null;
-  }[];
-  reuses: { checkId: string; role: string; reason: string; tree: string; recordedAt: string }[];
+    workId: string;
+    list: { command: string[]; folder: string }[];
+    runs: {
+        checkId: string;
+        command: string[];
+        folder: string;
+        role: string;
+        reason: string | null;
+        outcome: 'unfinished' | 'interrupted' | 'failed' | 'expired' | 'passed';
+        eligible: boolean;
+        snapshotState: 'unfinished' | 'missing' | 'changed' | 'stable';
+        failureState: 'open' | 'resolved' | null;
+        failure: { tests: string[]; diagnosis: string } | null;
+    }[];
+    reuses: { checkId: string; role: string; reason: string; tree: string; recordedAt: string }[];
 }

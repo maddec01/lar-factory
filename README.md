@@ -194,7 +194,9 @@ pnpm run dev
 ```
 
 The first install downloads Electron. The workspace contains the server, web UI,
-Electron app and shared packages. See [the server README](apps/server/README.md)
+Electron app and shared packages. Formatting, lint and TypeScript settings come from
+Lar's shared toolchain, `@lar-works/config`: `pnpm run check` checks them and
+`pnpm run fix` formats and applies lint fixes. See [the server README](apps/server/README.md)
 for local server and sample commands, and [the skill layout](docs/skill-layout.md)
 for assembly.
 
@@ -256,7 +258,7 @@ apps/server/          local board server and provider adapters
 apps/web/             board UI
 apps/desktop/         Electron app
 packages/shared/      shared model and local settings
-packages/ui/          design system
+packages/ui/          board UI on @lar-works/design-system
 packages/work-records/ local work records and lar-work command
 scripts/              assembly, workspace setup and release tools
 ```

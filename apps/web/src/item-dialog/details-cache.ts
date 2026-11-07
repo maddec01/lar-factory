@@ -8,16 +8,21 @@ import type { ItemComment, ItemDetails } from '@lar-factory/shared';
 
 /** The older comments "Load 10 more" fetched, with the cursor of the next page. */
 interface OlderPages {
-  comments: ItemComment[];
-  cursor: string | null;
+    comments: ItemComment[];
+    cursor: string | null;
 }
 
 export interface DetailsEntry {
-  /** The item's updatedAt on the board when the details were read. */
-  updatedAt: string;
-  details: ItemDetails;
-  /** What "Load 10 more" added since; kept with the entry so a reopen shows it. */
-  older: OlderPages | null;
+    /** The item's updatedAt on the board when the details were read. */
+    updatedAt: string;
+    details: ItemDetails;
+    /** What "Load 10 more" added since; kept with the entry so a reopen shows it. */
+    older: OlderPages | null;
+}
+
+/** Keeps what "Load 10 more" added with `entry`, so a reopen shows it. */
+export function keepOlder(entry: DetailsEntry, older: OlderPages): void {
+    entry.older = older;
 }
 
 /** Entries kept at once; the least recently used goes first. */
@@ -25,27 +30,33 @@ const BOUND = 20;
 
 /** `cached` says whether an item's provider advances updatedAt on a new comment; both do, so by default every item is kept. */
 export function createDetailsCache(cached: (itemId: string) => boolean = () => true, bound = BOUND) {
-  const entries = new Map<string, DetailsEntry>();
-  return {
-    /** The entry read at `updatedAt`, or null when there is none or the item has changed since. */
-    get(itemId: string, updatedAt: string): DetailsEntry | null {
-      const entry = entries.get(itemId);
-      if (!entry || entry.updatedAt !== updatedAt) return null;
-      entries.delete(itemId);
-      entries.set(itemId, entry);
-      return entry;
-    },
-    put(itemId: string, entry: DetailsEntry): void {
-      if (!cached(itemId)) return;
-      entries.delete(itemId);
-      entries.set(itemId, entry);
-      if (entries.size > bound) entries.delete(entries.keys().next().value!);
-    },
-    /** Forgets the item's entry, as one a description save has made stale, so the next open reads its details again. */
-    drop(itemId: string): void {
-      entries.delete(itemId);
-    },
-  };
+    const entries = new Map<string, DetailsEntry>();
+
+    return {
+        /** The entry read at `updatedAt`, or null when there is none or the item has changed since. */
+        get(itemId: string, updatedAt: string): DetailsEntry | null {
+            const entry = entries.get(itemId);
+
+            if (!entry || entry.updatedAt !== updatedAt) return null;
+
+            entries.delete(itemId);
+            entries.set(itemId, entry);
+
+            return entry;
+        },
+        put(itemId: string, entry: DetailsEntry): void {
+            if (!cached(itemId)) return;
+
+            entries.delete(itemId);
+            entries.set(itemId, entry);
+
+            if (entries.size > bound) entries.delete(entries.keys().next().value!);
+        },
+        /** Forgets the item's entry, as one a description save has made stale, so the next open reads its details again. */
+        drop(itemId: string): void {
+            entries.delete(itemId);
+        },
+    };
 }
 
 export const detailsCache = createDetailsCache();

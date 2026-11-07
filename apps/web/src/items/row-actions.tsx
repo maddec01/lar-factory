@@ -5,5 +5,8 @@ import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 
 const ON_ROW = createContext(false);
-export const RowActions = ({ children }: { children: ReactNode }) => <ON_ROW.Provider value>{children}</ON_ROW.Provider>;
+
+export const RowActions = ({ children }: { children: ReactNode }) => (
+    <ON_ROW.Provider value>{children}</ON_ROW.Provider>
+);
 export const useOnRow = () => useContext(ON_ROW);

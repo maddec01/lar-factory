@@ -33,7 +33,7 @@ function stable(tags, gitState) {
     return planRelease({ channel: 'stable', runNumber: 60, date: '20261024', tags, ...git(gitState) });
 }
 
-test('publishes a Nightly of main\'s head', () => {
+test("publishes a Nightly of main's head", () => {
     assert.deepEqual(nightly(), {
         publish: true,
         channel: 'nightly',
@@ -53,12 +53,19 @@ test('dates a Nightly by its UTC day', () => {
 
 test('a Nightly fails when CI failed on the head', () => {
     for (const conclusion of ['failure', 'cancelled', 'timed_out']) {
-        assert.throws(() => nightly(ciRun({ conclusion })), /^Error: CI failed on aaaaaaaaaaaa; fix main before a Nightly\.$/);
+        assert.throws(
+            () => nightly(ciRun({ conclusion })),
+            /^Error: CI failed on aaaaaaaaaaaa; fix main before a Nightly\.$/,
+        );
     }
 });
 
 test('a Nightly fails when CI has not finished on the head', () => {
-    for (const run of [null, ciRun({ status: 'in_progress', conclusion: null }), ciRun({ status: 'queued', conclusion: null })]) {
+    for (const run of [
+        null,
+        ciRun({ status: 'in_progress', conclusion: null }),
+        ciRun({ status: 'queued', conclusion: null }),
+    ]) {
         assert.throws(() => nightly(run), /^Error: CI has not finished on aaaaaaaaaaaa; try again when it has\.$/);
     }
 });
@@ -93,8 +100,14 @@ test('a Stable Release rebuilds the latest Nightly commit', () => {
 });
 
 test('a Stable Release fails when its tag exists', () => {
-    const tags = [{ name: 'v0.1.0-nightly.20261023.57', sha: HEAD }, { name: 'v0.1.0', sha: HEAD }];
-    assert.throws(() => stable(tags), /v0\.1\.0 already exists.*bump "version" in the app package's package\.json, merge it and start its Nightly/);
+    const tags = [
+        { name: 'v0.1.0-nightly.20261023.57', sha: HEAD },
+        { name: 'v0.1.0', sha: HEAD },
+    ];
+    assert.throws(
+        () => stable(tags),
+        /v0\.1\.0 already exists.*bump "version" in the app package's package\.json, merge it and start its Nightly/,
+    );
 });
 
 test('a Stable Release fails without a Nightly', () => {
@@ -114,7 +127,10 @@ test('a Stable Release takes the version of the Nightly commit it rebuilds', () 
 
 test('a Stable Release fails when the latest Nightly commit is not on main', () => {
     const sha = 'b'.repeat(40);
-    assert.throws(() => stable([{ name: 'v0.1.0-nightly.20261023.9', sha }], { offMain: [sha] }), /bbbbbbbbbbbb is not on main/);
+    assert.throws(
+        () => stable([{ name: 'v0.1.0-nightly.20261023.9', sha }], { offMain: [sha] }),
+        /bbbbbbbbbbbb is not on main/,
+    );
 });
 
 test('a Nightly fails when its commit is not on main', () => {

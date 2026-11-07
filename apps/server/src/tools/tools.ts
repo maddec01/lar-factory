@@ -1,20 +1,41 @@
 // Finds the `t3`, `gh`, `az`, `git`, `jq` and `curl` binaries the way a Mac app opened from Finder must,
 // whose inherited PATH is often just /usr/bin:/bin. Copies T3 Code's lookup.
 
+import {
+    GH_FLOOR,
+    type AzCheck,
+    type CommandCheck,
+    type GhCheck,
+    type T3Check,
+    type ToolChecks,
+} from '@lar-factory/shared';
 import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
-import { GH_FLOOR, type AzCheck, type CommandCheck, type GhCheck, type T3Check, type ToolChecks } from '@lar-factory/shared';
+
 import { loopTrace } from '../startup/loop-trace.ts';
 import { serverRuntimePath, t3Running } from '../t3/t3-settings.ts';
 import { type RunResult, runTool } from './run-tool.ts';
 
 export const TOOL_NAMES = ['t3', 'gh', 'az', 'git', 'jq', 'curl'] as const;
-export type ToolName = typeof TOOL_NAMES[number];
+export type ToolName = (typeof TOOL_NAMES)[number];
 
-const OVERRIDES: Record<ToolName, string> = { t3: 'T3_PATH', gh: 'GH_PATH', az: 'AZ_PATH', git: 'GIT_PATH', jq: 'JQ_PATH', curl: 'CURL_PATH' };
+const OVERRIDES: Record<ToolName, string> = {
+    t3: 'T3_PATH',
+    gh: 'GH_PATH',
+    az: 'AZ_PATH',
+    git: 'GIT_PATH',
+    jq: 'JQ_PATH',
+    curl: 'CURL_PATH',
+};
 /** The command that installs each missing tool but t3, which T3 Code installs. */
-const INSTALL: Record<Exclude<ToolName, 't3'>, string> = { gh: 'brew install gh', az: 'brew install azure-cli', git: 'brew install git', jq: 'brew install jq', curl: 'brew install curl' };
+const INSTALL: Record<Exclude<ToolName, 't3'>, string> = {
+    gh: 'brew install gh',
+    az: 'brew install azure-cli',
+    git: 'brew install git',
+    jq: 'brew install jq',
+    curl: 'brew install curl',
+};
 const FALLBACK_DIRS = ['/opt/homebrew/bin', '/usr/local/bin'];
 const START = '__LAR_BOARD_PATH_START__';
 const END = '__LAR_BOARD_PATH_END__';
@@ -23,31 +44,35 @@ const END = '__LAR_BOARD_PATH_END__';
 type ToolLookup = { path: string } | { path: null; override?: string };
 
 export interface Tools extends Record<ToolName, ToolLookup> {
-  /** The PATH the lookup searched; tools run with it. */
-  searchPath: string;
+    /** The PATH the lookup searched; tools run with it. */
+    searchPath: string;
 }
 
 /** The login shell PATH first, then the inherited one, then the Homebrew folders, without empty entries or duplicates. */
-export function mergePaths(loginPath: string | null, inherited: string | undefined, fallbackDirs = FALLBACK_DIRS): string {
-  const dirs = [loginPath, inherited].flatMap((path) => path?.split(':') ?? []);
-  return [...new Set([...dirs, ...fallbackDirs].filter(Boolean))].join(':');
+export function mergePaths(
+    loginPath: string | null,
+    inherited: string | undefined,
+    fallbackDirs = FALLBACK_DIRS,
+): string {
+    const dirs = [loginPath, inherited].flatMap((path) => path?.split(':') ?? []);
+    return [...new Set([...dirs, ...fallbackDirs].filter(Boolean))].join(':');
 }
 
 function runnable(file: string): boolean {
-  try {
-    accessSync(file, constants.X_OK);
-    return statSync(file).isFile();
-  } catch {
-    return false;
-  }
+    try {
+        accessSync(file, constants.X_OK);
+        return statSync(file).isFile();
+    } catch {
+        return false;
+    }
 }
 
 function onPath(name: string, searchPath: string): string | null {
-  for (const dir of searchPath.split(':')) {
-    const file = join(dir, name);
-    if (runnable(file)) return file;
-  }
-  return null;
+    for (const dir of searchPath.split(':')) {
+        const file = join(dir, name);
+        if (runnable(file)) return file;
+    }
+    return null;
 }
 
 /**
@@ -55,27 +80,30 @@ function onPath(name: string, searchPath: string): string | null {
  * with no fallback; looked up on the PATH when it's a bare name), else its own name on the PATH.
  */
 export function findTools(env: NodeJS.ProcessEnv, loginPath: string | null, fallbackDirs = FALLBACK_DIRS): Tools {
-  const searchPath = mergePaths(loginPath, env.PATH, fallbackDirs);
-  const find = (name: ToolName): ToolLookup => {
-    const value = env[OVERRIDES[name]];
-    if (!value) return { path: onPath(name, searchPath) };
-    const path = value.includes('/') ? (runnable(value) ? value : null) : onPath(value, searchPath);
-    return path ? { path } : { path: null, override: `${OVERRIDES[name]}=${value}` };
-  };
-  return { ...Object.fromEntries(TOOL_NAMES.map((name) => [name, find(name)])) as Record<ToolName, ToolLookup>, searchPath };
+    const searchPath = mergePaths(loginPath, env.PATH, fallbackDirs);
+    const find = (name: ToolName): ToolLookup => {
+        const value = env[OVERRIDES[name]];
+        if (!value) return { path: onPath(name, searchPath) };
+        const path = value.includes('/') ? (runnable(value) ? value : null) : onPath(value, searchPath);
+        return path ? { path } : { path: null, override: `${OVERRIDES[name]}=${value}` };
+    };
+    return {
+        ...(Object.fromEntries(TOOL_NAMES.map((name) => [name, find(name)])) as Record<ToolName, ToolLookup>),
+        searchPath,
+    };
 }
 
 async function output(file: string, args: string[], env: NodeJS.ProcessEnv, timeout: number): Promise<string | null> {
-  const { code, stdout } = await runTool(file, args, { env, timeout });
-  return code === 0 ? stdout : null;
+    const { code, stdout } = await runTool(file, args, { env, timeout });
+    return code === 0 ? stdout : null;
 }
 
 function accountShell(): string | undefined {
-  try {
-    return userInfo().shell ?? undefined;
-  } catch {
-    return undefined;
-  }
+    try {
+        return userInfo().shell ?? undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /**
@@ -83,11 +111,16 @@ function accountShell(): string | undefined {
  * `launchctl getenv PATH` (2 s), else null. The shell is $SHELL, else the account's, else zsh.
  */
 export async function readLoginPath(env: NodeJS.ProcessEnv, launchctl = '/bin/launchctl'): Promise<string | null> {
-  const shell = env.SHELL || accountShell() || '/bin/zsh';
-  const printed = await output(shell, ['-ilc', `printf '\\n%s\\n%s\\n%s\\n' '${START}' "$PATH" '${END}'`], env, 5_000);
-  const match = printed?.match(new RegExp(`${START}\\n(.*)\\n${END}`));
-  if (match?.[1]) return match[1];
-  return (await output(launchctl, ['getenv', 'PATH'], env, 2_000))?.trim() || null;
+    const shell = env.SHELL || accountShell() || '/bin/zsh';
+    const printed = await output(
+        shell,
+        ['-ilc', `printf '\\n%s\\n%s\\n%s\\n' '${START}' "$PATH" '${END}'`],
+        env,
+        5_000,
+    );
+    const match = printed?.match(new RegExp(`${START}\\n(.*)\\n${END}`));
+    if (match?.[1]) return match[1];
+    return (await output(launchctl, ['getenv', 'PATH'], env, 2_000))?.trim() || null;
 }
 
 let current: Tools | null = null;
@@ -98,87 +131,90 @@ let loginPath: string | null = null;
  * `rereadLoginPath` is set (startup and Recheck); the timed retry keeps the PATH it last read.
  */
 export async function lookUpTools(env: NodeJS.ProcessEnv = process.env, rereadLoginPath = true): Promise<Tools> {
-  if (rereadLoginPath || !current) loginPath = await readLoginPath(env);
-  current = loopTrace.span('tool lookup', () => findTools(env, loginPath));
-  return current;
+    if (rereadLoginPath || !current) loginPath = await readLoginPath(env);
+    current = loopTrace.span('tool lookup', () => findTools(env, loginPath));
+    return current;
 }
 
 /** The last lookup's result, or null before the first. */
 export function tools(): Tools | null {
-  return current;
+    return current;
 }
 
 /** How to run a tool the last lookup found, or null when it's missing. */
 export function toolCommand(name: ToolName): { file: string; env: NodeJS.ProcessEnv } | null {
-  const path = current?.[name].path;
-  return path ? { file: path, env: { ...process.env, PATH: current!.searchPath } } : null;
+    const path = current?.[name].path;
+    return path ? { file: path, env: { ...process.env, PATH: current!.searchPath } } : null;
 }
 
 /** Why a tool can't run, as a clause without a full stop: missing, naming the override that pointed nowhere. */
 export function missingTool(name: ToolName): string {
-  const lookup = current?.[name];
-  const override = lookup && lookup.path === null ? lookup.override : undefined;
-  return override ? `${name} was not found at ${override}` : `${name} was not found`;
+    const lookup = current?.[name];
+    const override = lookup && lookup.path === null ? lookup.override : undefined;
+    return override ? `${name} was not found at ${override}` : `${name} was not found`;
 }
 
 /** The failed check for a tool the last lookup didn't find, naming the override that pointed nowhere, if one did. */
 function missingCheck(name: ToolName): { result: 'missing'; override?: string } {
-  const lookup = current?.[name];
-  const override = lookup && lookup.path === null ? lookup.override : undefined;
-  return { result: 'missing', ...(override && { override }) };
+    const lookup = current?.[name];
+    const override = lookup && lookup.path === null ? lookup.override : undefined;
+    return { result: 'missing', ...(override && { override }) };
 }
 
 /** missingCheck with the command that installs the tool. */
 function missingWithFix(name: Exclude<ToolName, 't3'>): { result: 'missing'; override?: string; fix: string } {
-  return { ...missingCheck(name), fix: INSTALL[name] };
+    return { ...missingCheck(name), fix: INSTALL[name] };
 }
 
 /** The first version number on the first line of a `--version` output, else that line; undefined when it's empty. */
 export function versionOf(stdout: string): string | undefined {
-  const line = stdout.trim().split('\n')[0]!.trim();
-  return line.match(/\d+\.\d+[\w.+-]*/)?.[0] ?? (line || undefined);
+    const line = stdout.trim().split('\n')[0]!.trim();
+    return line.match(/\d+\.\d+[\w.+-]*/)?.[0] ?? (line || undefined);
 }
 
 /** Runs `<tool> --version`: the tool passes when it runs, with the version if it printed one with status 0; else it's missing. */
 async function checkVersion<M>(name: ToolName, missing: () => M): Promise<{ result: 'ok'; version?: string } | M> {
-  const command = toolCommand(name);
-  if (!command) return missing();
-  const { code, stdout } = await runTool(command.file, ['--version'], { env: command.env, timeout: 5_000 });
-  // A string code is a spawn error: the binary went away or can't run since the lookup.
-  if (typeof code === 'string') return missing();
-  const version = code === 0 ? versionOf(stdout) : undefined;
-  return { result: 'ok', ...(version && { version }) };
+    const command = toolCommand(name);
+    if (!command) return missing();
+    const { code, stdout } = await runTool(command.file, ['--version'], { env: command.env, timeout: 5_000 });
+    // A string code is a spawn error: the binary went away or can't run since the lookup.
+    if (typeof code === 'string') return missing();
+    const version = code === 0 ? versionOf(stdout) : undefined;
+    return { result: 'ok', ...(version && { version }) };
 }
 
 /** Checks git, jq or curl runs. */
 function checkCommand(name: 'git' | 'jq' | 'curl'): Promise<CommandCheck> {
-  return checkVersion(name, () => missingWithFix(name));
+    return checkVersion(name, () => missingWithFix(name));
 }
 
 /** What the gh probe found: gh's check, and gh's error for the Stale banner when a probe failed without a notice of its own. */
 export interface GhProbe {
-  check: GhCheck;
-  error?: string;
+    check: GhCheck;
+    error?: string;
 }
 
 const LOGGED_OUT = /not logged in|gh auth login/i;
 
 /** Whether `version` is older than GH_FLOOR; false when it isn't a version number. */
 function olderThanFloor(version: string | undefined): boolean {
-  const parts = version?.match(/^(\d+)\.(\d+)\.(\d+)/)?.slice(1).map(Number);
-  if (!parts) return false;
-  const floor = GH_FLOOR.split('.').map(Number);
-  const i = parts.findIndex((part, j) => part !== floor[j]);
-  return i !== -1 && parts[i]! < floor[i]!;
+    const parts = version
+        ?.match(/^(\d+)\.(\d+)\.(\d+)/)
+        ?.slice(1)
+        .map(Number);
+    if (!parts) return false;
+    const floor = GH_FLOOR.split('.').map(Number);
+    const i = parts.findIndex((part, j) => part !== floor[j]);
+    return i !== -1 && parts[i]! < floor[i]!;
 }
 
 const GH_UPGRADE = 'brew upgrade gh';
 
 /** Whether a logged-in gh's version needs an upgrade. */
 function loggedInCheck(version: string | undefined): GhCheck {
-  const outdated = olderThanFloor(version);
-  if (outdated) return { result: 'outdated', version: version!, fix: GH_UPGRADE };
-  return { result: 'ok', ...(version && { version }) };
+    const outdated = olderThanFloor(version);
+    if (outdated) return { result: 'outdated', version: version!, fix: GH_UPGRADE };
+    return { result: 'ok', ...(version && { version }) };
 }
 
 /**
@@ -186,35 +222,38 @@ function loggedInCheck(version: string | undefined): GhCheck {
  * failure that isn't a logout, returns gh's error for the Stale banner.
  */
 export async function probeGh(): Promise<GhProbe> {
-  const command = toolCommand('gh');
-  if (!command) return { check: missingWithFix('gh') };
-  const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 5_000 });
-  /** A failed run's probe: missing on a spawn error, which means gh went away or can't run since the lookup; else gh's error. */
-  const failed = ({ code, detail }: RunResult, args: string[], version?: string): GhProbe => {
-    if (typeof code === 'string') return { check: missingWithFix('gh') };
-    // No code means a signal, which here is the timeout.
-    return { check: { result: 'ok', ...(version && { version }) }, error: `gh ${args.join(' ')} failed: ${code === null ? 'timed out after 5 s' : detail}` };
-  };
-  const versionRun = await run(['--version']);
-  if (versionRun.code !== 0) return failed(versionRun, ['--version']);
-  const version = versionOf(versionRun.stdout);
-  const status = await run(['auth', 'status']);
-  // Older gh prints the status to stderr.
-  if (status.code === 0) return { check: loggedInCheck(version) };
-  if (typeof status.code === 'number' && LOGGED_OUT.test(status.stderr || status.stdout)) {
-    return { check: { result: 'logged-out', ...(version && { version }), fix: 'gh auth login' } };
-  }
-  return failed(status, ['auth', 'status'], version);
+    const command = toolCommand('gh');
+    if (!command) return { check: missingWithFix('gh') };
+    const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 5_000 });
+    /** A failed run's probe: missing on a spawn error, which means gh went away or can't run since the lookup; else gh's error. */
+    const failed = ({ code, detail }: RunResult, args: string[], version?: string): GhProbe => {
+        if (typeof code === 'string') return { check: missingWithFix('gh') };
+        // No code means a signal, which here is the timeout.
+        return {
+            check: { result: 'ok', ...(version && { version }) },
+            error: `gh ${args.join(' ')} failed: ${code === null ? 'timed out after 5 s' : detail}`,
+        };
+    };
+    const versionRun = await run(['--version']);
+    if (versionRun.code !== 0) return failed(versionRun, ['--version']);
+    const version = versionOf(versionRun.stdout);
+    const status = await run(['auth', 'status']);
+    // Older gh prints the status to stderr.
+    if (status.code === 0) return { check: loggedInCheck(version) };
+    if (typeof status.code === 'number' && LOGGED_OUT.test(status.stderr || status.stdout)) {
+        return { check: { result: 'logged-out', ...(version && { version }), fix: 'gh auth login' } };
+    }
+    return failed(status, ['auth', 'status'], version);
 }
 
 /** az's own version from `az version`'s JSON, under `azure-cli`; none when az printed something else. */
 function azVersionOf(stdout: string): string | undefined {
-  try {
-    const version: unknown = (JSON.parse(stdout) as Record<string, unknown> | null)?.['azure-cli'];
-    return typeof version === 'string' ? version : undefined;
-  } catch {
-    return undefined;
-  }
+    try {
+        const version: unknown = (JSON.parse(stdout) as Record<string, unknown> | null)?.['azure-cli'];
+        return typeof version === 'string' ? version : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /**
@@ -223,24 +262,28 @@ function azVersionOf(stdout: string): string | undefined {
  * A signed-out az names `az login`, which comes before a missing extension.
  */
 export async function probeAz(): Promise<AzCheck> {
-  const command = toolCommand('az');
-  if (!command) return missingWithFix('az');
-  const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 10_000 });
-  const versionRun = await run(['version']);
-  // A string code is a spawn error: az went away or can't run since the lookup.
-  if (typeof versionRun.code === 'string') return missingWithFix('az');
-  const version = versionRun.code === 0 ? azVersionOf(versionRun.stdout) : undefined;
-  const [account, extension] = await Promise.all([run(['account', 'show']), run(['extension', 'show', '--name', 'azure-devops'])]);
-  if (account.code !== 0) return { result: 'logged-out', ...(version && { version }), fix: 'az login' };
-  if (extension.code !== 0) return { result: 'no-extension', ...(version && { version }), fix: 'az extension add --name azure-devops' };
-  return { result: 'ok', ...(version && { version }) };
+    const command = toolCommand('az');
+    if (!command) return missingWithFix('az');
+    const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 10_000 });
+    const versionRun = await run(['version']);
+    // A string code is a spawn error: az went away or can't run since the lookup.
+    if (typeof versionRun.code === 'string') return missingWithFix('az');
+    const version = versionRun.code === 0 ? azVersionOf(versionRun.stdout) : undefined;
+    const [account, extension] = await Promise.all([
+        run(['account', 'show']),
+        run(['extension', 'show', '--name', 'azure-devops']),
+    ]);
+    if (account.code !== 0) return { result: 'logged-out', ...(version && { version }), fix: 'az login' };
+    if (extension.code !== 0)
+        return { result: 'no-extension', ...(version && { version }), fix: 'az extension add --name azure-devops' };
+    return { result: 'ok', ...(version && { version }) };
 }
 
 /** Checks t3 runs, then that T3 Code is running, as its runtime file at `runtime` says. */
 async function checkT3(runtime: string): Promise<T3Check> {
-  const check = await checkVersion('t3', () => missingCheck('t3'));
-  if (check.result !== 'ok' || t3Running(runtime)) return check;
-  return { result: 'not-running', ...(check.version && { version: check.version }) };
+    const check = await checkVersion('t3', () => missingCheck('t3'));
+    if (check.result !== 'ok' || t3Running(runtime)) return check;
+    return { result: 'not-running', ...(check.version && { version: check.version }) };
 }
 
 /**
@@ -249,14 +292,24 @@ async function checkT3(runtime: string): Promise<T3Check> {
  * T3's runtime file at `t3Runtime` tells. `landed` hears each check as it lands, so a slow one holds up no other.
  * `ghError` is the gh probe's error for the Stale banner.
  */
-export async function checkTools(needs: { gh: boolean; az: boolean }, t3Runtime = serverRuntimePath(),
-  landed: (check: Partial<ToolChecks>) => void = () => {}): Promise<{ tools: ToolChecks; ghError?: string }> {
-  const heard = <T>(check: Promise<T>, of: (found: T) => Partial<ToolChecks>) => check.then((found) => { landed(of(found)); return found; });
-  const [gh, az, t3, git, jq, curl] = await Promise.all([
-    needs.gh ? heard(probeGh(), (found) => ({ gh: found.check })) : undefined,
-    needs.az ? heard(probeAz(), (found) => ({ az: found })) : undefined,
-    heard(checkT3(t3Runtime), (t3) => ({ t3 })), heard(checkCommand('git'), (git) => ({ git })),
-    heard(checkCommand('jq'), (jq) => ({ jq })), heard(checkCommand('curl'), (curl) => ({ curl }))]);
-  const tools: ToolChecks = { t3, git, jq, curl, ...(gh && { gh: gh.check }), ...(az && { az }) };
-  return { tools, ...(gh?.error && { ghError: gh.error }) };
+export async function checkTools(
+    needs: { gh: boolean; az: boolean },
+    t3Runtime = serverRuntimePath(),
+    landed: (check: Partial<ToolChecks>) => void = () => {},
+): Promise<{ tools: ToolChecks; ghError?: string }> {
+    const heard = <T>(check: Promise<T>, of: (found: T) => Partial<ToolChecks>) =>
+        check.then((found) => {
+            landed(of(found));
+            return found;
+        });
+    const [gh, az, t3, git, jq, curl] = await Promise.all([
+        needs.gh ? heard(probeGh(), (found) => ({ gh: found.check })) : undefined,
+        needs.az ? heard(probeAz(), (found) => ({ az: found })) : undefined,
+        heard(checkT3(t3Runtime), (t3) => ({ t3 })),
+        heard(checkCommand('git'), (git) => ({ git })),
+        heard(checkCommand('jq'), (jq) => ({ jq })),
+        heard(checkCommand('curl'), (curl) => ({ curl })),
+    ]);
+    const tools: ToolChecks = { t3, git, jq, curl, ...(gh && { gh: gh.check }), ...(az && { az }) };
+    return { tools, ...(gh?.error && { ghError: gh.error }) };
 }

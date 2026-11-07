@@ -1,424 +1,557 @@
-import * as NodeFS from "node:fs";
-import * as NodePath from "node:path";
+import { assert, describe, it } from '@effect/vitest';
+import type { InstallSnapshot } from '@lar-factory/shared';
+import { installTargets, type InstanceDiscovery } from '@lar-factory/shared/install-targets';
+import * as Effect from 'effect/Effect';
+import * as NodeFS from 'node:fs';
+import * as NodePath from 'node:path';
 
-import { assert, describe, it } from "@effect/vitest";
-import * as Effect from "effect/Effect";
-
-import type { InstallSnapshot } from "@lar-factory/shared";
-import { installTargets, type InstanceDiscovery } from "@lar-factory/shared/install-targets";
-import { makeBundle, tempDir } from "../../test/support.ts";
-import * as InstallBoard from "./install-board.ts";
-import * as SkillInstall from "./skill-install.ts";
+import { makeBundle, tempDir } from '../../test/support.ts';
+import * as InstallBoard from './install-board.ts';
+import * as SkillInstall from './skill-install.ts';
 
 /** A throwaway home with two Claude profiles, ~/.claude and .claude-work. */
 const makeHome = () => {
-  const home = NodeFS.realpathSync(tempDir("board-home-"));
-  NodeFS.mkdirSync(NodePath.join(home, ".claude"));
-  NodeFS.mkdirSync(NodePath.join(home, ".claude-work"));
-  return home;
+    const home = NodeFS.realpathSync(tempDir('board-home-'));
+    NodeFS.mkdirSync(NodePath.join(home, '.claude'));
+    NodeFS.mkdirSync(NodePath.join(home, '.claude-work'));
+    return home;
 };
 
-const notRunning: InstanceDiscovery = { available: false, reason: "not-running" };
+const notRunning: InstanceDiscovery = { available: false, reason: 'not-running' };
 
 /** A packaged launch's checks into `home` and the board over them, with T3 answering `answer()`. */
 const launch = (home: string, answer: () => InstanceDiscovery = () => notRunning, root?: string) =>
-  Effect.gen(function* () {
-    const input = { home, version: "1.0.0", bundle: makeBundle() };
-    const checks = (yield* SkillInstall.makeChecks(
-      { ...input, isPackaged: true, argv: [], env: root ? { [SkillInstall.ROOT_ENV]: root } : {} },
-      () => Effect.sync(answer),
-    ))!;
-    return { checks, board: InstallBoard.makeInstallBoard(input, checks) };
-  });
-
-const target = (snapshot: InstallSnapshot, path: string) => snapshot.targets.find((candidate) => candidate.path === path);
-const link = (home: string, profile: string) => NodePath.join(home, profile, "skills/lar-work");
-
-describe("fromBoard", () => {
-  it("accepts only a frame on the board's origin", () => {
-    const board = "http://127.0.0.1:4319";
-    assert.isTrue(InstallBoard.fromBoard("http://127.0.0.1:4319/?view=all", board));
-    assert.isFalse(InstallBoard.fromBoard("http://127.0.0.1:4320/", board));
-    assert.isFalse(InstallBoard.fromBoard("https://example.com/", board));
-    assert.isFalse(InstallBoard.fromBoard(undefined, board));
-    assert.isFalse(InstallBoard.fromBoard("not a url", board));
-    assert.isFalse(InstallBoard.fromBoard("about:blank", ""));
-  });
-});
-
-describe("snapshot", () => {
-  it.effect("reads the same state after the page reopens, and sends each change to a subscriber", () =>
     Effect.gen(function* () {
-      const home = makeHome();
-      const { checks, board } = yield* launch(home);
-      const sent: Array<InstallSnapshot> = [];
-      const stop = board.subscribe((snapshot) => sent.push(snapshot));
-      yield* checks.atLaunch;
-      stop();
-
-      const reopened = InstallBoard.makeInstallBoard({ home, version: "1.0.0", bundle: "" }, checks).snapshot();
-      assert.deepStrictEqual(board.snapshot(), sent.at(-1));
-      assert.deepStrictEqual(reopened.targets.map(({ path, active }) => [path, active]), board.snapshot().targets.map(({ path, active }) => [path, active]));
-      assert.strictEqual(sent[0]?.running, "launch");
-      assert.strictEqual(sent.at(-1)?.running, null);
-      assert.isTrue(sent.some((snapshot) => target(snapshot, "~/.agents/skills")?.skills.some(({ state }) => state === "installing")));
-      const snapshot = board.snapshot();
-      assert.deepStrictEqual([snapshot.installs, snapshot.installed, snapshot.discovery], [true, true, "waiting"]);
-      assert.deepStrictEqual(snapshot.targets.map(({ path, active, locked, release }) => [path, active, locked, release]), [
-        ["~/.agents/skills", true, true, "1.0.0"],
-        ["~/.claude/skills", true, false, "1.0.0"],
-        ["~/.claude-work/skills", false, false, undefined],
-      ]);
-      assert.deepStrictEqual(target(snapshot, "~/.claude/skills")?.skills, [{ name: "lar-work", state: "installed" }]);
-      assert.deepStrictEqual(target(snapshot, "~/.claude-work/skills")?.skills, [{ name: "lar-work", state: "missing" }]);
-    }));
-
-  it.effect("says a T3 Claude target whose home doesn't exist isn't installed, and creates no home", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const missing = NodePath.join(home, ".claude-gone/skills");
-      const answer: InstanceDiscovery = {
-        available: true, instances: [{ id: "gone", driver: "claudeAgent", displayName: "Gone", enabled: true, targets: [{ kind: "claude", path: missing }] }],
-      };
-      const { checks, board } = yield* launch(home, () => answer);
-      yield* checks.afterDiscovery;
-
-      const gone = target(board.snapshot(), "~/.claude-gone/skills");
-      assert.deepStrictEqual([gone?.active, gone?.locked, gone?.homeMissing], [false, true, true]);
-      assert.strictEqual(target(board.snapshot(), "~/.claude/skills")?.homeMissing, undefined);
-      assert.isFalse(NodeFS.existsSync(NodePath.dirname(missing)));
-    }));
-
-  it.effect("names T3's instances and the targets they read, and holds no environment or home", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const settings = {
-        config: { homePath: "~/.claude-work" },
-        environment: [{ name: "HOME", value: "/Users/hidden-home" }, { name: "API_TOKEN", value: "token-123" }],
-      };
-      const answer = (): InstanceDiscovery => ({
-        available: true,
-        instances: [{ id: "work", driver: "claudeAgent", displayName: "Work", enabled: false, targets: installTargets("claudeAgent", home, settings) }],
-      });
-      const { checks, board } = yield* launch(home, answer);
-      yield* checks.afterDiscovery;
-
-      const snapshot = board.snapshot();
-      assert.deepStrictEqual(snapshot.instances, [{ id: "work", driver: "claudeAgent", displayName: "Work", enabled: false }]);
-      assert.deepStrictEqual(target(snapshot, "~/.claude-work/skills")?.instances, ["work"]);
-      assert.deepStrictEqual([target(snapshot, "~/.claude-work/skills")?.active, target(snapshot, "~/.claude-work/skills")?.locked], [true, true]);
-      const text = JSON.stringify(snapshot);
-      for (const hidden of [home, "/Users/hidden-home", "token-123", "API_TOKEN", "environment", "homePath"]) assert.notInclude(text, hidden);
-    }));
-
-  it.effect("reports the last check's Drift per target and skill", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const { checks, board } = yield* launch(home);
-      yield* checks.atLaunch;
-      NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
-      yield* checks.beforeBuild();
-
-      const snapshot = board.snapshot();
-      assert.deepStrictEqual(target(snapshot, "~/.agents/skills")?.skills, [{ name: "lar-work", state: "drift" }]);
-      assert.deepStrictEqual(snapshot.drift, [{ skill: "lar-work", paths: [{ place: "agents", path: "~/.agents/skills/lar-work" }] }]);
-
-      const replaced = yield* Effect.promise(board.replace);
-      assert.strictEqual(replaced.error, undefined);
-      assert.deepStrictEqual(replaced.snapshot.replaced, ["lar-work"]);
-      assert.deepStrictEqual(target(replaced.snapshot, "~/.agents/skills")?.replaced, ["lar-work"]);
-      assert.deepStrictEqual(target(replaced.snapshot, "~/.claude/skills")?.replaced, []);
-      yield* checks.beforeBuild();
-      yield* checks.afterDiscovery;
-      assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.replaced, ["lar-work"]);
-      assert.strictEqual(NodeFS.readFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "utf8"), "# lar-work\n");
-    }));
-
-  it("lists the targets of a run that installs nothing, and refuses every operation without writing", async () => {
-    const home = makeHome();
-    const board = InstallBoard.makeInstallBoard({ home, version: "1.0.0", bundle: makeBundle() }, undefined);
-    const snapshot = board.snapshot();
-    assert.deepStrictEqual([snapshot.installs, snapshot.installed], [false, false]);
-    assert.deepStrictEqual(snapshot.targets.map(({ path }) => path), ["~/.agents/skills", "~/.claude/skills", "~/.claude-work/skills"]);
-    for (const result of [await board.retry(), await board.replace(), await board.setTick("~/.claude/skills", true)]) {
-      assert.include(result.error, "--install-skills");
-    }
-    assert.isFalse(NodeFS.existsSync(NodePath.join(home, ".agents")));
-  });
-
-  it.effect("keeps known Drift actionable after Replace fails before reading targets", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const { checks, board } = yield* launch(home, () => notRunning, home);
-      yield* checks.atLaunch;
-      NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
-      yield* checks.beforeBuild();
-      const drift = board.snapshot().drift;
-      const manifest = NodePath.join(home, ".agents/.lar-factory-install.json");
-      const original = NodeFS.readFileSync(manifest, "utf8");
-      NodeFS.writeFileSync(manifest, "{");
-      const failed = yield* Effect.promise(board.replace);
-      assert.include(failed.error, "Couldn't read");
-      assert.deepStrictEqual(failed.snapshot.drift, drift);
-      assert.deepStrictEqual(board.snapshot().drift, drift);
-      NodeFS.writeFileSync(manifest, original);
-      const recovered = yield* Effect.promise(board.replace);
-      assert.strictEqual(recovered.error, undefined);
-      assert.deepStrictEqual(recovered.snapshot.drift, []);
-      assert.deepStrictEqual(recovered.snapshot.replaced, ["lar-work"]);
-    }));
-
-  it.effect("keeps Drift in a target whose replacement copy fails and clears it after recovery", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const { checks, board } = yield* launch(home, () => notRunning, home);
-      yield* checks.atLaunch;
-      NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
-      yield* checks.beforeBuild();
-      const drift = board.snapshot().drift;
-      const skills = NodePath.join(home, ".agents/skills");
-      NodeFS.chmodSync(skills, 0o500);
-      try {
-        const failed = yield* Effect.promise(board.replace);
-        assert.isDefined(target(failed.snapshot, "~/.agents/skills")?.error);
-        assert.deepStrictEqual(failed.snapshot.drift, drift);
-      } finally {
-        NodeFS.chmodSync(skills, 0o700);
-      }
-      const recovered = yield* Effect.promise(board.replace);
-      assert.deepStrictEqual(recovered.snapshot.drift, []);
-      assert.deepStrictEqual(recovered.snapshot.replaced, ["lar-work"]);
-    }));
-});
-
-describe("setTick", () => {
-  it.effect("unticks a profile, removing its links, and ticks it back", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const { checks, board } = yield* launch(home);
-      yield* checks.atLaunch;
-
-      const off = yield* Effect.promise(() => board.setTick("~/.claude/skills", false));
-      assert.strictEqual(off.error, undefined);
-      assert.deepStrictEqual(off.removed, { links: ["lar-work"], checklists: false });
-      assert.deepStrictEqual([target(off.snapshot, "~/.claude/skills")?.active, target(off.snapshot, "~/.claude/skills")?.selection], [false, "unticked"]);
-      assert.isFalse(NodeFS.existsSync(link(home, ".claude")));
-
-      const on = yield* Effect.promise(() => board.setTick("~/.claude-work/skills", true));
-      assert.strictEqual(target(on.snapshot, "~/.claude-work/skills")?.active, true);
-      assert.isTrue(NodeFS.lstatSync(link(home, ".claude-work")).isSymbolicLink());
-    }));
-
-  it.effect("returns the paths a tick left alone, from ~", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const { checks, board } = yield* launch(home);
-      yield* checks.atLaunch;
-      NodeFS.mkdirSync(link(home, ".claude-work"), { recursive: true });
-      const result = yield* Effect.promise(() => board.setTick("~/.claude-work/skills", true));
-      assert.deepStrictEqual(result.conflicts, ["~/.claude-work/skills/lar-work"]);
-      assert.strictEqual(result.error, undefined);
-    }));
-
-  it.effect("refuses a path that isn't a listed target or a tick that isn't a boolean, and writes nothing", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const { checks, board } = yield* launch(home);
-      yield* checks.atLaunch;
-      const manifest = NodePath.join(home, ".agents/.lar-factory-install.json");
-      const before = NodeFS.readFileSync(manifest, "utf8");
-      NodeFS.mkdirSync(NodePath.join(home, "other"));
-      for (const path of ["~/other", "../.claude/skills", NodePath.join(home, ".claude/skills"), "", 1, null]) {
-        const result = yield* Effect.promise(() => board.setTick(path, false));
-        assert.include(result.error, "is not an Install target", String(path));
-      }
-      const result = yield* Effect.promise(() => board.setTick("~/.claude/skills", "no"));
-      assert.include(result.error, "true or false");
-      assert.strictEqual(NodeFS.readFileSync(manifest, "utf8"), before);
-      assert.isTrue(NodeFS.existsSync(link(home, ".claude")));
-    }));
-
-  it.effect("refuses to untick a locked target: one T3 requires, or ~/.agents/skills", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const answer = (): InstanceDiscovery => ({
-        available: true,
-        instances: [{ id: "claude", driver: "claudeAgent", displayName: "Claude", enabled: true, targets: installTargets("claudeAgent", home) }],
-      });
-      const { checks, board } = yield* launch(home, answer);
-      yield* checks.afterDiscovery;
-      for (const path of ["~/.claude/skills", "~/.agents/skills"]) {
-        const result = yield* Effect.promise(() => board.setTick(path, false));
-        assert.include(result.error, "stays ticked", path);
-      }
-      assert.isTrue(NodeFS.lstatSync(link(home, ".claude")).isSymbolicLink());
-    }));
-
-  it.effect("refuses a profile linked outside the install root, and writes nothing there", () =>
-    Effect.gen(function* () {
-      const home = makeHome();
-      const outside = tempDir("board-outside-");
-      NodeFS.symlinkSync(outside, NodePath.join(home, ".claude-elsewhere"));
-      const { checks, board } = yield* launch(home, () => notRunning, home);
-      yield* checks.atLaunch;
-      const result = yield* Effect.promise(() => board.setTick("~/.claude-elsewhere/skills", true));
-      assert.include(result.error, "outside the install root");
-      assert.deepStrictEqual(NodeFS.readdirSync(outside), []);
-    }));
-});
-
-
-it.effect("keeps completed results through late shared targets and clears a resolved failure on Retry", () =>
-  Effect.gen(function* () {
-    const home = makeHome();
-    let answer: InstanceDiscovery = notRunning;
-    const { checks, board } = yield* launch(home, () => answer);
-    yield* checks.atLaunch;
-    NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
-    yield* checks.replace;
-    const earlier = target(board.snapshot(), "~/.agents/skills");
-    NodeFS.writeFileSync(NodePath.join(home, "late"), "blocks the folder");
-    const path = NodePath.join(home, "late/skills");
-    answer = { available: true, instances: [true, false].map((enabled, index) => ({
-      id: `late-${index}`, driver: "antigravity", displayName: `Late ${index}`, enabled, targets: [{ kind: "antigravity", path }],
-    })) };
-    const duringDiscovery: InstallSnapshot[] = [];
-    const stop = board.subscribe((snapshot) => duringDiscovery.push(snapshot));
-    yield* checks.afterDiscovery;
-    stop();
-    assert.isTrue(duringDiscovery.every((snapshot) => target(snapshot, "~/.agents/skills")?.skills.every(({ state }) => state === "installed")));
-    const late = target(board.snapshot(), "~/late/skills");
-    assert.isString(late?.error);
-    assert.deepStrictEqual(late?.skills, [{ name: "lar-work", state: "failed" }]);
-    assert.deepStrictEqual(late?.instances, ["late-0", "late-1"]);
-    assert.strictEqual(board.snapshot().targets.filter(({ path }) => path === "~/late/skills").length, 1);
-    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.replaced, earlier?.replaced);
-    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.skills, earlier?.skills);
-    NodeFS.rmSync(NodePath.join(home, "late"));
-    yield* checks.retry;
-    assert.strictEqual(target(board.snapshot(), "~/late/skills")?.error, undefined);
-    assert.deepStrictEqual(target(board.snapshot(), "~/late/skills")?.skills, [{ name: "lar-work", state: "installed" }]);
-    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.replaced, ["lar-work"]);
-  }));
-
-
-it.effect("a Clash cannot mark a target successfully finished", () =>
-  Effect.gen(function* () {
-    const home = makeHome();
-    NodeFS.mkdirSync(NodePath.join(home, ".agents/skills/lar-work"), { recursive: true });
-    const { checks, board } = yield* launch(home);
-    yield* checks.atLaunch;
-    assert.isFalse(target(board.snapshot(), "~/.agents/skills")!.finished);
-    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")!.skills, [{ name: "lar-work", state: "blocked" }]);
-  }));
-
-describe("board-page mutations", () => {
-  it("rejects readiness from the old origin after a restart, and while the server is unavailable", () => {
-    let origin = "http://127.0.0.1:4319";
-    const requireBoard = InstallBoard.boardPageOnly(() => origin, "Only the board's page can change the skill install");
-    requireBoard("http://127.0.0.1:4319/");
-    origin = "";
-    assert.throws(() => requireBoard("http://127.0.0.1:4319/"));
-    origin = "http://127.0.0.1:4320";
-    assert.throws(() => requireBoard("http://127.0.0.1:4319/"));
-    assert.throws(() => requireBoard("https://example.com/"));
-    requireBoard("http://127.0.0.1:4320/?loading=drawn");
-  });
-});
-
-describe("retained install work", () => {
-  it.effect("keeps a completed install visible after discovery checks it without reinstalling", () =>
-    Effect.gen(function* () {
-      const { checks, board } = yield* launch(makeHome(), () => ({ available: true, instances: [] }));
-      yield* checks.atLaunch;
-      yield* checks.afterDiscovery;
-      const snapshot = board.snapshot();
-      assert.strictEqual(target(snapshot, "~/.agents/skills")?.operation, "install");
-      assert.strictEqual(target(snapshot, "~/.agents/skills")?.running, false);
-      assert.strictEqual(target(snapshot, "~/.agents/skills")?.finished, true);
-    }));
-});
-
-it.effect("recovers automatic closure on reconnect and reopens only for new target work", () =>
-  Effect.gen(function* () {
-    const home = makeHome();
-    let answer: InstanceDiscovery = notRunning;
-    const { checks, board } = yield* launch(home, () => answer);
-    yield* checks.atLaunch;
-    const completed = board.snapshot();
-    const sent: InstallSnapshot[] = [];
-    const stop = board.subscribe((snapshot) => sent.push(snapshot));
-    const closed = board.closeOverview("automatic", completed.revision);
-    assert.strictEqual(closed.overview, "automatic");
-    assert.isAbove(closed.revision!, completed.revision!);
-    stop();
-    assert.deepStrictEqual(sent.at(-1), closed);
-    assert.deepStrictEqual(board.snapshot(), closed);
-
-    answer = { available: true, instances: [true, false].map((enabled, index) => ({
-      id: `reader-${index}`, driver: "codex", displayName: `Reader ${index}`, enabled,
-      targets: [{ kind: "agents", path: NodePath.join(home, ".agents/skills") }],
-    })) };
-    yield* checks.afterDiscovery;
-    assert.strictEqual(board.snapshot().overview, "automatic");
-    assert.strictEqual(board.snapshot().targets.filter(({ path }) => path === "~/.agents/skills").length, 1);
-
-    const path = NodePath.join(home, "late/skills");
-    answer = { available: true, instances: [{ id: "late", driver: "antigravity", displayName: "Late", enabled: true,
-      targets: [{ kind: "antigravity", path }] }] };
-    const late: InstallSnapshot[] = [];
-    const reconnect = board.subscribe((snapshot) => late.push(snapshot));
-    yield* checks.afterDiscovery;
-    reconnect();
-    assert.isTrue(late.some((snapshot) => snapshot.overview === "open" && target(snapshot, "~/late/skills")?.running));
-    assert.strictEqual(board.snapshot().overview, "open");
-    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.skills, target(completed, "~/.agents/skills")?.skills);
-    assert.strictEqual(board.closeOverview("automatic", closed.revision).overview, "open");
-    assert.strictEqual(board.closeOverview("automatic", board.snapshot().revision).overview, "automatic");
-  }));
-
-it.effect("dismissal survives disconnection, late failure and Retry for the rest of the launch", () =>
-  Effect.gen(function* () {
-    const home = makeHome();
-    let answer: InstanceDiscovery = notRunning;
-    const { checks, board } = yield* launch(home, () => answer);
-    const during: InstallSnapshot[] = [];
-    const stop = board.subscribe((snapshot) => {
-      during.push(snapshot);
-      if (snapshot.overview === "open" && snapshot.targets.some(({ running }) => running)) board.closeOverview("dismissed", snapshot.revision);
+        const input = { home, version: '1.0.0', bundle: makeBundle() };
+        const checks = (yield* SkillInstall.makeChecks(
+            { ...input, isPackaged: true, argv: [], env: root ? { [SkillInstall.ROOT_ENV]: root } : {} },
+            () => Effect.sync(answer),
+        ))!;
+        return { checks, board: InstallBoard.makeInstallBoard(input, checks) };
     });
-    yield* checks.atLaunch;
-    stop();
-    assert.isTrue(during.some((snapshot) => snapshot.overview === "dismissed" && snapshot.running === "launch"));
-    assert.strictEqual(board.snapshot().overview, "dismissed");
-    assert.isTrue(target(board.snapshot(), "~/.agents/skills")?.finished);
-    NodeFS.writeFileSync(NodePath.join(home, "late"), "blocks the target");
-    answer = { available: true, instances: [{ id: "late", driver: "antigravity", displayName: "Late", enabled: true,
-      targets: [{ kind: "antigravity", path: NodePath.join(home, "late/skills") }] }] };
-    yield* checks.afterDiscovery;
-    assert.strictEqual(board.snapshot().overview, "dismissed");
-    assert.isString(target(board.snapshot(), "~/late/skills")?.error);
-    const reconnected: InstallSnapshot[] = [];
-    const reconnect = board.subscribe((snapshot) => reconnected.push(snapshot));
-    NodeFS.rmSync(NodePath.join(home, "late"));
-    yield* checks.retry;
-    reconnect();
-    assert.isTrue(reconnected.every(({ overview }) => overview === "dismissed"));
-    assert.isTrue(target(board.snapshot(), "~/late/skills")?.finished);
-    assert.strictEqual(board.closeOverview("automatic", board.snapshot().revision).overview, "dismissed");
-    const nextLaunch = yield* launch(home, () => answer);
-    assert.strictEqual(nextLaunch.board.snapshot().overview, "open");
-  }));
 
-it.effect("rejects invalid and premature automatic closure without changing installation", () =>
-  Effect.gen(function* () {
-    const home = makeHome();
-    NodeFS.mkdirSync(NodePath.join(home, ".agents/skills/lar-work"), { recursive: true });
-    const { checks, board } = yield* launch(home);
-    assert.throws(() => board.closeOverview("open", 0));
-    assert.strictEqual(board.closeOverview("automatic", board.snapshot().revision).overview, "open");
-    yield* checks.atLaunch;
-    const blocked = board.snapshot();
-    assert.isNotEmpty(blocked.blocked);
-    assert.deepStrictEqual(board.closeOverview("automatic", blocked.revision), blocked);
-  }));
+const target = (snapshot: InstallSnapshot, path: string) =>
+    snapshot.targets.find((candidate) => candidate.path === path);
+const link = (home: string, profile: string) => NodePath.join(home, profile, 'skills/lar-work');
+
+describe('fromBoard', () => {
+    it("accepts only a frame on the board's origin", () => {
+        const board = 'http://127.0.0.1:4319';
+        assert.isTrue(InstallBoard.fromBoard('http://127.0.0.1:4319/?view=all', board));
+        assert.isFalse(InstallBoard.fromBoard('http://127.0.0.1:4320/', board));
+        assert.isFalse(InstallBoard.fromBoard('https://example.com/', board));
+        assert.isFalse(InstallBoard.fromBoard(undefined, board));
+        assert.isFalse(InstallBoard.fromBoard('not a url', board));
+        assert.isFalse(InstallBoard.fromBoard('about:blank', ''));
+    });
+});
+
+describe('snapshot', () => {
+    it.effect('reads the same state after the page reopens, and sends each change to a subscriber', () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const { checks, board } = yield* launch(home);
+            const sent: Array<InstallSnapshot> = [];
+            const stop = board.subscribe((snapshot) => sent.push(snapshot));
+            yield* checks.atLaunch;
+            stop();
+
+            const reopened = InstallBoard.makeInstallBoard({ home, version: '1.0.0', bundle: '' }, checks).snapshot();
+            assert.deepStrictEqual(board.snapshot(), sent.at(-1));
+            assert.deepStrictEqual(
+                reopened.targets.map(({ path, active }) => [path, active]),
+                board.snapshot().targets.map(({ path, active }) => [path, active]),
+            );
+            assert.strictEqual(sent[0]?.running, 'launch');
+            assert.strictEqual(sent.at(-1)?.running, null);
+            assert.isTrue(
+                sent.some((snapshot) =>
+                    target(snapshot, '~/.agents/skills')?.skills.some(({ state }) => state === 'installing'),
+                ),
+            );
+            const snapshot = board.snapshot();
+            assert.deepStrictEqual(
+                [snapshot.installs, snapshot.installed, snapshot.discovery],
+                [true, true, 'waiting'],
+            );
+            assert.deepStrictEqual(
+                snapshot.targets.map(({ path, active, locked, release }) => [path, active, locked, release]),
+                [
+                    ['~/.agents/skills', true, true, '1.0.0'],
+                    ['~/.claude/skills', true, false, '1.0.0'],
+                    ['~/.claude-work/skills', false, false, undefined],
+                ],
+            );
+            assert.deepStrictEqual(target(snapshot, '~/.claude/skills')?.skills, [
+                { name: 'lar-work', state: 'installed' },
+            ]);
+            assert.deepStrictEqual(target(snapshot, '~/.claude-work/skills')?.skills, [
+                { name: 'lar-work', state: 'missing' },
+            ]);
+        }),
+    );
+
+    it.effect("says a T3 Claude target whose home doesn't exist isn't installed, and creates no home", () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const missing = NodePath.join(home, '.claude-gone/skills');
+            const answer: InstanceDiscovery = {
+                available: true,
+                instances: [
+                    {
+                        id: 'gone',
+                        driver: 'claudeAgent',
+                        displayName: 'Gone',
+                        enabled: true,
+                        targets: [{ kind: 'claude', path: missing }],
+                    },
+                ],
+            };
+            const { checks, board } = yield* launch(home, () => answer);
+            yield* checks.afterDiscovery;
+
+            const gone = target(board.snapshot(), '~/.claude-gone/skills');
+            assert.deepStrictEqual([gone?.active, gone?.locked, gone?.homeMissing], [false, true, true]);
+            assert.strictEqual(target(board.snapshot(), '~/.claude/skills')?.homeMissing, undefined);
+            assert.isFalse(NodeFS.existsSync(NodePath.dirname(missing)));
+        }),
+    );
+
+    it.effect("names T3's instances and the targets they read, and holds no environment or home", () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const settings = {
+                config: { homePath: '~/.claude-work' },
+                environment: [
+                    { name: 'HOME', value: '/Users/hidden-home' },
+                    { name: 'API_TOKEN', value: 'token-123' },
+                ],
+            };
+            const answer = (): InstanceDiscovery => ({
+                available: true,
+                instances: [
+                    {
+                        id: 'work',
+                        driver: 'claudeAgent',
+                        displayName: 'Work',
+                        enabled: false,
+                        targets: installTargets('claudeAgent', home, settings),
+                    },
+                ],
+            });
+            const { checks, board } = yield* launch(home, answer);
+            yield* checks.afterDiscovery;
+
+            const snapshot = board.snapshot();
+            assert.deepStrictEqual(snapshot.instances, [
+                { id: 'work', driver: 'claudeAgent', displayName: 'Work', enabled: false },
+            ]);
+            assert.deepStrictEqual(target(snapshot, '~/.claude-work/skills')?.instances, ['work']);
+            assert.deepStrictEqual(
+                [target(snapshot, '~/.claude-work/skills')?.active, target(snapshot, '~/.claude-work/skills')?.locked],
+                [true, true],
+            );
+            const text = JSON.stringify(snapshot);
+            for (const hidden of [home, '/Users/hidden-home', 'token-123', 'API_TOKEN', 'environment', 'homePath'])
+                assert.notInclude(text, hidden);
+        }),
+    );
+
+    it.effect("reports the last check's Drift per target and skill", () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const { checks, board } = yield* launch(home);
+            yield* checks.atLaunch;
+            NodeFS.writeFileSync(NodePath.join(home, '.agents/skills/lar-work/SKILL.md'), 'edited');
+            yield* checks.beforeBuild();
+
+            const snapshot = board.snapshot();
+            assert.deepStrictEqual(target(snapshot, '~/.agents/skills')?.skills, [
+                { name: 'lar-work', state: 'drift' },
+            ]);
+            assert.deepStrictEqual(snapshot.drift, [
+                { skill: 'lar-work', paths: [{ place: 'agents', path: '~/.agents/skills/lar-work' }] },
+            ]);
+
+            const replaced = yield* Effect.promise(board.replace);
+            assert.strictEqual(replaced.error, undefined);
+            assert.deepStrictEqual(replaced.snapshot.replaced, ['lar-work']);
+            assert.deepStrictEqual(target(replaced.snapshot, '~/.agents/skills')?.replaced, ['lar-work']);
+            assert.deepStrictEqual(target(replaced.snapshot, '~/.claude/skills')?.replaced, []);
+            yield* checks.beforeBuild();
+            yield* checks.afterDiscovery;
+            assert.deepStrictEqual(target(board.snapshot(), '~/.agents/skills')?.replaced, ['lar-work']);
+            assert.strictEqual(
+                NodeFS.readFileSync(NodePath.join(home, '.agents/skills/lar-work/SKILL.md'), 'utf8'),
+                '# lar-work\n',
+            );
+        }),
+    );
+
+    it('lists the targets of a run that installs nothing, and refuses every operation without writing', async () => {
+        const home = makeHome();
+        const board = InstallBoard.makeInstallBoard({ home, version: '1.0.0', bundle: makeBundle() }, undefined);
+        const snapshot = board.snapshot();
+        assert.deepStrictEqual([snapshot.installs, snapshot.installed], [false, false]);
+        assert.deepStrictEqual(
+            snapshot.targets.map(({ path }) => path),
+            ['~/.agents/skills', '~/.claude/skills', '~/.claude-work/skills'],
+        );
+        for (const result of [
+            await board.retry(),
+            await board.replace(),
+            await board.setTick('~/.claude/skills', true),
+        ]) {
+            assert.include(result.error, '--install-skills');
+        }
+        assert.isFalse(NodeFS.existsSync(NodePath.join(home, '.agents')));
+    });
+
+    it.effect('keeps known Drift actionable after Replace fails before reading targets', () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const { checks, board } = yield* launch(home, () => notRunning, home);
+            yield* checks.atLaunch;
+            NodeFS.writeFileSync(NodePath.join(home, '.agents/skills/lar-work/SKILL.md'), 'edited');
+            yield* checks.beforeBuild();
+            const drift = board.snapshot().drift;
+            const manifest = NodePath.join(home, '.agents/.lar-factory-install.json');
+            const original = NodeFS.readFileSync(manifest, 'utf8');
+            NodeFS.writeFileSync(manifest, '{');
+            const failed = yield* Effect.promise(board.replace);
+            assert.include(failed.error, "Couldn't read");
+            assert.deepStrictEqual(failed.snapshot.drift, drift);
+            assert.deepStrictEqual(board.snapshot().drift, drift);
+            NodeFS.writeFileSync(manifest, original);
+            const recovered = yield* Effect.promise(board.replace);
+            assert.strictEqual(recovered.error, undefined);
+            assert.deepStrictEqual(recovered.snapshot.drift, []);
+            assert.deepStrictEqual(recovered.snapshot.replaced, ['lar-work']);
+        }),
+    );
+
+    it.effect('keeps Drift in a target whose replacement copy fails and clears it after recovery', () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const { checks, board } = yield* launch(home, () => notRunning, home);
+            yield* checks.atLaunch;
+            NodeFS.writeFileSync(NodePath.join(home, '.agents/skills/lar-work/SKILL.md'), 'edited');
+            yield* checks.beforeBuild();
+            const drift = board.snapshot().drift;
+            const skills = NodePath.join(home, '.agents/skills');
+            NodeFS.chmodSync(skills, 0o500);
+            try {
+                const failed = yield* Effect.promise(board.replace);
+                assert.isDefined(target(failed.snapshot, '~/.agents/skills')?.error);
+                assert.deepStrictEqual(failed.snapshot.drift, drift);
+            } finally {
+                NodeFS.chmodSync(skills, 0o700);
+            }
+            const recovered = yield* Effect.promise(board.replace);
+            assert.deepStrictEqual(recovered.snapshot.drift, []);
+            assert.deepStrictEqual(recovered.snapshot.replaced, ['lar-work']);
+        }),
+    );
+});
+
+describe('setTick', () => {
+    it.effect('unticks a profile, removing its links, and ticks it back', () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const { checks, board } = yield* launch(home);
+            yield* checks.atLaunch;
+
+            const off = yield* Effect.promise(() => board.setTick('~/.claude/skills', false));
+            assert.strictEqual(off.error, undefined);
+            assert.deepStrictEqual(off.removed, { links: ['lar-work'], checklists: false });
+            assert.deepStrictEqual(
+                [target(off.snapshot, '~/.claude/skills')?.active, target(off.snapshot, '~/.claude/skills')?.selection],
+                [false, 'unticked'],
+            );
+            assert.isFalse(NodeFS.existsSync(link(home, '.claude')));
+
+            const on = yield* Effect.promise(() => board.setTick('~/.claude-work/skills', true));
+            assert.strictEqual(target(on.snapshot, '~/.claude-work/skills')?.active, true);
+            assert.isTrue(NodeFS.lstatSync(link(home, '.claude-work')).isSymbolicLink());
+        }),
+    );
+
+    it.effect('returns the paths a tick left alone, from ~', () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const { checks, board } = yield* launch(home);
+            yield* checks.atLaunch;
+            NodeFS.mkdirSync(link(home, '.claude-work'), { recursive: true });
+            const result = yield* Effect.promise(() => board.setTick('~/.claude-work/skills', true));
+            assert.deepStrictEqual(result.conflicts, ['~/.claude-work/skills/lar-work']);
+            assert.strictEqual(result.error, undefined);
+        }),
+    );
+
+    it.effect("refuses a path that isn't a listed target or a tick that isn't a boolean, and writes nothing", () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const { checks, board } = yield* launch(home);
+            yield* checks.atLaunch;
+            const manifest = NodePath.join(home, '.agents/.lar-factory-install.json');
+            const before = NodeFS.readFileSync(manifest, 'utf8');
+            NodeFS.mkdirSync(NodePath.join(home, 'other'));
+            for (const path of ['~/other', '../.claude/skills', NodePath.join(home, '.claude/skills'), '', 1, null]) {
+                const result = yield* Effect.promise(() => board.setTick(path, false));
+                assert.include(result.error, 'is not an Install target', String(path));
+            }
+            const result = yield* Effect.promise(() => board.setTick('~/.claude/skills', 'no'));
+            assert.include(result.error, 'true or false');
+            assert.strictEqual(NodeFS.readFileSync(manifest, 'utf8'), before);
+            assert.isTrue(NodeFS.existsSync(link(home, '.claude')));
+        }),
+    );
+
+    it.effect('refuses to untick a locked target: one T3 requires, or ~/.agents/skills', () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const answer = (): InstanceDiscovery => ({
+                available: true,
+                instances: [
+                    {
+                        id: 'claude',
+                        driver: 'claudeAgent',
+                        displayName: 'Claude',
+                        enabled: true,
+                        targets: installTargets('claudeAgent', home),
+                    },
+                ],
+            });
+            const { checks, board } = yield* launch(home, answer);
+            yield* checks.afterDiscovery;
+            for (const path of ['~/.claude/skills', '~/.agents/skills']) {
+                const result = yield* Effect.promise(() => board.setTick(path, false));
+                assert.include(result.error, 'stays ticked', path);
+            }
+            assert.isTrue(NodeFS.lstatSync(link(home, '.claude')).isSymbolicLink());
+        }),
+    );
+
+    it.effect('refuses a profile linked outside the install root, and writes nothing there', () =>
+        Effect.gen(function* () {
+            const home = makeHome();
+            const outside = tempDir('board-outside-');
+            NodeFS.symlinkSync(outside, NodePath.join(home, '.claude-elsewhere'));
+            const { checks, board } = yield* launch(home, () => notRunning, home);
+            yield* checks.atLaunch;
+            const result = yield* Effect.promise(() => board.setTick('~/.claude-elsewhere/skills', true));
+            assert.include(result.error, 'outside the install root');
+            assert.deepStrictEqual(NodeFS.readdirSync(outside), []);
+        }),
+    );
+});
+
+it.effect('keeps completed results through late shared targets and clears a resolved failure on Retry', () =>
+    Effect.gen(function* () {
+        const home = makeHome();
+        let answer: InstanceDiscovery = notRunning;
+        const { checks, board } = yield* launch(home, () => answer);
+        yield* checks.atLaunch;
+        NodeFS.writeFileSync(NodePath.join(home, '.agents/skills/lar-work/SKILL.md'), 'edited');
+        yield* checks.replace;
+        const earlier = target(board.snapshot(), '~/.agents/skills');
+        NodeFS.writeFileSync(NodePath.join(home, 'late'), 'blocks the folder');
+        const path = NodePath.join(home, 'late/skills');
+        answer = {
+            available: true,
+            instances: [true, false].map((enabled, index) => ({
+                id: `late-${index}`,
+                driver: 'antigravity',
+                displayName: `Late ${index}`,
+                enabled,
+                targets: [{ kind: 'antigravity', path }],
+            })),
+        };
+        const duringDiscovery: InstallSnapshot[] = [];
+        const stop = board.subscribe((snapshot) => duringDiscovery.push(snapshot));
+        yield* checks.afterDiscovery;
+        stop();
+        assert.isTrue(
+            duringDiscovery.every((snapshot) =>
+                target(snapshot, '~/.agents/skills')?.skills.every(({ state }) => state === 'installed'),
+            ),
+        );
+        const late = target(board.snapshot(), '~/late/skills');
+        assert.isString(late?.error);
+        assert.deepStrictEqual(late?.skills, [{ name: 'lar-work', state: 'failed' }]);
+        assert.deepStrictEqual(late?.instances, ['late-0', 'late-1']);
+        assert.strictEqual(board.snapshot().targets.filter(({ path }) => path === '~/late/skills').length, 1);
+        assert.deepStrictEqual(target(board.snapshot(), '~/.agents/skills')?.replaced, earlier?.replaced);
+        assert.deepStrictEqual(target(board.snapshot(), '~/.agents/skills')?.skills, earlier?.skills);
+        NodeFS.rmSync(NodePath.join(home, 'late'));
+        yield* checks.retry;
+        assert.strictEqual(target(board.snapshot(), '~/late/skills')?.error, undefined);
+        assert.deepStrictEqual(target(board.snapshot(), '~/late/skills')?.skills, [
+            { name: 'lar-work', state: 'installed' },
+        ]);
+        assert.deepStrictEqual(target(board.snapshot(), '~/.agents/skills')?.replaced, ['lar-work']);
+    }),
+);
+
+it.effect('a Clash cannot mark a target successfully finished', () =>
+    Effect.gen(function* () {
+        const home = makeHome();
+        NodeFS.mkdirSync(NodePath.join(home, '.agents/skills/lar-work'), { recursive: true });
+        const { checks, board } = yield* launch(home);
+        yield* checks.atLaunch;
+        assert.isFalse(target(board.snapshot(), '~/.agents/skills')!.finished);
+        assert.deepStrictEqual(target(board.snapshot(), '~/.agents/skills')!.skills, [
+            { name: 'lar-work', state: 'blocked' },
+        ]);
+    }),
+);
+
+describe('board-page mutations', () => {
+    it('rejects readiness from the old origin after a restart, and while the server is unavailable', () => {
+        let origin = 'http://127.0.0.1:4319';
+        const requireBoard = InstallBoard.boardPageOnly(
+            () => origin,
+            "Only the board's page can change the skill install",
+        );
+        requireBoard('http://127.0.0.1:4319/');
+        origin = '';
+        assert.throws(() => requireBoard('http://127.0.0.1:4319/'));
+        origin = 'http://127.0.0.1:4320';
+        assert.throws(() => requireBoard('http://127.0.0.1:4319/'));
+        assert.throws(() => requireBoard('https://example.com/'));
+        requireBoard('http://127.0.0.1:4320/?loading=drawn');
+    });
+});
+
+describe('retained install work', () => {
+    it.effect('keeps a completed install visible after discovery checks it without reinstalling', () =>
+        Effect.gen(function* () {
+            const { checks, board } = yield* launch(makeHome(), () => ({ available: true, instances: [] }));
+            yield* checks.atLaunch;
+            yield* checks.afterDiscovery;
+            const snapshot = board.snapshot();
+            assert.strictEqual(target(snapshot, '~/.agents/skills')?.operation, 'install');
+            assert.strictEqual(target(snapshot, '~/.agents/skills')?.running, false);
+            assert.strictEqual(target(snapshot, '~/.agents/skills')?.finished, true);
+        }),
+    );
+});
+
+it.effect('recovers automatic closure on reconnect and reopens only for new target work', () =>
+    Effect.gen(function* () {
+        const home = makeHome();
+        let answer: InstanceDiscovery = notRunning;
+        const { checks, board } = yield* launch(home, () => answer);
+        yield* checks.atLaunch;
+        const completed = board.snapshot();
+        const sent: InstallSnapshot[] = [];
+        const stop = board.subscribe((snapshot) => sent.push(snapshot));
+        const closed = board.closeOverview('automatic', completed.revision);
+        assert.strictEqual(closed.overview, 'automatic');
+        assert.isAbove(closed.revision!, completed.revision!);
+        stop();
+        assert.deepStrictEqual(sent.at(-1), closed);
+        assert.deepStrictEqual(board.snapshot(), closed);
+
+        answer = {
+            available: true,
+            instances: [true, false].map((enabled, index) => ({
+                id: `reader-${index}`,
+                driver: 'codex',
+                displayName: `Reader ${index}`,
+                enabled,
+                targets: [{ kind: 'agents', path: NodePath.join(home, '.agents/skills') }],
+            })),
+        };
+        yield* checks.afterDiscovery;
+        assert.strictEqual(board.snapshot().overview, 'automatic');
+        assert.strictEqual(board.snapshot().targets.filter(({ path }) => path === '~/.agents/skills').length, 1);
+
+        const path = NodePath.join(home, 'late/skills');
+        answer = {
+            available: true,
+            instances: [
+                {
+                    id: 'late',
+                    driver: 'antigravity',
+                    displayName: 'Late',
+                    enabled: true,
+                    targets: [{ kind: 'antigravity', path }],
+                },
+            ],
+        };
+        const late: InstallSnapshot[] = [];
+        const reconnect = board.subscribe((snapshot) => late.push(snapshot));
+        yield* checks.afterDiscovery;
+        reconnect();
+        assert.isTrue(
+            late.some((snapshot) => snapshot.overview === 'open' && target(snapshot, '~/late/skills')?.running),
+        );
+        assert.strictEqual(board.snapshot().overview, 'open');
+        assert.deepStrictEqual(
+            target(board.snapshot(), '~/.agents/skills')?.skills,
+            target(completed, '~/.agents/skills')?.skills,
+        );
+        assert.strictEqual(board.closeOverview('automatic', closed.revision).overview, 'open');
+        assert.strictEqual(board.closeOverview('automatic', board.snapshot().revision).overview, 'automatic');
+    }),
+);
+
+it.effect('dismissal survives disconnection, late failure and Retry for the rest of the launch', () =>
+    Effect.gen(function* () {
+        const home = makeHome();
+        let answer: InstanceDiscovery = notRunning;
+        const { checks, board } = yield* launch(home, () => answer);
+        const during: InstallSnapshot[] = [];
+        const stop = board.subscribe((snapshot) => {
+            during.push(snapshot);
+            if (snapshot.overview === 'open' && snapshot.targets.some(({ running }) => running))
+                board.closeOverview('dismissed', snapshot.revision);
+        });
+        yield* checks.atLaunch;
+        stop();
+        assert.isTrue(during.some((snapshot) => snapshot.overview === 'dismissed' && snapshot.running === 'launch'));
+        assert.strictEqual(board.snapshot().overview, 'dismissed');
+        assert.isTrue(target(board.snapshot(), '~/.agents/skills')?.finished);
+        NodeFS.writeFileSync(NodePath.join(home, 'late'), 'blocks the target');
+        answer = {
+            available: true,
+            instances: [
+                {
+                    id: 'late',
+                    driver: 'antigravity',
+                    displayName: 'Late',
+                    enabled: true,
+                    targets: [{ kind: 'antigravity', path: NodePath.join(home, 'late/skills') }],
+                },
+            ],
+        };
+        yield* checks.afterDiscovery;
+        assert.strictEqual(board.snapshot().overview, 'dismissed');
+        assert.isString(target(board.snapshot(), '~/late/skills')?.error);
+        const reconnected: InstallSnapshot[] = [];
+        const reconnect = board.subscribe((snapshot) => reconnected.push(snapshot));
+        NodeFS.rmSync(NodePath.join(home, 'late'));
+        yield* checks.retry;
+        reconnect();
+        assert.isTrue(reconnected.every(({ overview }) => overview === 'dismissed'));
+        assert.isTrue(target(board.snapshot(), '~/late/skills')?.finished);
+        assert.strictEqual(board.closeOverview('automatic', board.snapshot().revision).overview, 'dismissed');
+        const nextLaunch = yield* launch(home, () => answer);
+        assert.strictEqual(nextLaunch.board.snapshot().overview, 'open');
+    }),
+);
+
+it.effect('rejects invalid and premature automatic closure without changing installation', () =>
+    Effect.gen(function* () {
+        const home = makeHome();
+        NodeFS.mkdirSync(NodePath.join(home, '.agents/skills/lar-work'), { recursive: true });
+        const { checks, board } = yield* launch(home);
+        assert.throws(() => board.closeOverview('open', 0));
+        assert.strictEqual(board.closeOverview('automatic', board.snapshot().revision).overview, 'open');
+        yield* checks.atLaunch;
+        const blocked = board.snapshot();
+        assert.isNotEmpty(blocked.blocked);
+        assert.deepStrictEqual(board.closeOverview('automatic', blocked.revision), blocked);
+    }),
+);

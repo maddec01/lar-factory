@@ -1,8 +1,8 @@
 {
-  "extends": "@lar-works/config/tsconfig/node.json",
-  "compilerOptions": {
-    "lib": ["es2023", "dom", "dom.iterable"],
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["src", "vite.config.ts"]
+    "extends": "@lar-works/config/tsconfig/node.json",
+    "compilerOptions": {
+        "lib": ["es2023", "dom", "dom.iterable"],
+        "noFallthroughCasesInSwitch": true
+    },
+    "include": ["src", "vite.config.ts"]
 }

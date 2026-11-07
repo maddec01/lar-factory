@@ -1,31 +1,31 @@
 {
-  "name": "@lar-factory/desktop",
-  "private": true,
-  "version": "0.1.0",
-  "description": "The board app: an Electron window that runs the Lar Factory board, copied from T3 Code's desktop app.",
-  "type": "module",
-  "main": "dist-electron/main.cjs",
-  "scripts": {
-    "dev": "pnpm --dir ../.. run assemble:skills && pnpm --dir ../web run build && vp pack && node scripts/start-electron.mjs",
-    "build": "pnpm --dir ../.. run assemble:skills && pnpm --dir ../web run build && vp pack && node scripts/build-desktop-artifact.ts",
-    "test": "{ test -f ../web/dist/index.html || pnpm --dir ../web run build; } && vp test run",
-    "typecheck": "tsc --noEmit -p ."
-  },
-  "dependencies": {
-    "@effect/platform-node": "4.0.5",
-    "effect": "4.0.5",
-    "electron-updater": "6.8.9"
-  },
-  "devDependencies": {
-    "@effect/vitest": "4.0.5",
-    "@electron/osx-sign": "2.7.0",
-    "@lar-factory/shared": "workspace:*",
-    "@lar-factory/ui": "workspace:*",
-    "@lar-works/design-system": "^0.1.1",
-    "@types/node": "^24.19.2",
-    "electron": "44.9.3",
-    "electron-builder": "26.16.1",
-    "typescript": "^7.0.2",
-    "vite-plus": "1.5.0"
-  }
+    "name": "@lar-factory/desktop",
+    "private": true,
+    "version": "0.1.0",
+    "description": "The board app: an Electron window that runs the Lar Factory board, copied from T3 Code's desktop app.",
+    "type": "module",
+    "main": "dist-electron/main.cjs",
+    "scripts": {
+        "dev": "pnpm --dir ../.. run assemble:skills && pnpm --dir ../web run build && vp pack && node scripts/start-electron.mjs",
+        "build": "pnpm --dir ../.. run assemble:skills && pnpm --dir ../web run build && vp pack && node scripts/build-desktop-artifact.ts",
+        "test": "{ test -f ../web/dist/index.html || pnpm --dir ../web run build; } && vp test run",
+        "typecheck": "tsc --noEmit -p ."
+    },
+    "dependencies": {
+        "@effect/platform-node": "4.0.5",
+        "effect": "4.0.5",
+        "electron-updater": "6.8.9"
+    },
+    "devDependencies": {
+        "@effect/vitest": "4.0.5",
+        "@electron/osx-sign": "2.7.0",
+        "@lar-factory/shared": "workspace:*",
+        "@lar-factory/ui": "workspace:*",
+        "@lar-works/design-system": "^0.1.1",
+        "@types/node": "^24.19.2",
+        "electron": "44.9.3",
+        "electron-builder": "26.16.1",
+        "typescript": "^7.0.2",
+        "vite-plus": "1.5.0"
+    }
 }

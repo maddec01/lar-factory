@@ -2,32 +2,39 @@
 // REPOSITORY_LIST_FILE in boardDataDir(). The
 // board leaves the old repositories.json and settings.json untouched.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
-  PROVIDERS, isRecord, sameRepo, type OnboardingProgress, type OnboardingRepository, type Provider,
-  type RepositoryItemSource, type RepositoryConfigAnswers, type SetupAnswers,
+    PROVIDERS,
+    isRecord,
+    sameRepo,
+    type OnboardingProgress,
+    type OnboardingRepository,
+    type Provider,
+    type RepositoryItemSource,
+    type RepositoryConfigAnswers,
+    type SetupAnswers,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** One repository's settings used by its item source. */
 export interface RepositoryConfig extends RepositoryConfigAnswers {
-  repo: string;
-  role: string;
-  itemSource: RepositoryItemSource;
-  labels: string[];
+    repo: string;
+    role: string;
+    itemSource: RepositoryItemSource;
+    labels: string[];
 }
 
 export interface BoardSettings {
-  refreshSeconds: number;
-  /** Why the list file couldn't be used, naming its path, when it couldn't; the defaults stand in for it. */
-  problem?: string;
+    refreshSeconds: number;
+    /** Why the list file couldn't be used, naming its path, when it couldn't; the defaults stand in for it. */
+    problem?: string;
 }
 
 /** An onboarded repository, an entry of the repository list's `repositories`, with where it stopped while it is still onboarding. */
 export interface OnboardedRepository {
-  repo: string;
-  onboarding?: OnboardingProgress;
+    repo: string;
+    onboarding?: OnboardingProgress;
 }
 
 /**
@@ -35,11 +42,11 @@ export interface OnboardedRepository {
  * as its origin URL has them, which may hold "%" and "~" too; no part is "." or "..". repo-config.sh's repo_form and
  * azure_form.
  */
-const REPO = /^(?:(?!\.\.?\/)[A-Za-z0-9._-]+\/(?!\.\.?$)[A-Za-z0-9._-]+|(?!\.\.?\/)[A-Za-z0-9._%~-]+\/(?!\.\.?\/)[A-Za-z0-9._%~-]+\/(?!\.\.?$)[A-Za-z0-9._%~-]+)$/;
+const REPO =
+    /^(?:(?!\.\.?\/)[A-Za-z0-9._-]+\/(?!\.\.?$)[A-Za-z0-9._-]+|(?!\.\.?\/)[A-Za-z0-9._%~-]+\/(?!\.\.?\/)[A-Za-z0-9._%~-]+\/(?!\.\.?$)[A-Za-z0-9._%~-]+)$/;
 
 /** Whether a value is a repository of the form owner/name or organization/project/repository. */
 export const isRepo = (value: unknown): value is string => typeof value === 'string' && REPO.test(value);
-
 
 const isTeam = (value: unknown): value is string => typeof value === 'string' && value !== '';
 
@@ -47,61 +54,87 @@ const isTeam = (value: unknown): value is string => typeof value === 'string' &&
  * Whether a value is an item source in local settings: GitHub issues or an Azure DevOps team's combined board.
  */
 export function isItemSource(value: unknown): value is RepositoryItemSource {
-  if (!isRecord(value)) return false;
-  if (value.kind === 'issues') return true;
-  return value.kind === 'azure-board' && isTeam(value.team);
+    if (!isRecord(value)) return false;
+    if (value.kind === 'issues') return true;
+    return value.kind === 'azure-board' && isTeam(value.team);
 }
 
 function readJson(file: string): unknown {
-  try { return JSON.parse(readFileSync(file, 'utf8')); }
-  catch { throw new Error(`${file} isn't valid JSON.`); }
+    try {
+        return JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+        throw new Error(`${file} isn't valid JSON.`);
+    }
 }
 
-const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
+const strings = (value: unknown): value is string[] =>
+    Array.isArray(value) && value.every((v) => typeof v === 'string');
 
 const SETUP_SOURCES: readonly SetupAnswers['itemSource'][] = ['issues', 'azure-board'];
 
 /** Whether the Provider and item source step's answers have their shape. Progress saved before show was dropped still has it, unread. */
 function isSetup(value: unknown): value is SetupAnswers {
-  return isRecord(value) && SETUP_SOURCES.includes(value.itemSource as SetupAnswers['itemSource'])
-    && (value.team === undefined || typeof value.team === 'string') && typeof value.role === 'string';
+    return (
+        isRecord(value) &&
+        SETUP_SOURCES.includes(value.itemSource as SetupAnswers['itemSource']) &&
+        (value.team === undefined || typeof value.team === 'string') &&
+        typeof value.role === 'string'
+    );
 }
 
 /** Whether an entry's onboarding is progress the dialog can resume from. */
 export function isProgress(value: unknown): value is OnboardingProgress {
-  return isRecord(value) && typeof value.step === 'string' && strings(value.done) && isRecord(value.answers)
-    && (value.answers.provider === undefined || PROVIDERS.includes(value.answers.provider as Provider))
-    && typeof value.answers.projectId === 'string' && (value.answers.setup === undefined || isSetup(value.answers.setup));
+    return (
+        isRecord(value) &&
+        typeof value.step === 'string' &&
+        strings(value.done) &&
+        isRecord(value.answers) &&
+        (value.answers.provider === undefined || PROVIDERS.includes(value.answers.provider as Provider)) &&
+        typeof value.answers.projectId === 'string' &&
+        (value.answers.setup === undefined || isSetup(value.answers.setup))
+    );
 }
 
 /**
  * The repository list's entries as the file holds them, checked; none when there is no file. An entry's local
  * settings stay in `raw`, for repository-settings.ts to check.
  */
-export function readListFile(file: string): { raw: Record<string, unknown> & { repositories: Record<string, unknown>[] }; list: OnboardedRepository[] } {
-  if (!existsSync(file)) return { raw: { repositories: [] }, list: [] };
-  const raw = readJson(file) as { repositories?: unknown } | null;
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || !Array.isArray(raw.repositories)) {
-    throw new Error(`${file}: expected an object with a repositories array, like {"repositories": [{"repo": "owner/name"}]}.`);
-  }
-  // An old source cannot be resumed. Remove that entry alone, keeping raw and checked entries aligned for later writes.
-  const repositories = raw.repositories.filter((entry: unknown) => {
-    const onboarding = isRecord(entry) && entry.onboarding;
-    const answers = isRecord(onboarding) && onboarding.answers;
-    const setup = isRecord(answers) && answers.setup;
-    return !isRecord(setup) || typeof setup.itemSource !== 'string' || !['github-project', 'azure-sprint', 'azure-backlog'].includes(setup.itemSource);
-  });
-  const list = repositories.map((entry: unknown, index): OnboardedRepository => {
-    const repo = (entry as { repo?: unknown } | null)?.repo;
-    if (typeof entry !== 'object' || typeof repo !== 'string' || !REPO.test(repo)) {
-      throw new Error(`${file}: repositories[${index}] needs a repo of the form owner/name.`);
+export function readListFile(file: string): {
+    raw: Record<string, unknown> & { repositories: Record<string, unknown>[] };
+    list: OnboardedRepository[];
+} {
+    if (!existsSync(file)) return { raw: { repositories: [] }, list: [] };
+    const raw = readJson(file) as { repositories?: unknown } | null;
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || !Array.isArray(raw.repositories)) {
+        throw new Error(
+            `${file}: expected an object with a repositories array, like {"repositories": [{"repo": "owner/name"}]}.`,
+        );
     }
-    const { onboarding } = entry as { onboarding?: unknown };
-    if (onboarding === undefined) return { repo };
-    if (!isProgress(onboarding)) throw new Error(`${file}: repositories[${index}] has an onboarding without its step, done steps and T3 project, or with answers it can't use.`);
-    return { repo, onboarding };
-  });
-  return { raw: { ...raw, repositories: repositories as Record<string, unknown>[] }, list };
+    // An old source cannot be resumed. Remove that entry alone, keeping raw and checked entries aligned for later writes.
+    const repositories = raw.repositories.filter((entry: unknown) => {
+        const onboarding = isRecord(entry) && entry.onboarding;
+        const answers = isRecord(onboarding) && onboarding.answers;
+        const setup = isRecord(answers) && answers.setup;
+        return (
+            !isRecord(setup) ||
+            typeof setup.itemSource !== 'string' ||
+            !['github-project', 'azure-sprint', 'azure-backlog'].includes(setup.itemSource)
+        );
+    });
+    const list = repositories.map((entry: unknown, index): OnboardedRepository => {
+        const repo = (entry as { repo?: unknown } | null)?.repo;
+        if (typeof entry !== 'object' || typeof repo !== 'string' || !REPO.test(repo)) {
+            throw new Error(`${file}: repositories[${index}] needs a repo of the form owner/name.`);
+        }
+        const { onboarding } = entry as { onboarding?: unknown };
+        if (onboarding === undefined) return { repo };
+        if (!isProgress(onboarding))
+            throw new Error(
+                `${file}: repositories[${index}] has an onboarding without its step, done steps and T3 project, or with answers it can't use.`,
+            );
+        return { repo, onboarding };
+    });
+    return { raw: { ...raw, repositories: repositories as Record<string, unknown>[] }, list };
 }
 
 /**
@@ -109,7 +142,7 @@ export function readListFile(file: string): { raw: Record<string, unknown> & { r
  * carries its progress as `onboarding`; none when there is no file.
  */
 export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] {
-  return readListFile(join(dir, REPOSITORY_LIST_FILE)).list;
+    return readListFile(join(dir, REPOSITORY_LIST_FILE)).list;
 }
 
 /**
@@ -117,8 +150,12 @@ export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] 
  * onboarding entry of `replaces`, the repository it was saved under before it picked another T3 project. Keeps every
  * other entry as the file has it, and returns the list. Throws for a repository that is onboarded already.
  */
-export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
-  return saveEntry({ repo, onboarding: progress }, replaces, dir);
+export function saveOnboarding(
+    { repo, progress }: OnboardingRepository,
+    replaces: string | null,
+    dir = boardDataDir(),
+): OnboardedRepository[] {
+    return saveEntry({ repo, onboarding: progress }, replaces, dir);
 }
 
 /**
@@ -126,25 +163,28 @@ export function saveOnboarding({ repo, progress }: OnboardingRepository, replace
  * the one saved under `replaces`, and is added when there is none. Throws for a repository that is onboarded already.
  */
 export function saveOnboarded(repo: string, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
-  return saveEntry({ repo }, replaces, dir);
+    return saveEntry({ repo }, replaces, dir);
 }
 
 /** Writes `entry` over its repository's entry and drops the one of `replaces`, as saveOnboarding and saveOnboarded say. */
 function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: string): OnboardedRepository[] {
-  const { repo } = entry;
-  if (!REPO.test(repo)) throw new Error(`${repo} isn't a repository of the form owner/name.`);
-  const file = join(dir, REPOSITORY_LIST_FILE);
-  const { raw, list } = readListFile(file);
-  const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces)));
-  if (onboarded) throw new Error(`${onboarded.repo} is onboarded already.`);
-  const at = list.findIndex((e) => sameRepo(e.repo, repo));
-  const dropped = (e: OnboardedRepository) => sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces);
-  // The entry keeps its local settings through every onboarding save.
-  const settings = at < 0 ? undefined : raw.repositories[at]!.settings;
-  const written: Record<string, unknown> = { ...entry, ...settings !== undefined && { settings } };
-  const repositories = raw.repositories.flatMap((e, i) => i === at ? [written] : dropped(list[i]!) ? [] : [e]);
-  if (at < 0) repositories.push(written);
-  return writeListFile(dir, { ...raw, repositories });
+    const { repo } = entry;
+    if (!REPO.test(repo)) throw new Error(`${repo} isn't a repository of the form owner/name.`);
+    const file = join(dir, REPOSITORY_LIST_FILE);
+    const { raw, list } = readListFile(file);
+    const onboarded = list.find(
+        (e) => !e.onboarding && (sameRepo(e.repo, repo) || (replaces !== null && sameRepo(e.repo, replaces))),
+    );
+    if (onboarded) throw new Error(`${onboarded.repo} is onboarded already.`);
+    const at = list.findIndex((e) => sameRepo(e.repo, repo));
+    const dropped = (e: OnboardedRepository) =>
+        sameRepo(e.repo, repo) || (replaces !== null && sameRepo(e.repo, replaces));
+    // The entry keeps its local settings through every onboarding save.
+    const settings = at < 0 ? undefined : raw.repositories[at]!.settings;
+    const written: Record<string, unknown> = { ...entry, ...(settings !== undefined && { settings }) };
+    const repositories = raw.repositories.flatMap((e, i) => (i === at ? [written] : dropped(list[i]!) ? [] : [e]));
+    if (at < 0) repositories.push(written);
+    return writeListFile(dir, { ...raw, repositories });
 }
 
 /** The list's repositories on the board: those no longer onboarding. */
@@ -155,49 +195,54 @@ export const onTheBoard = (list: readonly OnboardedRepository[]) => list.filter(
  * has goes with it.
  */
 export function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {
-  const file = join(dir, REPOSITORY_LIST_FILE);
-  mkdirSync(dir, { recursive: true });
-  const repos = (content.repositories as { repo: string }[]).map((e) => e.repo);
-  const written = 'connections' in content ? { ...content, connections: pairsIn(content.connections, repos) } : content;
-  // Written beside it, then renamed over it, so repo-config.sh never reads half a file.
-  const temp = `${file}.${process.pid}.tmp`;
-  writeFileSync(temp, `${JSON.stringify(written, null, 2)}\n`);
-  renameSync(temp, file);
-  return readListFile(file).list;
+    const file = join(dir, REPOSITORY_LIST_FILE);
+    mkdirSync(dir, { recursive: true });
+    const repos = (content.repositories as { repo: string }[]).map((e) => e.repo);
+    const written =
+        'connections' in content ? { ...content, connections: pairsIn(content.connections, repos) } : content;
+    // Written beside it, then renamed over it, so repo-config.sh never reads half a file.
+    const temp = `${file}.${process.pid}.tmp`;
+    writeFileSync(temp, `${JSON.stringify(written, null, 2)}\n`);
+    renameSync(temp, file);
+    return readListFile(file).list;
 }
 
 /** A Connection: two repositories in one order, so A,B and B,A are the same pair. */
 type Pair = [string, string];
 
-const pairOf = (a: string, b: string): Pair => a.toLowerCase() < b.toLowerCase() ? [a, b] : [b, a];
+const pairOf = (a: string, b: string): Pair => (a.toLowerCase() < b.toLowerCase() ? [a, b] : [b, a]);
 
 /**
  * The list file's `connections`, each pair of two of `repos` once, with their names as `repos` has them. A pair of
  * another shape, or naming a repository `repos` doesn't, is left out.
  */
 function pairsIn(value: unknown, repos: readonly string[]): Pair[] {
-  if (!Array.isArray(value)) return [];
-  const listed = (name: unknown) => typeof name === 'string' ? repos.find((repo) => sameRepo(repo, name)) : undefined;
-  const pairs: Pair[] = [];
-  for (const entry of value) {
-    if (!Array.isArray(entry) || entry.length !== 2) continue;
-    const [a, b] = entry.map(listed);
-    if (!a || !b || sameRepo(a, b)) continue;
-    const pair = pairOf(a, b);
-    if (!pairs.some(([x, y]) => sameRepo(x, pair[0]) && sameRepo(y, pair[1]))) pairs.push(pair);
-  }
-  return pairs;
+    if (!Array.isArray(value)) return [];
+    const listed = (name: unknown) =>
+        typeof name === 'string' ? repos.find((repo) => sameRepo(repo, name)) : undefined;
+    const pairs: Pair[] = [];
+    for (const entry of value) {
+        if (!Array.isArray(entry) || entry.length !== 2) continue;
+        const [a, b] = entry.map(listed);
+        if (!a || !b || sameRepo(a, b)) continue;
+        const pair = pairOf(a, b);
+        if (!pairs.some(([x, y]) => sameRepo(x, pair[0]) && sameRepo(y, pair[1]))) pairs.push(pair);
+    }
+    return pairs;
 }
 
 /** The repositories `connections` pairs with `repo`, among the list's. */
 export function connectedTo(repo: string, connections: unknown, list: readonly OnboardedRepository[]): string[] {
-  return pairsIn(connections, list.map((e) => e.repo)).flatMap(([a, b]) => sameRepo(a, repo) ? [b] : sameRepo(b, repo) ? [a] : []);
+    return pairsIn(
+        connections,
+        list.map((e) => e.repo),
+    ).flatMap(([a, b]) => (sameRepo(a, repo) ? [b] : sameRepo(b, repo) ? [a] : []));
 }
 
 /** The repositories the user connected to `repo`, each once. */
 export function readConnections(repo: string, dir = boardDataDir()): string[] {
-  const { raw, list } = readListFile(join(dir, REPOSITORY_LIST_FILE));
-  return connectedTo(repo, raw.connections, list);
+    const { raw, list } = readListFile(join(dir, REPOSITORY_LIST_FILE));
+    return connectedTo(repo, raw.connections, list);
 }
 
 /**
@@ -205,18 +250,21 @@ export function readConnections(repo: string, dir = boardDataDir()): string[] {
  * board and dropping the rest of `repo`'s pairs. Throws for a repository that isn't on the board.
  */
 export function saveConnections(repo: string, connected: readonly string[], dir = boardDataDir()): void {
-  const { raw, list } = readListFile(join(dir, REPOSITORY_LIST_FILE));
-  const board = onTheBoard(list).map((e) => e.repo);
-  const self = board.find((r) => sameRepo(r, repo));
-  if (!self) throw new Error(`${repo} is not on the board.`);
-  const others = board.filter((r) => !sameRepo(r, repo) && connected.some((c) => sameRepo(c, r)));
-  const kept = pairsIn(raw.connections, list.map((e) => e.repo)).filter((pair) => !pair.some((r) => sameRepo(r, repo)));
-  writeListFile(dir, { ...raw, connections: [...kept, ...others.map((other) => pairOf(self, other))] });
+    const { raw, list } = readListFile(join(dir, REPOSITORY_LIST_FILE));
+    const board = onTheBoard(list).map((e) => e.repo);
+    const self = board.find((r) => sameRepo(r, repo));
+    if (!self) throw new Error(`${repo} is not on the board.`);
+    const others = board.filter((r) => !sameRepo(r, repo) && connected.some((c) => sameRepo(c, r)));
+    const kept = pairsIn(
+        raw.connections,
+        list.map((e) => e.repo),
+    ).filter((pair) => !pair.some((r) => sameRepo(r, repo)));
+    writeListFile(dir, { ...raw, connections: [...kept, ...others.map((other) => pairOf(self, other))] });
 }
 
 /** The list's repositories that are still onboarding, each with where it stopped. */
 export function stillOnboarding(list: readonly OnboardedRepository[]): OnboardingRepository[] {
-  return list.flatMap(({ repo, onboarding }) => onboarding ? [{ repo, progress: onboarding }] : []);
+    return list.flatMap(({ repo, onboarding }) => (onboarding ? [{ repo, progress: onboarding }] : []));
 }
 
 /**
@@ -224,15 +272,26 @@ export function stillOnboarding(list: readonly OnboardedRepository[]): Onboardin
  * the whole file, taking its default; a file it can't use takes them all, with the problem.
  */
 export function readBoardSettings(dir = boardDataDir()): BoardSettings {
-  const defaults = { refreshSeconds: 300 };
-  const file = join(dir, REPOSITORY_LIST_FILE);
-  if (!existsSync(file)) return defaults;
-  let raw: unknown;
-  try { raw = readJson(file); }
-  catch (err) { return { ...defaults, problem: (err as Error).message }; }
-  const seconds = (raw as { refreshSeconds?: unknown } | null)?.refreshSeconds;
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || seconds !== undefined && !(typeof seconds === 'number' && seconds > 0)) {
-    return { ...defaults, problem: `${file}: expected an object with a positive refreshSeconds, like {"refreshSeconds": 300}.` };
-  }
-  return { refreshSeconds: seconds ?? defaults.refreshSeconds };
+    const defaults = { refreshSeconds: 300 };
+    const file = join(dir, REPOSITORY_LIST_FILE);
+    if (!existsSync(file)) return defaults;
+    let raw: unknown;
+    try {
+        raw = readJson(file);
+    } catch (err) {
+        return { ...defaults, problem: (err as Error).message };
+    }
+    const seconds = (raw as { refreshSeconds?: unknown } | null)?.refreshSeconds;
+    if (
+        typeof raw !== 'object' ||
+        raw === null ||
+        Array.isArray(raw) ||
+        (seconds !== undefined && !(typeof seconds === 'number' && seconds > 0))
+    ) {
+        return {
+            ...defaults,
+            problem: `${file}: expected an object with a positive refreshSeconds, like {"refreshSeconds": 300}.`,
+        };
+    }
+    return { refreshSeconds: seconds ?? defaults.refreshSeconds };
 }

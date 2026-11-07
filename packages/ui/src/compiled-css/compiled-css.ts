@@ -11,25 +11,25 @@ const prefix = '\0compiled-css:';
 const suffix = '.js';
 
 interface Context {
-  addWatchFile(file: string): void;
+    addWatchFile(file: string): void;
 }
 
 export const compiledCss = () => ({
-  name: 'lar-factory:compiled-css',
-  enforce: 'pre' as const,
-  resolveId(source: string, importer: string | undefined): string | undefined {
-    if (!source.endsWith(query) || importer === undefined) return undefined;
-    return prefix + resolve(dirname(importer), source.slice(0, -query.length)) + suffix;
-  },
-  async load(this: Context, id: string): Promise<string | undefined> {
-    if (!id.startsWith(prefix)) return undefined;
-    const file = id.slice(prefix.length, -suffix.length);
-    this.addWatchFile(file);
-    const compiler = await compile(await readFile(file, 'utf8'), {
-      base: dirname(file),
-      onDependency: (dependency) => this.addWatchFile(dependency),
-    });
-    const css = optimize(compiler.build([]), { file, minify: true }).code;
-    return `export default ${JSON.stringify(css)};`;
-  },
+    name: 'lar-factory:compiled-css',
+    enforce: 'pre' as const,
+    resolveId(source: string, importer: string | undefined): string | undefined {
+        if (!source.endsWith(query) || importer === undefined) return undefined;
+        return prefix + resolve(dirname(importer), source.slice(0, -query.length)) + suffix;
+    },
+    async load(this: Context, id: string): Promise<string | undefined> {
+        if (!id.startsWith(prefix)) return undefined;
+        const file = id.slice(prefix.length, -suffix.length);
+        this.addWatchFile(file);
+        const compiler = await compile(await readFile(file, 'utf8'), {
+            base: dirname(file),
+            onDependency: (dependency) => this.addWatchFile(dependency),
+        });
+        const css = optimize(compiler.build([]), { file, minify: true }).code;
+        return `export default ${JSON.stringify(css)};`;
+    },
 });

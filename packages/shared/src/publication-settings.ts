@@ -1,6 +1,6 @@
+import { decodePart, isRecord, onAzure, sameRepo, type RepositorySetup } from './index.ts';
 // Node entry used by the installed command and the board. Discovery only reads provider metadata.
 import { providerCommand as commandOutput } from './provider-command.ts';
-import { decodePart, isRecord, onAzure, sameRepo, type RepositorySetup } from './index.ts';
 import { isRepo, readRepositorySetups } from './repository-settings.ts';
 import { typedLabelsProblem } from './tracker-capabilities.ts';
 import { trackerLabels } from './tracker-labels.ts';
@@ -8,158 +8,312 @@ import { publicationSettingsSnapshot, type VocabularyCapability, type Vocabulary
 
 /** Authenticated GETs. GitHub list reads include every page; Azure reads return its JSON envelope. */
 export interface VocabularyReads {
-  github(path: string): Promise<unknown>;
-  azure(repo: string, resource: 'workitemtypes' | 'tags'): Promise<unknown>;
-
+    github(path: string): Promise<unknown>;
+    azure(repo: string, resource: 'workitemtypes' | 'tags'): Promise<unknown>;
 }
 
 async function jsonCommand(command: 'gh' | 'az', args: string[]): Promise<unknown> {
-  return JSON.parse(await commandOutput(command, args));
+    return JSON.parse(await commandOutput(command, args));
 }
 
 /** Uses each provider CLI's existing local login, without reading or persisting its credentials. */
 export const vocabularyReads: VocabularyReads = {
-  github: (path) => jsonCommand('gh', ['api', '--method', 'GET', path, '--paginate', '--slurp']),
-  azure: (repo, resource) => readAzureVocabulary(repo, resource),
+    github: (path) => jsonCommand('gh', ['api', '--method', 'GET', path, '--paginate', '--slurp']),
+    azure: (repo, resource) => readAzureVocabulary(repo, resource),
 };
 
 /** Use the Azure DevOps extension's login for metadata, as the board does, rather than az rest's tenant. */
-export async function readAzureVocabulary(repo: string, resource: 'workitemtypes' | 'tags', run?: (args: string[]) => Promise<string>): Promise<unknown> {
-  const [organization, project] = repo.split('/');
-  const args = ['devops', 'invoke', '--area', 'wit', '--resource', resource, '--route-parameters', `project=${decodePart(project!)}`,
-    '--http-method', 'GET', '--api-version', '7.1', '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json'];
-  return run ? JSON.parse(await run(args)) : jsonCommand('az', args);
+export async function readAzureVocabulary(
+    repo: string,
+    resource: 'workitemtypes' | 'tags',
+    run?: (args: string[]) => Promise<string>,
+): Promise<unknown> {
+    const [organization, project] = repo.split('/');
+    const args = [
+        'devops',
+        'invoke',
+        '--area',
+        'wit',
+        '--resource',
+        resource,
+        '--route-parameters',
+        `project=${decodePart(project!)}`,
+        '--http-method',
+        'GET',
+        '--api-version',
+        '7.1',
+        '--org',
+        `https://dev.azure.com/${organization}`,
+        '--detect',
+        'false',
+        '--output',
+        'json',
+    ];
+    return run ? JSON.parse(await run(args)) : jsonCommand('az', args);
 }
 
 function failure(err: unknown): VocabularyCapability {
-  const reason = err instanceof Error ? err.message : String(err);
-  // 404 may conceal a private resource. Never call it unsupported without explicit evidence.
-  return { state: /(?:HTTP\s*|status(?: code)?[=: ]+)(?:410|501)\b|not implemented|unsupported (?:capability|api|api version)/i.test(reason) ? 'unsupported' : 'refused', reason };
+    const reason = err instanceof Error ? err.message : String(err);
+    // 404 may conceal a private resource. Never call it unsupported without explicit evidence.
+    return {
+        state: /(?:HTTP\s*|status(?: code)?[=: ]+)(?:410|501)\b|not implemented|unsupported (?:capability|api|api version)/i.test(
+            reason,
+        )
+            ? 'unsupported'
+            : 'refused',
+        reason,
+    };
 }
 
 /** A valid empty response is available with zero choices. A malformed response is a refused read. */
-async function choices(read: () => Promise<unknown>, keep?: (rows: Record<string, unknown>[]) => void): Promise<VocabularyCapability> {
-  try {
-    const raw = await read();
-    const list = Array.isArray(raw) ? raw.flatMap((page) => isRecord(page) && Array.isArray(page.value) ? page.value : page)
-      : isRecord(raw) ? raw.value : undefined;
-    if (!Array.isArray(list) || list.some((item) => !isRecord(item) || typeof item.name !== 'string' || !item.name.trim())) {
-      throw new Error('The provider returned an unreadable list of terms.');
+async function choices(
+    read: () => Promise<unknown>,
+    keep?: (rows: Record<string, unknown>[]) => void,
+): Promise<VocabularyCapability> {
+    try {
+        const raw = await read();
+        const list = Array.isArray(raw)
+            ? raw.flatMap((page) => (isRecord(page) && Array.isArray(page.value) ? page.value : page))
+            : isRecord(raw)
+              ? raw.value
+              : undefined;
+        if (
+            !Array.isArray(list) ||
+            list.some((item) => !isRecord(item) || typeof item.name !== 'string' || !item.name.trim())
+        ) {
+            throw new Error('The provider returned an unreadable list of terms.');
+        }
+        keep?.(list as Record<string, unknown>[]);
+        return {
+            state: 'available',
+            choices: [...new Set(list.filter((item) => item.isDisabled !== true).map((item) => item.name as string))],
+        };
+    } catch (err) {
+        return failure(err);
     }
-    keep?.(list as Record<string, unknown>[]);
-    return { state: 'available', choices: [...new Set(list.filter((item) => item.isDisabled !== true).map((item) => item.name as string))] };
-  } catch (err) { return failure(err); }
 }
 
-export async function discoverVocabulary(repo: string, reads: VocabularyReads = vocabularyReads): Promise<VocabularyDiscovery> {
-  if (!isRepo(repo)) throw new Error('Name a GitHub or Azure DevOps repository.');
-  if (onAzure(repo)) {
-    const [types, labels] = await Promise.all([
-      choices(() => reads.azure(repo, 'workitemtypes')), choices(() => reads.azure(repo, 'tags')),
+export async function discoverVocabulary(
+    repo: string,
+    reads: VocabularyReads = vocabularyReads,
+): Promise<VocabularyDiscovery> {
+    if (!isRepo(repo)) throw new Error('Name a GitHub or Azure DevOps repository.');
+    if (onAzure(repo)) {
+        const [types, labels] = await Promise.all([
+            choices(() => reads.azure(repo, 'workitemtypes')),
+            choices(() => reads.azure(repo, 'tags')),
+        ]);
+        return { provider: 'azure', types, labels };
+    }
+    const types = async (): Promise<VocabularyCapability> => {
+        try {
+            const raw = await reads.github(`repos/${repo}`);
+            const metadata = Array.isArray(raw) ? raw[0] : raw;
+            if (!isRecord(metadata) || !isRecord(metadata.owner) || typeof metadata.owner.type !== 'string')
+                throw new Error('Could not detect the repository owner.');
+            if (metadata.owner.type === 'User')
+                return {
+                    state: 'unsupported',
+                    reason: 'GitHub issue types are available only in organization repositories.',
+                };
+            return choices(() => reads.github(`repos/${repo}/issue-types`));
+        } catch (err) {
+            return failure(err);
+        }
+    };
+    const labelColors: Record<string, string> = {};
+    const [foundTypes, labels] = await Promise.all([
+        types(),
+        choices(
+            () => reads.github(`repos/${repo}/labels?per_page=100`),
+            (rows) => {
+                for (const { name, color } of rows) if (typeof color === 'string') labelColors[name as string] = color;
+            },
+        ),
     ]);
-    return { provider: 'azure', types, labels };
-  }
-  const types = async (): Promise<VocabularyCapability> => {
-    try {
-      const raw = await reads.github(`repos/${repo}`);
-      const metadata = Array.isArray(raw) ? raw[0] : raw;
-      if (!isRecord(metadata) || !isRecord(metadata.owner) || typeof metadata.owner.type !== 'string') throw new Error('Could not detect the repository owner.');
-      if (metadata.owner.type === 'User') return { state: 'unsupported', reason: 'GitHub issue types are available only in organization repositories.' };
-      return choices(() => reads.github(`repos/${repo}/issue-types`));
-    } catch (err) { return failure(err); }
-  };
-  const labelColors: Record<string, string> = {};
-  const [foundTypes, labels] = await Promise.all([types(), choices(() => reads.github(`repos/${repo}/labels?per_page=100`), (rows) => {
-    for (const { name, color } of rows) if (typeof color === 'string') labelColors[name as string] = color;
-  })]);
-  return { provider: 'github', types: foundTypes, labels, ...Object.keys(labelColors).length > 0 && { labelColors } };
+    return {
+        provider: 'github',
+        types: foundTypes,
+        labels,
+        ...(Object.keys(labelColors).length > 0 && { labelColors }),
+    };
 }
 
 export interface PublicationSettings {
-  setup: RepositorySetup;
-  discovery: VocabularyDiscovery;
-  /** Compare with a fresh read before each write; changed mappings or destination require a replacement plan. */
-  snapshot: string;
+    setup: RepositorySetup;
+    discovery: VocabularyDiscovery;
+    /** Compare with a fresh read before each write; changed mappings or destination require a replacement plan. */
+    snapshot: string;
 }
 
 /** Reads local settings and provider vocabulary without changing either. */
-export async function readPublicationSettings(repo: string, options: { dir?: string; reads?: VocabularyReads } = {}): Promise<PublicationSettings> {
-  const listed = readRepositorySetups(options.dir).find((s) => sameRepo(s.repo, repo));
-  if (!listed) throw new Error(`${repo} is not on this Mac's list.`);
-  const reads = options.reads ?? vocabularyReads;
-  const setup = readRepositorySetups(options.dir).find((s) => sameRepo(s.repo, repo))!;
-  return { setup, discovery: await discoverVocabulary(setup.repo, reads), snapshot: publicationSettingsSnapshot(setup) };
+export async function readPublicationSettings(
+    repo: string,
+    options: { dir?: string; reads?: VocabularyReads } = {},
+): Promise<PublicationSettings> {
+    const listed = readRepositorySetups(options.dir).find((s) => sameRepo(s.repo, repo));
+    if (!listed) throw new Error(`${repo} is not on this Mac's list.`);
+    const reads = options.reads ?? vocabularyReads;
+    const setup = readRepositorySetups(options.dir).find((s) => sameRepo(s.repo, repo))!;
+    return {
+        setup,
+        discovery: await discoverVocabulary(setup.repo, reads),
+        snapshot: publicationSettingsSnapshot(setup),
+    };
 }
 
-export { readRepositorySetups, setOverride, setVocabularyOverride, validateRepositorySettings } from './repository-settings.ts';
+export {
+    readRepositorySetups,
+    setOverride,
+    setVocabularyOverride,
+    validateRepositorySettings,
+} from './repository-settings.ts';
 
 /** Creates only names explicitly submitted with Save that the tracker lacks, after access and Azure safety checks. */
-export async function saveVocabularyLabels(repo: string, names: unknown, discovery: VocabularyDiscovery, access: Partial<RepositorySetup['access']>, create = createVocabularyLabel): Promise<string[]> {
-  if (!Array.isArray(names) || names.some((name) => typeof name !== 'string' || !name.trim() || name.length > 100)) throw new Error('Enter nonempty new label names of at most 100 characters.');
-  if (!names.length) return [];
-  const refused = typedLabelsProblem(repo, names as string[]);
-  if (refused) throw new Error(refused);
-  if (discovery.labels.state !== 'available') throw new Error('Recheck label access before creating labels.');
-  const choices = [...discovery.labels.choices];
-  if ((names as string[]).some((name) => !choices.some((choice) => choice.toLowerCase() === name.trim().toLowerCase()))) {
-    const { newLabelProblem } = await import('./write-access.ts');
-    const problem = newLabelProblem(repo, access);
-    if (problem) throw new Error(problem);
-  }
-  const resolved: string[] = [];
-  for (const raw of names as string[]) {
-    const name = raw.trim();
-    const existing = choices.find((choice) => choice.toLowerCase() === name.toLowerCase());
-    const saved = existing ?? await create(repo, name);
-    choices.push(saved);
-    resolved.push(saved);
-  }
-  return [...new Set(resolved)];
+export async function saveVocabularyLabels(
+    repo: string,
+    names: unknown,
+    discovery: VocabularyDiscovery,
+    access: Partial<RepositorySetup['access']>,
+    create = createVocabularyLabel,
+): Promise<string[]> {
+    if (!Array.isArray(names) || names.some((name) => typeof name !== 'string' || !name.trim() || name.length > 100))
+        throw new Error('Enter nonempty new label names of at most 100 characters.');
+    if (!names.length) return [];
+    const refused = typedLabelsProblem(repo, names as string[]);
+    if (refused) throw new Error(refused);
+    if (discovery.labels.state !== 'available') throw new Error('Recheck label access before creating labels.');
+    const choices = [...discovery.labels.choices];
+    if (
+        (names as string[]).some(
+            (name) => !choices.some((choice) => choice.toLowerCase() === name.trim().toLowerCase()),
+        )
+    ) {
+        const { newLabelProblem } = await import('./write-access.ts');
+        const problem = newLabelProblem(repo, access);
+        if (problem) throw new Error(problem);
+    }
+    const resolved: string[] = [];
+    for (const raw of names as string[]) {
+        const name = raw.trim();
+        const existing = choices.find((choice) => choice.toLowerCase() === name.toLowerCase());
+        const saved = existing ?? (await create(repo, name));
+        choices.push(saved);
+        resolved.push(saved);
+    }
+    return [...new Set(resolved)];
 }
 
-const createVocabularyLabel = async (repo: string, name: string): Promise<string> => (await trackerLabels(repo).create({ name })).name;
+const createVocabularyLabel = async (repo: string, name: string): Promise<string> =>
+    (await trackerLabels(repo).create({ name })).name;
 
 interface TicketOptionReads extends VocabularyReads {
-  azureOptions(repo: string, team: string, field: 'assignees' | 'iterations'): Promise<unknown>;
+    azureOptions(repo: string, team: string, field: 'assignees' | 'iterations'): Promise<unknown>;
 }
 
 const ticketOptionReads: TicketOptionReads = {
-  ...vocabularyReads,
-  azureOptions: (repo, team, field) => {
-    const [organization, project] = repo.split('/');
-    return jsonCommand('az', field === 'assignees'
-      ? ['devops', 'team', 'list-member', '--team', team, '--project', decodePart(project!), '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json']
-      : ['boards', 'iteration', 'team', 'list', '--team', team, '--project', decodePart(project!), '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json']);
-  },
+    ...vocabularyReads,
+    azureOptions: (repo, team, field) => {
+        const [organization, project] = repo.split('/');
+        return jsonCommand(
+            'az',
+            field === 'assignees'
+                ? [
+                      'devops',
+                      'team',
+                      'list-member',
+                      '--team',
+                      team,
+                      '--project',
+                      decodePart(project!),
+                      '--org',
+                      `https://dev.azure.com/${organization}`,
+                      '--detect',
+                      'false',
+                      '--output',
+                      'json',
+                  ]
+                : [
+                      'boards',
+                      'iteration',
+                      'team',
+                      'list',
+                      '--team',
+                      team,
+                      '--project',
+                      decodePart(project!),
+                      '--org',
+                      `https://dev.azure.com/${organization}`,
+                      '--detect',
+                      'false',
+                      '--output',
+                      'json',
+                  ],
+        );
+    },
 };
 
 /** Reads the existing provider options. Failures leave title/description submission available. */
-export async function discoverTicketOptions(config: import('./model.ts').RepoConfig, reads: TicketOptionReads = ticketOptionReads): Promise<import('./add-item.ts').TicketCreationOptions> {
-  const { repo } = config;
-  const vocabulary = await discoverVocabulary(repo, reads);
-  const problems = [vocabulary.labels, vocabulary.types].flatMap(capability => capability.state === 'refused' ? [capability.reason] : []);
-  const list = async <T>(read: () => Promise<unknown>, parse: (row: Record<string, unknown>) => T): Promise<T[]> => {
-    try {
-      const raw = await read();
-      const rows = Array.isArray(raw) ? raw.flat() : isRecord(raw) && Array.isArray(raw.value) ? raw.value : null;
-      if (!rows || !rows.every(isRecord)) throw Error('The provider returned unreadable issue options.');
-      return rows.map(parse);
-    } catch (err) { problems.push(err instanceof Error ? err.message : String(err)); return []; }
-  };
-  const text = (value: unknown) => {
-    if (typeof value !== 'string' || !value.trim()) throw Error('The provider returned an unreadable issue option.');
-    return value;
-  };
-  const azure = onAzure(repo);
-  const team = config.team ?? (config.setup?.itemSource?.kind === 'azure-board' ? config.setup.itemSource.team : '');
-  const [assignees, milestones, iterations] = await Promise.all([
-    list(() => azure ? reads.azureOptions(repo, team, 'assignees') : reads.github(`repos/${repo}/assignees?per_page=100`), row => azure && isRecord(row.identity) ? text(row.identity.uniqueName) : text(row.login)),
-    azure ? Promise.resolve([]) : list(() => reads.github(`repos/${repo}/milestones?state=open&per_page=100`), row => {
-      if (!Number.isSafeInteger(row.number) || Number(row.number) <= 0) throw Error('The provider returned an unreadable milestone.');
-      return { value: String(row.number), name: text(row.title) };
-    }),
-    azure ? list(() => reads.azureOptions(repo, team, 'iterations'), row => text(row.path)) : Promise.resolve([]),
-  ]);
-  return { provider: vocabulary.provider, labels: vocabulary.labels.state === 'available' ? vocabulary.labels.choices : [], ...vocabulary.labelColors && { labelColors: vocabulary.labelColors },
-    types: vocabulary.types.state === 'available' ? vocabulary.types.choices : [], assignees, milestones, iterations, problems };
+export async function discoverTicketOptions(
+    config: import('./model.ts').RepoConfig,
+    reads: TicketOptionReads = ticketOptionReads,
+): Promise<import('./add-item.ts').TicketCreationOptions> {
+    const { repo } = config;
+    const vocabulary = await discoverVocabulary(repo, reads);
+    const problems = [vocabulary.labels, vocabulary.types].flatMap((capability) =>
+        capability.state === 'refused' ? [capability.reason] : [],
+    );
+    const list = async <T>(read: () => Promise<unknown>, parse: (row: Record<string, unknown>) => T): Promise<T[]> => {
+        try {
+            const raw = await read();
+            const rows = Array.isArray(raw) ? raw.flat() : isRecord(raw) && Array.isArray(raw.value) ? raw.value : null;
+            if (!rows || !rows.every(isRecord)) throw Error('The provider returned unreadable issue options.');
+            return rows.map(parse);
+        } catch (err) {
+            problems.push(err instanceof Error ? err.message : String(err));
+            return [];
+        }
+    };
+    const text = (value: unknown) => {
+        if (typeof value !== 'string' || !value.trim())
+            throw Error('The provider returned an unreadable issue option.');
+        return value;
+    };
+    const azure = onAzure(repo);
+    const team = config.team ?? (config.setup?.itemSource?.kind === 'azure-board' ? config.setup.itemSource.team : '');
+    const [assignees, milestones, iterations] = await Promise.all([
+        list(
+            () =>
+                azure
+                    ? reads.azureOptions(repo, team, 'assignees')
+                    : reads.github(`repos/${repo}/assignees?per_page=100`),
+            (row) => (azure && isRecord(row.identity) ? text(row.identity.uniqueName) : text(row.login)),
+        ),
+        azure
+            ? Promise.resolve([])
+            : list(
+                  () => reads.github(`repos/${repo}/milestones?state=open&per_page=100`),
+                  (row) => {
+                      if (!Number.isSafeInteger(row.number) || Number(row.number) <= 0)
+                          throw Error('The provider returned an unreadable milestone.');
+                      return { value: String(row.number), name: text(row.title) };
+                  },
+              ),
+        azure
+            ? list(
+                  () => reads.azureOptions(repo, team, 'iterations'),
+                  (row) => text(row.path),
+              )
+            : Promise.resolve([]),
+    ]);
+    return {
+        provider: vocabulary.provider,
+        labels: vocabulary.labels.state === 'available' ? vocabulary.labels.choices : [],
+        ...(vocabulary.labelColors && { labelColors: vocabulary.labelColors }),
+        types: vocabulary.types.state === 'available' ? vocabulary.types.choices : [],
+        assignees,
+        milestones,
+        iterations,
+        problems,
+    };
 }

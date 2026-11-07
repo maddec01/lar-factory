@@ -1,32 +1,32 @@
 {
-  "name": "lar-factory",
-  "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=24.15"
-  },
-  "packageManager": "pnpm@12.14.0",
-  "scripts": {
-    "test": "pnpm -r --filter '!@lar-factory/desktop' test; s=$?; pnpm run test:desktop && exit $s",
-    "test:shared": "pnpm --filter @lar-factory/shared test",
-    "test:ui": "pnpm --filter @lar-factory/ui test",
-    "test:work-records": "pnpm --filter @lar-factory/work-records test",
-    "test:server": "pnpm --filter @lar-factory/server test",
-    "test:web": "pnpm --filter @lar-factory/web test",
-    "test:desktop": "pnpm --filter @lar-factory/desktop test",
-    "typecheck": "tsc --noEmit -p . && pnpm -r run typecheck",
-    "check": "vp check",
-    "fix": "vp check --fix",
-    "sample": "pnpm --filter @lar-factory/server sample",
-    "dev": "pnpm --filter @lar-factory/desktop dev",
-    "knip": "knip",
-    "assemble:skills": "node scripts/assemble-skills.mjs"
-  },
-  "devDependencies": {
-    "@lar-works/config": "^0.1.1",
-    "@types/node": "^24.19.2",
-    "knip": "6.42.1",
-    "typescript": "^7.0.2",
-    "vite-plus": "1.5.0"
-  }
+    "name": "lar-factory",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=24.15"
+    },
+    "packageManager": "pnpm@12.14.0",
+    "scripts": {
+        "test": "pnpm -r --filter '!@lar-factory/desktop' test; s=$?; pnpm run test:desktop && exit $s",
+        "test:shared": "pnpm --filter @lar-factory/shared test",
+        "test:ui": "pnpm --filter @lar-factory/ui test",
+        "test:work-records": "pnpm --filter @lar-factory/work-records test",
+        "test:server": "pnpm --filter @lar-factory/server test",
+        "test:web": "pnpm --filter @lar-factory/web test",
+        "test:desktop": "pnpm --filter @lar-factory/desktop test",
+        "typecheck": "tsc --noEmit -p . && pnpm -r run typecheck",
+        "check": "vp check",
+        "fix": "vp check --fix",
+        "sample": "pnpm --filter @lar-factory/server sample",
+        "dev": "pnpm --filter @lar-factory/desktop dev",
+        "knip": "knip",
+        "assemble:skills": "node scripts/assemble-skills.mjs"
+    },
+    "devDependencies": {
+        "@lar-works/config": "^0.1.1",
+        "@types/node": "^24.19.2",
+        "knip": "6.42.1",
+        "typescript": "^7.0.2",
+        "vite-plus": "1.5.0"
+    }
 }

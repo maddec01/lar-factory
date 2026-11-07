@@ -1,10 +1,12 @@
 // The work-record database's schema, one step per entry. Never edit a released step: add one.
 
 import { createHash } from 'node:crypto';
+
 import type { Migration } from './database.ts';
 
 export const MIGRATIONS: readonly Migration[] = [
-  (db) => db.exec(`
+    (db) =>
+        db.exec(`
     CREATE TABLE work_records (
       work_id TEXT PRIMARY KEY,
       repository TEXT NOT NULL,
@@ -20,7 +22,8 @@ export const MIGRATIONS: readonly Migration[] = [
     ) STRICT;
     CREATE INDEX work_records_by_repository ON work_records (repository, status);
   `),
-  (db) => db.exec(`
+    (db) =>
+        db.exec(`
     -- A record's one structural parent: a concept owns decisions and builds, a build owns slices.
     ALTER TABLE work_records ADD COLUMN parent_id TEXT REFERENCES work_records (work_id);
     CREATE INDEX work_records_by_parent ON work_records (parent_id);
@@ -33,7 +36,8 @@ export const MIGRATIONS: readonly Migration[] = [
     ) STRICT;
     CREATE INDEX blockers_by_blocker ON blockers (blocker_id);
   `),
-  (db) => db.exec(`
+    (db) =>
+        db.exec(`
     -- Where a build stands in the lar-build workflow, and the PR it delivers through.
     ALTER TABLE work_records ADD COLUMN build_phase TEXT;
     ALTER TABLE work_records ADD COLUMN pull_request TEXT;
@@ -93,11 +97,13 @@ export const MIGRATIONS: readonly Migration[] = [
     ) STRICT;
     CREATE INDEX launch_intents_by_work_id ON launch_intents (work_id);
   `),
-  (db) => db.exec(`
+    (db) =>
+        db.exec(`
     -- When the work was finished, recorded from its delivery PR. Retention counts from it; Status never sets it.
     ALTER TABLE work_records ADD COLUMN finished_at TEXT;
   `),
-  (db) => db.exec(`
+    (db) =>
+        db.exec(`
     -- The title and context a record was captured or imported with. A later ticket edit never changes them.
     ALTER TABLE work_records ADD COLUMN title TEXT NOT NULL DEFAULT '';
     ALTER TABLE work_records ADD COLUMN initial_context TEXT NOT NULL DEFAULT '';
@@ -130,7 +136,8 @@ export const MIGRATIONS: readonly Migration[] = [
       PRIMARY KEY (work_id, observed)
     ) STRICT;
   `),
-  (db) => db.exec(`
+    (db) =>
+        db.exec(`
     CREATE TABLE brief_gates (
       gate_id TEXT PRIMARY KEY,
       work_id TEXT NOT NULL REFERENCES work_records (work_id) ON DELETE CASCADE,
@@ -193,18 +200,30 @@ export const MIGRATIONS: readonly Migration[] = [
       recorded_at TEXT NOT NULL
     ) STRICT;
   `),
-  (db) => {
-    db.exec('ALTER TABLE bodies ADD COLUMN has_content INTEGER NOT NULL DEFAULT 0; ALTER TABLE bodies ADD COLUMN has_passing_gate INTEGER NOT NULL DEFAULT 0');
-    const update = db.prepare(`UPDATE bodies SET has_content = ?, has_passing_gate = EXISTS (
+    (db) => {
+        db.exec(
+            'ALTER TABLE bodies ADD COLUMN has_content INTEGER NOT NULL DEFAULT 0; ALTER TABLE bodies ADD COLUMN has_passing_gate INTEGER NOT NULL DEFAULT 0',
+        );
+        const update = db.prepare(`UPDATE bodies SET has_content = ?, has_passing_gate = EXISTS (
       SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ?
     ) WHERE work_id = ? AND body = ?`);
-    for (const row of db.prepare('SELECT work_id, body, markdown FROM bodies').all()) {
-      const markdown = String(row.markdown);
-      const digest = row.body === 'brief' && markdown.trim() ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex') : '';
-      update.run(Number(Boolean(markdown.trim())), String(row.work_id), digest, String(row.work_id), String(row.body));
-    }
-  },
-  (db) => db.exec(`
+        for (const row of db.prepare('SELECT work_id, body, markdown FROM bodies').all()) {
+            const markdown = String(row.markdown);
+            const digest =
+                row.body === 'brief' && markdown.trim()
+                    ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex')
+                    : '';
+            update.run(
+                Number(Boolean(markdown.trim())),
+                String(row.work_id),
+                digest,
+                String(row.work_id),
+                String(row.body),
+            );
+        }
+    },
+    (db) =>
+        db.exec(`
     -- A change a work record needs from a team that owns another repository. It lives inside its record. Only the user
     -- sets met_at; needs_review_at records that an observation changed after it was set.
     CREATE TABLE dependencies (
@@ -248,8 +267,8 @@ export const MIGRATIONS: readonly Migration[] = [
       PRIMARY KEY (dependency_id, subject)
     ) STRICT;
   `),
-  (db) => {
-    db.exec(`
+    (db) => {
+        db.exec(`
       CREATE TABLE tracker_identities (source_key TEXT PRIMARY KEY, work_id TEXT NOT NULL UNIQUE REFERENCES work_records(work_id) ON DELETE CASCADE) STRICT;
       CREATE TABLE tracker_creations (source_key TEXT PRIMARY KEY) STRICT;
       CREATE TABLE tracker_sequence (value INTEGER NOT NULL) STRICT;
@@ -260,90 +279,124 @@ export const MIGRATIONS: readonly Migration[] = [
         error TEXT, conflict INTEGER NOT NULL DEFAULT 0
       ) STRICT;
     `);
-    for (const table of ['work_records', 'bodies', 'blockers', 'review_rounds', 'review_axes', 'review_findings',
-      'replaced_pull_requests', 'brief_gates', 'dependencies']) {
-      for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
-        if (table === 'work_records' && action === 'DELETE') continue;
-        const row = action === 'DELETE' ? 'OLD' : 'NEW';
-        db.exec(`CREATE TRIGGER tracker_${table}_${action.toLowerCase()} AFTER ${action} ON ${table} BEGIN
+        for (const table of [
+            'work_records',
+            'bodies',
+            'blockers',
+            'review_rounds',
+            'review_axes',
+            'review_findings',
+            'replaced_pull_requests',
+            'brief_gates',
+            'dependencies',
+        ]) {
+            for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
+                if (table === 'work_records' && action === 'DELETE') continue;
+                const row = action === 'DELETE' ? 'OLD' : 'NEW';
+                db.exec(`CREATE TRIGGER tracker_${table}_${action.toLowerCase()} AFTER ${action} ON ${table} BEGIN
           UPDATE tracker_sequence SET value = value + 1;
           INSERT INTO tracker_outbox (work_id, sequence) VALUES (${row}.work_id, (SELECT value FROM tracker_sequence))
           ON CONFLICT(work_id) DO UPDATE SET sequence = excluded.sequence;
         END;`);
-      }
-    }
-    for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
-      const row = action === 'DELETE' ? 'OLD' : 'NEW';
-      db.exec(`CREATE TRIGGER tracker_dependency_blocks_${action.toLowerCase()} AFTER ${action} ON dependency_blocks BEGIN
+            }
+        }
+        for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
+            const row = action === 'DELETE' ? 'OLD' : 'NEW';
+            db.exec(`CREATE TRIGGER tracker_dependency_blocks_${action.toLowerCase()} AFTER ${action} ON dependency_blocks BEGIN
         UPDATE tracker_sequence SET value = value + 1;
         INSERT INTO tracker_outbox (work_id, sequence) SELECT work_id, (SELECT value FROM tracker_sequence)
         FROM dependencies WHERE dependency_id = ${row}.dependency_id
         ON CONFLICT(work_id) DO UPDATE SET sequence = excluded.sequence;
       END;`);
-    }
-    db.exec('INSERT INTO tracker_outbox SELECT work_id, 0 FROM work_records');
-  },
-  (db) => {
-    // An owner issue can leave a dependency graph without its own record changing.
-    // Keep that old member due so the next drain retires its reverse projection.
-    for(const action of ['INSERT','UPDATE','DELETE']){
-      const tickets=action==='INSERT' ? 'lower(NEW.ticket)' : action==='DELETE' ? 'lower(OLD.ticket)' : 'lower(OLD.ticket),lower(NEW.ticket)';
-      db.exec(`CREATE TRIGGER tracker_dependency_members_${action.toLowerCase()} AFTER ${action} ON dependencies BEGIN
+        }
+        db.exec('INSERT INTO tracker_outbox SELECT work_id, 0 FROM work_records');
+    },
+    (db) => {
+        // An owner issue can leave a dependency graph without its own record changing.
+        // Keep that old member due so the next drain retires its reverse projection.
+        for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
+            const tickets =
+                action === 'INSERT'
+                    ? 'lower(NEW.ticket)'
+                    : action === 'DELETE'
+                      ? 'lower(OLD.ticket)'
+                      : 'lower(OLD.ticket),lower(NEW.ticket)';
+            db.exec(`CREATE TRIGGER tracker_dependency_members_${action.toLowerCase()} AFTER ${action} ON dependencies BEGIN
         UPDATE tracker_sequence SET value=value+1;
         INSERT INTO tracker_outbox(work_id,sequence)
           SELECT work_id,(SELECT value FROM tracker_sequence) FROM work_records WHERE lower(ticket) IN (${tickets})
           ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
       END;`);
-    }
-  },
-  (db) => {
-    // Forward repair for checkouts that opened the first structural-cache schema
-    // before its reservation table and final outbox triggers were present.
-    db.exec(`
+        }
+    },
+    (db) => {
+        // Forward repair for checkouts that opened the first structural-cache schema
+        // before its reservation table and final outbox triggers were present.
+        db.exec(`
       CREATE TABLE IF NOT EXISTS tracker_creations(source_key TEXT PRIMARY KEY) STRICT;
       CREATE TABLE IF NOT EXISTS tracker_identities(source_key TEXT PRIMARY KEY,work_id TEXT NOT NULL UNIQUE REFERENCES work_records(work_id) ON DELETE CASCADE) STRICT;
       CREATE TABLE tracker_outbox_upgrade(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE,sequence INTEGER NOT NULL) STRICT;
       INSERT INTO tracker_outbox_upgrade SELECT o.work_id,o.sequence FROM tracker_outbox o JOIN work_records r ON r.work_id=o.work_id;
     `);
-    for(const trigger of db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'tracker_%'").all()){
-      db.exec(`DROP TRIGGER "${String(trigger.name).replaceAll('"','""')}"`);
-    }
-    db.exec('DROP TABLE tracker_outbox; ALTER TABLE tracker_outbox_upgrade RENAME TO tracker_outbox');
-    for(const table of ['work_records','bodies','blockers','review_rounds','review_axes','review_findings','replaced_pull_requests','brief_gates','dependencies']){
-      for(const action of ['INSERT','UPDATE','DELETE']){
-        if(table==='work_records'&&action==='DELETE')continue;
-        const row=action==='DELETE'?'OLD':'NEW';
-        db.exec(`CREATE TRIGGER tracker_${table}_${action.toLowerCase()} AFTER ${action} ON ${table} BEGIN
+        for (const trigger of db
+            .prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'tracker_%'")
+            .all()) {
+            db.exec(`DROP TRIGGER "${String(trigger.name).replaceAll('"', '""')}"`);
+        }
+        db.exec('DROP TABLE tracker_outbox; ALTER TABLE tracker_outbox_upgrade RENAME TO tracker_outbox');
+        for (const table of [
+            'work_records',
+            'bodies',
+            'blockers',
+            'review_rounds',
+            'review_axes',
+            'review_findings',
+            'replaced_pull_requests',
+            'brief_gates',
+            'dependencies',
+        ]) {
+            for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
+                if (table === 'work_records' && action === 'DELETE') continue;
+                const row = action === 'DELETE' ? 'OLD' : 'NEW';
+                db.exec(`CREATE TRIGGER tracker_${table}_${action.toLowerCase()} AFTER ${action} ON ${table} BEGIN
           UPDATE tracker_sequence SET value=value+1;
           INSERT INTO tracker_outbox(work_id,sequence) VALUES (${row}.work_id,(SELECT value FROM tracker_sequence))
           ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
         END;`);
-      }
-    }
-    for(const action of ['INSERT','UPDATE','DELETE']){
-      const row=action==='DELETE'?'OLD':'NEW';
-      db.exec(`CREATE TRIGGER tracker_dependency_blocks_${action.toLowerCase()} AFTER ${action} ON dependency_blocks BEGIN
+            }
+        }
+        for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
+            const row = action === 'DELETE' ? 'OLD' : 'NEW';
+            db.exec(`CREATE TRIGGER tracker_dependency_blocks_${action.toLowerCase()} AFTER ${action} ON dependency_blocks BEGIN
         UPDATE tracker_sequence SET value=value+1;
         INSERT INTO tracker_outbox(work_id,sequence) SELECT work_id,(SELECT value FROM tracker_sequence) FROM dependencies WHERE dependency_id=${row}.dependency_id
         ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
       END;`);
-      const tickets=action==='INSERT'?'lower(NEW.ticket)':action==='DELETE'?'lower(OLD.ticket)':'lower(OLD.ticket),lower(NEW.ticket)';
-      db.exec(`CREATE TRIGGER tracker_dependency_members_${action.toLowerCase()} AFTER ${action} ON dependencies BEGIN
+            const tickets =
+                action === 'INSERT'
+                    ? 'lower(NEW.ticket)'
+                    : action === 'DELETE'
+                      ? 'lower(OLD.ticket)'
+                      : 'lower(OLD.ticket),lower(NEW.ticket)';
+            db.exec(`CREATE TRIGGER tracker_dependency_members_${action.toLowerCase()} AFTER ${action} ON dependencies BEGIN
         UPDATE tracker_sequence SET value=value+1;
         INSERT INTO tracker_outbox(work_id,sequence) SELECT work_id,(SELECT value FROM tracker_sequence) FROM work_records WHERE lower(ticket) IN (${tickets})
         ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
       END;`);
-    }
-    db.exec(`INSERT OR IGNORE INTO tracker_sync(work_id,local_digest,remote_digest,error,conflict)
+        }
+        db.exec(`INSERT OR IGNORE INTO tracker_sync(work_id,local_digest,remote_digest,error,conflict)
       SELECT i.source_key,s.local_digest,s.remote_digest,s.error,s.conflict FROM tracker_sync s JOIN tracker_identities i ON i.work_id=s.work_id WHERE i.source_key<>s.work_id`);
-  },
-  (db) => db.exec(`CREATE TABLE capture_submissions (
+    },
+    (db) =>
+        db.exec(`CREATE TABLE capture_submissions (
     request_id TEXT PRIMARY KEY, draft TEXT NOT NULL, ticket TEXT, work_id TEXT,
     failure TEXT
   )`),
-  (db) => db.exec(`ALTER TABLE capture_submissions ADD COLUMN target_work_id TEXT;
+    (db) =>
+        db.exec(`ALTER TABLE capture_submissions ADD COLUMN target_work_id TEXT;
     CREATE UNIQUE INDEX capture_target ON capture_submissions(target_work_id) WHERE failure IS NULL`),
-  (db) => db.exec(`
+    (db) =>
+        db.exec(`
     CREATE TABLE ticket_specs (
       work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE,
       generation INTEGER NOT NULL,
@@ -351,18 +404,22 @@ export const MIGRATIONS: readonly Migration[] = [
     ) STRICT;
     ALTER TABLE brief_gates ADD COLUMN source TEXT NOT NULL DEFAULT 'gate';
   `),
-  (db) => db.exec(`UPDATE capture_submissions SET draft='',failure='This submission expired.'
+    (db) =>
+        db.exec(`UPDATE capture_submissions SET draft='',failure='This submission expired.'
     WHERE (work_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM work_records WHERE work_records.work_id=capture_submissions.work_id))
       OR (target_work_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM work_records WHERE work_records.work_id=capture_submissions.target_work_id))`),
-  (db) => db.exec('ALTER TABLE capture_submissions ADD COLUMN created_ticket TEXT'),
-  (db) => db.exec(`ALTER TABLE threads ADD COLUMN deleted_at TEXT;
+    (db) => db.exec('ALTER TABLE capture_submissions ADD COLUMN created_ticket TEXT'),
+    (db) =>
+        db.exec(`ALTER TABLE threads ADD COLUMN deleted_at TEXT;
     ALTER TABLE work_records ADD COLUMN build_branch TEXT;
     ALTER TABLE brief_gates ADD COLUMN invalidated INTEGER NOT NULL DEFAULT 0;`),
-  (db) => db.exec('ALTER TABLE work_records ADD COLUMN cleanup_ownership TEXT'),
-  (db) => db.exec('ALTER TABLE launch_intents ADD COLUMN recovery TEXT'),
-  (db) => db.exec(`ALTER TABLE work_records ADD COLUMN agreed_ticket_kind TEXT;
+    (db) => db.exec('ALTER TABLE work_records ADD COLUMN cleanup_ownership TEXT'),
+    (db) => db.exec('ALTER TABLE launch_intents ADD COLUMN recovery TEXT'),
+    (db) =>
+        db.exec(`ALTER TABLE work_records ADD COLUMN agreed_ticket_kind TEXT;
     ALTER TABLE work_records ADD COLUMN kind_answer TEXT`),
-  (db) => db.exec(`
+    (db) =>
+        db.exec(`
     -- The choice saved at Start build. Null is an earlier intent or one that isn't a Start build, which cleans up nothing.
     ALTER TABLE launch_intents ADD COLUMN shaping_thread_cleanup TEXT;
     -- A row means the board handled the thread once. Action is null when the setting couldn't be read.
@@ -376,14 +433,15 @@ export const MIGRATIONS: readonly Migration[] = [
     ) STRICT;
     CREATE INDEX shaping_thread_cleanups_by_work_id ON shaping_thread_cleanups (work_id);
   `),
-  (db) => db.exec('ALTER TABLE work_records ADD COLUMN needs_you_causes TEXT'),
-  (db) => db.exec(`
+    (db) => db.exec('ALTER TABLE work_records ADD COLUMN needs_you_causes TEXT'),
+    (db) =>
+        db.exec(`
     CREATE TABLE check_lists(work_id TEXT PRIMARY KEY REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
     CREATE TABLE check_runs(check_id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
     CREATE INDEX check_runs_owner ON check_runs(work_id);
     CREATE TABLE check_reuses(work_id TEXT NOT NULL REFERENCES work_records(work_id) ON DELETE CASCADE, check_id TEXT NOT NULL REFERENCES check_runs(check_id) ON DELETE CASCADE, content TEXT NOT NULL) STRICT;
     CREATE INDEX check_reuses_owner ON check_reuses(work_id);
   `),
-  // Fence legacy structural writers without changing their journals or settings.
-  () => {},
+    // Fence legacy structural writers without changing their journals or settings.
+    () => {},
 ];

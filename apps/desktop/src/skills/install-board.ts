@@ -3,65 +3,80 @@
 // so a call must come from the board's page and a tick must name a listed target and be a boolean. The snapshot
 // writes paths in the home from `~` and holds no instance's settings.
 
-import * as NodeFS from "node:fs";
-import * as NodePath from "node:path";
+import {
+    installOverviewSucceeded,
+    type InstallOperationResult,
+    type InstallSnapshot,
+    type TargetSkillState,
+    type TargetSnapshot,
+} from '@lar-factory/shared';
+import {
+    describeTargets,
+    profileTargets,
+    type InstallResult,
+    type SkillPaths,
+} from '@lar-factory/shared/install-skills';
+import * as Effect from 'effect/Effect';
+import * as NodeFS from 'node:fs';
+import * as NodePath from 'node:path';
 
-import * as Effect from "effect/Effect";
-
-import { installOverviewSucceeded, type InstallOperationResult, type InstallSnapshot, type TargetSkillState, type TargetSnapshot } from "@lar-factory/shared";
-import { describeTargets, profileTargets, type InstallResult, type SkillPaths } from "@lar-factory/shared/install-skills";
-
-import { offlineTargets, SkillInstallError, type Checks, type CheckState } from "./skill-install.ts";
+import { offlineTargets, SkillInstallError, type Checks, type CheckState } from './skill-install.ts';
 
 const message = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
 
 /** `text` with each path in `home` written from `~`, as the page shows paths. */
 const inHome = (text: string, home: string) => {
-  const escaped = home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return text.replace(new RegExp(`${escaped}(?=$|[/\\s:'",;)])`, "g"), "~");
+    const escaped = home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.replace(new RegExp(`${escaped}(?=$|[/\\s:'",;)])`, 'g'), '~');
 };
 
 /** True when `url`, the calling frame's address, is on the board's origin. */
 export const fromBoard = (url: string | undefined, boardOrigin: string): boolean => {
-  if (!url || !boardOrigin) return false;
-  try {
-    return new URL(url).origin === boardOrigin;
-  } catch {
-    return false;
-  }
+    if (!url || !boardOrigin) return false;
+    try {
+        return new URL(url).origin === boardOrigin;
+    } catch {
+        return false;
+    }
 };
 
 /** Checks the current origin on every page mutation, including after the board server restarts. */
 export const boardPageOnly = (boardOrigin: () => string, refusal: string) => (url: string | undefined) => {
-  if (!fromBoard(url, boardOrigin())) throw new Error(refusal);
+    if (!fromBoard(url, boardOrigin())) throw new Error(refusal);
 };
 
 export interface BoardInput {
-  /** The home the app installs into. */
-  readonly home: string;
-  readonly version: string;
-  /** The folder holding the bundled `skills/`. */
-  readonly bundle: string;
+    /** The home the app installs into. */
+    readonly home: string;
+    readonly version: string;
+    /** The folder holding the bundled `skills/`. */
+    readonly bundle: string;
 }
 
 /** The bundle's skill names, or none when it can't be read. */
 const bundledSkills = (bundle: string) => {
-  try {
-    return NodeFS.readdirSync(NodePath.join(bundle, "skills"), { withFileTypes: true })
-      .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  } catch {
-    return [];
-  }
+    try {
+        return NodeFS.readdirSync(NodePath.join(bundle, 'skills'), { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name)
+            .sort();
+    } catch {
+        return [];
+    }
 };
 
 /** The state of a run that installs nothing: the targets offered before T3 answers, and no check. */
-const readOnlyState = (home: string): CheckState =>
-  ({ running: null, discovery: "waiting", instances: [], targets: offlineTargets(home) });
+const readOnlyState = (home: string): CheckState => ({
+    running: null,
+    discovery: 'waiting',
+    instances: [],
+    targets: offlineTargets(home),
+});
 
 /** The page's snapshot, and each target it shows with its real path, which the snapshot writes from `~`. */
 interface Described {
-  readonly snapshot: InstallSnapshot;
-  readonly targets: ReadonlyArray<{ readonly real: string; readonly shown: TargetSnapshot }>;
+    readonly snapshot: InstallSnapshot;
+    readonly targets: ReadonlyArray<{ readonly real: string; readonly shown: TargetSnapshot }>;
 }
 
 /**
@@ -69,76 +84,100 @@ interface Described {
  * each bundled skill's state there from the last check.
  */
 const describe = (input: BoardInput, state: CheckState, installs: boolean): Described => {
-  const { home } = input;
-  const tilde = (path: string) => inHome(path, home);
-  const outcome: InstallResult | undefined = state.outcome instanceof SkillInstallError ? state.lastResult : state.outcome;
-  const shownPaths = (list: ReadonlyArray<SkillPaths>) =>
-    list.map(({ skill, paths }) => ({ skill, paths: paths.map((at) => ({ ...at, path: tilde(at.path) })) }));
-  const at = (list: ReadonlyArray<SkillPaths>, skill: string, folders: ReadonlyArray<string>) =>
-    list.some((found) => found.skill === skill && found.paths.some(({ path }) => folders.some((folder) => path === NodePath.join(folder, skill))));
-  const bundled = bundledSkills(input.bundle);
-  let error = state.outcome instanceof SkillInstallError ? state.outcome.message : undefined;
-  let described: Described["targets"] = [];
-  try {
-    described = describeTargets(home, [...state.targets], profileTargets(home)).map((target) => {
-      const progress = state.progress?.find(({ target: { paths } }) => paths.some((path) => target.paths.includes(path)));
-      const checked = progress?.target ?? outcome?.targets.find(({ paths }) => paths.some((path) => target.paths.includes(path)));
-      const current = checked ?? target;
-      const skillState = (skill: string): TargetSkillState =>
-        outcome && at(outcome.blocked, skill, target.paths) ? "blocked"
-        : outcome && at(outcome.drift, skill, target.paths) ? "drift"
-        : target.skills.includes(skill) ? "installed" : "missing";
-      const skills = progress?.skills ?? bundled.map((name) => ({ name, state: skillState(name) }));
-      const shown: TargetSnapshot = {
-        kind: target.kind,
-        path: tilde(target.path),
-        paths: target.paths.map(tilde),
-        locked: target.required || target.path === NodePath.join(home, ".agents/skills"),
-        ...target.selection && { selection: target.selection },
-        active: target.active,
-        ...target.homeMissing && { homeMissing: true },
-        ...current.release !== undefined && { release: current.release },
-        finished: current.finished && !checked?.error && skills.every(({ state }) => state === "installed"),
-        instances: state.instances.filter(({ targets: read }) => read.some(({ path }) => target.paths.includes(path))).map(({ id }) => id),
-        skills,
-        ...progress && { operation: progress.operation, running: progress.running, replaced: progress.replaced },
-        ...checked?.error && { error: tilde(checked.error.message) },
-      };
-      return { real: target.path, shown };
-    });
-  } catch (cause) {
-    error = message(cause);
-  }
-  const targets = described.map(({ shown }) => shown);
-  const snapshot: InstallSnapshot = {
-    revision: state.revision ?? 0,
-    installs,
-    installed: targets.some(({ release }) => release !== undefined),
-    version: input.version,
-    running: state.running,
-    discovery: state.discovery,
-    instances: state.instances.map(({ id, driver, displayName, enabled }) => ({ id, driver, displayName, enabled })),
-    targets,
-    drift: shownPaths(outcome?.drift ?? []),
-    replaced: [...new Set(state.progress?.flatMap(({ replaced }) => replaced) ?? outcome?.replaced ?? [])].sort(),
-    conflicts: (outcome?.conflicts ?? []).map(tilde),
-    blocked: shownPaths(outcome?.blocked ?? []),
-    ...error !== undefined && { error: tilde(error) },
-  };
-  return { snapshot, targets: described };
+    const { home } = input;
+    const tilde = (path: string) => inHome(path, home);
+    const outcome: InstallResult | undefined =
+        state.outcome instanceof SkillInstallError ? state.lastResult : state.outcome;
+    const shownPaths = (list: ReadonlyArray<SkillPaths>) =>
+        list.map(({ skill, paths }) => ({ skill, paths: paths.map((at) => ({ ...at, path: tilde(at.path) })) }));
+    const at = (list: ReadonlyArray<SkillPaths>, skill: string, folders: ReadonlyArray<string>) =>
+        list.some(
+            (found) =>
+                found.skill === skill &&
+                found.paths.some(({ path }) => folders.some((folder) => path === NodePath.join(folder, skill))),
+        );
+    const bundled = bundledSkills(input.bundle);
+    let error = state.outcome instanceof SkillInstallError ? state.outcome.message : undefined;
+    let described: Described['targets'] = [];
+    try {
+        described = describeTargets(home, [...state.targets], profileTargets(home)).map((target) => {
+            const progress = state.progress?.find(({ target: { paths } }) =>
+                paths.some((path) => target.paths.includes(path)),
+            );
+            const checked =
+                progress?.target ??
+                outcome?.targets.find(({ paths }) => paths.some((path) => target.paths.includes(path)));
+            const current = checked ?? target;
+            const skillState = (skill: string): TargetSkillState =>
+                outcome && at(outcome.blocked, skill, target.paths)
+                    ? 'blocked'
+                    : outcome && at(outcome.drift, skill, target.paths)
+                      ? 'drift'
+                      : target.skills.includes(skill)
+                        ? 'installed'
+                        : 'missing';
+            const skills = progress?.skills ?? bundled.map((name) => ({ name, state: skillState(name) }));
+            const shown: TargetSnapshot = {
+                kind: target.kind,
+                path: tilde(target.path),
+                paths: target.paths.map(tilde),
+                locked: target.required || target.path === NodePath.join(home, '.agents/skills'),
+                ...(target.selection && { selection: target.selection }),
+                active: target.active,
+                ...(target.homeMissing && { homeMissing: true }),
+                ...(current.release !== undefined && { release: current.release }),
+                finished: current.finished && !checked?.error && skills.every(({ state }) => state === 'installed'),
+                instances: state.instances
+                    .filter(({ targets: read }) => read.some(({ path }) => target.paths.includes(path)))
+                    .map(({ id }) => id),
+                skills,
+                ...(progress && {
+                    operation: progress.operation,
+                    running: progress.running,
+                    replaced: progress.replaced,
+                }),
+                ...(checked?.error && { error: tilde(checked.error.message) }),
+            };
+            return { real: target.path, shown };
+        });
+    } catch (cause) {
+        error = message(cause);
+    }
+    const targets = described.map(({ shown }) => shown);
+    const snapshot: InstallSnapshot = {
+        revision: state.revision ?? 0,
+        installs,
+        installed: targets.some(({ release }) => release !== undefined),
+        version: input.version,
+        running: state.running,
+        discovery: state.discovery,
+        instances: state.instances.map(({ id, driver, displayName, enabled }) => ({
+            id,
+            driver,
+            displayName,
+            enabled,
+        })),
+        targets,
+        drift: shownPaths(outcome?.drift ?? []),
+        replaced: [...new Set(state.progress?.flatMap(({ replaced }) => replaced) ?? outcome?.replaced ?? [])].sort(),
+        conflicts: (outcome?.conflicts ?? []).map(tilde),
+        blocked: shownPaths(outcome?.blocked ?? []),
+        ...(error !== undefined && { error: tilde(error) }),
+    };
+    return { snapshot, targets: described };
 };
 
 /** The install as the board's page uses it. */
 export interface InstallBoard {
-  readonly snapshot: () => InstallSnapshot;
-  /** Calls `listener` with each new snapshot; the returned function stops it. */
-  readonly subscribe: (listener: (snapshot: InstallSnapshot) => void) => () => void;
-  /** Records presentation only. An automatic close must name the current successful snapshot's revision. */
-  readonly closeOverview: (reason: unknown, revision: unknown) => InstallSnapshot;
-  readonly retry: () => Promise<InstallOperationResult>;
-  readonly replace: () => Promise<InstallOperationResult>;
-  /** Ticks or unticks the target the snapshot shows at `path`; anything else is refused. */
-  readonly setTick: (path: unknown, ticked: unknown) => Promise<InstallOperationResult>;
+    readonly snapshot: () => InstallSnapshot;
+    /** Calls `listener` with each new snapshot; the returned function stops it. */
+    readonly subscribe: (listener: (snapshot: InstallSnapshot) => void) => () => void;
+    /** Records presentation only. An automatic close must name the current successful snapshot's revision. */
+    readonly closeOverview: (reason: unknown, revision: unknown) => InstallSnapshot;
+    readonly retry: () => Promise<InstallOperationResult>;
+    readonly replace: () => Promise<InstallOperationResult>;
+    /** Ticks or unticks the target the snapshot shows at `path`; anything else is refused. */
+    readonly setTick: (path: unknown, ticked: unknown) => Promise<InstallOperationResult>;
 }
 
 const NOT_INSTALLING = `This run of Lar Factory doesn't install skills. Start it with --install-skills to change them.`;
@@ -148,58 +187,84 @@ const NOT_INSTALLING = `This run of Lar Factory doesn't install skills. Start it
  * refused. A refused or failed operation answers with its reason and the snapshot as it is.
  */
 export const makeInstallBoard = (input: BoardInput, checks: Checks | undefined): InstallBoard => {
-  const look = () => describe(input, checks?.state() ?? readOnlyState(input.home), checks !== undefined);
-  const listeners = new Set<(snapshot: InstallSnapshot) => void>();
-  let overview: NonNullable<InstallSnapshot["overview"]> = "open";
-  let presentationRevision = 0;
-  // These paths identify the work visible at automatic closure. They carry no install ownership or results.
-  let closedTargets: string[][] = [];
-  const read = (): InstallSnapshot => {
-    const snapshot = look().snapshot;
-    const addedWork = snapshot.targets.some(({ operation, paths }) => (operation === "install" || operation === "replace")
-      && !closedTargets.some((previous) => paths.some((path) => previous.includes(path))));
-    if (overview === "automatic" && addedWork) {
-      overview = "open";
-      presentationRevision++;
-    }
-    return { ...snapshot, revision: (snapshot.revision ?? 0) + presentationRevision, overview };
-  };
-  const publish = () => {
-    const snapshot = read();
-    for (const listener of listeners) listener(snapshot);
-  };
-  checks?.subscribe(publish);
-  const answer = <A>(operation: Effect.Effect<A, SkillInstallError>, extra: (result: A) => Partial<InstallOperationResult> = () => ({})) =>
-    Effect.runPromise(operation.pipe(Effect.match({
-      onFailure: (failed): InstallOperationResult => ({ snapshot: read(), error: inHome(failed.message, input.home) }),
-      onSuccess: (result): InstallOperationResult => ({ snapshot: read(), ...extra(result) }),
-    })));
-  const refuse = (error: string) => Promise.resolve<InstallOperationResult>({ snapshot: read(), error });
-  return {
-    snapshot: read,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => { listeners.delete(listener); };
-    },
-    closeOverview: (reason, revision) => {
-      if (reason !== "automatic" && reason !== "dismissed") throw new Error("The overview can close automatically or be dismissed");
-      const snapshot = read();
-      if (overview === "dismissed" || (reason === "automatic" && (revision !== snapshot.revision || !installOverviewSucceeded(snapshot)))) return snapshot;
-      overview = reason;
-      closedTargets = snapshot.targets.filter(({ operation }) => operation === "install" || operation === "replace").map(({ paths }) => paths);
-      presentationRevision++;
-      publish();
-      return read();
-    },
-    retry: () => (checks ? answer(checks.retry) : refuse(NOT_INSTALLING)),
-    replace: () => (checks ? answer(checks.replace) : refuse(NOT_INSTALLING)),
-    setTick: (path, ticked) => {
-      if (!checks) return refuse(NOT_INSTALLING);
-      if (typeof ticked !== "boolean") return refuse("A tick must be true or false");
-      const target = look().targets.find(({ shown }) => shown.path === path);
-      if (typeof path !== "string" || !target) return refuse(`${String(path)} is not an Install target`);
-      if (!ticked && target.shown.locked) return refuse(`${path} stays ticked: T3 Code's provider instances or Claude's skill links read it`);
-      return answer(checks.tick(target.real, ticked), ({ conflicts, removed }) => ({ conflicts: conflicts.map((at) => inHome(at, input.home)), removed }));
-    },
-  };
+    const look = () => describe(input, checks?.state() ?? readOnlyState(input.home), checks !== undefined);
+    const listeners = new Set<(snapshot: InstallSnapshot) => void>();
+    let overview: NonNullable<InstallSnapshot['overview']> = 'open';
+    let presentationRevision = 0;
+    // These paths identify the work visible at automatic closure. They carry no install ownership or results.
+    let closedTargets: string[][] = [];
+    const read = (): InstallSnapshot => {
+        const snapshot = look().snapshot;
+        const addedWork = snapshot.targets.some(
+            ({ operation, paths }) =>
+                (operation === 'install' || operation === 'replace') &&
+                !closedTargets.some((previous) => paths.some((path) => previous.includes(path))),
+        );
+        if (overview === 'automatic' && addedWork) {
+            overview = 'open';
+            presentationRevision++;
+        }
+        return { ...snapshot, revision: (snapshot.revision ?? 0) + presentationRevision, overview };
+    };
+    const publish = () => {
+        const snapshot = read();
+        for (const listener of listeners) listener(snapshot);
+    };
+    checks?.subscribe(publish);
+    const answer = <A>(
+        operation: Effect.Effect<A, SkillInstallError>,
+        extra: (result: A) => Partial<InstallOperationResult> = () => ({}),
+    ) =>
+        Effect.runPromise(
+            operation.pipe(
+                Effect.match({
+                    onFailure: (failed): InstallOperationResult => ({
+                        snapshot: read(),
+                        error: inHome(failed.message, input.home),
+                    }),
+                    onSuccess: (result): InstallOperationResult => ({ snapshot: read(), ...extra(result) }),
+                }),
+            ),
+        );
+    const refuse = (error: string) => Promise.resolve<InstallOperationResult>({ snapshot: read(), error });
+    return {
+        snapshot: read,
+        subscribe: (listener) => {
+            listeners.add(listener);
+            return () => {
+                listeners.delete(listener);
+            };
+        },
+        closeOverview: (reason, revision) => {
+            if (reason !== 'automatic' && reason !== 'dismissed')
+                throw new Error('The overview can close automatically or be dismissed');
+            const snapshot = read();
+            if (
+                overview === 'dismissed' ||
+                (reason === 'automatic' && (revision !== snapshot.revision || !installOverviewSucceeded(snapshot)))
+            )
+                return snapshot;
+            overview = reason;
+            closedTargets = snapshot.targets
+                .filter(({ operation }) => operation === 'install' || operation === 'replace')
+                .map(({ paths }) => paths);
+            presentationRevision++;
+            publish();
+            return read();
+        },
+        retry: () => (checks ? answer(checks.retry) : refuse(NOT_INSTALLING)),
+        replace: () => (checks ? answer(checks.replace) : refuse(NOT_INSTALLING)),
+        setTick: (path, ticked) => {
+            if (!checks) return refuse(NOT_INSTALLING);
+            if (typeof ticked !== 'boolean') return refuse('A tick must be true or false');
+            const target = look().targets.find(({ shown }) => shown.path === path);
+            if (typeof path !== 'string' || !target) return refuse(`${String(path)} is not an Install target`);
+            if (!ticked && target.shown.locked)
+                return refuse(`${path} stays ticked: T3 Code's provider instances or Claude's skill links read it`);
+            return answer(checks.tick(target.real, ticked), ({ conflicts, removed }) => ({
+                conflicts: conflicts.map((at) => inHome(at, input.home)),
+                removed,
+            }));
+        },
+    };
 };

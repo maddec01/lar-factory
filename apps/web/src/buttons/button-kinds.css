@@ -3,30 +3,57 @@
 
 /* Every kind is 28 px tall, with 12 px text, except a toggle marked data-toggle (Scope board), which keeps its own
    size. `:where` keeps the selector as specific as [data-kind], so the title bar's strip still sizes its counters. */
-[data-kind]:where(:not([data-toggle])) { height: --spacing(7); font-size: var(--text-xs); }
+[data-kind]:where(:not([data-toggle])) {
+    height: --spacing(7);
+    font-size: var(--text-xs);
+}
 
 /* A section header's action and a desk card's actions: 32 px, icon-only buttons square. */
-.row-action [data-kind]:where(:not([data-toggle])) { height: --spacing(8); }
-.row-action [data-kind][data-icon-only] { width: --spacing(8); }
+.row-action [data-kind]:where(:not([data-toggle])) {
+    height: --spacing(8);
+}
+.row-action [data-kind][data-icon-only] {
+    width: --spacing(8);
+}
 
 /* Start, and an App control marked data-tint (Update): the primary colour, tinted on the card, with no border or
    shadow; its icon takes the text colour. */
-[data-kind="start"], [data-tint] {
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, var(--card));
-  border-color: transparent;
-  box-shadow: none;
+[data-kind='start'],
+[data-tint] {
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 10%, var(--card));
+    border-color: transparent;
+    box-shadow: none;
 }
-:is([data-kind="start"], [data-tint]):not(:disabled, [aria-disabled="true"]):hover, :is([data-kind="start"], [data-tint])[data-state="open"] { background: color-mix(in srgb, var(--primary) 18%, var(--card)); }
-:is([data-kind="start"], [data-tint]) [data-slot="icon"] { color: inherit; }
+:is([data-kind='start'], [data-tint]):not(:disabled, [aria-disabled='true']):hover,
+:is([data-kind='start'], [data-tint])[data-state='open'] {
+    background: color-mix(in srgb, var(--primary) 18%, var(--card));
+}
+:is([data-kind='start'], [data-tint]) [data-slot='icon'] {
+    color: inherit;
+}
 
 /* An icon-only button: 28 px square, keeping its kind's 16 px icon (a desk card's Open thread), or a 20 px one when
    marked large (Settings). */
-[data-kind][data-icon-only] { width: --spacing(7); padding: 0; }
-[data-kind][data-icon-only="large"] svg { width: --spacing(5); height: --spacing(5); }
+[data-kind][data-icon-only] {
+    width: --spacing(7);
+    padding: 0;
+}
+[data-kind][data-icon-only='large'] svg {
+    width: --spacing(5);
+    height: --spacing(5);
+}
 
 /* A button marked data-wrap, whose long label would clip on a narrow dialog: the label wraps and the button grows. */
-[data-kind][data-wrap] { height: auto; min-height: --spacing(7); padding-block: --spacing(1); white-space: normal; }
+[data-kind][data-wrap] {
+    height: auto;
+    min-height: --spacing(7);
+    padding-block: --spacing(1);
+    white-space: normal;
+}
 
 /* The design system's Modal's Close: 28 px square, like every icon-only button. */
-[data-slot="modal-close"] { width: --spacing(7); height: --spacing(7); }
+[data-slot='modal-close'] {
+    width: --spacing(7);
+    height: --spacing(7);
+}

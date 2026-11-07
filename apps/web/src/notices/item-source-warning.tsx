@@ -2,14 +2,24 @@
 // logged-out az, with the command that fixes it when one does.
 
 import { repoName, type ItemSourceProblem, type RepoConfig } from '@lar-factory/shared';
-import { Warning } from './warning.tsx';
+
 import { CopyableCommand } from './tool-notices.tsx';
+import { Warning } from './warning.tsx';
 
 /** The warning names the repository as the title bar and the List modal do, among `repos`. */
 export function ItemSourceWarning({ repo, problem, fix, repos }: ItemSourceProblem & { repos: readonly RepoConfig[] }) {
-  return (
-    <Warning dismissKey={`item-source:${repo.toLowerCase()}`} title={`${repoName(repo, repos)}'s items could not be refreshed.`}>
-      {problem} {fix && <>Run <CopyableCommand command={fix} /> in a terminal. </>}The board reads it again on each refresh.
-    </Warning>
-  );
+    return (
+        <Warning
+            dismissKey={`item-source:${repo.toLowerCase()}`}
+            title={`${repoName(repo, repos)}'s items could not be refreshed.`}
+        >
+            {problem}{' '}
+            {fix && (
+                <>
+                    Run <CopyableCommand command={fix} /> in a terminal.{' '}
+                </>
+            )}
+            The board reads it again on each refresh.
+        </Warning>
+    );
 }

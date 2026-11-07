@@ -5,15 +5,15 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
-import type * as Electron from "electron";
+import type * as Electron from 'electron';
 
 const TOPBAR_HEIGHT = 52;
 /** The traffic lights are 14 points tall. */
 const WINDOW_BUTTON_RADIUS = 7;
 
 export const options = (
-  platform: NodeJS.Platform,
-): Pick<Electron.BrowserWindowConstructorOptions, "titleBarStyle" | "trafficLightPosition"> =>
-  platform === "darwin"
-    ? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: TOPBAR_HEIGHT / 2 - WINDOW_BUTTON_RADIUS } }
-    : {};
+    platform: NodeJS.Platform,
+): Pick<Electron.BrowserWindowConstructorOptions, 'titleBarStyle' | 'trafficLightPosition'> =>
+    platform === 'darwin'
+        ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: TOPBAR_HEIGHT / 2 - WINDOW_BUTTON_RADIUS } }
+        : {};

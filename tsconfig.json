@@ -1,4 +1,4 @@
 {
-  "extends": "@lar-works/config/tsconfig/node.json",
-  "include": ["vite.config.ts"]
+    "extends": "@lar-works/config/tsconfig/node.json",
+    "include": ["vite.config.ts"]
 }

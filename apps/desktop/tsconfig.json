@@ -1,10 +1,10 @@
 {
-  "extends": "@lar-works/config/tsconfig/node.json",
-  "compilerOptions": {
-    "lib": ["es2023", "dom"],
-    "types": ["node", "electron"],
-    "exactOptionalPropertyTypes": true,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["src", "scripts", "test", "vite.config.ts"]
+    "extends": "@lar-works/config/tsconfig/node.json",
+    "compilerOptions": {
+        "lib": ["es2023", "dom"],
+        "types": ["node", "electron"],
+        "exactOptionalPropertyTypes": true,
+        "noFallthroughCasesInSwitch": true
+    },
+    "include": ["src", "scripts", "test", "vite.config.ts"]
 }

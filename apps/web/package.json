@@ -1,41 +1,41 @@
 {
-  "name": "@lar-factory/web",
-  "private": true,
-  "version": "0.1.0",
-  "description": "The board's page: React, built by Vite+ into dist/, which the board server serves.",
-  "type": "module",
-  "scripts": {
-    "build": "vp build",
-    "test": "vp test run",
-    "typecheck": "tsc --noEmit -p ."
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "4.3.3",
-    "@types/node": "^24.19.2",
-    "@types/react": "~19.3.0",
-    "@types/react-dom": "~19.3.0",
-    "jsdom": "^30.0.1",
-    "typescript": "^7.0.2",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0",
-    "vite-plus": "1.5.0"
-  },
-  "dependencies": {
-    "@lar-factory/shared": "workspace:*",
-    "@lar-factory/ui": "workspace:*",
-    "@lar-works/design-system": "^0.1.1",
-    "@lexical/code": "0.52.0",
-    "@lexical/html": "0.52.0",
-    "@lexical/link": "0.52.0",
-    "@lexical/list": "0.52.0",
-    "@lexical/markdown": "0.52.0",
-    "@lexical/react": "0.52.0",
-    "@lexical/rich-text": "0.52.0",
-    "@lexical/selection": "0.52.0",
-    "lexical": "0.52.0",
-    "lucide-react": "^1.70.0",
-    "mermaid": "^12.2.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "zustand": "^5.0.11"
-  }
+    "name": "@lar-factory/web",
+    "private": true,
+    "version": "0.1.0",
+    "description": "The board's page: React, built by Vite+ into dist/, which the board server serves.",
+    "type": "module",
+    "scripts": {
+        "build": "vp build",
+        "test": "vp test run",
+        "typecheck": "tsc --noEmit -p ."
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "4.3.3",
+        "@types/node": "^24.19.2",
+        "@types/react": "~19.3.0",
+        "@types/react-dom": "~19.3.0",
+        "jsdom": "^30.0.1",
+        "typescript": "^7.0.2",
+        "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0",
+        "vite-plus": "1.5.0"
+    },
+    "dependencies": {
+        "@lar-factory/shared": "workspace:*",
+        "@lar-factory/ui": "workspace:*",
+        "@lar-works/design-system": "^0.1.1",
+        "@lexical/code": "0.52.0",
+        "@lexical/html": "0.52.0",
+        "@lexical/link": "0.52.0",
+        "@lexical/list": "0.52.0",
+        "@lexical/markdown": "0.52.0",
+        "@lexical/react": "0.52.0",
+        "@lexical/rich-text": "0.52.0",
+        "@lexical/selection": "0.52.0",
+        "lexical": "0.52.0",
+        "lucide-react": "^1.70.0",
+        "mermaid": "^12.2.0",
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+        "zustand": "^5.0.11"
+    }
 }

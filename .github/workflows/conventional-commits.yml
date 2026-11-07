@@ -1,36 +1,36 @@
 name: Conventional commits
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, edited, reopened, synchronize]
+    pull_request:
+        branches: [main]
+        types: [opened, edited, reopened, synchronize]
 
 permissions:
-  contents: read
-  pull-requests: read
+    contents: read
+    pull-requests: read
 
 concurrency:
-  group: conventional-commits-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+    group: conventional-commits-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
 
 jobs:
-  check:
-    name: Conventional commits
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Set git's default branch
-        run: git config --global init.defaultBranch main
+    check:
+        name: Conventional commits
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - name: Set git's default branch
+              run: git config --global init.defaultBranch main
 
-      - name: Check out repository
-        uses: actions/checkout@v6
+            - name: Check out repository
+              uses: actions/checkout@v6
 
-      - name: Check the rules
-        run: node --test --test-reporter=spec .github/scripts/conventional-commits.test.cjs
+            - name: Check the rules
+              run: node --test --test-reporter=spec .github/scripts/conventional-commits.test.cjs
 
-      - name: Check the PR title and commits
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const { checkPullRequest } = require('./.github/scripts/conventional-commits.cjs');
-            await checkPullRequest({ github, context, core });
+            - name: Check the PR title and commits
+              uses: actions/github-script@v8
+              with:
+                  script: |
+                      const { checkPullRequest } = require('./.github/scripts/conventional-commits.cjs');
+                      await checkPullRequest({ github, context, core });

@@ -70,6 +70,11 @@ jobs:
               if: ${{ !cancelled() && steps.install.outcome == 'success' }}
               run: pnpm run knip
 
+            # Formatting, lint and type checks, with @lar-works/config's rules (the root vite.config.ts).
+            - name: Format and lint
+              if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+              run: pnpm run check
+
     packages:
         name: Shared, UI and work-records tests
         runs-on: ubuntu-latest

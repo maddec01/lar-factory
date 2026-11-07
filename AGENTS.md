@@ -32,7 +32,9 @@ the flow and `docs/plan.md` for how it was set up.
   The user merges every PR.
 - Board changes: run `pnpm test` in each of `apps/server`, `apps/web`,
   `apps/desktop`, `packages/shared`, `packages/ui` and `packages/work-records` that changed (`pnpm test` at
-  the root runs them all), then `pnpm run typecheck` and `pnpm run knip` at the root.
+  the root runs them all), then `pnpm run typecheck`, `pnpm run knip` and `pnpm run check` at the root.
+  `pnpm run check` checks formatting, lint and types with Lar's shared rules (`@lar-works/config`, set up in the
+  root `vite.config.ts`); `pnpm run fix` formats and applies the lint fixes. Copies and skill text stay unformatted.
   `pnpm run dev` at the root opens the board app's window.
 - Sample board: `BOARD_PORT=<port> pnpm run sample` in `apps/server`, on a port where
   `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing (the board app's board

@@ -1,5 +1,5 @@
 import type { ItemChecks } from '@lar-factory/shared';
-import { CheckRun, ChecksDisclosure, Text } from '@lar-works/design-system';
+import { CheckRun, Disclosure, Stack, Text } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 
 /** One read per mounted section; collapsing and board refreshes keep its result. */
@@ -28,7 +28,10 @@ export function ItemChecksSection({ itemId }: { itemId: string }) {
     }
 
     return (
-        <ChecksDisclosure summary="Checks" onOpen={() => void read()} data-checks>
+        <Disclosure presentation="section" label="Checks" onOpenChange={(open) => {
+                if (open) void read();
+            }} data-checks="">
+            <Stack space="group">
             {error ? (
                 <Text variant="inherit" role="alert">
                     Could not load checks: {error}
@@ -79,6 +82,7 @@ export function ItemChecksSection({ itemId }: { itemId: string }) {
                     ))}
                 </>
             )}
-        </ChecksDisclosure>
+        </Stack>
+        </Disclosure>
     );
 }

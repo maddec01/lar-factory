@@ -4,7 +4,7 @@
 import { toast as toasts, Toaster } from '@lar-factory/ui/toasts';
 import { IconButton } from '@lar-works/design-system';
 import { XIcon as CloseIcon } from '@lar-works/design-system/icons';
-import { createContext, useEffect, useRef, useState } from 'react';
+import { createContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode, RefObject } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -207,7 +207,9 @@ export function clearToast(slot: string): void {
 function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClose: () => void): void {
     const close = useRef(onClose);
 
-    close.current = onClose;
+    useLayoutEffect(() => {
+        close.current = onClose;
+    });
     useEffect(() => {
         if (!enabled) return;
 
@@ -215,28 +217,30 @@ function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClo
 
         if (!entry) return;
 
-        let hovered = entry.matches(':hover');
-        let focused = entry.contains(document.activeElement);
-        let timer: ReturnType<typeof setTimeout> | undefined;
+        const held = {
+            hovered: entry.matches(':hover'),
+            focused: entry.contains(document.activeElement),
+            timer: undefined as ReturnType<typeof setTimeout> | undefined,
+        };
         const restart = () => {
-            clearTimeout(timer);
+            clearTimeout(held.timer);
 
-            if (!hovered && !focused) timer = setTimeout(() => close.current(), TOAST_MS);
+            if (!held.hovered && !held.focused) held.timer = setTimeout(() => close.current(), TOAST_MS);
         };
         const enter = () => {
-            hovered = true;
+            held.hovered = true;
             restart();
         };
         const leave = () => {
-            hovered = false;
+            held.hovered = false;
             restart();
         };
         const focus = () => {
-            focused = true;
+            held.focused = true;
             restart();
         };
         const blur = (event: FocusEvent) => {
-            focused = event.relatedTarget instanceof Node && entry.contains(event.relatedTarget);
+            held.focused = event.relatedTarget instanceof Node && entry.contains(event.relatedTarget);
             restart();
         };
 
@@ -247,7 +251,7 @@ function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClo
         restart();
 
         return () => {
-            clearTimeout(timer);
+            clearTimeout(held.timer);
             entry.removeEventListener('mouseenter', enter);
             entry.removeEventListener('mouseleave', leave);
             entry.removeEventListener('focusin', focus);

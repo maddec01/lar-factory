@@ -731,6 +731,7 @@ function PartsBar({ m }: { m: Moving }) {
         >
             {order.map((p) => {
                 const { word, glyph } = shownStatus(p.item, unavailable);
+                // oxlint-disable-next-line react/purity -- the pulse reads the time as of this render; board updates render the bar again
                 const pulse = glyph === 'In progress' && !itemActivityStill(p.item, Date.now(), disconnected);
 
                 return (

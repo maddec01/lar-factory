@@ -49,7 +49,9 @@ export function useItemDetails(
 ): { read: ItemDetailsRead; refresh: () => Promise<boolean> } {
     const board = useRef(updatedAt);
 
-    board.current = updatedAt;
+    useLayoutEffect(() => {
+        board.current = updatedAt;
+    });
 
     const [read, setRead] = useState<{ itemId: string; result: ItemDetailsRead } | null>(null);
 

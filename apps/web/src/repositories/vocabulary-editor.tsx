@@ -15,7 +15,7 @@ import {
 } from '@lar-factory/shared/vocabulary';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { Alert, Button, Popover, Badge, Input } from '@lar-works/design-system';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { kind } from '../buttons/button-kinds.tsx';
 import { postAction } from '../items/card-actions.ts';
@@ -32,27 +32,28 @@ export function useVocabularyDiscovery(repo: string, onboarding = false) {
     const labelChanges = useEditStore((s) => s.labelChanges);
     const [read, setRead] = useState<{ repo: string; discovery: VocabularyDiscovery } | null>(null);
     const discovery = read?.repo === repo ? read.discovery : null;
-    const [error, setError] = useState<string | null>(null);
     const [attempt, retry] = useState(0);
+    // Why the read failed, for the read it answers; a newer read shows no error until it fails too.
+    const request = JSON.stringify([repo, onboarding, attempt, labelChanges]);
+    const [failure, setFailure] = useState<{ request: string; error: string } | null>(null);
+    const error = failure?.request === request ? failure.error : null;
 
     useEffect(() => {
-        let current = true;
+        const read = new AbortController();
 
-        setError(null);
         void postAction<{ discovery: VocabularyDiscovery }>(
             onboarding ? '/api/onboarding/vocabulary' : '/api/repositories/settings',
             onboarding ? { repo } : { repo, change: 'discover-vocabulary' },
         ).then((result) => {
-            if (!current) return;
+            if (read.signal.aborted) return;
 
-            if (result.error || !result.discovery) setError(result.error ?? 'The board sent no vocabulary.');
+            if (result.error || !result.discovery)
+                setFailure({ request, error: result.error ?? 'The board sent no vocabulary.' });
             else setRead({ repo, discovery: result.discovery });
         });
 
-        return () => {
-            current = false;
-        };
-    }, [repo, onboarding, attempt, labelChanges]);
+        return () => read.abort();
+    }, [repo, onboarding, attempt, labelChanges, request]);
 
     return { discovery, error, retry: () => retry((n) => n + 1) };
 }
@@ -122,7 +123,9 @@ export function VocabularyFields({
     const changed = useRef(false);
     const latest = useRef({ value, newLabels, onCommit });
 
-    latest.current = { value, newLabels, onCommit };
+    useLayoutEffect(() => {
+        latest.current = { value, newLabels, onCommit };
+    });
     useEffect(
         () => () => {
             if (changed.current) latest.current.onCommit?.(latest.current.value, latest.current.newLabels);

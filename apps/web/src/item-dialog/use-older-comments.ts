@@ -5,7 +5,7 @@
 import type { ItemComment, ItemCommentsPage } from '@lar-factory/shared';
 import { useEffect, useRef, useState } from 'react';
 
-import type { DetailsEntry } from './details-cache.ts';
+import { type DetailsEntry, keepOlder } from './details-cache.ts';
 
 export interface OlderComments {
     /** The pages loaded so far, in the details' order: each page's comments follow the one before. */
@@ -47,7 +47,7 @@ export function useOlderComments(itemId: string, entry: DetailsEntry): OlderComm
     });
 
     useEffect(() => {
-        entry.older = { comments: state.comments, cursor: state.cursor };
+        keepOlder(entry, { comments: state.comments, cursor: state.cursor });
     }, [entry, state.comments, state.cursor]);
 
     const reading = useRef<AbortController | null>(null);

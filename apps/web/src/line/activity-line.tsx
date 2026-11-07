@@ -111,6 +111,7 @@ export function ItemAgents({ item }: { item: Item }) {
     // Renders when the list goes unavailable; the ages in it move with their own clock.
     useClock((now) => itemActivityAgents(item, now, disconnected) === 'unavailable');
 
+    // oxlint-disable-next-line react/purity -- the useClock above renders this again when the time changes the answer
     const agents = itemActivityAgents(item, Date.now(), disconnected);
 
     if (!agents) return null;
@@ -148,6 +149,7 @@ export function ActivityLine({ item }: { item: Item }) {
         );
     });
 
+    // oxlint-disable-next-line react/purity -- the useClock above renders this again when the time changes the words
     const now = Date.now();
     const line = itemActivityLine(item, now, disconnected);
 

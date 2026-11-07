@@ -1,7 +1,7 @@
 import { onAzure, trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { Button, Input } from '@lar-works/design-system';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 
 import { kind } from '../buttons/button-kinds.tsx';
 import { FIELD_GROUP, FieldRow } from '../settings/field-row.tsx';
@@ -57,7 +57,9 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
     const errors = fieldErrors[repo] ?? {};
     const latest = useRef(setup);
 
-    latest.current = setup;
+    useLayoutEffect(() => {
+        latest.current = setup;
+    });
     useEffect(
         () => () => {
             // Unmounting on Close or navigation counts as leaving every text field.

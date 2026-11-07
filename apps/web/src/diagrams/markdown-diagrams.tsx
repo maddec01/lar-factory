@@ -5,13 +5,12 @@ import { useEffect, useId, useRef, useState } from 'react';
 function Diagram({ source }: { source: string }) {
     const id = useId().replace(/[^a-zA-Z0-9]/g, '');
     const host = useRef<HTMLDivElement>(null);
-    const [problem, setProblem] = useState<string | null>(null);
+    // The source the diagram failed on, so a new source draws afresh.
+    const [failed, setFailed] = useState<string | null>(null);
+    const problem = failed === source ? 'The diagram could not be drawn. Its source is available below.' : null;
 
     useEffect(() => {
-        let current = true;
-
-        setProblem(null);
-
+        const drawn = new AbortController();
         const render = async () => {
             try {
                 const { default: mermaid } = await import('mermaid');
@@ -27,17 +26,15 @@ function Diagram({ source }: { source: string }) {
 
                 const { svg } = await mermaid.render(`concept-${id}`, source);
 
-                if (current && host.current) host.current.innerHTML = svg;
+                if (!drawn.signal.aborted && host.current) host.current.innerHTML = svg;
             } catch {
-                if (current) setProblem('The diagram could not be drawn. Its source is available below.');
+                if (!drawn.signal.aborted) setFailed(source);
             }
         };
 
         void render();
 
-        return () => {
-            current = false;
-        };
+        return () => drawn.abort();
     }, [id, source]);
 
     return (

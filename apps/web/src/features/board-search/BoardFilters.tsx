@@ -36,7 +36,7 @@ export function KindIcon({ choice }: { choice: KindFilter }) {
 }
 
 function LabelDot({ color }: { color: string | undefined }) {
-    return <StatusIndicator tone="neutral" color={color} />;
+    return <StatusIndicator tone="neutral" labelColor={color} />;
 }
 
 /** The colour any item on the board gives each picked label, which a label no item in view shows still has. */

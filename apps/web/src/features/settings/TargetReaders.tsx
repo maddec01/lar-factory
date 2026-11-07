@@ -1,6 +1,6 @@
 // Reader badges are shared by Settings and the install overview. Targets arrive physically deduplicated from the app.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Badge, LabelsValue, Text } from '@lar-works/design-system';
+import { Badge, Inline, Text } from '@lar-works/design-system';
 
 import { useInstallStore } from '@/services/install/install.hooks';
 
@@ -8,7 +8,7 @@ export function TargetReaders({ target }: { target: TargetSnapshot }) {
     const snapshot = useInstallStore((state) => state.snapshot);
 
     return (
-        <LabelsValue label={`Provider instances reading ${target.path}`}>
+        <Inline as="span" wrap align="center" space="tight" aria-label={`Provider instances reading ${target.path}`}>
             {target.instances.length ? (
                 target.instances.map((id) => {
                     const instance = snapshot?.instances.find((instance) => instance.id === id);
@@ -33,6 +33,6 @@ export function TargetReaders({ target }: { target: TargetSnapshot }) {
                     {target.locked ? 'Shared skill copies' : 'Manual target'}
                 </Text>
             )}
-        </LabelsValue>
+        </Inline>
     );
 }

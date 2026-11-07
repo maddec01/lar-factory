@@ -5,11 +5,11 @@ import { shortAgo } from '@lar-factory/shared';
 import {
     Button,
     buttonKind,
-    ButtonRow,
     Comment as CommentCard,
     CommentList,
     DetailsHeading,
     DetailsText,
+    Inline,
     MainSection,
     RichText,
     Text,
@@ -69,7 +69,7 @@ function Comments({
                 !older.hasMore && <DetailsText>No comments.</DetailsText>
             )}
             {older.hasMore && (
-                <ButtonRow layout="status">
+                <Inline as="span" wrap align="center" space="group">
                     <Button {...buttonKind('other')} loading={older.loading} onClick={older.loadMore}>
                         Load older comments
                     </Button>
@@ -78,7 +78,7 @@ function Comments({
                             Could not load older comments: {older.error}
                         </Text>
                     )}
-                </ButtonRow>
+                </Inline>
             )}
         </MainSection>
     );

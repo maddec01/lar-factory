@@ -6,9 +6,9 @@ import {
     ChipGroup,
     DetailFact as Fact,
     IconButton,
+    Inline,
     LabelChip,
     LabelEditorPanel,
-    LabelsValue,
     Popover,
     Text,
 } from '@lar-works/design-system';
@@ -45,7 +45,7 @@ export function ItemLabels({ item }: { item: Item }) {
 
     return (
         <Fact label={heading}>
-            <LabelsValue>
+            <Inline as="span" wrap align="center" space="tight">
                 {(shown.length > 0 || linked) && (
                     <ChipGroup data-labels>
                         <LabelChips item={item} />
@@ -101,7 +101,7 @@ export function ItemLabels({ item }: { item: Item }) {
                         {edit.error}
                     </Text>
                 )}
-            </LabelsValue>
+            </Inline>
         </Fact>
     );
 }

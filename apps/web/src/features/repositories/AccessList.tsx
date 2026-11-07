@@ -6,7 +6,7 @@ import {
     type RepositoryOperation,
     type RepositorySetup,
 } from '@lar-factory/shared';
-import { Button, buttonKind, ButtonRow, InlineLink, InsetPanel, ReasonNote, Stack } from '@lar-works/design-system';
+import { Button, buttonKind, Inline, InlineLink, InsetPanel, ReasonNote, Stack } from '@lar-works/design-system';
 
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { ToolState } from '@/shared/settings/SettingControls';
@@ -78,11 +78,11 @@ export function AccessList({
                 ))}
             </InsetPanel>
             {onRecheck && (
-                <ButtonRow>
+                <Inline as="span">
                     <Button {...buttonKind('other')} loading={checking} onClick={onRecheck}>
                         Recheck access
                     </Button>
-                </ButtonRow>
+                </Inline>
             )}
         </Stack>
     );

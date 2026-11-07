@@ -4,7 +4,7 @@ import {
     Alert,
     Button,
     buttonKind,
-    ButtonRow,
+    Inline,
     InlineLink,
     LabelChip,
     OptionSelect,
@@ -166,7 +166,7 @@ export function VocabularyFields({
                 </Text>
             )}
             {value.type && (typesProblem || !types.includes(value.type)) && (
-                <ButtonRow>
+                <Inline as="span">
                     <Button
                         {...buttonKind('other')}
                         wrap
@@ -174,7 +174,7 @@ export function VocabularyFields({
                     >
                         Remove {value.type}
                     </Button>
-                </ButtonRow>
+                </Inline>
             )}
             {error && (
                 <Text variant="caption" tone="danger" role="alert">

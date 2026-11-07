@@ -7,7 +7,7 @@
 
 import { onAzure } from '@lar-factory/shared';
 import type { Item, ItemDetails } from '@lar-factory/shared';
-import { DetailFact as Fact, MetaArea, PeopleList, Person } from '@lar-works/design-system';
+import { DetailFact as Fact, Inline, MetaArea, Person } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { ConceptState, ConceptWork } from './ConceptParts';
@@ -75,11 +75,11 @@ export function ItemMeta({
                 label="Assignees"
                 show={(d) =>
                     d.assignees.length > 0 && (
-                        <PeopleList>
+                        <Inline as="span" wrap space="related">
                             {d.assignees.map((a) => (
                                 <Person key={a} name={a} />
                             ))}
-                        </PeopleList>
+                        </Inline>
                     )
                 }
             />

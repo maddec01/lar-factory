@@ -6,7 +6,7 @@ import { decisionMethodName, itemRepoNames, ref, labelsOnRow, repoKey, repoName,
 import type { AzureWorkItem, Item, Kind, RepoConfig } from '@lar-factory/shared';
 import {
     Badge,
-    ItemBadges,
+    Inline,
     ItemFields,
     ItemTitle as DesignItemTitle,
     KindMarker as DesignKindMarker,
@@ -149,13 +149,13 @@ export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean 
     const badge = KIND_BADGES[item.kind];
 
     return badge || words.length ? (
-        <ItemBadges data-item-kind>
+        <Inline as="span" inline wrap space="tight" data-item-kind>
             <KindBadge kind={item.kind} />
             {onRow && <KindMarker item={item} />}
             {words.map((word) => (
                 <Badge key={word}>{word}</Badge>
             ))}
-        </ItemBadges>
+        </Inline>
     ) : null;
 }
 

@@ -12,10 +12,10 @@ import {
     InsetPanel,
     Modal,
     OpenSettingsButton,
-    SettingsGroups,
     SettingsNav,
     SidebarNavigationGroup,
     SidebarNavigationItem,
+    Stack,
     Text,
 } from '@lar-works/design-system';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -209,7 +209,7 @@ function SettingsModal() {
                 }
             >
                 <Modal.Body key={setup?.repo ?? page.id}>
-                    <SettingsGroups data-settings-body="">
+                    <Stack space="page" data-settings-body="">
                         {setup ? (
                             <>
                                 <span>
@@ -222,7 +222,7 @@ function SettingsModal() {
                         ) : (
                             page.groups.map((g) => <GroupView group={g} key={g.title} />)
                         )}
-                    </SettingsGroups>
+                    </Stack>
                 </Modal.Body>
             </Modal.Content>
         </Modal>

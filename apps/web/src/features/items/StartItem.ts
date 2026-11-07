@@ -7,8 +7,7 @@ import { flushSync } from 'react-dom';
 import { useActionStore } from './ActionStore';
 import { PURPOSE, startOf, useStartStore } from './StartStore';
 import type { StartKind } from './StartStore';
-import { notify } from '@/features/notices/Notices';
-import { refocus } from '@/features/notices/Toasts';
+import { notify, refocus } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 

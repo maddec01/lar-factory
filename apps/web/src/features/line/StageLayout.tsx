@@ -9,10 +9,8 @@ import { Dossiers } from './Dossiers';
 import { Queue } from './Queue';
 import { Build, ReadyToBuild, Shaping } from './StagePanes';
 import { stageRows } from './StageRows';
-import { rowFilter } from '@/features/filters/ItemFilters';
-import { useScopeStore } from '@/features/filters/ScopeStore';
-import { useActivityUnavailable } from '@/features/items/ItemParts';
-import { RowActions } from '@/features/items/RowActions';
+import { rowFilter, useScopeStore } from '@/features/filters';
+import { useActivityUnavailable, RowActions } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 
 /** `items` are the items in the main area's scope; `desk` sits above the stages. */

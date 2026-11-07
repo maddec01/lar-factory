@@ -7,7 +7,7 @@ import { ItemSourceWarning } from './ItemSourceWarning';
 import { T3AvailabilityWarning } from './T3AvailabilityWarning';
 import { AzWarning, CommandWarning, GhWarning, T3NotRunningWarning } from './ToolNotices';
 import { Warning } from './Warning';
-import { useSettingsStore } from '@/features/settings/SettingsStore';
+import { useSettingsStore } from '@/features/settings';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 

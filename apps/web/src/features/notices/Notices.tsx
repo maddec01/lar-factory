@@ -8,11 +8,9 @@ import { flushSync } from 'react-dom';
 
 import { ToastFailure, ToastLifetime, clearToast, showToast } from './Toasts';
 import type { Toast } from './Toasts';
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { useActionStore, useItemAction } from '@/features/items/ActionStore';
-import { TitleLink } from '@/features/items/ItemParts';
-import { LinkButton } from '@/features/items/LinkButton';
-import type { StartKind } from '@/features/items/StartStore';
+import { useItemDialogStore } from '@/features/item-dialog';
+import { useActionStore, useItemAction, TitleLink, LinkButton } from '@/features/items';
+import type { StartKind } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';

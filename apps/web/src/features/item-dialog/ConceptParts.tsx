@@ -5,11 +5,17 @@
 import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 
-import { AgentWork, INCOMPLETE_TOTAL, ItemTitle, usageUnreadable, useShownStatus } from '@/features/items/ItemParts';
-import { OpenThread } from '@/features/items/OpenThread';
-import { SourceIcon } from '@/features/items/SourceIcon';
-import { ItemStatusGlyph } from '@/features/items/StatusGlyph';
-import { isDone, partsOf } from '@/features/line/DossierParts';
+import {
+    AgentWork,
+    INCOMPLETE_TOTAL,
+    ItemTitle,
+    usageUnreadable,
+    useShownStatus,
+    OpenThread,
+    SourceIcon,
+    ItemStatusGlyph,
+} from '@/features/items';
+import { isDone, partsOf } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
 
 const WORK_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';

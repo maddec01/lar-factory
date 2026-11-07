@@ -9,13 +9,19 @@ import { CircleDashed, Layers } from '@lar-works/design-system/icons';
 import { useMemo } from 'react';
 
 import type { SearchGroup } from './SearchOptions';
-import { kindName } from '@/features/filters/ItemFilterBar';
-import { KIND_FILTERS, headingOf, labelChoices, toggled } from '@/features/filters/ItemFilters';
-import type { ItemFilters, KindFilter } from '@/features/filters/ItemFilters';
-import { useScopeStore, useShownScope } from '@/features/filters/ScopeStore';
-import { KIND_BADGES, useActivityUnavailable } from '@/features/items/ItemParts';
-import { stageRows } from '@/features/line/StageRows';
-import { ProjectIcon } from '@/features/repositories/ProjectIcon';
+import {
+    kindName,
+    KIND_FILTERS,
+    headingOf,
+    labelChoices,
+    toggled,
+    useScopeStore,
+    useShownScope,
+} from '@/features/filters';
+import type { ItemFilters, KindFilter } from '@/features/filters';
+import { KIND_BADGES, useActivityUnavailable } from '@/features/items';
+import { stageRows } from '@/features/line';
+import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 
 export interface FilterToken extends SearchDialogToken {

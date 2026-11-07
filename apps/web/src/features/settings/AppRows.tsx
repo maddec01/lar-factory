@@ -8,15 +8,15 @@ import { Button } from '@lar-works/design-system';
 
 import { type SettingsResult, useSettingsStore } from './SettingsStore';
 import { InstallRecovery } from './TargetProgress';
-import { FormResult } from '@/features/notices/FormResult';
+import { FormResult } from '@/features/notices';
 import {
     canCheckForUpdate,
     getUpdateDisabledReason,
     resolveUpdateButtonAction,
     resolveUpdatePill,
     updateStatusText,
-} from '@/features/updates/UpdateButtonLogic';
-import { useUpdateStore } from '@/features/updates/UpdateStore';
+    useUpdateStore,
+} from '@/features/updates';
 import { useDriftStore } from '@/services/install/drift.hooks';
 import { useInstallStore } from '@/services/install/install.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';

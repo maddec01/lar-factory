@@ -29,9 +29,9 @@ import {
     accessRows,
     operationNames,
     type AccessRow,
-} from '@/features/repositories/AccessList';
-import { IssueDefaults } from '@/features/repositories/IssueDefaults';
-import { ProjectChoiceIcon } from '@/features/repositories/ProjectIcon';
+    IssueDefaults,
+    ProjectChoiceIcon,
+} from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { Spinner } from '@/shared/ui/loading/Loader';

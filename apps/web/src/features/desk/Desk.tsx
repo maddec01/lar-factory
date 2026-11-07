@@ -9,16 +9,19 @@
 import { deskItems, needsAnswer, openQuestionThread, HINTS, itemPr, itemName, readingScope } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 
-import { rowFilter } from '@/features/filters/ItemFilters';
-import { useScopeStore, useShownScope } from '@/features/filters/ScopeStore';
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { Age, AzureFields, ItemTitle, useActivityUnavailable } from '@/features/items/ItemParts';
-import { KeepClicks } from '@/features/items/KeepClicks';
-import { OpenThread } from '@/features/items/OpenThread';
-import { PrLink } from '@/features/items/PrLink';
-import { ItemStatusGlyph } from '@/features/items/StatusGlyph';
-import { RowKind, RowSource } from '@/features/line/RowIdentity';
-import { ROW_OPENS } from '@/features/line/StageTrack';
+import { rowFilter, useScopeStore, useShownScope } from '@/features/filters';
+import { useItemDialogStore } from '@/features/item-dialog';
+import {
+    Age,
+    AzureFields,
+    ItemTitle,
+    useActivityUnavailable,
+    KeepClicks,
+    OpenThread,
+    PrLink,
+    ItemStatusGlyph,
+} from '@/features/items';
+import { RowKind, RowSource, ROW_OPENS } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { Loader } from '@/shared/ui/loading/Loader';
 

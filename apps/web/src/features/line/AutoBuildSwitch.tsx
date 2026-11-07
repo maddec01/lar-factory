@@ -6,7 +6,7 @@ import type { AutoBuildPass } from '@lar-factory/shared';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { showToast } from '@/features/notices/Toasts';
+import { showToast } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { Switch } from '@/shared/ui/setting-rows/SettingControls';

@@ -4,7 +4,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
-import { showToast } from '@/features/notices/Toasts';
+import { showToast } from '@/features/notices';
 
 /** The update toasts share one toast: a new one replaces the last. */
 const SLOT = 'update';

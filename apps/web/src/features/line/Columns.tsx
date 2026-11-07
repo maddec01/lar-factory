@@ -8,8 +8,8 @@ import type { MouseEvent, ReactNode } from 'react';
 
 import { useActivityStill } from './ActivityLine';
 import { statsOf } from './StageTrack';
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { hasFigures, INCOMPLETE_TOTAL, useLastKnown, usageLoading } from '@/features/items/ItemParts';
+import { useItemDialogStore } from '@/features/item-dialog';
+import { hasFigures, INCOMPLETE_TOTAL, useLastKnown, usageLoading } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { Loader } from '@/shared/ui/loading/Loader';
 

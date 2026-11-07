@@ -10,7 +10,7 @@ import {
     VocabularyFields,
     VocabularyRead,
     type VocabularyKind,
-} from '@/features/repositories/VocabularyEditor';
+} from '@/features/repositories';
 import { FIELD_GROUP, HelpTip } from '@/shared/ui/setting-rows/FieldRow';
 
 function KindMappingFields({ run, detection }: { run: Run; detection: SetupDetection }) {

@@ -5,7 +5,7 @@ import { shownRepo } from '@lar-factory/shared';
 import { Button, Badge, NoticeCard } from '@lar-works/design-system';
 
 import { stoppedAt, useWizardStore } from './WizardStore';
-import { ProjectIcon } from '@/features/repositories/ProjectIcon';
+import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 

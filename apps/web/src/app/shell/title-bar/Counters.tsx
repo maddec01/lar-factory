@@ -24,11 +24,9 @@ import { Button, Popover, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-wor
 import { CircleDollarSign } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { ItemTitle } from '@/features/items/ItemParts';
-import { SourceIcon } from '@/features/items/SourceIcon';
-import { ItemStatusGlyph, StatusGlyph, STATUS_COLOR, useStatusActivity } from '@/features/items/StatusGlyph';
-import { ProjectIcon } from '@/features/repositories/ProjectIcon';
+import { useItemDialogStore } from '@/features/item-dialog';
+import { ItemTitle, SourceIcon, ItemStatusGlyph, StatusGlyph, STATUS_COLOR, useStatusActivity } from '@/features/items';
+import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { Loader } from '@/shared/ui/loading/Loader';

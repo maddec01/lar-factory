@@ -11,7 +11,7 @@ import { Button, DropdownMenu } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { ModelEntries, opensOnChecked } from '@/features/items/ModelEntries';
+import { ModelEntries, opensOnChecked } from '@/features/items';
 import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 

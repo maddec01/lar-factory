@@ -6,9 +6,7 @@ import type { BoardData } from '@lar-factory/shared';
 
 import { openWaits } from './DossierParts';
 import type { Part } from './DossierParts';
-import { OpenThread, hasLiveThread } from '@/features/items/OpenThread';
-import { StartOrAfter } from '@/features/items/StartAfter';
-import { StartBuild } from '@/features/items/StartBuild';
+import { OpenThread, hasLiveThread, StartOrAfter, StartBuild } from '@/features/items';
 
 /** Whether PartStart offers the part a Start now: it is Ready or Queued, waits on no open issue, has no live thread
  *  and carries one status. The dossier's "Ready to start" row and its header's "what's next" both read it. */

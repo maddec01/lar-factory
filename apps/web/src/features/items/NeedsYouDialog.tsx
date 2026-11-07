@@ -8,10 +8,11 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
 import { inspectRecovery, resolveNeedsYou, startAgain } from './CardActions';
-import type { ActionResult, RecoveryInspection } from './CardActions';
+import type { RecoveryInspection } from './CardActions';
 import { CleanupChoices, executeCleanup, inspectCleanup, offersCleanup, useCleanupChoices } from './CleanupChoices';
 import { writeState } from './ItemActions';
 import { StartEntries } from './StartControl';
+import type { ActionResult } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 interface Props {

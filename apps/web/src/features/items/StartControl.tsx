@@ -20,7 +20,6 @@ import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { useItemAction } from './ActionStore';
-import { postAction, receive } from './CardActions';
 import { writeState } from './ItemActions';
 import { ModelEntries, opensOnChecked } from './ModelEntries';
 import { OpenThread } from './OpenThread';
@@ -30,6 +29,7 @@ import type { StartKind } from './StartStore';
 import { notify } from '@/features/notices/Notices';
 import { DismissButton, closeKeepingFocus } from '@/features/notices/Toasts';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 import { ICON, kind as buttonKind } from '@/shared/ui/buttons/ButtonKinds';
 import { Spinner } from '@/shared/ui/loading/Loader';
 

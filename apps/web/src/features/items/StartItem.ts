@@ -5,12 +5,12 @@ import type { ModelChoice, StartResult } from '@lar-factory/shared';
 import { flushSync } from 'react-dom';
 
 import { useActionStore } from './ActionStore';
-import { postAction, receive } from './CardActions';
 import { PURPOSE, startOf, useStartStore } from './StartStore';
 import type { StartKind } from './StartStore';
 import { notify } from '@/features/notices/Notices';
 import { refocus } from '@/features/notices/Toasts';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 
 const PATH: Record<StartKind, string> = { refine: '/api/start', build: '/api/start-build' };
 

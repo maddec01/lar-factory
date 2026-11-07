@@ -14,9 +14,9 @@ import {
 import { create } from 'zustand';
 
 import { STEP_TITLES, answerProblem, answersOf, connectionsOf, isStep, stepsOf, type StepId } from './WizardChoices';
-import { postAction, receive } from '@/features/items/CardActions';
 import { showToast } from '@/features/notices/Toasts';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 
 /** Where a kept onboarding stopped, as a phrase; a step this dialog doesn't have, as an older board's, reads as the first. */
 export const stoppedAt = ({ step }: OnboardingProgress): string =>

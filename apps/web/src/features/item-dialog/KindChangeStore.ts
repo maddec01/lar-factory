@@ -8,7 +8,7 @@ import { flushSync } from 'react-dom';
 import { create } from 'zustand';
 
 import { useItemDialogStore } from './ItemDialogStore';
-import { postAction, receive } from '@/features/items/CardActions';
+import { postAction, receive } from '@/services/board/board.service';
 
 interface KindChange {
     kind: SwapKind;

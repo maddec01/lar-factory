@@ -10,11 +10,11 @@ import { ToastFailure, ToastLifetime, clearToast, showToast } from './Toasts';
 import type { Toast } from './Toasts';
 import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
 import { useActionStore, useItemAction } from '@/features/items/ActionStore';
-import { postAction, receive } from '@/features/items/CardActions';
 import { TitleLink } from '@/features/items/ItemParts';
 import { LinkButton } from '@/features/items/LinkButton';
 import type { StartKind } from '@/features/items/StartStore';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 export type Notice =

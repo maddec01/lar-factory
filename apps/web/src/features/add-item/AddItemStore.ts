@@ -9,9 +9,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { postAction, receive } from '@/features/items/CardActions';
 import { notify } from '@/features/notices/Notices';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 
 interface Attempt {
     requestId: string;

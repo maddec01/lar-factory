@@ -11,8 +11,8 @@ import { Button, DropdownMenu } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { postAction, receive } from '@/features/items/CardActions';
 import { ModelEntries, opensOnChecked } from '@/features/items/ModelEntries';
+import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 function modelLabel(groups: ModelGroup[], selected: ModelChoice | undefined): string {

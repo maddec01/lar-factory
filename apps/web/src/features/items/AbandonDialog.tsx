@@ -13,9 +13,10 @@ import { Alert, Button, Modal, Text } from '@lar-works/design-system';
 import { useEffect, useState, useRef } from 'react';
 
 import { useAbandonStore } from './AbandonStore';
-import { abandonItem, postAction, receive, closeTicket } from './CardActions';
+import { abandonItem, closeTicket } from './CardActions';
 import { CleanupChoices, executeCleanup, inspectCleanup, useCleanupChoices } from './CleanupChoices';
 import { useBoardStore } from '@/services/board/board.hooks';
+import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** The cleanup of the notice's work `itemId` names while its confirmation is open: null for any other Abandon. */

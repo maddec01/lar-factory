@@ -28,6 +28,12 @@ export default defineConfig({
         overrides: [
             ...(lintConfig.overrides ?? []),
             {
+                // CommonJS files (the commit-msg check, the release plan, the fake CLIs the server tests run) load
+                // modules with require.
+                files: ['**/*.cjs'],
+                rules: { 'typescript/no-require-imports': 'off' },
+            },
+            {
                 files: ['apps/web/src/**/*.ts', 'apps/web/src/**/*.tsx'],
                 // Step 2 of the lar-web alignment turns these on.
                 rules: { 'lar/boundaries': 'off', 'lar/no-visual-recipes': 'off', 'max-lines': 'off' },

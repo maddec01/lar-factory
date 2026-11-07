@@ -6,7 +6,7 @@ import {
     type RepositoryOperation,
     type RepositorySetup,
 } from '@lar-factory/shared';
-import { Button, ButtonRow, buttonKind, InlineButton, InsetPanel, ReasonNote, Stack } from '@lar-works/design-system';
+import { Button, buttonKind, ButtonRow, InlineLink, InsetPanel, ReasonNote, Stack } from '@lar-works/design-system';
 
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { ToolState } from '@/shared/settings/SettingControls';
@@ -115,9 +115,9 @@ export function AccessReason({
             helpLabel="access"
             action={
                 onRecheck && (
-                    <InlineButton disabled={checking} onClick={onRecheck}>
+                    <InlineLink disabled={checking} onClick={onRecheck}>
                         {checking ? 'Checking…' : 'Recheck'}
-                    </InlineButton>
+                    </InlineLink>
                 )
             }
         />

@@ -6,7 +6,7 @@ import {
     buttonKind,
     ButtonRow,
     FormSelect,
-    InlineButton,
+    InlineLink,
     Text,
     VocabularyChip,
     VocabularyMore,
@@ -180,7 +180,7 @@ export function VocabularyFields({
             )}
             {error && (
                 <Text variant="caption" tone="danger" role="alert">
-                    {error} <InlineButton onClick={retryCommit}>Retry</InlineButton>
+                    {error} <InlineLink onClick={retryCommit}>Retry</InlineLink>
                 </Text>
             )}
         </VocabularyRow>

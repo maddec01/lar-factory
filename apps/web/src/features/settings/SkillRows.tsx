@@ -2,7 +2,7 @@
 
 import { blockedBy, clock, day, type BundledSkill, type TargetSnapshot } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
-import { CodeText, Inline, InlineLink, SourceLink, Text } from '@lar-works/design-system';
+import { Code, Inline, InlineLink, Link, Text } from '@lar-works/design-system';
 import type { ComponentProps } from 'react';
 
 import { TargetSwitch, TargetsNote } from './AppRows';
@@ -113,9 +113,9 @@ function BlockedReason({ status }: { status: BundledSkill['status'] }) {
     if (status?.state !== 'blocked') return null;
 
     const [opening, ...rest] = blockedBy(status.paths, (path) => (
-        <CodeText key={path} wrap="anywhere">
+        <Code key={path} wrap="anywhere">
             {path}
-        </CodeText>
+        </Code>
     ));
 
     return (
@@ -175,9 +175,9 @@ export function bundledGroup({ data, version }: PagesInput): Group {
               control: custom(() => (
                   <Inline as="span" space="related" align="center">
                       <InstallState status={skill.status} />
-                      <SourceLink label={`${skill.name} source`} href={skill.source}>
+                      <Link variant="caption" external aria-label={`${skill.name} source`} href={skill.source}>
                           Source
-                      </SourceLink>
+                      </Link>
                   </Inline>
               )),
           }))

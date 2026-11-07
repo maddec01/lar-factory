@@ -12,7 +12,7 @@ import {
     CreateIssueChoice,
     DraftTicketPart,
     FormSelect,
-    InlineButton,
+    InlineLink,
     PanelField,
     Stack,
     Text,
@@ -176,12 +176,12 @@ export function CreateIssueBox({
                 reason && (
                     <Text variant="caption" tone="muted" id="item-create-reason">
                         {reason}{' '}
-                        <InlineButton
+                        <InlineLink
                             disabled={disabled || running !== null}
                             onClick={() => void useEditStore.getState().recheck(repo.repo)}
                         >
                             Recheck access
-                        </InlineButton>
+                        </InlineLink>
                     </Text>
                 )
             }

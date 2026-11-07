@@ -2,7 +2,7 @@
 
 import { kindSwapAccessProblem, sameRepo, trackerCapabilities } from '@lar-factory/shared';
 import type { Item, KindTicketSwap, SwapKind } from '@lar-factory/shared';
-import { Button, buttonKind, InlineButton, KindQuestion, Text } from '@lar-works/design-system';
+import { Button, buttonKind, InlineLink, KindQuestion, Text } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { detailsCache } from './DetailsCache';
@@ -86,7 +86,7 @@ export function KindNotice({
         return (
             <Text variant="caption" tone="muted" data-kind-kept ownLine>
                 {ticketKind ? `Ticket says ${kindName(ticketKind)}. Kept as is.` : 'Ticket has no kind. Left as is.'}{' '}
-                <InlineButton onClick={() => setReopened(true)}>Change</InlineButton>
+                <InlineLink onClick={() => setReopened(true)}>Change</InlineLink>
             </Text>
         );
     }

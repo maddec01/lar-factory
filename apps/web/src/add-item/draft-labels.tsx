@@ -45,10 +45,12 @@ export function DraftLabels({
             : mapped(kind),
     );
     const [mappedKind, setMappedKind] = useState(kind);
+
     if (mappedKind !== kind) {
         setMappedKind(kind);
         setPicked([...new Set([...without(picked, mapped(mappedKind)), ...mapped(kind)])]);
     }
+
     const group = useRef<HTMLDivElement>(null);
     const change = (update: () => void) => {
         flushSync(update);
@@ -60,6 +62,7 @@ export function DraftLabels({
         name,
         color: colorOf(read, name),
     }));
+
     return (
         <div ref={group} id="item-labels" role="group" aria-label={heading} className="grid gap-1.5">
             <span className={headingClass}>{heading}</span>

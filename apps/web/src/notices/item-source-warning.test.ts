@@ -15,7 +15,9 @@ const problems = [
 
 test("each repository whose items can't be read gets a warning naming it as the List modal does, why and its fix, which clears once it reads", async () => {
     await mountPage({ ...sample, itemSourceProblems: problems });
+
     const warnings = () => $$('[data-slot="notice"]');
+
     expect(warnings().map(warningText)).toEqual([
         [
             "lar-api's items could not be refreshed.",

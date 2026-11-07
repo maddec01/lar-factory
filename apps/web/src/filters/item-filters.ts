@@ -25,6 +25,7 @@ export function readFilters(key: string): ItemFilters {
             kinds?: unknown;
             labels?: unknown;
         };
+
         return {
             kinds: Array.isArray(kinds) ? kinds.filter(isKindFilter) : [],
             labels: Array.isArray(labels) ? labels.filter((label): label is string => typeof label === 'string') : [],
@@ -37,6 +38,7 @@ export function readFilters(key: string): ItemFilters {
 /** List's filters, stored in this browser until cleared. */
 export function useItemFilters(): [ItemFilters, (filters: ItemFilters) => void] {
     const [filters, setFilters] = useState(() => readFilters(LIST_FILTERS_KEY));
+
     return [
         filters,
         (next) => {
@@ -54,6 +56,7 @@ export const toggled = <T>(list: readonly T[], value: T, same: (a: T, b: T) => b
 /** With every row on one tracker, its word for labels; rows across trackers say Labels. */
 export const headingOf = (rows: readonly Item[]): string => {
     const headings = new Set(rows.map((row) => trackerCapabilities(row.repo).heading));
+
     return headings.size === 1 ? [...headings][0]! : 'Labels';
 };
 
@@ -70,12 +73,15 @@ export const rowFilter =
 /** What the Labels filter offers for `rows`: the names they show, once each without case, in order, in a colour one of them has. */
 export function labelChoices(rows: readonly Item[], repos: readonly RepoConfig[]): LabelChoice[] {
     const choices = new Map<string, LabelChoice>();
+
     for (const row of rows) {
         for (const name of labelsOnRow(row, repos)) {
             const key = name.toLowerCase();
             const color = choices.get(key)?.color ?? row.labelColors?.[name];
+
             choices.set(key, { name: choices.get(key)?.name ?? name, color });
         }
     }
+
     return [...choices.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

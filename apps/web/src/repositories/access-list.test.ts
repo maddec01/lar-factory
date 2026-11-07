@@ -10,8 +10,11 @@ test.each([
     ['org/project/repo', 'Create work items', 'Edit work items'],
 ])('access reasons use the %s operation names', async (repo, create, edit) => {
     const { AccessReason } = await import('./access-list.tsx');
+
     document.body.replaceChildren();
+
     const host = document.body.appendChild(document.createElement('div'));
+
     await settle(() =>
         createRoot(host).render(
             createElement(AccessReason, {
@@ -36,8 +39,11 @@ test('the shared list accepts a separate read row and the compact onboarding ope
         { name: names['open-pr'], access: 'allowed' },
     ];
     const recheck = vi.fn();
+
     document.body.replaceChildren();
+
     const host = document.body.appendChild(document.createElement('div'));
+
     await settle(() => createRoot(host).render(createElement(AccessList, { rows, onRecheck: recheck })));
     expect([...host.querySelectorAll('.settings-row-title')].map(text)).toEqual([
         'Read issues',

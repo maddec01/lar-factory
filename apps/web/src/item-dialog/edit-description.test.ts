@@ -36,15 +36,20 @@ const details = (body: string, more: Partial<ItemDetails> = {}): ItemDetails => 
  */
 function serve(board: BoardData, served: Record<string, ItemDetails>) {
     const saves: ((status: number, body: object) => Promise<void>)[] = [];
+
     fetchMock.mockImplementation(async (url: string) => {
         const itemId = detailsRead(url);
+
         if (itemId) return new Response(JSON.stringify({ details: served[itemId] }));
+
         if (url === '/api/item-description')
             return new Promise<Response>((resolve) => {
                 saves.push((status, body) => settle(() => resolve(new Response(JSON.stringify(body), { status }))));
             });
+
         return new Response(JSON.stringify(board));
     });
+
     return {
         /** Answers the save in flight. */
         answer: (status: number, body: object) => saves.shift()!(status, body),
@@ -61,8 +66,10 @@ function serve(board: BoardData, served: Record<string, ItemDetails>) {
 
 async function openItem(itemId: string): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
+
 const isOpen = async () => (await import('./item-dialog-store.ts')).useItemDialogStore.getState().itemId !== null;
 const press = (button: HTMLButtonElement | undefined) => settle(() => button!.click());
 const escape = (el: Element) =>
@@ -95,6 +102,7 @@ const azureBoard = (): [BoardData, string] => {
         url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/310',
         labels: ['bug'],
     };
+
     return [
         allowEdits({
             ...sample,
@@ -114,7 +122,9 @@ test('Edit shows once the details load, opens the editor on the description and 
     await mountPage(editing);
     await openItem(github);
     expect(editButton()).toBeDefined();
+
     const heading = description().querySelector('h2')!;
+
     expect([text(heading), heading.classList.contains('uppercase')], 'a small uppercase heading beside Edit').toEqual([
         'Description',
         true,
@@ -148,6 +158,7 @@ test('Edit is not offered while the details load', async () => {
 test('Save writes the new Markdown to the GitHub issue, reads the details again and shows the new text', async () => {
     const served = { [github]: details('Old text.') };
     const board = serve(editing, served);
+
     await mountPage(editing);
     await openItem(github);
     await press(editButton());
@@ -157,7 +168,9 @@ test('Save writes the new Markdown to the GitHub issue, reads the details again 
     expect(board.saved()).toEqual([{ itemId: github, body: 'Old text. More.' }]);
     expect(editorArea()!.getAttribute('contenteditable'), 'the editor locks while it saves').toBe('false');
     served[github] = details('Old text. More.');
+
     const before = board.reads(github);
+
     await board.answer(200, { error: null });
     expect(board.reads(github), 'the details are read again').toBe(before + 1);
     expect(editorArea()).toBeNull();
@@ -168,6 +181,7 @@ test('Save writes the new Markdown to the GitHub issue, reads the details again 
 test('a save whose reload fails shows the saved text, says so, and Edit opens on the saved text', async () => {
     const served: Record<string, ItemDetails> = { [github]: details('Old text.') };
     const board = serve(editing, served);
+
     await mountPage(editing);
     await openItem(github);
     await press(editButton());
@@ -178,7 +192,9 @@ test('a save whose reload fails shows the saved text, says so, and Edit opens on
     expect(editorArea()).toBeNull();
     expect(text(dialog()!)).not.toContain('Could not load the details');
     expect(text(description())).toContain('Old text. More.');
+
     const status = description().querySelector('[role="status"]')!;
+
     expect([text(status), status.getAttribute('title')], 'the truncated status has its whole text as a title').toEqual([
         'Saved; could not reload the details',
         'Saved; could not reload the details',
@@ -197,6 +213,7 @@ test('a save whose reload fails shows the saved text, says so, and Edit opens on
 test('a save whose reload fails drops the cached details, so a reopen reads them again rather than showing the old text', async () => {
     const served: Record<string, ItemDetails> = { [github]: details('Old text.') };
     const board = serve(editing, served);
+
     await mountPage(editing);
     await openItem(github);
     await press(editButton());
@@ -204,10 +221,14 @@ test('a save whose reload fails drops the cached details, so a reopen reads them
     await press(buttonIn(description(), 'Save'));
     delete served[github];
     await board.answer(200, { error: null });
+
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().close());
     served[github] = details('Old text. More.');
+
     const before = board.reads(github);
+
     await openItem(github);
     expect(board.reads(github), 'the reopen reads the details again').toBe(before + 1);
     expect(text(description())).toContain('Old text. More.');
@@ -217,6 +238,7 @@ test('a save whose reload fails drops the cached details, so a reopen reads them
 
 test('Cancel closes the editor and writes nothing', async () => {
     const board = serve(editing, { [github]: details('Old text.') });
+
     await mountPage(editing);
     await openItem(github);
     await press(editButton());
@@ -239,6 +261,7 @@ test('an Azure work item saves to the field and revision its details gave, and a
         }),
     };
     const board = serve(data, served);
+
     await mountPage(data);
     await openItem(id);
     await press(editButton());
@@ -261,17 +284,22 @@ test('an Azure work item saves to the field and revision its details gave, and a
 test('a failed save, such as an Azure conflict, keeps the editor open with the draft and shows the error', async () => {
     const [data, id] = azureBoard();
     const board = serve(data, { [id]: details('Old text.', { bodyField: 'System.Description', revision: 3 }) });
+
     await mountPage(data);
     await openItem(id);
     await press(editButton());
     await typeAtEnd(' More.');
     await press(buttonIn(description(), 'Save'));
+
     const error =
         'Could not save the description. Someone else changed work item 310 since you opened it. Copy your text, close the item and open it again to edit the latest version.';
+
     await board.answer(409, { error });
     expect(editorArea()!.getAttribute('contenteditable')).toBe('true');
     expect(text(editorArea())).toBe('Old text. More.');
+
     const alert = description().querySelector('[role="alert"]')!;
+
     expect(text(alert), "the board's message, said once").toBe(error);
     expect(
         alert.closest('[data-edit-actions]'),
@@ -304,7 +332,9 @@ test('Escape in the Link URL field closes the field, not the dialog', async () =
     await press(editButton());
     await selectAll(editorArea()!);
     await press(description().querySelector<HTMLButtonElement>('[role="toolbar"] button[aria-label="Link"]')!);
+
     const field = () => $('input[aria-label="Link URL"]');
+
     expect(field()).not.toBeNull();
     await escape(field()!);
     expect(field()).toBeNull();
@@ -326,7 +356,9 @@ test('the expand button and Ctrl+Shift+E grow the item dialog and back, the edit
     serve(editing, { [github]: details('Old text.') });
     await mountPage(editing);
     await openItem(github);
+
     const expand = () => inDialog<HTMLButtonElement>('button[data-expand]')!;
+
     await press(expand());
     expect(dialog()!.style.height).toBe('calc(100dvh - (52px + 1rem))');
     await press(editButton());
@@ -342,6 +374,7 @@ test('the expand button and Ctrl+Shift+E grow the item dialog and back, the edit
 
 test('Azure read-only setup hides Edit and explains the denial despite allowed edit access', async () => {
     const [board, id] = azureBoard();
+
     board.repos.find((repo) => repo.repo === board.items[0]!.repo)!.setup!.azureReadOnly = true;
     serve(board, { [id]: details('Read-only description.') });
     await mountPage(board);
@@ -357,6 +390,7 @@ test.each([false, true])(
         const server = serve(editing, { [github]: details('Old text.'), I_imported: details('Old text.') });
         const original = fetchMock.getMockImplementation()!;
         let completeQueue!: (response: Response) => void;
+
         fetchMock.mockImplementation((...args) =>
             args[0] === '/api/queue'
                 ? new Promise<Response>((resolve) => {
@@ -370,16 +404,20 @@ test.each([false, true])(
         await press(editButton());
         await typeAtEnd(' More.');
         await press(inDialog<HTMLButtonElement>('[data-queue]')!);
+
         if (saving) await press(buttonIn(description(), 'Save'));
+
         const board = {
             ...editing,
             items: editing.items.map((item) =>
                 item.id === github ? { ...item, id: 'I_imported', status: 'Queued' } : item,
             ),
         };
+
         await settle(() => completeQueue(new Response(JSON.stringify({ error: null, board, itemId: 'I_imported' }))));
         expect(await isOpen()).toBe(true);
         expect(text(editorArea())).toBe('Old text. More.');
+
         if (saving) {
             expect(prompt()).toBeUndefined();
             await server.answer(409, { error: 'Save refused' });
@@ -391,6 +429,7 @@ test.each([false, true])(
             expect(await isOpen()).toBe(true);
             expect(text(editorArea())).toBe('Old text. More.');
         }
+
         await escape(editorArea()!);
         await press(buttonIn(prompt()!, 'Discard'));
         expect(await isOpen()).toBe(false);
@@ -408,12 +447,15 @@ test('opening a concept part with unsaved changes asks first: Keep editing stays
                   : i,
         ),
     };
+
     serve(concept, { [github]: details('Old text.'), I_sample14: details('The part.') });
     await mountPage(concept);
     await openItem(github);
     await press(editButton());
     await typeAtEnd(' More.');
+
     const part = () => inDialog<HTMLButtonElement>('[data-concept-part="I_sample14"] button')!;
+
     await press(part());
     expect(prompt(), 'the prompt asks first').toBeDefined();
     await press(buttonIn(prompt()!, 'Keep editing'));

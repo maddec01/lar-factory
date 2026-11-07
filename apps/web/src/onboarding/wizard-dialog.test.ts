@@ -9,9 +9,11 @@ const button = (label: string) =>
         (b) => text(b).trim() === label,
     )!;
 const heading = () => text(dialog()!.querySelector('[data-slot="modal-header"] h2'));
+
 async function pick(name = 'lar-web', work = true) {
     await settle(() => dialog()!.querySelector<HTMLElement>(`[data-choice="${name}"] [role="radio"]`)!.click());
     await settle(() => button('Next').click());
+
     if (work) await settle(() => button('Next').click());
 }
 
@@ -56,6 +58,7 @@ const accessRow = (name: string) =>
 
 test('the access step lists label management without letting it block adding the repository', async () => {
     const found = detection();
+
     found.access['manage-labels'] = 'refused';
     await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
     await pick('lar-web', false);
@@ -74,6 +77,7 @@ test('the access step lists label management without letting it block adding the
 
 test('the access step names tags and shows Allowed when Azure allows managing them', async () => {
     const repo = 'organization/project/repository';
+
     await openOnboarding([project('app', { repo, provider: 'Azure DevOps' })], {
         '/api/onboarding/detect': {
             detection: detection({
@@ -93,6 +97,7 @@ const issueSetting = (key: string) =>
 
 test('onboarding starts issue defaults on and sends individual choices', async () => {
     const repo = 'team/app';
+
     await openOnboarding([project('app', { repo })], {
         '/api/onboarding/detect': { detection: detection({ repo }) },
         '/api/onboarding/setup': { error: null },
@@ -116,11 +121,14 @@ test('onboarding starts issue defaults on and sends individual choices', async (
 test('onboarding shows access reasons and rechecks without losing the issue choices', async () => {
     const repo = 'team/app';
     let found = detection({ repo });
+
     await openOnboarding([project('app', { repo })], { '/api/onboarding/detect': () => ({ detection: found }) });
     await pick('app');
     await settle(() => issueSetting('createIssuesFromRetro').click());
     found = detection({ repo, access: { ...found.access, 'publish-ticket': 'refused', 'edit-ticket': 'unverified' } });
+
     const { useWizardStore } = await import('./wizard-store.ts');
+
     await settle(() => useWizardStore.getState().detect());
     for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec']) {
         expect([issueSetting(key).getAttribute('aria-checked') === 'true', issueSetting(key).disabled]).toEqual([
@@ -131,9 +139,11 @@ test('onboarding shows access reasons and rechecks without losing the issue choi
     expect(dialog()!.querySelector('[data-setting="createIssuesFromAddItem"]')!.textContent).toContain('refused');
     expect(dialog()!.querySelector('[data-setting="writeRefinedSpec"]')!.textContent).toContain('not checked yet');
     found = detection({ repo });
+
     const recheck = [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find(
         (b) => text(b) === 'Recheck access',
     )!;
+
     await settle(() => recheck.click());
     expect([
         issueSetting('createIssuesFromAddItem').getAttribute('aria-checked') === 'true',
@@ -144,6 +154,7 @@ test('onboarding shows access reasons and rechecks without losing the issue choi
 
 test('Azure onboarding displays the session write restriction with allowed Access', async () => {
     const repo = 'organization/project/repository';
+
     await openOnboarding([project('app', { repo, provider: 'Azure DevOps' })], {
         '/api/onboarding/detect': {
             detection: detection({
@@ -166,6 +177,7 @@ test('Azure onboarding displays the session write restriction with allowed Acces
 
 test('Azure onboarding picks its team in the design system Select, whose list opens above the dialog', async () => {
     const repo = 'organization/project/repository';
+
     await openOnboarding([project('app', { repo, provider: 'Azure DevOps' })], {
         '/api/onboarding/detect': {
             detection: detection({
@@ -181,7 +193,9 @@ test('Azure onboarding picks its team in the design system Select, whose list op
         },
     });
     await pick('app');
+
     const team = dialog()!.querySelector<HTMLElement>('[role="combobox"][aria-label="Team"]')!;
+
     expect(await openOptions(team)).toEqual(['Fiber', 'Docs']);
     expect(dialog()!.compareDocumentPosition($('[role="listbox"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await chooseOption(team, 'Docs');
@@ -196,6 +210,7 @@ test('resuming onboarding keeps issue choices and turns legacy private docs off'
         ...empty,
         onboarding: [{ repo, progress: { step: 'work', done: ['project'], answers: { projectId: 'app', choices } } }],
     };
+
     serve(data, [project('app', { repo, onBoard: true })], { error: null }, 200, {
         '/api/onboarding/detect': { detection: detection({ repo }) },
         '/api/onboarding/setup': { error: null },
@@ -213,6 +228,7 @@ test('resuming onboarding keeps issue choices and turns legacy private docs off'
 
 test('structural write refusal does not block local setup', async () => {
     const found = detection();
+
     found.access['comment-ticket'] = 'refused';
     await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
     await pick();
@@ -222,10 +238,13 @@ test('structural write refusal does not block local setup', async () => {
 
 test('unverified token writes allow setup and never show Allowed for builds', async () => {
     const found = detection();
+
     for (const op of Object.keys(found.access) as (keyof typeof found.access)[]) found.access[op] = 'unverified';
     await openOnboarding([project('lar-web')], { '/api/onboarding/detect': { detection: found } });
     await pick('lar-web', false);
+
     const rows = [...dialog()!.querySelectorAll('[data-access-step] .settings-row')];
+
     expect(rows).toHaveLength(4);
     expect(rows.slice(1).every((row) => row.textContent?.includes('Not checked'))).toBe(true);
     await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="About build access"]')!.click());
@@ -244,6 +263,7 @@ const rowButton = (key: string, label: string) =>
         (b) => text(b) === label,
     )!;
 const mapping = () => dialog()!.querySelector<HTMLDetailsElement>('[data-kind-mapping]')!;
+
 /** Opens the mapping as a click does; jsdom answers a details' toggle on a timer. */
 async function openMapping() {
     await settle(() => mapping().querySelector('summary')!.click());
@@ -259,12 +279,15 @@ async function labelPicker(key: 'bug' | 'feature' | 'improvement' = 'bug') {
             .click(),
     );
     await settle(() => vi.advanceTimersByTime(50));
+
     return document.querySelector<HTMLElement>(`[data-label-picker="${key}"]`)!;
 }
+
 async function type(input: HTMLInputElement, value: string) {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
     await settle(() => input.dispatchEvent(new Event('input', { bubbles: true })));
 }
+
 const inPicker = (popover: Element, label: string) =>
     [...popover.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!;
 
@@ -284,13 +307,16 @@ test('the mapping is folded, marked optional and reads nothing until opened, so 
     expect(text(mapping().querySelector('summary'))).toContain('Optional');
     expect(posted('/api/onboarding/vocabulary')).toEqual([]);
     await settle(() => button('Add Project').click());
+
     const body = posted('/api/onboarding/setup')[0]!;
+
     expect(body).not.toHaveProperty('vocabulary');
     expect(body).not.toHaveProperty('newLabels');
 });
 
 test('on Azure the mapping names tags', async () => {
     const repo = 'organization/project/repository';
+
     await openOnboarding([project('app', { repo, provider: 'Azure DevOps' })], {
         '/api/onboarding/detect': {
             detection: detection({
@@ -309,7 +335,9 @@ test('opening the mapping changes nothing, and its suggestions stay out of the s
     await openMapping();
     expect(text(kindRow('bug'))).toContain('bug · suggested');
     await settle(() => button('Add Project').click());
+
     const body = posted('/api/onboarding/setup')[0]!;
+
     expect(body).not.toHaveProperty('vocabulary');
     expect(body).not.toHaveProperty('newLabels');
 });
@@ -324,7 +352,9 @@ test('the mapping never offers the label sync needs', async () => {
 test('onboarding refuses linked-work typed as a new label without changing its drafts', async () => {
     await workStep();
     await openMapping();
+
     const popover = await labelPicker();
+
     await type(popover.querySelector('input')!, 'linked-work');
     expect(text(popover)).toContain("linked-work is reserved for the factory's saved links.");
     expect(inPicker(popover, 'Create "linked-work" when you add the Project').disabled).toBe(true);
@@ -335,7 +365,9 @@ test('onboarding saves explicit suggestions and none and keeps failed new label 
     await workStep();
     await openMapping();
     await settle(() => rowButton('bug', '+ bug · suggested').click());
+
     let popover = await labelPicker('feature');
+
     await settle(() => inPicker(popover, 'None').click());
     await settle(() => inPicker(popover, 'Done').click());
     await settle(() => vi.advanceTimersByTime(50));
@@ -359,6 +391,7 @@ test('onboarding saves explicit suggestions and none and keeps failed new label 
 
 test('unreadable vocabulary can be skipped and a retry never submits a mapping', async () => {
     let unreadable = true;
+
     await openOnboarding([project('app', { repo: 'team/app' })], {
         '/api/onboarding/detect': { detection: detection({ repo: 'team/app' }) },
         '/api/onboarding/vocabulary': () =>
@@ -394,6 +427,7 @@ test.each(['recheck', 'resume'])(
                 { repo, progress: { step: 'work', done: ['project'], answers: { projectId: 'app', choices } } },
             ],
         };
+
         if (how === 'resume')
             found = {
                 ...found,
@@ -404,6 +438,7 @@ test.each(['recheck', 'resume'])(
                     'manage-labels': 'refused',
                 },
             };
+
         serve(data, [project('app', { repo, onBoard: true })], { error: null }, 200, {
             '/api/onboarding/detect': () => ({ detection: found }),
             '/api/onboarding/vocabulary': { discovery },
@@ -411,6 +446,7 @@ test.each(['recheck', 'resume'])(
         });
         await mountPage(data);
         await settle(() => $<HTMLButtonElement>(`[data-onboarding-card="${repo}"] [data-resume]`)!.click());
+
         if (how === 'recheck') {
             expect(button('Save and add Project').disabled).toBe(false);
             found = {
@@ -428,6 +464,7 @@ test.each(['recheck', 'resume'])(
                     .click(),
             );
         }
+
         expect(mapping().open).toBe(true);
         expect(text(kindRow('bug'))).toContain('triage (new)');
         expect(text(kindRow('bug'))).toContain('bug');
@@ -435,8 +472,10 @@ test.each(['recheck', 'resume'])(
         expect(text(kindRow('bug'))).toContain('Access to Manage labels was refused');
         expect(text(kindRow('bug'))).toContain('Access to Set labels is not checked');
         expect(button('Save and add Project').disabled).toBe(true);
+
         const { useWizardStore } = await import('./wizard-store.ts');
         const denied = found;
+
         found = detection({ repo, access: { ...detection().access, 'type-ticket': 'allowed' } });
         await settle(() => useWizardStore.getState().detect());
         expect(button('Save and add Project').disabled).toBe(false);
@@ -470,6 +509,7 @@ test('a run kept on the old vocabulary step resumes on the first step with its d
             },
         ],
     };
+
     serve(data, [project('app', { repo, onBoard: true })], { error: null }, 200, {
         '/api/onboarding/detect': { detection: detection({ repo }) },
         '/api/onboarding/vocabulary': { discovery: vocabularyDiscovery },
@@ -516,6 +556,7 @@ test("a resumed repository whose project can't be read takes its icon from the b
         projectIcons: { [repo]: { kind: 'emoji', emoji: '🚀' } as const },
         onboarding: [{ repo, progress: { step: 'project', done: [], answers: { projectId: 'app' } } }],
     };
+
     serve(data, { error: 'T3 is down.' });
     await mountPage(data);
     await settle(() => $<HTMLButtonElement>(`[data-onboarding-card="${repo}"] [data-resume]`)!.click());
@@ -536,6 +577,7 @@ test.each(['push-branch', 'open-pr'] as const)(
                 { repo, progress: { step: 'work', done: ['project'], answers: { projectId: 'app', choices } } },
             ],
         };
+
         serve(data, [project('app', { repo, onBoard: true })], {}, 200, {
             '/api/onboarding/detect': () => ({ detection: found }),
         });
@@ -543,7 +585,9 @@ test.each(['push-branch', 'open-pr'] as const)(
         await settle(() => $<HTMLButtonElement>(`[data-onboarding-card="${repo}"] [data-resume]`)!.click());
         expect(issueSetting('domainDocs').getAttribute('aria-checked')).toBe('true');
         found = { ...found, access: { ...found.access, [operation]: 'unverified' } };
+
         const { useWizardStore } = await import('./wizard-store.ts');
+
         await settle(() => useWizardStore.getState().detect());
         expect(issueSetting('domainDocs').disabled).toBe(true);
         expect(issueSetting('domainDocs').getAttribute('aria-checked')).toBe('false');
@@ -560,6 +604,7 @@ test.each(['push-branch', 'open-pr'] as const)(
 
 test('onboarding finds one of 150 labels by keyboard and keeps every edit local until add', async () => {
     const labels = Array.from({ length: 150 }, (_, i) => `label-${i}`);
+
     await openOnboarding([project('app', { repo: 'team/app' })], {
         '/api/onboarding/detect': { detection: detection({ repo: 'team/app' }) },
         '/api/onboarding/vocabulary': {
@@ -569,8 +614,10 @@ test('onboarding finds one of 150 labels by keyboard and keeps every edit local 
     });
     await pick('app');
     await openMapping();
+
     const popover = await labelPicker();
     const input = popover.querySelector<HTMLInputElement>('input')!;
+
     await type(input, 'label-149');
     expect([...popover.querySelectorAll('[role="option"]')].map(text)).toEqual(['label-149']);
     await settle(() =>

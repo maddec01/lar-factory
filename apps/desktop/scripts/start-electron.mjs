@@ -15,6 +15,7 @@ const electronPath = ensureElectronRuntime();
 
 // Electron run from a shell that has ELECTRON_RUN_AS_NODE set would start as plain Node.
 const childEnv = { ...process.env };
+
 delete childEnv.ELECTRON_RUN_AS_NODE;
 
 // Arguments pass through, so `pnpm run dev --install-skills` reaches the app.
@@ -30,7 +31,9 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 child.on('exit', (code, signal) => {
     if (signal) {
         process.kill(process.pid, signal);
+
         return;
     }
+
     process.exit(code ?? 0);
 });

@@ -8,5 +8,6 @@ export const launchThread: LaunchThread = async (projectId, text, selection, wor
         `${process.env.FAKE_GH_STATE}.t3calls`,
         `${JSON.stringify(['launch', projectId, text, selection, workspace, runtimeMode])}\n`,
     );
+
     return { thread: { threadId: 'thread-1', title: text.split('\n')[0] ?? text }, error: null };
 };

@@ -26,6 +26,7 @@ const FADE_PX = 24;
  */
 function followNewest(viewport: HTMLDivElement | null) {
     if (!viewport) return;
+
     let following = true;
     const notices = () => Array.from(viewport.children).filter((el): el is HTMLElement => el instanceof HTMLElement);
     const fade = () => {
@@ -33,8 +34,10 @@ function followNewest(viewport: HTMLDivElement | null) {
         const stack = viewport.getBoundingClientRect();
         const top = Math.min(FADE_PX, Math.max(0, scrollTop));
         const bottom = Math.min(FADE_PX, Math.max(0, scrollHeight - clientHeight - scrollTop));
+
         for (const entry of notices()) {
             const y = entry.getBoundingClientRect().top - stack.top;
+
             entry.style.setProperty('--fade-from', `${-y}px`);
             entry.style.setProperty('--fade-top', `${top - y}px`);
             entry.style.setProperty('--fade-bottom', `${stack.height - bottom - y}px`);
@@ -43,6 +46,7 @@ function followNewest(viewport: HTMLDivElement | null) {
     };
     const toNewest = () => {
         if (following) viewport.scrollTop = viewport.scrollHeight;
+
         fade();
     };
     const scrolled = () => {
@@ -57,12 +61,15 @@ function followNewest(viewport: HTMLDivElement | null) {
     };
     const entries = new MutationObserver((changes) => {
         observe();
+
         const newest = viewport.lastElementChild;
         const arrived = changes.some(({ addedNodes }) => Array.from(addedNodes).includes(newest as Node));
+
         // Only a new entry moves the stack; one closing or changing above leaves the User where they are.
         if (arrived) toNewest();
         else fade();
     });
+
     entries.observe(viewport, { childList: true });
     viewport.addEventListener('scroll', scrolled, { passive: true });
     // Entering notices slide in; measure them where they land.
@@ -70,6 +77,7 @@ function followNewest(viewport: HTMLDivElement | null) {
     viewport.addEventListener('transitionend', fade);
     observe();
     toNewest();
+
     return () => {
         entries.disconnect();
         resizes.disconnect();
@@ -128,6 +136,7 @@ const focusFirst = (selectors: string[]) => {
         document.querySelector(OPEN_ITEM_DIALOG) ??
         document.querySelector('[role="dialog"][data-state="open"]') ??
         document;
+
     // querySelector returns the first in page order; take the first selector that matches.
     selectors
         .map((sel) => root.querySelector<HTMLElement>(sel))
@@ -140,6 +149,7 @@ export function refocus(selectors: string[]): void {
     // The item dialog's focus trap catches focus on the dialog itself when the element that had it goes.
     const lost =
         document.activeElement === document.body || document.activeElement === document.querySelector(OPEN_ITEM_DIALOG);
+
     if (lost) focusFirst(selectors);
 }
 
@@ -149,7 +159,9 @@ const focusAfterClose = (next: string[]) => focusFirst([...next, ...FALLBACK_FOC
 /** Closes something in `close`, then, if focus was inside `el`, moves it to the first of `next` that's on the page. */
 export function closeKeepingFocus(el: Element | null, close: () => void, next: string[] = []): void {
     const hadFocus = Boolean(el?.contains(document.activeElement));
+
     flushSync(close);
+
     if (hadFocus) focusAfterClose(next);
 }
 
@@ -162,6 +174,7 @@ function closeToast(slot: string, id: string, focusAfter: string[] = []): void {
         document.querySelector(`[data-toast-id="${id}"]`),
         () => {
             if (slots.get(slot) === id) slots.delete(slot);
+
             toasts.dismiss(id);
         },
         focusAfter,
@@ -171,6 +184,7 @@ function closeToast(slot: string, id: string, focusAfter: string[] = []): void {
 /** Shows `toast` in its slot, replacing the one there. */
 export function showToast(toast: Toast): void {
     clearToast(toast.slot);
+
     const id: string = toasts.create({
         color: toast.failed ? 'danger' : 'success',
         // The board's own clock closes successes (ToastBody) and its own button closes every toast, so ninna-ui never does.
@@ -178,28 +192,35 @@ export function showToast(toast: Toast): void {
         closable: false,
         description: <ToastBody {...toast} onClose={() => closeToast(toast.slot, id, toast.focusAfter)} />,
     });
+
     slots.set(toast.slot, id);
 }
 
 /** Closes whatever toast holds this slot. */
 export function clearToast(slot: string): void {
     const id = slots.get(slot);
+
     if (id) closeToast(slot, id);
 }
 
 /** Gives a successful notification five seconds after hover and keyboard focus leave it. */
 function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClose: () => void): void {
     const close = useRef(onClose);
+
     close.current = onClose;
     useEffect(() => {
         if (!enabled) return;
+
         const entry = ref.current?.closest<HTMLElement>('[data-slot="toast"]');
+
         if (!entry) return;
+
         let hovered = entry.matches(':hover');
         let focused = entry.contains(document.activeElement);
         let timer: ReturnType<typeof setTimeout> | undefined;
         const restart = () => {
             clearTimeout(timer);
+
             if (!hovered && !focused) timer = setTimeout(() => close.current(), TOAST_MS);
         };
         const enter = () => {
@@ -218,11 +239,13 @@ function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClo
             focused = event.relatedTarget instanceof Node && entry.contains(event.relatedTarget);
             restart();
         };
+
         entry.addEventListener('mouseenter', enter);
         entry.addEventListener('mouseleave', leave);
         entry.addEventListener('focusin', focus);
         entry.addEventListener('focusout', blur);
         restart();
+
         return () => {
             clearTimeout(timer);
             entry.removeEventListener('mouseenter', enter);
@@ -238,12 +261,14 @@ function ToastBody({ slot, what, failed = false, body, onClose }: Toast & { onCl
     const ref = useRef<HTMLSpanElement>(null);
     const [held, setHeld] = useState(false);
     const [bodyFailed, setBodyFailed] = useState(false);
+
     useEffect(() => {
         ref.current
             ?.closest('[data-slot="toast"]')
             ?.setAttribute('data-toast-color', failed || bodyFailed ? 'danger' : 'success');
     }, [failed, bodyFailed]);
     useSuccessClose(ref, !failed && !bodyFailed && !held, onClose);
+
     return (
         <span ref={ref} data-toast={slot}>
             <DismissButton what={`: ${what}`} onClick={onClose} />

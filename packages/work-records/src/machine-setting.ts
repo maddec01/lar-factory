@@ -38,28 +38,37 @@ export function machineSetting<T extends object>({
     needs,
 }: SettingShape<T>): MachineSetting<T> {
     const pathIn = (dir: string): string => join(dir, file);
+
     return {
         read(dir = boardDataDir()) {
             const path = pathIn(dir);
             let text: string;
+
             try {
                 text = readFileSync(path, 'utf8');
             } catch (error) {
                 if ((error as NodeJS.ErrnoException).code === 'ENOENT') return fallback;
+
                 return { ...fallback, problem: `Can't read the ${name} setting ${path}: ${(error as Error).message}.` };
             }
+
             let json: unknown;
+
             try {
                 json = JSON.parse(text);
             } catch (error) {
                 return { ...fallback, problem: `The ${name} setting ${path} isn't JSON: ${(error as Error).message}.` };
             }
+
             return parse(json) ?? { ...fallback, problem: `The ${name} setting ${path} ${needs}.` };
         },
         write(value, dir = boardDataDir()) {
             const valid = parse(value);
+
             if (!valid) throw new WorkRecordError('invalid', `The ${name} setting ${needs}.`);
+
             const path = pathIn(dir);
+
             try {
                 mkdirSync(dir, { recursive: true });
                 writeFileSync(`${path}.${process.pid}.tmp`, `${JSON.stringify(valid, null, 2)}\n`);
@@ -70,6 +79,7 @@ export function machineSetting<T extends object>({
                     `Can't save the ${name} setting ${path}: ${(error as Error).message}.`,
                 );
             }
+
             return valid;
         },
     };

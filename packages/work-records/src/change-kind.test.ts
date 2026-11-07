@@ -19,6 +19,7 @@ const REPO = 'team/app';
 const AZURE = 'contoso/Fabrikam/web';
 const ALLOWED = { 'tag-ticket': 'allowed', 'type-ticket': 'allowed' } as const;
 const opened: { records: WorkRecords; dir: string }[] = [];
+
 afterEach(() => {
     vi.unstubAllEnvs();
     for (const { records, dir } of opened.splice(0)) {
@@ -26,10 +27,13 @@ afterEach(() => {
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
 async function open(): Promise<WorkRecords> {
     const dir = mkdtempSync(join(tmpdir(), 'change-kind-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
+
     opened.push({ records, dir });
+
     return records;
 }
 
@@ -56,12 +60,14 @@ function fakeTracker(
     const writes: string[] = [];
     const write = (name: string) => {
         if (name === fail) throw new Error(`refused ${name}`);
+
         writes.push(name);
     };
     const labels: Pick<TrackerLabels, 'addToTicket' | 'removeFromTicket'> = {
         addToTicket: async (_, names) => {
             for (const name of names) {
                 write(`add ${name}`);
+
                 if (!ticket.labels.includes(name)) ticket.labels.push(name);
             }
         },
@@ -80,6 +86,7 @@ function fakeTracker(
         },
         boardTypes: async () => board,
     };
+
     return { labels, kinds, writes, ticket };
 }
 
@@ -93,6 +100,7 @@ test('a ticket-backed item swaps its labels and type, then the record takes the 
     }).record;
     const tracker = fakeTracker({ labels: ['type: bug', 'bug', 'docs', 'build'], type: 'Bug' });
     const result = await changeKind(records, workId, revision, 'feature', { setup: setupOf(REPO), ...tracker });
+
     expect(result.error).toBeNull();
     expect(tracker.ticket).toEqual({ labels: ['docs', 'build', 'type: feature'], type: 'Feature' });
     expect(result.line).toBe(
@@ -121,6 +129,7 @@ test("a new kind with no mapped type leaves the ticket's type alone", async () =
     }).record;
     const tracker = fakeTracker({ labels: ['bug'], type: 'Bug' });
     const result = await changeKind(records, workId, revision, 'improvement', { setup: setupOf(REPO), ...tracker });
+
     expect(tracker.writes).toEqual(['remove bug']);
     expect(tracker.ticket.type).toBe('Bug');
     expect(records.read(workId).kind).toBe('improvement');
@@ -140,6 +149,7 @@ test('a type the change leaves alone settles the question it would raise, until 
         setup: setupOf(REPO),
         ...tracker,
     });
+
     expect(ticketType).toBeNull();
     expect(record.kindAnswer).toEqual({ answer: 'update', itemKind: 'improvement', ticketKind: 'bug' });
     expect(kindDisagreement(record, tracker.ticket, setupOf(REPO).vocabulary)).toBeNull();
@@ -165,6 +175,7 @@ const AFTER_SWAP: [
     ],
     ['no mapping', {}, ['bug', 'docs'], null, { labels: ['docs'], type: null }],
 ];
+
 for (const [name, mapping, labels, type, after] of AFTER_SWAP) {
     test(`no disagreement remains after a swap, with ${name}`, async () => {
         const records = await open();
@@ -177,6 +188,7 @@ for (const [name, mapping, labels, type, after] of AFTER_SWAP) {
         const setup = setupOf(REPO, ALLOWED, mapping);
         const tracker = fakeTracker({ labels: [...labels], type });
         const { record, ticketType } = await changeKind(records, workId, revision, 'feature', { setup, ...tracker });
+
         expect(tracker.ticket).toEqual(after);
         expect(ticketType).toBe(after.type);
         expect(record.kindAnswer).toBeNull();
@@ -194,6 +206,7 @@ test("a type the team's backlog doesn't show stays unchanged, and the update lin
     }).record;
     const tracker = fakeTracker({ labels: [], type: 'User Story' }, { board: ['User Story'] });
     const result = await changeKind(records, workId, revision, 'bug', { setup: setupOf(AZURE), ...tracker });
+
     expect(tracker.ticket).toEqual({ labels: ['type: bug'], type: 'User Story' });
     expect(result.line).toBe(
         "#7: added tag type: bug. The type stays User Story, because the team's backlog doesn't show Bug.",
@@ -211,6 +224,7 @@ test('a write failing partway keeps the old kind and says what changed, and runn
     }).record;
     const tracker = fakeTracker({ labels: ['bug', 'defect'], type: 'Bug' }, { fail: 'remove defect' });
     const failed = await changeKind(records, workId, revision, 'feature', { setup: setupOf(REPO), ...tracker });
+
     expect(failed.error).toBe('Could not finish changing #12 to Feature. refused remove defect');
     expect(failed.line).toBe('#12: added label type: feature; removed label bug.');
     expect(records.read(workId)).toMatchObject({ kind: 'bug', agreedTicketKind: null, revision });
@@ -219,6 +233,7 @@ test('a write failing partway keeps the old kind and says what changed, and runn
         setup: setupOf(REPO),
         ...fakeTracker(tracker.ticket),
     });
+
     expect(retried.error).toBeNull();
     expect(retried.line).toBe('#12: removed label defect; type Bug to Feature.');
     expect(tracker.ticket).toEqual({ labels: ['type: feature'], type: 'Feature' });
@@ -234,10 +249,13 @@ test('a failed read changes nothing', async () => {
         ticket: `${REPO}#12`,
     }).record;
     const tracker = fakeTracker({ labels: [], type: null });
+
     tracker.kinds.read = async () => {
         throw new Error('gh failed: HTTP 502');
     };
+
     const failed = await changeKind(records, workId, revision, 'feature', { setup: setupOf(REPO), ...tracker });
+
     expect(failed.error).toBe('Could not finish changing #12 to Feature. gh failed: HTTP 502');
     expect(failed.line).toBe('');
     expect(records.read(workId).kind).toBe('bug');
@@ -260,6 +278,7 @@ for (const [name, access] of [
             setup: setupOf(REPO, access),
             ...tracker,
         });
+
         expect(tracker.writes).toEqual([]);
         expect(result.error).toBeNull();
         expect(result.line).toMatch(
@@ -279,6 +298,7 @@ test('access only matters for what the change writes', async () => {
     }).record;
     const tracker = fakeTracker({ labels: ['docs'], type: null });
     const result = await changeKind(records, workId, revision, 'improvement', { setup: setupOf(REPO, {}), ...tracker });
+
     expect(result.line).toBe('#12: nothing to change on the ticket.');
     expect(records.read(workId)).toMatchObject({ kind: 'improvement', agreedTicketKind: 'improvement' });
 });
@@ -292,6 +312,7 @@ test('the same kind still swaps the ticket, for a record whose kind changed firs
         ticket: `${REPO}#12`,
     }).record;
     const tracker = fakeTracker({ labels: ['type: bug'], type: 'Bug' });
+
     await changeKind(records, workId, revision, 'feature', { setup: setupOf(REPO), ...tracker });
     expect(tracker.ticket).toEqual({ labels: ['type: feature'], type: 'Feature' });
 });
@@ -300,6 +321,7 @@ test('local work changes kind with no tracker read or write', async () => {
     const records = await open();
     const { workId, revision } = records.create({ title: 'T', repository: REPO, kind: 'bug' });
     const result = await changeKind(records, workId, revision, 'feature', { setup: setupOf(REPO) });
+
     expect(result).toMatchObject({
         error: null,
         line: 'This item is now Feature. Local work has no ticket to change.',
@@ -311,13 +333,17 @@ test('local work changes kind with no tracker read or write', async () => {
 test("concepts, decisions, builds and slices refuse before any tracker call, as does a kind details doesn't offer", async () => {
     const records = await open();
     const tracker = fakeTracker({ labels: [], type: null });
+
     for (const kind of ['concept', 'decision', 'build', 'slice'] as const) {
         const { workId, revision } = records.create({ title: 'T', repository: REPO, kind });
+
         await expect(
             changeKind(records, workId, revision, 'bug', { setup: setupOf(REPO), ...tracker }),
         ).rejects.toThrow(`A ${kind} has no kind to change.`);
     }
+
     const { workId, revision } = records.create({ title: 'T', repository: REPO, kind: 'bug' });
+
     await expect(
         changeKind(records, workId, revision, 'concept' as 'bug', { setup: setupOf(REPO), ...tracker }),
     ).rejects.toThrow('Choose Bug, Feature or Improvement.');
@@ -331,8 +357,11 @@ test('a stale revision refuses before any tracker call', async () => {
         kind: 'bug',
         ticket: `${REPO}#12`,
     }).record;
+
     records.update(workId, revision, { status: 'Queued' });
+
     const tracker = fakeTracker({ labels: ['bug'], type: 'Bug' });
+
     await expect(
         changeKind(records, workId, revision, 'feature', { setup: setupOf(REPO), ...tracker }),
     ).rejects.toThrow(/revision/);
@@ -349,14 +378,18 @@ test('a local kind update keeps the agreed ticket kind and drops an answer, whic
     }).record;
     const agreed = records.update(workId, revision, { kind: 'bug', agreedTicketKind: 'bug' });
     const answered = records.recordKindAnswer(workId, agreed.revision, { answer: 'keep', ticketKind: 'feature' });
+
     expect(answered.kindAnswer).toEqual({ answer: 'keep', itemKind: 'bug', ticketKind: 'feature' });
+
     const local = records.update(workId, answered.revision, { kind: 'improvement' });
+
     expect(local).toMatchObject({ agreedTicketKind: 'bug', kindAnswer: null });
 });
 
 test('an answer can say the ticket has no kind, and refuses anything else', async () => {
     const records = await open();
     const { workId, revision } = records.create({ title: 'T', repository: REPO, kind: 'bug' });
+
     expect(records.recordKindAnswer(workId, revision, { answer: 'update', ticketKind: null }).kindAnswer).toEqual({
         answer: 'update',
         itemKind: 'bug',
@@ -374,12 +407,15 @@ test('a record from before the migration has no agreed kind or answer, and keeps
     const dir = mkdtempSync(join(tmpdir(), 'change-kind-'));
     const path = join(dir, 'work-records.db');
     const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, -1) });
+
     old.db
         .prepare(`INSERT INTO work_records (work_id, title, initial_context, repository, kind, status, revision, created_at, updated_at)
     VALUES ('old-work', 'T', '', 'team/app', 'bug', 'List', 1, '2026-01-01', '2026-01-01')`)
         .run();
     old.close();
+
     const records = await openWorkRecords(path);
+
     opened.push({ records, dir });
     expect(records.read('old-work')).toMatchObject({ kind: 'bug', agreedTicketKind: null, kindAnswer: null });
 });
@@ -397,6 +433,7 @@ test("the check plans the swap as the change would: a type the backlog doesn't s
         setup: setupOf(AZURE, { 'tag-ticket': 'allowed' }),
         ...tracker,
     });
+
     expect(check).toMatchObject({
         ticketKind: 'feature',
         accessProblem: null,

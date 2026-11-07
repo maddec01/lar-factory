@@ -35,7 +35,9 @@ const MERGE_COLOR: Record<MergeState, string> = {
  */
 function NextStep({ item }: { item: Item }) {
     if (needsAnswer(item)) return null;
+
     const pipeline = itemPr(item)?.pipeline;
+
     if (pipeline) {
         const { checks, mergeState } = pipeline;
         const counts = checks
@@ -47,6 +49,7 @@ function NextStep({ item }: { item: Item }) {
                   .filter(Boolean)
                   .join(' · ')
             : 'no checks';
+
         return (
             <>
                 <span className="size-2 shrink-0 rounded-full" style={{ background: MERGE_COLOR[mergeState] }} />
@@ -58,6 +61,7 @@ function NextStep({ item }: { item: Item }) {
             </>
         );
     }
+
     return (
         <span className="truncate" title={HINTS[item.status]}>
             {HINTS[item.status]}
@@ -84,6 +88,7 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
 
 function DeskCard({ item, data }: { item: Item; data: BoardData }) {
     const picked = useItemDialogStore((state) => state.itemId === item.id);
+
     // The card takes the click; its summary is a button too, so the keyboard can open the dialog.
     return (
         <div
@@ -126,6 +131,7 @@ export function Desk({ items: inScope }: { items: Item[] }) {
     const filters = useScopeStore((state) => state.filters);
     const items = deskItems({ ...data, items: inScope }, unavailable).filter(rowFilter(filters, data.repos));
     const scope = useShownScope();
+
     if (!items.length)
         return (
             <section
@@ -148,6 +154,7 @@ export function Desk({ items: inScope }: { items: Item[] }) {
                 </p>
             </section>
         );
+
     return (
         <section className="desk grid shrink-0 gap-2" aria-labelledby="desk-h">
             <h2 id="desk-h" className="m-0 text-[13px] font-medium">

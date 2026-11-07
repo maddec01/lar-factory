@@ -20,10 +20,14 @@ export const useArchiveStore = create<ArchiveState>()((set) => ({
     problem: null,
     async load() {
         const read = ++reads;
+
         try {
             const response = await fetch('/api/archive', { cache: 'no-store' });
+
             if (!response.ok) throw new Error(`the board answered ${response.status}`);
+
             const { items } = (await response.json()) as { items: Item[] };
+
             if (read === reads) set({ items, problem: null });
         } catch (err) {
             if (read === reads)

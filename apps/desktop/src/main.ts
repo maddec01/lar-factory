@@ -48,8 +48,10 @@ const quitRequested = Effect.callback<void>((resume) => {
         resume(Effect.void);
     };
     const onAllClosed = () => resume(Effect.void);
+
     Electron.app.on('before-quit', onBeforeQuit);
     Electron.app.on('window-all-closed', onAllClosed);
+
     return Effect.sync(() => {
         Electron.app.off('before-quit', onBeforeQuit);
         Electron.app.off('window-all-closed', onAllClosed);
@@ -59,6 +61,7 @@ const quitRequested = Effect.callback<void>((resume) => {
 /** Opens a web link in the browser and a T3 Code link in T3 Code; any other link opens nothing. */
 const openOutside = (target: string) => {
     const url = ExternalLink.outsideUrl(target);
+
     if (url) void Electron.shell.openExternal(url);
 };
 
@@ -86,11 +89,13 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
     });
     const followTheme = () =>
         window.setBackgroundColor(WindowBackground.color(Electron.nativeTheme.shouldUseDarkColors));
+
     Electron.nativeTheme.on('updated', followTheme);
     window.once('closed', () => Electron.nativeTheme.off('updated', followTheme));
     window.once('ready-to-show', () => {
         // A window whose saved bounds no longer fit a display opens as a new one, not maximized.
         if (persisted.mainWindowMaximized && bounds === persisted.mainWindowBounds) window.maximize();
+
         window.show();
     });
     // Quitting holds in before-quit and then exits, so the window gets no close event to save on.
@@ -102,20 +107,25 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
     window.webContents.ipc.on(IpcChannels.GET_WINDOW_FULLSCREEN_STATE, (event) => {
         event.returnValue = window.isFullScreen();
     });
+
     if (process.platform === 'darwin') {
         window.on('enter-full-screen', () => window.webContents.send(IpcChannels.WINDOW_FULLSCREEN_STATE, true));
         window.on('leave-full-screen', () => window.webContents.send(IpcChannels.WINDOW_FULLSCREEN_STATE, false));
     }
+
     // Links to GitHub and elsewhere open in the browser, and thread links in T3 Code; only the board stays in the window.
     window.webContents.setWindowOpenHandler(({ url: target }) => {
         openOutside(target);
+
         return { action: 'deny' };
     });
     window.webContents.on('will-navigate', (event, target) => {
         if (ExternalLink.isOn(target, boardOrigin())) return;
+
         event.preventDefault();
         openOutside(target);
     });
+
     return window;
 };
 
@@ -139,6 +149,7 @@ const openBoardWindow = (secret: string, address: Awaited<ReturnType<typeof open
     // Runs a message in the starting page, which the board's page replaces: after that nothing is sent.
     const tell = (script: string) => {
         if (boardShown || window.isDestroyed()) return;
+
         window.webContents.executeJavaScript(script).catch((error: unknown) => {
             console.error(`could not update the starting page: ${String(error)}`);
         });
@@ -148,19 +159,26 @@ const openBoardWindow = (secret: string, address: Awaited<ReturnType<typeof open
             Effect.suspend(() => {
                 address.connect(url);
                 origin = address.url.origin;
+
                 if (boardShown) return Effect.void;
+
                 const mine = ++generation;
+
                 // The board's page is held for the tool check, so the starting page stays up while it loads.
                 tell(StartingPage.stepScript(StartingPage.STEPS.tools));
+
                 // The first board page waits until the starting mark has finished drawing.
                 const wait = StartingPage.drawWait(startingShownAt, Date.now());
+
                 // Forked, so the supervisor watches the server's exit while the load waits.
                 return Effect.sleep(Duration.millis(wait)).pipe(
                     Effect.andThen(
                         Effect.suspend(() => {
                             if (mine !== generation) return Effect.void;
+
                             origin = address.url.origin;
                             boardShown = true;
+
                             return load(StartingPage.boardUrl(address.url));
                         }),
                     ),
@@ -175,6 +193,7 @@ const openBoardWindow = (secret: string, address: Awaited<ReturnType<typeof open
                 origin = '';
                 address.disconnect();
                 tell(StartingPage.errorScript(reason));
+
                 return Effect.void;
             }),
     };
@@ -189,6 +208,7 @@ const openBoardWindow = (secret: string, address: Awaited<ReturnType<typeof open
     const showStarting = load(StartingPage.url()).pipe(
         Effect.tap(() => Effect.sync(() => void (startingShownAt = Date.now()))),
     );
+
     return { window, events, progress, origin: () => origin, forgetOrigin, showStarting };
 };
 
@@ -233,6 +253,7 @@ const handleInstall = (
         },
         checks,
     );
+
     board.subscribe((snapshot) => {
         if (!window.isDestroyed()) window.webContents.send(IpcChannels.INSTALL_STATE, snapshot);
     });
@@ -242,22 +263,27 @@ const handleInstall = (
     });
     Electron.ipcMain.handle(IpcChannels.INSTALL_GET_STATE, (event) => {
         checkSender(event);
+
         return board.snapshot();
     });
     Electron.ipcMain.handle(IpcChannels.INSTALL_CLOSE_OVERVIEW, (event, reason: unknown, revision: unknown) => {
         checkSender(event);
+
         return board.closeOverview(reason, revision);
     });
     Electron.ipcMain.handle(IpcChannels.INSTALL_RETRY, (event) => {
         checkSender(event);
+
         return board.retry();
     });
     Electron.ipcMain.handle(IpcChannels.INSTALL_REPLACE, (event) => {
         checkSender(event);
+
         return board.replace();
     });
     Electron.ipcMain.handle(IpcChannels.INSTALL_SET_TICK, (event, path: unknown, ticked: unknown) => {
         checkSender(event);
+
         return board.setTick(path, ticked);
     });
 };
@@ -268,8 +294,10 @@ const handleUpdates = (window: Electron.BrowserWindow, boardOrigin: () => string
     const handle = (channel: string, call: (...args: Array<unknown>) => Effect.Effect<unknown, Error>) =>
         Electron.ipcMain.handle(channel, (event, ...args) => {
             checkSender(event);
+
             return Effect.runPromise(call(...args));
         });
+
     handle(IpcChannels.UPDATE_GET_STATE, () => updates.getState);
     handle(IpcChannels.UPDATE_CHECK, () => updates.check);
     handle(IpcChannels.UPDATE_DOWNLOAD, () => updates.download);
@@ -292,6 +320,7 @@ const handleUpdates = (window: Electron.BrowserWindow, boardOrigin: () => string
 const startUpdates = (window: Electron.BrowserWindow, board: AppUpdates.BoardServerControl) =>
     Effect.gen(function* () {
         const isPackaged = Electron.app.isPackaged;
+
         return yield* AppUpdates.make({
             updater: yield* Effect.promise(ElectronUpdater.make),
             board,
@@ -312,24 +341,30 @@ const startUpdates = (window: Electron.BrowserWindow, board: AppUpdates.BoardSer
 
 const program = Effect.gen(function* () {
     yield* Effect.promise(() => Electron.app.whenReady());
+
     // One secret per launch, shared by the restarted servers and the page.
     const secret = LaunchSecret.make();
     const address = yield* Effect.acquireRelease(Effect.promise(openBoardAddress), (address) =>
         Effect.sync(address.close),
     );
     const board = openBoardWindow(secret, address);
+
     // Opening the app again brings this window forward; the second copy has already quit.
     Electron.app.on('second-instance', () => {
         if (board.window.isMinimized()) board.window.restore();
+
         board.window.focus();
     });
     yield* board.showStarting;
+
     // Read once: a restarted server keeps the PATH the first one got.
     const env = yield* ShellEnvironment.childEnvironment(process.env);
     // One pair of checks for the whole run, so the launch's check and each Start build's take turns.
     const skillChecks = yield* makeSkillChecks(env);
     const installReady = skillChecks ? yield* SkillInstall.launchWhenReady(skillChecks) : () => {};
+
     handleInstall(board.window, board.origin, skillChecks, installReady);
+
     const config = BoardServer.makeStartConfig({
         ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
         executablePath: process.execPath,
@@ -355,6 +390,7 @@ const program = Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient;
     const stopBoard = Effect.suspend(() => {
         const origin = board.origin();
+
         // With no server ready there is no write to wait for.
         return origin ? BoardServer.drain(new URL(origin), secret) : Effect.void;
     }).pipe(
@@ -362,6 +398,7 @@ const program = Effect.gen(function* () {
         Effect.andThen(supervisor.stop),
         Effect.andThen(board.forgetOrigin),
     );
+
     // A failed drain leaves the server refusing writes, so the install's failure path restarts it.
     handleUpdates(
         board.window,

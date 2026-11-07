@@ -27,8 +27,10 @@ const boardWith = (item: Partial<Item>): BoardData => ({
 /** Serves the board, holding each kind write until the test answers it. */
 function serve(board: BoardData, details?: object) {
     const writes: ((status: number, body: object) => Promise<void>)[] = [];
+
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
         const itemId = detailsRead(url);
+
         if (itemId)
             return details
                 ? new Response(
@@ -48,32 +50,41 @@ function serve(board: BoardData, details?: object) {
                       }),
                   )
                 : detailsReply(itemId);
+
         if ((url === '/api/item-kind' || url === '/api/item-kind-answer') && init?.method === 'POST')
             return new Promise<Response>((resolve) => {
                 writes.push((status, body) => settle(() => resolve(new Response(JSON.stringify(body), { status }))));
             });
+
         return new Response(JSON.stringify(board));
     });
+
     return { answer: (status: number, body: object) => writes.shift()!(status, body) };
 }
+
 const sentTo = (path: string) =>
     (fetchMock.mock.calls as unknown as [string, RequestInit?][])
         .filter(([url, init]) => url === path && init?.method === 'POST')
         .map(([, init]) => JSON.parse(init!.body as string) as object);
 const sent = () => sentTo('/api/item-kind');
+
 async function openItem(itemId = ID): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
+
 const control = () => $('[data-item-dialog] [data-item-kind-control] [role="combobox"]');
 const shownKind = () => text(control());
 const choose = (name: string) => chooseOption(control()!, name);
 const options = async () => {
     await openOptions(control()!);
+
     return $$('[role="option"]').map((o) => text(o));
 };
 const retry = () => $$<HTMLButtonElement>('[data-kind-change-failed] button').find((b) => text(b) === 'Retry')!;
 const detailsReads = () => (fetchMock.mock.calls as unknown as [string][]).filter(([url]) => detailsRead(url)).length;
+
 /** Holds each details read from here on until the test calls the function this returns, which answers the latest. */
 function holdDetails(): () => Promise<void> {
     const serving = fetchMock.getMockImplementation() as unknown as (
@@ -81,6 +92,7 @@ function holdDetails(): () => Promise<void> {
         init?: RequestInit,
     ) => Promise<Response>;
     let release = () => {};
+
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
         detailsRead(url)
             ? new Promise<Response>((resolve) => {
@@ -88,6 +100,7 @@ function holdDetails(): () => Promise<void> {
               })
             : serving(url, init),
     );
+
     return () => settle(() => release());
 }
 
@@ -99,6 +112,7 @@ for (const [kind, shown] of [
 ] as const) {
     test(`an item with ${kind === 'issue' ? 'no kind' : `the kind ${kind}`} shows it and offers the three kinds`, async () => {
         const board = boardWith({ kind });
+
         serve(board);
         await mountPage(board);
         await openItem();
@@ -110,6 +124,7 @@ for (const [kind, shown] of [
 for (const kind of ['concept', 'decision', 'build'] as Kind[]) {
     test(`a ${kind} has no kind control`, async () => {
         const board = boardWith({ kind });
+
         serve(board);
         await mountPage(board);
         await openItem();
@@ -120,6 +135,7 @@ for (const kind of ['concept', 'decision', 'build'] as Kind[]) {
 test("changing the kind writes it, and the control and line follow the board's answer", async () => {
     const before = boardWith({ kind: 'bug' });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await choose('Feature');
@@ -140,6 +156,7 @@ test("changing the kind writes it, and the control and line follow the board's a
 test('a change without access says it changed only the item', async () => {
     const before = boardWith({ kind: 'bug' });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await choose('Feature');
@@ -156,6 +173,7 @@ test('a change without access says it changed only the item', async () => {
 test('a failure keeps the old kind, says what changed, and Retry sends the same change', async () => {
     const before = boardWith({ kind: 'bug' });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await choose('Feature');
@@ -166,7 +184,9 @@ test('a failure keeps the old kind, says what changed, and Retry sends the same 
         board: before,
     });
     expect(shownKind()).toBe('Bug');
+
     const failed = text($('[data-kind-change-failed]'));
+
     expect(failed).toContain('Could not finish changing #129 to Feature. gh failed: HTTP 403');
     expect(failed).toContain('Changed on the ticket so far: #129: added label feature.');
     await settle(() => retry().click());
@@ -187,6 +207,7 @@ test('a failure keeps the old kind, says what changed, and Retry sends the same 
 test('a failed retry keeps what the first attempt changed', async () => {
     const before = boardWith({ kind: 'bug' });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await choose('Feature');
@@ -203,7 +224,9 @@ test('a failed retry keeps what the first attempt changed', async () => {
         line: '',
         board: before,
     });
+
     const failed = text($('[data-kind-change-failed]'));
+
     expect(failed).toContain('Second');
     expect(failed).toContain('Changed on the ticket so far: #129: added label feature.');
 });
@@ -211,6 +234,7 @@ test('a failed retry keeps what the first attempt changed', async () => {
 test('a failed change that wrote nothing says so', async () => {
     const before = boardWith({ kind: 'bug' });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await choose('Feature');
@@ -226,13 +250,16 @@ test('a failed change that wrote nothing says so', async () => {
 test('an item with no record follows its new work ID', async () => {
     const before = boardWith({ kind: 'issue', recorded: false });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await choose('Bug');
+
     const after: BoardData = {
         ...sample,
         items: sample.items.map((i) => (i.id === ID ? { ...i, id: 'work-1', kind: 'bug', recorded: true } : i)),
     };
+
     await answer(200, { error: null, itemId: 'work-1', line: '#129: added label bug.', board: after });
     expect(shownKind()).toBe('Bug');
     expect(text($('[data-kind-change-line]'))).toBe('#129: added label bug.');
@@ -241,6 +268,7 @@ test('an item with no record follows its new work ID', async () => {
 test('local work changes kind the same way', async () => {
     const local = boardWith({ kind: 'bug', number: 0, labels: [], url: '' });
     const { answer } = serve(local);
+
     await mountPage(local);
     await openItem();
     await choose('Improvement');
@@ -281,13 +309,16 @@ const withAccess = (board: BoardData, access: object = ALLOWED): BoardData => ({
 const opened = async (item: Partial<Item>, access?: object, details?: object) => {
     const board = withAccess(boardWith(item), access);
     const server = serve(board, details);
+
     await mountPage(board);
     await openItem();
+
     return server;
 };
 
 test('when the item changed, the notice offers updating the ticket and names what it swaps', async () => {
     const { answer } = await opened({ kind: 'feature', kindDisagreement: itemMoved });
+
     expect(text(notice())).toContain('Shaping decided this is a Feature. The ticket still says Bug.');
     expect(noticeButtons().map((b) => text(b))).toEqual(['Update ticket to Feature', 'Keep ticket as Bug']);
     expect(text($('[data-kind-notice-hint]'))).toBe(
@@ -319,6 +350,7 @@ test('an update that a backlog-hidden type leaves with nothing to write says tha
         swap: { add: [], remove: [], type: null },
         note: " The type stays Bug, because the team's backlog doesn't show Feature.",
     };
+
     await opened({ kind: 'feature', kindDisagreement: itemMoved }, ALLOWED, { kindPlan });
     expect(text($('[data-kind-notice-hint]'))).toBe(
         "Update writes nothing to #129. The type stays Bug, because the team's backlog doesn't show Feature.",
@@ -327,13 +359,18 @@ test('an update that a backlog-hidden type leaves with nothing to write says tha
 
 test('while the details load, Update waits and says it is checking', async () => {
     const board = withAccess(boardWith({ kind: 'feature', kindDisagreement: itemMoved }));
+
     serve(board, { kindPlan: { ...FEATURE_PLAN, swap: SWAP, note: '' } });
+
     const release = holdDetails();
+
     await mountPage(board);
     await openItem();
     expect(noticeButton('Update ticket to Feature').disabled).toBe(true);
     expect(text($('[data-kind-notice-hint]'))).toBe('Checking what the update changes…');
+
     const reads = detailsReads();
+
     await release();
     expect(noticeButton('Update ticket to Feature').disabled).toBe(false);
     expect(text($('[data-kind-notice-hint]'))).toBe(
@@ -344,11 +381,16 @@ test('while the details load, Update waits and says it is checking', async () =>
 
 test("details with no plan are read once more, and then the board's own swap stands in", async () => {
     const board = withAccess(boardWith({ kind: 'feature', kindDisagreement: itemMoved }));
+
     serve(board);
+
     const release = holdDetails();
+
     await mountPage(board);
     await openItem();
+
     const reads = detailsReads();
+
     await release();
     expect(text($('[data-kind-notice-hint]'))).toBe('Checking what the update changes…');
     expect(noticeButton('Update ticket to Feature').disabled).toBe(true);
@@ -363,10 +405,15 @@ test("details with no plan are read once more, and then the board's own swap sta
 test('an item-only change with the dialog open checks again, and shows no plan for the earlier kind', async () => {
     const details = { kindPlan: FEATURE_PLAN as object };
     const { answer } = await opened({ kind: 'feature', kindDisagreement: itemMoved }, TYPE_REFUSED, details);
+
     expect(noticeButton('Update ticket to Feature').disabled).toBe(false);
+
     const release = holdDetails();
+
     await choose('Improvement');
+
     const swap = { add: [], remove: ['type: bug'], type: { from: 'Bug', to: 'Improvement' } };
+
     details.kindPlan = {
         itemKind: 'improvement',
         ticketKind: 'bug',
@@ -391,6 +438,7 @@ test('an item-only change with the dialog open checks again, and shows no plan f
 test("an item-only change on an item with no plan at open uses the board's swap once the read finds none", async () => {
     const before = withAccess(boardWith({ kind: 'bug' }), TYPE_REFUSED);
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await choose('Feature');
@@ -406,11 +454,16 @@ test("an item-only change on an item with no plan at open uses the board's swap 
 
 test('reopening after the ticket changed, with updatedAt unmoved, reads the details again', async () => {
     const details = { kindPlan: FEATURE_PLAN as object };
+
     await opened({ kind: 'feature', kindDisagreement: itemMoved }, TYPE_REFUSED, details);
+
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().close());
+
     const release = holdDetails();
     const { receive } = await import('../items/card-actions.ts');
+
     await settle(() =>
         receive({
             error: null,
@@ -436,6 +489,7 @@ test('reopening after the ticket changed, with updatedAt unmoved, reads the deta
 
 test('opening an ordinary item leaves focus off Kind, and a letter key on the closed control changes nothing', async () => {
     const board = boardWith({ kind: 'bug' });
+
     serve(board);
     await mountPage(board);
     await openItem();
@@ -455,6 +509,7 @@ test('opening an ordinary item leaves focus off Kind, and a letter key on the cl
 test('focus comes back to Kind when a kind change ends with focus on the page', async () => {
     const board = boardWith({ kind: 'bug' });
     const { answer } = serve(board);
+
     await mountPage(board);
     await openItem();
     await choose('Feature');
@@ -488,6 +543,7 @@ for (const [ending, status, body] of [
     test(`focus comes back to Kind from the dialog when a kind change ${ending}`, async () => {
         const board = boardWith({ kind: 'bug' });
         const { answer } = serve(board);
+
         await mountPage(board);
         await openItem();
         await choose('Feature');
@@ -501,10 +557,13 @@ for (const [ending, status, body] of [
 test('a control the user moved to during a kind change keeps focus', async () => {
     const board = boardWith({ kind: 'bug' });
     const { answer } = serve(board);
+
     await mountPage(board);
     await openItem();
     await choose('Feature');
+
     const close = $('[data-item-dialog] [aria-label="Close"]')!;
+
     close.focus();
     await answer(200, {
         error: null,
@@ -517,6 +576,7 @@ test('a control the user moved to during a kind change keeps focus', async () =>
 
 test('an answer that leaves focus on the page brings it back to Kind', async () => {
     const { answer } = await opened({ kind: 'feature', kindDisagreement: ticketMoved });
+
     await settle(() => noticeButton('Keep item as Feature').click());
     (document.activeElement as HTMLElement).blur();
     await answer(200, { error: null, board: boardWith({ kind: 'feature' }) });
@@ -530,6 +590,7 @@ test('an Improvement reads with its article', async () => {
 
 test('when the ticket changed, the notice offers updating the item and writes nothing to the ticket', async () => {
     const { answer } = await opened({ kind: 'feature', kindDisagreement: ticketMoved });
+
     expect(text(notice())).toContain('The ticket now says Bug. This item still says Feature.');
     expect(noticeButtons().map((b) => text(b))).toEqual(['Update item to Bug', 'Keep item as Feature']);
     expect(text($('[data-kind-notice-hint]'))).toBe('Changes this item only. Nothing is written to the ticket.');
@@ -568,6 +629,7 @@ test('an update with nothing to write says so', async () => {
 
 test('Keep records the answer and leaves a line in details, whose Change shows the choice again', async () => {
     const { answer } = await opened({ kind: 'bug', kindDisagreement: { ...itemMoved, ticketKind: 'feature' } });
+
     await settle(() => noticeButton('Keep ticket as Feature').click());
     expect(sentTo('/api/item-kind-answer')).toEqual([{ itemId: ID, answer: 'keep', ticketKind: 'feature' }]);
     await answer(200, {
@@ -577,7 +639,9 @@ test('Keep records the answer and leaves a line in details, whose Change shows t
         ),
     });
     expect(notice()).toBeNull();
+
     const kept = $('[data-kind-kept]')!;
+
     expect(text(kept)).toBe('Ticket says Feature. Kept as is. Change');
     await settle(() => $<HTMLButtonElement>('[data-kind-kept] button')!.click());
     expect(noticeButtons().map((b) => text(b))).toEqual(['Update ticket to Bug', 'Keep ticket as Feature']);
@@ -590,6 +654,7 @@ test('a kept ticket with no kind says it was left', async () => {
 
 test('a failed answer stays in the notice and changes nothing', async () => {
     const { answer } = await opened({ kind: 'feature', kindDisagreement: ticketMoved });
+
     await settle(() => noticeButton('Keep item as Feature').click());
     await answer(409, { error: 'The kinds changed. Check the updated item.' });
     expect(text($('[data-kind-notice] [role="alert"]'))).toBe('The kinds changed. Check the updated item.');

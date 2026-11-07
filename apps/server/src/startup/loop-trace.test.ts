@@ -21,11 +21,14 @@ function traced() {
         delay,
         watchGc: (report) => {
             reportGc = report;
+
             return () => {};
         },
     });
+
     trace.begin((line) => lines.push(line), 0);
     lines.length = 0;
+
     return {
         trace,
         lines,
@@ -40,6 +43,7 @@ function traced() {
 
 test('a stall names the work that ran in it, and how much of it no label covers', () => {
     const { trace, lines, pass, teardown } = traced();
+
     trace.span('records', () => pass(300));
     trace.span('threads', () => pass(150));
     pass(40);
@@ -53,6 +57,7 @@ test('a stall names the work that ran in it, and how much of it no label covers'
 
 test('a gap under the threshold logs nothing, and a later stall names only its own work', () => {
     const { trace, lines, pass, teardown } = traced();
+
     trace.span('records', () => pass(30));
     trace.tick();
     expect(lines).toEqual([]);
@@ -65,6 +70,7 @@ test('a gap under the threshold logs nothing, and a later stall names only its o
 
 test('a span counts its own time, leaving out a span nested in it', () => {
     const { trace, lines, pass, teardown } = traced();
+
     trace.span('local refresh', () => {
         pass(20);
         trace.span('records', () => pass(100));
@@ -80,6 +86,7 @@ test('a span counts its own time, leaving out a span nested in it', () => {
 test('a timed block leaves out the spans that ran inside it', () => {
     const { trace, lines, pass, teardown } = traced();
     const spannedAt = trace.spanned();
+
     pass(40);
     trace.span('board push', () => pass(60));
     trace.block('stats publish', 100, spannedAt, 100);
@@ -93,6 +100,7 @@ test('a timed block leaves out the spans that ran inside it', () => {
 
 test("a window gives the whole loop delay and each label's synchronous total, count and longest", () => {
     const { trace, lines, pass, teardown } = traced();
+
     trace.span('records', () => pass(40));
     trace.span('records', () => pass(10));
     trace.endWindow();
@@ -104,6 +112,7 @@ test("a window gives the whole loop delay and each label's synchronous total, co
 
 test('wall far above CPU shows the thread was held, not working', () => {
     const { trace, lines, pass, teardown } = traced();
+
     trace.span('local refresh', () => pass(200, 5));
     pass(100, 1);
     trace.tick();
@@ -116,6 +125,7 @@ test('wall far above CPU shows the thread was held, not working', () => {
 
 test('a stall counts the GC inside it, as the observer reports it after the stall ends', () => {
     const { trace, lines, pass, gc, teardown } = traced();
+
     gc(-50, 20);
     pass(100);
     trace.tick();
@@ -132,6 +142,7 @@ test('a stall counts the GC inside it, as the observer reports it after the stal
 
 test('ending the trace writes a stall still waiting for its GC', () => {
     const { trace, lines, pass, teardown } = traced();
+
     pass(100);
     trace.tick();
     teardown();
@@ -141,6 +152,7 @@ test('ending the trace writes a stall still waiting for its GC', () => {
 
 test('a slow request names its wait for the tool check, and a fast one logs nothing', () => {
     const { trace, lines, teardown } = traced();
+
     trace.request('GET /api/board', 12, 0);
     trace.request('GET /api/board', 1095, 1094);
     expect(lines).toEqual(['request GET /api/board took 1095 ms, 1094 ms of it waiting for the first tool check']);
@@ -149,11 +161,13 @@ test('a slow request names its wait for the tool check, and a fast one logs noth
 
 test('after the trace ends, spans only run their work', () => {
     const { trace, lines, pass, teardown } = traced();
+
     teardown();
     lines.length = 0;
     expect(
         trace.span('records', () => {
             pass(500);
+
             return 7;
         }),
     ).toBe(7);

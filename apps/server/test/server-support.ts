@@ -31,6 +31,7 @@ type SliceSearches = { builds?: ReadonlySet<string>; active?: ReadonlySet<string
 /** The calls the fakes logged, skipping a last line a running fake has not finished writing. */
 async function readCalls(file: string): Promise<string[][]> {
     const lines = (await readFile(file, 'utf8')).split('\n');
+
     return lines
         .slice(0, -1)
         .filter(Boolean)
@@ -48,11 +49,16 @@ export const SAMPLE_MODELS = {
 
 export async function freePort(): Promise<number> {
     const socket = createServer();
+
     socket.listen(0, '127.0.0.1');
     await once(socket, 'listening');
+
     const address = socket.address();
+
     if (!address || typeof address === 'string') throw new Error('No test port');
+
     await new Promise<void>((resolve) => socket.close(() => resolve()));
+
     return address.port;
 }
 
@@ -66,6 +72,7 @@ export function writeRepositoryList(
     setups: Record<string, unknown> = {},
 ): void {
     const dir = join(home, 'Library/Application Support/Lar Factory');
+
     mkdirSync(dir, { recursive: true });
     writeFileSync(
         join(dir, 'repository-settings.json'),
@@ -94,16 +101,21 @@ async function recordIssues(
     threads: Record<string, string[]> = {},
 ): Promise<Map<string, string>> {
     const ids = new Map<string, string>();
+
     if (!raws.length) return ids;
+
     const records = await openWorkRecords(workRecordsPath(boardDataDir(home, {})));
+
     try {
         const recent = (item: Item) =>
             item.status !== 'Done' || Date.now() - Date.parse(item.closedAt ?? item.updatedAt) <= DONE_WINDOW_MS;
         const items = normalizeItems([...raws], {
             builds: new Set([...readBuilds([...raws]), ...(searched.builds ?? [])]),
         }).filter(recent);
+
         for (const item of items) {
             const ticket = `${item.repo}#${item.number}`;
+
             ids.set(
                 ticket,
                 records.importTicket({
@@ -119,13 +131,16 @@ async function recordIssues(
         for (const item of items) {
             const parent = item.parent && ids.get(`${item.parent.repo}#${item.parent.number}`);
             const workId = ids.get(`${item.repo}#${item.number}`)!;
+
             if (parent)
                 try {
                     records.setParent(workId, records.read(workId).revision, parent);
                 } catch {
                     /* a parent of another kind */
                 }
+
             if (item.kind !== 'build') continue;
+
             for (const slice of item.slices) {
                 const key = refKey(slice.repo, slice.number);
                 const open = slice.progress !== 'done';
@@ -137,18 +152,22 @@ async function recordIssues(
                     status,
                     ticket: `${slice.repo}#${slice.number}`,
                 }).record;
+
                 made = records.setParent(made.workId, made.revision, workId);
+
                 if (open && searched.blocked?.has(key))
                     records.setNeedsYou(made.workId, made.revision, 'The implementer could not finish it.');
             }
         }
         for (const [ticket, threadIds] of Object.entries(threads)) {
             const workId = ids.get(ticket)!;
+
             for (const id of threadIds) records.addThread(workId, records.read(workId).revision, id, 'shape');
         }
     } finally {
         records.close();
     }
+
     return ids;
 }
 
@@ -167,6 +186,7 @@ export async function larWork(dataDir: string, ...args: string[]): Promise<{ wor
     const printed = JSON.parse(stdout) as
         | { workId: string; revision: number }
         | { record: { workId: string; revision: number } };
+
     return 'record' in printed ? printed.record : printed;
 }
 
@@ -181,13 +201,16 @@ export async function changeRecords(
     shown: (item: Item) => boolean,
 ): Promise<BoardData> {
     const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
     try {
         change(records);
     } finally {
         records.close();
     }
+
     return until(board, (d) => {
         const found = d.items.find((i) => i.id === item);
+
         return !!found && shown(found);
     });
 }
@@ -198,11 +221,13 @@ export async function changeRecords(
  */
 export async function recordBlockers(board: Board, workId: string, titles: string[]): Promise<string[]> {
     const ids: string[] = [];
+
     await changeRecords(
         board,
         (records) => {
             for (const title of titles) {
                 const decision = records.create({ title, repository: OFF_BOARD, kind: 'decision', status: 'Shaping' });
+
                 records.addBlocker(workId, records.read(workId).revision, decision.workId);
                 ids.push(decision.workId);
             }
@@ -210,6 +235,7 @@ export async function recordBlockers(board: Board, workId: string, titles: strin
         workId,
         (item) => ids.every((id) => item.blockers.some((b) => b.workId === id)),
     );
+
     return ids;
 }
 
@@ -236,8 +262,11 @@ export const NOT_LANDED = { localSetups: { 'maddec01/lar-factory': null } };
 
 export function writeOnboarding(home: string, repo: string): void {
     const progress = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'project-factory' } };
+
     writeRepositoryList(home, TEST_REPOSITORIES);
+
     const file = join(home, 'Library/Application Support/Lar Factory/repository-settings.json');
+
     writeFileSync(
         file,
         JSON.stringify({
@@ -263,30 +292,39 @@ export async function startBoard(
 ) {
     const dir = await mkdtemp(join(tmpdir(), 'lar-board-test-'));
     const stateFile = join(dir, 'github.json');
+
     await writeFile(stateFile, JSON.stringify(options));
     await writeFile(stateFile + '.calls', '');
     await writeFile(stateFile + '.t3calls', '');
+
     // T3 settings whose built-in Claude instance has no transcripts, so tests never read real ones.
     const settingsFile = join(dir, 't3-settings.json');
+
     await writeFile(
         settingsFile,
         JSON.stringify({
             providerInstances: { claudeAgent: { driver: 'claudeAgent', config: { homePath: join(dir, 'no-claude') } } },
         }),
     );
+
     // T3 Code's runtime file, naming this test's process, so T3 Code counts as running.
     const runtimeFile = join(dir, 't3-runtime.json');
+
     await writeFile(
         runtimeFile,
         JSON.stringify({ version: 1, pid: process.pid, port: 3773, origin: 'http://127.0.0.1:3773' }),
     );
+
     // Each test gets a spare port; BOARD_PORT '' leaves the board to pick one from its range.
     const home = env.HOME ?? dir;
     const { repositories = TEST_REPOSITORIES } = options as { repositories?: readonly string[] | null };
+
     if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json')))
         writeRepositoryList(home, repositories, (options as { localSetups?: Record<string, unknown> }).localSetups);
+
     // Only recorded work is on the board, so each fake issue starts recorded, unless `recorded: false` says none is.
     type Ref = { number: number; repository: { nameWithOwner: string } };
+
     const {
         items: issues = [],
         repoIssues = {},
@@ -370,36 +408,47 @@ export async function startBoard(
               { stdio: ['pipe', 'ignore', 'ignore'] },
           )
         : undefined;
+
     watchdog?.unref();
     (watchdog?.stdin as Socket | undefined)?.unref();
+
     let skillChecks = 0;
+
     if (skillCheck)
         child.on('message', (message) => {
             if (!isSkillCheckRequest(message)) return;
+
             skillChecks += 1;
+
             const outcome = skillCheck(message.drift);
+
             child.send({
                 type: 'skills-checked',
                 id: message.id,
                 ...(typeof outcome === 'object' && outcome ? outcome : { refusal: outcome }),
             } satisfies SkillCheckAnswer);
         });
+
     let logs = '';
+
     child.stdout!.on('data', (data: Buffer) => {
         logs += data.toString();
     });
     child.stderr!.on('data', (data: Buffer) => {
         logs += data.toString();
     });
+
     const stop = async () => {
         // A board that failed to start has already exited, or never got a pid.
         if (child.pid && child.exitCode === null && child.signalCode === null) {
             const exited = once(child, 'exit');
+
             // Stopping the whole group stops a gh still running, so none writes into the home as it is removed.
             process.kill(-child.pid, 'SIGTERM');
             await exited;
         }
     };
+
     t.onTestFinished(async () => {
         // The watchdog stays up through cleanup, so an interrupt during it is still covered, and goes even if cleanup
         // throws, so it never signals a group id the system may have reused.
@@ -410,6 +459,7 @@ export async function startBoard(
             watchdog?.kill();
         }
     });
+
     const board = () => fetch(`${url}/api/board`).then((r) => r.json());
     const post = (body: unknown, origin = url, path = '/api/items') =>
         fetch(`${url}${path}`, {
@@ -430,6 +480,7 @@ export async function startBoard(
             };
             const ready = () => {
                 const found = find(logs);
+
                 if (found !== undefined) {
                     cleanup();
                     resolve(found);
@@ -443,17 +494,23 @@ export async function startBoard(
                 cleanup();
                 reject(error);
             };
+
             child.stdout!.on('data', ready);
             child.stderr!.on('data', ready);
             child.once('close', closed);
             child.once('error', failed);
             ready();
+
             if (child.stdout!.closed && child.stderr!.closed) closed();
         });
+
     // The listening line follows bind.
     url = await logged((output) => output.match(/board on (http:\/\/127\.0\.0\.1:\d+)/)?.[1]);
+
     const response = await fetch(`${url}/api/board`);
+
     if (!response.ok) throw new Error(`Board answered ${response.status}: ${logs}`);
+
     return {
         url,
         /** The work ID of the fake issue `number` in `repo`, as startBoard recorded it. */
@@ -472,6 +529,7 @@ export async function startBoard(
                     void readCalls(stateFile + '.calls')
                         .then((calls) => {
                             const found = calls.filter(check);
+
                             if (found.length >= count) {
                                 watcher.close();
                                 resolve(found[count - 1]!);
@@ -484,6 +542,7 @@ export async function startBoard(
                     watcher.close();
                     reject(error);
                 };
+
                 watcher.on('error', failed);
                 ready();
             }),
@@ -506,15 +565,22 @@ export type Board = Awaited<ReturnType<typeof startBoard>>;
 /** Waits for the current or next pushed board that passes `check`, within the caller's test deadline. */
 export async function until(board: Board, check: (data: BoardData) => boolean): Promise<BoardData> {
     const response = await fetch(`${board.url}/api/events`);
+
     if (!response.ok || !response.body) throw new Error(`Can't read board events: ${response.status}`);
+
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
     let buffered = '';
+
     try {
         for (;;) {
             const { value, done } = await reader.read();
+
             if (done) throw new Error('The board closed before reaching the expected state');
+
             buffered += value;
+
             const events = buffered.split('\n\n');
+
             buffered = events.pop()!;
             for (const event of events) {
                 const json = event
@@ -522,8 +588,11 @@ export async function until(board: Board, check: (data: BoardData) => boolean): 
                     .filter((line) => line.startsWith('data: '))
                     .map((line) => line.slice(6))
                     .join('\n');
+
                 if (!json) continue;
+
                 const data = JSON.parse(json) as BoardData;
+
                 if (check(data)) return data;
             }
         }
@@ -552,12 +621,14 @@ function sshOrigin(home: string) {
     const origin = join(home, 'origin.git');
     const env = committingEnv();
     const git = (...args: string[]) => execFileSync('git', ['-C', origin, ...args], { env, encoding: 'utf8' }).trim();
+
     execFileSync('git', ['init', '-q', '--bare', origin], { env });
     git(
         'update-ref',
         'refs/heads/main',
         git('commit-tree', git('hash-object', '-t', 'tree', '-w', '/dev/null'), '-m', 'first'),
     );
+
     return {
         FAKE_ORIGIN: origin,
         GIT_SSH_COMMAND: `sh '${new URL('./fake-ssh.sh', import.meta.url).pathname}'`,
@@ -569,8 +640,10 @@ function sshOrigin(home: string) {
  * checkout, and a T3 database with a live project there. */
 export function startableEnv(t: TestContext): Record<string, string> {
     const home = mkdtempSync(join(tmpdir(), 'lar-start-home-'));
+
     t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
     checkouts(home, { 'lar-factory': 'git@github.com:maddec01/lar-factory.git' });
+
     return {
         HOME: home,
         ...sshOrigin(home),

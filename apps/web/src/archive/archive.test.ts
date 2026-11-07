@@ -43,8 +43,11 @@ let shelved: Item[] = [];
 function answer(board: BoardData, replies: Record<string, (body: Record<string, unknown>) => object>) {
     fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
         if (url === '/api/archive') return new Response(JSON.stringify({ items: shelved }));
+
         const reply = replies[url];
+
         if (reply) return new Response(JSON.stringify(reply(JSON.parse(init!.body as string))));
+
         return new Response(JSON.stringify(board));
     }) as never);
 }
@@ -83,6 +86,7 @@ test('Archive reads set-aside and hidden work when it opens, with Export markdow
 
 test('archived rows identify local work and each ticket provider', async () => {
     const local = { ...aside, id: 'local', repo: 'example/product', number: 0, url: null };
+
     await openArchive(withRetention(), {}, [
         local,
         { ...local, id: 'github', number: 17, url: 'https://github.com/example/product/issues/17' },
@@ -107,6 +111,7 @@ test('archived rows identify local work and each ticket provider', async () => {
 
 test('Restore posts the work, and the row leaves Archive as Archive is read again', async () => {
     const restored = withRetention({ items: [...sample.items, { ...aside, archived: undefined }] });
+
     await openArchive(withRetention(), {
         '/api/restore': () => ((shelved = [finished]), { error: null, board: restored }),
     });
@@ -119,7 +124,9 @@ test('Restore posts the work, and the row leaves Archive as Archive is read agai
 test("Close ticket asks as Abandon's own step does, and closes only on its confirm", async () => {
     await openArchive(withRetention(), { '/api/close-ticket': () => ({ error: null }) });
     await settle(() => button(row('archived-W_aside'), 'Close ticket')!.click());
+
     const confirm = $('#abandon-dialog')!;
+
     expect(confirm.getAttribute('data-abandon-step')).toBe('close-ticket');
     expect(posted('/api/close-ticket')).toEqual([]);
     await settle(() => button(confirm, 'Close issue')!.click());
@@ -136,13 +143,16 @@ test('a timed delete names the work it would delete and saves only on its confir
             kept: [{ workId: 'W_done', reason: 'It owns the slice W_slice, which is kept.' }],
         },
     };
+
     await openArchive(withRetention(), {
         '/api/retention': (body) =>
             body.confirmed
                 ? ((shelved = [aside]), { error: null, saved: true, board: withRetention({ retention: kept }) })
                 : { error: null, saved: false, due: [{ workId: 'W_done', title: 'Shipped' }] },
     });
+
     const setting = $('[data-retention]')!;
+
     await chooseOption(document.querySelector('[data-retention] [role="combobox"]')!, 'Delete it after');
     await settle(() => $<HTMLButtonElement>('[data-save-retention]')!.click());
     expect(posted('/api/retention')).toEqual([{ hideAfterDays: 7, deleteAfterDays: 30, confirmed: false }]);

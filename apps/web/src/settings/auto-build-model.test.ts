@@ -18,6 +18,7 @@ const posted = () =>
         .filter(([url]) => url === '/api/auto-build')
         .map((call) => JSON.parse((call as unknown as [string, RequestInit])[1].body as string));
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
+
 async function chooseModel(label: string): Promise<void> {
     await pressMenu(trigger());
     await settle(() =>
@@ -27,6 +28,7 @@ async function chooseModel(label: string): Promise<void> {
     );
     await settle(() => vi.advanceTimersByTime(50));
 }
+
 const withAutoBuild = (autoBuild?: BoardData['autoBuild']): BoardData => ({
     ...sample,
     modelChoices: CHOICES,
@@ -46,7 +48,9 @@ test('General offers T3 Project default and each model choice, with T3 Project d
     expect(text(trigger())).toBe('T3 Project default ▾');
     await pressMenu(trigger());
     expect(entries().map(text)).toEqual(['T3 Project default', 'Opus 5.5', 'GPT-5.5']);
+
     const groups = $$('[role="menu"] [role="group"] [role="group"][aria-labelledby]');
+
     expect(groups.map((group) => text(document.getElementById(group.getAttribute('aria-labelledby')!)))).toEqual([
         'Claude',
         'Codex',
@@ -64,6 +68,7 @@ test('a saved model shows as picked', async () => {
 
 test('the T3 Project default entry names no model, even when every repository shares it', async () => {
     const repos = [{ repo: 'o/a' }, { repo: 'o/b' }] as BoardData['repos'];
+
     await openGeneral({ ...withAutoBuild({ on: false }), repos, t3Defaults: { 'o/a': OPUS, 'o/b': OPUS } });
     await pressMenu(trigger());
     expect(text(entries()[0])).toBe('T3 Project default');
@@ -90,7 +95,9 @@ test('a saved model the choices no longer offer still shows, and says so', async
     await openGeneral(withAutoBuild({ on: true, model: { instanceId: 'cursor', model: 'cursor-agent' } }));
     expect(text(trigger())).toBe('cursor cursor-agent (not offered) ▾');
     await pressMenu(trigger());
+
     const missing = entries().at(-1)!;
+
     expect(missing.getAttribute('aria-checked')).toBe('true');
     expect(missing.getAttribute('aria-disabled')).toBe('true');
     await settle(() => missing.click());

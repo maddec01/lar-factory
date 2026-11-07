@@ -59,16 +59,20 @@ const pressOutside = (el: Element) =>
         el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
         el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     });
+
 /** Opens the item dialog on `id` through its store, as every list on the page does. */
 async function openItem(id: string): Promise<void> {
     const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(id));
 }
+
 /** Mounts the page with `data` and opens the dialog on the Queued #129. */
 async function mountItem(data?: BoardData, id = 'I_sample05'): Promise<void> {
     await mountPage(data);
     await openItem(id);
 }
+
 const open = async (id = 'I_sample05') => {
     start(id).focus();
     await pressMenu(start(id));
@@ -110,11 +114,15 @@ test("Shape issue opens a menu: 'T3 Project default' first, then each provider i
         ['Opus 5.5', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5'],
         ['claude-opus-5-5[1m]', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5[1m]'],
     ]);
+
     const label = (g: Element) => text(document.getElementById(g.getAttribute('aria-labelledby')!));
+
     expect(label($('[role="menu"] > [role="group"]')!), 'the entries are a group, headed "Start with"').toBe(
         'Start with',
     );
+
     const groups = $$('[role="menu"] [role="group"] [role="group"][aria-labelledby]');
+
     expect(groups.map(label), 'grouped by instance, by its name').toEqual(['Codex', 'VI <work>']);
     expect(document.activeElement, 'focus is on the highlighted entry').toBe(entries()[0]);
 });
@@ -144,7 +152,9 @@ test('without model choices, the menu offers only "T3 Project default"', async (
 test('arrow keys, Home and End move through the entries and wrap', async () => {
     await mountItem(withChoices);
     await open();
+
     const at = () => entries().indexOf(document.activeElement as HTMLElement);
+
     await key(document.activeElement!, 'ArrowUp');
     expect(at(), 'up from the first wraps to the last').toBe(3);
     await key(document.activeElement!, 'ArrowDown');
@@ -169,7 +179,9 @@ test('Escape closes the menu and returns focus to Start', async () => {
 test('a click outside closes the menu; a control it lands on keeps focus', async () => {
     await mountItem(withChoices);
     await open();
+
     const other = card().querySelector<HTMLButtonElement>('[data-back-to-list="I_sample05"]')!;
+
     await pressOutside(other);
     other.focus();
     expect(menu()).toBeNull();
@@ -200,8 +212,11 @@ test('picking an entry starts the item with that model, shows the thread, and re
     expect(menu(), 'no menu while a start is in flight').toBeNull();
 
     const thread = { threadId: 'thread-1', title: '#129 Run more than one 4K HDR to 1080p stream at a time' };
+
     await answer({ thread, error: null, board: { ...withChoices, started: { I_sample05: thread } } });
+
     const tag = card().querySelector('[data-start-result]')!;
+
     expect([
         tag.classList.contains('started-tag'),
         tag.getAttribute('data-slot'),
@@ -248,7 +263,9 @@ test('a failed Start shows in the dialog, keeps Move to List and the last choice
         instanceId: 'codex',
         model: 'gpt-5.5',
     });
+
     const close = card().querySelector<HTMLButtonElement>('p.start button.dismiss')!;
+
     expect(close.getAttribute('aria-label')).toBe('Dismiss error for #129');
     close.focus();
     await settle(() => close.click());
@@ -272,7 +289,9 @@ test('a Start that may have run hides Start, Move to List and Abandon; closing i
     });
     expect(card().querySelector('[data-start]')).toBeNull();
     expect(footer()).toBeNull();
+
     const message = card().querySelector<HTMLElement>('p.start[data-start-result]')!;
+
     expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
     expect(document.activeElement, 'focus moves to the message').toBe(message);
     expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!), 'it may have started, so the choice is kept').toEqual({
@@ -280,7 +299,9 @@ test('a Start that may have run hides Start, Move to List and Abandon; closing i
         model: 'gpt-5.5',
     });
     await settle(() => message.querySelector<HTMLButtonElement>('button.dismiss')!.click());
+
     const tag = card().querySelector('.started-tag.unsure')!;
+
     expect([
         tag.getAttribute('data-slot'),
         tag.className.includes('bg-warning/12'),
@@ -302,6 +323,7 @@ test('a failed start from the server offers Retry start, and closing it clears i
         ...withChoices,
         startProgress: { I_sample05: { shape: { phase: 'failed' as const, message: 'T3 said no' } } },
     };
+
     await mountItem(failed);
     expect(text(start())).toBe('Retry start ▾');
     expect(text(card().querySelector('p.start [role="alert"]'))).toBe('T3 said no');
@@ -354,9 +376,13 @@ test('in sample mode, Start still opens its menu, and no entry in it starts anyt
 test('Started clears after its server record disappears', async () => {
     await mountItem(withChoices, 'I_sample05');
     await press(start());
+
     const thread = { threadId: 'thread-1', title: 'Refine' };
+
     await answer({ thread, error: null });
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     await settle(() => useBoardStore.getState().receive({ ...withChoices, started: { I_sample05: thread } }));
     await settle(() => useBoardStore.getState().receive({ ...withChoices, started: {} }));
     expect(card().querySelector('.started-tag')).toBeNull();

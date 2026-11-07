@@ -5,6 +5,7 @@ import { createCooldown } from './cooldown.ts';
 
 test('a rate limit holds every call back until the limit resets', async () => {
     const cooldown = createCooldown('gh', async () => 10_000);
+
     cooldown.check(0);
     await cooldown.failed('gh: API rate limit exceeded for user ID 1.', 1_000);
     assert.throws(() => cooldown.check(9_999), /gh is rate limited/);
@@ -15,6 +16,7 @@ test('a rate limit holds every call back until the limit resets', async () => {
 
 test('a rate limit without a known reset backs off for a minute, then twice as long each time', async () => {
     const cooldown = createCooldown('az');
+
     await cooldown.failed('TF400733: The request has been canceled', 0);
     assert.equal(cooldown.until(0), 60_000);
     await cooldown.failed('HTTP 429 Too Many Requests', 60_000);
@@ -26,6 +28,7 @@ test('a rate limit without a known reset backs off for a minute, then twice as l
 
 test('any other failure starts no cooldown', async () => {
     const cooldown = createCooldown('gh', async () => 10_000);
+
     await cooldown.failed('HTTP 404: Not Found', 0);
     assert.equal(cooldown.until(0), 0);
 });

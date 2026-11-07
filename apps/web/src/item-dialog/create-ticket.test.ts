@@ -17,6 +17,7 @@ import {
 } from '../../test/support.ts';
 
 beforeEach(() => localStorage.removeItem('lar-board:create-ticket'));
+
 const repo = 'example/product';
 const local: Item = {
     ...sample.items[0]!,
@@ -68,6 +69,7 @@ async function open(
 ) {
     fetchMock.mockImplementation(async (url) => {
         if (url.startsWith('/api/ticket-preview')) return new Response(JSON.stringify({ preview }));
+
         if (url.startsWith('/api/ticket-options'))
             return new Response(
                 JSON.stringify({
@@ -82,12 +84,17 @@ async function open(
                     },
                 }),
             );
+
         if (url === '/api/create-ticket') return post();
+
         const id = detailsRead(url);
+
         return id ? detailsReply(id) : new Response(JSON.stringify(data));
     });
     await mountPage(data);
+
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(local.id));
     await settle(() => vi.advanceTimersByTime(50));
     await settle(() => action().click());
@@ -114,10 +121,13 @@ test('local details offer Create issue beside Attach, preview noneditable text a
 
 test('the Create issue form has the searchable picker, and a typed label submits with the ticket', async () => {
     const data = board();
+
     (data.repos[0]!.setup!.access as Record<string, string>)['manage-labels'] = 'allowed';
     await open(data);
     await settle(() => section().querySelector<HTMLButtonElement>('#item-labels button')!.click());
+
     const search = $<HTMLInputElement>('[data-label-picker] input[aria-label]')!;
+
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'needs-design');
     await settle(() => search.dispatchEvent(new Event('input', { bubbles: true })));
     await settle(() =>
@@ -146,10 +156,14 @@ test('a lost response survives a page reload with its request ID and options, th
     });
     expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
     await settle(() => submit().click());
+
     const first = posts()[0]!;
+
     expect(text(submit())).toBe('Retry this submission');
     vi.resetModules();
+
     const converted = { ...local, number: 17, url: 'https://github.com/example/product/issues/17' };
+
     await open(
         board(),
         async () =>
@@ -198,9 +212,13 @@ test('opening the issue preview moves keyboard focus into it and Cancel returns 
 
 test('the Create issue form picks in Selects whose lists open above the item dialog, and submits the picks', async () => {
     await open();
+
     const assignee = $('#item-assignee')!;
+
     await openOptions(assignee);
+
     const list = $('[role="listbox"]')!;
+
     expect($('[data-item-dialog]')!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await settle(() => list.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect($('[data-item-dialog]')).not.toBeNull();

@@ -12,6 +12,7 @@ describe('ChannelSetting', () => {
     it.effect('reads nothing before a choice, then the channel last written', () =>
         Effect.gen(function* () {
             const file = tempFile();
+
             assert.isNull(yield* ChannelSetting.atFile(file).read);
             yield* ChannelSetting.atFile(file).write('nightly');
             assert.strictEqual(yield* ChannelSetting.atFile(file).read, 'nightly');
@@ -23,6 +24,7 @@ describe('ChannelSetting', () => {
     it.effect("reads a file that isn't a channel as no choice", () =>
         Effect.gen(function* () {
             const file = tempFile();
+
             NodeFS.mkdirSync(NodePath.dirname(file), { recursive: true });
             NodeFS.writeFileSync(file, '{"channel":"beta"}');
             assert.isNull(yield* ChannelSetting.atFile(file).read);

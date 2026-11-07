@@ -37,19 +37,24 @@ async function bundleWith(
     upstream = UPSTREAM,
 ): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'lar bundled skills test '));
+
     t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
     await mkdir(join(dir, 'skills'));
     for (const name of skills) await mkdir(join(dir, 'skills', name));
     await mkdir(join(dir, 'references'), { recursive: true });
     for (const name of checklists) await writeFile(join(dir, 'references', name), '');
     await writeFile(join(dir, 'UPSTREAM.md'), upstream);
+
     return dir;
 }
 
 test('the assembled bundle installs only Lar skills with shared copies and nested checklists', () => {
     const root = fileURLToPath(BUNDLE_URL);
+
     assert.deepEqual(bundledSkillNames().sort(), ['lar-build', 'lar-shape']);
+
     const rows = readBundledSkills(root);
+
     assert.deepEqual(rows.map((row) => row.name).sort(), ['lar-build', 'lar-shape']);
     for (const row of rows) {
         assert.equal(row.author, 'Lar');
@@ -61,6 +66,7 @@ test('the assembled bundle installs only Lar skills with shared copies and neste
         }).filter((entry) => entry.isFile())) {
             const source = join(file.parentPath, file.name);
             const relative = source.split('/skills/shared/')[1]!;
+
             assert.deepEqual(readFileSync(join(root, 'skills', row.name, 'shared', relative)), readFileSync(source));
         }
     }
@@ -80,6 +86,7 @@ Full commits`,
     const credits = Object.fromEntries(
         readBundledSkills(await bundleWith(t, [], [], upstream)).map((skill) => [skill.name, skill.includedAuthors]),
     );
+
     assert.deepEqual(credits, {
         'lar-shape': ['Addy Osmani', 'Lauren Tan'],
         'lar-build': ['Addy Osmani', 'Jesse Vincent', 'Lauren Tan', 'Matt Pocock'],
@@ -89,12 +96,14 @@ Full commits`,
 /** A home whose install manifest holds `status`. */
 async function homeWith(t: TestContext, status: unknown): Promise<string> {
     const home = await mkdtemp(join(tmpdir(), 'lar bundled skills home '));
+
     t.onTestFinished(() => rm(home, { recursive: true, force: true }));
     await mkdir(join(home, '.agents'));
     await writeFile(
         join(home, '.agents', INSTALL_MANIFEST),
         JSON.stringify({ version: '1.0.0', skills: ['lar-work', 'tdd'], status }),
     );
+
     return home;
 }
 
@@ -102,9 +111,12 @@ test('without a manifest, or with one it can’t read, no skill has a state', as
     const bundle = await bundleWith(t, ['tdd'], []);
     const skills = readBundledSkills(bundle);
     const empty = await mkdtemp(join(tmpdir(), 'lar bundled skills home '));
+
     t.onTestFinished(() => rm(empty, { recursive: true, force: true }));
     assert.deepEqual(withInstallState(skills, empty), skills);
+
     const broken = await homeWith(t, {});
+
     await writeFile(join(broken, '.agents', INSTALL_MANIFEST), '{');
     assert.deepEqual(withInstallState(skills, broken), skills);
 });

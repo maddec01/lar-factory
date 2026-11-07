@@ -186,6 +186,7 @@ export const openBlockerRefs = (item: Pick<Item, 'blockers' | 'repo'>, short = f
 export function blockerGroups(item: Pick<Item, 'blockers' | 'repo'>, blockers = openBlockers(item)) {
     const work = blockers.filter((b) => !b.dependency).map((b) => blockerRef(item, b));
     const owners = blockers.flatMap((b) => (b.dependency ? [b.dependency.owner] : []));
+
     return {
         work: work.length ? { names: work.join(', '), many: work.length > 1 } : null,
         dependencies: owners.length
@@ -204,6 +205,7 @@ export function blockedText(item: Pick<Item, 'blockers' | 'repo'>): string | nul
         ...(work ? [`${work.names} until ${work.many ? 'they complete' : 'it completes'}`] : []),
         ...(dependencies ? [`${dependencies.names} until you mark ${dependencies.many ? 'them' : 'it'} met`] : []),
     ];
+
     return parts.length ? `Blocked by ${parts.join(', and by ')}` : null;
 }
 
@@ -213,12 +215,16 @@ export function blockedText(item: Pick<Item, 'blockers' | 'repo'>): string | nul
  */
 export function dependencyNotice(d: DependencyHold): string | null {
     const seen = d.observation;
+
     if (!seen) return null;
+
     const subject = `Its ${seen.subject === d.ticket ? 'ticket' : 'PR'} ${seen.subject}`;
+
     if (d.met)
         return d.needsReview
             ? `${subject} changed to ${DEPENDENCY_OBSERVATION_WORDS[seen.kind]} after you marked it met. Review the mark.`
             : null;
+
     return seen.kind === 'closed' || seen.kind === 'merged'
         ? `${subject} is ${seen.kind}. Mark it met once the change is delivered.`
         : null;
@@ -259,6 +265,7 @@ export interface Slice extends IssueRef {
  */
 export function sliceProgress(state: 'OPEN' | 'CLOSED', stateReason: string | null): SliceProgress | null {
     if (state === 'CLOSED') return stateReason === 'NOT_PLANNED' || stateReason === 'DUPLICATE' ? null : 'done';
+
     return 'waiting';
 }
 
@@ -288,9 +295,13 @@ const hasNoFigures = (s: ItemStats) => !s.agentMs && !s.wallMs && !s.tokens && !
  */
 export function usageIncomplete(item: Item): boolean {
     const { stats, threads, usageState } = item;
+
     if (typeof stats === 'object' && stats.frozen) return false;
+
     if (Array.isArray(threads) && !threads.length) return false;
+
     if (stats === 'unavailable' || usageState === 'loading' || usageState === 'failed') return true;
+
     return !usageState && !stats && (threads === 'unavailable' || !!threads?.length);
 }
 
@@ -308,12 +319,15 @@ export function itemMembers(item: Item, items: readonly Item[]): Item[] {
     const add = (parent: Item) => {
         for (const child of items) {
             if (seen.has(child.id) || !isSubIssueOf(child, parent)) continue;
+
             seen.add(child.id);
             members.push(child);
             add(child);
         }
     };
+
     add(item);
+
     return members;
 }
 
@@ -326,17 +340,29 @@ export function itemMembers(item: Item, items: readonly Item[]): Item[] {
  */
 export function itemTotal(item: Item, items: readonly Item[]): ItemStats | 'unavailable' | null {
     const members = itemMembers(item, items);
+
     if (!members.length) return null;
+
     members.push(item);
+
     const incomplete = members.filter(usageIncomplete);
+
     if (incomplete.some((m) => !m.stats || m.stats === 'unavailable' || hasNoFigures(m.stats))) return 'unavailable';
+
     const all = members.flatMap((m) => (m.stats && m.stats !== 'unavailable' ? [m.stats] : []));
+
     if (!incomplete.length && all.every((s) => s === item.stats || hasNoFigures(s))) return null;
+
     const total: ItemStats = { agentMs: sum(all, (s) => s.agentMs), tokens: sum(all, (s) => s.tokens) };
+
     if (all.every((s) => s.wallMs !== undefined)) total.wallMs = sum(all, (s) => s.wallMs!);
+
     if (all.some((s) => s.costUsd !== undefined)) total.costUsd = sum(all, (s) => s.costUsd ?? 0);
+
     if (all.every((s) => s.frozen)) total.frozen = true;
+
     if (incomplete.length) total.incomplete = true;
+
     return total;
 }
 
@@ -522,6 +548,7 @@ export const isLiveThread = (thread: ItemThread): boolean =>
 export function canResumeShaping(item: Item): boolean {
     if (item.status !== 'Shaping' || item.needsYou || !Array.isArray(item.threads) || !item.threads.length)
         return false;
+
     if (
         item.threads.some(
             (thread) =>
@@ -532,7 +559,9 @@ export function canResumeShaping(item: Item): boolean {
         )
     )
         return false;
+
     const shaping = item.threads.filter((thread) => thread.purpose === 'shape');
+
     return (shaping.length ? shaping : item.threads)[0]?.state === 'stopped';
 }
 
@@ -553,6 +582,7 @@ export function canRetryBuild(item: Item): boolean {
         !Array.isArray(item.threads)
     )
         return false;
+
     if (
         item.threads.some(
             (thread) =>
@@ -563,6 +593,7 @@ export function canRetryBuild(item: Item): boolean {
         )
     )
         return false;
+
     return item.threads.find((thread) => thread.purpose === 'build')?.state === 'stopped';
 }
 
@@ -645,10 +676,12 @@ export function t3DefaultDetail(
     selection: ModelSelection | undefined,
 ): string | undefined {
     if (!selection) return undefined;
+
     const group = groups.find((g) => g.instanceId === selection.instanceId);
     const model = group?.models.find((m) => m.slug === selection.model)?.label ?? selection.model;
     const effort = selection.options?.find((o) => o.id === 'effort' || o.id === 'reasoningEffort')?.value;
     const name = `${group?.name ?? selection.instanceId} ${model}`;
+
     return typeof effort === 'string' ? `${name}, ${effort}` : name;
 }
 
@@ -911,6 +944,7 @@ export function repositoryProjectIcon(data: Pick<BoardData, 'projectIcons'>, rep
 /** The hint for adding the repository's T3 project when a start can't find it, whatever the case; null when it can, or before the first read. */
 export function repositoryProjectHint(data: Pick<BoardData, 'repositoryProjects'>, repo: string | null): string | null {
     const key = repo?.toLowerCase();
+
     return Object.entries(data.repositoryProjects ?? {}).find(([r]) => r.toLowerCase() === key)?.[1] ?? null;
 }
 
@@ -931,6 +965,7 @@ export function startHold(
     repo: string | null,
 ): string | null {
     if (isOnboarding(data, repo)) return WAITS_FOR_ONBOARDING;
+
     return repositoryProjectHint(data, repo);
 }
 
@@ -999,6 +1034,7 @@ export function failedCheck<N extends CheckedTool>(
     name: N,
 ): FailedCheck<NonNullable<ToolChecks[N]>> | undefined {
     const check = tools?.[name];
+
     // TypeScript can't narrow a generic indexed access (ToolChecks[N]) by `result`, so the cast restates it.
     return check && check.result !== 'ok' ? (check as FailedCheck<NonNullable<ToolChecks[N]>>) : undefined;
 }
@@ -1028,7 +1064,9 @@ export function usesGh(repos: readonly { repo: string }[]): boolean {
  */
 export function ghBlocksRead(check: GhCheck | undefined, source: ItemSource): boolean {
     if (providerTool(source) === 'az') return false;
+
     if (!check || check.result === 'missing' || check.result === 'logged-out') return true;
+
     return false;
 }
 
@@ -1038,7 +1076,9 @@ export type Kind = 'bug' | 'feature' | 'improvement' | 'concept' | 'decision' | 
 
 export function decisionType(item: Item): string | null {
     if (item.decisionMethod !== undefined) return item.decisionMethod;
+
     const label = item.labels.find((l) => l.startsWith('decision-'));
+
     return label ? label.slice('decision-'.length) : null;
 }
 
@@ -1047,6 +1087,7 @@ export function parseDecisionMethod(body: string): Item['decisionMethod'] {
     const method = /^Method:\s*(grill|prototype|research|task)\s*$/i
         .exec(body.split('\n')[0]?.trim() ?? '')?.[1]
         ?.toLowerCase();
+
     return (method as Item['decisionMethod']) ?? null;
 }
 
@@ -1064,12 +1105,19 @@ export const decisionMethodName = (item: Item): string | null =>
 /** The kind a ticket's labels give it. */
 export function labelKind(labels: readonly string[]): Kind {
     const has = (l: string) => labels.includes(l);
+
     if (has('concept')) return 'concept';
+
     if (labels.some((l) => l.startsWith('decision-'))) return 'decision';
+
     if (has('bug')) return 'bug';
+
     if (has('feature')) return 'feature';
+
     if (has('improvement')) return 'improvement';
+
     if (has('build')) return 'build';
+
     return 'issue';
 }
 
@@ -1082,6 +1130,7 @@ export function isBuild(item: Pick<Item, 'labels'>): boolean {
 export function kindLabel(item: Item): string {
     const { kind } = item;
     const type = decisionType(item);
+
     return kind === 'decision' && type ? `decision-${type}` : kind;
 }
 
@@ -1090,7 +1139,9 @@ export function kindLabel(item: Item): string {
 /** Running while any check runs, then failed if any failed, else passed. */
 export function checkState(checks: Checks | null): CheckState | null {
     if (!checks) return null;
+
     if (checks.running) return 'running';
+
     return checks.failed ? 'failed' : 'passed';
 }
 
@@ -1104,11 +1155,13 @@ interface ItemPr {
 /** The item's first linked PR; null when it links none. */
 export function itemPr(item: Pick<Item, 'linkedPrs'>): ItemPr | null {
     const pr = item.linkedPrs[0];
+
     return pr ? { url: pr.url, pipeline: pr.pipelineUnread ? null : pr } : null;
 }
 
 export function isSlow(checks: Checks, now: number): boolean {
     if (checkState(checks) !== 'running' || !checks.since) return false;
+
     return now - Date.parse(checks.since) >= SLOW_CHECKS_MS;
 }
 
@@ -1118,7 +1171,9 @@ export const DONE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function isRecentlyDone(item: Item, now: number): boolean {
     if (item.status !== 'Done') return false;
+
     const at = Date.parse(item.closedAt ?? item.updatedAt);
+
     return Number.isFinite(at) && now - at <= DONE_WINDOW_MS;
 }
 
@@ -1166,6 +1221,7 @@ export const decodePart = (part: string): string => {
 export const shownRepo = (repo: string): string => repo.split('/').map(decodePart).join('/');
 
 const REPO_TAG_PREFIX = 'repo-';
+
 /** The tag that records an Azure work item's repository: repo- and the repository's name as Azure shows it. */
 export const repoTag = (repo: string): string => `${REPO_TAG_PREFIX}${decodePart(repo.split('/').at(-1)!)}`;
 /** Whether the tag records a work item's repository; Azure keeps a tag's case, so the board ignores it. */
@@ -1177,8 +1233,10 @@ export const isRepoTag = (tag: string): boolean => tag.trim().toLowerCase().star
  */
 export function repoName(key: string, repos: readonly RepoConfig[]): string {
     if (!key.includes('/')) return key;
+
     const nameOf = (repo: string) => repo.split('/').at(-1);
     const name = nameOf(key)!;
+
     return shownRepo(repos.some((r) => !sameRepo(r.repo, key) && nameOf(r.repo) === name) ? key : name);
 }
 
@@ -1203,7 +1261,9 @@ export interface FactoryThreadContext {
     shapeSkill: string;
     azureReadOnly?: boolean;
 }
+
 const shellPath = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+
 function factoryEnvironment(context: FactoryThreadContext): string {
     return [
         'Use the factory installation and data folder below for this thread and every subagent.',
@@ -1220,8 +1280,10 @@ function factoryEnvironment(context: FactoryThreadContext): string {
         'Pass these exact paths and environment to every delegated task. The target repository needs no factory files or factory instructions in AGENTS.md or CLAUDE.md.',
     ].join('\n');
 }
+
 function shapeInstructions(item: Item, context?: FactoryThreadContext | null): string {
     if (!context) return `$lar-shape ${item.id}`;
+
     return `Shape ${item.id}. Read ${shellPath(context.shapeSkill)} and follow it.\nShaping is independent of implementation. Do not build unless the user later chooses Start build.\n\n${factoryEnvironment(context)}`;
 }
 
@@ -1252,12 +1314,14 @@ export function buildBranch(item: Item): string {
         .split(/[^a-z0-9]+/)
         .filter(Boolean)
         .slice(0, 5);
+
     return `${prefix}/${[item.number || item.id.slice(0, 8), ...words].join('-')}`;
 }
 
 /** The build message boards sent before thread names carried a phase, which a launch intent still unresolved may have started. */
 export function earlierBuildMessage(item: Item, larBuild: string, context?: FactoryThreadContext | null): string {
     const message = `Build ${item.id}. Read ${larBuild}/agents/builder.md and follow it.`;
+
     return context ? `${message}\n\n${factoryEnvironment(context)}` : message;
 }
 
@@ -1269,7 +1333,9 @@ export function buildMessage(item: Item, larBuild: string, context?: FactoryThre
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */
 export function isStale(data: BoardData, now: number): boolean {
     if (data.error) return true;
+
     if (!data.fetchedAt) return false;
+
     return now - Date.parse(data.fetchedAt) > data.refreshSeconds * 3 * 1000;
 }
 
@@ -1359,6 +1425,7 @@ export function buildAccessProblem(
     )
         .filter(([operation]) => access[operation] !== 'allowed')
         .map(([, name]) => name);
+
     return missing.length
         ? `Builds need verified access to ${missing.join(' and ')}. Recheck Project access in Settings.`
         : null;
@@ -1546,8 +1613,11 @@ export function activityUnavailable(data: BoardData, now: number, clientError?: 
  */
 export function workingAgain(item: Item, unavailable = false): boolean {
     if (item.status !== 'Verify' && item.status !== 'Ready to merge') return false;
+
     if (unavailable || item.paused || item.archived || item.needsYou || openQuestionThread(item)) return false;
+
     const current = currentBuildThread(item);
+
     return !!current?.currentRunning || delegatedWorkRunning(item);
 }
 
@@ -1558,7 +1628,9 @@ export function workingAgain(item: Item, unavailable = false): boolean {
 export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, unavailable = false): Item[] {
     return data.items.filter((item) => {
         if (item.kind === 'concept') return false;
+
         const start = startProgressOf(data, item.id, 'build');
+
         return (
             start?.phase === 'starting' ||
             start?.phase === 'may-have-started' ||
@@ -1571,14 +1643,22 @@ export function buildsAtWork(data: Pick<BoardData, 'items' | 'startProgress'>, u
 
 export function buildActivity(item: Item, stale = false, start?: StartProgress): { label: string; running: boolean } {
     if (start?.phase === 'starting') return { label: 'Starting', running: false };
+
     if (start?.phase === 'may-have-started') return { label: 'May have started', running: false };
+
     if (workingAgain(item, stale)) return { label: 'Working', running: true };
+
     if (!['In progress', 'Review', 'Ready'].includes(item.status)) return { label: item.status, running: false };
+
     const current = currentBuildThread(item);
+
     if (stale || item.paused || item.archived || item.needsYou)
         return { label: 'Activity unavailable', running: false };
+
     const running = !!current?.currentRunning || delegatedWorkRunning(item);
+
     if (!current && !running) return { label: 'Activity unavailable', running: false };
+
     if (!running)
         return {
             label:
@@ -1589,6 +1669,7 @@ export function buildActivity(item: Item, stale = false, start?: StartProgress):
                       : 'Activity unavailable',
             running: false,
         };
+
     // A builder can still be integrating or checking after its last slice finishes, before it records the next phase.
     if (
         item.buildPhase === 'implement' &&
@@ -1597,6 +1678,7 @@ export function buildActivity(item: Item, stale = false, start?: StartProgress):
     ) {
         return { label: 'Finishing build', running };
     }
+
     const phases: Record<string, string> = {
         plan: 'Planning',
         implement: 'Implementing',
@@ -1607,5 +1689,6 @@ export function buildActivity(item: Item, stale = false, start?: StartProgress):
         approve: 'Awaiting approval',
         retro: 'Retro',
     };
+
     return { label: phases[item.buildPhase ?? ''] ?? 'Working', running };
 }

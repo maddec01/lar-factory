@@ -28,37 +28,49 @@ export async function postAction<T extends object = object>(
     progress?: (value: Partial<T>) => void,
 ): Promise<ActionResult & Partial<T>> {
     useBoardStore.getState().beginWrite();
+
     try {
         const response = await fetch(path, {
             method: 'POST',
             headers: { ...writeHeaders(), ...(progress && { Accept: 'application/x-ndjson' }) },
             body: JSON.stringify(body),
         });
+
         if (response.headers.get('content-type')?.startsWith('application/x-ndjson') && response.body) {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let pending = '';
+
             try {
                 while (true) {
                     const chunk = await reader.read();
+
                     pending += decoder.decode(chunk.value, { stream: !chunk.done });
+
                     let newline;
+
                     while ((newline = pending.indexOf('\n')) >= 0) {
                         const event = JSON.parse(pending.slice(0, newline)) as {
                             progress?: Partial<T>;
                             result?: ActionResult & Partial<T>;
                         };
+
                         pending = pending.slice(newline + 1);
+
                         if (event.progress) progress?.(event.progress);
+
                         if (event.result) return event.result;
                     }
+
                     if (chunk.done) throw new Error('Incomplete progress response');
                 }
             } finally {
                 reader.releaseLock();
             }
         }
+
         const result = (await response.json()) as Partial<ActionResult & T>;
+
         return { ...result, error: result.error ?? (response.ok ? null : `Request failed (HTTP ${response.status}).`) };
     } catch {
         return { error: "Can't reach the board server. Try again." } as ActionResult & Partial<T>;
@@ -68,7 +80,9 @@ export async function postAction<T extends object = object>(
 /** Shows the board the server sent back with the action. Call inside the flushSync that shows the result. */
 export function receive(result: ActionResult): void {
     if (!result.board) return;
+
     const board = useBoardStore.getState();
+
     board.beginWrite();
     board.receive(result.board, 'action');
 }
@@ -93,28 +107,41 @@ async function runAction(
     show: (result: ActionResult) => string | undefined,
 ): Promise<ActionResult> {
     const actions = useActionStore.getState();
+
     actions.set(itemId, { phase: 'pending', kind });
+
     const result = await postAction(`/api/${kind}`, body);
+
     flushSync(() => {
         receive(result);
+
         const message = show(result);
+
         actions.set(itemId, message === undefined ? undefined : { phase: 'error', kind, message });
     });
+
     return result;
 }
 
 export async function queueItem(itemId: string): Promise<void> {
     if (!ready(itemId, 'data-queue')) return;
+
     const origin = useItemDialogStore.getState();
     const result = await runAction(itemId, 'queue', { itemId }, (result) => {
         const currentId = result.itemId ?? itemId;
         const item = itemOf(currentId);
+
         if (result.error || !item) return result.error ?? 'The item left the board.';
+
         const dialog = useItemDialogStore.getState();
+
         if (dialog.session !== origin.session || dialog.itemId !== itemId) return;
+
         if (currentId !== itemId) useItemDialogStore.setState({ itemId: currentId });
+
         if (origin.fromList) dialog.dismiss?.();
     });
+
     // The item stays on show, Queued, so focus goes to its Start.
     if (
         !result.error &&
@@ -127,7 +154,9 @@ export async function queueItem(itemId: string): Promise<void> {
 
 export async function backToList(itemId: string): Promise<void> {
     const item = itemOf(itemId);
+
     if (!ready(itemId, 'data-back-to-list') || !item) return;
+
     // A failure is a toast only: the dialog's footer goes back to its links.
     const result = await runAction(itemId, 'back-to-list', { itemId }, (result) => {
         notify(
@@ -136,18 +165,22 @@ export async function backToList(itemId: string): Promise<void> {
                 : { verb: 'Moved', item, to: 'List' },
         );
     });
+
     refocus([by(result.error ? 'data-back-to-list' : 'data-queue', itemId)]);
 }
 
 /** Opens Abandon's confirm dialog for the item. */
 export function askAbandon(itemId: string): void {
     const item = itemOf(itemId);
+
     if (item && !pending(itemId)) useAbandonStore.getState().ask(item);
 }
 
 export async function abandonItem(itemId: string) {
     const item = itemOf(itemId);
+
     if (!ready(itemId, 'data-abandon') || !item) return;
+
     // The confirmation retains failures until the user retries or cancels. On a notice's work it has choices a toast
     // would cover, so its failure raises none; List and Queued work keeps the toast.
     const result = await runAction(
@@ -159,14 +192,17 @@ export async function abandonItem(itemId: string) {
             else if (!abandonsNotice(item)) notify({ verb: 'Failed', item, message: result.error });
         },
     );
+
     // An abandoned item leaves the item dialog, which closes and hands focus back itself.
     if (result.error) refocus([by('data-abandon', itemId)]);
+
     return result;
 }
 
 /** Closes the ticket of work set aside in Archive. */
 export async function closeTicket(item: Item): Promise<void> {
     const result = await postAction('/api/close-ticket', { itemId: item.id });
+
     flushSync(() => {
         receive(result);
         notify(result.error ? { verb: 'Failed', item, ticket: true, message: result.error } : { verb: 'Closed', item });
@@ -180,6 +216,7 @@ export async function resolveNeedsYou(
     briefChoice?: 'keep' | 'reshape',
 ): Promise<ActionResult | undefined> {
     if (!ready(itemId, 'data-needs-you')) return;
+
     return runAction(itemId, 'needs-you', { itemId, choice, briefChoice }, () => undefined);
 }
 
@@ -191,6 +228,7 @@ export async function markDependencyMet(
     met: boolean,
 ): Promise<void> {
     if (!ready(itemId, 'data-dependency-met')) return;
+
     await runAction(
         itemId,
         'dependency-met',
@@ -217,13 +255,20 @@ export async function startAgain(
     model?: ModelChoice,
 ) {
     const actions = useActionStore.getState();
+
     if (pending(itemId)) return;
+
     actions.set(itemId, { phase: 'pending', kind: 'needs-you' });
+
     const result = await postAction<StartResult>('/api/start-again', { itemId, options, model });
+
     flushSync(() => {
         receive(result);
+
         if (remembersChoice(result)) useStartStore.getState().remember(model);
+
         actions.set(itemId, undefined);
     });
+
     return result;
 }

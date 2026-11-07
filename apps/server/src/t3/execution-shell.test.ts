@@ -4,6 +4,7 @@ import { readArchivedShells, subscribeExecutionShell } from './execution-protoco
 import type { ProjectProtocol } from './project-protocol.ts';
 
 const fixture = vi.hoisted(() => ({ accept: (_value: unknown) => {}, tag: '', payload: {} as unknown }));
+
 vi.mock('./project-subscription.ts', () => ({
     subscribeProjects: (
         _origin: URL,
@@ -15,6 +16,7 @@ vi.mock('./project-subscription.ts', () => ({
         fixture.accept = execution.accept;
         fixture.tag = execution.tag;
         fixture.payload = execution.payload;
+
         return () => {};
     },
 }));
@@ -26,6 +28,7 @@ it('keeps projects and active/archived threads during metadata refresh and appli
     const threads = [{ id: 'active' }];
     const archivedThreads = [{ id: 'archived' }];
     const snapshot = { snapshotSequence: 3, projects, threads, archivedThreads };
+
     fixture.accept({ kind: 'snapshot', snapshot });
     fixture.accept({
         kind: 'snapshot',
@@ -63,6 +66,7 @@ it('keeps projects and active/archived threads during metadata refresh and appli
 
 it('reads archived shells through their own RPC, and refuses a response that lacks them', async () => {
     const read = readArchivedShells(new URL('http://127.0.0.1:3773'), 'any', {} as ProjectProtocol);
+
     expect([fixture.tag, fixture.payload]).toEqual(['orchestration.getArchivedShellSnapshot', {}]);
     fixture.accept({ schemaVersion: 2, snapshotSequence: 7, projects: [], threads: [{ id: 'archived' }] });
     expect(await read).toMatchObject({

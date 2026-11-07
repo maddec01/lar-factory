@@ -76,6 +76,7 @@ export const useAddItemStore = create<AddItemState>()(
             setOpen: (open) => {
                 // Recorded work is done with; the next opening starts a new draft.
                 if (open && get().submission.phase === 'complete') get().reset();
+
                 set({ open });
             },
             setPane: (pane) => set({ pane }),
@@ -91,10 +92,13 @@ export const useAddItemStore = create<AddItemState>()(
                 })),
             submit: async (values) => {
                 const { submission } = get();
+
                 if (submission.phase !== 'editing' && submission.phase !== 'retry') return;
+
                 const retrying = submission.phase === 'retry';
                 const { data } = useBoardStore.getState();
                 let attempt: Attempt;
+
                 if (retrying) attempt = submission.attempt;
                 else {
                     try {
@@ -105,15 +109,18 @@ export const useAddItemStore = create<AddItemState>()(
                         };
                     } catch (err) {
                         set({ message: (err as Error).message });
+
                         return;
                     }
                 }
+
                 set({
                     submission: { phase: 'pending', attempt },
                     message: retrying ? 'Finishing this submission…' : 'Adding it to List…',
                 });
                 // A poll that started before this write would bring older data than its answer.
                 useBoardStore.getState().beginWrite();
+
                 try {
                     const response = await fetch('/api/items', {
                         method: 'POST',
@@ -124,6 +131,7 @@ export const useAddItemStore = create<AddItemState>()(
                         uncertain?: boolean;
                         board?: BoardData;
                     };
+
                     if (result.item && result.board) {
                         useBoardStore.getState().beginWrite();
                         useBoardStore.getState().receive(result.board, 'action');
@@ -149,11 +157,15 @@ export const useAddItemStore = create<AddItemState>()(
                     repo,
                     number: ticket.number,
                 });
+
                 if (!result.item) return result.error ?? 'Could not pick the ticket.';
+
                 receive(result);
                 set({ open: false });
+
                 if (result.created) notify({ verb: 'Added', item: result.item, to: 'List' });
                 else useItemDialogStore.getState().open(result.item.id);
+
                 return null;
             },
         }),
@@ -162,11 +174,13 @@ export const useAddItemStore = create<AddItemState>()(
             partialize: ({ values, submission, message, draft }) => ({ values, submission, message, draft }),
             merge: (saved, current) => {
                 const restored = { ...current, ...(saved as Partial<AddItemState>) };
+
                 if (restored.submission.phase === 'pending') {
                     restored.submission = { phase: 'retry', attempt: restored.submission.attempt };
                     restored.message =
                         'The submission response was lost. Retry this submission to recover its result without adding it twice.';
                 }
+
                 return restored;
             },
         },

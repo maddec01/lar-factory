@@ -14,6 +14,7 @@ type Shows = (row: Row) => boolean;
 
 function Rows({ rows }: { rows: Row[] }) {
     const data = useBoardStore((state) => state.data);
+
     return (
         <ol className="m-0 grid list-none p-0">
             {rows.map((row) => (
@@ -25,6 +26,7 @@ function Rows({ rows }: { rows: Row[] }) {
 
 export function Shaping({ shaping, shows }: { shaping: Row[]; shows: Shows }) {
     const rows = shaping.filter(shows);
+
     return (
         <Pane id="shaping" title="Shaping" status="Shaping" count={rows.length}>
             {rows.length ? (
@@ -40,6 +42,7 @@ export function Shaping({ shaping, shows }: { shaping: Row[]; shows: Shows }) {
 
 export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
     const rows = ready.filter(shows);
+
     return (
         <Pane id="ready" title="Ready to build" status="Ready" count={rows.length} right={<AutoBuildSwitch />}>
             {rows.length ? (
@@ -84,6 +87,7 @@ export function Build({ build, shows }: { build: Row[]; shows: Shows }) {
     const buildLimit = useBoardStore((state) => state.data.buildLimit);
     const rows = build.filter(shows);
     const running = useStatusActivity();
+
     return (
         <Pane
             id="build"

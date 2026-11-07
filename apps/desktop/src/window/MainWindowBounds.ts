@@ -13,6 +13,7 @@ import * as NodePath from 'node:path';
 
 export const MIN_MAIN_WINDOW_SIZE = { width: 1024, height: 700 } as const;
 export const DEFAULT_MAIN_WINDOW_SIZE = { width: 1280, height: 860 } as const;
+
 const MAIN_WINDOW_BOUNDS_PERSIST_DEBOUNCE_MS = 500;
 
 export interface DesktopWindowBounds {
@@ -32,8 +33,10 @@ type DisplayBounds = Pick<Electron.Rectangle, 'x' | 'y' | 'width' | 'height'>;
 /** Whole-number bounds at least the minimum size, or null. */
 function normalizeMainWindowBounds(value: unknown): DesktopWindowBounds | null {
     if (typeof value !== 'object' || value === null) return null;
+
     const { x, y, width, height } = value as Record<string, unknown>;
     const isInt = (n: unknown): n is number => Number.isInteger(n);
+
     return isInt(x) &&
         isInt(y) &&
         isInt(width) &&
@@ -61,6 +64,7 @@ export function resolveInitialMainWindowBounds(
     if (persistedBounds !== null && displays.some((display) => windowFitsWithinDisplay(persistedBounds, display))) {
         return persistedBounds;
     }
+
     return DEFAULT_MAIN_WINDOW_SIZE;
 }
 
@@ -78,6 +82,7 @@ export const atFile = (file: string): WindowStateSetting => ({
                 Record<keyof DesktopWindowState, unknown>
             >;
             const mainWindowBounds = normalizeMainWindowBounds(parsed?.mainWindowBounds);
+
             return {
                 mainWindowBounds,
                 mainWindowMaximized: mainWindowBounds !== null && parsed.mainWindowMaximized === true,
@@ -104,11 +109,13 @@ export const persistMainWindowBounds = (window: Electron.BrowserWindow, setting:
     let timer: ReturnType<typeof setTimeout> | undefined;
     const readPersistableBounds = (): DesktopWindowBounds | null => {
         if (window.isDestroyed()) return null;
+
         // Full screen, maximized and minimized keep the bounds the window returns to.
         const bounds =
             window.isFullScreen() || window.isMaximized() || window.isMinimized()
                 ? window.getNormalBounds()
                 : window.getBounds();
+
         return normalizeMainWindowBounds({
             x: Math.round(bounds.x),
             y: Math.round(bounds.y),
@@ -122,13 +129,16 @@ export const persistMainWindowBounds = (window: Electron.BrowserWindow, setting:
     };
     const flushBoundsPersist = () => {
         clearBoundsPersist();
+
         const bounds = readPersistableBounds();
+
         if (bounds !== null) Effect.runSync(setting.write(bounds, window.isMaximized()));
     };
     const scheduleBoundsPersist = () => {
         clearBoundsPersist();
         timer = setTimeout(flushBoundsPersist, MAIN_WINDOW_BOUNDS_PERSIST_DEBOUNCE_MS);
     };
+
     window.on('resize', scheduleBoundsPersist);
     window.on('move', scheduleBoundsPersist);
     window.on('maximize', scheduleBoundsPersist);
@@ -136,5 +146,6 @@ export const persistMainWindowBounds = (window: Electron.BrowserWindow, setting:
     // Closing the window, or installing an update, closes it without before-quit.
     window.on('close', flushBoundsPersist);
     window.on('closed', clearBoundsPersist);
+
     return flushBoundsPersist;
 };

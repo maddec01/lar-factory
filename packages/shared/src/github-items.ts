@@ -132,18 +132,24 @@ const STATUS_CONTEXT_OUTCOMES: Record<string, CheckOutcome> = {
 /** Counts a PR's checks by outcome; null when it has none. */
 export function normalizeChecks(rollup: RawLinkedPr['statusCheckRollup']): Checks | null {
     if (!rollup) return null;
+
     const checks: Checks = { passed: 0, failed: 0, running: 0, total: 0, since: null };
     const tally = (counts: RawStateCount[], outcomes: Record<string, CheckOutcome>) => {
         for (const { state, count } of counts) {
             const outcome = outcomes[state];
+
             if (!outcome) continue;
+
             checks[outcome] += count;
             checks.total += count;
         }
     };
+
     tally(rollup.contexts.checkRunCountsByState, CHECK_RUN_OUTCOMES);
     tally(rollup.contexts.statusContextCountsByState, STATUS_CONTEXT_OUTCOMES);
+
     if (!checks.total) return null;
+
     // A rerun on the same head keeps its finished checks, so time only the running ones.
     // A queued check has no start yet; its suite's creation still times a stuck runner.
     checks.since =
@@ -156,6 +162,7 @@ export function normalizeChecks(rollup: RawLinkedPr['statusCheckRollup']): Check
             .map((n) => n.startedAt ?? n.checkSuite?.createdAt ?? n.createdAt)
             .filter((at) => !!at)
             .sort()[0] ?? null;
+
     return checks;
 }
 
@@ -178,6 +185,7 @@ export function normalizeMergeState(status: string | undefined): MergeState {
 
 function normalizeLinkedPr({ id: _id, statusCheckRollup, mergeStateStatus, state, ...pr }: RawLinkedPr): LinkedPr {
     const prState = state === 'MERGED' ? 'merged' : state === 'CLOSED' ? 'closed' : 'open';
+
     return {
         ...pr,
         state: prState,
@@ -189,7 +197,9 @@ function normalizeLinkedPr({ id: _id, statusCheckRollup, mergeStateStatus, state
 /** Open, or closed as done or not planned: an issue closed as completed (or before GitHub kept a reason) is done. */
 function closing(c: RawContent): Pick<Item, 'state' | 'closedAs'> {
     if (c.state !== 'CLOSED') return { state: 'open', closedAs: null };
+
     const notPlanned = c.stateReason === 'NOT_PLANNED' || c.stateReason === 'DUPLICATE';
+
     return { state: 'closed', closedAs: notPlanned ? 'not-planned' : 'done' };
 }
 
@@ -237,7 +247,9 @@ function rawSlices(raw: RawItem, builds: ReadonlySet<string>): RawIssueRef[] {
 /** GitHub's sub-issue counts, except that a build counts only its `build` sub-issues: its slices show in its slice bar. */
 function subIssueCounts(raw: RawItem, builds: ReadonlySet<string>): Item['subIssues'] {
     if (!isBuild({ labels: rawLabels(raw) })) return raw.content?.subIssuesSummary ?? { total: 0, completed: 0 };
+
     const found = rawSubIssues(raw).filter((s) => isBuildRef(s, builds));
+
     return { total: found.length, completed: found.filter((b) => b.state === 'CLOSED').length };
 }
 
@@ -245,6 +257,7 @@ function subIssueCounts(raw: RawItem, builds: ReadonlySet<string>): Item['subIss
 function normalizeSlices(raws: RawIssueRef[]): Slice[] {
     return raws.flatMap((raw) => {
         const progress = sliceProgress(raw.state, raw.stateReason ?? null);
+
         return progress ? [{ ...normalizeIssueRef(raw), progress }] : [];
     });
 }
@@ -252,7 +265,9 @@ function normalizeSlices(raws: RawIssueRef[]): Slice[] {
 /** Turns one raw item into the board's Item, reading its statuses `from` its item source's store; null for items we can't see. */
 export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {}): Item | null {
     const c = raw.content;
+
     if (!c) return null;
+
     const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
     const closed = closing(c);
     const statuses = labelStatuses(rawLabels(raw));
@@ -286,14 +301,19 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
         linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
         slices: normalizeSlices(rawSlices(raw, builds)),
     };
+
     try {
         const tracker = readTrackerStructure(c.body ?? '');
+
         if (tracker) {
             item.tracker = tracker;
             item.kind = tracker.kind;
+
             if (tracker.map) item.map = parseConceptMap(tracker.map);
+
             if (tracker.parent) {
                 const parent = trackerReference(tracker.parent.url)!;
+
                 item.parent = {
                     number: parent.number,
                     repo: tracker.parent.repository ?? parent.repository,
@@ -302,27 +322,35 @@ export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {
                     state: 'open',
                 };
             }
+
             if (tracker.parts) item.subIssues = { total: tracker.parts.length, completed: 0 };
+
             item.blockers =
                 tracker.blockers?.map((blocker) => {
                     const ref = trackerReference(blocker.url)!;
+
                     return { number: ref.number, repo: ref.repository, title: blocker.title, state: 'open' as const };
                 }) ?? item.blockers;
         }
     } catch (error) {
         item.sync = { state: 'error', message: (error as Error).message };
     }
+
     if (c.assignees)
         item.assignee =
             c.assignees.nodes
                 .map((a) => a.login)
                 .sort()
                 .join(', ') || null;
+
     if (c.trackerError) item.sync = { state: 'error', message: c.trackerError };
+
     if (!item.map && item.kind === 'concept') {
         const map = bodyMap(c.body);
+
         if (map) item.map = map;
     }
+
     return item;
 }
 
@@ -335,23 +363,31 @@ export function normalizeItems(raws: RawItem[], searched: Searched = {}): Item[]
     const items: Item[] = [];
     const bodies = new Map<string, string | undefined>();
     const slices = new Set<string>();
+
     for (const raw of raws) {
         const item = normalizeItem(raw, searched);
+
         if (!item) continue;
+
         items.push(item);
         bodies.set(item.id, raw.content?.body);
         // A slice closed as not planned is hidden from its build, but it's still no board item.
         for (const s of rawSlices(raw, searched.builds ?? new Set()))
             slices.add(refKey(s.repository.nameWithOwner, s.number));
     }
+
     const board = items.filter((i) => i.closedAs !== 'not-planned' && !slices.has(refKey(i.repo, i.number)));
     // An item with sub-issues on the board is a dossier too, so its body's map sections show, when it has any.
     const parents = parentKeys(board);
+
     for (const item of board) {
         if (item.map || !parents.has(refKey(item.repo, item.number))) continue;
+
         const map = bodyMap(bodies.get(item.id));
+
         if (map) item.map = map;
     }
+
     return board;
 }
 
@@ -362,7 +398,9 @@ const parentKeys = (items: readonly Item[]) =>
 /** A map from an issue body, only when at least one section has parsed content. */
 function bodyMap(body: string | undefined): ConceptMap | undefined {
     if (!body) return undefined;
+
     const map = parseConceptMap(body);
+
     return map.destination || map.decisions.length || map.fog.length || map.check?.title || map.check?.steps.length
         ? map
         : undefined;
@@ -371,6 +409,7 @@ function bodyMap(body: string | undefined): ConceptMap | undefined {
 /** The issues the line shows as dossiers, whose bodies hold their maps: every concept, and every item with a sub-issue on the board. */
 export function rawDossiers(raws: RawItem[], searched: Searched = {}): RawItem[] {
     const parents = parentKeys(normalizeItems(raws, searched));
+
     return raws.filter((raw) => isRawConcept(raw) || parents.has(rawKey(raw)));
 }
 
@@ -396,5 +435,6 @@ export function buildSubIssueSearches(raws: RawItem[]): string[] {
                 .map((s) => s.repository.nameWithOwner),
         ),
     );
+
     return [...repos].map((repo) => `is:issue label:build repo:${repo}`);
 }

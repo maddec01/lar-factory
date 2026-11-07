@@ -11,6 +11,7 @@ const isProvisional = (stats: Item['stats']): boolean => typeof stats === 'objec
 export function createShownStats(overcounted: ReadonlySet<string>) {
     /** While an item shows provisional figures, the figures retention may keep instead; the first read past that replaces them. */
     const held = new Map<string, Item['stats']>();
+
     return {
         /**
          * The figures an item shows: the ones frozen in its latest merged linked PR's block once no linked PR is open, else those of
@@ -32,17 +33,24 @@ export function createShownStats(overcounted: ReadonlySet<string>) {
             const kept = (): Item['stats'] => (isProvisional(before) ? before : (known ?? previous));
             const shown = (): Item['stats'] => {
                 if (!withStats) return kept();
+
                 const merged = mergedStats({ ...item, stats: known }, read?.provisional ? undefined : live);
+
                 if (merged) return merged;
+
                 if (!read) return kept();
+
                 const figures = retainStats(known, live);
+
                 return read.provisional && typeof live === 'object'
                     ? { ...(figures as ItemStats), provisional: true }
                     : figures;
             };
             const stats = shown();
+
             if (isProvisional(stats)) held.set(item.id, previous);
             else held.delete(item.id);
+
             return stats;
         },
         /** Forgets the figures held for items no longer on the board, `ids`. */

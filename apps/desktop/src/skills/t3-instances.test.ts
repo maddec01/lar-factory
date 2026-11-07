@@ -9,7 +9,9 @@ import * as T3Instances from './t3-instances.ts';
 /** A PATH whose `t3` prints its arguments and exits with `code`. */
 const fakeT3 = (code: number) => {
     const bin = tempDir('fake-t3-');
+
     NodeFS.writeFileSync(NodePath.join(bin, 't3'), `#!/bin/sh\necho "$@"\nexit ${code}\n`, { mode: 0o755 });
+
     return { PATH: bin };
 };
 
@@ -18,8 +20,11 @@ describe('runT3', () => {
         Effect.gen(function* () {
             const run = T3Instances.runT3(fakeT3(0));
             const answer = yield* Effect.promise(() => run(['auth', 'session'], new AbortController().signal));
+
             assert.deepStrictEqual(answer, { code: 0, stdout: 'auth session\n' });
+
             const failed = yield* Effect.promise(() => T3Instances.runT3(fakeT3(3))([], new AbortController().signal));
+
             assert.strictEqual(failed.code, 3);
         }),
     );
@@ -29,6 +34,7 @@ describe('runT3', () => {
             const answer = yield* Effect.promise(() =>
                 T3Instances.runT3({ PATH: tempDir('no-t3-') })([], new AbortController().signal),
             );
+
             assert.strictEqual(answer.code, null);
         }),
     );
@@ -50,6 +56,7 @@ describe('discover', () => {
                 { T3_SERVER_RUNTIME: NodePath.join(dir, 'missing.json'), PATH: dir },
                 dir,
             )(dir);
+
             assert.deepStrictEqual(answer, { available: false, reason: 'not-running' });
         }),
     );

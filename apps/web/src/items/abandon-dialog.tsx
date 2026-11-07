@@ -26,28 +26,39 @@ function useNoticeCleanup(itemId: string | null) {
     const [failure, setFailure] = useState<{ message: string; combined: boolean } | null>(null);
     // Only the newest inspection answers, as the server keeps only its token.
     const latest = useRef(0);
+
     async function inspect(id: string, keep = false) {
         const run = ++latest.current;
+
         setInspected(false);
         setFailure(null);
+
         const result = await inspectCleanup(id);
+
         if (run !== latest.current) return;
+
         if (result.error || !result.token || !result.plans) setUninspected(result.error ?? 'It gave no answer.');
         else choices.offer({ token: result.token, plans: result.plans }, keep);
+
         setInspected(true);
     }
+
     // StrictMode starts an effect twice, and one read answers for both.
     const opened = useRef<string | null>(null);
+
     useEffect(() => {
         if (opened.current === itemId) return;
+
         opened.current = itemId;
         latest.current++;
         choices.reset();
         setUninspected(null);
         setFailure(null);
         setInspected(false);
+
         if (itemId) void inspect(itemId);
     }, [itemId]);
+
     return {
         choices,
         uninspected,
@@ -63,10 +74,15 @@ function useNoticeCleanup(itemId: string | null) {
         /** Runs the ticked steps once: whether Abandon may go on. Execution uses up the token, so a retry inspects again. */
         async run(id: string, combined: boolean): Promise<boolean> {
             if (!choices.cleanup || (!choices.local && !choices.remote)) return true;
+
             const cleaned = await executeCleanup(id, choices.selection());
+
             choices.drop();
+
             const message = cleaned.error ?? cleaned.errors?.join(' ');
+
             if (message) setFailure({ message, combined });
+
             return !message;
         },
     };
@@ -86,7 +102,9 @@ export function AbandonDialog() {
     const [pending, setPending] = useState(false);
     const [unknown, setUnknown] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
     if (!open || !item) return null;
+
     const closing = step === 'close-ticket';
     const prompt = closing ? closeTicketPrompt(item) : abandonPrompt(item);
     const dismiss = () => {
@@ -98,32 +116,43 @@ export function AbandonDialog() {
     };
     const confirm = async (combined = false, withoutCleanup = false) => {
         if (submitting.current) return;
+
         if (!withoutCleanup && notice.choices.asksLoss()) return;
+
         submitting.current = true;
         setPending(true);
         setError(null);
+
         if (closing) {
             await closeTicket(item);
             setPending(false);
             submitting.current = false;
             close();
+
             return;
         }
+
         if (withoutCleanup) notice.skip();
         else if (!(await notice.run(item.id, combined))) {
             setPending(false);
             submitting.current = false;
+
             return;
         }
+
         if (!combined) {
             if (unknown) {
                 setPending(false);
                 submitting.current = false;
+
                 return;
             }
+
             const result = await abandonItem(item.id);
+
             setPending(false);
             submitting.current = false;
+
             if (result?.error)
                 setError(
                     ticketClosed.current
@@ -134,17 +163,23 @@ export function AbandonDialog() {
                 ticketClosed.current = false;
                 close();
             }
+
             return;
         }
+
         let result = await postAction('/api/abandon-and-close', { itemId: item.id });
+
         if (result.error === "Can't reach the board server. Try again.") {
             result = await postAction('/api/abandon-and-close', { itemId: item.id });
+
             if (result.error === "Can't reach the board server. Try again.")
                 result.error =
                     'The outcome is unknown. Restore the connection and try again to reconcile the work and ticket.';
         }
+
         if (result.error?.startsWith('The ticket is closed, but the work remains on the board.'))
             ticketClosed.current = true;
+
         setUnknown(
             result.error ===
                 'The outcome is unknown. Restore the connection and try again to reconcile the work and ticket.',
@@ -152,6 +187,7 @@ export function AbandonDialog() {
         receive(result);
         setPending(false);
         submitting.current = false;
+
         if (result.error) setError(result.error);
         else {
             setError(null);
@@ -161,6 +197,7 @@ export function AbandonDialog() {
     };
     const loss = notice.choices.confirmLoss;
     const failedCombined = !!notice.failure?.combined && closesTicketOnAbandon(item);
+
     return (
         <Modal onClose={dismiss}>
             {/* ninna-ui's Modal drops the description from aria-describedby, so the detail names itself. */}

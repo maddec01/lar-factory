@@ -34,8 +34,10 @@ const saveReads: SaveReads = {
         if (source.kind === 'issues') {
             // Prove list access without loading every issue and its PR evidence during Add.
             await checkIssueListAccess(repo);
+
             return;
         }
+
         await checkAzureSourceAccess(repo, source.team);
     },
 };
@@ -58,14 +60,18 @@ function answersOf({
 }: Record<string, unknown>): LocalSetupAnswers | null {
     if ([createIssuesFromAddItem, createIssuesFromRetro, writeRefinedSpec].some((value) => typeof value !== 'boolean'))
         return null;
+
     if (vocabulary !== undefined && !isVocabularyMapping(vocabulary)) return null;
+
     const docs =
         isRecord(domainDocs) &&
         (domainDocs.kind === 'off' ||
             (domainDocs.kind === 'repository' &&
                 typeof domainDocs.glossary === 'string' &&
                 typeof domainDocs.adrs === 'string'));
+
     if (structureSync !== undefined && typeof structureSync !== 'boolean') return null;
+
     if (
         typeof projectId !== 'string' ||
         (role !== undefined && typeof role !== 'string') ||
@@ -74,6 +80,7 @@ function answersOf({
         !strings(skills)
     )
         return null;
+
     return {
         ...(vocabulary === undefined ? {} : { vocabulary }),
         projectId,
@@ -102,6 +109,7 @@ export async function saveSetup(
 ): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }> {
     const { repo, replaces, connections } = input;
     const answers = answersOf(input);
+
     if (
         !isRepo(repo) ||
         !answers ||
@@ -110,39 +118,53 @@ export async function saveSetup(
     ) {
         return { status: 400, error: ANSWERS };
     }
+
     const { role, itemSource, domainDocs, skills } = answers;
     const fits = validateRepositorySettings({ role, itemSource, domainDocs, skills }, onAzure(repo));
+
     if (fits) return { status: 400, error: `${repo}: ${fits}.` };
+
     try {
         await reads.source?.(repo, answers.itemSource);
     } catch (err) {
         return { status: 403, error: `Can't read the selected issue list. ${message(err)}` };
     }
+
     const access = await reads.access(repo).catch(() => ({}) as Awaited<ReturnType<SaveReads['access']>>);
+
     if (answers.vocabulary && Object.keys(answers.vocabulary).length) {
         const discovery = await discoverVocabulary(repo, reads.vocabulary);
+
         for (const term of Object.values(answers.vocabulary)) {
             const selectionProblem = vocabularySelectionProblem(term, discovery);
+
             if (selectionProblem) return { status: 400, error: selectionProblem };
+
             for (const operation of [
                 ...(term.type === null ? [] : ['type-ticket' as const]),
                 ...(term.labels.length ? ['tag-ticket' as const] : []),
             ]) {
                 const problem = writeAccessProblem(repo, operation, access);
+
                 if (problem) return { status: 403, error: problem };
             }
         }
     }
+
     try {
         if (input.newLabels !== undefined) {
             if (!isRecord(input.newLabels)) throw new Error('Choose vocabulary kinds for new labels.');
+
             const discovery = await discoverVocabulary(repo, reads.vocabulary);
             const vocabulary = { ...answers.vocabulary };
+
             for (const [key, names] of Object.entries(input.newLabels)) {
                 if (!isVocabularyMapping({ [key]: { type: null, labels: [] } }))
                     throw new Error('Choose a vocabulary kind.');
+
                 const labels = await saveVocabularyLabels(repo, names, discovery, access, reads.createLabel);
                 const term = vocabulary[key as keyof typeof vocabulary] ?? { type: null, labels: [] };
+
                 vocabulary[key as keyof typeof vocabulary] = {
                     ...term,
                     labels: [...new Set([...term.labels, ...labels])],
@@ -150,9 +172,13 @@ export async function saveSetup(
             }
             answers.vocabulary = vocabulary;
         }
+
         const list = saveOnboarded(repo, replaces ?? null, dir);
+
         saveLocalSetup(repo, answers, access, dir);
+
         if (connections) saveConnections(repo, connections, dir);
+
         return { onboarding: stillOnboarding(list) };
     } catch (err) {
         return { status: 409, error: message(err) };

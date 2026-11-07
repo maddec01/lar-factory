@@ -22,12 +22,16 @@ type Lineage = { parentThreadId?: string; rootThreadId?: string } | undefined;
 function ancestorsOf(id: string, lineages: Map<unknown, Lineage>): Set<string> {
     const above = new Set<string>();
     let parent = lineages.get(id)?.parentThreadId;
+
     while (parent && parent !== id && !above.has(parent)) {
         above.add(parent);
         parent = lineages.get(parent)?.parentThreadId;
     }
+
     const root = lineages.get(id)?.rootThreadId;
+
     if (root && root !== id) above.add(root);
+
     return above;
 }
 
@@ -58,12 +62,16 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
     const shellsById = new Map<string, Record<string, unknown>>();
     const lineages = new Map<unknown, Lineage>();
     const working: Record<string, unknown>[] = [];
+
     for (const shell of shells) {
         if (typeof shell.id !== 'string' || shell.deletedAt) continue;
+
         if (typeof shell.updatedAt !== 'string' || !Number.isFinite(Date.parse(shell.updatedAt)))
             throw Error('Invalid execution timestamp');
+
         shellsById.set(shell.id, shell);
         lineages.set(shell.id, shell.lineage as Lineage);
+
         if (
             shell.pendingRuntimeRequest ||
             ACTIVITY.has(statusOf(shell)) ||
@@ -71,30 +79,44 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
         )
             working.push(shell);
     }
+
     const liveChildren = new Set<string>();
     const runningChildren = new Set<string>();
     const needsYouChildren = new Set<string>();
+
     for (const shell of working) {
         const id = shell.id as string;
+
         if (shellsById.get(id) !== shell) continue;
+
         const status = statusOf(shell);
         const live = !!shell.pendingRuntimeRequest || ACTIVITY.has(status);
         // A thread's background tasks carry on after its turn ends, so it and its ancestors are still at work.
         const background = Array.isArray(shell.pendingBackgroundTasks) && shell.pendingBackgroundTasks.length > 0;
+
         if (background) runningChildren.add(id);
+
         const running = !shell.pendingRuntimeRequest && status === 'running';
+
         for (const ancestor of ancestorsOf(id, lineages)) {
             if (live) liveChildren.add(ancestor);
+
             if (background || running) runningChildren.add(ancestor);
+
             if (shell.pendingRuntimeRequest) needsYouChildren.add(ancestor);
         }
     }
+
     const threads = new Map<string, ItemThread>();
     const threadOf = (id: string): ItemThread | undefined => {
         const found = threads.get(id);
+
         if (found) return found;
+
         const shell = shellsById.get(id);
+
         if (!shell) return undefined;
+
         const status = statusOf(shell);
         const state: ItemThread['state'] = shell.pendingRuntimeRequest
             ? 'needs you'
@@ -115,9 +137,12 @@ export function executionItemThreads(shells: Record<string, unknown>[]) {
             ...(liveChildren.has(id) ? { hasLiveChildren: true } : {}),
             ...(needsYouChildren.has(id) ? { childNeedsYou: true } : {}),
         };
+
         threads.set(id, thread);
+
         return thread;
     };
+
     /** The recorded threads T3 shows, newest first by `orderedBy` and archived ones last, since archiving updates a thread; undefined for work with no recorded thread. */
     return (threadIds: readonly string[]): ItemThread[] | undefined =>
         threadIds.length
@@ -143,19 +168,28 @@ export function activityFamilies(shells: Record<string, unknown>[]) {
     const families = new Map<string, ActivityFamily>();
     const familyOf = (id: string) =>
         families.get(id) ?? families.set(id, { threads: new Set([id]), background, commandRunning: false }).get(id)!;
+
     for (const shell of live) {
         const id = shell.id as string;
         const tasks = pendingTasks(shell);
+
         if (!tasks.length && !RUNNING.has(statusOf(shell))) continue;
+
         const commandRunning = tasks.some((task) => task.kind !== 'subagent');
+
         for (const above of [id, ...ancestorsOf(id, lineages)]) {
             const family = familyOf(above);
+
             family.threads.add(id);
+
             const parent = lineages.get(id)?.parentThreadId;
+
             if (parent && above !== id) family.threads.add(parent);
+
             family.commandRunning ||= commandRunning;
         }
     }
+
     return (threadId: string): ActivityFamily =>
         families.get(threadId) ?? { threads: new Set([threadId]), background, commandRunning: false };
 }
@@ -192,22 +226,28 @@ let current:
     | undefined;
 /** Each shell's JSON. T3's events replace a shell's record rather than change it, so a record's JSON never goes stale. */
 const shellJson = new WeakMap<Record<string, unknown>, string>();
+
 function fingerprintOf(shell: Record<string, unknown>): string {
     let json = shellJson.get(shell);
+
     if (json === undefined) {
         json = JSON.stringify(shell);
         shellJson.set(shell, json);
     }
+
     return json;
 }
 
 /** T3's runtime file as this synchronous pass read it, as a refresh asks once per item and slice. */
 let runtimeNow: { key: string; origin: unknown; serverVersion: unknown; running: boolean } | undefined;
+
 function readRuntime() {
     if (runtimeNow) return runtimeNow;
+
     const path = serverRuntimePath(process.env);
     const runtime = readJsonRecord(path);
     const key = JSON.stringify([path, runtime?.origin, runtime?.serverVersion, runtime?.pid]);
+
     runtimeNow = {
         key,
         origin: runtime?.origin,
@@ -217,6 +257,7 @@ function readRuntime() {
     queueMicrotask(() => {
         runtimeNow = undefined;
     });
+
     return runtimeNow;
 }
 
@@ -230,15 +271,21 @@ export const protocolAwaitingFirstShell = (): boolean => !!current && !current.a
 export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] | 'unavailable' | undefined {
     const runtime = readRuntime();
     const { key } = runtime;
+
     if (!runtime.running || typeof runtime.origin !== 'string') {
         current?.stop();
         current = undefined;
+
         return 'unavailable';
     }
+
     if (current?.key !== key) {
         current?.stop();
+
         const state: NonNullable<typeof current> = { key, stop() {}, available: false };
+
         current = state;
+
         try {
             const origin = new URL(runtime.origin);
             const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
@@ -251,25 +298,37 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
             let epoch = 0;
             const drain = () => {
                 if (current !== state || !state.available) return;
+
                 for (const [id, shell] of queued) {
                     if (active.size >= 8) break;
+
                     if (active.has(id)) continue;
+
                     queued.delete(id);
+
                     if ((retryAt.get(id) ?? 0) > Date.now()) continue;
+
                     const fingerprint = fingerprintOf(shell);
+
                     if (fingerprints.get(id) === fingerprint && entries.get(id)?.availability === 'available') continue;
+
                     active.add(id);
+
                     const startedEpoch = epoch;
+
                     void readExecution(origin, version, protocol, id)
                         .catch((): ExecutionRead => ({ availability: 'unavailable' }))
                         .then((result) => {
                             if (current !== state || epoch !== startedEpoch) return;
+
                             const observation = result.observation && {
                                 ...result.observation,
                                 projection: statsProjection(result.observation.projection),
                             };
+
                             entries.set(id, { ...result, observation: observation ?? entries.get(id)?.observation });
                             fingerprints.set(id, fingerprint);
+
                             if (result.availability !== 'available') retryAt.set(id, Date.now() + 1000);
                             else retryAt.delete(id);
                         })
@@ -279,18 +338,22 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
                         });
                 }
             };
+
             state.demand = (shells) => {
                 for (const shell of shells) {
                     if (typeof shell.id !== 'string' || (retryAt.get(shell.id) ?? 0) > Date.now()) continue;
+
                     if (
                         fingerprints.get(shell.id) === fingerprintOf(shell) &&
                         entries.get(shell.id)?.availability === 'available'
                     )
                         continue;
+
                     queued.set(shell.id, shell);
                 }
                 drain();
             };
+
             let archivedReading = false;
             let archivedReadAt = -Infinity;
             let archivedFresh = false;
@@ -320,30 +383,40 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
                 state.activityFamilies = undefined;
                 lastSeen = { lookup: state.lookup, observedAt: state.observedAt! };
             };
+
             state.archivedCurrent = () => archivedFresh && Date.now() - archivedReadAt < ARCHIVED_READ_MS;
             state.archivedAnswered = () => archivedAnswered;
             state.archivedFailed = () => archivedFailed;
             state.demandArchived = () => {
                 if (!state.available || archivedReading || Date.now() - archivedReadAt < ARCHIVED_READ_MS) return;
+
                 archivedReading = true;
                 archivedReadAt = Date.now();
+
                 const startedEpoch = archivedEpoch;
+
                 void readArchivedShells(origin, version, protocol)
                     .catch((): ThreadFamilyRead => ({ availability: 'unavailable' }))
                     .then((read) => {
                         if (current !== state) return;
+
                         const threads = read.availability === 'available' ? read.observation?.threads : undefined;
+
                         try {
                             if (!threads) throw Error('T3 archived threads unavailable');
+
                             executionItemThreads(threads);
                         } catch {
                             archivedFresh = false;
                             archivedFailed = startedEpoch === archivedEpoch;
+
                             return;
                         }
+
                         archivedFailed = false;
                         lastArchived = threads;
                         showShells();
+
                         // A thread that left the active shells during the read may be missing from its answer.
                         if (startedEpoch === archivedEpoch) archivedFresh = archivedAnswered = true;
                         else archivedReadAt = -Infinity;
@@ -362,8 +435,10 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
                     retryAt.clear();
                     forgetArchived();
                 }
+
                 state.shell = read;
                 state.available = false;
+
                 if (read.availability === 'available' && read.observation) {
                     // Shell events already contain status and runtime requests. History reads must not delay those facts.
                     try {
@@ -372,7 +447,9 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
                             ...(read.observation.snapshot.archivedThreads as Record<string, unknown>[]),
                         ];
                         const ids = new Set(shells.map((shell) => shell.id));
+
                         if ([...(state.shellIds ?? [])].some((id) => !ids.has(id))) forgetArchived();
+
                         state.shells = shells;
                         state.shellIds = ids;
                         state.observedAt = read.observation.observedAt;
@@ -388,14 +465,21 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
             state.shell = { availability: 'unavailable' };
         }
     }
+
     if (!threadIds.length) return undefined;
+
     if (current.available) {
         if (threadIds.some((id) => !current!.shellIds?.has(id))) current.demandArchived?.();
+
         return current.lookup?.(threadIds);
     }
+
     const seen = lastSeen?.lookup(threadIds);
+
     if (!lastSeen || seen?.length !== threadIds.length) return 'unavailable';
+
     const { observedAt } = lastSeen;
+
     return seen.map((thread) => ({ ...thread, observedAt }));
 }
 
@@ -409,7 +493,9 @@ export function protocolStartedThread(
     known: readonly string[],
 ): StartedThread | null {
     protocolItemThreads([]);
+
     if (!current?.available) throw Error('T3 execution unavailable');
+
     const candidates = (current.shells ?? []).filter(
         (shell) =>
             shell.projectId === projectId &&
@@ -418,8 +504,11 @@ export function protocolStartedThread(
             !known.includes(shell.id) &&
             messages.some((message) => titledFrom(shell.title, message)),
     );
+
     current.demand?.(candidates);
+
     if (candidates.some((shell) => !executionAvailable(shell))) throw Error('T3 execution unavailable');
+
     const matches = new Set(
         candidates
             .filter((shell) => {
@@ -427,12 +516,16 @@ export function protocolStartedThread(
                     ?.get(String(shell.id))
                     ?.observation?.projection.messages.filter((entry) => entry.role === 'user')
                     .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))[0];
+
                 return messages.some((message) => first?.text === message);
             })
             .map((shell) => String(shell.id)),
     );
+
     if (matches.size !== 1) return null;
+
     const [threadId] = matches;
+
     return { threadId: threadId!, title: String(candidates.find((shell) => shell.id === threadId)!.title) };
 }
 
@@ -448,9 +541,12 @@ function executionAvailable(shell: Record<string, unknown>): boolean {
 /** Thread-ID lookup for the future switch/import; retained facts never imply availability. */
 export function protocolThreadById(threadId: string): ExecutionRead {
     protocolItemThreads([]);
+
     const read = current?.reads?.get(threadId);
     const shell = current?.shownById?.get(threadId);
+
     if (shell) current?.demand?.([shell]);
+
     return {
         availability: shell && executionAvailable(shell) && read ? read.availability : 'unavailable',
         ...(read?.observation ? { observation: read.observation } : {}),
@@ -471,6 +567,7 @@ const hasHiddenWork = ({ activityRunStatus, pendingBackgroundTasks }: Record<str
 /** Whether the thread or a descendant T3 still has might be at work. */
 function mayBeLive(threadId: string, shells: Record<string, unknown>[]): boolean {
     const lineages = new Map(shells.map((shell) => [shell.id, shell.lineage as Lineage]));
+
     return shells.some(
         (shell) =>
             !shell.deletedAt &&
@@ -485,20 +582,28 @@ function mayBeLive(threadId: string, shells: Record<string, unknown>[]): boolean
  */
 export function threadCleanupState(threadId: string): ThreadCleanupState {
     protocolItemThreads([]);
+
     if (!current?.available) return 'unavailable';
+
     if (!current.shellIds?.has(threadId) && !current.archivedCurrent?.()) {
         current.demandArchived?.();
+
         return 'unavailable';
     }
+
     const shell = current.shownById?.get(threadId);
+
     if (!shell || shell.deletedAt) return 'absent';
+
     return { archived: !!shell.archivedAt, settled: isSettled(shell), live: mayBeLive(threadId, current.shownShells!) };
 }
 
 /** The current shells' activity families, worked out once per snapshot when a pass first asks; undefined while T3 can't be read, so no read can pass as current. */
 export function protocolActivityFamilies(): ReturnType<typeof activityFamilies> | undefined {
     protocolItemThreads([]);
+
     if (!current?.available || !current.shownShells) return undefined;
+
     return (current.activityFamilies ??= activityFamilies(current.shownShells));
 }
 
@@ -520,10 +625,12 @@ export type StatsInputs = Awaited<ReturnType<typeof executionStats>> & {
 function threadFamily(threadIds: readonly string[], shells: Record<string, unknown>[]): Set<string> {
     const wanted = new Set(threadIds);
     let added = true;
+
     while (added) {
         added = false;
         for (const shell of shells) {
             const lineage = shell.lineage as { rootThreadId?: string; parentThreadId?: string } | undefined;
+
             if (
                 typeof shell.id === 'string' &&
                 !wanted.has(shell.id) &&
@@ -534,16 +641,23 @@ function threadFamily(threadIds: readonly string[], shells: Record<string, unkno
             }
         }
     }
+
     return wanted;
 }
 
 function threadUsageRead(id: string): ThreadUsageRead {
     const shell = current?.shownById?.get(id);
+
     if (!shell) return current?.archivedAnswered?.() ? 'gone' : 'never';
+
     if (shell.deletedAt) return 'gone';
+
     const read = current?.reads?.get(id);
+
     if (!read) return 'never';
+
     if (read.availability !== 'available' || !read.observation) return 'failed';
+
     return executionAvailable(shell) ? 'current' : 'pending';
 }
 
@@ -564,19 +678,25 @@ export function protocolThreadReads(threadIds: readonly string[]): ThreadReads |
 
 function threadReadsNow(threadIds: readonly string[]): ThreadReads | null {
     if (!threadIds.length) return { reads: new Map(), observed: new Set(), demand() {} };
+
     protocolItemThreads(threadIds);
+
     if (protocolAwaitingFirstShell()) return null;
+
     if (!current?.available || !current.reads)
         return { reads: new Map(threadIds.map((id) => [id, 'failed'])), observed: new Set(), demand() {} };
+
     const state = current;
     const shells = (state.shownShells ?? []).filter((shell) => !shell.deletedAt);
     const family = threadFamily(threadIds, shells);
     const reads = new Map(
         [...family].map((id): [string, ThreadUsageRead] => {
             const read = threadUsageRead(id);
+
             return [id, read === 'never' && state.archivedFailed?.() && !state.shellIds?.has(id) ? 'failed' : read];
         }),
     );
+
     return {
         reads,
         observed: new Set([...family].filter((id) => state.reads!.get(id)?.observation)),
@@ -594,19 +714,26 @@ export async function protocolStatsInputs(
     pause?: () => Promise<void>,
 ): Promise<StatsInputs | null> {
     if (threadIds?.length === 0) return { ...(await executionStats([])), familyReads: () => [], allObserved: true };
+
     protocolItemThreads(threadIds ?? []);
+
     if (current && !current.available && !current.shell) return null;
+
     if (!current?.available || !current.reads) throw Error('T3 execution unavailable');
+
     const shells = (current.shownShells ?? []).filter((shell) => !shell.deletedAt);
     const wanted = threadIds ? threadFamily(threadIds, shells) : undefined;
     const requested = shells.filter((shell) => !wanted || wanted.has(String(shell.id)));
+
     current.demand?.(requested);
+
     const observation = (id: string) => current!.reads!.get(id)?.observation;
     // A warm reads these inputs' transcripts before the stats read that uses them, so a read landing in between waits for the next inputs.
     const reads = new Map(
         [...(wanted ?? requested.map((shell) => String(shell.id)))].map((id) => [id, threadUsageRead(id)]),
     );
     const projections = requested.flatMap((shell) => observation(String(shell.id))?.projection ?? []);
+
     return {
         ...(await executionStats(projections, pause)),
         familyReads: (ids) => [...threadFamily(ids, shells)].map((id) => reads.get(id) ?? 'never'),
@@ -617,7 +744,9 @@ export async function protocolStatsInputs(
 /** All live shell bindings, including slice and child threads. Unknown bindings refuse cleanup. */
 export function liveWorktreePaths(): string[] | undefined {
     protocolItemThreads([]);
+
     if (!current?.available || !current.shells) return undefined;
+
     return liveBindings(
         current.shells,
         (current.shell?.observation?.snapshot.projects as Record<string, unknown>[]) ?? [],
@@ -629,6 +758,7 @@ export function liveBindings(
     projects: Record<string, unknown>[] = [],
 ): string[] | undefined {
     const paths: string[] = [];
+
     for (const shell of shells) {
         if (
             shell.deletedAt ||
@@ -636,14 +766,18 @@ export function liveBindings(
                 !['preparing', 'starting', 'running', 'waiting'].includes(String(shell.status)))
         )
             continue;
+
         const workspace = shell.workspace as { worktreePath?: unknown; rootPath?: unknown } | undefined;
         const path =
             shell.worktreePath ??
             workspace?.worktreePath ??
             workspace?.rootPath ??
             projects.find((project) => project.id === shell.projectId)?.workspaceRoot;
+
         if (typeof path !== 'string' || !path) return undefined;
+
         paths.push(path);
     }
+
     return paths;
 }

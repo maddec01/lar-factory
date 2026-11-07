@@ -13,7 +13,9 @@ const HOME = '/Users/someone';
 
 function temporary(): string {
     const path = mkdtempSync(join(tmpdir(), 'install-targets-'));
+
     onTestFinished(() => rmSync(path, { recursive: true, force: true }));
+
     return path;
 }
 
@@ -84,6 +86,7 @@ test("resolves the user's home from an instance's HOME and from no other variabl
         { name: 'CLAUDE_CONFIG_DIR', value: '/elsewhere' },
         { name: 'XDG_CONFIG_HOME', value: '/xdg' },
     ];
+
     assert.deepEqual(installTargets('pi', HOME, { environment }), [
         { kind: 'agents', path: '/Volumes/other/.agents/skills' },
     ]);
@@ -102,6 +105,7 @@ test("resolves the user's home from an instance's HOME and from no other variabl
 test("discovers every instance T3's server.getConfig lists, default and disabled ones too, with their targets", async () => {
     const t3 = await startFakeT3(temporary(), { config }, onTestFinished);
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
     assert.deepEqual(found, {
         available: true,
         instances: [
@@ -157,8 +161,11 @@ test("discovers every instance T3's server.getConfig lists, default and disabled
 
 test('asks T3 with a short-lived read-only session and revokes it afterwards', async () => {
     const t3 = await startFakeT3(temporary(), { config }, onTestFinished);
+
     await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
     const issue = t3.calls.find((args) => args[2] === 'issue');
+
     assert.deepEqual(issue, [
         'auth',
         'session',
@@ -178,10 +185,13 @@ test("keeps an instance's environment out of what it returns and logs", async ()
     const logs = (['log', 'info', 'warn', 'error', 'debug'] as const).map((level) =>
         vi.spyOn(console, level).mockImplementation(() => {}),
     );
+
     onTestFinished(() => logs.forEach((spy) => spy.mockRestore()));
+
     const t3 = await startFakeT3(temporary(), { config }, onTestFinished);
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
     const text = JSON.stringify(found);
+
     assert.equal(text.includes('/Volumes/sandbox-home"'), false, 'the HOME value itself');
     assert.equal(text.includes('secret'), false);
     assert.equal(text.includes('environment'), false);
@@ -194,12 +204,14 @@ test('says T3 is unavailable when its runtime file is missing', async () => {
         runtimePath: join(temporary(), 'missing.json'),
         runT3: async () => ({ code: 0, stdout: '' }),
     });
+
     assert.deepEqual(found, { available: false, reason: 'not-running' });
 });
 
 test('says T3 is unavailable when it rejects the session', async () => {
     const t3 = await startFakeT3(temporary(), { config, rejectToken: true }, onTestFinished);
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
     assert.deepEqual(found, { available: false, reason: 'unauthenticated' });
     await vi.waitFor(() => assert.deepEqual(t3.revoked, ['fake-session-id']));
 });
@@ -211,6 +223,7 @@ test('says T3 is unavailable when the CLI cannot issue a session', async () => {
         runtimePath: t3.runtimePath,
         runT3: async () => ({ code: 1, stdout: '' }),
     });
+
     assert.deepEqual(found, { available: false, reason: 'unauthenticated' });
 });
 
@@ -223,6 +236,7 @@ test('gives up within its timeout when T3 does not answer', async () => {
         runT3: t3.runT3,
         timeoutMs: 300,
     });
+
     assert.deepEqual(found, { available: false, reason: 'timed-out' });
     assert.ok(Date.now() - started < 1_000);
     await vi.waitFor(() => assert.deepEqual(t3.revoked, ['fake-session-id']));
@@ -237,6 +251,7 @@ test('gives up within its timeout when the CLI hangs', async () => {
         runT3: () => new Promise(() => {}),
         timeoutMs: 300,
     });
+
     assert.deepEqual(found, { available: false, reason: 'timed-out' });
     assert.ok(Date.now() - started < 1_000);
 });
@@ -245,27 +260,33 @@ test('says T3 is unavailable when nothing listens at its origin', async () => {
     const dir = temporary();
     const t3 = await startFakeT3(dir, { config }, (close) => close());
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
     assert.deepEqual(found, { available: false, reason: 'not-running' });
 });
 
 test("says T3 is unavailable when its answer isn't a config", async () => {
     const t3 = await startFakeT3(temporary(), { config: { providers: 'none' } }, onTestFinished);
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
     assert.deepEqual(found, { available: false, reason: 'failed' });
 });
 
 test("says T3 is unavailable when it sends a frame that isn't JSON", async () => {
     const t3 = await startFakeT3(temporary(), { config, garbage: true }, onTestFinished);
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
     assert.deepEqual(found, { available: false, reason: 'failed' });
 });
 
 test('never sends a token to an origin off this machine', async () => {
     const dir = temporary();
     const t3 = await startFakeT3(dir, { config }, onTestFinished);
+
     for (const origin of ['http://example.com:4000', 'http://10.0.0.2:4000', 'http://localhost.example.com:4000']) {
         writeFileSync(t3.runtimePath, JSON.stringify({ origin }));
+
         const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
         assert.deepEqual(found, { available: false, reason: 'failed' }, origin);
     }
     assert.deepEqual(t3.calls, []);
@@ -277,10 +298,12 @@ test('never follows a redirect with the token', async () => {
         followed.push(request.headers.authorization);
         response.writeHead(200, { 'content-type': 'application/json' }).end('{"ticket":"stolen"}');
     });
+
     await new Promise<void>((resolve) => elsewhere.listen(0, '127.0.0.1', resolve));
     onTestFinished(() => {
         elsewhere.close();
     });
+
     const { port } = elsewhere.address() as AddressInfo;
     const t3 = await startFakeT3(
         temporary(),
@@ -288,6 +311,7 @@ test('never follows a redirect with the token', async () => {
         onTestFinished,
     );
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
     assert.equal(found.available, false);
     assert.deepEqual(followed, []);
 });
@@ -295,7 +319,10 @@ test('never follows a redirect with the token', async () => {
 test('asks a T3 at localhost', async () => {
     const t3 = await startFakeT3(temporary(), { config }, onTestFinished);
     const { port } = new URL(JSON.parse(readFileSync(t3.runtimePath, 'utf8')).origin);
+
     writeFileSync(t3.runtimePath, JSON.stringify({ origin: `http://localhost:${port}` }));
+
     const found = await discoverProviderInstances({ home: HOME, runtimePath: t3.runtimePath, runT3: t3.runT3 });
+
     assert.equal(found.available, true);
 });

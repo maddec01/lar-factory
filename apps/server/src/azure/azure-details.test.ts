@@ -39,6 +39,7 @@ test('a markdown description answers with its people, dates, iteration and area'
     const az = fakeAz({
         items: [workItem({ description: '## Export\n\nAs **CSV**.', descriptionFormat: 'Markdown' })],
     });
+
     assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
         body: '## Export\n\nAs **CSV**.',
         format: 'markdown',
@@ -59,6 +60,7 @@ test('a markdown description answers with its people, dates, iteration and area'
 test('an HTML description is answered as HTML', async () => {
     const az = fakeAz({ items: [workItem({ description: '<div>As <b>CSV</b>.</div>', descriptionFormat: 'Html' })] });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual([details.body, details.format], ['<div>As <b>CSV</b>.</div>', 'html']);
 });
@@ -73,6 +75,7 @@ test('a description whose format is missing is HTML when it opens with a tag, el
     ]) {
         const az = fakeAz({ items: [workItem({ description })] });
         const details = await readAzureItemDetails(item(5), az.run);
+
         assert.ok(!('error' in details));
         assert.equal(details.format, format, description);
     }
@@ -80,14 +83,20 @@ test('a description whose format is missing is HTML when it opens with a tag, el
 
 test('the work item is one batch read at 7.2-preview and its comments are read at 7.1-preview, 10 newest first', async () => {
     const az = fakeAz({ items: [workItem()] });
+
     await readAzureItemDetails(item(5), az.run);
+
     const version = (resource: string) => {
         const call = az.calls.find((args) => args.includes(resource))!;
+
         return call[call.indexOf('--api-version') + 1];
     };
+
     assert.deepEqual([version('workitemsbatch'), version('comments')], ['7.2-preview', '7.1-preview']);
     assert.deepEqual(az.batches, [[5]]);
+
     const comments = az.calls.find((args) => args.includes('comments'))!;
+
     assert.deepEqual(
         comments.slice(comments.indexOf('--query-parameters') + 1, comments.indexOf('--query-parameters') + 3),
         ['$top=10', 'order=desc'],
@@ -113,6 +122,7 @@ test('comments of mixed formats answer newest first, each in its own format', as
         ],
     });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(
         details.comments.map((c) => [c.id, c.format]),
@@ -136,6 +146,7 @@ test('comments of mixed formats answer newest first, each in its own format', as
 test('more than 10 comments answer the newest 10 and the token of the older ones', async () => {
     const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 12 }, (_, i) => comment(i + 1)) })] });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(
         [
@@ -151,6 +162,7 @@ test('more than 10 comments answer the newest 10 and the token of the older ones
 
 test('a work item with no description, people or comments answers empty details', async () => {
     const az = fakeAz({ items: [{ id: 5, type: 'Task', state: 'New' }] });
+
     assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
         body: '',
         format: 'markdown',
@@ -178,6 +190,7 @@ test('the child work items answer as sub-tickets, Completed ones closed and Remo
         ],
     });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(details.subTickets, [
         {
@@ -203,6 +216,7 @@ test('the child work items answer as sub-tickets, Completed ones closed and Remo
 test('a work item with no child links reads no batch', async () => {
     const az = fakeAz({ items: [workItem()] });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual([details.subTickets, az.batches], [[], [[5]]]);
 });
@@ -212,6 +226,7 @@ test('an az failure answers its message', async () => {
         items: [workItem()],
         fail: (args) => (args.includes('comments') ? new Error('az devops invoke failed: timed out') : undefined),
     });
+
     assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
         status: 502,
         error: 'az devops invoke failed: timed out',
@@ -221,11 +236,13 @@ test('an az failure answers its message', async () => {
 test('a logged-out az answers the fix', async () => {
     const az = fakeAz({ items: [workItem()], fail: () => new Error('Please run az login to setup account.') });
     const answer = await readAzureItemDetails(item(5), az.run);
+
     assert.ok('error' in answer && /az login/.test(answer.error));
 });
 
 test('a work item az no longer finds answers 404', async () => {
     const az = fakeAz({ items: [] });
+
     assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
         status: 404,
         error: 'Work item 5 does not exist, or you have no right to read it.',
@@ -234,6 +251,7 @@ test('a work item az no longer finds answers 404', async () => {
 
 test('an item without an Azure DevOps repository answers 404', async () => {
     const az = fakeAz({ items: [] });
+
     assert.deepEqual(await readAzureItemDetails({ ...item(5), repo: 'maddec01/lar' }, az.run), {
         status: 404,
         error: 'That item is not an Azure DevOps work item.',
@@ -243,13 +261,16 @@ test('an item without an Azure DevOps repository answers 404', async () => {
 test('older comments are one comments call with the continuation token, 10 newest first, and the next token', async () => {
     const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 25 }, (_, i) => comment(i + 1)) })] });
     const page = await readAzureOlderComments(item(5), '10', az.run);
+
     assert.ok(!('error' in page));
     assert.deepEqual(
         [page.comments.length, page.comments[0]!.id, page.comments[9]!.id, page.olderCursor],
         [10, '15', '6', '20'],
     );
     assert.equal(az.calls.length, 1);
+
     const call = az.calls[0]!;
+
     assert.ok(call.includes('comments') && call.includes('workItemId=5'));
     assert.deepEqual(call.slice(call.indexOf('--query-parameters') + 1, call.indexOf('--query-parameters') + 4), [
         '$top=10',
@@ -262,6 +283,7 @@ test('older comments are one comments call with the continuation token, 10 newes
 test('the oldest page answers no token', async () => {
     const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 12 }, (_, i) => comment(i + 1)) })] });
     const page = await readAzureOlderComments(item(5), '10', az.run);
+
     assert.ok(!('error' in page));
     assert.deepEqual([page.comments.map((c) => c.id), page.olderCursor], [['2', '1'], null]);
 });
@@ -288,10 +310,13 @@ test('details and older pages skip managed-only history to its end without expos
         const page = older
             ? await readAzureOlderComments(item(5), '0', az.run)
             : await readAzureItemDetails(item(5), az.run);
+
         assert.ok(!('error' in page));
         assert.deepEqual([page.comments, page.olderCursor], [[], null]);
+
         if ('hasOlderComments' in page && 'body' in page)
             assert.deepEqual([page.hasOlderComments, page.body], [false, 'Human description.']);
+
         assert.equal(commentCalls(az).length, 3);
         assert.doesNotMatch(JSON.stringify(page), /lar-factory:|c2VjcmV0/);
     }
@@ -299,6 +324,7 @@ test('details and older pages skip managed-only history to its end without expos
 
 test('managed-only leading pages reveal all ordinary discussion from the larger lookahead page', async () => {
     const human = Array.from({ length: 30 }, (_, i) => comment(i + 1));
+
     for (const older of [false, true]) {
         const az = fakeAz({
             items: [workItem({ comments: [...human, ...Array.from({ length: 15 }, (_, i) => managed(i + 31))] })],
@@ -306,6 +332,7 @@ test('managed-only leading pages reveal all ordinary discussion from the larger 
         const page = older
             ? await readAzureOlderComments(item(5), '0', az.run)
             : await readAzureItemDetails(item(5), az.run);
+
         assert.ok(!('error' in page));
         assert.deepEqual(
             page.comments.map((c) => c.id),
@@ -321,18 +348,23 @@ test('large managed histories stop after three comments calls and preserve a con
         items: [workItem({ comments: [comment(1), ...Array.from({ length: 999 }, (_, i) => managed(i + 2))] })],
     });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(
         [details.comments, details.hasOlderComments, details.olderCursor, commentCalls(az).length],
         [[], true, '210', 3],
     );
+
     let cursor = details.olderCursor;
+
     while (cursor !== null) {
         const before = commentCalls(az).length;
         const page = await readAzureOlderComments(item(5), cursor, az.run);
+
         assert.ok(!('error' in page));
         assert.ok(commentCalls(az).length - before <= 3);
         cursor = page.olderCursor;
+
         if (cursor === null)
             assert.deepEqual(
                 page.comments.map((c) => c.id),
@@ -344,15 +376,20 @@ test('large managed histories stop after three comments calls and preserve a con
 test('ordinary history keeps ten-comment pages in order without gaps or duplicate comments', async () => {
     const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 23 }, (_, i) => comment(i + 1)) })] });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
+
     const ids = details.comments.map((c) => c.id);
     let cursor = details.olderCursor;
+
     while (cursor !== null) {
         const page = await readAzureOlderComments(item(5), cursor, az.run);
+
         assert.ok(!('error' in page));
         ids.push(...page.comments.map((c) => c.id));
         cursor = page.olderCursor;
     }
+
     assert.deepEqual(
         ids,
         Array.from({ length: 23 }, (_, i) => String(23 - i)),
@@ -377,9 +414,11 @@ test('older comments of a repository not on Azure DevOps, or of a failed az, ans
         ),
         { status: 404, error: 'That item is not an Azure DevOps work item.' },
     );
+
     const failing = async () => {
         throw new Error('az exploded');
     };
+
     assert.deepEqual(await readAzureOlderComments(item(5), '10', failing), { status: 502, error: 'az exploded' });
 });
 
@@ -396,6 +435,7 @@ test('details hydrate 217 children in batches of at most 200', async () => {
         ],
     });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.equal(details.body, 'Keep this description');
     assert.equal(details.subTickets.length, 217);
@@ -414,6 +454,7 @@ test('a child relations failure preserves the main description, people and comme
         fail: (args) => (args.includes('workitemtypestates') ? new Error('Relations unavailable') : undefined),
     });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(
         [details.body, details.assignees, details.comments.length, details.subTickets, details.relationsError],
@@ -434,6 +475,7 @@ test('an empty Bug description falls back to Repro Steps, keeping Acceptance Cri
         ],
     });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(
         [details.body, details.format, details.bodyField],
@@ -453,6 +495,7 @@ test('an empty description is read from System.Description, except on a Bug, who
     ]) {
         const az = fakeAz({ items: [workItem({ type })] });
         const details = await readAzureItemDetails(item(5), az.run);
+
         assert.ok(!('error' in details));
         assert.equal(details.bodyField, bodyField, type);
     }
@@ -469,6 +512,7 @@ test('details keep named Azure attachments, Related work and predecessors alongs
         ],
     });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(details.attachments, [{ name: 'OAuth implementation.pdf', url }]);
     assert.deepEqual(
@@ -503,6 +547,7 @@ test('attachments survive a failed relation read and only link to Azure over HTT
         fail: (args) => (args.includes('workitemtypestates') ? new Error('Relations unavailable') : undefined),
     });
     const details = await readAzureItemDetails(item(5), az.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(details.attachments, [{ name: 'Evidence.pdf', url }]);
     assert.equal(details.relationsError, 'Relations unavailable');
@@ -513,7 +558,9 @@ test('a Bug displays Repro Steps even when Description also contains text', asyn
         items: [workItem({ type: 'Bug', description: 'Separate description.', reproSteps: '<p>Displayed steps.</p>' })],
     });
     const details = await readAzureItemDetails(item(5), run.run);
+
     if ('error' in details) throw Error(details.error);
+
     assert.equal(details.bodyField, 'Microsoft.VSTS.TCM.ReproSteps');
     assert.equal(details.body, '<p>Displayed steps.</p>');
     assert.deepEqual(details.sections, [{ title: 'Description', body: 'Separate description.', format: 'markdown' }]);

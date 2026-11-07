@@ -16,6 +16,7 @@ async function batchSsh(checkout: string, env: NodeJS.ProcessEnv): Promise<strin
             await runTool('git', ['-C', checkout, 'config', '--get', 'core.sshCommand'], { env, timeout: 10_000 })
         ).stdout.trim() ||
         (env.GIT_SSH ? quoted(env.GIT_SSH) : 'ssh');
+
     return `${configured} -o BatchMode=yes`;
 }
 
@@ -42,6 +43,7 @@ export async function fetchBaseCommit(
         env: fetching,
         timeout,
     });
+
     if (code !== 0) {
         log(`can't fetch ${branch} in ${checkout}: ${detail}`);
         throw new Error(
@@ -50,10 +52,13 @@ export async function fetchBaseCommit(
                 : `Could not fetch ${branch} from origin. Check the network and your Git login, then start the build again.`,
         );
     }
+
     const commit = await runTool('git', ['-C', checkout, 'rev-parse', '--verify', `${ref}^{commit}`], {
         env,
         timeout: 10_000,
     });
+
     if (commit.code !== 0) throw new Error(`Could not read the fetched ${branch}. Start the build again.`);
+
     return commit.stdout.trim();
 }

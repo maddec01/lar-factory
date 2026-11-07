@@ -15,12 +15,17 @@ export function writeAccessProblem(
         )
             return 'Azure DevOps is read-only in this test session.';
     }
+
     if (access[operation] === 'refused') return `Access to ${operation} was refused. Recheck access in Settings.`;
+
     if (access[operation] === 'allowed') return null;
+
     if (!onAzure(repo) && options.fineGrainedToken)
         return 'Fine-grained GitHub token permissions cannot be verified. Sign in with a classic token or gh OAuth login and recheck access.';
+
     if (!onAzure(repo) && operation === 'edit-ticket' && access['push-branch'] !== 'allowed')
         return "This login cannot edit other people's issues without verified push access. Recheck access in Settings.";
+
     return `Access to ${operation} is not checked yet. ${!onAzure(repo) ? 'GitHub permissions require a classic token or gh OAuth login to verify. ' : ''}Recheck access in Settings.`;
 }
 
@@ -45,6 +50,7 @@ export function effectiveIssueSettings(
     const safety = azureReadOnly === undefined ? {} : { azureReadOnly };
     const createReason = writeAccessProblem(setup.repo, 'publish-ticket', setup.access, safety);
     const specReason = writeAccessProblem(setup.repo, 'edit-ticket', setup.access, safety);
+
     return {
         createIssuesFromAddItem: (setup.createIssuesFromAddItem ?? true) && createReason === null,
         createIssuesFromRetro: (setup.createIssuesFromRetro ?? true) && createReason === null,

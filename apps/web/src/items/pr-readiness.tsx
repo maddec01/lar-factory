@@ -13,6 +13,7 @@ function blockerLabel(blocker: string): string {
     const [kind, ...parts] = blocker.split(':');
     const state = parts.pop() ?? 'unknown';
     const name = parts.join(':');
+
     if (kind === 'reviewer') {
         const vote =
             (
@@ -24,10 +25,14 @@ function blockerLabel(blocker: string): string {
                     '10': 'approved',
                 } as Record<string, string>
             )[state] ?? 'has an unknown vote';
+
         return `Reviewer ${name}: ${vote}. Check reviewer requirements in Azure.`;
     }
+
     if (kind === 'policy') return `Required policy ${name}: ${state}. Check the policy in Azure.`;
+
     if (kind === 'status') return `Check ${name}: ${state}.`;
+
     return blocker;
 }
 
@@ -58,11 +63,16 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
         attempt,
     ]);
     const stale = loading || settledKey !== key;
+
     useEffect(() => {
         const request = ++sequence.current;
+
         setLoading(true);
+
         if (!open || disconnected) return;
+
         const controller = new AbortController();
+
         void fetch('/api/pr-readiness', {
             method: 'POST',
             headers: writeHeaders(),
@@ -71,6 +81,7 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
         })
             .then(async (response) => {
                 if (!response.ok) throw new Error('Azure evidence is unavailable. Refresh to try again.');
+
                 return response.json() as Promise<{ evidence: Evidence }>;
             })
             .then(({ evidence: next }) => {
@@ -87,12 +98,15 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
                     setLoading(false);
                 }
             });
+
         return () => {
             ++sequence.current;
             controller.abort();
         };
     }, [open, item.id, pr.number, disconnected, key]);
+
     if (!item.azure) return null;
+
     return (
         <div className="basis-full text-xs text-(--muted-foreground)">
             <Button

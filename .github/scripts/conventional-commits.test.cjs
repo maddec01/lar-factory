@@ -36,6 +36,7 @@ test('rejects merge, fixup and non-conventional commits and a bad title', () => 
             { sha: 'd'.repeat(40), message: 'Retry titles', parents: 1 },
         ],
     });
+
     assert.equal(problems.length, 4);
     assert.match(problems[0], /^PR title/);
     assert.match(problems[1], /^bbbbbbbb .*rebase/);

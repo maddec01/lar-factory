@@ -11,6 +11,7 @@ test('GitHub has labels with colour and description, scoped to the repository, a
         ticketNameProblem: _ticketNameProblem,
         ...capabilities
     } = trackerCapabilities('maddec01/lar-factory');
+
     assert.deepEqual(capabilities, {
         noun: 'label',
         heading: 'Labels',
@@ -33,6 +34,7 @@ test('Azure DevOps has tags with neither, scoped to the project, sync needs no t
         ticketNameProblem: _ticketNameProblem,
         ...capabilities
     } = trackerCapabilities('fabrikam/fiber/lar-factory');
+
     assert.deepEqual(capabilities, {
         noun: 'tag',
         heading: 'Tags',
@@ -77,6 +79,7 @@ test('a repo- tag is managed on Azure DevOps, in any case, and an ordinary label
 
 test('rows hide a repo- tag on Azure DevOps and show a repo- label on GitHub', () => {
     const labels = ['repo-one', 'docs'];
+
     assert.deepEqual(labelsOnRow({ kind: 'issue', labels, repo: AZURE }, []), ['docs']);
     assert.deepEqual(labelsOnRow({ kind: 'issue', labels, repo: GITHUB }, []), ['repo-one', 'docs']);
 });

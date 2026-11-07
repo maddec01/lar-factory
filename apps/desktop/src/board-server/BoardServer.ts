@@ -70,6 +70,7 @@ export interface BoardLocation {
  */
 export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
     const serverDir = NodePath.resolve(appPath, '../server');
+
     return isPackaged
         ? {
               serverDir,
@@ -125,12 +126,17 @@ export const start = Effect.fn('BoardServer.start')(function* (
     },
 ): Effect.fn.Return<RunningBoard, BoardServerError, Scope.Scope | HttpClient.HttpClient> {
     options?.progress?.('starting');
+
     const child = yield* Effect.acquireRelease(spawn(config), stop);
+
     if (options?.checkSkills) answerSkillChecks(child, options.checkSkills);
+
     const port = yield* reportedPort(child, options?.portTimeout ?? DEFAULT_PORT_TIMEOUT);
     const url = new URL(`http://${HOST}:${port}/`);
+
     options?.progress?.('healthz');
     yield* waitForHealthz(url);
+
     return { pid: child.pid!, url, exited: exitReason(child) };
 });
 
@@ -144,6 +150,7 @@ export const drain = Effect.fn('BoardServer.drain')(function* (url: URL, secret:
     const request = HttpClientRequest.post(new URL('/api/drain', url)).pipe(
         HttpClientRequest.setHeaders({ Origin: url.origin, 'X-Board-Secret': secret }),
     );
+
     yield* client.execute(request).pipe(
         Effect.flatMap((response) => response.text),
         Effect.timeout(DRAIN_TIMEOUT),
@@ -170,6 +177,7 @@ const answerSkillChecks = (
 ) =>
     child.on('message', (message) => {
         if (!isSkillCheckRequest(message)) return;
+
         // A check that throws refuses the build too, so Start build never waits for an answer that won't come.
         void checkSkills(message.drift)
             .catch((cause: unknown): SkillCheckOutcome => ({
@@ -190,16 +198,21 @@ const describeExit = (code: number | null, signal: NodeJS.Signals | null) =>
 const exitReason = (child: NodeChildProcess.ChildProcess) =>
     Effect.callback<string>((resume) => {
         if (exited(child)) return resume(Effect.succeed(describeExit(child.exitCode, child.signalCode)));
+
         const onExit = (code: number | null, signal: NodeJS.Signals | null) =>
             resume(Effect.succeed(describeExit(code, signal)));
+
         child.once('exit', onExit);
+
         return Effect.sync(() => child.off('exit', onExit));
     });
 
 const stop = (child: NodeChildProcess.ChildProcess) =>
     Effect.callback<void>((resume) => {
         if (exited(child)) return resume(Effect.void);
+
         const forceKill = setTimeout(() => child.kill('SIGKILL'), Duration.toMillis(TERMINATE_GRACE));
+
         child.once('exit', () => {
             clearTimeout(forceKill);
             resume(Effect.void);
@@ -220,8 +233,10 @@ const reportedPort = (child: NodeChildProcess.ChildProcess, timeout: Duration.In
                     }),
                 ),
             );
+
         child.on('message', onMessage);
         child.once('exit', onExit);
+
         return Effect.sync(() => {
             child.off('message', onMessage);
             child.off('exit', onExit);
@@ -251,6 +266,7 @@ const waitForHealthz = Effect.fn('BoardServer.waitForHealthz')(function* (url: U
         HttpClient.tap((response) => response.text.pipe(Effect.ignore)),
         HttpClient.filterStatusOk,
     );
+
     yield* client.execute(HttpClientRequest.get(new URL('/healthz', url))).pipe(
         Effect.timeout(READINESS_REQUEST_TIMEOUT),
         Effect.retry(Schedule.spaced(READINESS_INTERVAL)),

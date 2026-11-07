@@ -12,11 +12,14 @@ import { stoppedAt, useWizardStore } from './wizard-store.ts';
 export function OnboardingCards() {
     const onboarding = useBoardStore((state) => state.data.onboarding);
     const resume = useWizardStore((s) => s.resume);
+
     if (!onboarding?.length) return null;
+
     return (
         <div className="grid max-h-[35%] shrink-0 gap-2 overflow-y-auto">
             {onboarding.map(({ repo, progress }) => {
                 const where = stoppedAt(progress);
+
                 return (
                     <div key={repo} data-onboarding-card={repo}>
                         <NoticeCard

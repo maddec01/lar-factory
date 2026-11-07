@@ -120,14 +120,21 @@ const onDesk = (item: Item, unavailable: boolean) =>
 function stageSection(item: Item, starts: PlacementFacts['starts']): BoardSection | null {
     const shaping = inFlight(starts?.shape);
     const building = inFlight(starts?.build);
+
     if (item.status === 'Done') return null;
+
     if (item.kind === 'concept') {
         if (!shaping && !building && item.status === 'List') return null;
+
         if (!shaping && !building && item.status === 'Queued') return 'queue';
+
         return item.refinement?.complete ? null : 'shaping';
     }
+
     if (building) return 'build';
+
     if (shaping) return 'shaping';
+
     switch (item.status) {
         case 'Queued':
             return 'queue';
@@ -163,6 +170,7 @@ export function placementOf(item: Item, { starts, unavailable, all }: PlacementF
         ...(stage ? [stage] : []),
         ...(dock ? ['dock' as const] : []),
     ];
+
     return part && stage ? { sections, concept: parent } : { sections };
 }
 
@@ -186,8 +194,10 @@ export const deskItems = (data: Pick<BoardData, 'items' | 'startProgress'>, unav
 /** The repositories List groups and the board search offers: the board's, then any other a List item names, in `data`'s order. */
 export function listRepos(data: Pick<BoardData, 'repos' | 'items'>): string[] {
     const repos = data.repos.map((r) => r.repo);
+
     for (const i of data.items)
         if (i.status === 'List' && !repos.some((r) => sameRepo(r, repoKey(i)))) repos.push(repoKey(i));
+
     return repos;
 }
 
@@ -205,6 +215,7 @@ export function boardSections(data: BoardData, now: number, clientError?: string
             items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)),
         }))
         .sort((a, b) => b.items.length - a.items.length);
+
     return {
         needsYou: inSection(items, data, unavailable, 'desk'),
         concepts: items.filter((i) => i.recorded !== false && i.kind === 'concept' && i.status !== 'Done'),
@@ -296,6 +307,7 @@ export function closeTicketPrompt(item: Item): {
     done: string;
 } {
     const azure = onAzure(item.repo ?? '');
+
     return {
         question: `Close the ticket of ${itemName(item)} too?`,
         keep: 'Keep it open',
@@ -314,8 +326,11 @@ export type NeedsYouAction = Exclude<NeedsYouOffer, 'set-aside'>;
 function ticketCauses(item: Item): string[] {
     return (item.needsYou?.causes ?? []).flatMap((cause) => {
         if (cause.type === 'ticket-closed') return ['Its ticket stays closed.'];
+
         if (cause.type === 'assignee-changed') return [`Its ticket stays with ${cause.to ?? 'no one'}.`];
+
         if (cause.type === 'ticket-missing') return ['Its ticket stays missing from its provider.'];
+
         return [];
     });
 }
@@ -335,6 +350,7 @@ export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: 
         ? 'The notice stays with only its other note, which you can then mark as handled.'
         : 'This notice goes away.';
     const sentences = (...parts: string[]) => parts.filter(Boolean).join(' ');
+
     switch (action) {
         case 'reopen-pr':
             return {
@@ -374,6 +390,7 @@ export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: 
             };
         case 'start-again': {
             const build = item.needsYou?.startAgainPurpose === 'build';
+
             return {
                 question: `Start ${name} again?`,
                 detail: sentences(
@@ -389,6 +406,7 @@ export function needsYouPrompt(item: Item, action: NeedsYouAction): { question: 
         case 'back-to-queue':
         case 'back-to-list': {
             const queue = action === 'back-to-queue';
+
             return {
                 question: queue ? `Move ${name} back to Queue?` : `Move ${name} to List?`,
                 detail: sentences(

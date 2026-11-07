@@ -31,16 +31,22 @@ function serve(
     list: Response | (() => Response) = () => new Response(JSON.stringify({ labels: LIST })),
 ) {
     const writes: ((status: number, body: object) => Promise<void>)[] = [];
+
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
         const itemId = detailsRead(url);
+
         if (itemId) return detailsReply(itemId);
+
         if (url.startsWith('/api/item-labels?')) return typeof list === 'function' ? list() : list;
+
         if (url === '/api/item-labels' && init?.method === 'POST')
             return new Promise<Response>((resolve) => {
                 writes.push((status, body) => settle(() => resolve(new Response(JSON.stringify(body), { status }))));
             });
+
         return new Response(JSON.stringify(board));
     });
+
     return { answer: (status: number, body: object) => writes.shift()!(status, body) };
 }
 
@@ -50,10 +56,13 @@ const sentWrites = () =>
         .map(([, init]) => JSON.parse(init!.body as string) as object);
 const sentReads = () =>
     (fetchMock.mock.calls as unknown as [string][]).filter(([url]) => url.startsWith('/api/item-labels?'));
+
 async function openItem(itemId = ID): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
+
 const pencil = () => $<HTMLButtonElement>('[data-item-dialog] [data-edit-labels]');
 const openPicker = () => settle(() => pencil()!.click());
 const choices = () => $$<HTMLLabelElement>('[data-label-choice]');
@@ -84,7 +93,9 @@ test('typing narrows the picker', async () => {
     await mountPage(boardWith({}));
     await openItem();
     await openPicker();
+
     const input = $<HTMLInputElement>('[data-label-picker] input:not([type="checkbox"])')!;
+
     await settle(() => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'DOC');
         input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -95,6 +106,7 @@ test('typing narrows the picker', async () => {
 test('adding a label writes that one label, and the chip shows only once the write succeeds', async () => {
     const before = boardWith({ labels: ['needs-design'] });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await openPicker();
@@ -110,6 +122,7 @@ test('adding a label writes that one label, and the chip shows only once the wri
 test('removing a label writes only its removal', async () => {
     const before = boardWith({ labels: ['needs-design', 'docs'] });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await openPicker();
@@ -122,6 +135,7 @@ test('removing a label writes only its removal', async () => {
 test('a second toggle waits for the write in flight', async () => {
     const before = boardWith({ labels: [] });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await openPicker();
@@ -134,6 +148,7 @@ test('a second toggle waits for the write in flight', async () => {
 test('a failed write leaves the labels as they were and shows the error, closed or open', async () => {
     const before = boardWith({ labels: ['needs-design'] });
     const { answer } = serve(before);
+
     await mountPage(before);
     await openItem();
     await openPicker();
@@ -141,7 +156,9 @@ test('a failed write leaves the labels as they were and shows the error, closed 
     await answer(502, { error: 'Could not change the labels on #129. gh failed: HTTP 403' });
     expect(chips()).toEqual(['needs-design']);
     expect(choice('docs').querySelector('input')!.checked).toBe(false);
+
     const alerts = () => $$('[role="alert"]').map((a) => text(a));
+
     expect(alerts()).toEqual(['Could not change the labels on #129. gh failed: HTTP 403']);
     await settle(() =>
         document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
@@ -171,6 +188,7 @@ test('on Azure the control says tags, has no colours and writes the same way', a
         azure(['docs']),
         () => new Response(JSON.stringify({ labels: [{ name: 'docs' }, { name: 'area-ui' }] })),
     );
+
     await mountPage(azure(['docs']));
     await openItem();
     expect(pencil()!.getAttribute('aria-label')).toBe('Edit tags');
@@ -193,6 +211,7 @@ test('on Azure the control says tags, has no colours and writes the same way', a
 
 test('without tag-ticket access the control is disabled with the reason and reads nothing', async () => {
     const refused = boardWith({ labels: ['docs'] }, setup({ 'tag-ticket': 'refused' }));
+
     serve(refused);
     await mountPage(refused);
     await openItem();
@@ -219,6 +238,7 @@ test('the Azure read-only safety disables the control with its reason', async ()
         ],
         items: sample.items.map((i) => (i.id === ID ? { ...i, repo, number: 310 } : i)),
     };
+
     serve(azure);
     await mountPage(azure);
     await openItem();
@@ -227,6 +247,7 @@ test('the Azure read-only safety disables the control with its reason', async ()
 
 test('a ticket with no labels can still add one', async () => {
     const none = boardWith({ labels: ['improvement'] });
+
     serve(none);
     await mountPage(none);
     await openItem();
@@ -237,6 +258,7 @@ test('a ticket with no labels can still add one', async () => {
 test('a failed read says why, and opening again reads again', async () => {
     let fails = true;
     const board = boardWith({});
+
     serve(board, () =>
         fails
             ? new Response(JSON.stringify({ error: 'Could not read the labels. gh failed: HTTP 502' }), { status: 502 })
@@ -257,6 +279,7 @@ test('a failed read says why, and opening again reads again', async () => {
 
 test('local work omits irrelevant ticket-label controls and instructions', async () => {
     const local = boardWith({ number: 0, labels: [], url: '' });
+
     serve(local);
     await mountPage(local);
     await openItem();

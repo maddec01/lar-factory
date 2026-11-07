@@ -62,21 +62,32 @@ function causesAfter(
     const without = (...types: NeedsYouCause['type'][]) => causes.filter((cause) => !types.includes(cause.type));
     const raised = (cause: NeedsYouCause, kept: NeedsYouCause[]) =>
         kept.some((c) => c.type === cause.type) ? kept : [...kept, cause];
+
     if (next.of === 'pr') {
         if (next.state !== 'closed') return without('pr-closed');
+
         if (was === 'closed') return [...causes];
+
         const withPr = raised({ type: 'pr-closed' }, [...causes]);
+
         return ticketClosed ? raised({ type: 'ticket-closed' }, withPr) : withPr;
     }
+
     if (next.state === 'not-found') return raised({ type: 'ticket-missing' }, [...causes]);
+
     const done = record.status === 'Done' || record.finishedAt !== null;
     let kept = without('ticket-missing', ...(next.state === 'open' ? (['ticket-closed'] as const) : []));
+
     if (next.state === 'closed' && was !== 'closed' && !done) kept = raised({ type: 'ticket-closed' }, kept);
+
     const assignee = next.assignee ?? null;
     const moved = kept.find((cause) => cause.type === 'assignee-changed');
+
     if (was === null || was === 'not-found' || previous!.assignee === assignee || (done && !moved)) return kept;
+
     const from = moved ? moved.from : previous!.assignee;
     const others = kept.filter((cause) => cause !== moved);
+
     return from === assignee ? others : [...others, { type: 'assignee-changed', from, to: assignee }];
 }
 
@@ -90,6 +101,7 @@ async function observeOne(
     const previous = records.observations(workId).find((o) => o.of === of);
     const reference = of === 'ticket' ? records.read(workId).ticket : records.read(workId).pullRequest;
     let next: NewObservation;
+
     try {
         next = await read();
     } catch (err) {
@@ -99,11 +111,15 @@ async function observeOne(
             of,
             err instanceof Error ? err.message : String(err),
         );
+
         return;
     }
+
     const before = records.read(workId);
+
     // A PR replaced during the read was not the one it read.
     if ((of === 'ticket' ? before.ticket : before.pullRequest) !== reference) return;
+
     // A slice is not on the board, so what a read shows on one stays free text.
     const slice = before.kind === 'slice';
     const observations = records.observations(workId);
@@ -116,9 +132,12 @@ async function observeOne(
         observations.some((o) => o.of === 'ticket' && o.state === 'closed'),
     );
     let record = records.observe(workId, before.revision, next);
+
     if (next.of === 'pr' && next.state === 'merged' && record.status !== 'Done')
         record = records.update(workId, record.revision, { status: 'Done' });
+
     if (next.of === 'ticket' && next.state === 'not-found') record = records.setAside(workId, record.revision);
+
     if (slice) {
         if (causes.length) records.setNeedsYou(workId, record.revision, causesText(before, causes).join(' '));
     } else records.setNeedsYouCauses(workId, record.revision, causes, { clearReason: saved.oldWording });
@@ -146,18 +165,25 @@ async function observeDependency(
 ): Promise<void> {
     let kind: DependencyObservationKind;
     let detail: string | undefined;
+
     try {
         const state = await read();
+
         kind = state === 'not-found' ? 'deleted' : state;
     } catch (err) {
         kind = err instanceof NotFound ? 'deleted' : err instanceof AccessLost ? 'access-lost' : 'read-failed';
         detail = (err instanceof Error ? err.message : String(err)) || undefined;
     }
+
     const dependency = records.dependency(dependencyId);
+
     // A ticket or PR the Dependency stopped naming during the read was not one it reads.
     if (subject !== dependency.ticket && !dependency.pullRequests.includes(subject)) return;
+
     const last = dependency.observations.find((o) => o.subject === subject);
+
     if (kind === 'open' && ENDED.includes(last?.lastGood?.kind ?? last?.kind)) kind = 'reopened';
+
     const { revision } = records.observeDependency(dependencyId, dependency.revision, {
         subject,
         kind,
@@ -165,6 +191,7 @@ async function observeDependency(
     });
     // A failed read shows the last read that answered, so it changes nothing a mark decides on.
     const shown = last?.kind === 'read-failed' ? last.lastGood?.kind : last?.kind;
+
     observed?.(dependencyId, dependency.revision, revision, kind !== 'read-failed' && kind !== shown);
 }
 
@@ -172,6 +199,7 @@ async function observeDependency(
 function noteAgreement(records: WorkRecords, workId: string, reads: ObserveReads): void {
     const record = records.read(workId);
     const agreed = reads.agreedKind?.(record);
+
     if (agreed && agreed !== record.agreedTicketKind)
         records.update(workId, record.revision, { agreedTicketKind: agreed });
 }
@@ -192,8 +220,10 @@ export async function observeWork(
             state: await reads.pr(repository, numberOf(pullRequest)),
         })).finally(changed);
     }
+
     if (ticket && !records.read(workId).setAside) {
         const number = numberOf(ticket);
+
         await observeOne(records, workId, 'ticket', async () => ({
             of: 'ticket',
             ...(reads.known?.(repository, number) ?? (await reads.ticket(repository, number))),
@@ -221,9 +251,11 @@ export async function observeRecords(
     const subjectReads = new Map<string, Promise<TicketObservation['state'] | PullRequestState>>();
     const readSubject = (subject: string, ticket: boolean) => {
         const key = `${ticket ? 'ticket' : 'pr'}:${subject.toLowerCase()}`;
+
         if (!subjectReads.has(key)) {
             const repo = subject.slice(0, subject.lastIndexOf('#'));
             const number = numberOf(subject);
+
             subjectReads.set(
                 key,
                 ticket
@@ -231,6 +263,7 @@ export async function observeRecords(
                     : reads.pr(repo, number),
             );
         }
+
         return subjectReads.get(key)!;
     };
     let next = 0;
@@ -239,12 +272,15 @@ export async function observeRecords(
     };
     const observeActive = async (record: WorkRecord): Promise<void> => {
         const { workId } = record;
+
         try {
             await observeWork(records, record, reads, changed);
             for (const { dependencyId, ticket: theirs, pullRequests } of records.dependencies(workId)) {
                 for (const subject of [...(theirs ? [theirs] : []), ...pullRequests]) {
                     const repo = subject.slice(0, subject.lastIndexOf('#'));
+
                     if (reads.waits?.(repo)) continue;
+
                     await observeDependency(
                         records,
                         dependencyId,
@@ -256,9 +292,11 @@ export async function observeRecords(
             }
         } catch (err) {
             if (err instanceof WorkRecordError && err.code === 'schema-too-new') throw err;
+
             log(`can't record what ${workId}'s provider shows: ${(err as Error).message}`);
         }
     };
+
     await Promise.all(Array.from({ length: Math.min(OBSERVED_AT_ONCE, active.length) }, observeNext));
 }
 
@@ -269,14 +307,18 @@ export async function observeRecords(
 export function finishCompleted(records: WorkRecords, repos: readonly string[]): void {
     for (const record of records.list({})) {
         if (record.setAside || record.finishedAt || (record.kind !== 'decision' && record.kind !== 'concept')) continue;
+
         if (!repos.some((repo) => sameRepo(repo, record.repository)) || !records.completion(record.workId).complete)
             continue;
+
         try {
             const done =
                 record.status === 'Done' ? record : records.update(record.workId, record.revision, { status: 'Done' });
+
             records.recordFinished(record.workId, done.revision);
         } catch (err) {
             if (err instanceof WorkRecordError && err.code === 'schema-too-new') throw err;
+
             log(`can't finish ${record.workId}: ${(err as Error).message}`);
         }
     }

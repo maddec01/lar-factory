@@ -6,6 +6,7 @@ import { useInstallStore } from './install-store.ts';
 
 export function TargetReaders({ target }: { target: TargetSnapshot }) {
     const snapshot = useInstallStore((state) => state.snapshot);
+
     return (
         <div className="flex flex-wrap gap-1" aria-label={`Provider instances reading ${target.path}`}>
             {target.instances.length ? (
@@ -13,6 +14,7 @@ export function TargetReaders({ target }: { target: TargetSnapshot }) {
                     const instance = snapshot?.instances.find((instance) => instance.id === id);
                     const name = instance?.displayName ?? id;
                     const disabled = instance?.enabled === false;
+
                     return (
                         <Badge
                             key={id}

@@ -30,8 +30,11 @@ export const useRecheckStore = create<RecheckState>()((set, get) => ({
     answer: undefined,
     recheck: async () => {
         if (get().checking) return;
+
         set({ checking: true });
+
         const result = await postAction('/api/recheck', {});
+
         flushSync(() => {
             receive(result);
             set({ checking: false, answer: { error: result.error, tools: toolsOf(useBoardStore.getState().data) } });
@@ -45,7 +48,9 @@ export const useRecheckStore = create<RecheckState>()((set, get) => ({
 // a note that found a problem goes once the checks change.
 useBoardStore.subscribe((state, prev) => {
     if (state.receives === prev.receives) return;
+
     const { answer } = useRecheckStore.getState();
+
     if (answer && (answer.error || answer.tools !== toolsOf(state.data)))
         useRecheckStore.setState({ answer: undefined });
 });

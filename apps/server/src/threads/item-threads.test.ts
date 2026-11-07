@@ -18,6 +18,7 @@ test('a ticket has the live root threads its first messages name, oldest activit
         { id: 'newer', messages: [`Build ${REPO}#1`], turns: [{ id: 'n1', startedAt: '2026-10-20T11:00:00Z' }] },
         { id: 'older', messages: [`$lar-shape ${REPO}#1`], turns: [{ id: 'o1', startedAt: '2026-10-20T09:00:00Z' }] },
     ]);
+
     assert.deepEqual(threadsOf(REPO, 1), [
         { threadId: 'older', purpose: 'shape' },
         { threadId: 'newer', purpose: 'build' },
@@ -31,6 +32,7 @@ test('a thread belongs only to the issue its first message names first, and chil
         { id: 'gone', messages: [`Build ${REPO}#3`], deletedAt: '2026-10-21T08:00:00Z' },
         { id: 'upper', messages: [`$lar-work Maddec01/Lar-Factory#3`] },
     ]);
+
     assert.deepEqual(
         threadsOf(REPO, 3)
             .map((thread) => thread.threadId)

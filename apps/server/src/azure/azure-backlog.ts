@@ -12,6 +12,7 @@ interface TeamFieldValues {
 function owns({ field: { referenceName }, values }: TeamFieldValues, raw: RawWorkItem): boolean {
     // Area paths ignore case.
     const path = field(raw, referenceName).toLowerCase();
+
     return values.some(
         ({ value, includeChildren }) =>
             path === value.toLowerCase() || (includeChildren && path.startsWith(`${value.toLowerCase()}\\`)),
@@ -30,5 +31,6 @@ export async function readBacklog(
     const top = (await workItems(ids)).filter(
         (raw) => requirements.has(field(raw, 'System.WorkItemType')) && owns(areas, raw),
     );
+
     return { title: `${team} backlog`, items: top, order: ids, completed: false };
 }

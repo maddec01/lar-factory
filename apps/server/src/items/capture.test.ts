@@ -34,6 +34,7 @@ const ticket = (number: number, extra: Partial<PickedTicket> = {}): PickedTicket
 });
 
 const opened: { records: WorkRecords; dir: string }[] = [];
+
 afterEach(() => {
     for (const { records, dir } of opened.splice(0)) {
         records.close();
@@ -45,23 +46,28 @@ afterEach(() => {
 async function captureOn(tickets: PickedTicket[] = []) {
     const dir = mkdtempSync(join(tmpdir(), 'capture-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
+
     opened.push({ records, dir });
+
     const board = createBoardState({ items: [], repos: REPOS, modelChoices: [] } as unknown as BoardData);
     const reread = () => board.update({ items: recordItems(records, [], [WEB]) });
     const calls: string[] = [];
     const source = {
         searchTickets: async (repo: string, query: string) => {
             calls.push(`search ${repo} ${query}`);
+
             return tickets
                 .filter((t) => t.title.includes(query))
                 .map(({ number, title, url }) => ({ number, title, url }));
         },
         readTicket: async (repo: string, number: number) => {
             calls.push(`read ${repo}#${number}`);
+
             return tickets.find((t) => t.number === number) ?? null;
         },
     } as unknown as ItemSource;
     const capture = createCapture({ board, items: source, records, reread, repos: () => REPOS });
+
     return { board, records, capture, calls };
 }
 
@@ -71,13 +77,18 @@ test('Add item records ticketless work with its title and description, and write
     const { records, capture, calls } = await captureOn();
     const draft = { repo: WEB, kind: 'feature', title: 'Export the report', description: '## Why\nAudits.' };
     const reply = await capture.capture({ requestId: REQUEST, draft });
+
     assert.equal(reply.status, 200);
+
     const item = itemOf(reply.body);
+
     assert.deepEqual(
         [item.title, item.kind, item.status, item.number, item.url],
         ['Export the report', 'feature', 'List', 0, null],
     );
+
     const record = records.read(item.id);
+
     assert.equal(record.ticket, null);
     assert.equal(records.initialContext(item.id), '## Why\nAudits.');
     assert.deepEqual(calls, []);
@@ -88,6 +99,7 @@ test('a resent submission finds the work it recorded, and one reusing its reques
     const draft = { repo: WEB, kind: 'bug', title: 'Stall', description: '' };
     const first = itemOf((await capture.capture({ requestId: REQUEST, draft })).body);
     const again = await capture.capture({ requestId: REQUEST, draft });
+
     assert.equal(itemOf(again.body).id, first.id);
     assert.equal((await capture.capture({ requestId: REQUEST, draft: { ...draft, title: 'Other' } })).status, 409);
     assert.equal(records.list({}).length, 1);
@@ -105,6 +117,7 @@ test("a ticket search lists the source's matches, each naming the work ID of the
         ticket: `${WEB}#7`,
     }).record;
     const reply = await capture.searchTickets({ repo: WEB, query: 'Seek' });
+
     assert.equal(reply.status, 200);
     assert.deepEqual((reply.body as { tickets: unknown[] }).tickets, [
         { number: 7, title: 'Seek stalls', url: `https://github.com/${WEB}/issues/7`, workId: held.workId },
@@ -116,15 +129,20 @@ test("a ticket search lists the source's matches, each naming the work ID of the
 test("picking a ticket records it with the ticket's text as initial context, and picking it again opens that record", async () => {
     const { capture, records, calls } = await captureOn([ticket(7)]);
     const first = await capture.pick({ repo: WEB, number: 7 });
+
     assert.equal(first.status, 200);
+
     const item = itemOf(first.body);
+
     assert.deepEqual(
         [item.title, item.kind, item.status, (first.body as { created: boolean }).created],
         ['Ticket 7', 'bug', 'List', true],
     );
     assert.equal(records.read(item.id).ticket, `${WEB}#7`);
     assert.equal(records.initialContext(item.id), 'Text of 7');
+
     const again = await capture.pick({ repo: WEB, number: 7 });
+
     assert.deepEqual([itemOf(again.body).id, (again.body as { created: boolean }).created], [item.id, false]);
     assert.equal(records.list({}).length, 1);
     assert.deepEqual(calls, [`read ${WEB}#7`], 'a recorded ticket is opened without reading it again');
@@ -133,11 +151,16 @@ test("picking a ticket records it with the ticket's text as initial context, and
 test('picking a ticket whose record is set aside restores that record, and a closed or missing ticket records nothing', async () => {
     const { capture, records } = await captureOn([ticket(7)]);
     const item = itemOf((await capture.pick({ repo: WEB, number: 7 })).body);
+
     records.setAside(item.id, records.read(item.id).revision);
+
     const restored = await capture.pick({ repo: WEB, number: 7 });
+
     assert.equal(itemOf(restored.body).id, item.id);
     assert.equal(records.read(item.id).setAside, false);
+
     const missing = await capture.pick({ repo: WEB, number: 9 });
+
     assert.equal(missing.status, 404);
     assert.equal((missing.body as { error: string }).error, `${WEB} has no open ticket #9.`);
     assert.equal(records.list({}).length, 1);
@@ -155,13 +178,18 @@ test('attaching a ticket to captured work keeps its work ID, and a ticket anothe
     );
     const picked = itemOf((await capture.pick({ repo: WEB, number: 8 })).body);
     const taken = await capture.attachTicket(captured.id, 8);
+
     assert.equal(taken.status, 409);
     assert.match((taken.body as { error: string }).error, new RegExp(`${picked.id} already holds`));
+
     const attached = await capture.attachTicket(captured.id, 7);
+
     assert.equal(attached.status, 200);
     assert.equal(records.read(captured.id).ticket, `${WEB}#7`);
     assert.equal(records.initialContext(captured.id), 'Mine.', 'the captured context stays');
+
     const again = await capture.attachTicket(captured.id, 8);
+
     assert.equal(again.status, 409, 'a record keeps the ticket it has');
 });
 
@@ -171,6 +199,7 @@ test('ticket capture imports original text once and replays after the handler re
     const provider = {
         create: async (repository: string, title: string, body: string) => {
             creates++;
+
             return { repository, number: 81, title, body, version: '1' };
         },
     } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
@@ -190,8 +219,11 @@ test('ticket capture imports original text once and replays after the handler re
         });
     const draft = { repo: WEB, kind: 'feature', title: 'Export', description: '## Why\nAudits.' };
     const first = await restart().capture({ requestId: REQUEST, draft });
+
     assert.equal(first.status, 200);
+
     const item = itemOf(first.body);
+
     assert.equal(records.read(item.id).ticket, `${WEB}#81`);
     assert.equal(records.initialContext(item.id), draft.description);
     assert.equal(itemOf((await restart().capture({ requestId: REQUEST, draft })).body).id, item.id);
@@ -223,12 +255,17 @@ test('uncertain creates reconcile by marker and never create again across a data
             discoverOptions: emptyOptions,
         });
     const draft = { repo: WEB, kind: 'bug', title: 'Stall', description: 'Original.', createIssue: true };
+
     assert.equal((await handler(records).capture({ requestId: REQUEST, draft })).status, 409);
     assert.equal(records.list({}).length, 0);
+
     const handle = opened.find((handle) => handle.records === records)!;
+
     records.close();
     handle.records = await openWorkRecords(join(handle.dir, 'work-records.db'));
+
     const result = await handler(handle.records).capture({ requestId: REQUEST, draft });
+
     assert.equal(result.status, 200);
     assert.equal(handle.records.read(itemOf(result.body).id).ticket, `${WEB}#91`);
     assert.equal(writes, 1);
@@ -269,8 +306,11 @@ test('Azure without a surviving marker stays blocked, and forbidden mappings nev
             provider,
             discoverOptions: emptyOptions,
         });
+
     assert.equal((await restart().capture({ requestId: REQUEST, draft: drafts })).status, 409);
+
     const result = await restart().capture({ requestId: REQUEST, draft: drafts });
+
     assert.match((result.body as { error: string }).error, /Azure may have stripped/);
     assert.equal(writes, 1);
     assert.equal(records.list({}).length, 0);
@@ -282,6 +322,7 @@ test('options read failures create with title/body only', async () => {
         create: async (_repo: string, _title: string, _body: string, type: string, _area: string, options: unknown) => {
             assert.equal(type, undefined);
             assert.deepEqual(options, { labels: [], type: undefined });
+
             return { number: 3 };
         },
     } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
@@ -307,6 +348,7 @@ test('options read failures create with title/body only', async () => {
         requestId: REQUEST,
         draft: { repo: WEB, kind: 'bug', title: 'Failure', description: '', createIssue: true },
     });
+
     assert.equal(result.status, 200);
 });
 
@@ -344,11 +386,13 @@ test('Access refusals and unreadable Azure targets leave List empty', async () =
         provider,
         discoverOptions: emptyOptions,
     });
+
     for (const [index, repo] of configs.entries()) {
         const result = await capture.capture({
             requestId: REQUEST.slice(0, -1) + (index + 1),
             draft: { repo: repo.repo, kind: 'bug', title: 'Failure', description: '', createIssue: true },
         });
+
         assert.equal(result.status, index === 1 ? 502 : 403);
     }
     assert.equal(writes, 0);
@@ -360,13 +404,17 @@ test('a record-write failure names the created issue and replay recovers it with
     let writes = 0;
     let fail = true;
     const complete = records.completeCapture;
+
     records.completeCapture = (...args) => {
         if (fail) throw Error('Disk full');
+
         return complete(...args);
     };
+
     const provider = {
         create: async () => {
             writes++;
+
             return { number: 7 };
         },
     } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
@@ -385,10 +433,13 @@ test('a record-write failure names the created issue and replay recovers it with
         draft: { repo: WEB, kind: 'feature', title: 'Export', description: '  Original.\n\n', createIssue: true },
     };
     const result = await capture.capture(request);
+
     assert.match((result.body as { error: string }).error, /Created .*#7.*Find a ticket/);
     assert.equal(records.list({}).length, 0);
     fail = false;
+
     const recovered = await capture.capture(request);
+
     assert.equal(recovered.status, 200);
     assert.equal(records.initialContext(itemOf(recovered.body).id), request.draft.description);
     assert.equal(writes, 1);
@@ -401,6 +452,7 @@ test('converting local work preserves its ID and context even with Add item crea
     const provider = {
         create: async (...args: unknown[]) => {
             writes.push(args);
+
             return { number: 11 };
         },
     } as unknown as import('@lar-factory/work-records/tracker-sync').StructureProvider;
@@ -409,7 +461,9 @@ test('converting local work preserves its ID and context even with Add item crea
         setup: { repo: WEB, createIssuesFromAddItem: false, access: { 'publish-ticket': 'allowed' }, vocabulary: {} },
     } as RepoConfig;
     const reread = () => board.update({ items: recordItems(records, [], [WEB]) });
+
     reread();
+
     const capture = createCapture({
         board,
         items: {} as ItemSource,
@@ -420,6 +474,7 @@ test('converting local work preserves its ID and context even with Add item crea
         discoverOptions: emptyOptions,
     });
     const result = await capture.createTicket(local.workId, { requestId: REQUEST, revision: local.revision });
+
     assert.equal(result.status, 200, JSON.stringify(result.body));
     assert.equal(itemOf(result.body).id, local.workId);
     assert.equal(records.read(local.workId).ticket, `${WEB}#11`);
@@ -432,8 +487,10 @@ test('converting local work preserves its ID and context even with Add item crea
 test('an Add item reservation from before local conversion support still recovers its known ticket', async () => {
     const { records, board } = await captureOn();
     const draft = { createIssue: true, repo: WEB, kind: 'bug', title: 'Recover export', description: 'Original.' };
+
     records.claimCapture(REQUEST, JSON.stringify(draft));
     records.saveCaptureTicket(REQUEST, `${WEB}#22`);
+
     const capture = createCapture({
         board,
         items: {} as ItemSource,
@@ -443,6 +500,7 @@ test('an Add item reservation from before local conversion support still recover
         provider: {} as import('@lar-factory/work-records/tracker-sync').StructureProvider,
     });
     const result = await capture.capture({ requestId: REQUEST, draft });
+
     assert.equal(result.status, 200, JSON.stringify(result.body));
     assert.equal(records.read(itemOf(result.body).id).ticket, `${WEB}#22`);
 });
@@ -453,8 +511,11 @@ test('picking a marked ticket imports only Original as initial context and resto
         ticket(7, { text: formatTicketSpec('Previously gated Spec.', 'Authored Original.') }),
     ]);
     const reply = await capture.pick({ repo: WEB, number: 7 });
+
     assert.equal(reply.status, 200);
+
     const workId = itemOf(reply.body).id;
+
     assert.equal(records.initialContext(workId), 'Authored Original.');
     assert.equal(records.body(workId, 'brief'), null);
 });

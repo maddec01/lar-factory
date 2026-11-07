@@ -22,7 +22,9 @@ export function subscribeExecution(
     onChange: (read: ExecutionRead) => void,
 ): () => void {
     if (!threadId.trim()) throw new Error('Thread ID required');
+
     const recovery = new ExecutionRecovery(threadId);
+
     return subscribeProjects(
         origin,
         version,
@@ -50,6 +52,7 @@ export function readExecution(
         let settled = false;
         const finish = (read: ExecutionRead) => {
             if (settled) return;
+
             settled = true;
             queueMicrotask(() => {
                 clearTimeout(timer);
@@ -101,6 +104,7 @@ function readThreadShells(
                         !value.threads.every(isRecord)
                     )
                         throw new Error(`Invalid ${tag} answer`);
+
                     finish({
                         availability: 'available',
                         observation: {
@@ -123,6 +127,7 @@ export function readThreadFamily(
     threadId: string,
 ): Promise<ThreadFamilyRead> {
     if (!threadId.trim()) throw new Error('Thread ID required');
+
     return readThreadShells(origin, version, protocol, 'orchestration.getThreadFamily', { threadId });
 }
 
@@ -167,6 +172,7 @@ export function subscribeExecutionShell(
 ): () => void {
     let observation: ShellRead['observation'];
     let sequence = -1;
+
     return subscribeProjects(
         origin,
         version,
@@ -177,16 +183,23 @@ export function subscribeExecutionShell(
             payload: { requestCompletionMarker: true, omitIdleSubagents: false, omitOlderSettled: false },
             accept(value) {
                 if (!isRecord(value)) throw Error('Invalid shell event');
+
                 if (value.kind === 'synchronized') return;
+
                 if (value.kind !== 'snapshot') {
                     if (!observation || !Number.isSafeInteger(value.sequence)) throw Error('Shell refresh required');
+
                     if ((value.sequence as number) <= sequence) return;
+
                     const snapshot = { ...observation.snapshot };
                     const threadEvent = value.kind === 'thread.updated' || value.kind === 'thread.removed';
                     const projectEvent = value.kind === 'project.updated' || value.kind === 'project.removed';
+
                     if (!threadEvent && !projectEvent) throw Error('Unknown shell event');
+
                     if (threadEvent && !['active', 'archive'].includes(String(value.location)))
                         throw Error('Invalid thread location');
+
                     const key = projectEvent
                         ? 'projects'
                         : value.location === 'archive'
@@ -201,17 +214,25 @@ export function subscribeExecutionShell(
                         : isRecord(record)
                           ? record.id
                           : undefined;
+
                     if (typeof id !== 'string') throw Error('Invalid shell ID');
+
                     snapshot[key] = (snapshot[key] as Record<string, unknown>[]).filter((entry) => entry.id !== id);
+
                     if (!removed) (snapshot[key] as Record<string, unknown>[]).push(record as Record<string, unknown>);
+
                     sequence = value.sequence as number;
                     snapshot.snapshotSequence = sequence;
                     observation = { snapshot, observedAt: new Date().toISOString() };
                     onChange({ availability: 'available', observation });
+
                     return;
                 }
+
                 if (!isRecord(value.snapshot)) throw Error('Invalid shell snapshot');
+
                 let snapshot = { ...value.snapshot };
+
                 if (
                     !Number.isSafeInteger(snapshot.snapshotSequence) ||
                     (snapshot.snapshotSequence as number) < 0 ||
@@ -220,21 +241,26 @@ export function subscribeExecutionShell(
                     )
                 )
                     throw Error('Invalid shell snapshot');
+
                 if ((snapshot.snapshotSequence as number) < sequence) return;
+
                 if (projectMetadataSnapshot(value)) {
                     if (!observation) throw Error('Full shell snapshot required');
+
                     const records = new Map(
                         (observation.snapshot.projects as Record<string, unknown>[]).map((record) => [
                             record.id,
                             record,
                         ]),
                     );
+
                     for (const record of snapshot.projects as Record<string, unknown>[])
                         if (records.has(record.id)) records.set(record.id, record);
                     snapshot = { ...observation.snapshot, projects: [...records.values()] };
                 } else {
                     sequence = snapshot.snapshotSequence as number;
                 }
+
                 observation = { snapshot, observedAt: new Date().toISOString() };
                 onChange({ availability: 'available', observation });
             },

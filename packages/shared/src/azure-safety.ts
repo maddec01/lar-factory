@@ -2,6 +2,7 @@
 import { onAzure } from './model.ts';
 
 type Environment = Readonly<Record<string, string | undefined>>;
+
 const refusal = 'Azure DevOps is read-only in this test session.';
 
 /** Kept in the environment so the board and lar-work subprocesses share the same boundary. */
@@ -14,7 +15,9 @@ function option(args: readonly string[], name: string): string | undefined {
     const values = args.flatMap((arg, i) =>
         arg === name ? [args[i + 1] ?? ''] : arg.startsWith(`${name}=`) ? [arg.slice(name.length + 1)] : [],
     );
+
     if (values.length > 1 || values.some((value) => !value || value.startsWith('-'))) throw new Error(refusal);
+
     return values[0];
 }
 
@@ -55,15 +58,21 @@ const READ_OPTIONS = new Set([
 /** Fail closed before any az process starts. POST is allowed only for Azure's two read APIs. */
 export function assertAzureCommandAllowed(args: readonly string[], env: Environment = process.env): void {
     if (!readOnly(env)) return;
+
     if (args.some((arg) => arg.startsWith('-') && !READ_OPTIONS.has(arg.split('=')[0]!))) throw new Error(refusal);
+
     const command = args.slice(0, 4).join(' ');
+
     if (args.some((arg) => arg === '-m' || arg === '--uri')) throw new Error(refusal);
+
     const method = option(args, '--http-method');
     const restMethod = option(args, '--method');
+
     if (args[0] === 'devops' && args[1] === 'invoke') {
         const area = option(args, '--area');
         const resource = option(args, '--resource');
         const verb = (method ?? 'GET').toUpperCase();
+
         if (
             !restMethod &&
             !args.some((arg) => arg === '--url' || arg.startsWith('--url=')) &&
@@ -76,8 +85,10 @@ export function assertAzureCommandAllowed(args: readonly string[], env: Environm
             return;
     } else if (args[0] === 'rest') {
         const url = option(args, '--url');
+
         if (!method && restMethod?.toUpperCase() === 'GET' && url) {
             const parsed = URL.canParse(url) ? new URL(url) : null;
+
             // Only the board's evaluated-permission and repository metadata reads are allowed.
             if (
                 parsed?.protocol === 'https:' &&
@@ -108,6 +119,7 @@ export function assertAzureCommandAllowed(args: readonly string[], env: Environm
             ].includes(command))
     )
         return;
+
     throw new Error(refusal);
 }
 

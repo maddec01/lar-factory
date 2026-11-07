@@ -22,6 +22,7 @@ const everything = () => true;
 
 test('hits while the updatedAt is the one the details were read at, and misses once it changes', () => {
     const cache = createDetailsCache(everything);
+
     cache.put('I_1', entry('2026-10-21T08:00:00Z'));
     expect(cache.get('I_1', '2026-10-21T08:00:00Z')?.details.body).toBe('text');
     expect(cache.get('I_1', '2026-10-21T08:05:00Z')).toBeNull();
@@ -30,6 +31,7 @@ test('hits while the updatedAt is the one the details were read at, and misses o
 
 test('an entry read again at a new updatedAt replaces the old one', () => {
     const cache = createDetailsCache(everything);
+
     cache.put('I_1', entry('2026-10-21T08:00:00Z', 'old'));
     cache.put('I_1', entry('2026-10-21T08:05:00Z', 'new'));
     expect(cache.get('I_1', '2026-10-21T08:00:00Z')).toBeNull();
@@ -38,6 +40,7 @@ test('an entry read again at a new updatedAt replaces the old one', () => {
 
 test('keeps nothing for an item whose provider has no cache', () => {
     const cache = createDetailsCache((itemId) => !itemId.startsWith('azure:'));
+
     cache.put('azure:contoso/310', entry('2026-10-21T08:00:00Z'));
     cache.put('I_1', entry('2026-10-21T08:00:00Z'));
     expect(cache.get('azure:contoso/310', '2026-10-21T08:00:00Z')).toBeNull();
@@ -46,6 +49,7 @@ test('keeps nothing for an item whose provider has no cache', () => {
 
 test('keeps at most the bound, dropping the entry used longest ago', () => {
     const cache = createDetailsCache(everything, 2);
+
     cache.put('I_1', entry('t'));
     cache.put('I_2', entry('t'));
     cache.get('I_1', 't');
@@ -57,6 +61,7 @@ test('keeps at most the bound, dropping the entry used longest ago', () => {
 
 test("drop forgets the item's entry and no other", () => {
     const cache = createDetailsCache(everything);
+
     cache.put('I_1', entry('t'));
     cache.put('I_2', entry('t'));
     cache.drop('I_1');

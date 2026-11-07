@@ -33,6 +33,7 @@ function Option({ value }: { value: string }) {
 
 const element = (props: Partial<SearchDialogProps>) => {
     const options = props.options ?? ['Add item', 'Settings', 'Archive'];
+
     return createElement(SearchDialog, {
         label: 'Search the board',
         description: 'Find tickets and set filters',
@@ -68,9 +69,11 @@ const button = (name: string) => document.querySelector<HTMLButtonElement>(`butt
 
 test('opens as a labelled dialog with no heading, focuses the field and reports typing', async () => {
     const onQueryChange = vi.fn();
+
     await show(element({ onQueryChange }));
 
     const dialog = document.querySelector('[role="dialog"]')!;
+
     expect([...dialog.querySelectorAll('h2')].map((heading) => heading.className)).toEqual(['sr-only']);
     expect(input().getAttribute('aria-label')).toBe('Search the board');
     expect(input().placeholder).toBe('Search');
@@ -87,7 +90,9 @@ test('opens as a labelled dialog with no heading, focuses the field and reports 
 
 test("its overlay is a child of the body that the page's animation pause selector matches", async () => {
     await show(element({}));
+
     const overlay = document.querySelector("[data-slot$='-overlay'][data-state='open']");
+
     expect(overlay?.parentElement).toBe(document.body);
     expect(host!.compareDocumentPosition(overlay!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
@@ -112,6 +117,7 @@ test('the arrow keys move the highlight, wrap at both ends and scroll it into vi
 
 test('Enter chooses the highlighted option, and does nothing with an empty list', async () => {
     const onSelect = vi.fn();
+
     await show(element({ onSelect }));
     await press('ArrowDown');
     await press('Enter');
@@ -126,6 +132,7 @@ test('Enter chooses the highlighted option, and does nothing with an empty list'
 
 test('Esc and the Close button close it', async () => {
     const onClose = vi.fn();
+
     await show(element({ onClose }));
     await press('Escape');
     expect(onClose).toHaveBeenCalledOnce();
@@ -135,6 +142,7 @@ test('Esc and the Close button close it', async () => {
 
 test('Backspace calls back in an empty query and does nothing otherwise', async () => {
     const onBackspaceEmpty = vi.fn();
+
     await show(element({ onBackspaceEmpty }));
     await press('Backspace');
     expect(onBackspaceEmpty).toHaveBeenCalledOnce();
@@ -148,6 +156,7 @@ test('no key acts during IME composition', async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     const onBackspaceEmpty = vi.fn();
+
     await show(element({ onSelect, onClose, onBackspaceEmpty }));
     for (const key of ['ArrowDown', 'Enter', 'Backspace', 'Escape']) await press(key, { isComposing: true });
     expect(active()).toBe('Add item');
@@ -158,6 +167,7 @@ test('no key acts during IME composition', async () => {
 
 test('a token shows its content, and its remove button has its own name and returns focus to the field', async () => {
     const onRemove = vi.fn();
+
     await show(
         element({
             tokens: [
@@ -188,6 +198,7 @@ test('a token shows its content, and its remove button has its own name and retu
 
 test('choosing an option can name the option the highlight moves to, as the list changes', async () => {
     const props = { onSelect: () => 'Restore' };
+
     await show(element(props));
     await act(async () => {
         input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
@@ -211,7 +222,9 @@ test('the highlight moves to the first option when the active option leaves the 
 
 test('an option follows the pointer and a click chooses it with the focus left in the field', async () => {
     const onSelect = vi.fn();
+
     await show(element({ onSelect }));
+
     const settings = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
         (option) => option.textContent === 'Settings',
     )!;
@@ -220,6 +233,7 @@ test('an option follows the pointer and a click chooses it with the focus left i
     expect(active()).toBe('Settings');
 
     const pressed = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+
     await act(async () => settings.dispatchEvent(pressed));
     expect(pressed.defaultPrevented).toBe(true);
     await act(async () => settings.click());
@@ -260,7 +274,9 @@ test('the footer holds the key hints', async () => {
 
 test('a press on the trailing control leaves the focus in the field', async () => {
     await show(element({ trailing: createElement('button', { id: 'clear' }, 'Clear') }));
+
     const clear = document.querySelector<HTMLButtonElement>('#clear')!;
+
     await act(async () => {
         clear.focus();
         clear.click();

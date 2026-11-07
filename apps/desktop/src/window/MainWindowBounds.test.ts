@@ -14,11 +14,13 @@ const monitor = { x: 1512, y: 0, width: 2560, height: 1440 };
 describe('resolveInitialMainWindowBounds', () => {
     it('keeps saved bounds that fit entirely inside one display', () => {
         const saved = { x: 1600, y: 100, width: 1400, height: 900 };
+
         assert.deepStrictEqual(MainWindowBounds.resolveInitialMainWindowBounds(saved, [laptop, monitor]), saved);
     });
 
     it("opens at the default size, centred, when the saved bounds were on a display that's gone", () => {
         const saved = { x: 1600, y: 100, width: 1400, height: 900 };
+
         assert.deepStrictEqual(MainWindowBounds.resolveInitialMainWindowBounds(saved, [laptop]), {
             width: 1280,
             height: 860,
@@ -27,6 +29,7 @@ describe('resolveInitialMainWindowBounds', () => {
 
     it('opens at the default size when the saved bounds are larger than every display', () => {
         const saved = { x: 0, y: 0, width: 4000, height: 1440 };
+
         assert.deepStrictEqual(MainWindowBounds.resolveInitialMainWindowBounds(saved, [laptop, monitor]), {
             width: 1280,
             height: 860,
@@ -35,6 +38,7 @@ describe('resolveInitialMainWindowBounds', () => {
 
     it('opens at the default size when the saved bounds straddle two displays', () => {
         const saved = { x: 1000, y: 0, width: 1100, height: 800 };
+
         assert.deepStrictEqual(MainWindowBounds.resolveInitialMainWindowBounds(saved, [laptop, monitor]), {
             width: 1280,
             height: 860,
@@ -55,11 +59,14 @@ describe('MainWindowBounds.atFile', () => {
     it.effect('reads nothing before a save, then the bounds and maximized state last written', () =>
         Effect.gen(function* () {
             const file = tempFile();
+
             assert.deepStrictEqual(yield* MainWindowBounds.atFile(file).read, {
                 mainWindowBounds: null,
                 mainWindowMaximized: false,
             });
+
             const bounds = { x: 10, y: 20, width: 1300, height: 900 };
+
             yield* MainWindowBounds.atFile(file).write(bounds, true);
             assert.deepStrictEqual(yield* MainWindowBounds.atFile(file).read, {
                 mainWindowBounds: bounds,
@@ -72,6 +79,7 @@ describe('MainWindowBounds.atFile', () => {
         Effect.gen(function* () {
             const file = tempFile();
             const nothing = { mainWindowBounds: null, mainWindowMaximized: false };
+
             NodeFS.mkdirSync(NodePath.dirname(file), { recursive: true });
             NodeFS.writeFileSync(file, 'not json');
             assert.deepStrictEqual(yield* MainWindowBounds.atFile(file).read, nothing);
@@ -109,6 +117,7 @@ const fakeWindow = () => {
         write: (bounds, isMaximized) => Effect.sync(() => void writes.push({ bounds, isMaximized })),
     };
     const flush = MainWindowBounds.persistMainWindowBounds(window as unknown as Electron.BrowserWindow, setting);
+
     return { window, writes, flush };
 };
 
@@ -118,6 +127,7 @@ describe('persistMainWindowBounds', () => {
 
     it('saves once, 500 ms after the window last moves or resizes', () => {
         const { window, writes } = fakeWindow();
+
         window.emit('move');
         vi.advanceTimersByTime(400);
         window.emit('resize');
@@ -129,6 +139,7 @@ describe('persistMainWindowBounds', () => {
 
     it('saves the bounds the window returns to while maximized, full screen or minimized', () => {
         const { window, writes, flush } = fakeWindow();
+
         window.maximized = true;
         window.emit('maximize');
         vi.advanceTimersByTime(500);
@@ -147,6 +158,7 @@ describe('persistMainWindowBounds', () => {
 
     it("saves at once when the window closes, and not again after it's gone", () => {
         const { window, writes } = fakeWindow();
+
         window.emit('resize');
         window.emit('close');
         assert.deepStrictEqual(writes, [{ bounds: window.bounds, isMaximized: false }]);
@@ -158,6 +170,7 @@ describe('persistMainWindowBounds', () => {
 
     it('saves nothing for a destroyed window', () => {
         const { window, writes, flush } = fakeWindow();
+
         window.emit('resize');
         window.destroyed = true;
         vi.advanceTimersByTime(500);

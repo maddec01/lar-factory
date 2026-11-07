@@ -9,8 +9,11 @@ export async function skipEmptyCommentPages(
 ): Promise<ItemCommentsPage | Refused> {
     for (let reads = 0; reads < 2 && page.comments.length === 0 && page.olderCursor !== null; reads++) {
         const next = await readOlder(page.olderCursor);
+
         if ('error' in next) return next;
+
         page = next;
     }
+
     return page;
 }

@@ -8,6 +8,7 @@ import { assertAzureCommandAllowed } from './azure-safety.ts';
 
 export async function providerCommand(command: 'gh' | 'az', args: string[], input?: string): Promise<string> {
     if (command === 'az') assertAzureCommandAllowed(args);
+
     return new Promise((resolve, reject) => {
         const child = execFile(
             process.env[command === 'gh' ? 'GH_PATH' : 'AZ_PATH'] || command,
@@ -17,10 +18,12 @@ export async function providerCommand(command: 'gh' | 'az', args: string[], inpu
                 if (error) {
                     // Do not include execFile's command line: it may contain private content.
                     const failure = new Error(`${command} failed: ${stderr.trim() || error.code || 'lost response'}`);
+
                     reject(failure);
                 } else resolve(stdout);
             },
         );
+
         child.stdin?.on('error', () => {
             /* execFile's completion owns a lost pipe. */
         });
@@ -66,9 +69,12 @@ export const workItemPatch = (
 /** Runs `use` on a temporary file holding `body` as JSON, for az's --in-file, and removes the file after. */
 export async function withFile<T>(body: unknown, use: (file: string) => Promise<T>): Promise<T> {
     const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
+
     try {
         const file = join(dir, 'body.json');
+
         await writeFile(file, JSON.stringify(body));
+
         return await use(file);
     } finally {
         await rm(dir, { recursive: true, force: true });

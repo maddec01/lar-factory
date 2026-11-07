@@ -12,20 +12,28 @@ function refUses(data: unknown): Map<string, Set<string>> {
     const uses = new Map<string, Set<string>>();
     const visit = (value: unknown): void => {
         if (Array.isArray(value)) return value.forEach(visit);
+
         if (!value || typeof value !== 'object') return;
+
         const node = value as Record<string, unknown>;
         const match =
             typeof node.url === 'string' ? /github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/(\d+)/.exec(node.url) : null;
+
         if (match) {
             const [, repo = '', kind = '', number = ''] = match;
             const key = `${repo.toLowerCase()}#${number}`;
             const set = uses.get(key) ?? uses.set(key, new Set()).get(key)!;
+
             set.add(kind);
+
             if (typeof node.title === 'string') set.add(`title: ${node.title}`);
         }
+
         Object.values(node).forEach(visit);
     };
+
     visit(data);
+
     return uses;
 }
 
@@ -42,6 +50,7 @@ function clashes(data: unknown): string[] {
 
 test('the clash check catches one number naming two things', () => {
     const url = (kind: string, n: number) => `https://github.com/o/r/${kind}/${n}`;
+
     assert.deepEqual(
         clashes([
             { url: url('issues', 1), title: 'A' },
@@ -61,12 +70,14 @@ test('the clash check catches one number naming two things', () => {
 
 test('sample data never gives one issue or PR number to two things', async () => {
     const data = JSON.parse(await readFile(SAMPLE_DATA, 'utf8'));
+
     assert.deepEqual(clashes(data), []);
 });
 
 test('sample mode offers the fixture model choices', async (t) => {
     const board = await startBoard(t, {}, true);
     const groups = ((await board.board()) as BoardData).modelChoices;
+
     assert.deepEqual(
         groups?.map((g) => [g.instanceId, g.models.map((m) => m.label)]),
         [
@@ -84,6 +95,7 @@ test("sample mode shows only the sample's chosen icons, and the image endpoint a
     const { url, t3Calls } = await startBoard(t, {}, true);
     const board = (await (await fetch(`${url}/api/board`)).json()) as BoardData;
     const icons = Object.values(board.projectIcons ?? {});
+
     assert.ok(icons.length > 0);
     assert.ok(icons.every((icon) => icon.kind !== 'favicon'));
     assert.equal((await fetch(`${url}/api/project-icon/I_sample`)).status, 404);
@@ -92,13 +104,16 @@ test("sample mode shows only the sample's chosen icons, and the image endpoint a
 
 test('the sampler variable makes the board write a sample from startup, with its PID', async (t) => {
     const dir = await mkdtemp(join(tmpdir(), 'lar-memory-board-'));
+
     t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
     const file = join(dir, 'samples.jsonl');
     const board = await startBoard(t, {}, true, false, { BOARD_MEMORY_SAMPLES: file });
     const [first] = (await readFile(file, 'utf8'))
         .trim()
         .split('\n')
         .map((line) => JSON.parse(line) as { kind: string; pid: number });
+
     assert.equal(first?.kind, 'start');
     assert.equal(first?.pid, board.pid);
 });

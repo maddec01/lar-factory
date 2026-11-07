@@ -10,6 +10,7 @@ import { LinkButton } from './link-button.tsx';
 
 export function PrLink({ item, label }: { item: Item; label: string }) {
     const url = itemPr(item)?.url;
+
     // Pointer events stay on while it's disabled, so its title says why.
     if (!url)
         return (
@@ -24,6 +25,7 @@ export function PrLink({ item, label }: { item: Item; label: string }) {
                 {label}
             </Button>
         );
+
     return (
         <LinkButton kind="open" leftIcon={ICON.pr} data-pr-link={item.id} href={url} target="_blank" rel="noopener">
             {label}

@@ -8,9 +8,12 @@ import { readRetention, writeRetention } from './retention.ts';
 const dirs: string[] = [];
 const tempDir = () => {
     const dir = mkdtempSync(join(tmpdir(), 'retention-'));
+
     dirs.push(dir);
+
     return dir;
 };
+
 afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
@@ -22,6 +25,7 @@ describe('retention setting', () => {
 
     it('saves a deletion choice in the data folder and reads it back', () => {
         const dir = join(tempDir(), 'Lar Factory');
+
         expect(writeRetention({ hideAfterDays: 7, deleteAfterDays: 30 }, dir)).toEqual({
             hideAfterDays: 7,
             deleteAfterDays: 30,
@@ -32,6 +36,7 @@ describe('retention setting', () => {
 
     it('refuses a malformed setting and leaves the saved one as it was', () => {
         const dir = tempDir();
+
         writeRetention({ hideAfterDays: 3, deleteAfterDays: null }, dir);
         expect(() => writeRetention({ hideAfterDays: -1, deleteAfterDays: null }, dir)).toThrow(
             'whole numbers of days',

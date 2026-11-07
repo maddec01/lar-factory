@@ -12,6 +12,7 @@ test('threads come back in one query, each with its title, lineage and deletion 
         { id: 'child', rootThreadId: 'root', messages: ['Build x/y#2'] },
     ]);
     const { threads } = readT3Db(db, threadRows);
+
     assert.deepEqual(
         threads.map((row) => ({ ...row })),
         [
@@ -31,6 +32,7 @@ test("a thread's sessions come back earliest first", (t) => {
             ],
         },
     ]);
+
     assert.deepEqual(
         readT3Db(db, threadSessions).map((row) => ({ ...row })),
         [
@@ -45,6 +47,7 @@ test('live projects leave deleted ones out and give each title and folder with `
         { id: 'a', root: '~/lar/' },
         { id: 'b', root: '/srv/b', deletedAt: '2026-10-20T08:00:00Z' },
     ]);
+
     assert.deepEqual(liveProjects(db, '/Users/me'), [{ id: 'a', title: 'a', folder: '/Users/me/lar' }]);
 });
 
@@ -70,6 +73,7 @@ test("a project's thread found by its title gives its id and latest assistant me
             ],
         },
     ]);
+
     assert.deepEqual(threadByTitle(db, 'web', 'Look for Clashes (run a1)'), {
         threadId: 'run',
         latest: 'Reading AGENTS.md',
@@ -81,10 +85,13 @@ test("a project's thread found by its title gives its id and latest assistant me
 test("a project's row gives its default model selection, leaving deleted projects and empty ones out", (t) => {
     const path = join(tempDir(t, 't3-db-'), 'state.sqlite');
     const db = new DatabaseSync(path);
+
     db.exec(`CREATE TABLE projection_projects (project_id TEXT, default_model_selection_json TEXT, deleted_at TEXT);
     INSERT INTO projection_projects VALUES ('a', '{"instanceId":"codex","model":"gpt"}', NULL), ('b', NULL, NULL), ('c', '{"instanceId":"codex","model":"gone"}', '2026-10-20');`);
     db.close();
+
     const read = (id: string) => readT3Db(path, (open) => projectDefaultSelection(open, id));
+
     assert.deepEqual(read('a'), { instanceId: 'codex', model: 'gpt' });
     assert.equal(read('b'), null);
     assert.equal(read('c'), null);

@@ -6,12 +6,16 @@ function Diagram({ source }: { source: string }) {
     const id = useId().replace(/[^a-zA-Z0-9]/g, '');
     const host = useRef<HTMLDivElement>(null);
     const [problem, setProblem] = useState<string | null>(null);
+
     useEffect(() => {
         let current = true;
+
         setProblem(null);
+
         const render = async () => {
             try {
                 const { default: mermaid } = await import('mermaid');
+
                 mermaid.initialize({
                     startOnLoad: false,
                     securityLevel: 'strict',
@@ -20,17 +24,22 @@ function Diagram({ source }: { source: string }) {
                     flowchart: { htmlLabels: false },
                     maxTextSize: 50_000,
                 });
+
                 const { svg } = await mermaid.render(`concept-${id}`, source);
+
                 if (current && host.current) host.current.innerHTML = svg;
             } catch {
                 if (current) setProblem('The diagram could not be drawn. Its source is available below.');
             }
         };
+
         void render();
+
         return () => {
             current = false;
         };
     }, [id, source]);
+
     return (
         <figure className="m-0 grid min-w-0 gap-2 rounded-lg border p-3" data-map-diagram>
             {problem ? (
@@ -55,6 +64,7 @@ function Diagram({ source }: { source: string }) {
 
 export function MarkdownDiagrams({ text }: { text: string }) {
     const parts = text.split(/```mermaid[^\S\r\n]*\r?\n([\s\S]*?)```/g);
+
     return (
         <div className="grid min-w-0 gap-3">
             {parts.map((part, index) =>

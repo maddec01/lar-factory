@@ -45,6 +45,7 @@ test('Start remembers the picked choice once it reports "Started" or "May have s
 
 test('a stored choice reads back as it was stored; "T3 Project default" or anything unreadable reads as none', () => {
     const choice = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5[1m]' };
+
     assert.deepEqual(readChoice(storedChoice(choice)), choice);
     assert.equal(readChoice(storedChoice(undefined)), undefined);
     for (const raw of [null, '', 'not json', '42', '{"instanceId":"codex"}', '{"instanceId":1,"model":"gpt-5.5"}'])
@@ -55,6 +56,7 @@ test('the menu highlights the remembered choice while it is offered, else "T3 Pr
     const groups: ModelGroup[] = [
         { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
     ];
+
     assert.deepEqual(highlightedChoice(groups, { instanceId: 'codex', model: 'gpt-5.5' }), {
         instanceId: 'codex',
         model: 'gpt-5.5',

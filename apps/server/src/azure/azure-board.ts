@@ -14,6 +14,7 @@ export function azureBoard(repos: readonly string[], team: string, run: Az = az)
             const reads = { ...calls, backlogIds: () => (order ??= calls.backlogIds()) };
             const [backlog, sprint] = await Promise.all([readBacklog(team, reads), readSprint(team, reads)]);
             const sprintIds = new Set(sprint.items.map((item) => item.id));
+
             return {
                 title: `${team} backlog and current sprint`,
                 items: [...new Map([...backlog.items, ...sprint.items].map((item) => [item.id, item])).values()],

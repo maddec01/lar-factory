@@ -36,23 +36,35 @@ function tokenCount(value: unknown): number {
 /** A transcript line's usage record, or null for any line T3 doesn't count. */
 export function parseClaudeLine(line: string): UsageRecord | null {
     let record: unknown;
+
     try {
         record = JSON.parse(line);
     } catch {
         return null;
     }
+
     if (!isObject(record) || record.type !== 'assistant') return null;
+
     const message = record.message;
+
     if (!isObject(message)) return null;
+
     const usage = message.usage;
+
     if (!isObject(usage)) return null;
+
     const timestampMs = parseTimestampMs(record.timestamp);
+
     if (timestampMs === null) return null;
+
     const model = typeof message.model === 'string' ? message.model : '';
+
     if (model.length === 0 || model === CLAUDE_SYNTHETIC_MODEL) return null;
+
     const messageId = typeof message.id === 'string' ? message.id : null;
     const requestId = typeof record.requestId === 'string' ? record.requestId : null;
     const cost = record.costUSD;
+
     return {
         provider: 'claude',
         timestampMs,
@@ -78,10 +90,12 @@ const claudeLineParser = (): LineParser => (line) => (line.includes('"usage"') ?
 /** Total tokens as T3's usage page sums them: reasoning is inside output, so it isn't added again. */
 export function totalTokens(records: Iterable<UsageRecord>): number {
     let total = 0;
+
     for (const { totals } of records) {
         total +=
             totals.uncachedInputTokens + totals.cachedInputTokens + totals.cacheCreationTokens + totals.outputTokens;
     }
+
     return total;
 }
 
@@ -92,10 +106,14 @@ export function totalTokens(records: Iterable<UsageRecord>): number {
  */
 export function firstCopies(): (record: UsageRecord) => boolean {
     const seen = new Set<string>();
+
     return ({ dedupeKey }) => {
         if (dedupeKey === null) return true;
+
         if (seen.has(dedupeKey)) return false;
+
         seen.add(dedupeKey);
+
         return true;
     };
 }
@@ -118,24 +136,32 @@ async function fileRecords({ path, parser }: TranscriptFile, trace: ReadTrace): 
     const records: UsageRecord[] = [];
     const add = (line: string) => {
         const record = parse(line);
+
         if (record) records.push(record);
     };
     const unfinished: string[] = [];
     const chunks = createReadStream(path, { encoding: 'utf8', highWaterMark: READ_BYTES })[
         Symbol.asyncIterator
     ]() as AsyncIterator<string>;
+
     for (;;) {
         const { value: chunk, done } = await trace.wait(chunks.next());
+
         if (done) break;
+
         let start = 0;
+
         for (let end = chunk.indexOf('\n'); end !== -1; start = end + 1, end = chunk.indexOf('\n', start)) {
             unfinished.push(chunk.slice(start, end));
             add(unfinished.length === 1 ? unfinished[0]! : unfinished.join(''));
             unfinished.length = 0;
         }
+
         if (start < chunk.length) unfinished.push(chunk.slice(start));
     }
+
     if (unfinished.length) add(unfinished.join(''));
+
     return records;
 }
 
@@ -157,21 +183,28 @@ export async function warmTranscripts(
 ): Promise<PinnedTranscripts> {
     const records = new Map<string, readonly UsageRecord[]>();
     let parsed = 0;
+
     for (const file of files) {
         if (records.has(file.path)) continue;
+
         let seen;
+
         try {
             seen = await trace.wait(stat(file.path));
         } catch {
             continue;
         }
+
         const hit = cache.get(file.path);
+
         if (hit && hit.mtimeMs === seen.mtimeMs && hit.size === seen.size) {
             records.set(file.path, hit.records);
             continue;
         }
+
         try {
             const read = await fileRecords(file, trace);
+
             cache.set(file.path, { mtimeMs: seen.mtimeMs, size: seen.size, records: read });
             records.set(file.path, read);
             parsed++;
@@ -180,6 +213,7 @@ export async function warmTranscripts(
         }
     }
     for (const path of cache.keys()) if (!records.has(path)) cache.delete(path);
+
     return { records, parsed };
 }
 
@@ -210,12 +244,16 @@ const pinnedLists = (files: readonly TranscriptFile[], { records }: PinnedTransc
 export async function claudeSessions(home: string, trace: ReadTrace = createReadTrace()): Promise<SessionTranscripts> {
     const paths = new Map<string, string[]>();
     const root = join(home, 'projects');
+
     for (const project of (await list(root, trace)).sort()) {
         const dir = join(root, project);
+
         for (const entry of (await list(dir, trace)).sort()) {
             const main = MAIN.exec(entry)?.[1];
             const session = main ?? (SESSION.test(entry) ? entry : undefined);
+
             if (!session) continue;
+
             const found = main
                 ? [join(dir, entry)]
                 : (await list(join(dir, entry, 'subagents'), trace))
@@ -223,12 +261,15 @@ export async function claudeSessions(home: string, trace: ReadTrace = createRead
                       .sort()
                       .map((name) => join(dir, entry, 'subagents', name));
             const known = paths.get(session) ?? [];
+
             // A session's own transcript goes before its subagents'.
             paths.set(session, main ? [...found, ...known] : [...known, ...found]);
         }
     }
+
     const files = (session: string) =>
         SESSION.test(session) ? (paths.get(session) ?? []).map((path) => ({ path, parser: claudeLineParser })) : [];
+
     return { files, records: (session, pinned) => pinnedLists(files(session), pinned) };
 }
 
@@ -239,14 +280,17 @@ const ROLLOUT = /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})
 async function walk(dir: string, trace: ReadTrace): Promise<string[]> {
     const found: string[] = [];
     let entries;
+
     try {
         entries = await trace.wait(readdir(dir, { withFileTypes: true }));
     } catch {
         return found;
     }
+
     for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
         const path = join(dir, entry.name);
         let isDirectory = entry.isDirectory();
+
         if (entry.isSymbolicLink()) {
             try {
                 isDirectory = (await trace.wait(stat(path))).isDirectory();
@@ -254,9 +298,11 @@ async function walk(dir: string, trace: ReadTrace): Promise<string[]> {
                 continue;
             }
         }
+
         if (isDirectory) found.push(...(await walk(path, trace)));
         else found.push(path);
     }
+
     return found;
 }
 
@@ -268,19 +314,26 @@ async function walk(dir: string, trace: ReadTrace): Promise<string[]> {
 function keyCopiedSessions(files: readonly (readonly UsageRecord[])[]): readonly (readonly UsageRecord[])[] {
     const firstFile = new Map<string, number>();
     const shared = new Set<string>();
+
     files.forEach((records, index) => {
         for (const { sessionId } of records) {
             if (sessionId.length === 0) continue;
+
             const first = firstFile.get(sessionId);
+
             if (first === undefined) firstFile.set(sessionId, index);
             else if (first !== index) shared.add(sessionId);
         }
     });
+
     if (shared.size === 0) return files;
+
     return files.map((records) => {
         const occurrences = new Map<string, number>();
+
         return records.map((record) => {
             if (!shared.has(record.sessionId)) return record;
+
             const key = JSON.stringify([
                 record.provider,
                 record.sessionId,
@@ -289,7 +342,9 @@ function keyCopiedSessions(files: readonly (readonly UsageRecord[])[]): readonly
                 record.totals,
             ]);
             const occurrence = (occurrences.get(key) ?? 0) + 1;
+
             occurrences.set(key, occurrence);
+
             return { ...record, dedupeKey: `${key}:${occurrence}` };
         });
     });
@@ -301,11 +356,15 @@ function keyCopiedSessions(files: readonly (readonly UsageRecord[])[]): readonly
  */
 export async function codexSessions(home: string, trace: ReadTrace = createReadTrace()): Promise<SessionTranscripts> {
     const paths = new Map<string, string[]>();
+
     for (const path of await walk(join(home, 'sessions'), trace)) {
         const session = ROLLOUT.exec(path)?.[1]?.toLowerCase();
+
         if (session) paths.set(session, [...(paths.get(session) ?? []), path]);
     }
+
     const files = (session: string) =>
         (paths.get(session.toLowerCase()) ?? []).map((path) => ({ path, parser: codexLineParser }));
+
     return { files, records: (session, pinned) => keyCopiedSessions(pinnedLists(files(session), pinned)) };
 }

@@ -28,23 +28,33 @@ export async function createProject(
     add: (folder: string) => Promise<string | null> = addProject,
 ): Promise<{ projects: ProjectChoice[]; projectId: string } | { status: number; error: string }> {
     const named = typeof input.folder === 'string' ? input.folder.trim() : '';
+
     if (!named) return { status: 400, error: 'Name the folder to add.' };
+
     if (!isAbsolute(named) && named !== '~' && !named.startsWith('~/')) {
         return { status: 400, error: "Give the folder's full path, such as ~/Developer/lar-web." };
     }
+
     const folder = resolve(expandHome(named, env.HOME ?? ''));
+
     if (!statSync(folder, { throwIfNoEntry: false })?.isDirectory())
         return { status: 400, error: `There is no folder at ${folder}.` };
+
     const failed = await add(folder);
+
     if (failed) return { status: 502, error: failed };
+
     let projects: ProjectChoice[];
+
     try {
         projects = await choices();
     } catch (err) {
         return { status: 502, error: err instanceof Error ? err.message : String(err) };
     }
+
     const real = realFolder(folder);
     const created = projects.find((p) => realFolder(p.folder) === real);
+
     return created
         ? { projects, projectId: created.id }
         : { status: 502, error: `T3 Code added ${folder}, but its projects don't list it.` };

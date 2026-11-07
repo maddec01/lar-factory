@@ -24,6 +24,7 @@ const fakeConfig = (env: Record<string, string>): BoardServer.StartConfig => ({
 const isRunning = (pid: number) => {
     try {
         process.kill(pid, 0);
+
         return true;
     } catch {
         return false;
@@ -57,6 +58,7 @@ describe('makeStartConfig', () => {
             env: {},
             secret: 's',
         };
+
         assert.equal(BoardServer.makeStartConfig({ ...input, checksSkills: true }).env.BOARD_SKILL_CHECK, '1');
         assert.equal(BoardServer.makeStartConfig(input).env.BOARD_SKILL_CHECK, undefined);
     });
@@ -70,6 +72,7 @@ describe('makeStartConfig', () => {
             env: {},
             secret: 'launch-secret',
         });
+
         assert.equal(config.env.BOARD_BUNDLE_DIR, '/bundle');
     });
 
@@ -81,6 +84,7 @@ describe('makeStartConfig', () => {
             env: { PATH: '/usr/bin', ELECTRON_RUN_AS_NODE: '0' },
             secret: 'launch-secret',
         });
+
         assert.deepStrictEqual(config, {
             executablePath: '/Applications/Board.app/Contents/MacOS/Board',
             args: ['--disable-warning=ExperimentalWarning', '/repo/apps/server/src/server.ts'],
@@ -99,6 +103,7 @@ describe('start', () => {
         Effect.gen(function* () {
             const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_BUSY: '3' }));
             const hits = yield* Effect.promise(() => fetch(new URL('/hits', board.url)).then((res) => res.json()));
+
             assert.strictEqual(hits, 4);
             assert.match(board.url.href, /^http:\/\/127\.0\.0\.1:\d+\/$/);
         }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
@@ -107,6 +112,7 @@ describe('start', () => {
     it.live('reports starting the server, then polling /healthz once it has a port', () =>
         Effect.gen(function* () {
             const steps: Array<string> = [];
+
             yield* BoardServer.start(fakeConfig({ FAKE_BOARD_BUSY: '3' }), { progress: (step) => steps.push(step) });
             assert.deepStrictEqual(steps, ['starting', 'healthz']);
         }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
@@ -115,6 +121,7 @@ describe('start', () => {
     it.live('reports no /healthz poll when the server exits before it reports a port', () =>
         Effect.gen(function* () {
             const steps: Array<string> = [];
+
             yield* BoardServer.start(fakeConfig({ FAKE_BOARD: 'crash' }), {
                 progress: (step) => steps.push(step),
             }).pipe(Effect.scoped, Effect.exit);
@@ -127,9 +134,12 @@ describe('start', () => {
         Effect.promise(async () => {
             for (let attempt = 0; attempt < 100; attempt++) {
                 const body = await fetch(new URL('/answer', url)).then((res) => res.json());
+
                 if (body) return body;
+
                 await new Promise((resolve) => setTimeout(resolve, 20));
             }
+
             return null;
         });
 
@@ -138,6 +148,7 @@ describe('start', () => {
             const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: '1' }), {
                 checkSkills: () => Promise.resolve({ refusal: 'tdd is blocked' }),
             });
+
             assert.deepStrictEqual(yield* skillAnswer(board.url), {
                 type: 'skills-checked',
                 id: 7,
@@ -152,9 +163,11 @@ describe('start', () => {
             const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: '1', FAKE_BOARD_DRIFT: 'keep' }), {
                 checkSkills: (drift) => {
                     choices.push(drift);
+
                     return Promise.resolve({ refusal: 'Replace or start anyway', drift: ['lar-build'] });
                 },
             });
+
             assert.deepStrictEqual(yield* skillAnswer(board.url), {
                 type: 'skills-checked',
                 id: 7,
@@ -171,6 +184,7 @@ describe('start', () => {
                 checkSkills: () => Promise.reject(new Error('the check died')),
             });
             const answer = yield* skillAnswer(board.url);
+
             assert.strictEqual(answer?.id, 7);
             assert.include(answer?.refusal, "couldn't check its skills");
             assert.include(answer?.refusal, 'the check died');
@@ -180,6 +194,7 @@ describe('start', () => {
     it.live('fails when the server exits before it reports a port', () =>
         Effect.gen(function* () {
             const exit = yield* BoardServer.start(fakeConfig({ FAKE_BOARD: 'crash' })).pipe(Effect.scoped, Effect.exit);
+
             assert.isTrue(Exit.isFailure(exit));
             assert.match(String(Exit.isFailure(exit) && exit.cause), /exited with code 3 before it reported a port/);
         }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
@@ -190,6 +205,7 @@ describe('start', () => {
             const exit = yield* BoardServer.start(fakeConfig({ FAKE_BOARD: 'silent' }), {
                 portTimeout: Duration.millis(300),
             }).pipe(Effect.scoped, Effect.exit);
+
             assert.match(String(Exit.isFailure(exit) && exit.cause), /reported no port within/);
         }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
     );
@@ -198,6 +214,7 @@ describe('start', () => {
         Effect.gen(function* () {
             const scope = yield* Scope.make();
             const board = yield* BoardServer.start(fakeConfig({})).pipe(Scope.provide(scope));
+
             assert.isTrue(isRunning(board.pid));
             yield* Scope.close(scope, Exit.void);
             assert.isFalse(isRunning(board.pid));
@@ -207,6 +224,7 @@ describe('start', () => {
     it.live('reports how the server exited', () =>
         Effect.gen(function* () {
             const board = yield* BoardServer.start(fakeConfig({}));
+
             process.kill(board.pid, 'SIGKILL');
             assert.strictEqual(yield* board.exited, 'on SIGKILL');
         }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
@@ -227,7 +245,9 @@ describe('start', () => {
             });
             const board = yield* BoardServer.start(config);
             const page = yield* Effect.promise(() => fetch(board.url).then((res) => res.text()));
+
             assert.include(page, '<html');
+
             // Each POST comes from the page's origin, as JSON, as the page's and status.sh's do.
             const post = (path: string, headers: Record<string, string> = {}) =>
                 Effect.promise(() =>
@@ -238,6 +258,7 @@ describe('start', () => {
                     }).then(async (res) => `${res.status} ${await res.text()}`),
                 );
             const refused = '403 {"error":"Submit from the board app."}';
+
             assert.strictEqual(yield* post('/api/queue'), refused, 'a write without the launch secret');
             // Sample mode turns the write down itself once the secret gets it past the check.
             assert.notStrictEqual(yield* post('/api/queue', { 'X-Board-Secret': 'launch-secret' }), refused);
@@ -245,6 +266,7 @@ describe('start', () => {
 
             // A drain with the wrong secret fails and leaves writes open; with the launch secret it closes them.
             const failed = yield* Effect.exit(BoardServer.drain(board.url, 'wrong-secret'));
+
             assert.match(String(Exit.isFailure(failed) && failed.cause), /could not drain the board's writes/);
             assert.notMatch(yield* post('/api/queue', { 'X-Board-Secret': 'launch-secret' }), /^503 /);
             yield* BoardServer.drain(board.url, 'launch-secret');

@@ -26,5 +26,6 @@ export function limitSetting(file: string, name: string): LimitSetting {
         needs: 'needs a limit of "automatic" or a whole number from 1',
         parse: (json) => (isRecord(json) && validLimit(json.limit) ? { limit: json.limit } : null),
     });
+
     return { read: setting.read, write: (limit, dir) => setting.write({ limit }, dir).limit };
 }

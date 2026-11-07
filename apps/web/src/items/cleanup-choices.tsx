@@ -35,7 +35,9 @@ export async function executeCleanup(
         itemId,
         options,
     });
+
     receive(cleaned);
+
     return cleaned;
 }
 
@@ -56,6 +58,7 @@ export function useCleanupChoices() {
     const [local, setLocal] = useState(false);
     const [remote, setRemote] = useState(false);
     const [confirmLoss, setConfirmLoss] = useState(false);
+
     return {
         cleanup,
         local,
@@ -93,7 +96,9 @@ export function useCleanupChoices() {
                 !cleanup?.plans.some((plan) => plan.dirtyFiles.length || plan.unpushedCommits.length)
             )
                 return false;
+
             setConfirmLoss(true);
+
             return true;
         },
         selection: () => ({ token: cleanup!.token, local, remote, confirmedLoss: confirmLoss }),
@@ -113,7 +118,9 @@ export function CleanupChoices({
     remoteNote?: ReactNode;
 }) {
     const { cleanup, local, remote, confirmLoss } = choices;
+
     if (!cleanup) return null;
+
     const remoteBranches = cleanup.plans
         .filter((plan) => plan.remoteAvailable)
         .map((plan) => plan.remoteBranch ?? plan.branch);
@@ -121,6 +128,7 @@ export function CleanupChoices({
     const localBranches = cleanup.plans
         .filter((plan) => plan.localAvailable)
         .flatMap((plan) => plan.localBranches ?? [plan.branch]);
+
     return (
         <>
             {cleanup.plans.map(

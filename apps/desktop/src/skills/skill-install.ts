@@ -84,7 +84,9 @@ export const installHome = (home: string, env: LaunchInput['env']) => installRoo
 /** What this launch installs, or undefined when it installs nothing. */
 export const plan = (input: LaunchInput): Plan | undefined => {
     if (!input.isPackaged && !input.argv.includes(INSTALL_FLAG)) return undefined;
+
     const root = installRoot(input.env);
+
     return { home: root ?? input.home, ...(root && { root }), bundle: input.bundle, version: input.version };
 };
 
@@ -119,9 +121,11 @@ export const offlineTargets = (home: string): Array<OfferedTarget> => {
 /** Every Install target of T3's instances, disabled ones too, once per path and required, so no untick turns it off. */
 export const requiredTargets = (instances: ReadonlyArray<ProviderInstance>): Array<OfferedTarget> => {
     const byPath = new Map<string, OfferedTarget>();
+
     for (const target of instances.flatMap(({ targets }) => targets)) {
         if (!byPath.has(target.path)) byPath.set(target.path, { ...target, required: true });
     }
+
     return [...byPath.values()];
 };
 
@@ -185,7 +189,9 @@ export const makeChecks = (
     run: typeof runInstall = runInstall,
 ): Effect.Effect<Checks | undefined> => {
     const install = plan(input);
+
     if (!install) return Effect.succeed(undefined);
+
     return oneAtATime.pipe(
         Effect.map((serial): Checks => {
             const listeners = new Set<() => void>();
@@ -208,6 +214,7 @@ export const makeChecks = (
                             targets: [...fallbackTargets(install.home), ...requiredTargets(answer.instances)],
                         });
                     } else update({ discovery: answer.reason });
+
                     return answer.available;
                 }),
             );
@@ -240,6 +247,7 @@ export const makeChecks = (
                             : event.target,
                     replaced: [...new Set([...(previous?.replaced ?? []), ...event.replaced])].sort(),
                 };
+
                 update({ progress: [...earlier.filter((entry) => entry !== previous), next] });
             };
             const settle = (outcome: InstallResult | SkillInstallError) =>
@@ -248,6 +256,7 @@ export const makeChecks = (
                         // A failed copy cannot establish that earlier Drift resolved. Keep only the failed paths whose skill did
                         // not finish, so a partial Replace can clear the skills it did replace while the others stay actionable.
                         const drift = new Map(outcome.drift.map(({ skill, paths }) => [skill, [...paths]]));
+
                         for (const { skill, paths } of state.lastResult?.drift ?? []) {
                             for (const at of paths) {
                                 const failed = outcome.targets.find(
@@ -260,14 +269,19 @@ export const makeChecks = (
                                         failed?.paths.some((path) => event.target.paths.includes(path)) &&
                                         event.skills.some(({ name, state }) => name === skill && state === 'installed'),
                                 );
+
                                 if (!failed || installed) continue;
+
                                 const known = drift.get(skill) ?? [];
+
                                 if (!known.some(({ path }) => path === at.path)) drift.set(skill, [...known, at]);
                             }
                         }
                         outcome = { ...outcome, drift: [...drift].map(([skill, paths]) => ({ skill, paths })) };
                     }
+
                     const failed = outcome instanceof SkillInstallError ? outcome : undefined;
+
                     update({
                         running: null,
                         outcome,
@@ -301,6 +315,7 @@ export const makeChecks = (
             ): Check =>
                 Effect.suspend(() => {
                     update({ running: operation });
+
                     return Effect.tryPromise({
                         try: () =>
                             run(
@@ -315,6 +330,7 @@ export const makeChecks = (
                 });
             const check = (operation: InstallOperation, options: { recordWarning: boolean; replace?: boolean }) =>
                 serial(checkNow(operation, options));
+
             return {
                 atLaunch: check('launch', { recordWarning: true }),
                 afterDiscovery: learn.pipe(
@@ -332,6 +348,7 @@ export const makeChecks = (
                     serial(
                         Effect.suspend(() => {
                             update({ running: 'tick' });
+
                             return Effect.try({
                                 try: () =>
                                     setTargetTick(install.home, path, ticked, {
@@ -349,6 +366,7 @@ export const makeChecks = (
                                                 ({ target }) => !target.paths.includes(path),
                                             ),
                                         });
+
                                     return checkNow('tick', { recordWarning: false }).pipe(Effect.as(result));
                                 }),
                             );
@@ -357,6 +375,7 @@ export const makeChecks = (
                 state: () => state,
                 subscribe: (listener) => {
                     listeners.add(listener);
+
                     return () => listeners.delete(listener);
                 },
             };
@@ -376,6 +395,7 @@ export const discoverUntilAnswered = (checks: Checks, every: Duration.Input): Ef
             answered ? Effect.void : Effect.sleep(every).pipe(Effect.andThen(Effect.suspend(() => ask))),
         ),
     );
+
     return ask;
 };
 
@@ -389,13 +409,19 @@ const failures = (outcome: InstallResult) =>
  */
 export const buildRefusal = (outcome: InstallResult | SkillInstallError, drift?: DriftChoice): string | null => {
     const couldnt = drift === 'replace' ? "couldn't replace its changed skills" : "couldn't install its skills";
+
     if (outcome instanceof SkillInstallError)
         return `Lar Factory ${couldnt}, so the build can't start: ${outcome.message}`;
+
     const failed = failures(outcome);
+
     if (failed.length > 0) return `Lar Factory ${couldnt}, so the build can't start. ${failed.join(' ')}`;
+
     if (outcome.blocked.length === 0) return null;
+
     const skills = outcome.blocked.map(({ skill, paths }) => `${skill} is ${blockedBy(paths).join('')}.`);
     const one = outcome.blocked.length === 1 && outcome.blocked[0]!.paths.length === 1;
+
     return `The build can't start while a skill is blocked. ${skills.join(' ')} Move ${one ? 'that path' : 'each path'} away, then start the build again.`;
 };
 
@@ -406,14 +432,18 @@ export const buildRefusal = (outcome: InstallResult | SkillInstallError, drift?:
  */
 export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: DriftChoice): SkillCheckOutcome => {
     const refusal = buildRefusal(outcome, drift);
+
     if (refusal || outcome instanceof SkillInstallError || outcome.drift.length === 0 || drift === 'keep')
         return { refusal };
+
     const skills = outcome.drift.map(({ skill }) => skill);
+
     if (drift === 'replace') {
         return {
             refusal: `Lar Factory couldn't replace ${listed(skills)}, so the build can't start. They still differ from Release ${outcome.version}.`,
         };
     }
+
     return {
         refusal: `${listed(skills)} changed since Lar Factory installed ${skills.length > 1 ? 'them' : 'it'}. Replace and start, or start anyway.`,
         drift: skills,
@@ -424,11 +454,13 @@ export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: 
 export const launchWhenReady = (checks: Checks) =>
     Effect.gen(function* () {
         const ready = yield* Deferred.make<void>();
+
         yield* Deferred.await(ready).pipe(
             Effect.andThen(checks.atLaunch.pipe(Effect.ignore)),
             Effect.andThen(discoverUntilAnswered(checks, REDISCOVER_EVERY)),
             Effect.forkScoped,
         );
+
         return () => {
             Effect.runSync(Deferred.succeed(ready, undefined));
         };

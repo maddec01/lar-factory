@@ -19,7 +19,9 @@ const rows = (name: string) => [...section(name)!.querySelectorAll('li')];
 test('the list holds the pickable projects in order, with Add a repository folder last', async () => {
     await openOnboarding([project('web'), worktree, added, project('api', { provider: 'Azure DevOps' })]);
     expect(choices()).toEqual(['web', 'api', 'new']);
+
     const web = dialog()!.querySelector('[data-choice="web"]')!;
+
     expect(text(web)).toContain('web');
     expect(text(web)).toContain('GitHub');
     expect(text(dialog()!.querySelector('[data-choice="api"]'))).toContain('Azure DevOps');
@@ -28,7 +30,9 @@ test('the list holds the pickable projects in order, with Add a repository folde
 
 test('a row shows its path from ~, with the full path on hover and for screen readers', async () => {
     await openOnboarding([project('web')]);
+
     const shown = dialog()!.querySelector<HTMLElement>('[data-choice="web"] [data-project-path]')!;
+
     expect(text(shown)).toBe('~/Developer/web');
     expect(shown.title).toBe('/Users/me/Developer/web');
     expect(shown.className).toContain('truncate');
@@ -36,8 +40,10 @@ test('a row shows its path from ~, with the full path on hover and for screen re
     expect(shown.parentElement!.querySelector(`[title="web"]`)!.className.split(' ')).toEqual(
         expect.arrayContaining(['max-w-[30%]', 'sm:max-w-1/2']),
     );
+
     const radio = dialog()!.querySelector<HTMLElement>('[data-choice="web"] [role="radio"]')!;
     const label = dialog()!.querySelector<HTMLLabelElement>(`label[for="${radio.id}"]`)!;
+
     expect(label.querySelector('.sr-only')!.textContent).toBe('/Users/me/Developer/web');
 });
 
@@ -68,6 +74,7 @@ test('an empty section does not render', async () => {
 
 test('a resumed setup keeps its own project selectable and checked', async () => {
     const data = { ...empty, onboarding: onboarding('maddec01/set-up', 'project') };
+
     serve(data, [setUp, added]);
     await mountPage(data);
     await settle(() => $<HTMLButtonElement>('[data-onboarding-card="maddec01/set-up"] [data-resume]')!.click());
@@ -86,7 +93,9 @@ test('a row of each kind shows a favicon served by project ID, a chosen icon, or
         project('mono', { icon: { kind: 'monogram', text: 'LF', color: 'rose' } }),
         project('plain'),
     ]);
+
     const row = (name: string) => iconOf(dialog()!.querySelector(`[data-choice="${name}"]`));
+
     expect(row('web').querySelector('img')!.getAttribute('src')).toBe('/api/project-icon/project%3Aweb?v=abc');
     expect(text(row('web'))).toBe('W');
     expect(text(row('rocket'))).toBe('🚀');
@@ -110,6 +119,7 @@ test('rows in both sections show their icons, and a project with no repository t
 
 test("a project on the board takes its board colour, and the initial is the name's first whole character", async () => {
     const onBoard = sample.repos[0]!.repo;
+
     await openOnboarding(
         [
             project('app', { repo: onBoard, onBoard: true }),
@@ -126,7 +136,9 @@ test("a project on the board takes its board colour, and the initial is the name
 
 test("an icon fills the row's fixed square, which can't grow the row or wrap its line", async () => {
     await openOnboarding([project('web', { icon: favicon })]);
+
     const row = dialog()!.querySelector('[data-choice="web"]')!;
+
     expect(iconOf(row).className).toContain('size-4');
     expect(iconOf(row).className).toContain('shrink-0');
     expect(iconOf(row).className).toContain('overflow-hidden');

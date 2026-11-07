@@ -5,6 +5,7 @@ import type { KindDisagreement } from '@lar-factory/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test';
 
 import { $, $$, moved, mountPage, push, sample, settle, text } from '../../test/support.ts';
+
 afterEach(() => {
     delete (Element.prototype as Partial<Element>).getAnimations;
 });
@@ -47,6 +48,7 @@ test("the title bar's List button counts the List and opens the List modal", asy
 
 test('the List button shows a loading cue, not 0, while the first read could add items', async () => {
     const empty = { ...sample, items: [] };
+
     await mountPage({ ...empty, firstRead: { step: 'items' as const, running: [], settled: false } });
     expect(text(listButton())).toBe('ListLoading Projects…');
     expect(listButton().querySelector('[data-loader]')).not.toBeNull();
@@ -74,7 +76,9 @@ test('the left pane lists All, each repository with its count', async () => {
         ['lar-server', '3'],
         ['lar-apple', '1'],
     ]);
+
     const nav = $('[data-list-modal] nav[aria-label="Projects"]')!;
+
     expect(nav.querySelector('[aria-label="No Project"]')).toBeNull();
 });
 
@@ -105,7 +109,9 @@ test("the List modal starts on the board's scope", async () => {
 test('under All Projects a row names its repository', async () => {
     await mountPage();
     await open();
+
     const meta = (id: string) => text($(`[data-list-modal] button[data-item="${id}"] .tabular-nums`));
+
     expect(meta('I_sample03')).toMatch(/^lar-apple · /);
     expect(meta('I_sample04')).toMatch(/^lar-server · /);
 });
@@ -116,6 +122,7 @@ test('a repository whose items have not landed yet says it is reading, not that 
         items: sample.items.filter((i) => i.repo !== 'maddec01/lar-apple'),
         firstRead: { step: 'items' as const, running: ['lar-apple'], waiting: ['maddec01/lar-apple'], settled: false },
     };
+
     await mountPage(reading);
     await open();
     await settle(() => group('lar-apple').click());
@@ -124,7 +131,9 @@ test('a repository whose items have not landed yet says it is reading, not that 
         counts().find(([name]) => name === 'lar-apple'),
         'no count in the left pane',
     ).toEqual(['lar-apple', '']);
+
     const header = () => text($('[data-list-modal] button.scope-board')!.parentElement);
+
     expect(header(), 'no count in the header').toBe('lar-appleScope boardRecently updated');
     await push({ ...sample, firstRead: { step: 'finishing', running: [], settled: true } });
     expect(rows()).toEqual(['I_sample03']);
@@ -138,9 +147,12 @@ test('All Projects keeps a loading cue and no count under the rows that landed u
         items: sample.items.filter((i) => i.repo !== 'maddec01/lar-apple'),
         firstRead: { step: 'items' as const, running: ['lar-apple'], waiting: ['maddec01/lar-apple'], settled: false },
     };
+
     await mountPage(reading);
     await open();
+
     const header = () => text($('[data-list-modal] span.font-semibold')!.parentElement);
+
     expect(rows().length).toBeGreaterThan(0);
     expect(text($('[data-list-modal] [data-reading]'))).toBe('Loading more Projects…');
     expect($('[data-list-modal] [data-reading] [data-loader]')).not.toBeNull();
@@ -193,7 +205,9 @@ test('the search filters the right pane and the counts on the left follow it', a
 test('Scope board scopes the board to the chosen repository, and is only there for a repository', async () => {
     await mountPage();
     await open();
+
     const scope = () => $<HTMLButtonElement>('[data-list-modal] button.scope-board');
+
     expect(scope()).toBeNull();
     await settle(() => group('lar-apple').click());
     expect(text(scope())).toBe('Scope board');
@@ -210,17 +224,23 @@ test("Scope board is a toggle, so it keeps its own size, not the button kinds' 2
     await mountPage();
     await open();
     await settle(() => group('lar-apple').click());
+
     const scope = $('[data-list-modal] button.scope-board')!;
+
     expect([scope.getAttribute('data-kind'), scope.hasAttribute('data-toggle')]).toEqual(['other', true]);
 });
 
 test('the sort menu reorders the items', async () => {
     await mountPage();
     await open();
+
     const sort = $<HTMLButtonElement>('[data-list-modal] button.sort')!;
+
     expect(text(sort)).toBe('Recently updated');
     await press(sort);
+
     const options = $$<HTMLElement>('[role="menuitemradio"]');
+
     expect(options.map(text)).toEqual(['Recently updated', 'Oldest', 'Title', 'Backlog priority']);
     await settle(() => options[1]!.click());
     expect(rows()).toEqual(['I_sample04', 'I_sample03', 'I_sample01', 'I_sample02']);
@@ -236,8 +256,10 @@ test('an item opens the item dialog over the List modal, and closing it comes ba
     await type('a');
     await press($('[data-list-modal] button.sort')!);
     await settle(() => $$<HTMLElement>('[role="menuitemradio"]')[2]!.click());
+
     const before = rows();
     const row = $<HTMLButtonElement>('[data-list-modal] button[data-item="I_sample01"]')!;
+
     row.focus();
     await settle(() => row.click());
     expect($('[data-item-dialog]'), 'the item dialog is open').not.toBeNull();
@@ -255,7 +277,9 @@ test('an item opens the item dialog over the List modal, and closing it comes ba
 test("closing the item dialog of an item that left List meanwhile puts focus on the List's search", async () => {
     await mountPage();
     await open();
+
     const row = $<HTMLButtonElement>('[data-list-modal] button[data-item="I_sample01"]')!;
+
     row.focus();
     await settle(() => row.click());
     await push(moved('I_sample01', 'Queued'));
@@ -270,7 +294,9 @@ test("closing the item dialog of an item that left List meanwhile puts focus on 
 test("Add item looks as it does in the title bar: the List modal's Main action, with the same icon", async () => {
     await mountPage();
     await open();
+
     const add = $('[data-list-modal] button.add-item')!;
+
     expect(add.getAttribute('data-kind')).toBe('main');
     expect(add.querySelector('svg')!.outerHTML).toBe($('.title-bar button.add-item svg')!.outerHTML);
 });
@@ -279,7 +305,9 @@ test('Add item opens the Add item flow over the List modal, and closing it hands
     await mountPage();
     await open();
     await settle(() => group('lar-apple').click());
+
     const add = $<HTMLButtonElement>('[data-list-modal] button.add-item')!;
+
     add.focus();
     await settle(() => add.click());
     expect($('#add-item-dialog'), 'Add item is open').not.toBeNull();
@@ -305,6 +333,7 @@ test('Azure List defaults to backlog priority and retains native work item field
             .filter((item) => item.id === 'I_sample01' || item.id === 'I_sample02')
             .map((item, i) => ({ ...item, azure, sourceOrder: i })),
     };
+
     await mountPage(data);
     await open();
     expect(text($('[data-list-modal] button.sort'))).toBe('Backlog priority');
@@ -325,13 +354,16 @@ test('List expands below the header and restores its search', async () => {
 
 test('a child copies List size once and owns the expansion shortcut', async () => {
     localStorage.setItem('lar-board:match-list-size', '1');
+
     try {
         await mountPage();
         await open();
         await settle(() => $<HTMLButtonElement>('[data-list-modal] button[aria-label="Expand"]')!.click());
         await settle(() => $<HTMLButtonElement>('[data-list-modal] button.add-item')!.click());
+
         const dialogs = $$<HTMLElement>('[role="dialog"]');
         const child = dialogs.at(-1)!;
+
         expect(child.style.top).toBe('52px');
         await settle(() =>
             window.dispatchEvent(
@@ -349,6 +381,7 @@ test('a child copies List size once and owns the expansion shortcut', async () =
 
 test('the saved List opening preference applies each time while permitting Restore', async () => {
     localStorage.setItem('lar-board:open-list-expanded', '1');
+
     try {
         await mountPage();
         await open();
@@ -368,19 +401,25 @@ for (const match of [false, true]) {
         for (const childKind of ['item', 'add'] as const) {
             test(`${childKind} opens over ${listExpanded ? 'expanded' : 'collapsed'} List with matching ${match ? 'on' : 'off'}`, async () => {
                 localStorage.setItem('lar-board:match-list-size', match ? '1' : '0');
+
                 try {
                     await mountPage();
                     await open();
+
                     if (listExpanded)
                         await settle(() =>
                             $<HTMLButtonElement>('[data-list-modal] button[aria-label="Expand"]')!.click(),
                         );
+
                     const opener =
                         childKind === 'item'
                             ? '[data-list-modal] button[data-item]'
                             : '[data-list-modal] button.add-item';
+
                     await settle(() => $<HTMLButtonElement>(opener)!.click());
+
                     const child = $$<HTMLElement>('[role="dialog"]').at(-1)!;
+
                     expect(child.style.top).toBe(match && listExpanded ? '52px' : '');
                 } finally {
                     localStorage.removeItem('lar-board:match-list-size');
@@ -397,6 +436,7 @@ test('a List row shows a kind disagreement beside its kind badge', async () => {
         kept: false,
         swap: { add: [], remove: [], type: null },
     };
+
     await mountPage({
         ...sample,
         items: sample.items.map((i) => (i.id === 'I_sample01' ? { ...i, kindDisagreement } : i)),
@@ -408,9 +448,13 @@ test('a List row shows a kind disagreement beside its kind badge', async () => {
 test('a List row shows its coloured kind badge and label chips', async () => {
     await mountPage();
     await open();
+
     const row = (id: string) => $(`[data-list-modal] button[data-item="${id}"]`)!;
+
     expect(text(row('I_sample01').querySelector('[data-kind-badge]'))).toBe('Feature');
+
     const chips = [...row('I_sample01').querySelectorAll<HTMLElement>('[data-label-chip]')];
+
     expect(chips.map(text)).toEqual(['area: server', 'area: web']);
     expect(chips[0]!.style.backgroundColor).toContain('color-mix');
 });
@@ -430,9 +474,11 @@ test("a third tracker's labels show as chips in its colours, leaving out the fac
         ),
     });
     await open();
+
     const chips = [
         ...$('[data-list-modal] button[data-item="I_sample01"]')!.querySelectorAll<HTMLElement>('[data-label-chip]'),
     ];
+
     expect(chips.map(text)).toEqual(['shiny']);
     expect(chips[0]!.style.backgroundColor).toContain('rgb(18, 52, 86)');
 });
@@ -447,12 +493,16 @@ describe('project icons', () => {
     test("a favicon from the board's endpoint shows over the toned initial once it loads, in a square that keeps its size", async () => {
         await mountPage({ ...sample, projectIcons: { [REPO]: favicon } });
         await open();
+
         const square = icon('lar-server');
         const classes = square.className;
+
         expect(text(square)).toBe('L');
         expect(classes).toContain('size-5');
         expect(square.getAttribute('aria-hidden')).toBe('true');
+
         const img = image('lar-server')!;
+
         expect(img.getAttribute('src')).toBe('/api/project-icon/project%3Aone?v=abc123');
         expect(img.alt).toBe('');
         expect(img.hidden, 'held back until it loads').toBe(true);
@@ -533,13 +583,17 @@ describe('project icons', () => {
             const held = new Promise<void>((resolve) => {
                 release = resolve;
             });
+
             vi.doMock('lucide-react/dynamic', async (importOriginal) => {
                 await held;
+
                 return importOriginal();
             });
             await mountPage({ ...sample, projectIcons: { [REPO]: lucide } });
             await open();
+
             const classes = icon('lar-server').className;
+
             expect(text(icon('lar-server')), 'the initial shows while the chunk loads').toBe('L');
             expect(classes).toMatch(/repo-tone-\d/);
             expect(svg()).toBeNull();
@@ -553,6 +607,7 @@ describe('project icons', () => {
 
         test("a name lucide doesn't have leaves the toned initial", async () => {
             const failure = vi.spyOn(console, 'error').mockImplementation(() => {});
+
             await mountPage({ ...sample, projectIcons: { [REPO]: { ...lucide, name: 'not-a-lucide-icon' } } });
             await open();
             await until(() => expect(failure).toHaveBeenCalled());
@@ -575,11 +630,13 @@ describe('project icons', () => {
     test('an item row that names its repository shows its icon, whatever the case of its key', async () => {
         await mountPage({ ...sample, projectIcons: { [REPO.toUpperCase()]: favicon } });
         await open();
+
         const row = () =>
             $$<HTMLButtonElement>('[data-list-modal] button[data-item]').find((b) =>
                 b.textContent.includes('lar-server'),
             )!;
         const small = row().querySelector<HTMLElement>('[data-project-icon]')!;
+
         expect(small.className).toContain('size-3.5');
         expect(small.querySelector('img')!.getAttribute('src')).toBe('/api/project-icon/project%3Aone?v=abc123');
         await settle(() => group('lar-server').click());

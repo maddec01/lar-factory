@@ -23,7 +23,9 @@ export function ShapingThreadCleanupSetting({ state }: { state: ShapingThreadCle
     const save = async (choice: ShapingThreadCleanup) => {
         setSaving(choice);
         setError(null);
+
         const result = await postAction('/api/shaping-thread-cleanup', { choice });
+
         flushSync(() => {
             receive(result);
             setSaving(null);

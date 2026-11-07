@@ -15,16 +15,20 @@ import { recordItems } from './record-items.ts';
 
 const REPO = 'maddec01/lar-factory';
 const opened: { records: WorkRecords; dir: string }[] = [];
+
 afterEach(() => {
     for (const { records, dir } of opened.splice(0)) {
         records.close();
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
 async function open(): Promise<WorkRecords> {
     const dir = mkdtempSync(join(tmpdir(), 'observe-records-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
+
     opened.push({ records, dir });
+
     return records;
 }
 
@@ -33,9 +37,12 @@ function provider(answers: { ticket?: TicketObservation | Error; pr?: PullReques
     const asked: string[] = [];
     const answer = <T>(value: T | Error | undefined, what: string): T => {
         if (value instanceof Error) throw value;
+
         if (value === undefined) throw new Error(`no ${what} answer`);
+
         return value;
     };
+
     return {
         answers,
         asked,
@@ -57,6 +64,7 @@ function build(
     const created = ticket
         ? records.importTicket({ title: 'Build', repository: REPO, kind: 'build', status, ticket }).record
         : records.create({ title: 'Build', repository: REPO, kind: 'build', status });
+
     return records.setPullRequest(created.workId, created.revision, `${REPO}#40`);
 }
 
@@ -64,8 +72,11 @@ test('a merged PR finishes the build and makes it Done', async () => {
     const records = await open();
     const { workId } = build(records);
     const { reads } = provider({ pr: 'merged', ticket: { state: 'closed' } });
+
     await observeRecords(records, [REPO], reads);
+
     const record = records.read(workId);
+
     assert.equal(record.status, 'Done');
     assert.ok(record.finishedAt);
     assert.equal(record.needsYou, null, 'the ticket the merge closed flags nothing');
@@ -76,6 +87,7 @@ test('a finished record keeps its ticket observed until retention hides it, and 
     const records = await open();
     const { workId } = build(records);
     const { reads, asked } = provider({ pr: 'merged', ticket: { state: 'closed' } });
+
     await observeRecords(records, [REPO], reads);
     await observeRecords(records, [REPO], reads);
     assert.deepEqual(asked, [`pr ${REPO}#40`, `ticket ${REPO}#12`, `ticket ${REPO}#12`]);
@@ -87,8 +99,11 @@ test('a PR closed unmerged sets Needs you once, leaving the Status as it was', a
     const records = await open();
     const { workId } = build(records, 'Review', null);
     const { reads, asked } = provider({ pr: 'closed' });
+
     await observeRecords(records, [REPO], reads);
+
     const record = records.read(workId);
+
     assert.equal(record.status, 'Review');
     assert.deepEqual([record.needsYou, record.needsYouCauses], [null, [{ type: 'pr-closed' }]]);
     assert.deepEqual(asked, [`pr ${REPO}#40`], 'ticketless work reads only its PR');
@@ -107,11 +122,14 @@ test('a ticket closing elsewhere sets Needs you without moving the Status', asyn
         ticket: `${REPO}#12`,
     }).record;
     const { reads, answers } = provider({ ticket: { state: 'open' } });
+
     await observeRecords(records, [REPO], reads);
     assert.equal(records.read(workId).needsYou, null);
     answers.ticket = { state: 'closed' };
     await observeRecords(records, [REPO], reads);
+
     const record = records.read(workId);
+
     assert.deepEqual([record.status, record.setAside], ['Queued', false]);
     assert.deepEqual(record.needsYouCauses, [{ type: 'ticket-closed' }]);
 });
@@ -120,8 +138,11 @@ test('a PR that closes after Keep working on a closed ticket names both causes',
     const records = await open();
     const { workId } = build(records, 'Review');
     const { reads, answers } = provider({ pr: 'open', ticket: { state: 'closed' } });
+
     await observeRecords(records, [REPO], reads);
+
     const kept = records.read(workId);
+
     assert.deepEqual(kept.needsYouCauses, [{ type: 'ticket-closed' }]);
     records.setNeedsYouCauses(workId, kept.revision, []);
     await observeRecords(records, [REPO], reads);
@@ -135,8 +156,11 @@ test('a ticket that closes after a replacement build resolved the closed PR name
     const records = await open();
     const { workId } = build(records, 'Review');
     const { reads, answers } = provider({ pr: 'closed', ticket: { state: 'open' } });
+
     await observeRecords(records, [REPO], reads);
+
     const closed = records.read(workId);
+
     assert.deepEqual(closed.needsYouCauses, [{ type: 'pr-closed' }]);
     records.setNeedsYouCauses(workId, closed.revision, [], { status: 'Ready' });
     answers.ticket = { state: 'closed' };
@@ -148,10 +172,13 @@ test('a ticket reopened or reassigned after merge adds nothing', async () => {
     const records = await open();
     const { workId } = build(records);
     const { reads, answers } = provider({ pr: 'merged', ticket: { state: 'closed', assignee: 'pedro' } });
+
     await observeRecords(records, [REPO], reads);
     answers.ticket = { state: 'open', assignee: 'ana' };
     await observeRecords(records, [REPO], reads);
+
     const record = records.read(workId);
+
     assert.equal(record.status, 'Done');
     assert.deepEqual([record.needsYou, record.needsYouCauses], [null, []]);
 });
@@ -166,10 +193,13 @@ test('a reassigned ticket sets Needs you without moving the Status', async () =>
         ticket: `${REPO}#12`,
     }).record;
     const { reads, answers } = provider({ ticket: { state: 'open', assignee: 'pedro' } });
+
     await observeRecords(records, [REPO], reads);
     answers.ticket = { state: 'open', assignee: 'ana' };
     await observeRecords(records, [REPO], reads);
+
     const record = records.read(workId);
+
     assert.equal(record.status, 'In progress');
     assert.deepEqual(record.needsYouCauses, [{ type: 'assignee-changed', from: 'pedro', to: 'ana' }]);
 });
@@ -182,10 +212,12 @@ test('a closed PR and a closed ticket hold both causes in either closing order',
         const records = await open();
         const { workId } = build(records);
         const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open' } });
+
         await observeRecords(records, [REPO], reads);
         for (const closing of [first, second]) {
             if (closing === 'pr') answers.pr = 'closed';
             else answers.ticket = { state: 'closed' };
+
             await observeRecords(records, [REPO], reads);
         }
         assert.deepEqual(
@@ -202,11 +234,14 @@ test('a reopened PR, a reopened ticket and an assignee changed back each remove 
     const records = await open();
     const { workId } = build(records);
     const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open', assignee: 'pedro' } });
+
     await observeRecords(records, [REPO], reads);
     answers.pr = 'closed';
     answers.ticket = { state: 'closed', assignee: 'ana' };
     await observeRecords(records, [REPO], reads);
+
     const causes = () => records.read(workId).needsYouCauses;
+
     assert.deepEqual(causes(), [
         { type: 'pr-closed' },
         { type: 'ticket-closed' },
@@ -241,8 +276,11 @@ test('a missing ticket read as found removes its cause, and free text stays unti
         ticket: `${REPO}#12`,
     }).record;
     const { reads, answers } = provider({ ticket: { state: 'not-found' } });
+
     await observeRecords(records, [REPO], reads);
+
     let record = records.restore(workId, records.read(workId).revision);
+
     records.setNeedsYou(workId, record.revision, 'Merge conflict.');
     answers.ticket = { state: 'open' };
     await observeRecords(records, [REPO], reads);
@@ -254,6 +292,7 @@ test('a failed read keeps every cause', async () => {
     const records = await open();
     const { workId } = build(records);
     const { reads, answers } = provider({ pr: 'closed', ticket: { state: 'open' } });
+
     await observeRecords(records, [REPO], reads);
     answers.pr = new Error('HTTP 502');
     await observeRecords(records, [REPO], reads);
@@ -264,11 +303,14 @@ test('a read turns saved old wording into causes and drops the old text', async 
     const records = await open();
     const made = build(records);
     const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open' } });
+
     await observeRecords(records, [REPO], reads);
     answers.pr = 'closed';
     answers.ticket = new Error('HTTP 502');
+
     const { workId } = made;
     const observed = records.observe(workId, records.read(workId).revision, { of: 'pr', state: 'closed' });
+
     records.setNeedsYou(
         workId,
         observed.revision,
@@ -277,7 +319,9 @@ test('a read turns saved old wording into causes and drops the old text', async 
     await observeRecords(records, [REPO], reads);
     answers.ticket = { state: 'closed' };
     await observeRecords(records, [REPO], reads);
+
     const record = records.read(workId);
+
     assert.deepEqual(
         [record.needsYou, record.needsYouCauses],
         [null, [{ type: 'pr-closed' }, { type: 'ticket-closed' }]],
@@ -298,6 +342,7 @@ test('free text stays free text when the same read raises a cause, and a slice s
         ticket: `${REPO}#99`,
     }).record;
     const { reads } = provider({ pr: 'closed', ticket: { state: 'closed' } });
+
     records.setNeedsYou(workId, records.read(workId).revision, 'Merge conflict.');
     await observeRecords(records, [REPO], reads);
     assert.deepEqual(
@@ -319,8 +364,11 @@ test('a confirmed not-found sets the work aside, and the record can be restored'
         status: 'List',
         ticket: `${REPO}#12`,
     }).record;
+
     await observeRecords(records, [REPO], provider({ ticket: { state: 'not-found' } }).reads);
+
     const record = records.read(workId);
+
     assert.equal(record.setAside, true);
     assert.equal(record.status, 'List');
     assert.deepEqual(record.needsYouCauses, [{ type: 'ticket-missing' }]);
@@ -331,12 +379,17 @@ test('a temporary provider error keeps the last observation and changes nothing 
     const records = await open();
     const { workId } = build(records);
     const { reads, answers } = provider({ pr: 'open', ticket: { state: 'open', assignee: 'pedro' } });
+
     await observeRecords(records, [REPO], reads);
+
     const before = records.read(workId);
+
     answers.pr = new Error('HTTP 502');
     answers.ticket = new Error('HTTP 502');
     await observeRecords(records, [REPO], reads);
+
     const after = records.read(workId);
+
     assert.deepEqual(
         [after.status, after.needsYou, after.setAside, after.finishedAt],
         [before.status, before.needsYou, before.setAside, before.finishedAt],
@@ -353,9 +406,12 @@ test('a temporary provider error keeps the last observation and changes nothing 
 test('set-aside work and work in repositories off the board read nothing', async () => {
     const records = await open();
     const aside = records.importTicket({ title: 'Bug', repository: REPO, kind: 'bug', ticket: `${REPO}#12` }).record;
+
     records.setAside(aside.workId, aside.revision);
     records.importTicket({ title: 'Other', repository: 'maddec01/other', kind: 'bug', ticket: 'maddec01/other#3' });
+
     const { reads, asked } = provider({ ticket: { state: 'closed' } });
+
     await observeRecords(records, [REPO], reads);
     assert.deepEqual(asked, []);
 });
@@ -363,8 +419,11 @@ test('set-aside work and work in repositories off the board read nothing', async
 test('a settled decision finishes while a concept without delivery stays unfinished', async () => {
     const records = await open();
     let decision = records.create({ title: 'Which store', repository: REPO, kind: 'decision', status: 'Shaping' });
+
     decision = records.setBody(decision.workId, decision.revision, 'answer', 'SQLite.');
+
     let concept = records.create({ title: 'Records', repository: REPO, kind: 'concept', status: 'Shaping' });
+
     finishCompleted(records, [REPO]);
     assert.deepEqual(
         [records.read(decision.workId).status, records.read(concept.workId).status],
@@ -376,6 +435,7 @@ test('a settled decision finishes while a concept without delivery stays unfinis
     finishCompleted(records, [REPO]);
     for (const { workId } of [decision]) {
         const record = records.read(workId);
+
         assert.equal(record.status, 'Done');
         assert.ok(record.finishedAt);
     }
@@ -385,15 +445,19 @@ test('a settled decision finishes while a concept without delivery stays unfinis
 
 test('the provider reads at most six records at once', async () => {
     const records = await open();
+
     for (let n = 1; n <= 12; n++)
         records.importTicket({ title: `Bug ${n}`, repository: REPO, kind: 'bug', ticket: `${REPO}#${n}` });
+
     let running = 0;
     let most = 0;
+
     await observeRecords(records, [REPO], {
         ticket: async () => {
             most = Math.max(most, ++running);
             await new Promise((resolve) => setTimeout(resolve, 5));
             running--;
+
             return { state: 'open' };
         },
         pr: async () => 'open',
@@ -415,6 +479,7 @@ test("a ticket the item source's last read shows open takes no read of its own",
         ticket: `${REPO}#12`,
     }).record;
     const { reads, asked } = provider({ ticket: new Error('not asked') });
+
     await observeRecords(records, [REPO], {
         ...reads,
         known: (repo, number) => (repo === REPO && number === 12 ? { state: 'open', assignee: 'pedro' } : undefined),
@@ -429,6 +494,7 @@ test("a ticket the item source's last read shows open takes no read of its own",
 /** A Dependency on `owner`'s ticket #5 and PR #9, held by a concept on the board with no ticket or PR of its own. */
 function dependencyOn(records: WorkRecords, owner: string): string {
     const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept' });
+
     return records.addDependency(concept.workId, {
         need: 'A sign-in endpoint',
         owner,
@@ -449,8 +515,10 @@ function ghAnswering(answers: { ticket: () => string; pr: () => string }) {
         ticket: (repo, number) => observeIssue(repo, number, run),
         pr: (repo, number) => observePr(repo, number, run),
     };
+
     return { calls, reads };
 }
+
 const issue = (state: string) => () => JSON.stringify({ state, assignees: [] });
 const fails = (message: string) => () => {
     throw new Error(message);
@@ -464,8 +532,10 @@ test("a Dependency's GitHub ticket and PR read as each kind, and the reads write
     const observed = async (ticket: () => string, pr: () => string) => {
         Object.assign(answers, { ticket, pr });
         await observeRecords(records, [REPO], gh.reads);
+
         return kinds(records, id);
     };
+
     assert.deepEqual(await observed(issue('OPEN'), () => 'OPEN'), ['open', 'open']);
     assert.deepEqual(await observed(issue('CLOSED'), () => 'MERGED'), ['closed', 'merged']);
     assert.deepEqual(await observed(issue('OPEN'), () => 'CLOSED'), ['reopened', 'closed']);
@@ -512,7 +582,9 @@ test("a Dependency's GitHub ticket and PR read as each kind, and the reads write
 
 test('each Dependency observation says whether it changed the kind a mark decides on, which a failed read never does', async () => {
     const records = await open();
+
     dependencyOn(records, 'acme/auth');
+
     const answers = { ticket: issue('OPEN'), pr: () => 'OPEN' };
     const gh = ghAnswering(answers);
     const heard: boolean[] = [];
@@ -526,8 +598,10 @@ test('each Dependency observation says whether it changed the kind a mark decide
         Object.assign(answers, { ticket, pr });
         heard.length = 0;
         await observeRecords(records, [REPO], reads);
+
         return [...heard];
     };
+
     assert.deepEqual(
         await observed(issue('OPEN'), () => 'OPEN'),
         [true, true],
@@ -563,8 +637,10 @@ test("a Dependency's Azure work item and PR read as each kind, and the reads wri
         Object.assign(item, { state });
         Object.assign(pr, { status });
         await observeRecords(records, [REPO], reads);
+
         return kinds(records, id);
     };
+
     assert.deepEqual(await observed('Active', 'active'), ['open', 'open']);
     assert.deepEqual(await observed('Closed', 'completed'), ['closed', 'merged']);
     assert.deepEqual(await observed('Active', 'abandoned'), ['reopened', 'closed']);
@@ -581,10 +657,12 @@ test("a Dependency's Azure work item and PR read as each kind, and the reads wri
         ['deleted', 'deleted'],
         'a work item the batch omits and a PR az finds no more are deleted',
     );
+
     const read = (call: string[]) =>
         call.slice(0, 3).join(' ') === 'repos pr show' ||
         (call.slice(0, 2).join(' ') === 'devops invoke' &&
             (!call.includes('--http-method') || call[call.indexOf('--resource') + 1] === 'workitemsbatch'));
+
     assert.deepEqual(
         calls.filter((call) => !read(call)),
         [],
@@ -597,12 +675,15 @@ test('a read never changes the met mark: an outage leaves it unflagged, and a re
     const id = dependencyOn(records, 'acme/auth');
     const answers = { ticket: issue('CLOSED'), pr: () => 'MERGED' };
     const { reads } = ghAnswering(answers);
+
     await observeRecords(records, [REPO], reads);
     records.markDependencyMet(id, records.dependency(id).revision, 'pedro');
 
     Object.assign(answers, { ticket: fails('HTTP 502: Bad Gateway'), pr: fails('HTTP 502: Bad Gateway') });
     await observeRecords(records, [REPO], reads);
+
     const outage = records.dependency(id);
+
     assert.deepEqual([outage.met?.by, outage.needsReview, outage.handover], ['pedro', false, '# Handover']);
     assert.deepEqual(
         outage.observations.map((o) => [o.kind, o.lastGood?.kind]),
@@ -614,7 +695,9 @@ test('a read never changes the met mark: an outage leaves it unflagged, and a re
 
     Object.assign(answers, { ticket: issue('OPEN'), pr: () => 'MERGED' });
     await observeRecords(records, [REPO], reads);
+
     const reopened = records.dependency(id);
+
     assert.deepEqual(
         [reopened.met?.by, reopened.needsReview, kinds(records, id)],
         ['pedro', true, ['reopened', 'merged']],
@@ -625,6 +708,7 @@ test("each Dependency subject reads once a pass, and a ticket the item source's 
     const records = await open();
     const [first, second] = [dependencyOn(records, 'acme/auth'), dependencyOn(records, 'acme/auth')];
     const gh = ghAnswering({ ticket: issue('OPEN'), pr: () => 'MERGED' });
+
     await observeRecords(records, [REPO], gh.reads);
     assert.deepEqual(
         gh.calls.map((call) => call.slice(0, 2).join(' ')),
@@ -640,6 +724,7 @@ test("each Dependency subject reads once a pass, and a ticket the item source's 
 
     const known = (repo: string, number: number) =>
         repo === 'acme/auth' && number === 5 ? { state: 'closed' as const } : undefined;
+
     await observeRecords(records, [REPO], { ...gh.reads, known });
     assert.deepEqual(
         gh.calls.slice(2).map((call) => call.slice(0, 2).join(' ')),
@@ -652,8 +737,11 @@ test('a Dependency in a repository whose reads wait takes no read and keeps its 
     const records = await open();
     const id = dependencyOn(records, 'acme/auth');
     const gh = ghAnswering({ ticket: issue('OPEN'), pr: () => 'OPEN' });
+
     await observeRecords(records, [REPO], gh.reads);
+
     const before = records.dependency(id);
+
     await observeRecords(records, [REPO], { ...gh.reads, waits: (repo) => repo === 'acme/auth' });
     assert.equal(gh.calls.length, 2);
     assert.deepEqual(records.dependency(id), before);
@@ -665,6 +753,7 @@ test("a read showing the record and its ticket agree keeps that kind, so a later
     const { reads } = provider({ ticket: { state: 'open' } });
     let agreed: 'bug' | null = null;
     const observing = { ...reads, agreedKind: () => agreed };
+
     await observeRecords(records, [REPO], observing);
     assert.equal(records.read(workId).agreedTicketKind, null);
     agreed = 'bug';
@@ -680,9 +769,12 @@ test('an agreement already kept writes nothing more', async () => {
         kind: 'bug',
         ticket: `${REPO}#12`,
     }).record;
+
     records.update(workId, revision, { agreedTicketKind: 'bug' });
+
     const answered = records.recordKindAnswer(workId, revision + 1, { answer: 'keep', ticketKind: 'feature' });
     const { reads } = provider({ ticket: { state: 'open' } });
+
     await observeRecords(records, [REPO], { ...reads, agreedKind: () => 'bug' });
     assert.deepEqual(records.read(workId).kindAnswer, answered.kindAnswer);
 });

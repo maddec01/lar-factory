@@ -12,6 +12,7 @@ export function sampleT3Session(cli = 't3'): BoardSessions & { revoke(): Promise
         label: 'Lar Factory sample board',
     });
     let held: BoardSession | undefined;
+
     return {
         authority,
         vault: {
@@ -24,7 +25,9 @@ export function sampleT3Session(cli = 't3'): BoardSessions & { revoke(): Promise
         },
         async revoke() {
             const session = held;
+
             held = undefined;
+
             if (session) await authority.revoke(session.sessionId);
         },
     };

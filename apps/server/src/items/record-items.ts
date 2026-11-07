@@ -45,8 +45,11 @@ const ticketNumber = (ticket: string | null): number =>
 function referenceUrl(reference: string, pr: boolean): string {
     const repo = reference.slice(0, reference.lastIndexOf('#'));
     const number = ticketNumber(reference);
+
     if (pr) return prUrl(repo, number);
+
     const [organization, project] = repo.split('/');
+
     return onAzure(repo) ? workItemUrl(organization!, project!, number) : `https://github.com/${repo}/issues/${number}`;
 }
 
@@ -72,6 +75,7 @@ function dependencyBlocker(d: Dependency): Blocker {
         needsReview: d.needsReview,
         observation,
     };
+
     return {
         number: ticketNumber(d.ticket),
         repo: d.ticket ? d.ticket.slice(0, d.ticket.lastIndexOf('#')) : d.owner,
@@ -87,7 +91,9 @@ function dependencyBlocker(d: Dependency): Blocker {
  */
 function linkedPrs(records: WorkRecords, record: WorkRecord, ticket: Item | undefined): LinkedPr[] {
     const fromTicket = ticket?.linkedPrs ?? [];
+
     if (!record.pullRequest) return fromTicket;
+
     const url = referenceUrl(record.pullRequest, true);
     const same = (pr: LinkedPr) => pr.url.toLowerCase() === url.toLowerCase();
     const observed = records.observations(record.workId).find((o) => o.of === 'pr')?.state as
@@ -102,6 +108,7 @@ function linkedPrs(records: WorkRecords, record: WorkRecord, ticket: Item | unde
         mergeState: 'checking',
         pipelineUnread: true,
     };
+
     return [recorded, ...fromTicket.filter((pr) => !same(pr))];
 }
 
@@ -110,17 +117,21 @@ const state = (record: WorkRecord): 'open' | 'closed' => (isDone(record) ? 'clos
 
 function sliceProgress(record: WorkRecord): SliceProgress {
     if (isDone(record) || record.finishedAt) return 'done';
+
     if (record.needsYou) return 'blocked';
+
     return 'waiting';
 }
 
 /** The ticket items an item source read, by their lowercase reference, `owner/name#12`, in each repository that lists them. */
 export function ticketsByReference(tickets: readonly Item[]): Map<string, Item> {
     const byTicket = new Map<string, Item>();
+
     for (const ticket of tickets) {
         for (const repo of [ticket.repo, ...(ticket.untaggedFor ?? [])])
             byTicket.set(refKey(repo, ticket.number).toLowerCase(), ticket);
     }
+
     return byTicket;
 }
 
@@ -138,6 +149,7 @@ export function agreedKind(
 ): SwapKind | null {
     const ticket = record.ticket ? byTicket.get(record.ticket.toLowerCase()) : undefined;
     const said = ticket && vocabulary ? ticketKindOf(record.kind, kindFacts(ticket), vocabulary) : null;
+
     return said === record.kind ? said : null;
 }
 
@@ -148,10 +160,12 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
     const completions = new Map<string, ReturnType<WorkRecords['completion']>>();
     const completionOf = (record: WorkRecord) => {
         let completion = completions.get(record.workId);
+
         if (!completion) {
             completion = records.completion(record.workId);
             completions.set(record.workId, completion);
         }
+
         return completion;
     };
     const ticketOf = (record: WorkRecord) => (record.ticket ? byTicket.get(record.ticket.toLowerCase()) : undefined);
@@ -241,13 +255,18 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], setups: read
             closedAt: done ? (record.finishedAt ?? record.updatedAt) : null,
             slices,
         };
+
         if (map) item.map = map;
+
         const needsYou = needsYouNotice(record, records.observations(record.workId), () =>
             records.launchIntents({ workId: record.workId }),
         );
+
         if (needsYou) item.needsYou = needsYou;
+
         return item;
     };
+
     return { ticketOf, toItem };
 }
 
@@ -277,6 +296,7 @@ function boardRecords(
                 !held.has(refKey(ticket.repo, ticket.number).toLowerCase()),
         )
         .map((ticket): Item => ({ ...ticket, recorded: false, status: 'List', statuses: [], slices: [] }));
+
     return {
         shown: all.filter((r) => !r.setAside && !hidden.has(r.workId) && listed(r, repos) && !waits(r)),
         toItem,
@@ -298,11 +318,13 @@ export function recordItems(
     setups: readonly RecordSetup[] = [],
 ): Item[] {
     const { shown, toItem, unpicked } = boardRecords(records, tickets, repos, unread, hidden, setups);
+
     return [...shown.map(toItem), ...unpicked];
 }
 
 /** How many records one turn maps: each takes a dozen queries, about 0.15 ms on a 340-item board. */
 const RECORDS_PER_TURN = 50;
+
 /**
  * recordItems, mapping RECORDS_PER_TURN records a turn so the event loop turns between them, all in one snapshot of the
  * records: commits between the turns, as an observation pass writes, wait for the next read. `records` must be a
@@ -322,10 +344,12 @@ function recordItemsInTurns(
             boardRecords(records, tickets, repos, unread, hidden, setups),
         );
         const items: Item[] = [];
+
         for (let at = 0; at < shown.length; at += RECORDS_PER_TURN) {
             await turn();
             items.push(...loopTrace.span('records', () => shown.slice(at, at + RECORDS_PER_TURN).map(toItem)));
         }
+
         return [...items, ...unpicked];
     });
 }
@@ -336,6 +360,7 @@ function recordItemsInTurns(
  */
 export function recordItemsReader(records: WorkRecords) {
     let mapped: { from: unknown[]; items: Item[] } | null = null;
+
     return async (
         tickets: readonly Item[],
         repos: readonly string[],
@@ -346,9 +371,13 @@ export function recordItemsReader(records: WorkRecords) {
     ): Promise<Item[]> => {
         // Marked before the snapshot starts, so a commit during the read only makes the next read map again.
         const from = [records.changes(), tickets, JSON.stringify([repos, unread, [...hidden], setups])];
+
         if (mapped?.from.every((input, i) => input === from[i])) return mapped.items;
+
         const items = await recordItemsInTurns(records, tickets, repos, unread, hidden, setups, turn);
+
         mapped = { from, items };
+
         return items;
     };
 }
@@ -361,6 +390,7 @@ export function archivedItems(
     hidden: ReadonlySet<string>,
 ): Item[] {
     const { ticketOf, toItem } = itemMapper(records, tickets);
+
     return records
         .list({})
         .filter((r) => (r.setAside || hidden.has(r.workId)) && listed(r, repos))

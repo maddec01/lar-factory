@@ -32,7 +32,9 @@ export interface UsageRecord {
 
 export function parseTimestampMs(value: unknown): number | null {
     if (typeof value !== 'string') return null;
+
     const parsed = Date.parse(value);
+
     return Number.isNaN(parsed) ? null : parsed;
 }
 

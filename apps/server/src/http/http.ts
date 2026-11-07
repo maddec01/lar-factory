@@ -142,8 +142,11 @@ function json(res: ServerResponse, status: number, value: unknown): void {
 /** Whether the request carries the app secret, compared in constant time. Hashing first evens out the lengths. */
 function hasAppSecret(req: IncomingMessage, secret: string): boolean {
     const given = req.headers['x-board-secret'];
+
     if (typeof given !== 'string') return false;
+
     const digest = (value: string) => createHash('sha256').update(value).digest();
+
     return timingSafeEqual(digest(given), digest(secret));
 }
 
@@ -155,24 +158,34 @@ async function readJson(
 ): Promise<Record<string, unknown> | null> {
     if (req.headers['content-type']?.split(';')[0]?.trim() !== 'application/json') {
         json(res, 415, { error: `Send ${what} as JSON.` });
+
         return null;
     }
+
     try {
         let size = 0;
         const chunks: Buffer[] = [];
+
         for await (const chunk of req) {
             size += (chunk as Buffer).length;
+
             if (size > 100_000) {
                 json(res, 413, { error: `${what[0]!.toUpperCase()}${what.slice(1)} are too large.` });
+
                 return null;
             }
+
             chunks.push(chunk as Buffer);
         }
+
         const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+
         if (!input || typeof input !== 'object') throw new Error('Invalid JSON.');
+
         return input as Record<string, unknown>;
     } catch {
         json(res, 400, { error: `Send valid ${what} as JSON.` });
+
         return null;
     }
 }
@@ -235,10 +248,13 @@ export function createBoardServer({
         streams.set(res, event);
         loopTrace.span('board stream write', () => res.write(event));
     };
+
     // A page already showing this board gets nothing. Its clock moves on by itself, and a new stream always gets the board.
     board.subscribe((data) => {
         if (!streams.size) return;
+
         const event = boardEvent(data);
+
         for (const [res, last] of streams) if (last !== event) sendEvent(res, event);
     });
 
@@ -269,24 +285,31 @@ export function createBoardServer({
             async run({ itemId, number }) {
                 const item = board.snapshot().items.find((i) => i.id === itemId);
                 const pr = item?.linkedPrs.find((p) => p.number === number);
+
                 if (!item || !pr || !item.azure)
                     return { status: 404, body: { error: 'That Azure PR is not on the board.' } };
+
                 if (board.snapshot().itemSourceProblems?.some((p) => p.repo === item.repo))
                     return { status: 503, body: { error: 'The Azure source is disconnected.' } };
+
                 // Resolve arguments from the board's provider link, never arbitrary client arguments.
                 const match = /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)$/i.exec(
                     pr.url,
                 );
+
                 if (!match || Number(match[4]) !== number)
                     return { status: 400, body: { error: 'This Azure PR link is unsupported.' } };
+
                 const evidence = await readAzureReadiness(
                     match[1]!,
                     decodeURIComponent(match[2]!),
                     decodeURIComponent(match[3]!),
                     Number(number),
                 );
+
                 if (board.snapshot().itemSourceProblems?.some((p) => p.repo === item.repo))
                     return { status: 503, body: { error: 'The Azure source is disconnected.' } };
+
                 return {
                     status: 200,
                     body: {
@@ -419,6 +442,7 @@ export function createBoardServer({
             disabled: 'Retention is disabled in sample mode.',
             async run(input) {
                 const saved = retention.save(input);
+
                 return { ...saved, body: { ...saved.body, board: board.snapshot() } };
             },
         },
@@ -427,6 +451,7 @@ export function createBoardServer({
             disabled: 'Shaping thread cleanup is disabled in sample mode.',
             async run(input) {
                 const saved = shapingThreadCleanup.save(input);
+
                 return { ...saved, body: { ...saved.body, board: board.snapshot() } };
             },
         },
@@ -435,6 +460,7 @@ export function createBoardServer({
             disabled: 'The heavy command limit is disabled in sample mode.',
             async run(input) {
                 const saved = heavyCommandLimit.save(input);
+
                 return { ...saved, body: { ...saved.body, board: board.snapshot() } };
             },
         },
@@ -443,6 +469,7 @@ export function createBoardServer({
             disabled: 'The build limit is disabled in sample mode.',
             async run(input) {
                 const saved = buildLimit.save(input);
+
                 return { ...saved, body: { ...saved.body, board: board.snapshot() } };
             },
         },
@@ -451,6 +478,7 @@ export function createBoardServer({
             disabled: 'Auto-build is disabled in sample mode.',
             async run(input) {
                 const saved = autoBuild.save(input);
+
                 return { ...saved, body: { ...saved.body, board: board.snapshot() } };
             },
         },
@@ -466,8 +494,10 @@ export function createBoardServer({
             disabled: 'Marking a Dependency met is disabled in sample mode.',
             run: forItem('Name the item the Dependency holds.', async (itemId, input) => {
                 const marked = commands.markDependencyMet(itemId, input.dependencyId, input.revision, input.met);
+
                 // A met mark can release an armed start at once, with no read to wait for.
                 if (marked.status === 200) await startAfter.startUnblocked();
+
                 return marked;
             }),
         },
@@ -481,15 +511,20 @@ export function createBoardServer({
                     !['retry', 'accept', 'reject'].includes(String(action))
                 )
                     return { status: 400, body: { error: 'Name the item, Spec generation and action.' } };
+
                 const item = board.snapshot().items.find((item) => item.id === itemId);
+
                 if (!item || !itemDetails.specAction)
                     return { status: 404, body: { error: 'That item is not available.' } };
+
                 const refused = await itemDetails.specAction(
                     item,
                     generation as number,
                     action as 'retry' | 'accept' | 'reject',
                 );
+
                 readSoon();
+
                 return { status: refused?.status ?? 200, body: { error: refused?.error ?? null } };
             },
         },
@@ -499,6 +534,7 @@ export function createBoardServer({
             async run({ itemId, body, bodyField, revision }) {
                 if (typeof itemId !== 'string' || !itemId || typeof body !== 'string')
                     return { status: 400, body: { error: 'Name the item and send its description.' } };
+
                 if (
                     (bodyField !== undefined &&
                         bodyField !== 'System.Description' &&
@@ -509,20 +545,27 @@ export function createBoardServer({
                         status: 400,
                         body: { error: "Send the field and revision the work item's details gave." },
                     };
+
                 const item = board.snapshot().items.find((i) => i.id === itemId);
+
                 if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+
                 const problem = writeAccessProblem(
                     item.repo,
                     'edit-ticket',
                     board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.access ?? {},
                 );
+
                 if (problem) return { status: 403, body: { error: problem } };
+
                 const refused = await itemDetails.saveDescription(item, {
                     body,
                     ...(bodyField !== undefined && { bodyField }),
                     ...(revision !== undefined && { revision: revision as number }),
                 });
+
                 readSoon();
+
                 return refused
                     ? { status: refused.status, body: { error: refused.error } }
                     : { status: 200, body: { error: null } };
@@ -543,26 +586,36 @@ export function createBoardServer({
                         status: 400,
                         body: { error: 'Name the item, the label and whether to add or remove it.' },
                     };
+
                 const item = board.snapshot().items.find((i) => i.id === itemId);
+
                 if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+
                 const setup = board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup;
                 const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {});
+
                 if (problem) return { status: 403, body: { error: problem } };
+
                 if (trackerCapabilities(item.repo).isManaged(label))
                     return {
                         status: 422,
                         body: { error: `The factory manages ${label}, so it can't be changed here.` },
                     };
+
                 if (kindLabels(item.kind, setup?.vocabulary).includes(label.toLowerCase()))
                     return {
                         status: 422,
                         body: { error: `${label} follows this item's kind, so it can't be changed here.` },
                     };
+
                 const change: LabelChange = { label, action };
                 const refused = await itemDetails.changeLabels(item, change);
+
                 if (refused) return { status: refused.status, body: { error: refused.error } };
+
                 showLabelChange(item, change);
                 readSoon(item.url ?? undefined);
+
                 return { status: 200, body: withBoard({ error: null }) };
             },
         },
@@ -572,12 +625,17 @@ export function createBoardServer({
             async run({ itemId, kind }) {
                 if (typeof itemId !== 'string' || !itemId)
                     return { status: 400, body: { error: 'Name the item and its new kind.' } };
+
                 const { status, body, labelChanges, ticketType } = await commands.changeKind(itemId, kind);
                 const shown = board.snapshot().items.find((i) => i.id === ('itemId' in body ? body.itemId : itemId));
+
                 if (shown) for (const change of labelChanges) showLabelChange(shown, change);
+
                 if (shown && ticketType) showTicketType(shown, ticketType);
+
                 // A failure can have changed the ticket too, so the read runs either way. Local work has no ticket to read.
                 if (shown?.url) readSoon(shown.url);
+
                 return { status, body: withBoard(body) };
             },
         },
@@ -594,8 +652,11 @@ export function createBoardServer({
             run: forItem('Name the item to export.', async (itemId) => {
                 const item =
                     board.snapshot().items.find((i) => i.id === itemId) ?? archive().find((i) => i.id === itemId);
+
                 if (!item) return { status: 404, body: { error: 'That item is not on the board or in Archive.' } };
+
                 const exported = await itemDetails.exportMarkdown(item);
+
                 return 'error' in exported
                     ? { status: exported.status, body: { error: exported.error } }
                     : { status: 200, body: { ...exported, error: null } };
@@ -606,6 +667,7 @@ export function createBoardServer({
             disabled: 'Sample mode onboards no Project.',
             async run(input) {
                 const created = await createProject(input);
+
                 return 'error' in created
                     ? { status: created.status, body: { error: created.error } }
                     : { status: 200, body: { ...created, error: null } };
@@ -616,9 +678,12 @@ export function createBoardServer({
             disabled: 'Sample mode onboards no Project.',
             async run(input) {
                 const kept = await keepOnboarding(input);
+
                 if ('error' in kept) return { status: kept.status, body: { error: kept.error } };
+
                 board.update({ onboarding: kept.onboarding });
                 board.push();
+
                 return { status: 200, body: withBoard({ error: null }) };
             },
         },
@@ -628,6 +693,7 @@ export function createBoardServer({
             async run(input) {
                 try {
                     const discovery = await discoverVocabulary(input.repo as string);
+
                     return { status: 200, body: { discovery, suggestions: suggestVocabularyLabels(discovery.labels) } };
                 } catch (err) {
                     return { status: 400, body: { error: (err as Error).message } };
@@ -639,6 +705,7 @@ export function createBoardServer({
             disabled: 'Sample mode onboards no Project.',
             async run(input) {
                 const detected = await detectSetup(input);
+
                 return 'error' in detected
                     ? { status: detected.status, body: { error: detected.error } }
                     : { status: 200, body: { ...detected, error: null } };
@@ -650,10 +717,13 @@ export function createBoardServer({
             disabled: 'Sample mode onboards no Project.',
             async run(input) {
                 const saved = await saveSetup(input);
+
                 if ('error' in saved) return { status: saved.status, body: { error: saved.error } };
+
                 board.update({ onboarding: saved.onboarding });
                 board.push();
                 readSoon();
+
                 return { status: 200, body: withBoard({ error: null }) };
             },
         },
@@ -663,9 +733,12 @@ export function createBoardServer({
             disabled: 'Sample mode changes no Project settings.',
             async run(input) {
                 const changed = await changeRepositorySettings(input);
+
                 if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
+
                 changeRow(input.repo as string, (r) => ({ ...r, setup: changed.setup }));
                 readSoon();
+
                 return { status: 200, body: withBoard({ ...changed, error: null }) };
             },
         },
@@ -675,10 +748,14 @@ export function createBoardServer({
             disabled: 'Sample mode reads and changes no labels.',
             async run(input) {
                 const changed = await changeRepositoryLabels(input);
+
                 if ('error' in changed) return { status: changed.status, body: { error: changed.error } };
+
                 if (input.change === 'list') return { status: 200, body: { ...changed, error: null } };
+
                 for (const setup of changed.setups ?? []) changeRow(setup.repo, (r) => ({ ...r, setup }));
                 readSoon();
+
                 return { status: 200, body: withBoard({ error: null }) };
             },
         },
@@ -688,8 +765,10 @@ export function createBoardServer({
             async run() {
                 if (sample || !reauthorizeT3)
                     return { status: 403, body: { error: 'T3 reauthorization is unavailable here.' } };
+
                 try {
                     await reauthorizeT3();
+
                     return { status: 200, body: withBoard({ error: null }) };
                 } catch {
                     return {
@@ -703,7 +782,9 @@ export function createBoardServer({
             what: 'the recheck request',
             async run(input) {
                 if (sample) return { status: 403, body: { error: 'Sample mode looks no tools up.' } };
+
                 await recheck({ gh: input.gh === true, az: input.az === true });
+
                 return { status: 200, body: withBoard({ error: null }) };
             },
         },
@@ -717,26 +798,36 @@ export function createBoardServer({
     ): Promise<Record<string, unknown> | null> {
         if (sample && write.disabled) {
             json(res, 403, { error: write.disabled });
+
             return null;
         }
+
         const input = await readJson(req, res, write.what);
+
         if (input && write.restarted && input.session !== board.snapshot().capture?.session) {
             json(res, 409, write.restarted());
+
             return null;
         }
+
         return input;
     }
 
     /** Answers a guarded write and counts it as running until then. */
     async function guardedWrite(req: IncomingMessage, res: ServerResponse, write: Write): Promise<void> {
         runningWrites++;
+
         try {
             const input = await writeInput(req, res, write);
+
             if (!input) return;
+
             const { status, body } = await write.run(input);
+
             json(res, status, body);
         } finally {
             resendAfterWrite();
+
             if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
         }
     }
@@ -744,7 +835,9 @@ export function createBoardServer({
     /** Refuses new guarded writes and answers once the running ones finish, so the app can stop the server. */
     async function drainRequest(res: ServerResponse): Promise<void> {
         draining = true;
+
         if (runningWrites > 0) await new Promise<void>((resolve) => drained.push(resolve));
+
         log('drained writes for an update');
         json(res, 200, {});
     }
@@ -755,8 +848,11 @@ export function createBoardServer({
      */
     async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const body = await readJson(req, res, 'the read request');
+
         if (!body) return;
+
         if (sample) return json(res, 200, {});
+
         readSoon(typeof body.url === 'string' ? body.url : undefined);
         json(res, 202, {});
     }
@@ -764,6 +860,7 @@ export function createBoardServer({
     /** Lists T3's projects and repository origins for onboarding. */
     async function projectsRequest(res: ServerResponse): Promise<void> {
         if (sample && !sampleReadsT3) return json(res, 403, { error: 'Sample mode onboards no Project.' });
+
         try {
             json(res, 200, { projects: await projectChoices() });
         } catch (err) {
@@ -774,14 +871,19 @@ export function createBoardServer({
     /** Answers one item's details, which the item dialog reads when it opens. */
     async function itemDetailsRequest(url: URL, res: ServerResponse): Promise<void> {
         const itemId = url.searchParams.get('itemId');
+
         if (!itemId) return json(res, 400, { error: 'Name the item whose details to read.' });
+
         const item = board.snapshot().items.find((i) => i.id === itemId);
+
         if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+
         try {
             const checks = url.pathname === '/api/item-checks';
             const read = checks
                 ? ((await itemDetails.checks?.(item)) ?? { status: 503, error: 'Checks are unavailable.' })
                 : await itemDetails.details(item);
+
             if ('error' in read) json(res, read.status, { error: read.error });
             else json(res, 200, checks ? { checks: read } : { details: read });
         } catch (err) {
@@ -792,10 +894,15 @@ export function createBoardServer({
     /** Answers the labels the item dialog's picker offers, which it reads each time it opens. */
     async function itemLabelsRequest(url: URL, res: ServerResponse): Promise<void> {
         const itemId = url.searchParams.get('itemId');
+
         if (!itemId) return json(res, 400, { error: 'Name the item whose labels to read.' });
+
         const item = board.snapshot().items.find((i) => i.id === itemId);
+
         if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+
         const read = await itemDetails.labels(item);
+
         if ('error' in read) json(res, read.status, { error: read.error });
         else json(res, 200, read);
     }
@@ -803,13 +910,20 @@ export function createBoardServer({
     /** Answers the next 10 older comments of one item, which the item dialog reads on "Load 10 more". */
     async function itemCommentsRequest(url: URL, res: ServerResponse): Promise<void> {
         const itemId = url.searchParams.get('itemId');
+
         if (!itemId) return json(res, 400, { error: 'Name the item whose comments to read.' });
+
         const before = url.searchParams.get('before');
+
         if (!before) return json(res, 400, { error: 'Name where the older comments start.' });
+
         const item = board.snapshot().items.find((i) => i.id === itemId);
+
         if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+
         try {
             const read = await itemDetails.olderComments(item, before);
+
             if ('error' in read) json(res, read.status, { error: read.error });
             else json(res, 200, { page: read satisfies ItemCommentsPage });
         } catch (err) {
@@ -820,10 +934,12 @@ export function createBoardServer({
     /** Answers the ticket picker's search of a repository's open tickets. */
     async function ticketsRequest(url: URL, res: ServerResponse): Promise<void> {
         if (sample) return json(res, 403, { error: 'Sample mode searches no tickets.' });
+
         const { status, body } = await capture.searchTickets({
             repo: url.searchParams.get('repo'),
             query: url.searchParams.get('q') ?? '',
         });
+
         json(res, status, body);
     }
 
@@ -834,7 +950,9 @@ export function createBoardServer({
             'Cache-Control': 'no-store',
             ...SECURITY_HEADERS,
         });
+
         if (req.method === 'HEAD') return void res.end();
+
         res.on('close', () => streams.delete(res));
         sendEvent(res, boardEvent(board.snapshot()));
     }
@@ -842,13 +960,17 @@ export function createBoardServer({
     /** The page's image of a project's favicon. Its URL carries the content's revision, so it can stay cached. */
     async function projectIconRequest(path: string, res: ServerResponse): Promise<void> {
         let projectId = '';
+
         try {
             projectId = decodeURIComponent(path.slice('/api/project-icon/'.length));
         } catch {
             /* A malformed ID lists no project. */
         }
+
         const image = await projectIcon(projectId);
+
         if (!image) return send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
+
         res.writeHead(200, {
             'Content-Type': image.type,
             'Cache-Control': 'max-age=31536000, immutable',
@@ -862,44 +984,58 @@ export function createBoardServer({
     function allowedHost(req: IncomingMessage): boolean {
         const host = (req.headers.host ?? '').toLowerCase();
         const { port } = server.address() as AddressInfo;
+
         return [`127.0.0.1:${port}`, `localhost:${port}`].includes(host);
     }
 
     async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
+
         const url = new URL(req.url ?? '/', 'http://localhost');
         const { pathname: path } = url;
         const startedAt = performance.now();
         let gateMs = 0;
+
         if (path !== '/api/events')
             res.once('finish', () => loopTrace.request(`${req.method} ${path}`, performance.now() - startedAt, gateMs));
+
         if (!answersAtOnce(req.method, path)) {
             await ready();
             gateMs = performance.now() - startedAt;
         }
+
         if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
             return json(res, 403, { error: 'Submit from this board page.' });
         }
+
         const write = req.method === 'POST' && Object.hasOwn(WRITES, path) ? WRITES[path] : undefined;
+
         if (write && appSecret && !hasAppSecret(req, appSecret)) {
             return json(res, 403, { error: 'Submit from the board app.' });
         }
+
         if (req.method === 'POST' && path === '/api/drain') {
             if (!appSecret || !hasAppSecret(req, appSecret))
                 return json(res, 403, { error: 'Only the board app can drain the board.' });
+
             return drainRequest(res);
         }
+
         if (write) {
             if (draining)
                 return json(res, 503, {
                     error: 'The board is installing an update. Try again once Lar Factory restarts.',
                 });
+
             return guardedWrite(req, res, write);
         }
+
         if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
+
         if (req.method !== 'GET' && req.method !== 'HEAD') {
             return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
         }
+
         if (path === '/') {
             return send(
                 res,
@@ -908,24 +1044,39 @@ export function createBoardServer({
                 loopTrace.span('page request', () => pageWithData(page.template, board.snapshot())),
             );
         }
+
         if (path === '/api/events') return openStream(req, res);
+
         if (path === '/api/onboarding/projects') return projectsRequest(res);
+
         if (path.startsWith('/api/project-icon/')) return projectIconRequest(path, res);
+
         if (path === '/api/item-details' || path === '/api/item-checks') return itemDetailsRequest(url, res);
+
         if (path === '/api/item-comments') return itemCommentsRequest(url, res);
+
         if (path === '/api/item-labels') return itemLabelsRequest(url, res);
+
         if (path === '/api/ticket-preview') {
             if (sample) return json(res, 403, { error: 'Creating issues is disabled in sample mode.' });
+
             const result = await capture.ticketPreview(url.searchParams.get('itemId') ?? '');
+
             return json(res, result.status, result.body);
         }
+
         if (path === '/api/ticket-options') {
             if (sample) return json(res, 403, { error: 'Sample mode reads no issue options.' });
+
             const result = await capture.options(url.searchParams.get('repo'));
+
             return json(res, result.status, result.body);
         }
+
         if (path === '/api/tickets') return ticketsRequest(url, res);
+
         if (path === '/api/archive') return json(res, 200, { items: archive() });
+
         if (path === '/api/board')
             return send(
                 res,
@@ -933,15 +1084,20 @@ export function createBoardServer({
                 'application/json; charset=utf-8',
                 loopTrace.span('board request', () => JSON.stringify(board.snapshot())),
             );
+
         if (path === '/healthz') return json(res, 200, {});
+
         const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
+
         if (asset) return send(res, 200, asset.type, asset.body);
+
         send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
     }
 
     const server = createServer((req, res) => {
         handle(req, res).catch((err: unknown) => {
             log(`request ${req.url} failed: ${err instanceof Error ? err.stack : String(err)}`);
+
             if (!res.headersSent) send(res, 500, 'text/plain; charset=utf-8', 'Internal error\n');
         });
     });

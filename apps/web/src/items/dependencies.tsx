@@ -22,7 +22,9 @@ export const dependenciesOf = (item: Item): DependencyHold[] =>
 function ReadLine({ d, now }: { d: DependencyHold; now: number }) {
     const seen = d.observation;
     const subject = seen?.subject ?? d.named[0]?.reference;
+
     if (!subject) return <>No ticket. Handover only.</>;
+
     const url = d.named.find((n) => n.reference === subject)?.url;
     const name = url ? (
         <a href={url} target="_blank" rel="noopener" className="underline">
@@ -31,10 +33,13 @@ function ReadLine({ d, now }: { d: DependencyHold; now: number }) {
     ) : (
         subject
     );
+
     if (!seen) return <>{name} not read yet</>;
+
     const last = seen.lastGood
         ? `; last read ${DEPENDENCY_OBSERVATION_WORDS[seen.lastGood.kind]}, ${shortAgo(seen.lastGood.observedAt, now)}`
         : '';
+
     return (
         <>
             {name} {DEPENDENCY_OBSERVATION_WORDS[seen.kind]}, read {shortAgo(seen.observedAt, now)}
@@ -46,10 +51,12 @@ function ReadLine({ d, now }: { d: DependencyHold; now: number }) {
 export function Dependencies({ item, data, now }: { item: Item; data: BoardData; now: number }) {
     const action = useItemAction(item.id);
     const state = writeState(data, action);
+
     return (
         <ul className="m-0 grid list-none gap-3 p-0 text-sm">
             {dependenciesOf(item).map((d) => {
                 const notice = dependencyNotice(d);
+
                 return (
                     <li key={d.dependencyId} className="grid gap-1" data-dependency={d.dependencyId}>
                         <span className="font-medium" data-dependency-owner>

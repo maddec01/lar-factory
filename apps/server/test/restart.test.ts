@@ -23,12 +23,15 @@ import { projectsDb } from './stats-db.ts';
 /** A home and T3 database that outlive each board started on them, as this Mac's do across a restart. */
 function machine(t: TestContext, title = 'Issue 12') {
     const home = mkdtempSync(join(tmpdir(), 'lar-restart-home-'));
+
     t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
     checkouts(home, { 'lar-factory': 'git@github.com:maddec01/lar-factory.git' });
+
     const env = {
         HOME: home,
         T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/lar/lar-factory` }]),
     };
+
     /** Starts a board on this machine with the fake gh and t3 as `options` say, and `extra` in its environment; `recorded` imports issue 12 once, as onboarding did. */
     return (options: object = {}, recorded = false, extra: Record<string, string> = {}) =>
         startBoard(
@@ -50,6 +53,7 @@ const starts = async (board: Board) => (await board.t3Calls()).filter((args) => 
 /** The launch intents the work record holds, with each one's outcome. */
 async function intents(board: Board, workId: string) {
     const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
     try {
         return records
             .launchIntents({ workId })
@@ -73,13 +77,17 @@ test(
         );
         // Simulate a newer lar-work process after this server has opened the database. No live user data is involved.
         const external = new DatabaseSync(workRecordsPath(board.dataDir));
+
         try {
             const version = Number(external.prepare('PRAGMA user_version').get()!.user_version);
+
             external.exec(`PRAGMA user_version = ${version + 1000}`);
         } finally {
             external.close();
         }
+
         const after = await until(board, (data) => data.localProblem === 'Restart Lar Factory to continue.');
+
         assert.deepEqual(after.items, before.items, 'a failed local read preserves the last successful items');
         assert.equal(after.error, 'Restart Lar Factory to continue.');
         assert.equal((await fetch(`${board.url}/healthz`)).status, 200);
@@ -98,7 +106,9 @@ test(
     async (t) => {
         const boardOn = machine(t);
         const before = await boardOn({ items: [] });
+
         await until(before, (d) => d.fetchedAt !== null);
+
         const kept = await larWork(
             before.dataDir,
             'create',
@@ -109,8 +119,10 @@ test(
             '--kind',
             'feature',
         );
+
         await until(before, (d) => d.items.some((i) => i.id === kept.workId));
         await before.stop();
+
         const moved = await larWork(
             before.dataDir,
             'update',
@@ -132,6 +144,7 @@ test(
         );
         const after = await boardOn({ items: [] });
         const shown = await until(after, (d) => d.items.length === 2);
+
         assert.deepEqual(
             shown.items.map((i) => [i.id, i.status]).sort(),
             [
@@ -148,12 +161,17 @@ test('a successful start holds its thread after a restart, so Start there asks T
     const boardOn = machine(t);
     const before = await boardOn({}, true);
     const workId = before.id(12);
+
     await until(before, (d) => d.items.some((i) => i.id === workId));
     assert.equal((await start(before, workId)).status, 200);
     await before.stop();
+
     const after = await boardOn();
+
     await until(after, (d) => d.items.some((i) => i.id === workId));
+
     const again = await start(after, workId);
+
     assert.deepEqual([again.status, (await again.json()).thread?.threadId], [200, 'thread-1']);
     assert.equal(await starts(after), 0);
     assert.deepEqual(await intents(after, workId), [{ threadId: 'thread-1', failure: false, resolved: true }]);
@@ -164,12 +182,17 @@ test('a failed start stays a failure after a restart, so Start there asks T3 aga
     // No t3 at all is a certain failure: nothing ran, so no thread can exist.
     const missing = await boardOn({}, true, { T3_PATH: '/nonexistent/t3' });
     const workId = missing.id(12);
+
     await until(missing, (d) => d.items.some((i) => i.id === workId));
+
     const failed = await start(missing, workId);
+
     assert.equal(failed.status, 502);
     assert.equal((await failed.json()).uncertain, undefined);
     await missing.stop();
+
     const after = await boardOn();
+
     await until(after, (d) => d.items.some((i) => i.id === workId));
     assert.equal((await start(after, workId)).status, 200);
     assert.equal(await starts(after), 1);
@@ -187,15 +210,21 @@ test(
         const boardOn = machine(t, title);
         const before = await boardOn({ t3: { fail: 'garbage' } }, true);
         const workId = before.id(12);
+
         await until(before, (d) => d.items.some((i) => i.id === workId));
+
         const message = earlierShapePrompt(before, `#12 ${title}`, workId);
+
         assert.equal((await (await start(before, workId)).json()).uncertain, true);
         await before.stop();
 
         const after = await boardOn({ t3: { recover: 'late', firstMessage: message } });
+
         await until(after, (d) => d.items.some((i) => i.id === workId));
+
         const settled = await start(after, workId);
         const recovered = (await settled.json()).thread;
+
         assert.deepEqual([settled.status, recovered?.threadId], [200, 'thread-1']);
         assert.ok(recovered.title.endsWith('…'));
         assert.ok(recovered.title.length <= 80);
@@ -212,14 +241,20 @@ test(
         const boardOn = machine(t, title);
         const before = await boardOn({ t3: { fail: 'garbage' } }, true);
         const workId = before.id(12);
+
         await until(before, (d) => d.items.some((i) => i.id === workId));
+
         const message = shapePrompt(before, `#12 ${title}`, workId);
+
         assert.equal((await (await start(before, workId)).json()).uncertain, true);
         await before.stop();
 
         const down = await boardOn({ t3: { fail: 'down' } });
+
         await until(down, (d) => d.items.some((i) => i.id === workId));
+
         const unread = await start(down, workId);
+
         assert.deepEqual([unread.status, (await unread.json()).uncertain], [502, true]);
         assert.equal(await starts(down), 0, "T3 that can't be read permits no retry");
         assert.ok(
@@ -229,9 +264,12 @@ test(
         await down.stop();
 
         const after = await boardOn({ t3: { recover: 'late', firstMessage: message } });
+
         await until(after, (d) => d.items.some((i) => i.id === workId));
+
         const settled = await start(after, workId);
         const recovered = (await settled.json()).thread;
+
         assert.deepEqual([settled.status, recovered?.threadId], [200, 'thread-1']);
         assert.ok(recovered.title.endsWith('…'));
         assert.ok(recovered.title.length <= 80);

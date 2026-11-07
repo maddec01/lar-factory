@@ -61,8 +61,11 @@ function faviconUrl(access: Access, project: ProjectFact, signal: AbortSignal): 
             resolve(url);
         };
         const abort = () => finish();
+
         signal.addEventListener('abort', abort);
+
         const protocol = { subscriptionSession: () => access.protocol.subscriptionSession(), invalidateSession() {} };
+
         try {
             stop = subscribeProjects(access.origin, '', protocol, () => finish(), {
                 tag: 'assets.createUrl',
@@ -91,14 +94,19 @@ async function limitedBody(response: Response): Promise<Buffer | undefined> {
     const chunks: Uint8Array[] = [];
     let size = 0;
     const reader = response.body?.getReader();
+
     for (let part = await reader?.read(); part && !part.done; part = await reader?.read()) {
         size += part.value.length;
+
         if (size > MAX_BYTES) {
             await reader?.cancel();
+
             return undefined;
         }
+
         chunks.push(part.value);
     }
+
     return Buffer.concat(chunks);
 }
 
@@ -106,20 +114,31 @@ async function limitedBody(response: Response): Promise<Buffer | undefined> {
 async function readFavicon(access: Access, project: ProjectFact): Promise<Favicon | 'absent' | undefined> {
     const deadline = new AbortController();
     const timer = setTimeout(() => deadline.abort(), FETCH_MS);
+
     try {
         const relative = await faviconUrl(access, project, deadline.signal);
+
         if (relative === null) return 'absent';
+
         if (relative === undefined) return undefined;
+
         const url = new URL(relative, access.origin);
+
         if (url.origin !== access.origin.origin) return undefined;
+
         const response = await fetch(url, { redirect: 'error', signal: deadline.signal });
         const type = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? '';
+
         if (!response.ok || !MEDIA_TYPES.has(type)) {
             await response.body?.cancel();
+
             return response.ok || response.status === 404 ? 'absent' : undefined;
         }
+
         const body = await limitedBody(response);
+
         if (!body?.length) return 'absent';
+
         return { type, body, revision: createHash('sha256').update(body).digest('hex').slice(0, 16) };
     } catch {
         return undefined;
@@ -152,43 +171,57 @@ export function createProjectIcons(
     async function read(): Promise<void> {
         const projectRead = await repositoryProjects();
         const projects = new Map(projectRead.observation?.projects.map((project) => [project.id, project]));
+
         for (const id of favicons.keys()) if (!projects.has(id)) favicons.delete(id);
+
         // T3 may be down, so these come from the retained observation, unlike Start's lookup.
         const found = projectRead.observation ? await observedCheckouts(projectRead.observation) : [];
         const owners = repositories(board.snapshot()).flatMap((repo): [string, ProjectFact][] => {
             const [only, ...others] = checkoutsOf(found, repo);
             const project = only && !others.length ? projects.get(only.id) : undefined;
+
             return project ? [[repo, project]] : [];
         });
         const access = projectRead.availability === 'available' ? repositoryProjectAccess() : undefined;
+
         for (const { id, projectIcon } of projects.values()) if (projectIcon) favicons.delete(id);
+
         if (access) {
             const queue = [...projects.values()].filter(({ projectIcon }) => !projectIcon);
+
             await Promise.all(
                 Array.from({ length: MAX_FETCHES }, async () => {
                     for (let project = queue.shift(); project; project = queue.shift()) {
                         const favicon = await readFavicon(access, project);
+
                         if (favicon === 'absent') favicons.delete(project.id);
                         else if (favicon) favicons.set(project.id, favicon);
                     }
                 }),
             );
         }
+
         known = new Map(
             [...projects.values()].flatMap(({ id, projectIcon }): [string, ProjectIcon][] => {
                 const favicon = favicons.get(id);
+
                 if (projectIcon) return [[id, projectIcon]];
+
                 return favicon ? [[id, { kind: 'favicon', projectId: id, revision: favicon.revision }]] : [];
             }),
         );
+
         const icons = Object.fromEntries(
             owners.flatMap(([repo, { id }]): [string, ProjectIcon][] => {
                 const icon = known.get(id);
+
                 return icon ? [[repo, icon]] : [];
             }),
         );
         const next = JSON.stringify(icons);
+
         if (next === published) return;
+
         published = next;
         board.update({ projectIcons: icons });
         board.push();
@@ -200,6 +233,7 @@ export function createProjectIcons(
             .finally(() => {
                 pending = undefined;
             });
+
         return pending;
     };
     // A read already running may have started before what this one is for changed. Calls during a read share the one after it.
@@ -217,24 +251,31 @@ export function createProjectIcons(
             const readChanges = () =>
                 void afterRunning(() => {
                     if (stopped) return;
+
                     changeWaiting = false;
                     gap = setTimeout(() => {
                         gap = undefined;
+
                         if (changeWaiting) readChanges();
                     }, CHANGE_GAP_MS);
                     void refresh();
                 });
+
             void refresh();
+
             const timer = setInterval(() => void refresh(), REFRESH_MS);
             const unsubscribe = board.subscribe(() => {
                 if (listed() === listedRepositories) return;
+
                 listedRepositories = listed();
                 void afterRunning(() => (stopped ? undefined : refresh()));
             });
             const unsubscribeProjects = subscribeRepositoryProjects(() => {
                 if (!changeWaiting && !gap) readChanges();
+
                 changeWaiting = true;
             });
+
             return () => {
                 stopped = true;
                 clearTimeout(gap);
@@ -245,6 +286,7 @@ export function createProjectIcons(
         },
         async byProject() {
             let timer: NodeJS.Timeout | undefined;
+
             await Promise.race([
                 afterRunning(refresh),
                 new Promise((resolve) => {
@@ -252,12 +294,16 @@ export function createProjectIcons(
                 }),
             ]);
             clearTimeout(timer);
+
             return known;
         },
         async image(projectId) {
             const { observation } = await repositoryProjects();
+
             if (!observation?.projects.some(({ id }) => id === projectId)) return undefined;
+
             const favicon = favicons.get(projectId);
+
             return favicon && { type: favicon.type, body: favicon.body };
         },
     };

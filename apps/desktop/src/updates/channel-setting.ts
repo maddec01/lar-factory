@@ -19,6 +19,7 @@ export const atFile = (file: string): ChannelSetting => ({
     read: Effect.sync(() => {
         try {
             const channel = (JSON.parse(NodeFS.readFileSync(file, 'utf8')) as { channel?: unknown } | null)?.channel;
+
             return isChannel(channel) ? channel : null;
         } catch {
             return null;

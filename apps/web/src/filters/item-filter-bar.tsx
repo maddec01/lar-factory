@@ -94,6 +94,7 @@ export function ItemFilterBar({
         bar.current?.querySelector<HTMLElement>('[data-filter="kind"]')?.focus();
         remove();
     };
+
     return (
         <div ref={bar} data-item-filters className="flex flex-wrap items-center gap-1.5">
             <FilterMenu which="kind" name="Kind" picked={kinds.length}>

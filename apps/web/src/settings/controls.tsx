@@ -100,5 +100,6 @@ export function ToolState({ text, tone }: { text: string; tone: ToolTone }) {
         error: 'text-(--destructive-foreground)',
         muted: 'text-(--muted-foreground)',
     }[tone];
+
     return <span className={`tool-state text-xs font-medium whitespace-nowrap ${color}`}>● {text}</span>;
 }

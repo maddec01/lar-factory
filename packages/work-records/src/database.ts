@@ -66,14 +66,18 @@ const CANTOPEN = 14;
 /** `error` as a WorkRecordError when SQLite says the database is locked or can't be written. */
 function sqliteError(error: unknown, path: string): unknown {
     if (error instanceof WorkRecordError || !(error instanceof Error) || !('errcode' in error)) return error;
+
     const code = Number(error.errcode) & 0xff;
+
     if (code === BUSY || code === LOCKED)
         return new WorkRecordError('busy', `The work-record database ${path} is locked by another writer; try again.`);
+
     if (code === READONLY || code === CANTOPEN)
         return new WorkRecordError(
             'unwritable',
             `The work-record database ${path} can't be written: ${error.message}.`,
         );
+
     return error;
 }
 
@@ -89,12 +93,16 @@ function tooNew(version: number, known: number, path: string): WorkRecordError {
 
 function transaction<T>(db: DatabaseSync, change: () => T): T {
     db.exec('BEGIN IMMEDIATE');
+
     try {
         const result = change();
+
         db.exec('COMMIT');
+
         return result;
     } catch (error) {
         if (db.isTransaction) db.exec('ROLLBACK');
+
         throw error;
     }
 }
@@ -108,30 +116,42 @@ function transaction<T>(db: DatabaseSync, change: () => T): T {
 async function migrate(db: DatabaseSync, path: string, migrations: readonly Migration[]): Promise<void> {
     for (let attempt = 1; ; attempt++) {
         const from = userVersion(db);
+
         if (from > migrations.length) throw tooNew(from, migrations.length, path);
+
         if (from === migrations.length) return;
+
         const copy = from > 0 ? `${path}.before-v${migrations.length}-${process.pid}` : null;
         const seen = dataVersion(db);
+
         try {
             if (copy) db.exec(`VACUUM INTO '${copy.replaceAll("'", "''")}'`);
+
             db.exec('BEGIN IMMEDIATE');
+
             if (dataVersion(db) !== seen) {
                 db.exec('ROLLBACK');
+
                 if (attempt === 3)
                     throw new WorkRecordError(
                         'busy',
                         `The work-record database ${path} kept changing during its schema update; try again.`,
                     );
+
                 continue;
             }
+
             for (let version = from + 1; version <= migrations.length; version++) {
                 try {
                     migrations[version - 1]!(db);
+
                     if (!db.isTransaction) throw new Error('the migration ended its transaction');
                 } catch (error) {
                     const intact = db.isTransaction;
+
                     if (intact) db.exec('ROLLBACK');
                     else if (copy) await restore(copy, path);
+
                     throw new WorkRecordError(
                         'schema-update-failed',
                         `The work-record database's schema update to version ${version} failed: ${error instanceof Error ? error.message : String(error)}. Its committed records are unchanged.`,
@@ -140,9 +160,11 @@ async function migrate(db: DatabaseSync, path: string, migrations: readonly Migr
             }
             db.exec(`PRAGMA user_version = ${migrations.length}`);
             db.exec('COMMIT');
+
             return;
         } catch (error) {
             if (db.isTransaction) db.exec('ROLLBACK');
+
             throw sqliteError(error, path);
         } finally {
             if (copy) rmSync(copy, { force: true });
@@ -153,6 +175,7 @@ async function migrate(db: DatabaseSync, path: string, migrations: readonly Migr
 /** Writes the copy at `copy` back over the database at `path` through SQLite, which honours other connections' locks. */
 async function restore(copy: string, path: string): Promise<void> {
     const source = new DatabaseSync(copy, { readOnly: true });
+
     try {
         await backup(source, path);
     } finally {
@@ -176,6 +199,7 @@ export async function openDatabase(
     } = {},
 ): Promise<Database> {
     let db: DatabaseSync;
+
     try {
         mkdirSync(dirname(path), { recursive: true });
         // The records are private. Making the file 0600 before SQLite opens it gives the WAL files SQLite creates the same mode.
@@ -193,6 +217,7 @@ export async function openDatabase(
         for (const file of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(file)) chmodSync(file, 0o600);
     } catch (error) {
         const failure = sqliteError(error, path);
+
         throw failure instanceof WorkRecordError
             ? failure
             : new WorkRecordError(
@@ -200,16 +225,19 @@ export async function openDatabase(
                   `The work-record database ${path} can't be opened: ${error instanceof Error ? error.message : String(error)}.`,
               );
     }
+
     try {
         if (userVersion(db) < migrations.length) {
             // Old writers check their schema after acquiring this same lease. Holding it
             // through commit excludes in-flight calls and fences the next old drain.
             const lease = await acquireTrackerSyncLock(path).catch(() => null);
+
             if (!lease)
                 throw new WorkRecordError(
                     'busy',
                     'Restart all Lar Factory servers and CLI commands before upgrading. A structural writer could not be excluded; no migration was applied.',
                 );
+
             try {
                 await migrate(db, path, migrations);
             } finally {
@@ -222,22 +250,28 @@ export async function openDatabase(
         db.close();
         throw error;
     }
+
     // A newer process may update the schema while this one stays open; check before every statement batch.
     const versionRow = db.prepare('PRAGMA user_version');
     const checked = <T>(run: () => T): T => {
         const version = Number(versionRow.get()?.user_version ?? 0);
+
         if (version !== migrations.length) throw tooNew(version, migrations.length, path);
+
         return run();
     };
     // data_version moves only when another connection commits.
     const dataVersionRow = db.prepare('PRAGMA data_version');
     let committed = 0;
+
     return {
         db,
         write: (change) => {
             try {
                 const result = transaction(db, () => checked(change));
+
                 committed++;
+
                 return result;
             } catch (error) {
                 throw sqliteError(error, path);
@@ -252,9 +286,11 @@ export async function openDatabase(
         },
         snapshot: async (read) => {
             db.exec('BEGIN');
+
             try {
                 // A deferred transaction takes its snapshot at its first read.
                 checked(() => versionRow.get());
+
                 return await read();
             } catch (error) {
                 throw sqliteError(error, path);

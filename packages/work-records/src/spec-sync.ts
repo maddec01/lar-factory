@@ -27,6 +27,7 @@ export interface SpecSyncOptions {
     workIds?: readonly string[];
     initialize?: boolean;
 }
+
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 const markdown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-' });
 const azure = (repository: string) => repository.split('/').length !== 2;
@@ -42,6 +43,7 @@ const checkpoint = (ticket: StructureTicket): SpecRemote => ({
 });
 const changed = (repository: string, base: SpecRemote, remote: SpecRemote) =>
     azure(repository) ? remote.version !== base.version : remote.digest !== base.digest;
+
 function content(ticket: Pick<StructureTicket, 'body'>) {
     return readTicketSpec(
         stripTrackerStructure(ticket.body)
@@ -49,20 +51,27 @@ function content(ticket: Pick<StructureTicket, 'body'>) {
             .trimEnd(),
     );
 }
+
 function outgoing(ticket: StructureTicket, spec: string, savedOriginal?: string): string {
     const parsed = content(ticket);
     let body: string;
+
     if (azure(ticket.repository)) {
         // Preserve Original's existing HTML exactly. A visible heading survives sanitizers that remove comments/details.
         const original = parsed.original ?? savedOriginal ?? stripTrackerStructure(ticket.body);
+
         body = formatTicketSpec(spec, original, { format: 'html', originalFormat: 'html' });
     } else body = formatTicketSpec(spec, parsed.original ?? savedOriginal ?? stripTrackerStructure(ticket.body));
+
     const structure = readTrackerStructure(ticket.body);
+
     return structure ? writeTrackerStructure(body, structure) : body;
 }
+
 function allowed(setup: RepositorySetup | undefined): setup is RepositorySetup {
     return Boolean(setup && setup.writeRefinedSpec !== false);
 }
+
 function save(
     records: WorkRecords,
     workId: string,
@@ -71,23 +80,28 @@ function save(
 ) {
     return records.saveSpecState(workId, state.generation, state, update);
 }
+
 const reading = new WeakMap<WorkRecords, Map<string, Promise<StructureTicket | null>>>();
 let activeReads = 0;
 const waitingReads: (() => void)[] = [];
+
 async function limitedRead(read: () => Promise<StructureTicket>): Promise<StructureTicket> {
     if (activeReads >= 6)
         await new Promise<void>((resolve) => {
             waitingReads.push(resolve);
         });
     else activeReads++;
+
     try {
         return await read();
     } finally {
         const next = waitingReads.shift();
+
         if (next) next();
         else activeReads--;
     }
 }
+
 function readOne(
     records: WorkRecords,
     workId: string,
@@ -95,18 +109,25 @@ function readOne(
     provider: StructureProvider,
 ): Promise<StructureTicket | null> {
     let reads = reading.get(records);
+
     if (!reads) {
         reads = new Map();
         reading.set(records, reads);
     }
+
     // Different generations must not share a result computed against an older provenance checkpoint.
     const key = `${workId}:${records.specState(workId).generation}:${Boolean(options.initialize)}`;
     const prior = reads.get(key);
+
     if (prior) return prior;
+
     const task = readFresh(records, workId, options, provider).finally(() => reads.delete(key));
+
     reads.set(key, task);
+
     return task;
 }
+
 async function readFresh(
     records: WorkRecords,
     workId: string,
@@ -114,15 +135,21 @@ async function readFresh(
     provider: StructureProvider,
 ): Promise<StructureTicket | null> {
     if (!records.specEligible(workId)) return null;
+
     const record = records.read(workId);
     const setup = (options.setups ?? readRepositorySetups(options.dir ?? boardDataDir())).find((setup) =>
         sameRepo(setup.repo, record.repository),
     );
+
     if (!allowed(setup)) return null;
+
     const before = records.specState(workId);
+
     if (!before.active && before.pending === null && !options.initialize) return null;
+
     try {
         if (!provider.readSpec) throw Error('The provider cannot read ticket Specs.');
+
         const ticket = await limitedRead(() =>
             provider.readSpec!(
                 record.repository,
@@ -131,7 +158,9 @@ async function readFresh(
             ),
         );
         const remote = checkpoint(ticket);
+
         if (records.specState(workId).generation !== before.generation) return null;
+
         if (!before.base || (!before.active && before.pending === null)) {
             save(records, workId, {
                 ...before,
@@ -143,8 +172,10 @@ async function readFresh(
                 error: before.failure === 'write' ? before.error : null,
                 warning: null,
             });
+
             return ticket;
         }
+
         if (
             before.sent &&
             stripTrackerStructure(remote.body) === stripTrackerStructure(before.sent.body) &&
@@ -160,29 +191,40 @@ async function readFresh(
                 error: null,
                 warning: null,
             });
+
             return ticket;
         }
+
         if (!changed(record.repository, before.base, remote)) {
             if ((before.failure === 'read' && before.error) || before.warning?.startsWith('Could not read'))
                 save(records, workId, { ...before, error: null, warning: null });
+
             return ticket;
         }
+
         // Azure revisions unrelated to title/description update the checkpoint without converting HTML again.
         if (before.base.digest === remote.digest) {
             save(records, workId, { ...before, base: remote, error: before.failure === 'write' ? before.error : null });
+
             return ticket;
         }
+
         const bodyChanged = content(remote).spec !== content(before.base).spec;
         const titleChanged = remote.title !== before.base.title;
+
         if (!bodyChanged && !titleChanged) {
             save(records, workId, { ...before, base: remote, original: content(remote).original ?? before.original });
+
             return ticket;
         }
+
         const untrusted =
             !azure(record.repository) &&
             ((bodyChanged && remote.editorWrite !== true) || (titleChanged && remote.titleEditorWrite !== true));
+
         if (untrusted) {
             if (before.held?.digest === remote.digest) return null;
+
             save(records, workId, {
                 ...before,
                 held: remote,
@@ -190,9 +232,12 @@ async function readFresh(
                 warning:
                     'A GitHub edit has unknown or non-write provenance. Accept or reject it before using its text.',
             });
+
             return null;
         }
+
         const replaced = before.pending !== null && bodyChanged;
+
         save(
             records,
             workId,
@@ -218,9 +263,11 @@ async function readFresh(
                     : 'The title and Spec came from the tracker.',
             },
         );
+
         return ticket;
     } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
+
         save(records, workId, {
             ...before,
             error: reason,
@@ -228,6 +275,7 @@ async function readFresh(
             retryAfter: Date.now() + 30_000,
             warning: `Could not read the ticket. Using the last local copy: ${reason}`,
         });
+
         return null;
     }
 }
@@ -242,48 +290,72 @@ export async function refreshSpecs(records: WorkRecords, options: SpecSyncOption
               .list({})
               .filter((record) => {
                   const state = records.specState(record.workId);
+
                   return state.active || state.pending !== null;
               })
               .map((record) => record.workId));
+
     // Each read commits against its starting generation. Writes retain their cross-process lease.
     await Promise.all(workIds.map((workId) => readOne(records, workId, options, provider)));
 }
+
 const running = new WeakMap<WorkRecords, Promise<void>>();
+
 /** A failed write stays Ready and pending. The shared lease serializes spec and structure writes across processes. */
 export function syncSpecs(records: WorkRecords, options: SpecSyncOptions = {}): Promise<void> {
     const prior = running.get(records);
+
     if (prior) return prior;
+
     const task = drain(records, options).finally(() => running.delete(records));
+
     running.set(records, task);
+
     return task;
 }
+
 async function drain(records: WorkRecords, options: SpecSyncOptions) {
     const lease = await acquireTrackerSyncLock(records.trackerDatabasePath());
+
     if (!lease) return;
+
     try {
         const provider = options.provider ?? structureProvider();
         const setups = options.setups ?? readRepositorySetups(options.dir ?? boardDataDir());
+
         for (const workId of options.workId ? [options.workId] : records.specPending()) {
             if (!records.specEligible(workId)) continue;
+
             let state = records.specState(workId);
+
             if (state.pending === null || state.held || (!options.workId && (state.retryAfter ?? 0) > Date.now()))
                 continue;
+
             const record = records.read(workId);
             const setup = setups.find((setup) => sameRepo(setup.repo, record.repository));
+
             if (setup?.writeRefinedSpec === false) {
                 save(records, workId, { ...state, pending: null, error: null });
                 continue;
             }
+
             try {
                 if (!setup) throw Error('Add the repository before syncing its Spec.');
+
                 const problem = writeAccessProblem(record.repository, 'edit-ticket', setup.access, {
                     azureReadOnly: setup.azureReadOnly || process.env.LAR_FACTORY_AZURE_READ_ONLY === '1',
                 });
+
                 if (problem) throw Error(problem);
+
                 await lease.assertOwned();
+
                 const ticket = await readOne(records, workId, { ...options, setups }, provider);
+
                 state = records.specState(workId);
+
                 if (!ticket || state.pending === null || state.held) continue;
+
                 if (records.body(workId, 'brief') !== state.pending) {
                     save(records, workId, {
                         ...state,
@@ -292,17 +364,26 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
                     });
                     continue;
                 }
+
                 if (!provider.replaceSpec) throw Error('The provider cannot write ticket Specs.');
+
                 const body = outgoing(ticket, state.pending, state.original);
+
                 await lease.assertOwned();
+
                 if (records.specState(workId).generation !== state.generation) continue;
+
                 if (
                     !save(records, workId, { ...state, sent: { body, title: ticket.title ?? '', spec: state.pending } })
                 )
                     continue;
+
                 state = records.specState(workId);
+
                 const written = await provider.replaceSpec(ticket, body);
+
                 await lease.assertOwned();
+
                 // The provider result checkpoints exactly our write; a subsequent edit is found by the next read.
                 const latest = records.specState(workId);
                 const original =
@@ -310,6 +391,7 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
                     state.original ??
                     content(ticket).original ??
                     stripTrackerStructure(ticket.body);
+
                 if (latest.generation === state.generation)
                     save(records, workId, {
                         ...state,
@@ -334,14 +416,17 @@ async function drain(records: WorkRecords, options: SpecSyncOptions) {
                 }
             } catch (error) {
                 const latest = records.specState(workId);
+
                 if (latest.generation === state.generation) {
                     const message = error instanceof Error ? error.message : String(error);
+
                     save(records, workId, {
                         ...state,
                         error: message,
                         failure: 'write',
                         retryAfter: Date.now() + 30_000,
                     });
+
                     if (/ticket changed before|TF26071|\b412\b/i.test(message))
                         await readOne(records, workId, { ...options, setups }, provider);
                 }
@@ -365,11 +450,16 @@ export async function resolveSpecEdit(
     const setup = (options.setups ?? readRepositorySetups(options.dir ?? boardDataDir())).find((setup) =>
         sameRepo(setup.repo, record.repository),
     );
+
     if (!allowed(setup)) throw Error('Spec sync is off for this repository.');
+
     const state = records.specState(workId);
+
     if (state.generation !== generation || !state.held) throw Error('The held edit changed. Read the details again.');
+
     if (!['accept', 'reject'].includes(choice) || !identity.trim())
         throw Error('Choose Accept or Reject and name the approving user.');
+
     const remote = state.held;
     const accepted = choice === 'accept';
     const next = {
@@ -382,6 +472,7 @@ export async function resolveSpecEdit(
         warning: accepted ? null : 'The GitHub edit was rejected. The last trusted local copy is kept.',
         ...(accepted ? { pending: null } : {}),
     };
+
     if (
         !save(
             records,
@@ -410,21 +501,32 @@ export async function editSpec(
     options: SpecSyncOptions = {},
 ): Promise<boolean> {
     if (!records.specEligible(workId)) return false;
+
     const record = records.read(workId);
     const setup = (options.setups ?? readRepositorySetups(options.dir ?? boardDataDir())).find((setup) =>
         sameRepo(setup.repo, record.repository),
     );
+
     if (!allowed(setup)) return false;
+
     const current = records.specState(workId);
+
     if (!current.active && current.pending === null) return false;
+
     const problem = writeAccessProblem(record.repository, 'edit-ticket', setup.access, {
         azureReadOnly: setup.azureReadOnly || process.env.LAR_FACTORY_AZURE_READ_ONLY === '1',
     });
+
     if (problem) throw Error(problem);
+
     if (!identity.trim()) throw Error('The approving user is required.');
+
     await refreshSpecs(records, { ...options, workId });
+
     const state = records.specState(workId);
+
     if (state.held) throw Error('Accept or reject the held GitHub edit before editing the Spec.');
+
     if (
         !save(
             records,
@@ -439,19 +541,25 @@ export async function editSpec(
         )
     )
         throw Error('The Spec changed. Read the details again.');
+
     await syncSpecs(records, { ...options, workId });
+
     return true;
 }
 
 /** Only already-synced, enabled Specs replace the details' ordinary tracker view. */
 export function activeSpecState(records: WorkRecords, workId: string, options: SpecSyncOptions = {}): SpecState | null {
     if (!records.specEligible(workId)) return null;
+
     const state = records.specState(workId);
+
     if (!state.active && state.pending === null) return null;
+
     const record = records.read(workId);
     const setup = (options.setups ?? readRepositorySetups(options.dir ?? boardDataDir())).find((setup) =>
         sameRepo(setup.repo, record.repository),
     );
+
     return allowed(setup) ? state : null;
 }
 
@@ -459,6 +567,7 @@ export function activeSpecState(records: WorkRecords, workId: string, options: S
 export function rememberCreatedSpec(records: WorkRecords, workId: string, ticket: StructureTicket): void {
     const state = records.specState(workId);
     const parsed = content(ticket);
+
     if (parsed.marked)
         save(records, workId, {
             ...state,

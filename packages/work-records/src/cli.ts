@@ -504,13 +504,16 @@ type StringOption = { [K in keyof Values]-?: Values[K] extends string | undefine
 
 function need(values: Values, name: StringOption): string {
     const value = values[name];
+
     if (value === undefined) throw new UsageError(`--${name} is required.`);
+
     return value;
 }
 
 /** The text in the file `--file` names, or standard input for `-`. */
 function readInput(values: Values): string {
     const file = need(values, 'file');
+
     try {
         return readFileSync(file === '-' ? 0 : file, 'utf8');
     } catch (error) {
@@ -527,6 +530,7 @@ function readJson(values: Values, what = 'publication input'): unknown {
         return JSON.parse(readInput(values)) as unknown;
     } catch (error) {
         if (error instanceof WorkRecordError) throw error;
+
         throw new WorkRecordError('invalid', `The ${what} in ${values.file} isn't JSON.`);
     }
 }
@@ -537,6 +541,7 @@ function readRound(values: Values): NewReviewRound {
         return JSON.parse(readInput(values)) as NewReviewRound;
     } catch (error) {
         if (error instanceof WorkRecordError) throw error;
+
         throw new WorkRecordError(
             'invalid',
             `The review round in ${values.file} isn't JSON: ${(error as Error).message}.`,
@@ -548,14 +553,18 @@ function readRound(values: Values): NewReviewRound {
 function retention(values: Values): unknown {
     const days = (name: 'hide-after' | 'delete-after') => {
         const value = values[name]!;
+
         if (!/^\d+$/.test(value))
             throw new UsageError(
                 `--${name} takes a whole number of days${name === 'delete-after' ? ' or never' : ''}.`,
             );
+
         return Number(value);
     };
     const current = readRetention(values['data-dir']);
+
     if (values['hide-after'] === undefined && values['delete-after'] === undefined) return current;
+
     return writeRetention(
         {
             hideAfterDays: values['hide-after'] === undefined ? current.hideAfterDays : days('hide-after'),
@@ -589,6 +598,7 @@ async function run(
         status,
         context: values.file === undefined ? undefined : readInput(values),
     });
+
     switch (command) {
         case 'set-check-list':
             return records.setCheckList(
@@ -609,7 +619,9 @@ async function run(
             throw new UsageError('Legacy structural publication is suspended. Local content is retained.');
         case 'gate': {
             await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
+
             const state = records.specState(workId!);
+
             return {
                 ...records.gate(workId!),
                 specSync: {
@@ -622,11 +634,13 @@ async function run(
         }
         case 'record-gate':
             await refreshSpecs(records, { workId: workId!, dir: values['data-dir'], initialize: true });
+
             if (records.specState(workId!).held)
                 throw new WorkRecordError(
                     'invalid',
                     'Accept or reject the held GitHub edit in item details before recording a later gate.',
                 );
+
             return records.recordGate(workId!, revision(), {
                 briefDigest: need(values, 'digest'),
                 approvedBy: need(values, 'identity'),
@@ -634,8 +648,11 @@ async function run(
             });
         case 'create': {
             const input = { ...captured(), ticket: values.ticket };
+
             if (!values['request-id']) return records.create(input);
+
             records.claimCapture(values['request-id'], JSON.stringify(input));
+
             return records.completeCapture(values['request-id'], input).record;
         }
         case 'create-ticket': {
@@ -654,7 +671,9 @@ async function run(
                         })),
                 },
             );
+
             if (result.body.error) throw new WorkRecordError('invalid', result.body.error);
+
             return result.body.record;
         }
         case 'import':
@@ -669,6 +688,7 @@ async function run(
             return records.update(workId!, revision(), { status, kind });
         case 'kind-disagreement': {
             const record = records.read(workId!);
+
             return { disagreement: await checkKind(record, { setup: setupOf(record.repository) }) };
         }
         case 'change-kind': {
@@ -676,15 +696,18 @@ async function run(
             const result = await changeKind(records, workId!, revision(), need(values, 'kind') as SwapKind, {
                 setup: setupOf(record.repository),
             });
+
             if (result.error)
                 throw new WorkRecordError(
                     'invalid',
                     result.line ? `${result.error} Changed so far: ${result.line}` : result.error,
                 );
+
             return { record: result.record, line: result.line };
         }
         case 'record-kind-answer': {
             const ticketKind = need(values, 'ticket-kind');
+
             return records.recordKindAnswer(workId!, revision(), {
                 answer: need(values, 'answer') as 'keep' | 'update',
                 ticketKind: ticketKind === 'none' ? null : (ticketKind as WorkKind),
@@ -724,7 +747,9 @@ async function run(
             return records.waitingOn(workId!);
         case 'set-fog': {
             const fog = need(values, 'fog');
+
             if (fog !== 'gone' && fog !== 'remaining') throw new UsageError('--fog takes gone or remaining.');
+
             return records.setFogGone(workId!, revision(), fog === 'gone');
         }
         case 'finish':
@@ -733,14 +758,18 @@ async function run(
                     'invalid',
                     'Only a slice is finished by hand; a build finishes when its PR is observed merged.',
                 );
+
             return records.recordFinished(workId!, revision());
         case 'set-body':
             return records.setBody(workId!, revision(), need(values, 'body') as Body, readInput(values));
         case 'body': {
             if (values.body === 'brief') await refreshSpecs(records, { workId: workId!, dir: values['data-dir'] });
+
             const body = need(values, 'body') as Body;
             const markdown = records.body(workId!, body);
+
             if (markdown === null) throw new WorkRecordError('not-found', `The work record ${workId} has no ${body}.`);
+
             return markdown;
         }
         case 'set-phase':
@@ -799,7 +828,9 @@ async function run(
         case 'resolve-intent': {
             if ((values.thread === undefined) === (values.failure === undefined))
                 throw new UsageError('resolve-intent needs --thread or --failure, not both.');
+
             const outcome = values.thread !== undefined ? { threadId: values.thread } : { failure: values.failure! };
+
             return records.resolveLaunchIntent(workId!, revision(), need(values, 'intent'), outcome);
         }
         case 'add-dependency':
@@ -843,54 +874,80 @@ async function run(
 
 async function main(args: string[]): Promise<number> {
     if (args[0] === 'run-check' || args[0] === 'reuse-check') return checkCommand(args);
+
     if (args[0] === 'heavy') return heavyCommand(args);
+
     let parsed;
+
     try {
         parsed = parseArgs({ args, options: OPTIONS, allowPositionals: true });
     } catch (error) {
         process.stderr.write(`lar-work: ${(error as Error).message}\nRun lar-work --help for usage.\n`);
+
         return 2;
     }
+
     const {
         values,
         positionals: [command, workId, ...extra],
     } = parsed;
+
     if (values.help || !command) {
         process.stdout.write(HELP);
+
         return values.help ? 0 : 2;
     }
+
     let records: WorkRecords | undefined;
+
     try {
         if (extra.length) throw new UsageError(`Unexpected arguments: ${extra.join(' ')}.`);
+
         if (!COMMANDS.includes(command)) throw new UsageError(`Unknown command "${command}".`);
+
         const takesId = TAKES_WORK_ID.includes(command) || TAKES_DEPENDENCY_ID.includes(command);
+
         if (takesId !== (workId !== undefined)) {
             const id = TAKES_DEPENDENCY_ID.includes(command) ? 'a Dependency ID' : 'a work ID';
+
             throw new UsageError(workId === undefined ? `${command} needs ${id}.` : `${command} takes no work ID.`);
         }
+
         if (command === 'retention') {
             process.stdout.write(`${JSON.stringify(retention(values), null, 2)}\n`);
+
             return 0;
         }
+
         records = await openWorkRecords(workRecordsPath(values['data-dir']));
+
         const result = await run(records, command, workId, values);
         const validationCommand = ['set-check-list', 'checks', 'describe-failure', 'resolve-failure'].includes(command);
+
         if (!validationCommand) await syncSpecs(records, { dir: values['data-dir'] });
+
         if (!validationCommand && workId && !TAKES_DEPENDENCY_ID.includes(command)) {
             const sync = records.specState(workId);
+
             if (sync.error || sync.warning) process.stderr.write(`lar-work: ${sync.warning ?? sync.error}\n`);
         }
+
         process.stdout.write(typeof result === 'string' ? result : `${JSON.stringify(result, null, 2)}\n`);
+
         return 0;
     } catch (error) {
         if (error instanceof UsageError) {
             process.stderr.write(`lar-work: ${error.message}\nRun lar-work --help for usage.\n`);
+
             return 2;
         }
+
         if (error instanceof WorkRecordError) {
             process.stderr.write(`lar-work: ${error.message}\n`);
+
             return 1;
         }
+
         throw error;
     } finally {
         records?.close();

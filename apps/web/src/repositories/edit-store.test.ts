@@ -41,14 +41,20 @@ test('Project saves wait their turn and an older save preserves newer text', asy
     const store = useEditStore.getState();
     const sent: unknown[] = [];
     const answers: ((response: Response) => void)[] = [];
+
     fetchMock.mockImplementation((async (_url: string, init: RequestInit) => {
         sent.push(JSON.parse(String(init.body)));
+
         return new Promise<Response>((resolve) => answers.push(resolve));
     }) as typeof fetchMock);
     store.type(setup.repo, 'role', 'First');
+
     const first = store.save(setup.repo, 'role', setup);
+
     store.type(setup.repo, 'skills', 'testing');
+
     const second = store.save(setup.repo, 'skills', setup);
+
     store.type(setup.repo, 'role', 'Newer');
     await settle();
     expect(sent).toEqual([{ repo: setup.repo, change: 'override', key: 'role', value: 'First' }]);
@@ -63,6 +69,7 @@ test('Project saves wait their turn and an older save preserves newer text', asy
 test('field failures preserve drafts and blank required values send no request', async () => {
     const { useEditStore } = await import('./edit-store.ts');
     const store = useEditStore.getState();
+
     fetchMock.mockImplementation(
         async () => new Response(JSON.stringify({ error: 'Skills refused.' }), { status: 403 }),
     );
@@ -90,16 +97,24 @@ test('returning to an earlier value still queues the last edit and keeps its dra
     const store = useEditStore.getState();
     const sent: unknown[] = [];
     const answers: ((response: Response) => void)[] = [];
+
     fetchMock.mockImplementation((async (_url: string, init: RequestInit) => {
         sent.push(JSON.parse(String(init.body)));
+
         return new Promise<Response>((resolve) => answers.push(resolve));
     }) as typeof fetchMock);
     store.type(setup.repo, 'role', 'A');
+
     const first = store.save(setup.repo, 'role', setup);
+
     store.type(setup.repo, 'role', 'B');
+
     const second = store.save(setup.repo, 'role', setup);
+
     store.type(setup.repo, 'role', 'A');
+
     const last = store.save(setup.repo, 'role', setup);
+
     await settle();
     await settle(() => answers[0]!(new Response('{}')));
     expect(useEditStore.getState().drafts[setup.repo]?.role).toBe('A');

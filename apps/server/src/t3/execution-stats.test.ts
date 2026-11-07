@@ -58,6 +58,7 @@ test('turning projections into rows yields in chunks of a bounded size', async (
             pauses++;
         },
     );
+
     assert.equal(rows.threads.length, PROJECTIONS_PER_CHUNK * 3);
     assert.equal(pauses, 3);
 });

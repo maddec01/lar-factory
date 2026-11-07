@@ -13,6 +13,7 @@ import {
 /** The provider an origin URL is on, or null for any other host. */
 function providerOf(origin: string): Provider | null {
     if (onAzureDevOps(origin)) return 'Azure DevOps';
+
     return originHost(origin) === 'github.com' ? 'GitHub' : null;
 }
 
@@ -25,12 +26,15 @@ export async function projectChoices(
     env: NodeJS.ProcessEnv = process.env,
 ): Promise<ProjectChoice[]> {
     let found;
+
     try {
         found = await checkouts(env);
     } catch {
         throw new Error("Can't read T3 Code's projects; reconnect T3 Code before onboarding");
     }
+
     const listed = new Map(list.map((entry) => [entry.repo.toLowerCase(), entry]));
+
     return Promise.all(
         found.map(async ({ id, title, folder, origin }) => {
             const provider = origin ? providerOf(origin) : null;
@@ -38,6 +42,7 @@ export async function projectChoices(
                 provider === 'GitHub' ? githubRepo(origin) : provider === 'Azure DevOps' ? azureRepo(origin!) : null;
             const entry = repo ? listed.get(repo.toLowerCase()) : undefined;
             const blocked = repo ? null : linkedWorktree(folder) ? 'linked-worktree' : 'no-provider-origin';
+
             return {
                 id,
                 name: title,

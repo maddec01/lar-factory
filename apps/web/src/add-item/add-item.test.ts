@@ -49,6 +49,7 @@ async function open(data: BoardData = withFactory): Promise<void> {
 /** Sets a field's value the way typing does, so React hears it. */
 async function enter(el: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
     const proto = Object.getPrototypeOf(el) as object;
+
     Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value);
     await settle(() => el.dispatchEvent(new Event('input', { bubbles: true })));
 }
@@ -80,7 +81,9 @@ test("the repository selector shows each repository's project icon, or its toned
 
 test('Add item opens a dialog with the configured repositories and kinds, and no labels to pick', async () => {
     await open();
+
     const popup = dialog()!;
+
     expect(popup.getAttribute('role')).toBe('dialog');
     expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Add item');
     expect(document.activeElement, 'focus starts on the title').toBe(field('item-title'));
@@ -107,8 +110,10 @@ test('Add item opens a dialog with the configured repositories and kinds, and no
 
 test('the side panel heads Project and Kind in small uppercase labels, beside the title and the editor', async () => {
     await open();
+
     const panel = $('#add-item-dialog aside[aria-label="Details"]')!;
     const labels = [...panel.querySelectorAll<HTMLLabelElement>(':scope > div > label')];
+
     expect(labels.filter((l) => l.htmlFor).map((l) => [l.htmlFor, l.textContent])).toEqual([
         ['item-repo', 'Project'],
         ['item-kind', 'Kind'],
@@ -153,11 +158,13 @@ test('a description typed in Add item survives closing and reopening it', async 
 
 test('a description added to over several openings creates the item with all of it', async () => {
     await open();
+
     const reopen = async () => {
         await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
         await settle(() => vi.advanceTimersByTime(50));
         await settle(() => addButton().click());
     };
+
     await typeInto(editorArea(), 'x');
     await reopen();
     await selectEnd(editorArea());
@@ -181,7 +188,9 @@ test('pasted Markdown shows formatted in the description', async () => {
 
 test('the expand button and Ctrl+Shift+E grow the dialog to the window and back, even while typing in the editor', async () => {
     await open();
+
     const expand = () => $<HTMLButtonElement>('#add-item-dialog button[data-expand]')!;
+
     expect([expand().getAttribute('aria-label'), expand().getAttribute('aria-keyshortcuts')]).toEqual([
         'Expand',
         'Control+Shift+E',
@@ -257,7 +266,9 @@ test('picking in a Select clears the message and keeps the draft, and reopening 
 test('the list opens above the dialog, after it in the page, and Escape closes only the list', async () => {
     await open();
     await openOptions(field('item-kind'));
+
     const list = $('[role="listbox"]')!;
+
     expect(
         dialog()!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING,
         'later in the page at the same z-index',
@@ -284,12 +295,16 @@ test('a repo picked while a message shows is the one posted', async () => {
 test('submitting posts the draft, shows it sending, then closes and announces the recorded work, which has no ticket number', async () => {
     await open();
     await fillDraft();
+
     let finish!: (response: Response) => void;
+
     fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (finish = resolve)));
     await settle(() => submit().click());
 
     expect(fetchMock.mock.calls.at(-1)![0]).toBe('/api/items');
+
     const body = posted();
+
     expect(body.draft).toEqual({
         createIssue: false,
         repo: 'maddec01/lar-server',
@@ -307,11 +322,14 @@ test('submitting posts the draft, shows it sending, then closes and announces th
 
     const item = { ...sample.items[0]!, id: 'work-501', title: 'Playback stalls', number: 0, url: null };
     const board = { ...sample, items: [...sample.items, item] };
+
     await settle(() => finish(new Response(JSON.stringify({ item, error: null, board }))));
     await settle(() => vi.advanceTimersByTime(50));
     expect(dialog(), 'the dialog closes').toBeNull();
     expect(document.activeElement, 'focus goes back to Add item').toBe(addButton());
+
     const toast = $('[data-slot="toast"][role="status"] [data-toast]')!;
+
     expect(toast.textContent).toBe('Added Playback stalls to List. View item Queue');
     expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added Playback stalls');
     expect(text($('.title-bar .list-button')), 'the board shows the new data').toBe('List5');
@@ -365,6 +383,7 @@ test('the description names the repository picked', async () => {
 test('with no repository onboarded, adding is disabled and says where to add one, but not before the first read, beside a read error or a repository left off the board', async () => {
     const empty = { ...withFactory, repos: [], repositoryConfigProblems: [], error: null };
     const hint = () => $('#item-repo-hint');
+
     await open(empty);
     expect(submit().disabled).toBe(true);
     expect(dialog()!.textContent).toContain('Record work and add it to List.');
@@ -397,9 +416,12 @@ test('opened before the repositories arrive, the dialog picks the first one once
 
 test("the dialog opens as the design system's Modal, and nothing over the title bar drags", async () => {
     const warnings = vi.spyOn(console, 'warn');
+
     await open();
+
     const { noDrag } = addStylesheet();
     const popup = dialog()!;
+
     expect(popup.dataset.slot).toBe('modal-content');
     expect(popup.getAttribute('aria-describedby'), 'its description names it').toBe('add-item-description');
     expect([popup, $('[data-slot="modal-overlay"]')!].map(noDrag)).toEqual([true, true]);
@@ -421,7 +443,9 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
     expect(field('item-title').value).toBe('Half written');
 
     await fillDraft();
+
     const item = { ...sample.items[0]!, title: 'Playback stalls', number: 501 };
+
     respond({ item, error: null, board: withFactory });
     await settle(() => submit().click());
     await settle(() => vi.advanceTimersByTime(50));
@@ -487,7 +511,9 @@ test('picking a new ticket closes the dialog and announces it, and one on the bo
     await settle(() => $<HTMLButtonElement>('[data-pane="pick"]')!.click());
     respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }], error: null });
     await searchFor('seek');
+
     const item = { ...sample.items[0]!, id: 'work-8', number: 8, title: 'Seek stalls' };
+
     respond({ item, created: true, error: null, board: { ...sample, items: [...sample.items, item] } });
     await settle(() => ticketButton(8).click());
     await settle(() => vi.advanceTimersByTime(50));
@@ -529,15 +555,20 @@ test('captured work shows no ticket number, and attaching a ticket keeps its ite
         status: 'List' as const,
         statuses: ['List' as const],
     };
+
     await mountPage({ ...withFactory, items: [...sample.items, captured] });
+
     const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open('work-1'));
     expect(text($('[data-item-dialog] [data-slot="modal-header"] h2'))).toBe('Playback stalls');
     await settle(() => $<HTMLButtonElement>('[data-attach-ticket="work-1"]')!.click());
     respond({ tickets: [{ number: 8, title: 'Seek stalls', url: 'u8' }], error: null });
     await enter(field('attach-query'), 'seek');
     await settle(() => field<HTMLButtonElement>('attach-search').click());
+
     const attached = { ...captured, number: 8, url: 'https://github.com/maddec01/lar-server/issues/8' };
+
     respond({ error: null, board: { ...withFactory, items: [...sample.items, attached] } });
     await settle(() => ticketButton(8).click());
     expect(calls('/api/attach-ticket')).toEqual([['/api/attach-ticket', { itemId: 'work-1', number: 8 }]]);
@@ -556,6 +587,7 @@ test('Create issue starts from each repository default and an override applies o
             ...effectiveVocabulary(),
         },
     })) as BoardData['repos'];
+
     respond({
         options: {
             provider: 'github',
@@ -601,7 +633,9 @@ test('a lost response keeps its request ID after the page reloads', async () => 
         throw Error('Connection lost');
     });
     await settle(() => submit().click());
+
     const requestId = posted().requestId;
+
     vi.resetModules();
     await open();
     expect(field('item-title').value).toBe('Playback stalls');
@@ -647,6 +681,7 @@ function labelledRepo(
     } as BoardData['repos'][number];
     const data = { ...withFactory, repos: [config] };
     const provider = repo.split('/').length === 3 ? 'azure' : 'github';
+
     fetchMock.mockImplementation(
         async (url) =>
             new Response(
@@ -668,21 +703,28 @@ function labelledRepo(
                 ),
             ),
     );
+
     return data;
 }
+
 const labelSetup = async (labels: string[], options?: Parameters<typeof labelledRepo>[2]) => {
     const { effectiveVocabulary } = await import('@lar-factory/shared');
+
     await open(labelledRepo(effectiveVocabulary, labels, options));
 };
 
 test('the footer has one Add item button with Create issue at its left, and the formatting hint sits under the description', async () => {
     await labelSetup([]);
+
     const footer = $('#add-item-form [data-slot="modal-footer"]') ?? submit().parentElement!;
+
     expect(submit().textContent).toBe('Add item');
     expect(footer.contains(field('item-create-issue'))).toBe(true);
     expect(footer.textContent).not.toContain('Formats as you type');
     expect(footer.textContent).not.toContain('Add to List');
+
     const hint = $$('#add-item-form p').find((p) => text(p) === 'Formats as you type · saved as Markdown')!;
+
     expect(editorArea().compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect($('aside[aria-label="Details"]')!.contains(hint)).toBe(false);
 });
@@ -719,6 +761,7 @@ test('Create issue follows the repository until the user changes it, and the cha
         },
     })) as BoardData['repos'];
     const data = { ...withFactory, repos };
+
     fetchMock.mockImplementation(
         async (url) =>
             new Response(
@@ -740,7 +783,9 @@ test('Create issue follows the repository until the user changes it, and the cha
             ),
     );
     await open(data);
+
     const box = () => field<HTMLInputElement>('item-create-issue');
+
     expect(box().checked).toBe(true);
     await chooseOption(field('item-repo'), 'lar-apple');
     expect(box().checked, 'it follows the repository').toBe(false);
@@ -761,9 +806,13 @@ test('Create issue follows the repository until the user changes it, and the cha
 
 test('without create access the checkbox is off and disabled with the reason, in the footer, and submits local work', async () => {
     await labelSetup(['docs'], { access: { 'publish-ticket': 'refused' } });
+
     const box = field<HTMLInputElement>('item-create-issue');
+
     expect([box.checked, box.disabled]).toEqual([false, true]);
+
     const reason = document.getElementById(box.getAttribute('aria-describedby')!)!;
+
     expect(text(reason)).toContain('publish-ticket');
     expect(submit().parentElement!.contains(reason)).toBe(true);
     expect(text($('aside[aria-label="Details"]'))).not.toContain('Tick Create issue');
@@ -801,6 +850,7 @@ test('on Azure the picker never offers a repo- tag, and refuses a typed name hol
     ] as const) {
         await settle(() => {
             const input = search();
+
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, typed);
             input.dispatchEvent(new Event('input', { bubbles: true }));
         });
@@ -874,7 +924,9 @@ test('a typed label the tracker has by the time the draft reopens becomes an ord
     await settle(() => createButton()!.click());
     await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
     await settle(() => vi.advanceTimersByTime(50));
+
     const { effectiveVocabulary } = await import('@lar-factory/shared');
+
     labelledRepo(effectiveVocabulary, ['docs', 'needs-design']);
     await settle(() => addButton().click());
     await settle(() => vi.advanceTimersByTime(50));
@@ -888,7 +940,9 @@ test('Enter on a typed name adds it and does not submit the form', async () => {
     await labelSetup(['docs']);
     await openPicker();
     await enter(search(), 'needs-design');
+
     const key = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+
     await settle(() => search().dispatchEvent(key));
     expect(key.defaultPrevented).toBe(true);
     expect(typedLabels()).toEqual(['needs-design']);
@@ -906,7 +960,9 @@ test.each([
     await enter(search(), name);
     expect(createButton()).toBeUndefined();
     expect(text($('[data-label-picker] [role="alert"]'))).toMatch(reason);
+
     const key = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+
     await settle(() => search().dispatchEvent(key));
     expect(typedLabels()).toEqual([]);
 });
@@ -973,6 +1029,7 @@ test('provider fields start from only the kind mapping and submit the chosen opt
         },
     } as BoardData['repos'][number];
     const data = { ...withFactory, repos: [config] };
+
     fetchMock.mockImplementation(
         async (url) =>
             new Response(
@@ -1025,6 +1082,7 @@ test('ticket options keep their picks in a kept draft, and changing repository r
     })) as BoardData['repos'];
     const data = { ...withFactory, repos };
     const assignees = (repo: string) => (repo.includes('apple') ? ['apple-dev'] : ['writer']);
+
     fetchMock.mockImplementation(
         async (url) =>
             new Response(
@@ -1076,6 +1134,7 @@ test('submitting before options load leaves their defaults to the server', async
         },
     } as BoardData['repos'][number];
     const data = { ...withFactory, repos: [config] };
+
     fetchMock.mockImplementation(async (url) =>
         url.startsWith('/api/ticket-options') ? new Promise<Response>(() => {}) : new Response(JSON.stringify(data)),
     );
@@ -1090,9 +1149,11 @@ test('denied creation offers Recheck access without losing the current draft', a
     await open();
     await fillDraft();
     expect(field<HTMLInputElement>('item-create-issue').disabled).toBe(true);
+
     const recheck = [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find(
         (button) => text(button) === 'Recheck access',
     );
+
     expect(recheck).toBeDefined();
     respond(withFactory);
     await settle(() => recheck!.click());

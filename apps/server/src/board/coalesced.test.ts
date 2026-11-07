@@ -14,6 +14,7 @@ afterEach(() => {
 test('a burst of triggers runs the work at once and makes one follow-up', () => {
     const work = vi.fn();
     const ask = coalesced(work, 500);
+
     for (let i = 0; i < 50; i++) ask();
     expect(work).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(500);
@@ -25,6 +26,7 @@ test('a burst of triggers runs the work at once and makes one follow-up', () => 
 test('a lone trigger makes no follow-up, and a later one runs at once', () => {
     const work = vi.fn();
     const ask = coalesced(work, 500);
+
     ask();
     vi.advanceTimersByTime(600);
     expect(work).toHaveBeenCalledTimes(1);
@@ -35,6 +37,7 @@ test('a lone trigger makes no follow-up, and a later one runs at once', () => {
 test('a trigger just after a follow-up waits for the next gap, so runs stay apart', () => {
     const work = vi.fn();
     const ask = coalesced(work, 500);
+
     ask();
     ask();
     vi.advanceTimersByTime(500);
@@ -51,16 +54,20 @@ const item = (id: string, status: Item['status']) =>
 function showingBoard(read: () => Item[]) {
     const board = createBoardState({ items: [] } as unknown as BoardData);
     const pushed: string[][] = [];
+
     board.subscribe((data) => pushed.push(data.items.map((i) => `${i.id} ${i.status}`)));
+
     const ask = coalesced(() => {
         board.applyRead(read(), board.revision(), (items) => items);
         board.push();
     }, 500);
+
     return { board, pushed, ask };
 }
 
 test('a start that lands between a show and its follow-up stays showing, though the records still say otherwise', () => {
     const { board, pushed, ask } = showingBoard(() => [item('a', 'Ready')]);
+
     ask();
     ask();
     board.showChanged(item('a', 'In progress'));
@@ -72,6 +79,7 @@ test('a start that lands between a show and its follow-up stays showing, though 
 test('a follow-up publishes one whole read, with what changed during the gap', () => {
     let read = [item('a', 'Ready'), item('b', 'Ready')];
     const { pushed, ask } = showingBoard(() => read);
+
     ask();
     ask();
     // Both items move together in the records, so no push may show one moved and not the other.

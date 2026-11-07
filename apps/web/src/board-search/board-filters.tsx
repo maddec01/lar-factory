@@ -25,6 +25,7 @@ export interface FilterToken extends SearchDialogToken {
 
 export function KindIcon({ choice }: { choice: KindFilter }) {
     const Icon = choice === 'no-kind' ? CircleDashed : KIND_BADGES[choice]!.icon;
+
     return <Icon aria-hidden="true" className="size-3.5" />;
 }
 
@@ -41,6 +42,7 @@ function LabelDot({ color }: { color: string | undefined }) {
 /** The colour any item on the board gives each picked label, which a label no item in view shows still has. */
 const colorsOf = (data: BoardData) => {
     const choices = labelChoices(data.items, data.repos);
+
     return (label: string) => choices.find(({ name }) => sameLabel(name, label))?.color;
 };
 
@@ -81,11 +83,13 @@ export function useFilterTokens(): { tokens: FilterToken[]; clear: () => void } 
             ...removing(label, () => setFilters({ kinds, labels: toggled(labels, label, sameLabel) })),
         })),
     ];
+
     return {
         tokens,
         clear: () => {
             // A saved repository off the board shows no token, so it stays saved for when it returns.
             if (scope) setScope(null);
+
             setFilters(NO_FILTERS);
         },
     };
@@ -94,6 +98,7 @@ export function useFilterTokens(): { tokens: FilterToken[]; clear: () => void } 
 /** The items in Scope on your desk and the stages. */
 function itemsInView(items: Item[], data: BoardData, unavailable: boolean): Item[] {
     const { queue, shaping, ready, build, dock } = stageRows(items, data, unavailable);
+
     return [
         ...deskItems({ ...data, items }, unavailable),
         ...[...queue, ...shaping, ...ready, ...build].map(({ item }) => item),
@@ -110,6 +115,7 @@ export function useFilterGroups(): SearchGroup[] {
     const setScope = useScopeStore((state) => state.setScope);
     const filters = useScopeStore((state) => state.filters);
     const setFilters = useScopeStore((state) => state.setFilters);
+
     // Typing in the dialog rerenders this, and none of it depends on the query.
     return useMemo(() => {
         const { kinds, labels } = filters;
@@ -124,6 +130,7 @@ export function useFilterGroups(): SearchGroup[] {
         const labelOptions = [...choices, ...unseen.map((name) => ({ name, color: colorOf(name) }))].sort((a, b) =>
             a.name.localeCompare(b.name),
         );
+
         return [
             {
                 label: 'Projects',

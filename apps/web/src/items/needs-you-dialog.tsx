@@ -47,14 +47,19 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
 
     async function inspect() {
         setError(null);
+
         const result = await inspectRecovery(item.id);
+
         if (result.error || !result.inspection) setError(result.error ?? 'Cannot inspect recovery.');
         else setInspection(result.inspection);
     }
+
     // StrictMode starts an effect twice, and one read answers for both.
     const inspected = useRef(false);
+
     useEffect(() => {
         if (!inspects || inspected.current) return;
+
         inspected.current = true;
         void inspect();
     }, []);
@@ -65,13 +70,18 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
     ) {
         setLoading(true);
         setError(null);
+
         try {
             const result = await run();
+
             if (!result) return;
+
             if (result.error || ('uncertain' in result && result.uncertain)) {
                 setError(result.error);
+
                 return;
             }
+
             if (selection) {
                 const cleaned = await executeCleanup(item.id, selection);
                 const message =
@@ -84,30 +94,41 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
                     ]
                         .filter(Boolean)
                         .join(' ') || undefined;
+
                 useActionStore.getState().setCleanupResult(item.id, message);
             }
+
             onClose();
         } finally {
             setLoading(false);
         }
     }
+
     async function prepare(run: () => Promise<ActionResult | undefined>) {
         useActionStore.getState().setCleanupResult(item.id, undefined);
         setLoading(true);
         setError(null);
+
         const result = await inspectCleanup(item.id);
+
         setLoading(false);
+
         if (result.error || !result.token || !result.plans) {
             setError(result.error ?? 'Cannot inspect cleanup.');
+
             return;
         }
+
         if (!offersCleanup(result.plans)) {
             await finish(run);
+
             return;
         }
+
         cleanupChoices.offer({ token: result.token, plans: result.plans });
         setNext(() => run);
     }
+
     const confirm = () => {
         if (moving) void prepare(() => resolveNeedsYou(item.id, offer));
         else if (inspection) void prepare(() => startAgain(item.id, { branchChoice: 'new' }));
@@ -132,7 +153,9 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
             return confirmButton(cleanupChoices.confirmLoss ? 'Confirm loss and proceed' : 'Proceed', () => {
                 if (!cleanupChoices.asksLoss()) void finish(next, cleanupChoices.selection());
             });
+
         if (inspects && !inspection) return error ? confirmButton('Try again', () => void inspect()) : null;
+
         if (inspection && (inspection.branchExists || inspection.pr !== 'none'))
             return choices.map((branchChoice) => (
                 <DropdownMenu key={branchChoice}>
@@ -153,12 +176,14 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
                                         { branchChoice, confirmedOpenPr: inspection.pr === 'open' },
                                         model,
                                     );
+
                                 void (branchChoice === 'new' ? prepare(run) : finish(run));
                             }}
                         />
                     </DropdownMenu.Content>
                 </DropdownMenu>
             ));
+
         if (moving && item.passingBrief)
             return (['keep', 'reshape'] as const).map((briefChoice) =>
                 confirmButton(
@@ -166,6 +191,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
                     () => void prepare(() => resolveNeedsYou(item.id, offer, briefChoice)),
                 ),
             );
+
         return confirmButton(loading ? 'Working…' : error ? 'Try again' : label, confirm);
     };
 

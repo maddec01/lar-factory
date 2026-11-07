@@ -49,8 +49,10 @@ export const orgFlags = (organization: string): string[] => [
     '--output',
     'json',
 ];
+
 /** The most ids one workitemsbatch call reads. */
 const BATCH = 200;
+
 /** How long a source keeps its team's backlog levels and each type's states, which change only when someone edits the process. */
 export const SETTINGS_TTL = 10 * 60_000;
 /** The most az repos pr show calls a read runs at once. */
@@ -59,14 +61,17 @@ export const PR_READS = 4;
 /** `read`'s answer, kept for SETTINGS_TTL by `now`'s clock; a failed read isn't kept, so the next call reads again. */
 function kept<T>(read: () => Promise<T>, now: () => number): () => Promise<T> {
     let last: { answer: Promise<T>; at: number } | undefined;
+
     return () => {
         if (!last || now() - last.at >= SETTINGS_TTL) {
             const answer = read();
+
             last = { answer, at: now() };
             answer.catch(() => {
                 if (last?.answer === answer) last = undefined;
             });
         }
+
         return last.answer;
     };
 }
@@ -75,14 +80,17 @@ function kept<T>(read: () => Promise<T>, now: () => number): () => Promise<T> {
 async function limited<T, R>(values: readonly T[], limit: number, each: (value: T) => Promise<R>): Promise<R[]> {
     const answers: R[] = [];
     let next = 0;
+
     await Promise.all(
         Array.from({ length: Math.min(limit, values.length) }, async () => {
             while (next < values.length) {
                 const i = next++;
+
                 answers[i] = await each(values[i]!);
             }
         }),
     );
+
     return answers;
 }
 
@@ -91,24 +99,33 @@ const azCooldown = createCooldown('az');
 
 export async function az(args: string[]): Promise<string> {
     assertAzureCommandAllowed(args);
+
     const command = toolCommand('az');
+
     if (!command) throw new ReadProblem(`${missingTool('az')}.`, 'brew install azure-cli');
+
     azCooldown.check();
+
     const result = await runTool(command.file, args, {
         env: command.env,
         timeout: 60_000,
         maxBuffer: 64 * 1024 * 1024,
     });
+
     if (result.code !== 0) {
         await azCooldown.failed(result.stderr || result.detail);
+
         // az rest prints Azure DevOps' error as JSON: its message is the part worth showing.
         if (args[0] === 'rest')
             throw new Error(
                 `az rest failed: ${/"message":"((?:[^"\\]|\\.)*)"/.exec(result.detail)?.[1] ?? result.detail}`,
             );
+
         throw new Error(`az ${args.slice(0, 3).join(' ')} failed: ${result.detail}`);
     }
+
     azCooldown.succeeded();
+
     return result.stdout;
 }
 
@@ -126,9 +143,12 @@ export async function azureGet<T>(url: string, run: Az = az): Promise<T> {
 /** A logged-out az or a missing azure-devops extension as the ReadProblem that names its fix; any other error as it is. */
 export function problemOf(err: unknown): unknown {
     const text = err instanceof Error ? err.message : String(err);
+
     if (/az login/i.test(text)) return new ReadProblem('az is logged out.', 'az login');
+
     if (/azure-devops|misspelled or not recognized/i.test(text))
         return new ReadProblem('az has no azure-devops extension.', 'az extension add --name azure-devops');
+
     return err;
 }
 
@@ -138,8 +158,11 @@ export function problemOf(err: unknown): unknown {
  */
 export function refusalOf(err: unknown): unknown {
     const text = err instanceof Error ? err.message : String(err);
+
     if (/TF400813|not authorized|Unauthorized|Forbidden/i.test(text)) return new AccessLost(text);
+
     if (/TF401180/.test(text)) return new NotFound(text);
+
     return problemOf(err);
 }
 
@@ -153,10 +176,12 @@ export interface RawWorkItem {
 type Category = 'Proposed' | 'InProgress' | 'Resolved' | 'Completed' | 'Removed';
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+
 export const field = (raw: RawWorkItem, name: string) => text(raw.fields[name]);
 /** Native Azure fields kept alongside factory status, including on child references. */
 export function azureWorkItem(raw: RawWorkItem): AzureWorkItem {
     const identity = raw.fields['System.AssignedTo'] as { displayName?: string } | string | undefined;
+
     return {
         type: field(raw, 'System.WorkItemType'),
         state: field(raw, 'System.State'),
@@ -170,6 +195,7 @@ export const workItemUrl = (organization: string, encodedProject: string, id: nu
 /** The ids a work item's links of `rel` point at: the last part of each link's URL. */
 export const linked = (raw: RawWorkItem, rel: string) =>
     (raw.relations ?? []).filter((r) => r.rel === rel).map((r) => Number(r.url.split('/').at(-1)));
+
 /** The work item's tags, from System.Tags's "a; b". */
 const tagsOf = (raw: RawWorkItem) =>
     field(raw, 'System.Tags')
@@ -187,9 +213,12 @@ type Placement = Pick<Item, 'repo' | 'untaggedFor'> | null;
  */
 function placement(tags: readonly string[], repos: readonly string[]): Placement {
     const tagged = tags.filter(isRepoTag);
+
     if (tagged.length === 0) return { repo: repos[0]!, untaggedFor: [...repos] };
+
     const repo =
         tagged.length === 1 ? repos.find((r) => repoTag(r).toLowerCase() === tagged[0]!.toLowerCase()) : undefined;
+
     return repo === undefined ? null : { repo };
 }
 
@@ -282,6 +311,7 @@ export function azureItems(
             `team=${team}`,
             `id=${levels.requirementBacklog.id}/workItems`,
         ]);
+
         return [...new Set(listed.workItems.map((w) => w.target.id))];
     };
     const typeStates = new Map<string, () => Promise<{ value: { name: string; category: Category }[] }>>();
@@ -298,6 +328,7 @@ export function azureItems(
                     now,
                 ),
             );
+
         return typeStates.get(type)!();
     };
     const url = (id: number) => workItemUrl(organization, encoded, id);
@@ -307,6 +338,7 @@ export function azureItems(
     /** The work items' fields and links, reading at most BATCH ids a call; an id az no longer finds is left out. */
     async function workItems(ids: readonly number[]): Promise<RawWorkItem[]> {
         if (!ids.length) return [];
+
         const batches = Array.from({ length: Math.ceil(ids.length / BATCH) }, (_, i) =>
             ids.slice(i * BATCH, (i + 1) * BATCH),
         );
@@ -327,12 +359,14 @@ export function azureItems(
                 .flatMap((read) => read.value.filter((raw): raw is RawWorkItem => raw !== null))
                 .map((raw) => [raw.id, raw]),
         );
+
         return ids.flatMap((id) => byId.get(id) ?? []);
     }
 
     /** Each type's state categories, by type and state name. */
     async function categories(types: readonly string[]): Promise<Map<string, Map<string, Category>>> {
         const read = await Promise.all(types.map(statesOf));
+
         return new Map(types.map((type, i) => [type, new Map(read[i]!.value.map((s) => [s.name, s.category]))]));
     }
 
@@ -343,9 +377,11 @@ export function azureItems(
             call<AzurePr>(['repos', 'pr', 'show', '--id', String(id)]).catch((err: unknown) => {
                 // TF401180 is Azure's "pull request was not found".
                 if (err instanceof Error && /TF401180/.test(err.message)) return null;
+
                 throw err;
             }),
         );
+
         return new Map(read.flatMap((pr) => (pr ? [[pr.pullRequestId, linkedPr(pr)] as const] : [])));
     }
 
@@ -353,10 +389,12 @@ export function azureItems(
         try {
             const repository = readTrackerStructure(field(raw, 'System.Description'))?.repository;
             const matched = repository && repos.find((repo) => sameRepo(repo, repository));
+
             if (matched) return { repo: matched };
         } catch {
             /* Normalization reports a malformed structure block inline. */
         }
+
         return placement(tagsOf(raw), repos);
     };
 
@@ -369,8 +407,10 @@ export function azureItems(
             );
         const shows = (raw: RawWorkItem) => {
             const where = placementOf(raw);
+
             return !!where && (where.untaggedFor ?? [where.repo]).some((r) => sameRepo(r, repo));
         };
+
         return raws.filter((raw) => open(raw) && shows(raw));
     }
 
@@ -379,6 +419,7 @@ export function azureItems(
     let childIds: readonly number[] | undefined;
     let currentSprint: Listing['currentSprint'];
     let order = new Map<number, number>();
+
     /** Requirement-level board items with Task counts, predecessors and PRs. */
     async function itemsOf(
         { title, items: listed, completed, childIds, currentSprint }: Listing,
@@ -390,6 +431,7 @@ export function azureItems(
         /** The ids the work items link by `rel` that `known` lacks, each once. */
         const unread = (raws: readonly RawWorkItem[], rel: string, known: readonly RawWorkItem[]) => {
             const ids = new Set(known.map((raw) => raw.id));
+
             return [...new Set(raws.flatMap((raw) => linked(raw, rel)))].filter((id) => !ids.has(id));
         };
         const factoryTask = (raw: RawWorkItem) =>
@@ -403,6 +445,7 @@ export function azureItems(
         const withTasks = [...listed];
         const attempted = new Set(withTasks.map((raw) => raw.id));
         let missing = unread(withTasks.filter(boardItem), 'System.LinkTypes.Hierarchy-Forward', withTasks);
+
         while (missing.length) {
             withTasks.push(...(await workItems(missing)));
             // An unreadable child must not make the traversal retry forever.
@@ -411,6 +454,7 @@ export function azureItems(
                 (id) => !attempted.has(id),
             );
         }
+
         const parents = withTasks.filter(boardItem);
         const references = [
             ...new Set([
@@ -435,11 +479,15 @@ export function azureItems(
         // Factory Tasks become board items even when hydration found them outside the listing.
         const placed = new Map<number, NonNullable<Placement>>();
         const childrenOf = new Map<number, RawWorkItem[]>();
+
         for (const raw of parents) {
             if (!shown(raw) || (!(typeof completed === 'boolean' ? completed : completed.has(raw.id)) && done(raw)))
                 continue;
+
             const where = placementOf(raw);
+
             if (!where) continue;
+
             placed.set(raw.id, where);
             childrenOf.set(
                 raw.id,
@@ -457,10 +505,12 @@ export function azureItems(
                     .filter((child) => {
                         const tags = tagsOf(child);
                         const own = tags.some(isRepoTag) ? placement(tags, repos) : where;
+
                         return own !== null;
                     }),
             );
         }
+
         const top = parents.filter((raw) => childrenOf.has(raw.id));
         // An item outside the listing, such as a predecessor, goes by its own tags.
         const repoOf = (raw: RawWorkItem | undefined) =>
@@ -469,6 +519,7 @@ export function azureItems(
             const raw = byId.get(id);
             // A Removed predecessor no longer holds anything up; one the board can't read is taken as open.
             const closed = raw !== undefined && (done(raw) || category(raw) === 'Removed');
+
             return { number: id, repo: repoOf(raw), state: closed ? 'closed' : 'open' };
         };
         const item = (raw: RawWorkItem, children: RawWorkItem[]): Item => {
@@ -479,11 +530,13 @@ export function azureItems(
             const childNumbers = linked(raw, 'System.LinkTypes.Hierarchy-Forward');
             let tracker;
             let sync: Item['sync'];
+
             try {
                 tracker = readTrackerStructure(field(raw, 'System.Description'));
             } catch (error) {
                 sync = { state: 'error', message: (error as Error).message };
             }
+
             return {
                 id: itemId(raw.id),
                 ...(currentSprint &&
@@ -533,7 +586,9 @@ export function azureItems(
         };
         const shownPrs = await prsOf(top);
         const items = top.map((raw) => item(raw, childrenOf.get(raw.id)!));
+
         items.sort((a, b) => (a.sourceOrder ?? Infinity) - (b.sourceOrder ?? Infinity));
+
         return { title, items };
     }
 
@@ -544,18 +599,21 @@ export function azureItems(
                 list({ organization, project, boards, invoke, workItems, backlog, backlogIds }),
                 backlog,
             ]);
+
             showsCompleted = listing.completed;
             childIds = listing.childIds;
             currentSprint = listing.currentSprint;
             order = new Map(
                 [...new Set([...(listing.order ?? []), ...listing.items.map((raw) => raw.id)])].map((id, i) => [id, i]),
             );
+
             return itemsOf(listing, levels);
         },
         // A partial read uses the last listing’s sprint membership for child counts.
         async readSome(items) {
             const ids = [...new Set(items.map((item) => item.number!))];
             const [listed, levels] = await Promise.all([workItems(ids), backlogOf()]);
+
             return (
                 await itemsOf(
                     {
@@ -584,6 +642,7 @@ export function azureItems(
                 requirements.has(field(raw, 'System.WorkItemType')),
             );
             const found = await openFor(repo, listed);
+
             return found
                 .filter(
                     (raw) =>
@@ -595,12 +654,15 @@ export function azureItems(
         },
         async readTicket(repo, number) {
             const [raw] = await openFor(repo, await workItems([number]));
+
             if (!raw) return null;
+
             const tracker = readTrackerStructure(field(raw, 'System.Description'));
             const bodyField =
                 field(raw, 'System.WorkItemType').toLowerCase() === 'bug'
                     ? 'Microsoft.VSTS.TCM.ReproSteps'
                     : 'System.Description';
+
             return {
                 number: raw.id,
                 title: field(raw, 'System.Title'),
@@ -614,10 +676,13 @@ export function azureItems(
             try {
                 // workitemsbatch omits an id it can't find, so a missing work item is a confirmed not-found.
                 const [raw] = await workItems([number]);
+
                 if (!raw) return { state: 'not-found' };
+
                 const type = field(raw, 'System.WorkItemType');
                 const category = (await categories([type])).get(type)?.get(field(raw, 'System.State'));
                 const { assignee } = azureWorkItem(raw);
+
                 return {
                     abandonmentComplete: category === 'Removed',
                     state: category === 'Completed' || category === 'Removed' ? 'closed' : 'open',

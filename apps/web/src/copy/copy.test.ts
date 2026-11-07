@@ -19,14 +19,18 @@ async function mount(): Promise<HTMLButtonElement> {
             ),
         ),
     );
+
     return $<HTMLButtonElement>('button')!;
 }
 
 test('Copy copies its text, says Copied, and announces it in the copy-status live region', async () => {
     const writeText = vi.fn(async () => {});
+
     vi.stubGlobal('navigator', { clipboard: { writeText } });
+
     const button = await mount();
     const status = $('#copy-status')!;
+
     expect([status.getAttribute('role'), status.getAttribute('aria-live'), status.className]).toEqual([
         'status',
         'polite',
@@ -49,7 +53,9 @@ test('Copy copies its text, says Copied, and announces it in the copy-status liv
 
 test('a second copy is announced again', async () => {
     vi.stubGlobal('navigator', { clipboard: { writeText: async () => {} } });
+
     const button = await mount();
+
     await settle(() => button.click());
     await settle(() => vi.advanceTimersByTime(100));
     await settle(() => button.click());
@@ -66,12 +72,17 @@ test('without clipboard access, Copy falls back to a selected textarea', async (
             },
         },
     });
+
     let copied = '';
+
     document.execCommand = vi.fn(() => {
         copied = $<HTMLTextAreaElement>('textarea')!.value;
+
         return true;
     });
+
     const button = await mount();
+
     await settle(() => button.click());
     expect(copied).toBe('pnpm test');
     expect($('textarea'), 'and removes it').toBeNull();

@@ -25,6 +25,7 @@ async function readPage(itemId: string, before: string, signal: AbortSignal): Pr
             { cache: 'no-store', signal },
         );
         const body = (await response.json()) as { page?: ItemCommentsPage; error?: string };
+
         return response.ok && body.page ? body.page : (body.error ?? 'The board did not return them.');
     } catch {
         return 'Could not reach the board to read them.';
@@ -44,18 +45,25 @@ export function useOlderComments(itemId: string, entry: DetailsEntry): OlderComm
         loading: false,
         error: null,
     });
+
     useEffect(() => {
         entry.older = { comments: state.comments, cursor: state.cursor };
     }, [entry, state.comments, state.cursor]);
+
     const reading = useRef<AbortController | null>(null);
+
     useEffect(() => () => reading.current?.abort(), []);
+
     const loadMore = () => {
         if (!state.cursor || state.loading) return;
+
         const controller = new AbortController();
+
         reading.current = controller;
         setState({ ...state, loading: true, error: null });
         void readPage(itemId, state.cursor, controller.signal).then((page) => {
             if (controller.signal.aborted) return;
+
             setState((now) =>
                 typeof page === 'string'
                     ? { ...now, loading: false, error: page }
@@ -68,6 +76,7 @@ export function useOlderComments(itemId: string, entry: DetailsEntry): OlderComm
             );
         });
     };
+
     return {
         comments: state.comments,
         hasMore: state.cursor !== null,

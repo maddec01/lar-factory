@@ -26,6 +26,7 @@ const ORDER = Object.keys(TEXT) as NeedsYouCause['type'][];
 /** The sentences that name `causes`, in a fixed order whichever came first. */
 export function causesText(record: WorkRecord, causes: readonly NeedsYouCause[]): string[] {
     const sorted = [...causes].sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
+
     return sorted.map((cause) =>
         (TEXT[cause.type] as (record: WorkRecord, cause: NeedsYouCause) => string)(record, cause),
     );
@@ -34,9 +35,13 @@ export function causesText(record: WorkRecord, causes: readonly NeedsYouCause[])
 /** The offers of the first row `causes` match. */
 function offersOf(causes: readonly NeedsYouCause[]): NeedsYouOffer[] {
     const has = (type: NeedsYouCause['type']) => causes.some((cause) => cause.type === type);
+
     if (has('pr-closed')) return ['reopen-pr', 'replace-pr', 'set-aside'];
+
     if (has('ticket-closed') || has('assignee-changed')) return ['keep-working', 'set-aside'];
+
     if (has('no-thread')) return ['start-again', 'set-aside'];
+
     return ['mark-handled', 'set-aside'];
 }
 
@@ -82,15 +87,22 @@ function oldCauses(
     const pr = observations.find((o) => o.of === 'pr');
     const ticket = observations.find((o) => o.of === 'ticket');
     const causes: NeedsYouCause[] = saved ? [saved] : [];
+
     if (saved?.type === 'pr-closed' && ticket?.state === 'closed') causes.push({ type: 'ticket-closed' });
+
     // Ready work replaced its closed PR, which sets that Status.
     if (saved?.type === 'ticket-closed' && pr?.state === 'closed' && record.status !== 'Ready')
         causes.push({ type: 'pr-closed' });
+
     return causes.filter((cause) => {
         if (cause.type === 'pr-closed') return !pr || pr.state === 'closed';
+
         if (cause.type === 'ticket-closed') return !ticket || ticket.state === 'closed';
+
         if (cause.type === 'ticket-missing') return !ticket || ticket.state === 'not-found';
+
         if (cause.type === 'assignee-changed') return !ticket || ticket.assignee !== cause.from;
+
         return true;
     });
 }
@@ -101,11 +113,15 @@ export function savedNeedsYou(
     observations: readonly Observation[],
 ): { causes: NeedsYouCause[]; other: string | null; oldWording: boolean } {
     const { needsYou: text, needsYouCauses: causes } = record;
+
     if (!text || causes.length || text.length > LONGEST_OLD_WORDING) return { causes, other: text, oldWording: false };
+
     for (const [wording, cause] of OLD_WORDING) {
         const match = wording.exec(text);
+
         if (match) return { causes: oldCauses(cause(match), record, observations), other: null, oldWording: true };
     }
+
     return { causes, other: text, oldWording: false };
 }
 
@@ -119,13 +135,17 @@ export function needsYouNotice(
     launchIntents: () => readonly LaunchIntent[] = () => [],
 ): Item['needsYou'] {
     if (record.status === 'Done') return undefined;
+
     const { causes, other } = savedNeedsYou(record, observations);
+
     if (!causes.length && !other) return undefined;
+
     const purpose = causes.some((cause) => cause.type === 'no-thread')
         ? launchIntents()
               .filter((intent) => intent.outcome === 'failed')
               .at(-1)?.purpose
         : undefined;
+
     return {
         reason: [...causesText(record, causes), ...(other ? [other] : [])].join(' '),
         offers: offersOf(causes),

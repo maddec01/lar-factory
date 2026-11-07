@@ -34,15 +34,19 @@ const child = (number: number, parent: Item, change: Partial<Item> = {}): Item =
 
 test('every open concept, and every open item with a sub-issue on the board, is a dossier, in board order', () => {
     expect(dossiersOf(items, items).map((d) => d.parent.number)).toEqual([200, 180]);
+
     const parent = byNumber(150);
     const withChild = [...items, child(151, parent)];
+
     expect(
         dossiersOf(withChild, withChild).map((d) => d.parent.number),
         'coupled work',
     ).toEqual([200, 150, 180]);
+
     const listed = withChild.map((i) =>
         i.number === 150 ? { ...i, status: 'List' as const } : i.number === 180 ? { ...i, status: 'Done' as const } : i,
     );
+
     expect(
         dossiersOf(listed, listed).map((d) => d.parent.number),
         'none in List or Done',
@@ -51,6 +55,7 @@ test('every open concept, and every open item with a sub-issue on the board, is 
 
 test('a dossier shows where its parent or any part is in the scope', () => {
     const apple = items.filter((i) => i.repo === 'maddec01/lar-apple');
+
     expect(
         dossiersOf(apple, items).map((d) => d.parent.number),
         '#180 through its Apple build #40',
@@ -83,6 +88,7 @@ test('parts follow dependency waves, then kind, with each kind from its labels',
 
 test('each part carries its blocked-by issues and its newest thread', () => {
     const [research, prototype, grill, build] = partsOf(byNumber(200), items);
+
     expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/lar-server', state: 'closed' }]);
     expect([research!.thread?.title, grill!.thread?.state, prototype!.thread?.state, build!.thread?.state]).toEqual([
         'Research: hosting cost of the relay',
@@ -94,6 +100,7 @@ test('each part carries its blocked-by issues and its newest thread', () => {
 
 test('a part waits on its open blockers until a thread takes it on', () => {
     const [, , grill, build] = partsOf(byNumber(200), items);
+
     expect(openWaits(build!).map((b) => b.number)).toEqual([202]);
     expect(openWaits(grill!), 'its blocker closed').toEqual([]);
     expect(
@@ -112,6 +119,7 @@ test('parts follow dependency waves across repositories, with stable ties and ex
     });
     const parallel = child(3, parent, { blockers: [{ repo: 'external/repo', number: 1, state: 'open' }] });
     const last = child(4, parent, { blockers: [{ repo: 'owner/b', number: 1, state: 'closed' }] });
+
     expect(partsOf(parent, [last, after, parallel, first]).map((p) => [p.item.repo, p.item.number])).toEqual([
         [parallel.repo, 3],
         ['owner/a', 1],
@@ -127,6 +135,7 @@ test('ticketless parts are told apart by their work IDs, and wait on each other 
     const first = ticketless('W_first');
     const second = ticketless('W_second', [{ repo: 'owner/a', number: 0, state: 'open', workId: 'W_first' }]);
     const third = ticketless('W_third', [{ repo: 'owner/a', number: 0, state: 'open', workId: 'W_second' }]);
+
     expect(partsOf(parent, [third, second, first]).map((p) => p.item.id)).toEqual(['W_first', 'W_second', 'W_third']);
     expect(Object.fromEntries(partWaves(partsOf(parent, [third, second, first])))).toEqual({
         W_first: 0,
@@ -161,6 +170,7 @@ test('recorded decisions need no factory labels, and local completion facts over
         labels: ['decision-grill'],
         completion: { complete: false, reasons: ['No merged PR.'] },
     });
+
     expect(partsOf(parent, [complete, pending, build]).map((part) => part.kind)).toEqual([
         'decision',
         'decision',
@@ -175,6 +185,7 @@ test('recorded decisions need no factory labels, and local completion facts over
 const quiet: ItemThread = { id: 'newest', title: 'Newest', state: 'done', updated: '2026-10-21T09:00:00.000Z' };
 const partWith = (threads: ItemThread[], change: Partial<Item> = {}): Part => {
     const item = child(1, byNumber(200), { status: 'In progress', threads, slices: [], ...change });
+
     return { item, kind: 'build', waitsOn: [], thread: threads[0] };
 };
 
@@ -217,6 +228,7 @@ test.each<[string, ItemThread[], Partial<Item>, string, string | undefined]>([
     ['no thread at all', [], {}, 'none', undefined],
 ])('a build reads its activity from every thread and descendant: %s', (_name, threads, change, kind, thread) => {
     const activity = partActivity(partWith(threads, change));
+
     expect([activity.kind, activity.thread?.id]).toEqual([kind, thread]);
 });
 
@@ -224,8 +236,10 @@ test('while activity is unavailable a part claims no live work, and keeps its qu
     const slices = [{ number: 1, repo: 'o/r', title: 'S', progress: 'active' }] as Item['slices'];
     const read = (threads: ItemThread[], change: Partial<Item> = {}) => {
         const { kind, thread } = partActivity(partWith(threads, change), false, true);
+
         return [kind, thread?.id];
     };
+
     expect(read([{ ...quiet, state: 'running' }])).toEqual(['none', 'newest']);
     expect(read([quiet], { slices }), 'a recorded active slice').toEqual(['none', 'newest']);
     expect(read([{ ...quiet, hasLiveChildren: true }]), 'a live child').toEqual(['none', 'newest']);
@@ -242,6 +256,7 @@ test('a thread running behind a finished one is the thread a part shows, as runn
 
 test('a finished part folds into history only once nothing of it is still at work', () => {
     const finished = { status: 'Done', completion: { complete: true, reasons: [] } } as Partial<Item>;
+
     expect(isHistory(partWith([quiet], finished))).toBe(true);
     expect(isHistory(partWith([], finished)), 'no thread is normal').toBe(true);
     expect(isHistory(partWith([{ ...quiet, hasRunningChildren: true }], finished)), 'background work goes on').toBe(

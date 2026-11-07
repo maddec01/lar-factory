@@ -64,6 +64,7 @@ const T3_UNREACHABLE = "Auto-build waits for T3, which the board can't reach.";
 const MODELS_UNREADABLE = "Auto-build waits for T3's model choices, which the board can't read.";
 const MODEL_GONE = "Auto-build's model isn't offered now. Choose another in Settings.";
 const ANOTHER_BOARD = 'Another board on this Mac starts the builds.';
+
 /** How long a build Start build held waits before Auto-build tries it again, as each try rereads its Spec. */
 export const HOLD_RETRY_MS = 30_000;
 
@@ -102,7 +103,9 @@ export function createAutoBuild({
 
     function savePauses(next: Record<string, Pause>): void {
         if (JSON.stringify(next) === JSON.stringify(pauses)) return;
+
         pauses = next;
+
         try {
             mkdirSync(dir, { recursive: true });
             writeFileSync(`${file}.${process.pid}.tmp`, JSON.stringify(next));
@@ -124,6 +127,7 @@ export function createAutoBuild({
     function startable(itemId: string): { at: string } | 'refinement' | null {
         const data = board.snapshot();
         const item = data.items.find((candidate) => candidate.id === itemId);
+
         if (
             !item ||
             item.status !== 'Ready' ||
@@ -136,21 +140,28 @@ export function createAutoBuild({
             blockedText(item)
         )
             return null;
+
         try {
             const record = records!.read(item.id);
+
             if (record.setAside || record.status !== 'Ready') return null;
+
             const gate = passingGate(item.id);
+
             if (!gate || records!.specState(item.id).held || records!.waitingOn(item.id).length || startPending(item))
                 return null;
+
             if (
                 record.parentId &&
                 records!.read(record.parentId).kind === 'concept' &&
                 !records!.refinement(record.parentId).complete
             )
                 return 'refinement';
+
             return { at: gate.recordedAt };
         } catch (err) {
             log(`Auto-build can't read ${item.id}: ${(err as Error).message}`);
+
             return null;
         }
     }
@@ -160,10 +171,14 @@ export function createAutoBuild({
         const waitsForRefinement: string[] = [];
         const builds = board.snapshot().items.flatMap((item) => {
             const found = startable(item.id);
+
             if (found === 'refinement') waitsForRefinement.push(item.id);
+
             return found && found !== 'refinement' ? [{ item, at: found.at }] : [];
         });
+
         builds.sort((a, b) => a.at.localeCompare(b.at) || a.item.id.localeCompare(b.item.id));
+
         return { builds: builds.map(({ item }) => item), waitsForRefinement };
     }
 
@@ -171,7 +186,9 @@ export function createAutoBuild({
     const atWork = () => {
         const data = board.snapshot();
         const counted = new Set(buildsAtWork(data).map((item) => item.id));
+
         for (const item of data.items) if (item.status === 'Ready' && startPending(item)) counted.add(item.id);
+
         return counted.size;
     };
 
@@ -185,7 +202,9 @@ export function createAutoBuild({
                 Object.entries(pauses).filter(([workId, pause]) => {
                     try {
                         if (records!.read(workId).status !== 'Ready') return false;
+
                         const gate = passingGate(workId);
+
                         return !gate || gate.gateId === pause.gateId;
                     } catch (err) {
                         return (err as { code?: string }).code !== 'not-found';
@@ -198,11 +217,17 @@ export function createAutoBuild({
     /** Why nothing may start now for every build, or null. */
     function hold(): string | null {
         const data = board.snapshot();
+
         if (data.t3Availability?.availability !== 'available') return T3_UNREACHABLE;
+
         const choices = offerModelChoices();
+
         if (!choices.length) return MODELS_UNREADABLE;
+
         const { model } = setting();
+
         if (model && !findModelChoice(choices, model)) return MODEL_GONE;
+
         return null;
     }
 
@@ -211,11 +236,13 @@ export function createAutoBuild({
         if (lease) {
             try {
                 await lease.assertOwned();
+
                 return true;
             } catch {
                 lease = null;
             }
         }
+
         try {
             lease = await acquireOwnerLock(
                 join(dir, 'auto-build.lock'),
@@ -224,18 +251,22 @@ export function createAutoBuild({
         } catch (err) {
             log(`Auto-build can't take its lock: ${(err as Error).message}`);
         }
+
         return lease !== null;
     }
 
     function show(pass: AutoBuildPass): void {
         if (JSON.stringify(board.snapshot().autoBuildPass) === JSON.stringify(pass)) return;
+
         board.update({ autoBuildPass: pass });
         board.push();
     }
 
     async function passOnce(): Promise<void> {
         if (!records) return;
+
         endPauses();
+
         const { builds, waitsForRefinement } = eligible();
         let room = Math.max(0, limit() - atWork());
         /** The builds still eligible: a start, a pause or a change since the scan drops a build. */
@@ -247,35 +278,50 @@ export function createAutoBuild({
             waitsForRefinement,
         });
         const { on, model } = setting();
+
         if (!on || !builds.length || !room) return show(shown());
+
         const holds = hold() ?? ((await owns()) ? null : ANOTHER_BOARD);
+
         if (holds) return show(shown(holds));
+
         let buildHold: string | null = null;
+
         for (const item of builds) {
             if (!room) break;
+
             const retry = held.get(item.id);
+
             if (retry && retry.retryAt > now()) {
                 buildHold ??= retry.error;
                 continue;
             }
+
             held.delete(item.id);
+
             // An earlier start, or a change while it ran, may have made this build ineligible.
             const found = startable(item.id);
+
             if (!found || found === 'refinement') {
                 waiting--;
                 continue;
             }
+
             const { body } = await commands.startBuild(item.id, model, undefined, true);
             const { error, uncertain, hold: passes } = body as Partial<StartResult>;
+
             if (passes && error) {
                 log(`Auto-build held ${ref(item)}: ${error}`);
                 held.set(item.id, { error, retryAt: now() + HOLD_RETRY_MS });
                 buildHold ??= error;
                 continue;
             }
+
             waiting--;
+
             // A start T3 may have made keeps its place, and the existing recovery settles it.
             if (!error || uncertain) room--;
+
             if (!error) log(`Auto-build started ${ref(item)}`);
             else if (!uncertain) {
                 log(`Auto-build paused ${ref(item)}: ${error}`);
@@ -289,8 +335,10 @@ export function createAutoBuild({
         pass() {
             if (running) {
                 again = true;
+
                 return running;
             }
+
             running = (async () => {
                 try {
                     do {
@@ -301,6 +349,7 @@ export function createAutoBuild({
                     running = null;
                 }
             })();
+
             return running;
         },
         async release() {

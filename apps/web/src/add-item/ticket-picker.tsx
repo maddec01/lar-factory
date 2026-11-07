@@ -17,6 +17,7 @@ async function searchTickets(repo: string, query: string): Promise<TicketMatch[]
     try {
         const response = await fetch(`/api/tickets?${new URLSearchParams({ repo, q: query })}`);
         const result = (await response.json()) as { tickets?: TicketMatch[]; error?: string | null };
+
         return result.tickets ?? result.error ?? `Request failed (HTTP ${response.status}).`;
     } catch {
         return "Can't reach the board server. Try again.";
@@ -46,10 +47,14 @@ export function TicketPicker({
 
     const search = async () => {
         if (busy || disabled) return;
+
         setPhase('searching');
         setMessage('Searching…');
+
         const found = await searchTickets(repo, query);
+
         setPhase('found');
+
         if (typeof found === 'string') {
             setTickets([]);
             setMessage(found);
@@ -61,12 +66,16 @@ export function TicketPicker({
     const pick = async (ticket: TicketMatch) => {
         setPhase('picking');
         setMessage('');
+
         const error = await onPick(ticket);
+
         setPhase('found');
+
         if (error) setMessage(error);
     };
     const onKey = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key !== 'Enter') return;
+
         event.preventDefault();
         void search();
     };

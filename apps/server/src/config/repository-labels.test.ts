@@ -28,6 +28,7 @@ afterEach(() => {
 /** A data folder listing `repo`, with `access` to manage its labels. */
 async function folder(t: TestContext, repo = REPO, access: OperationAccess = 'allowed') {
     const dir = await mkdtemp(join(tmpdir(), 'repository-labels-'));
+
     t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
     saveOnboarded(repo, null, dir);
     replaceAccess(
@@ -38,6 +39,7 @@ async function folder(t: TestContext, repo = REPO, access: OperationAccess = 'al
         },
         dir,
     );
+
     return dir;
 }
 
@@ -48,10 +50,12 @@ function thirdTracker(start: TrackerLabel[] = [{ name: 'docs' }]) {
         list: async () => labels,
         create: async (label) => {
             labels = [...labels, label];
+
             return label;
         },
         update: async (name, change) => {
             labels = labels.map((l) => (l.name === name ? { ...l, ...change } : l));
+
             return labels.find((l) => l.name === (change.name ?? name))!;
         },
         delete: async (name) => {
@@ -66,6 +70,7 @@ function thirdTracker(start: TrackerLabel[] = [{ name: 'docs' }]) {
         heading: 'Stickers',
         description: false,
     };
+
     return { labels: tracker, capabilities };
 }
 
@@ -73,6 +78,7 @@ test('a fake third tracker lists, creates, renames and deletes through its adapt
     const dir = await folder(t);
     const tracker = thirdTracker();
     const change = (body: object) => changeRepositoryLabels({ repo: REPO, ...body }, dir, tracker);
+
     expect(await change({ change: 'list' })).toEqual({ labels: [{ name: 'docs' }] });
     expect(await change({ change: 'create', name: ' area-ui ' })).toEqual({});
     expect(await change({ change: 'update', name: 'docs', update: { name: 'guides' } })).toEqual({});
@@ -85,6 +91,7 @@ test('managed names are refused with the reason, whether typed or already on the
     const dir = await folder(t);
     const tracker = thirdTracker([{ name: 'bug' }, { name: 'docs' }]);
     const change = (body: object) => changeRepositoryLabels({ repo: REPO, ...body }, dir, tracker);
+
     expect(await change({ change: 'create', name: 'linked-work' })).toEqual({
         status: 400,
         error: "linked-work is reserved for the factory's saved links.",
@@ -118,6 +125,7 @@ test("Azure's repo- tags are locked, and GitHub's repo- labels are ordinary", as
     };
     const onAzure = (body: object) => changeRepositoryLabels({ repo: AZURE, ...body }, azureDir, azure);
     const reserved = "repo-lar-api is reserved for the work item's repository.";
+
     expect(await onAzure({ change: 'delete', name: 'repo-lar-api' })).toEqual({ status: 400, error: reserved });
     expect(await onAzure({ change: 'update', name: 'repo-lar-api', update: { name: 'docs-two' } })).toEqual({
         status: 400,
@@ -130,6 +138,7 @@ test("Azure's repo- tags are locked, and GitHub's repo- labels are ordinary", as
     expect(az.tags).toEqual(['repo-lar-api', 'docs']);
 
     const github = thirdTracker([{ name: 'repo-web' }]);
+
     github.capabilities = trackerCapabilities(REPO);
     expect(
         await changeRepositoryLabels(
@@ -144,6 +153,7 @@ test('changes that the capability rules out are refused before the adapter runs'
     const dir = await folder(t);
     const tracker = thirdTracker();
     const change = (body: object) => changeRepositoryLabels({ repo: REPO, ...body }, dir, tracker);
+
     expect(await change({ change: 'update', name: 'docs', update: { description: 'Guides' } })).toMatchObject({
         status: 400,
     });
@@ -152,10 +162,12 @@ test('changes that the capability rules out are refused before the adapter runs'
     });
     expect(await change({ change: 'rename', name: 'docs' })).toMatchObject({ status: 400 });
     expect(await tracker.labels.list()).toEqual([{ name: 'docs' }]);
+
     const noCreate = {
         ...tracker,
         capabilities: { ...tracker.capabilities, createUnavailable: 'Stickers appear on first use.' },
     };
+
     expect(await changeRepositoryLabels({ repo: REPO, change: 'create', name: 'new' }, dir, noCreate)).toEqual({
         status: 400,
         error: 'Stickers appear on first use.',
@@ -166,6 +178,7 @@ for (const access of ['refused', 'unverified'] as const)
     test(`reading works and writing is refused when label management is ${access}`, async (t) => {
         const dir = await folder(t, REPO, access);
         const tracker = thirdTracker();
+
         expect(await changeRepositoryLabels({ repo: REPO, change: 'list' }, dir, tracker)).toEqual({
             labels: [{ name: 'docs' }],
         });
@@ -184,6 +197,7 @@ for (const access of ['refused', 'unverified'] as const)
 
 test('a repository not on this Mac and a bad request are refused', async (t) => {
     const dir = await folder(t);
+
     expect(await changeRepositoryLabels({ repo: 'else/app', change: 'list' }, dir, thirdTracker())).toMatchObject({
         status: 409,
     });
@@ -193,6 +207,7 @@ test('a repository not on this Mac and a bad request are refused', async (t) => 
 test("a failed read reports the tracker's reason", async (t) => {
     const dir = await folder(t);
     const tracker = thirdTracker();
+
     expect(
         await changeRepositoryLabels({ repo: REPO, change: 'list' }, dir, {
             ...tracker,
@@ -209,6 +224,7 @@ test('on Azure a comma is refused, and rename and delete reach the fake az', asy
         capabilities: trackerCapabilities(AZURE),
     };
     const change = (body: object) => changeRepositoryLabels({ repo: AZURE, ...body }, dir, tracker);
+
     expect(await change({ change: 'update', name: 'old name', update: { name: 'a,b' } })).toEqual({
         status: 400,
         error: 'Use a tag name without commas or semicolons.',
@@ -224,12 +240,15 @@ test('on Azure a comma is refused, and rename and delete reach the fake az', asy
 
 test('LAR_FACTORY_AZURE_READ_ONLY=1 refuses Azure label writes and still reads', async (t) => {
     const dir = await folder(t, AZURE);
+
     vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '1');
+
     const az = fakeAz({ items: [], tags: ['docs'] });
     const tracker = {
         labels: trackerLabels(AZURE, { az: az.run, gh: () => Promise.reject(new Error('gh is not for Azure')) }),
         capabilities: trackerCapabilities(AZURE),
     };
+
     expect(await changeRepositoryLabels({ repo: AZURE, change: 'delete', name: 'docs' }, dir, tracker)).toEqual({
         status: 400,
         error: 'Azure DevOps is read-only in this test session.',
@@ -255,9 +274,11 @@ function alsoListed(dir: string, repos: string[], labels: string[]) {
 
 test('renaming a mapped label updates every kind mapping it, matching without case, and sends back the changed setup', async (t) => {
     const dir = await folder(t);
+
     setVocabularyOverride(REPO, 'bug', { type: 'Bug', labels: ['Docs', 'triage'] }, dir);
     setVocabularyOverride(REPO, 'feature', { type: null, labels: ['docs'] }, dir);
     setVocabularyOverride(REPO, 'improvement', { type: null, labels: ['triage'] }, dir);
+
     const tracker = thirdTracker([{ name: 'docs' }, { name: 'triage' }]);
     const changed = await changeRepositoryLabels(
         { repo: REPO, change: 'update', name: 'docs', update: { name: 'guides' } },
@@ -265,6 +286,7 @@ test('renaming a mapped label updates every kind mapping it, matching without ca
         tracker,
     );
     const [setup] = readRepositorySetups(dir);
+
     expect(setup!.vocabulary).toMatchObject({
         bug: { type: 'Bug', labels: ['guides', 'triage'] },
         feature: { labels: ['guides'] },
@@ -275,8 +297,11 @@ test('renaming a mapped label updates every kind mapping it, matching without ca
 
 test('a colour change and a label no kind maps leave mappings alone', async (t) => {
     const dir = await folder(t);
+
     setVocabularyOverride(REPO, 'bug', { type: null, labels: ['docs'] }, dir);
+
     const tracker = { ...thirdTracker([{ name: 'docs' }, { name: 'other' }]), capabilities: trackerCapabilities(REPO) };
+
     expect(
         await changeRepositoryLabels(
             { repo: REPO, change: 'update', name: 'docs', update: { color: '00ff00' } },
@@ -290,8 +315,11 @@ test('a colour change and a label no kind maps leave mappings alone', async (t) 
 
 test('deleting a mapped label removes it from the mapping and keeps the rest', async (t) => {
     const dir = await folder(t);
+
     setVocabularyOverride(REPO, 'bug', { type: 'Bug', labels: ['docs', 'triage'] }, dir);
+
     const tracker = thirdTracker([{ name: 'docs' }, { name: 'triage' }]);
+
     expect(await changeRepositoryLabels({ repo: REPO, change: 'delete', name: 'docs' }, dir, tracker)).toMatchObject({
         setups: [{ repo: REPO }],
     });
@@ -300,12 +328,15 @@ test('deleting a mapped label removes it from the mapping and keeps the rest', a
 
 test('a refused tracker change leaves mappings as they were', async (t) => {
     const dir = await folder(t);
+
     setVocabularyOverride(REPO, 'bug', { type: null, labels: ['docs'] }, dir);
+
     const tracker = thirdTracker();
     const refusing = {
         ...tracker,
         labels: { ...tracker.labels, delete: () => Promise.reject(new Error('The tracker refused.')) },
     };
+
     expect(await changeRepositoryLabels({ repo: REPO, change: 'delete', name: 'docs' }, dir, refusing)).toEqual({
         status: 400,
         error: 'The tracker refused.',
@@ -315,9 +346,12 @@ test('a refused tracker change leaves mappings as they were', async (t) => {
 
 test('on GitHub a change stays in its repository, even under the same owner', async (t) => {
     const dir = await folder(t);
+
     setVocabularyOverride(REPO, 'bug', { type: null, labels: ['docs'] }, dir);
     alsoListed(dir, ['team/other'], ['docs']);
+
     const tracker = { ...thirdTracker(), capabilities: trackerCapabilities(REPO) };
+
     await changeRepositoryLabels(
         { repo: REPO, change: 'update', name: 'docs', update: { name: 'guides' } },
         dir,
@@ -329,8 +363,10 @@ test('on GitHub a change stays in its repository, even under the same owner', as
 
 test("renaming an Azure tag updates mappings in the project's other repositories, and no other project", async (t) => {
     const dir = await folder(t, AZURE);
+
     setVocabularyOverride(AZURE, 'bug', { type: null, labels: ['old name'] }, dir);
     alsoListed(dir, [AZURE_SIBLING, AZURE_ELSEWHERE], ['old name']);
+
     const az = fakeAz({ items: [], tags: ['old name'] });
     const tracker = {
         labels: trackerLabels(AZURE, { az: az.run, gh: () => Promise.reject(new Error('gh is not for Azure')) }),
@@ -341,6 +377,7 @@ test("renaming an Azure tag updates mappings in the project's other repositories
         dir,
         tracker,
     );
+
     expect(bugLabels(dir, AZURE)).toEqual(['new name']);
     expect(bugLabels(dir, AZURE_SIBLING)).toEqual(['new name']);
     expect(bugLabels(dir, AZURE_ELSEWHERE)).toEqual(['old name']);
@@ -349,13 +386,16 @@ test("renaming an Azure tag updates mappings in the project's other repositories
 
 test("deleting an Azure tag removes it from the project's mappings, and from no other project's", async (t) => {
     const dir = await folder(t, AZURE);
+
     setVocabularyOverride(AZURE, 'bug', { type: null, labels: ['gone', 'kept'] }, dir);
     alsoListed(dir, [AZURE_SIBLING, AZURE_ELSEWHERE], ['gone']);
+
     const az = fakeAz({ items: [], tags: ['gone', 'kept'] });
     const tracker = {
         labels: trackerLabels(AZURE, { az: az.run, gh: () => Promise.reject(new Error('gh is not for Azure')) }),
         capabilities: trackerCapabilities(AZURE),
     };
+
     await changeRepositoryLabels({ repo: AZURE, change: 'delete', name: 'gone' }, dir, tracker);
     expect(bugLabels(dir, AZURE)).toEqual(['kept']);
     expect(bugLabels(dir, AZURE_SIBLING)).toEqual([]);
@@ -364,9 +404,12 @@ test("deleting an Azure tag removes it from the project's mappings, and from no 
 
 test('an Azure tag change leaves a GitHub repository named like the project alone', async (t) => {
     const dir = await folder(t, AZURE_ELSEWHERE);
+
     setVocabularyOverride(AZURE_ELSEWHERE, 'bug', { type: null, labels: ['gone'] }, dir);
     alsoListed(dir, ['contoso/Other'], ['gone']);
+
     const tracker = { ...thirdTracker([{ name: 'gone' }]), capabilities: trackerCapabilities(AZURE_ELSEWHERE) };
+
     await changeRepositoryLabels({ repo: AZURE_ELSEWHERE, change: 'delete', name: 'gone' }, dir, tracker);
     expect(bugLabels(dir, AZURE_ELSEWHERE)).toEqual([]);
     expect(bugLabels(dir, 'contoso/Other')).toEqual(['gone']);
@@ -374,12 +417,15 @@ test('an Azure tag change leaves a GitHub repository named like the project alon
 
 test('a list that cannot be saved says the tracker already changed', async (t) => {
     const dir = await folder(t);
+
     setVocabularyOverride(REPO, 'bug', { type: null, labels: ['docs'] }, dir);
+
     const tracker = thirdTracker();
     const breaking = {
         ...tracker,
         labels: { ...tracker.labels, delete: () => writeFile(join(dir, 'repository-settings.json'), 'not json') },
     };
+
     expect(await changeRepositoryLabels({ repo: REPO, change: 'delete', name: 'docs' }, dir, breaking)).toEqual({
         status: 400,
         error: expect.stringMatching(/^The tracker made this change, but kind mappings did not follow\. /),

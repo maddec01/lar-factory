@@ -26,6 +26,7 @@ export type LinkButtonProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 
 export function LinkButton({ kind, leftIcon, className = '', children, ...props }: LinkButtonProps) {
     const { variant, ...mark } = kindOf(kind);
+
     return (
         <a {...props} {...mark} data-slot="button" className={`${base} ${recipes[variant]} ${className}`}>
             {leftIcon && <span data-slot="icon">{leftIcon}</span>}

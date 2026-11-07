@@ -22,6 +22,7 @@ test('the Azure board combines backlog and sprint once, keeping sprint completio
     });
     const source = azureBoard([REPO], 'Fabrikam Team', az.run);
     const read = await source.read();
+
     assert.deepEqual(read.items.map((i) => i.number).sort(), [1, 2, 3, 6]);
     assert.equal(read.items.find((i) => i.number === 3)?.status, 'Done');
     assert.deepEqual((await source.readSome!(read.items)).map((i) => i.number).sort(), [1, 2, 3, 6]);
@@ -29,6 +30,7 @@ test('the Azure board combines backlog and sprint once, keeping sprint completio
 
 test('the Azure board still reads the backlog when no sprint is current', async () => {
     const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }], iterations: [] });
+
     assert.deepEqual(
         (await azureBoard([REPO], 'Fabrikam Team', az.run).read()).items.map((i) => i.number),
         [1],
@@ -40,6 +42,7 @@ test('the Azure board reports sprint read failures instead of silently dropping 
         items: [],
         fail: (args) => (args.includes('list-work-items') ? new Error('Sprint unavailable') : undefined),
     });
+
     await assert.rejects(azureBoard([REPO], 'Fabrikam Team', az.run).read(), /Sprint unavailable/);
 });
 
@@ -57,6 +60,7 @@ test('combined reads keep backlog priority and count sprint children only for sp
     });
     const source = azureBoard([REPO], 'Fabrikam Team', az.run);
     const read = await source.read();
+
     assert.deepEqual(
         read.items.map((i) => [i.number, i.sourceOrder, i.subIssues]),
         [
@@ -83,11 +87,14 @@ test('a concept exposes its Ready child build outside the sprint, while plain te
     });
     const source = azureBoard([REPO], 'Fabrikam Team', az.run);
     const read = await source.read();
+
     assert.deepEqual(
         read.items.map((i) => i.number),
         [1, 11],
     );
+
     const build = read.items[1]!;
+
     assert.equal(build.status, 'Ready');
     assert.equal(isBuild(build), true);
     assert.deepEqual(openBlockers(build), []);
@@ -118,6 +125,7 @@ test('factory tags expose Tasks, while kind, repository and slice tags alone kee
         items: tags.map((tag, i) => ({ id: i + 1, type: 'Task', state: 'New', tags: tag })),
         backlog: [],
     });
+
     assert.deepEqual(
         (await azureBoard([REPO], 'Fabrikam Team', az.run).read()).items.map((i) => i.number),
         [1, 2, 3, 4, 5, 6, 7],
@@ -137,6 +145,7 @@ test('factory Tasks retain sprint completion, Removed filtering, blockers and re
         sprint: [1, 11, 12, 13, 14],
     });
     const items = (await azureBoard([REPO], 'Fabrikam Team', az.run).read()).items;
+
     assert.deepEqual(
         items.map((i) => [i.number, i.status]),
         [
@@ -163,6 +172,7 @@ test('sprint membership names only current children and survives partial reads, 
     });
     const source = azureBoard([REPO], 'Fabrikam Team', az.run);
     const read = await source.read();
+
     assert.deepEqual(
         read.items.map((i) => i.currentSprint),
         [
@@ -174,6 +184,7 @@ test('sprint membership names only current children and survives partial reads, 
         (await source.readSome!(read.items)).map((i) => i.currentSprint),
         read.items.map((i) => i.currentSprint),
     );
+
     const noSprint = fakeAz({
         items: [
             { id: 1, type: 'User Story', state: 'New' },
@@ -181,5 +192,6 @@ test('sprint membership names only current children and survives partial reads, 
         ],
         iterations: [],
     });
+
     assert.equal((await azureBoard([REPO], 'Fabrikam Team', noSprint.run).read()).items[0]!.currentSprint, undefined);
 });

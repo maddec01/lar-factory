@@ -31,7 +31,9 @@ for (const color of [
 
 test('a colour with room to spare keeps its hue, and the pale ones the review measured move towards the foreground', () => {
     expect(chipText('#D73A4A', 'light')).not.toBe(PALETTE.light.foreground);
+
     const before = contrastRatio('#7c8a7e', chipFill('#C2E0C6', 'light'));
+
     expect(before).toBeLessThan(CONTRAST_FLOOR);
     expect(contrastRatio(chipText('#C2E0C6', 'light'), chipFill('#C2E0C6', 'light'))).toBeGreaterThan(before);
 });
@@ -49,6 +51,7 @@ test('the palette values match the theme', () => {
         'utf8',
     );
     const [light, dark] = theme.split('@utility lar-dark-palette') as [string, string];
+
     expect(light).toContain(`--color-base-content: ${PALETTE.light.foreground};`);
     expect(light).toContain(`--color-base-200: ${PALETTE.light.surface};`);
     expect(dark).toContain(`--color-base-content: ${PALETTE.dark.foreground};`);

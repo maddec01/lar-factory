@@ -5,6 +5,7 @@ import { projectSkills } from './project-skills.ts';
 
 test("each agent's project skill folder is scanned for folders holding a SKILL.md, and nothing else", () => {
     const dirs = ['.claude', '.agents', '.cursor', '.codex', '.opencode', '.grok', '.pi'];
+
     assert.deepEqual(
         projectSkills([
             ...dirs.map((dir, i) => `${dir}/skills/own-${i}/SKILL.md`),

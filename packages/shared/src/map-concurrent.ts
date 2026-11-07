@@ -9,9 +9,12 @@ export async function mapConcurrent<T, R>(
     const worker = async () => {
         while (cursor < values.length) {
             const index = cursor++;
+
             results[index] = await read(values[index]!, index);
         }
     };
+
     await Promise.all(Array.from({ length: Math.min(values.length, Math.max(1, Math.trunc(concurrency))) }, worker));
+
     return results;
 }

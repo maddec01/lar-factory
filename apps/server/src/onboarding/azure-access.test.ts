@@ -6,8 +6,11 @@ test('Azure checks branch, PR and work-item permissions independently using read
     const calls: string[][] = [];
     const access = await azureAccess('example/Team%20Project/app', async (args) => {
         calls.push(args);
+
         if (args[0] === 'repos') return JSON.stringify({ id: 'repository', project: { id: 'project' } });
+
         const url = new URL(args[args.indexOf('--url') + 1]!);
+
         if (url.pathname.endsWith('/securitynamespaces'))
             return JSON.stringify({
                 value: [
@@ -23,12 +26,16 @@ test('Azure checks branch, PR and work-item permissions independently using read
                     { namespaceId: 'css', name: 'CSS', actions: [{ name: 'WORK_ITEM_WRITE', bit: 32 }] },
                 ],
             });
+
         if (url.pathname.endsWith('/classificationnodes/areas')) return JSON.stringify({ identifier: 'root-area' });
+
         expect(url.searchParams.get('tokens')).toBe(
             url.pathname.includes('/git/') ? 'repoV2/project/repository' : 'vstfs:///Classification/Node/root-area',
         );
+
         return JSON.stringify({ value: [!url.pathname.endsWith('/git/16384')] });
     });
+
     expect(access).toMatchObject({
         'push-branch': 'allowed',
         'open-pr': 'refused',
@@ -46,10 +53,14 @@ test('Azure checks branch, PR and work-item permissions independently using read
 /** Azure's answers for a login whose Tagging permissions are `tagging`, by action; an action left out is not in the namespace. */
 const taggingAccess = (tagging: Record<string, boolean>) => {
     const bits: Record<string, number> = { Create: 2, Update: 4, Delete: 8 };
+
     return azureAccess('example/project/app', async (args) => {
         if (args[0] === 'repos') return JSON.stringify({ id: 'repository', project: { id: 'project-id' } });
+
         expect(args[args.indexOf('--method') + 1]).toBe('get');
+
         const url = new URL(args[args.indexOf('--url') + 1]!);
+
         if (url.pathname.endsWith('/securitynamespaces'))
             return JSON.stringify({
                 value: [
@@ -60,9 +71,13 @@ const taggingAccess = (tagging: Record<string, boolean>) => {
                     },
                 ],
             });
+
         if (url.pathname.endsWith('/classificationnodes/areas')) throw new Error('Not permitted');
+
         expect(url.searchParams.get('tokens')).toBe('/project-id');
+
         const action = Object.keys(bits).find((name) => url.pathname.endsWith(`/tagging/${bits[name]}`))!;
+
         return JSON.stringify({ value: [tagging[action]] });
     });
 };
@@ -80,8 +95,11 @@ test('an Azure login with no evidence for a tag permission leaves label manageme
 test('missing or unreadable permission evidence stays unchecked', async () => {
     const access = await azureAccess('example/project/app', async (args) => {
         if (args[0] === 'repos') return JSON.stringify({ id: 'repository', project: { id: 'project' } });
+
         if (args.some((arg) => arg.includes('/securitynamespaces?'))) return JSON.stringify({ value: [] });
+
         throw new Error('Not permitted');
     });
+
     expect(access).toEqual({});
 });

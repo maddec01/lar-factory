@@ -39,12 +39,15 @@ export async function launchThread(
 ): Promise<StartResult> {
     const authority = boardSessionAuthority('t3', 'orchestration:operate');
     let session;
+
     try {
         session = await authority.issue();
     } catch {
         return { thread: null, error: 'T3 launch authorization failed.' };
     }
+
     const lost: StartResult = { thread: null, uncertain: true, error: 'T3 launch could not be confirmed.' };
+
     try {
         return await new Promise<StartResult>((resolve) => {
             let stop: (() => void) | undefined;
@@ -52,6 +55,7 @@ export async function launchThread(
                 stop?.();
                 resolve(lost);
             }, 30_000);
+
             try {
                 stop = subscribeProjects(
                     new URL(origin),
@@ -79,6 +83,7 @@ export async function launchThread(
                                 typeof value.resumed !== 'boolean'
                             )
                                 return;
+
                             clearTimeout(timer);
                             stop?.();
                             resolve({
@@ -89,8 +94,10 @@ export async function launchThread(
                         // Only T3's own refusal says no thread started. Any other exit, such as T3 stopping, says no more than a lost answer.
                         reject(exit) {
                             clearTimeout(timer);
+
                             const refusal =
                                 isRecord(exit) && exit._tag === 'Failure' ? rejectionReason(exit.cause) : undefined;
+
                             resolve(refusal ? { thread: null, error: refusal } : lost);
                         },
                     },

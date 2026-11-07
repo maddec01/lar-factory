@@ -22,9 +22,11 @@ async function render(
     const { VocabularyFields } = await import('./vocabulary-editor.tsx');
     const recheck = vi.fn();
     const changed = vi.fn();
+
     function Draft() {
         const [value, setValue] = useState<VocabularyTerm>(change.value ?? { type: null, labels: [] });
         const [newLabels, setNewLabels] = useState<string[]>([]);
+
         return createElement(VocabularyFields, {
             name: 'bug',
             setup: change.setup ?? setup,
@@ -39,16 +41,23 @@ async function render(
             },
         });
     }
+
     document.body.replaceChildren();
+
     const host = document.body.appendChild(document.createElement('div'));
+
     await settle(() => createRoot(host).render(createElement(Draft)));
+
     return { recheck, changed };
 }
+
 async function picker() {
     await settle(() => $<HTMLButtonElement>('[aria-label^="Choose Bug"]')!.click());
     await settle(() => vi.advanceTimersByTime(50));
+
     return $('[data-label-picker]')!;
 }
+
 async function type(input: HTMLInputElement, value: string) {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
     await settle(() => input.dispatchEvent(new Event('input', { bubbles: true })));
@@ -57,6 +66,7 @@ async function type(input: HTMLInputElement, value: string) {
 test('onboarding creates a draft only after an explicit choice, without writing', async () => {
     const { changed } = await render();
     const popover = await picker();
+
     await type(popover.querySelector('input')!, 'needs-review');
     expect(changed).not.toHaveBeenCalled();
     await settle(() =>
@@ -86,14 +96,19 @@ test('Azure uses work item types and tags and excludes repository routing tags',
             labels: { state: 'available', choices: ['docs', 'repo-repository'] },
         },
     });
+
     await chooseOption($('[aria-label="Bug type"]')!, 'Defect');
     expect(changed).toHaveBeenLastCalledWith({ type: 'Defect', labels: [] }, []);
+
     const popover = await picker();
+
     expect([...popover.querySelectorAll('[role="option"]')].map(text)).toEqual(['docs']);
     await type(popover.querySelector('input')!, 'brand-new');
+
     const create = [...popover.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
         text(button).startsWith('Create'),
     )!;
+
     expect(create.disabled).toBe(true);
     expect(text(popover)).toContain('Azure DevOps has no way to create a tag on its own.');
 });

@@ -67,9 +67,12 @@ test('a change check asks again with the last ETag, and an unchanged answer, a 3
     const asked: string[][] = [];
     const answer = async (args: string[]) => {
         asked.push(args);
+
         if (args.includes('If-None-Match: W/"1"')) throw new Error('gh api -H failed: gh: HTTP 304');
+
         return 'HTTP/2.0 200 OK\r\nEtag: W/"1"\r\nX-Ratelimit-Remaining: 4999\r\n\r\n[{"number":1}]';
     };
+
     assert.deepEqual(await getIfChanged('repos/a/b/issues', undefined, answer), {
         etag: 'W/"1"',
         body: [{ number: 1 }],
@@ -96,8 +99,10 @@ test('repository role alone never proves token write access', async () => {
         const calls: string[][] = [];
         const access = await repositoryAccess('team/app', async (args) => {
             calls.push(args);
+
             return `HTTP/2.0 200 OK\r\n${header}\r\n${JSON.stringify({ push: true, triage: true, issues: true, private: false })}`;
         });
+
         assert.deepEqual(access, { push: true, triage: true, issues: true });
         assert.deepEqual(calls, [
             [
@@ -123,6 +128,7 @@ test('classic repo scope proves token writes while public_repo covers only publi
             async () =>
                 `HTTP/2.0 200 OK\r\nX-OAuth-Scopes: ${scopes}\r\n\r\n${JSON.stringify({ push: true, triage: true, issues: true, private: privateRepo })}`,
         );
+
         assert.equal(access.tokenWrites, tokenWrites);
     }
 });

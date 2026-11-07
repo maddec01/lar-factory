@@ -35,29 +35,37 @@ export const useKindChangeStore = create<KindChangeState>((set, get) => ({
     answers: {},
     async start(itemId, kind) {
         const before = get().changes[itemId];
+
         if (before?.saving) return;
+
         set(({ changes }) => ({
             changes: { ...changes, [itemId]: { kind, saving: true, line: before?.line ?? '', error: null } },
         }));
+
         const result = await postAction<{ line: string; itemId: string }>('/api/item-kind', { itemId, kind });
         // An item with no record has one now, under its work ID, so the dialog follows it there.
         const shownId = result.itemId ?? itemId;
         // Each attempt says what it changed itself, so a failed retry keeps what the attempts before it changed.
         const earlier = result.error && before?.error && before.kind === kind ? before.line : '';
         const line = [earlier, result.line ?? ''].filter(Boolean).join(' ');
+
         flushSync(() => {
             set(({ changes: { [itemId]: _done, ...changes } }) => ({
                 changes: { ...changes, [shownId]: { kind, saving: false, line, error: result.error } },
             }));
             receive(result);
+
             if (shownId !== itemId && useItemDialogStore.getState().itemId === itemId)
                 useItemDialogStore.getState().open(shownId);
         });
     },
     async answer(itemId, answer, ticketKind) {
         if (get().answers[itemId]?.saving) return;
+
         set(({ answers }) => ({ answers: { ...answers, [itemId]: { saving: true, error: null } } }));
+
         const result = await postAction('/api/item-kind-answer', { itemId, answer, ticketKind });
+
         flushSync(() => {
             set(({ answers }) => ({ answers: { ...answers, [itemId]: { saving: false, error: result.error } } }));
             receive(result);

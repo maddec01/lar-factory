@@ -15,6 +15,7 @@ import { FIELD_GROUP, FieldRow, HelpTip } from '../settings/field-row.tsx';
 export function operationNames(repo: string): Record<RepositoryOperation, string> {
     const azure = onAzure(repo);
     const labels = trackerCapabilities(repo).heading.toLowerCase();
+
     return {
         'push-branch': 'Push branches',
         'open-pr': 'Open PRs',
@@ -90,6 +91,7 @@ export function AccessList({
 
 export function accessExplanation(repo: string, reason: string): string {
     const names = operationNames(repo);
+
     return REPOSITORY_OPERATIONS.reduce((text, operation) => text.replaceAll(operation, names[operation]), reason);
 }
 
@@ -106,6 +108,7 @@ export function AccessReason({
 }) {
     const explanation = accessExplanation(repo, reason);
     const short = explanation.split('. ')[0]!.replace(/\.$/, '');
+
     return (
         <span className="inline-flex min-w-0 flex-wrap items-center gap-1 text-xs text-(--muted-foreground)">
             <span>{short}.</span>

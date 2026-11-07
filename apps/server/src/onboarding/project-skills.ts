@@ -22,6 +22,7 @@ export function projectSkills(files: string[]): ProjectSkill[] {
     return files.flatMap((file) => {
         const dir = PROJECT_SKILL_DIRS.find((d) => file.startsWith(`${d}/`));
         const name = dir && /^([^/]+)\/SKILL\.md$/.exec(file.slice(dir.length + 1))?.[1];
+
         return name ? [{ name, path: `${dir}/${name}/` }] : [];
     });
 }

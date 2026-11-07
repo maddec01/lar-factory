@@ -51,6 +51,7 @@ const FOOTPRINT = JSON.stringify({
 
 test('a footprint reads as its total and each region by dirty plus swapped size, the largest first', () => {
     const read = footprintRegions(FOOTPRINT);
+
     assert.equal(read?.total, 500 * MiB);
     assert.deepEqual(read?.regions.slice(0, 3), [
         { name: 'App-Specific Tag 16', bytes: 410 * MiB },
@@ -66,6 +67,7 @@ test('a footprint that does not parse reads as null', () => {
 
 test('the regions holding 80% stop at the first that reaches it', () => {
     const read = footprintRegions(FOOTPRINT)!;
+
     assert.deepEqual(
         regionsHolding(read, 0.8).map((held) => held.name),
         ['App-Specific Tag 16'],
@@ -78,6 +80,7 @@ test('the regions holding 80% stop at the first that reaches it', () => {
 
 test('a summary gives the peak, range and end of RSS, and a second PID voids the run', () => {
     const samples = [sample(0, 100), sample(1, 300), sample(2, 50), sample(3, 120)];
+
     assert.deepEqual(summarize(samples), {
         peak: 300 * MiB,
         peakAt: samples[1]!.time,
@@ -94,6 +97,7 @@ test('no forced GC gives no conclusion', () => {
 
 test('heapUsed after GC above half of RSS is JS retention', () => {
     const samples = [sample(4, 500), sample(5, 300, 'after-gc', { heapUsed: 151, heapTotal: 160 })];
+
     assert.equal(conclude(samples)?.cause, 'JS retention');
 });
 
@@ -103,12 +107,15 @@ test('the last GC at least 20% above the first is JS retention, even under half 
         sample(9, 500),
         sample(10, 400, 'after-gc', { heapUsed: 120, heapTotal: 130 }),
     ];
+
     assert.equal(conclude(samples)?.cause, 'JS retention');
+
     const flat = [
         sample(5, 400, 'after-gc', { heapUsed: 100, heapTotal: 110 }),
         sample(9, 500),
         sample(10, 400, 'after-gc', { heapUsed: 119, heapTotal: 130 }),
     ];
+
     assert.equal(conclude(flat)?.cause, 'allocator or native pages');
 });
 
@@ -124,6 +131,7 @@ test('otherwise it is allocator or native pages, using the GC nearest the highes
         sample(30, 200, 'after-gc', { heapUsed: 100, heapTotal: 150 }),
     ];
     const conclusion = conclude(samples);
+
     assert.equal(conclusion?.cause, 'allocator or native pages');
     assert.equal(conclusion?.gc.time, samples[2]!.time);
 });
@@ -135,6 +143,7 @@ test('the report names the peak capture, its regions and the ones it could not i
         { time: Date.UTC(2026, 10, 5, 12, 5), footprint: FOOTPRINT },
     ];
     const report = renderReport(samples, captures);
+
     assert.match(report, /RSS peak 600\.0 MiB, range 100\.0 MiB to 600\.0 MiB, end 200\.0 MiB/);
     assert.match(report, /Peak capture 2026-11-05T12:05:00\.000Z/);
     assert.match(report, /App-Specific Tag 16: 410\.0 MiB \(82%\), unidentified/);
@@ -151,6 +160,7 @@ test('the report says a second PID voids the run, and gives the forced-GC figure
         sample(6, 200, 'start', {}, 8),
     ];
     const report = renderReport(samples, []);
+
     assert.match(report, /VOID: the server restarted \(PIDs 7, 8\)/);
     assert.match(report, /heapUsed after GC 100\.0 MiB, heapTotal slack 50\.0 MiB, external 20\.0 MiB, RSS 400\.0 MiB/);
     assert.match(report, /Conclusion: allocator or native pages/);

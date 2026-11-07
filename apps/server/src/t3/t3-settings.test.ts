@@ -18,6 +18,7 @@ import {
 
 test("T3's files are under its userdata folder unless the environment names them", () => {
     const env = { HOME: '/Users/me' };
+
     assert.equal(statsDbPath(env), '/Users/me/.t3/userdata/statev2.sqlite');
     assert.equal(t3SettingsPath(env), '/Users/me/.t3/userdata/settings.json');
     assert.equal(usageRatesPath({ ...env, T3_STATE_DB: '/tmp/t3/state.sqlite' }), '/tmp/t3/usage-model-rates.json');
@@ -31,6 +32,7 @@ test('T3 Code runs while its runtime file names a live process', (t) => {
     const dir = tempDir(t, 'lar-t3-runtime-');
     const runtime = (name: string, text: string) => {
         writeFileSync(join(dir, name), text);
+
         return join(dir, name);
     };
     const state = (pid: unknown) =>
@@ -41,6 +43,7 @@ test('T3 Code runs while its runtime file names a live process', (t) => {
             origin: 'http://127.0.0.1:3773',
             startedAt: '2026-10-25T09:04:46.754Z',
         });
+
     assert.equal(t3Running(runtime('live', state(process.pid))), true);
     // pid 1 belongs to root: signalling it fails with EPERM, which still means it runs.
     assert.equal(t3Running(runtime('root', state(1))), true);
@@ -54,6 +57,7 @@ test('T3 Code runs while its runtime file names a live process', (t) => {
 
 test("T3's environment id is the file's trimmed text, absent when the file is missing or blank", (t) => {
     const dir = tempDir(t, 'lar-t3-env-');
+
     writeFileSync(join(dir, 'environment-id'), '5e3c-8c5a\n');
     writeFileSync(join(dir, 'blank'), ' \n');
     assert.equal(readEnvironmentId(join(dir, 'environment-id')), '5e3c-8c5a');
@@ -89,6 +93,7 @@ test("an instance's homePath expands `~`, other drivers are left out, and only v
         },
     );
     const settings = readT3Settings(path, '/home');
+
     assert.deepEqual(settings.instanceHomes.get('work'), { driver: 'claudeAgent', home: '/home/work-claude' });
     assert.deepEqual(settings.instanceHomes.get('box'), { driver: 'codex', home: '/box/codex' });
     assert.equal(settings.instanceHomes.has('cursor'), false);

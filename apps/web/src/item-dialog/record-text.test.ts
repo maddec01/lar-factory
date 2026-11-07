@@ -44,14 +44,18 @@ const record = () => dialog().querySelector('[data-record]');
 function answer(details: Record<string, ItemDetails>, exported: () => Response = () => new Response('{}')) {
     fetchMock.mockImplementation(async (url: string) => {
         const itemId = detailsRead(url);
+
         if (itemId) return new Response(JSON.stringify({ details: details[itemId] ?? NO_TICKET }));
+
         if (url === '/api/item-export') return exported();
+
         return new Response(JSON.stringify(sample));
     });
 }
 
 async function openItem(itemId: string): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
 
@@ -82,7 +86,9 @@ test("a picked ticket's build shows its brief, build phase, review rounds and in
     );
     expect(text(record()!.querySelector('details summary'))).toBe('Initial context');
     expect(text(record()!.querySelector('details [data-slot="rich-text"]'))).toBe('Owners sign up from the website.');
+
     const ticket = dialog().querySelector('[data-description]')!;
+
     expect(text(ticket.querySelector('h2'))).toBe('Ticket description');
     expect(
         record()!.compareDocumentPosition(ticket) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -94,6 +100,7 @@ test("a picked ticket's build shows its brief, build phase, review rounds and in
 test('a concept shows its map and a decision its text, each with a note while none is written', async () => {
     const concept = ticketless('W_concept', 'Cloud', { kind: 'concept' });
     const decision = ticketless('W_decision', 'Relay', { kind: 'decision' });
+
     answer({
         W_concept: {
             ...NO_TICKET,
@@ -125,6 +132,7 @@ test('a concept shows its map and a decision its text, each with a note while no
 
 test('a settled decision leads with its outcome and folds the original question', async () => {
     const decision = ticketless('W_decision', 'Relay', { kind: 'decision', status: 'Done' });
+
     answer({
         W_decision: {
             ...NO_TICKET,
@@ -142,7 +150,9 @@ test('a settled decision leads with its outcome and folds the original question'
     await openItem('W_decision');
     expect(text(record()!.querySelector('h2'))).toBe('Outcome');
     expect(text(record()!.querySelector('[data-record-body]'))).toBe('Use a relay broker.');
+
     const question = record()!.querySelector('details')!;
+
     expect(question.open).toBe(false);
     expect(text(question.querySelector('summary'))).toBe('Original question');
     expect(text(question)).toContain('Broker only?');
@@ -176,6 +186,7 @@ test('ticketless work shows its record alone, with its private slices and the wo
             },
         ],
     });
+
     answer({ W_build: { ...NO_TICKET, record: brief } });
     await mountPage({ ...sample, items: [build, blocker, ...sample.items] });
     await openItem('W_build');
@@ -192,12 +203,17 @@ test('ticketless work shows its record alone, with its private slices and the wo
 
 test('Export markdown writes the files lar-work export writes and names them; a refusal shows why', async () => {
     let reply = new Response(JSON.stringify({ paths: ['/Users/me/Downloads/brief-owner-accounts.md'], error: null }));
+
     answer({ I_sample13: { ...sampleDetails.I_sample13!, record: brief } }, () => reply);
     await mountPage();
     await openItem('I_sample13');
+
     const button = [...record()!.querySelectorAll('button')].find((b) => text(b) === 'Export markdown')!;
+
     await settle(() => button.click());
+
     const posted = fetchMock.mock.calls.find(([url]) => url === '/api/item-export') as unknown as [string, RequestInit];
+
     expect(JSON.parse(posted[1].body as string)).toEqual({ itemId: 'I_sample13' });
     expect(text(record()!.querySelector('[role="status"]'))).toBe(
         'Exported to /Users/me/Downloads/brief-owner-accounts.md',

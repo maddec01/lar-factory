@@ -8,16 +8,23 @@ export async function openBoardAddress() {
     const server = createServer((incoming, outgoing) => {
         if (incoming.headers.host !== url.host) {
             outgoing.writeHead(421).end();
+
             return;
         }
+
         const current = target;
+
         if (!current) {
             outgoing.writeHead(503).end();
+
             return;
         }
+
         // Never turn an unrelated site's Origin into an authorized board write.
         const headers = { ...incoming.headers, host: current.host };
+
         if (headers.origin === url.origin) headers.origin = current.origin;
+
         const upstream = request(
             {
                 hostname: current.hostname,
@@ -32,6 +39,7 @@ export async function openBoardAddress() {
                 response.on('error', () => outgoing.destroy());
             },
         );
+
         pending.add(upstream);
         upstream.on('close', () => pending.delete(upstream));
         upstream.on('error', () => {
@@ -41,15 +49,20 @@ export async function openBoardAddress() {
         outgoing.on('close', () => upstream.destroy());
         incoming.pipe(upstream);
     });
+
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
+
     const address = server.address();
+
     if (!address || typeof address === 'string') throw new Error('Expected a board address');
+
     const url = new URL(`http://127.0.0.1:${address.port}`);
     const disconnect = () => {
         target = undefined;
         for (const upstream of pending) upstream.destroy();
     };
+
     return {
         url,
         connect: (next: URL) => {

@@ -24,6 +24,7 @@ export function SourceIcon({
     const shape = corner
         ? 'absolute right-0 top-0 z-10 size-6 rounded-bl-lg rounded-tr-[inherit] border-b border-l'
         : 'size-5 shrink-0 rounded-md border';
+
     return (
         <span
             role="img"

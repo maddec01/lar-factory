@@ -33,6 +33,7 @@ const STILL: Record<FailedCheck['result'], string> = {
 function Recheck({ check }: { check: FailedCheck }) {
     const { checking, answer, recheck } = useRecheckStore();
     const note = answer && !checking ? (answer.error ?? STILL[check.result]) : null;
+
     return (
         <>
             <Button
@@ -67,7 +68,9 @@ export function CopyableCommand({ command }: { command: string }) {
 /** How to fix an override that points at nothing runnable, else the usual fix in `children`. */
 function Fix({ check, tool, what, children }: { check: FailedCheck; tool: string; what: string; children: ReactNode }) {
     if (check.result !== 'missing' || !check.override) return children;
+
     const variable = check.override.split('=')[0]!;
+
     return (
         <>
             No runnable <code>{tool}</code> is at <code>{check.override}</code>. Point {variable} at {what} or unset it,
@@ -151,6 +154,7 @@ function ghNotice(check: FailedCheck<GhCheck>): { title: string; body: ReactNode
 /** The warning for a missing, logged-out or outdated gh. */
 export function GhWarning({ check }: { check: FailedCheck<GhCheck> }) {
     const { title, body } = ghNotice(check);
+
     return (
         <Warning dismissKey="gh" title={title}>
             {body}
@@ -192,11 +196,13 @@ const COMMAND_USES = {
     jq: "lar-shape's scripts read gh's answers with",
     curl: "lar-shape's scripts tell the board to refresh with",
 } as const;
+
 export type Command = keyof typeof COMMAND_USES;
 
 /** The warning for a missing git, jq or curl, which the board reads without. */
 export function CommandWarning({ name, check }: { name: Command; check: FailedCheck<CommandCheck> }) {
     const { fix: install, override } = check;
+
     return (
         <Warning dismissKey={name} title={`${name} not found.`}>
             {COMMAND_USES[name]} <code>{name}</code>.{' '}

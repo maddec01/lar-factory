@@ -30,6 +30,7 @@ function mappingsOf(name: string, setup: RepositorySetup): string | null {
     const kinds = (Object.keys(KIND_NAMES) as VocabularyKind[])
         .filter((key) => setup.vocabulary[key].labels.some((label) => label.toLowerCase() === name.toLowerCase()))
         .map((key) => KIND_NAMES[key]);
+
     return kinds.length ? `the ${new Intl.ListFormat('en').format(kinds)} mapping${kinds.length > 1 ? 's' : ''}` : null;
 }
 
@@ -48,19 +49,24 @@ function useTrackerLabels(repo: string) {
     const [labels, setLabels] = useState<TrackerLabel[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [attempt, setAttempt] = useState(0);
+
     useEffect(() => {
         let current = true;
+
         void postAction<{ labels: TrackerLabel[] }>('/api/repositories/labels', { repo, change: 'list' }).then(
             (result) => {
                 if (!current) return;
+
                 setError(result.error ?? (result.labels ? null : 'The board sent no labels.'));
                 setLabels(result.labels ? [...result.labels].sort((a, b) => a.name.localeCompare(b.name)) : null);
             },
         );
+
         return () => {
             current = false;
         };
     }, [repo, attempt]);
+
     return { labels, error, retry: () => setAttempt((n) => n + 1) };
 }
 
@@ -105,11 +111,16 @@ function LabelEditor({
         update.color !== undefined && !/^[0-9a-f]{6}$/i.test(update.color) ? 'Use a colour of six hex digits.' : null;
     const save = async (event: FormEvent) => {
         event.preventDefault();
+
         if (problem || badColor || !Object.keys(update).length) return;
+
         const failed = await onSave({ change: 'update', name: label.name, update });
+
         setFailure(failed);
+
         if (!failed) onDone();
     };
+
     return (
         <form className="bg-base-200/40 grid gap-3 border-t p-3" onSubmit={(event) => void save(event)}>
             {capabilities.changeScope === 'project' && (
@@ -204,9 +215,12 @@ function DeleteConfirm({
     const [failure, setFailure] = useState<string | null>(null);
     const confirm = async () => {
         const failed = await onDelete();
+
         setFailure(failed);
+
         if (!failed) onClose();
     };
+
     return (
         <Modal loading={running !== null} onClose={onClose}>
             {/* ninna-ui's Modal drops the description from aria-describedby, so the detail names itself. */}
@@ -271,6 +285,7 @@ function LabelRow({
           ? label.description
           : undefined;
     const disabled = !!readOnly || running !== null;
+
     return (
         <li data-label={label.name} className="border-b last:border-b-0">
             <div className="flex min-w-0 items-center gap-3 px-3 py-1.5">
@@ -346,11 +361,16 @@ function CreateLabel({
     const problem = fresh.trim() ? nameProblem(fresh) : null;
     const create = async (event: FormEvent) => {
         event.preventDefault();
+
         if (cannotCreate || problem || !fresh.trim()) return;
+
         const failed = await onCreate(fresh.trim());
+
         setFailure(failed);
+
         if (!failed) setFresh('');
     };
+
     return (
         <>
             <div className={FIELD_GROUP}>
@@ -398,7 +418,9 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
     /** Sends one change, and reads the tracker again once it lands. The reason it failed, or null. */
     const change = async (body: LabelChange) => {
         const failed = await useEditStore.getState().labels(repo, body);
+
         if (!failed) retry();
+
         return failed;
     };
 

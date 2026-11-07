@@ -72,6 +72,7 @@ export interface ValidationRecords {
     describeFailure(checkId: string, input: { tests: string[]; diagnosis: string }): CheckRun;
     resolveFailure(checkId: string, reason: string): CheckRun;
 }
+
 const invalid = (message: string): never => {
     throw new WorkRecordError('invalid', message);
 };
@@ -85,6 +86,7 @@ const tree = (value: unknown): string | null =>
         : typeof value === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)
           ? value
           : invalid('Expected a git tree object ID or null.');
+
 function entry(value: CheckEntry): CheckEntry {
     if (
         !Array.isArray(value?.command) ||
@@ -92,8 +94,11 @@ function entry(value: CheckEntry): CheckEntry {
         value.command.some((arg) => typeof arg !== 'string' || arg.includes('\0'))
     )
         invalid('A command must be a nonempty argument array without NUL.');
+
     filled(value.command[0]);
+
     const folder = filled(value.folder);
+
     if (
         folder !== '.' &&
         (folder.startsWith('/') ||
@@ -101,8 +106,10 @@ function entry(value: CheckEntry): CheckEntry {
             folder.split('/').some((part) => !part || part === '.' || part === '..'))
     )
         invalid('The folder must be a normalized repository-relative path.');
+
     return { command: [...value.command], folder };
 }
+
 const passed = (run: CheckRun): boolean => run.endedAt !== null && !run.interrupted && run.exitStatus === 0;
 const failed = (run: CheckRun): boolean =>
     run.endedAt !== null && !run.interrupted && run.exitStatus !== null && run.exitStatus !== 0;
@@ -112,21 +119,28 @@ export function validationRecords(database: Database, read: (id: string) => Work
     const { db } = database;
     const owner = (id: string): string => {
         let record = read(id);
+
         if (record.kind === 'slice') {
             if (!record.parentId) invalid('The slice has no build.');
+
             record = read(record.parentId!);
         }
+
         if (!['build', 'bug', 'feature', 'improvement', 'issue'].includes(record.kind))
             invalid('Validation records require buildable work.');
+
         return record.workId;
     };
     const get = (id: string): CheckRun => {
         const row = db.prepare('SELECT content FROM check_runs WHERE check_id=?').get(id);
+
         if (!row) throw new WorkRecordError('not-found', `Check ${id} does not exist.`);
+
         return JSON.parse(String(row.content)) as CheckRun;
     };
     const save = (run: CheckRun): CheckRun => {
         db.prepare('UPDATE check_runs SET content=? WHERE check_id=?').run(JSON.stringify(run), run.checkId);
+
         return run;
     };
     const insert = (
@@ -151,27 +165,35 @@ export function validationRecords(database: Database, read: (id: string) => Work
                 failure: null,
                 resolution: null,
             };
+
             if (typeof run.live !== 'boolean') invalid('live must be boolean.');
+
             db.prepare('INSERT INTO check_runs(check_id,work_id,content) VALUES (?,?,?)').run(
                 run.checkId,
                 run.workId,
                 JSON.stringify(run),
             );
+
             return run;
         });
+
     return {
         startCheck: (id, input) => insert(id, input, { tree: tree(input.tree), startedAt: new Date().toISOString() }),
         waitCheck: (id, input) => insert(id, input, { tree: null, startedAt: null }),
         beginCheck: (id, input) =>
             database.write(() => {
                 const run = get(id);
+
                 if (run.startedAt || run.endedAt) invalid('The check has already started.');
+
                 return save({ ...run, tree: tree(input.tree), startedAt: new Date().toISOString() });
             }),
         finishCheck: (id, input) =>
             database.write(() => {
                 const run = get(id);
+
                 if (run.endedAt) invalid('The check is already finished.');
+
                 if (
                     typeof input.interrupted !== 'boolean' ||
                     !(
@@ -180,9 +202,12 @@ export function validationRecords(database: Database, read: (id: string) => Work
                     )
                 )
                     invalid('Expected an exit status from 0 to 255, or null for interruption.');
+
                 const log = input.log === null ? null : filled(input.log);
+
                 if (log !== null && log !== `check-logs/${run.workId}/${id}.log`)
                     invalid('The log reference must name this check in check-logs.');
+
                 return save({
                     ...run,
                     endTree: tree(input.tree),
@@ -195,18 +220,24 @@ export function validationRecords(database: Database, read: (id: string) => Work
         setCheckList: (id, entries) =>
             database.write(() => {
                 const workId = owner(id);
+
                 if (!Array.isArray(entries)) invalid('The check list must be an array.');
+
                 const list = entries.map(entry);
+
                 if (new Set(list.map((item) => JSON.stringify(item))).size !== list.length)
                     invalid('The check list contains duplicates.');
+
                 db.prepare(
                     'INSERT INTO check_lists(work_id,content) VALUES (?,?) ON CONFLICT(work_id) DO UPDATE SET content=excluded.content',
                 ).run(workId, JSON.stringify(list));
+
                 return list;
             }),
         checks: (id, now = new Date()) =>
             database.read(() => {
                 if (!Number.isFinite(now.getTime())) invalid('Invalid time.');
+
                 const workId = owner(id);
                 const list = JSON.parse(
                     String(db.prepare('SELECT content FROM check_lists WHERE work_id=?').get(workId)?.content ?? '[]'),
@@ -234,6 +265,7 @@ export function validationRecords(database: Database, read: (id: string) => Work
                               : run.tree !== run.endTree
                                 ? ('changed' as const)
                                 : ('stable' as const);
+
                         return {
                             ...run,
                             outcome,
@@ -250,16 +282,21 @@ export function validationRecords(database: Database, read: (id: string) => Work
                     .prepare('SELECT content FROM check_reuses WHERE work_id=? ORDER BY rowid')
                     .all(workId)
                     .map((row) => JSON.parse(String(row.content)) as CheckReuse);
+
                 return { workId, list, runs, reuses };
             }),
         reuseCheck: (id, checkId, input) =>
             database.write(() => {
                 const workId = owner(id),
                     run = get(checkId);
+
                 if (run.workId !== workId || !eligible(run) || run.live)
                     invalid('Reuse requires an eligible non-live pass belonging to this build.');
+
                 const target = tree(input.tree);
+
                 if (!target) invalid('Reuse requires a target tree.');
+
                 const reuse: CheckReuse = {
                     checkId,
                     role: filled(input.role),
@@ -267,18 +304,23 @@ export function validationRecords(database: Database, read: (id: string) => Work
                     tree: target!,
                     recordedAt: new Date().toISOString(),
                 };
+
                 db.prepare('INSERT INTO check_reuses(work_id,check_id,content) VALUES (?,?,?)').run(
                     workId,
                     checkId,
                     JSON.stringify(reuse),
                 );
+
                 return reuse;
             }),
         describeFailure: (id, input) =>
             database.write(() => {
                 const run = get(id);
+
                 if (!failed(run)) invalid('Only a failed check can have a failure description.');
+
                 if (!Array.isArray(input?.tests) || !input.tests.length) invalid('Name at least one failing test.');
+
                 return save({
                     ...run,
                     failure: { tests: input.tests.map(filled), diagnosis: filled(input.diagnosis) },
@@ -287,7 +329,9 @@ export function validationRecords(database: Database, read: (id: string) => Work
         resolveFailure: (id, reason) =>
             database.write(() => {
                 const run = get(id);
+
                 if (!failed(run)) invalid('Only a failed check can be resolved.');
+
                 return save({ ...run, resolution: filled(reason) });
             }),
     };

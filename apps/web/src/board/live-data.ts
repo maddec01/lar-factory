@@ -16,11 +16,13 @@ export function startLiveData(): void {
 
     const receive = (text: string) => {
         const data = JSON.parse(text) as BoardData;
+
         board.receive(data);
     };
 
     function schedule(): void {
         clearTimeout(timer);
+
         // A silent stream sends no new data; the clock still moves on, so stale data shows as stale.
         if (streaming)
             timer = setTimeout(() => {
@@ -35,10 +37,14 @@ export function startLiveData(): void {
         const writes = useBoardStore.getState().writes;
         // A write this page made meanwhile brought newer data than this poll's.
         const fresh = () => current === sequence && writes === useBoardStore.getState().writes;
+
         try {
             const res = await fetch('/api/board', { cache: 'no-store', signal: AbortSignal.timeout(5_000) });
+
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
             const text = await res.text();
+
             if (fresh()) receive(text);
         } catch (err) {
             if (fresh()) board.fail(err instanceof Error ? err.message : String(err));
@@ -50,6 +56,7 @@ export function startLiveData(): void {
     /** The browser reconnects a dropped stream by itself, but not a refused one. */
     function openStream(): void {
         const source = new EventSource('/api/events');
+
         source.onopen = () => {
             streaming = true;
             schedule();
@@ -66,6 +73,7 @@ export function startLiveData(): void {
                 streaming = false;
                 schedule();
             }
+
             if (source.readyState === EventSource.CLOSED) setTimeout(openStream, POLL_MS);
         };
     }

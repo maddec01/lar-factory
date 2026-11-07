@@ -68,6 +68,7 @@ export const url = (): string => {
 <p class="loading-line" id="step"><span class="loading-line-slot" id="slot"><span>${STEPS.shell}</span></span></p>
 <p class="loading-line loading-error" id="error" hidden></p>
 </main><script>${script}</script></body></html>`;
+
     return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 };
 
@@ -92,6 +93,8 @@ export const drawWait = (shownAt: number | undefined, now: number): number =>
 /** The board's page, told by the flag that this page drew the mark already, so it opens on the finished mark. */
 export const boardUrl = (board: URL): string => {
     const url = new URL(board);
+
     url.searchParams.set('loading', 'drawn');
+
     return url.href;
 };

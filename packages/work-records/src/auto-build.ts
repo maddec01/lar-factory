@@ -17,10 +17,14 @@ const autoBuildSetting = machineSetting<AutoBuild>({
     needs: 'needs "on" as true or false, and a model choice or none',
     parse(json) {
         if (!isRecord(json) || typeof json.on !== 'boolean') return null;
+
         if (json.model === undefined) return { on: json.on };
+
         const model = modelChoice(json.model);
+
         return model && { on: json.on, model };
     },
 });
+
 export const readAutoBuild = autoBuildSetting.read;
 export const writeAutoBuild = autoBuildSetting.write;

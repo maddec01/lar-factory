@@ -9,22 +9,27 @@ import { $, $$, NOW, mountPage, sample, settle, stubApp, text, toolChecks, updat
 
 // Counts the board work that doesn't depend on the query, which a keystroke must not repeat.
 const calls = vi.hoisted(() => ({ stageRows: 0, pages: 0 }));
+
 vi.mock('../line/stage-rows.ts', async (actual) => {
     const real = await actual<typeof import('../line/stage-rows.ts')>();
+
     return {
         ...real,
         stageRows: (...args: Parameters<typeof real.stageRows>) => {
             calls.stageRows++;
+
             return real.stageRows(...args);
         },
     };
 });
 vi.mock('../settings/settings-pages.tsx', async (actual) => {
     const real = await actual<typeof import('../settings/settings-pages.tsx')>();
+
     return {
         ...real,
         pages: (...args: Parameters<typeof real.pages>) => {
             calls.pages++;
+
             return real.pages(...args);
         },
     };
@@ -75,6 +80,7 @@ function layOut(room: number, width: number, bar = 1280) {
     });
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(width);
 }
+
 const pills = () => [...field().querySelectorAll('[title]')].map((pill) => text(pill));
 const count = () => text(field().querySelector('[data-search-count]'));
 
@@ -183,6 +189,7 @@ const OTHER_DIALOGS: [string, () => Promise<void>][] = [
         'the item dialog',
         async () => {
             const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+
             await settle(() => useItemDialogStore.getState().open('I_sample01'));
         },
     ],
@@ -190,6 +197,7 @@ const OTHER_DIALOGS: [string, () => Promise<void>][] = [
         'the wizard',
         async () => {
             const { useWizardStore } = await import('../onboarding/wizard-store.ts');
+
             await settle(() => useWizardStore.getState().start());
         },
     ],
@@ -209,6 +217,7 @@ const OTHER_DIALOGS: [string, () => Promise<void>][] = [
                 access: {},
                 sources: {},
             } as unknown as RepositorySetup;
+
             await settle(() =>
                 useBoardStore
                     .getState()
@@ -224,6 +233,7 @@ const OTHER_DIALOGS: [string, () => Promise<void>][] = [
         'Abandon',
         async () => {
             const { useAbandonStore } = await import('../items/abandon-store.ts');
+
             await settle(() => useAbandonStore.getState().ask(base));
         },
     ],
@@ -335,7 +345,9 @@ test('Clear and Backspace leave a saved Scope that is off the board, which retur
     expect(removes()).toEqual([]);
     expect(saved()).toEqual({ kinds: [], labels: [] });
     expect(localStorage.getItem(SCOPE_KEY)).toBe('maddec01/lar-gone');
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     await settle(() =>
         useBoardStore
             .getState()
@@ -403,6 +415,7 @@ test('whatever the filters hide, the labels stay on offer', async () => {
 
 test('Azure repositories head their labels Tags', async () => {
     const repos = [{ repo: AZURE, role: 'API', items: 'azure-board' as const, team: 'Team', labels: [] }];
+
     await mountPage({ ...sample, repos, items: [item('Q1', { number: 1, repo: AZURE, labels: ['docs'] })] });
     await openDialog();
     expect(groups().at(-1)).toEqual(['Tags', ['docs']]);
@@ -428,7 +441,9 @@ test('a saved Scope missing from the board shows no token, and returns with its 
     expect(removes()).toEqual([]);
     expect($('[data-search-clear]')).toBeNull();
     expect(option('All Projects').getAttribute('aria-checked')).toBe('true');
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     await settle(() =>
         useBoardStore
             .getState()
@@ -473,7 +488,9 @@ test.each([
 
 test('each action does what it says', async () => {
     await mountPage();
+
     const { addItem, settings, list } = await stores();
+
     await openDialog();
     await choose('List');
     expect(list().open).toBe(true);
@@ -495,7 +512,9 @@ test('each action does what it says', async () => {
 
 test('choosing a Settings section or a single setting opens Settings on the section that holds it', async () => {
     await mountPage();
+
     const { settings } = await stores();
+
     await openDialog();
     await type('diagnostics');
     await choose('Diagnostics');
@@ -513,6 +532,7 @@ const UPDATE = { ...updatesOff, enabled: true, status: 'available', availableVer
 
 test('Update is offered only while it has a step to run, and runs the step the pill does', async () => {
     const downloadUpdate = vi.fn(async () => ({ accepted: true, completed: false, state: UPDATE }));
+
     stubApp({ getUpdateState: async () => UPDATE, onUpdateState: () => () => {}, downloadUpdate });
     await mountPage();
     await openDialog();
@@ -520,7 +540,9 @@ test('Update is offered only while it has a step to run, and runs the step the p
     await choose('Download the update');
     expect(dialog()).toBeNull();
     expect(downloadUpdate).toHaveBeenCalledOnce();
+
     const { useUpdateStore } = await import('../updates/update-store.ts');
+
     await settle(() => useUpdateStore.setState({ state: { ...UPDATE, status: 'downloading' } }));
     await openDialog();
     expect(groups()[0]).toEqual(['Actions', ['Add item', 'List', 'Settings']]);
@@ -534,7 +556,9 @@ const tickets = () => groups().find(([label]) => label === 'Tickets')?.[1];
 
 test('choosing a ticket closes the dialog and opens its item dialog, which returns the focus to the field', async () => {
     await mountPage(WIDE);
+
     const { itemDialog } = await stores();
+
     await openDialog();
     await type('#2');
     await choose('Match hidden');
@@ -599,6 +623,7 @@ test('Clear filters is offered once typing and while a filter is on; it clears t
 
 test("a Done ticket older than the board's 7-day window is not listed", async () => {
     const closed = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
+
     await mountPage(
         withItems([
             item('D1', { number: 1, title: 'Shipped long ago', status: 'Done', closedAt: closed(8) }),
@@ -613,7 +638,9 @@ test("a Done ticket older than the board's 7-day window is not listed", async ()
 test('while the first read is unfinished the dialog shows the loading cue, not that nothing matches', async () => {
     await mountPage({ ...sample, items: [], firstRead: { step: 'items', running: [], settled: false } });
     await openDialog();
+
     const status = () => text($('[data-search-dialog] [role="status"]'));
+
     expect(status(), 'no tickets are on offer before typing').toBe('');
     await type('zzz');
     expect(groups()).toEqual([]);

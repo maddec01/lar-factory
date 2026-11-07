@@ -62,16 +62,20 @@ export function createBoardState(initial: BoardData): BoardState {
             applied++;
             for (const [id, recent] of recentItems) {
                 if (since < recent.revision || !afresh(recent.item)) continue;
+
                 // Give GitHub three reads of the item's source to expose the change, then trust what it reports.
                 const reported = items.some(
                     (i) => i.id === id && i.status === recent.item.status && sameStatuses(i, recent.item),
                 );
+
                 if (reported || ++recent.unconfirmedReads >= 3) recentItems.delete(id);
             }
             for (const [id, removed] of abandoned) {
                 if (!removed.item || removed.item.number === null || since < removed.revision || !afresh(removed.item))
                     continue;
+
                 const reported = items.find((i) => i.id === id);
+
                 if (reported?.state === 'open' && reported.updatedAt > removed.item.updatedAt) abandoned.delete(id);
             }
             state.items = enrich([
@@ -81,6 +85,7 @@ export function createBoardState(initial: BoardData): BoardState {
         },
         showChanged(item) {
             if (abandoned.has(item.id)) return;
+
             applied++;
             recentItems.set(item.id, { item, revision: ++revision, unconfirmedReads: 0 });
             state.items = [...state.items.filter((i) => i.id !== item.id), item];
@@ -99,6 +104,7 @@ export function createBoardState(initial: BoardData): BoardState {
         push,
         subscribe(send) {
             pages.add(send);
+
             return () => pages.delete(send);
         },
     };

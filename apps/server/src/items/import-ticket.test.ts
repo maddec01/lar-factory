@@ -20,6 +20,7 @@ test('structure recovery extracts each marked ticket Original and restores no br
     const dir = mkdtempSync(join(tmpdir(), 'import-structure-'));
     const source = await openWorkRecords(join(dir, 'source.db'));
     const restored = await openWorkRecords(join(dir, 'restored.db'));
+
     try {
         const repository = 'example/product';
         const setups = [
@@ -37,7 +38,9 @@ test('structure recovery extracts each marked ticket Original and restores no br
         ] as RepositorySetup[];
         const root = source.create({ repository, kind: 'concept', title: 'Concept', ticket: `${repository}#1` });
         const child = source.create({ repository, kind: 'build', title: 'Build', ticket: `${repository}#2` });
+
         source.setParent(child.workId, child.revision, root.workId);
+
         const tickets = new Map<number, tracker.StructureTicket>(
             [1, 2].map((number) => [
                 number,
@@ -58,7 +61,9 @@ test('structure recovery extracts each marked ticket Original and restores no br
             },
             comment: async (_ticket, body) => {
                 const id = String(comments.size + 1);
+
                 comments.set(id, body);
+
                 return id;
             },
             readComment: async (_ticket, id) => comments.get(id)!,
@@ -67,13 +72,16 @@ test('structure recovery extracts each marked ticket Original and restores no br
         const digest = (value: string) => createHash('sha256').update(value).digest('hex');
         const data = gzipSync(payload).toString('base64');
         const generation = '11111111-1111-1111-1111-111111111111';
+
         comments.set(
             '1',
             `<!-- lar-factory:chunk ${generation} 0
 ${data}
 -->`,
         );
+
         const legacy = tickets.get(1)!;
+
         legacy.body = writeTrackerStructure(legacy.body, {
             version: 1,
             kind: 'concept',
@@ -87,8 +95,10 @@ ${data}
                 chunks: [{ id: '1', digest: digest(data) }],
             },
         });
+
         const ticket = tickets.get(1)!;
         const metadata = readTrackerStructure(ticket.body)!;
+
         expect(metadata.snapshot).toBeDefined();
         vi.spyOn(tracker, 'structureProvider').mockReturnValue(provider);
         vi.spyOn(settings, 'readRepositorySetups').mockReturnValue(setups);
@@ -104,6 +114,7 @@ ${data}
         });
         for (const number of [1, 2]) {
             const record = restored.list({}).find((record) => record.ticket === `${repository}#${number}`)!;
+
             expect(restored.initialContext(record.workId)).toBe(`Original ${number}`);
             expect(restored.body(record.workId, 'brief')).toBeNull();
         }

@@ -9,14 +9,19 @@ const dirs: string[] = [];
 const opened: WorkRecords[] = [];
 const tempDir = () => {
     const dir = mkdtempSync(join(tmpdir(), 'work-records-dependencies-'));
+
     dirs.push(dir);
+
     return dir;
 };
 const open = async (path = join(tempDir(), 'work-records.db')) => {
     const records = await openWorkRecords(path);
+
     opened.push(records);
+
     return records;
 };
+
 afterEach(() => {
     for (const records of opened.splice(0)) records.close();
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -37,15 +42,19 @@ const NEED = {
 async function blockedBuild() {
     const records = await open();
     const [concept, build] = [lar(records, 'concept'), lar(records, 'build')];
+
     records.setParent(build.workId, 1, concept.workId);
+
     const added = records.addDependency(concept.workId, NEED);
     const dependency = records.addDependencyBlock(added.dependencyId, added.revision, build.workId);
+
     return { records, concept, build, dependency };
 }
 
 describe('Dependencies', () => {
     it('finishes concept refinement without meeting an external Dependency or releasing its build', async () => {
         const { records, concept, build, dependency } = await blockedBuild();
+
         records.setBody(
             concept.workId,
             at(records, concept.workId),
@@ -71,6 +80,7 @@ describe('Dependencies', () => {
             contract: 'Returns a session token.',
             evidence: 'The PR merges.',
         });
+
         expect(added).toMatchObject({
             workId: concept.workId,
             need: NEED.need,
@@ -89,7 +99,9 @@ describe('Dependencies', () => {
         });
         expect(records.read(concept.workId).revision).toBe(2);
         records.close();
+
         const reopened = await open(path);
+
         expect(reopened.dependency(added.dependencyId)).toEqual(added);
         expect(reopened.dependencies(concept.workId)).toEqual([added]);
     });
@@ -102,6 +114,7 @@ describe('Dependencies', () => {
             ticket: null,
             pullRequests: [],
         });
+
         expect(updated).toMatchObject({
             contract: 'Returns a token.',
             ticket: null,
@@ -121,8 +134,11 @@ describe('Dependencies', () => {
     it('blocks only builds in its own work tree, and refuses unknown IDs', async () => {
         const { records, concept, build, dependency } = await blockedBuild();
         const [slice, outside, sibling] = [lar(records, 'slice'), lar(records, 'build'), lar(records, 'build')];
+
         records.setParent(sibling.workId, 1, concept.workId);
+
         const id = dependency.dependencyId;
+
         expect(() => records.addDependencyBlock(id, 2, slice.workId)).toThrow('blocks only builds');
         expect(() => records.addDependencyBlock(id, 2, outside.workId)).toThrow('same work tree');
         expect(() => records.addDependencyBlock(id, 2, 'missing')).toThrow(
@@ -133,7 +149,9 @@ describe('Dependencies', () => {
         );
         expect(() => records.addDependency('missing', NEED)).toThrow(expect.objectContaining({ code: 'not-found' }));
         expect(records.addDependencyBlock(id, 2, sibling.workId).blocks).toEqual([build.workId, sibling.workId]);
+
         const own = records.addDependency(outside.workId, NEED);
+
         records.addDependencyBlock(own.dependencyId, 1, outside.workId);
         expect(() => records.update(outside.workId, at(records, outside.workId), { kind: 'feature' })).toThrow(
             'blocked by the Dependency',
@@ -147,6 +165,7 @@ describe('Dependencies', () => {
         const { records, build, dependency } = await blockedBuild();
         const id = dependency.dependencyId;
         const waiting = [{ dependencyId: id, reasons: ["It isn't marked met."] }];
+
         expect(records.waitingOn(build.workId)).toEqual(waiting);
         expect(records.observeDependency(id, 2, { subject: 'acme/auth#5', kind: 'closed' }).met).toBeNull();
         expect(records.observeDependency(id, 3, { subject: 'acme/auth#9', kind: 'merged' }).met).toBeNull();
@@ -159,6 +178,7 @@ describe('Dependencies', () => {
         });
 
         const met = records.markDependencyMet(id, 4, 'pedro');
+
         expect(met).toMatchObject({ met: { by: 'pedro', at: expect.any(String) }, needsReview: false, revision: 5 });
         expect(records.waitingOn(build.workId)).toEqual([]);
         expect(records.completion(build.workId).complete).toBe(true);
@@ -169,10 +189,13 @@ describe('Dependencies', () => {
     it('keeps a met Dependency met when an observation changes, and flags it for review', async () => {
         const { records, build, dependency } = await blockedBuild();
         const id = dependency.dependencyId;
+
         records.observeDependency(id, 2, { subject: 'acme/auth#9', kind: 'merged' });
         records.markDependencyMet(id, 3, 'pedro');
         expect(records.observeDependency(id, 4, { subject: 'acme/auth#9', kind: 'merged' }).needsReview).toBe(false);
+
         const changed = records.observeDependency(id, 5, { subject: 'acme/auth#9', kind: 'reopened' });
+
         expect(changed).toMatchObject({ met: { by: 'pedro' }, needsReview: true });
         expect(changed.observations).toEqual([
             { subject: 'acme/auth#9', kind: 'reopened', detail: null, observedAt: expect.any(String), lastGood: null },
@@ -184,6 +207,7 @@ describe('Dependencies', () => {
     it('leaves a met Dependency unflagged by the first read of a subject, even after a read that failed', async () => {
         const { records, dependency } = await blockedBuild();
         const id = dependency.dependencyId;
+
         records.markDependencyMet(id, 2, 'pedro');
         expect(records.observeDependency(id, 3, { subject: 'acme/auth#5', kind: 'closed' }).needsReview).toBe(false);
         records.observeDependency(id, 4, { subject: 'acme/auth#9', kind: 'read-failed', detail: 'HTTP 502' });
@@ -193,12 +217,15 @@ describe('Dependencies', () => {
     it('keeps the Dependency and its handover through a failed read or lost access, and keeps each kind distinct', async () => {
         const { records, dependency } = await blockedBuild();
         const id = dependency.dependencyId;
+
         records.observeDependency(id, 2, { subject: 'acme/auth#5', kind: 'access-lost', detail: 'HTTP 404' });
+
         const failed = records.observeDependency(id, 3, {
             subject: 'acme/auth#9',
             kind: 'read-failed',
             detail: 'gh timed out',
         });
+
         expect(failed).toMatchObject({ handover: NEED.handover, blocks: dependency.blocks, met: null });
         expect(failed.observations.map(({ subject, kind, detail }) => ({ subject, kind, detail }))).toEqual([
             { subject: 'acme/auth#5', kind: 'access-lost', detail: 'HTTP 404' },
@@ -219,7 +246,9 @@ describe('Dependencies', () => {
         const { records, dependency } = await blockedBuild();
         const id = dependency.dependencyId;
         const merged = records.observeDependency(id, 2, { subject: 'acme/auth#9', kind: 'merged' }).observations[0]!;
+
         records.markDependencyMet(id, 3, 'pedro');
+
         const lastGood = { kind: 'merged', observedAt: merged.observedAt };
 
         const outage = records.observeDependency(id, 4, {
@@ -227,6 +256,7 @@ describe('Dependencies', () => {
             kind: 'read-failed',
             detail: 'HTTP 502',
         });
+
         expect(outage).toMatchObject({ met: { by: 'pedro' }, needsReview: false });
         expect(outage.observations).toEqual([
             {
@@ -241,7 +271,9 @@ describe('Dependencies', () => {
             records.observeDependency(id, 5, { subject: 'acme/auth#9', kind: 'read-failed', detail: 'HTTP 503' })
                 .observations[0]!.lastGood,
         ).toEqual(lastGood);
+
         const back = records.observeDependency(id, 6, { subject: 'acme/auth#9', kind: 'merged' });
+
         expect(back).toMatchObject({ met: { by: 'pedro' }, needsReview: false });
         expect(back.observations[0]!.lastGood).toBeNull();
 
@@ -250,6 +282,7 @@ describe('Dependencies', () => {
             kind: 'access-lost',
             detail: 'HTTP 403',
         });
+
         expect(lost).toMatchObject({ met: { by: 'pedro' }, needsReview: true });
         expect(lost.observations[0]!.lastGood).toMatchObject({ kind: 'merged' });
     });
@@ -257,12 +290,16 @@ describe('Dependencies', () => {
     it('swaps its blocker references on every dependent build for a named build in one transaction', async () => {
         const { records, concept, build, dependency } = await blockedBuild();
         const [second, replacement] = [lar(records, 'build'), lar(records, 'build')];
+
         records.setParent(second.workId, 1, concept.workId);
+
         const id = dependency.dependencyId;
+
         records.addDependencyBlock(id, 2, second.workId);
         records.markDependencyMet(id, 3, 'pedro');
 
         const replaced = records.replaceDependencyWithBuild(id, 4, replacement.workId);
+
         expect(replaced).toMatchObject({
             blocks: [],
             replacedBy: replacement.workId,
@@ -280,10 +317,14 @@ describe('Dependencies', () => {
     it('rolls the whole replacement back when one dependent would close a cycle', async () => {
         const { records, concept, build, dependency } = await blockedBuild();
         const [second, replacement] = [lar(records, 'build'), lar(records, 'build')];
+
         records.setParent(second.workId, 1, concept.workId);
+
         const id = dependency.dependencyId;
+
         records.addDependencyBlock(id, 2, second.workId);
         records.addBlocker(replacement.workId, 1, second.workId);
+
         const before = {
             dependency: records.dependency(id),
             build: records.read(build.workId),
@@ -300,9 +341,12 @@ describe('Dependencies', () => {
 
     it('survives retention while unmet: a due record holding or blocked by an unmet Dependency is kept', async () => {
         const { records, concept, build, dependency } = await blockedBuild();
+
         records.setAside(build.workId, at(records, build.workId));
         records.setAside(concept.workId, at(records, concept.workId));
+
         const later = new Date(Date.now() + 31 * 86_400_000);
+
         expect(records.deleteExpired({ hideAfterDays: 7, deleteAfterDays: 30 }, later)).toEqual({
             deleted: [],
             kept: [
@@ -319,11 +363,14 @@ describe('Dependencies', () => {
     it('deletes a met Dependency with its holder, its blocks and its reads', async () => {
         const { records, concept, build, dependency } = await blockedBuild();
         const id = dependency.dependencyId;
+
         records.observeDependency(id, 2, { subject: 'acme/auth#9', kind: 'merged' });
         records.markDependencyMet(id, 3, 'pedro');
         records.setAside(build.workId, at(records, build.workId));
         records.setAside(concept.workId, at(records, concept.workId));
+
         const later = new Date(Date.now() + 31 * 86_400_000);
+
         expect(records.deleteExpired({ hideAfterDays: 7, deleteAfterDays: 30 }, later)).toEqual({
             deleted: [concept.workId, build.workId],
             kept: [],
@@ -335,13 +382,16 @@ describe('Dependencies', () => {
         const { records, concept, build, dependency } = await blockedBuild();
         const id = dependency.dependencyId;
         const sibling = lar(records, 'build');
+
         records.setParent(sibling.workId, 1, concept.workId);
         records.addDependencyBlock(id, 2, sibling.workId);
         records.markDependencyMet(id, 3, 'pedro');
         records.setAside(concept.workId, at(records, concept.workId));
         records.setAside(sibling.workId, at(records, sibling.workId));
+
         const before = at(records, concept.workId);
         const later = new Date(Date.now() + 31 * 86_400_000);
+
         expect(records.deleteExpired({ hideAfterDays: 7, deleteAfterDays: 30 }, later)).toEqual({
             deleted: [sibling.workId],
             kept: [

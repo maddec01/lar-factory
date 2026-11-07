@@ -41,7 +41,9 @@ import { detectedOf, unpickable, useWizardStore, type Run } from './wizard-store
 function ProjectStep({ run }: { run: Run }) {
     const { projects, creating, pick, chooseNew, loadProjects, setFolder, createProject } = useWizardStore();
     const onboarding = useBoardStore((s) => s.data.onboarding);
+
     if (projects.state === 'loading') return <Pending>Loading Projects…</Pending>;
+
     if (projects.state === 'failed')
         return (
             <Alert
@@ -56,9 +58,11 @@ function ProjectStep({ run }: { run: Run }) {
                 {projects.error}
             </Alert>
         );
+
     const rows = projects.projects.map((project) => ({ project, reason: unpickable(project, run, { onboarding }) }));
     const added = rows.filter(({ project, reason }) => reason && project.onBoard);
     const blocked = rows.filter(({ project, reason }) => reason && !project.onBoard);
+
     return (
         <>
             <div className={FIELD_GROUP}>
@@ -211,6 +215,7 @@ function Pending({ children }: { children: React.ReactNode }) {
 
 function DetectionPending() {
     const { detection, detect } = useWizardStore();
+
     return detection?.state === 'failed' ? (
         <Alert
             tone="danger"
@@ -245,6 +250,7 @@ function WorkStep({ run, detection }: { run: Run; detection: SetupDetection }) {
     const recheck = () => {
         void detect();
     };
+
     return (
         <div data-work-step className="grid min-w-0 gap-5">
             <div className={FIELD_GROUP}>
@@ -369,6 +375,7 @@ function AccessStep({ detection }: { run: Run; detection: SetupDetection }) {
     );
     const buildsShort = rows.slice(-2).some((row) => row.access !== 'allowed');
     const unverified = rows.some((row) => row.access === 'unverified');
+
     return (
         <div data-access-step className="grid min-w-0 gap-3">
             <AccessList rows={rows} onRecheck={() => void detect()} />
@@ -413,12 +420,14 @@ function AccessStep({ detection }: { run: Run; detection: SetupDetection }) {
 export function StepBody({ run }: { run: Run }) {
     const { detection: read, finish } = useWizardStore();
     const detection = detectedOf(read);
+
     if (finish.state === 'done')
         return (
             <Alert data-done tone="success" title={`${shownRepo(run.repo!)} is ready`}>
                 Open its list to queue an issue for shaping.
             </Alert>
         );
+
     return (
         <div className="grid gap-4">
             {finish.state === 'failed' && (

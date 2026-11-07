@@ -13,19 +13,27 @@ import { useOnRow } from './row-actions.tsx';
 /** A child question may belong to its nearest concept's thread before it has a thread of its own. */
 function conceptQuestionThread(item: Item, data: BoardData): ItemThread | undefined {
     if (item.status !== 'Needs you') return undefined;
+
     const byId = new Map(data.items.map((candidate) => [candidate.id, candidate]));
     const seen = new Set([item.id]);
     let parentId = item.parentId;
+
     while (parentId && !seen.has(parentId)) {
         seen.add(parentId);
+
         const parent = byId.get(parentId);
+
         if (!parent) return undefined;
+
         if (parent.kind === 'concept') {
             if (!Array.isArray(parent.threads) || parent.threads.some((thread) => thread.observedAt)) return undefined;
+
             return parent.threads.find((thread) => thread.state === 'needs you' || thread.state === 'running');
         }
+
         parentId = parent.parentId;
     }
+
     return undefined;
 }
 
@@ -36,12 +44,17 @@ function latestThread(
     threadId?: string,
 ): { link: string; conceptQuestion: boolean } | { reason: string } {
     if (item.threads === 'unavailable') return { reason: 'The T3 Code database could not be read' };
+
     const own = threadId ? item.threads?.find((thread) => thread.id === threadId) : item.threads?.[0];
     const inherited = !threadId && !item.threads?.length ? conceptQuestionThread(item, data) : undefined;
     const latest = own ?? inherited;
+
     if (!latest) return { reason: 'No T3 thread has worked on this yet' };
+
     if (latest.archived) return { reason: 'This thread is archived in T3 Code' };
+
     if (!data.t3EnvironmentId) return { reason: "T3 Code hasn't written its environment id" };
+
     return { link: threadLink(data.t3EnvironmentId, latest.id), conceptQuestion: !own && Boolean(inherited) };
 }
 
@@ -100,7 +113,9 @@ export function OpenThread({
                 {shown}
             </Button>
         );
+
     if (!tooltip) return button;
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
@@ -125,7 +140,9 @@ export function EarlierThreads({ item, data }: { item: Item; data: BoardData }) 
                               !(needsAnswer(item) && thread.id === openQuestionThread(item)?.id)))),
           )
         : [];
+
     if (!earlier.length) return null;
+
     return (
         <ul className="m-0 grid list-none gap-1 p-0 text-xs text-(--muted-foreground)" data-earlier-threads>
             {earlier.map((thread) => (

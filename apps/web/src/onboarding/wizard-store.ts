@@ -74,10 +74,12 @@ export function unpickable(
             ? 'Setup is already in progress. Close this window and choose Resume.'
             : 'This Project is already on the board.';
     }
+
     if (!project.repo)
         return project.blocked === 'linked-worktree'
             ? 'This folder is a git worktree. Add its main checkout instead.'
             : 'This folder has no GitHub or Azure DevOps origin.';
+
     return null;
 }
 
@@ -96,30 +98,40 @@ export const runSteps = (run: Run, detection: Read<SetupDetection> | null): Step
 /** Whether the current step has everything needed to continue. */
 export function stepReady(run: Run, projects: Projects, detection: Read<SetupDetection> | null): boolean {
     if (!pickedProject(run, projects)) return false;
+
     if (run.step === 'project') return true;
+
     const detected = detectedOf(detection);
+
     if (!detected || !('found' in detected.checkout)) return false;
+
     if (run.step === 'access') return true;
+
     const answers = answersOf(detected, run.choices);
     const options = detected.azureReadOnly === undefined ? {} : { azureReadOnly: detected.azureReadOnly };
     const terms = Object.values(run.choices.vocabulary ?? {});
     const typed = Object.values(run.choices.newLabels ?? {}).flat();
+
     if (
         terms.some((term) => term.type !== null) &&
         writeAccessProblem(detected.repo, 'type-ticket', detected.access, options)
     )
         return false;
+
     if (
         (terms.some((term) => term.labels.length) || typed.length) &&
         writeAccessProblem(detected.repo, 'tag-ticket', detected.access, options)
     )
         return false;
+
     if (
         typed.length &&
         (newLabelProblem(detected.repo, detected.access, options) ?? typedLabelsProblem(detected.repo, typed))
     )
         return false;
+
     if (answerProblem(run.step, answers) || !answers.itemSource) return false;
+
     return true;
 }
 
@@ -181,6 +193,7 @@ const resumed = (repo: string, progress: OnboardingProgress): Run => ({
 /** Where the run stopped, as the board keeps it, with the steps before it as done. */
 function progressOf(run: Run & { projectId: string }, detection: Read<SetupDetection> | null): OnboardingProgress {
     const steps = runSteps(run, detection);
+
     return {
         step: run.step,
         done: steps.slice(0, Math.max(0, steps.indexOf(run.step))),
@@ -206,7 +219,9 @@ async function keep(
         progress: progressOf(run, detection),
         ...replacing(run),
     });
+
     receive(result);
+
     if (result.error)
         showToast({
             slot: 'onboarding',
@@ -227,15 +242,20 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     /** Reads what a step shows when the run reaches it, unless it has it already. */
     const enter = (step: StepId) => {
         const { detection } = get();
+
         if (step !== 'project' && !detection) void get().detect();
     };
 
     const move = (by: 1 | -1) => {
         const { run, detection } = get();
+
         if (!run) return;
+
         const steps = runSteps(run, detection);
         const to = steps[steps.indexOf(run.step) + by];
+
         if (!to) return;
+
         set({ run: { ...run, step: to } });
         enter(to);
     };
@@ -248,6 +268,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
         opener: null,
         start: () => {
             forget();
+
             const run: Run = {
                 step: 'project',
                 projectId: null,
@@ -256,54 +277,72 @@ export const useWizardStore = create<WizardState>()((set, get) => {
                 savedAs: null,
                 choices: {},
             };
+
             set({ run, creating: null, ...FRESH, opener: focused() });
             void get().loadProjects();
         },
         resume: (repo) => {
             const kept = useBoardStore.getState().data.onboarding?.find((o) => sameRepo(o.repo, repo));
+
             if (!kept) return;
+
             forget();
+
             const run = resumed(kept.repo, kept.progress);
+
             set({ run, creating: null, ...FRESH, opener: focused() });
             void get().loadProjects();
+
             if (run.step !== 'project')
                 void get()
                     .detect()
                     .then(() => {
                         const now = get().run;
+
                         if (now) enter(now.step);
                     });
         },
         close: () => {
             const { run, detection, finish } = get();
+
             reads++;
             forget();
             set({ run: null, ...FRESH });
+
             // A run Finish saved is on the board, so there's no onboarding left to keep.
             if (run?.projectId && run.repo && finish.state !== 'done')
                 keep({ ...run, projectId: run.projectId, repo: run.repo }, detection);
         },
         loadProjects: async () => {
             const read = ++reads;
+
             set({ projects: { state: 'loading' } });
+
             let projects: Projects;
+
             try {
                 const response = await fetch('/api/onboarding/projects', { cache: 'no-store' });
                 const body = (await response.json()) as { projects?: ProjectChoice[]; error?: string };
+
                 projects = body.projects
                     ? { state: 'loaded', projects: body.projects }
                     : { state: 'failed', error: body.error ?? `The board answered ${response.status}.` };
             } catch {
                 projects = { state: 'failed', error: "Can't reach the board." };
             }
+
             if (read === reads) set({ projects });
         },
         pick: (projectId) => {
             const { run, projects } = get();
             const project = projects.state === 'loaded' ? projects.projects.find((p) => p.id === projectId) : undefined;
+
             if (!run || !project || unpickable(project, run)) return;
+
             const same = run.projectId === projectId;
+
             if (!same) forget();
+
             set({
                 run: {
                     ...run,
@@ -318,7 +357,9 @@ export const useWizardStore = create<WizardState>()((set, get) => {
         },
         chooseNew: () => {
             const { run, creating } = get();
+
             if (!run) return;
+
             forget();
             set({
                 run: { ...run, projectId: null, repo: null, provider: null, choices: {} },
@@ -328,27 +369,36 @@ export const useWizardStore = create<WizardState>()((set, get) => {
         },
         setFolder: (folder) => {
             const { creating } = get();
+
             if (creating) set({ creating: { ...creating, folder } });
         },
         createProject: async () => {
             const { creating } = get();
+
             if (!creating || creating.adding) return;
+
             set({ creating: { ...creating, adding: true, error: null } });
+
             const result = await postAction<{ projects: ProjectChoice[]; projectId: string }>(
                 '/api/onboarding/projects',
                 { folder: creating.folder },
             );
             const { run, creating: now } = get();
+
             // The run closed, or the step chose a listed project, while t3 ran.
             if (!run || !now) return;
+
             if (result.error || !result.projects || !result.projectId)
                 return set({
                     creating: { ...now, adding: false, error: result.error ?? 'The board sent no project.' },
                 });
+
             reads++;
             set({ projects: { state: 'loaded', projects: result.projects } });
+
             const added = result.projects.find((p) => p.id === result.projectId);
             const reason = added ? unpickable(added, run) : "T3 Code doesn't list it.";
+
             if (reason)
                 return set({
                     creating: {
@@ -357,18 +407,25 @@ export const useWizardStore = create<WizardState>()((set, get) => {
                         error: `T3 Code added the project, but it can't be picked: ${reason}`,
                     },
                 });
+
             get().pick(result.projectId);
         },
         detect: async () => {
             const { run } = get();
+
             if (!run?.repo || !run.projectId) return;
+
             const read = ++detections;
+
             set({ detection: { state: 'reading' } });
+
             const answer = await postAction<{ detection: SetupDetection }>('/api/onboarding/detect', {
                 repo: run.repo,
                 projectId: run.projectId,
             });
+
             if (read !== detections || !get().run) return;
+
             set({
                 detection: answer.detection
                     ? { state: 'read', value: answer.detection }
@@ -377,11 +434,14 @@ export const useWizardStore = create<WizardState>()((set, get) => {
         },
         choose: (change) => {
             const { run } = get();
+
             if (run) set({ run: { ...run, choices: { ...run.choices, ...change } } });
         },
         next: async () => {
             const { run, projects, detection } = get();
+
             if (!run || !stepReady(run, projects, detection)) return;
+
             if (get().run?.step === run.step) move(1);
         },
         back: () => move(-1),
@@ -389,6 +449,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
             const { run, projects, detection, finish } = get();
             const detected = detectedOf(detection);
             const steps = run && runSteps(run, detection);
+
             if (
                 !run?.repo ||
                 !run.projectId ||
@@ -399,8 +460,11 @@ export const useWizardStore = create<WizardState>()((set, get) => {
                 !stepReady(run, projects, detection)
             )
                 return;
+
             const answers = answersOf(detected, run.choices);
+
             set({ finish: { state: 'saving' } });
+
             const connections = connectionsOf(run.repo, answers.role, run.choices, useBoardStore.getState().data.repos);
             const result = await postAction('/api/onboarding/setup', {
                 repo: run.repo,
@@ -409,9 +473,13 @@ export const useWizardStore = create<WizardState>()((set, get) => {
                 connections,
                 ...replacing({ ...run, repo: run.repo }),
             });
+
             receive(result);
+
             if (get().run !== run) return;
+
             if (result.error) return set({ finish: { state: 'failed', error: result.error } });
+
             set({ finish: { state: 'done' } });
         },
     };

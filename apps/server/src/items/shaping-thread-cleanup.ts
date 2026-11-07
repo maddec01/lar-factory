@@ -50,13 +50,17 @@ export function createShapingThreadCleanup({
                     status: 409,
                     body: { error: 'The board has no work records whose threads it could clean up.' },
                 };
+
             try {
                 writeShapingThreadCleanup(choice as ShapingThreadCleanup, dir);
             } catch (err) {
                 if (!(err instanceof WorkRecordError)) throw err;
+
                 return { status: err.code === 'invalid' ? 400 : 500, body: { error: err.message } };
             }
+
             changed();
+
             return { status: 200, body: { error: null } };
         },
     };
@@ -68,11 +72,14 @@ const UNREADABLE_SETTING = "It can't read the shaping thread cleanup setting.";
 /** What details says, by work ID, about work whose pending rows have a failure or no action. A thread only held back adds nothing. */
 export function shapingThreadCleanupProblems(records: WorkRecords): Map<string, string> {
     const reasons = new Map<string, Set<string>>();
+
     for (const { workId, action, failure } of records.pendingShapingThreadCleanups()) {
         const reason = action ? failure : UNREADABLE_SETTING;
+
         if (reason)
             reasons.set(workId, (reasons.get(workId) ?? new Set()).add(/[.!?]$/.test(reason) ? reason : `${reason}.`));
     }
+
     return new Map(
         [...reasons].map(([workId, why]) => [
             workId,
@@ -118,39 +125,55 @@ export function createShapingThreadSweep({
     const rejectedRetryMs = new Map<string, number>();
     let sweeping = false;
     const later = (threadId: string, wait = RETRY_MS) => retryAt.set(threadId, now() + wait);
+
     /** The setting's first readable value becomes the row's action; until then the row waits, with its notice. */
     function savedSetting(threadId: string): ShapingThreadCleanup | null {
         let choice: ShapingThreadCleanup;
+
         try {
             choice = readShapingThreadCleanup(dir);
         } catch {
             return null;
         }
+
         records.saveShapingThreadAction(threadId, choice);
+
         return choice;
     }
+
     async function step({ threadId, workId, commandId }: ShapingThreadCleanupRow, action: ThreadAction): Promise<void> {
         const cleaned = () => {
             retryAt.delete(threadId);
             rejectedRetryMs.delete(threadId);
+
             if (action !== 'delete') return records.markShapingThreadCleaned(threadId);
+
             records.markShapingThreadDeleted(threadId);
             deleted(workId);
         };
         // Read just before sending: T3 refuses to archive an archived thread or settle one, and its deletion cancels active runs.
         const state = stateOf(threadId);
+
         if (state === 'unavailable') return;
+
         if (state === 'absent') {
             if ((await lookup(threadId)) === 'deleted') cleaned();
             else later(threadId);
+
             return;
         }
+
         if (state.live) return;
+
         if (action !== 'delete' && (state.archived || (action === 'settle' && state.settled))) return cleaned();
+
         const result = await send({ type: `thread.${action}`, commandId, threadId });
+
         if (result.outcome === 'accepted') return cleaned();
+
         if (result.outcome === 'rejected') {
             const wait = rejectedRetryMs.get(threadId) ?? RETRY_MS;
+
             rejectedRetryMs.set(threadId, Math.min(wait * 2, MAX_REJECTED_RETRY_MS));
             later(threadId, wait);
             records.saveShapingThreadRejection(threadId, result.reason);
@@ -159,14 +182,19 @@ export function createShapingThreadSweep({
             records.saveShapingThreadFailure(threadId, result.reason);
         }
     }
+
     return async () => {
         if (sweeping) return;
+
         sweeping = true;
+
         try {
             for (const row of records.pendingShapingThreadCleanups()) {
                 const action = row.action ?? savedSetting(row.threadId);
+
                 // Keep's rows start cleaned.
                 if (!action || action === 'keep' || now() < (retryAt.get(row.threadId) ?? -Infinity)) continue;
+
                 try {
                     await step(row, action);
                 } catch (err) {

@@ -36,6 +36,7 @@ export function createBaseUpdateState(
     disabledReason: string | null,
 ): UpdateState {
     const enabled = disabledReason === null;
+
     return {
         ...createInitialUpdateState(currentVersion, channel),
         enabled,
@@ -46,6 +47,7 @@ export function createBaseUpdateState(
 
 export function reduceOnCheckStart(state: UpdateState, checkedAt: string): UpdateState {
     const hasDownloadedUpdate = state.downloadedVersion !== null;
+
     return {
         ...state,
         status: 'checking',
@@ -92,6 +94,7 @@ export function reduceOnUpdateAvailable(
 ): UpdateState {
     const isDownloadedVersion = state.downloadedVersion === version;
     const preserveReleaseNotes = isDownloadedVersion && releaseNotes.length === 0;
+
     return {
         ...state,
         status: isDownloadedVersion ? 'downloaded' : 'available',
@@ -213,9 +216,11 @@ export function reduceOnBackgroundError(state: UpdateState, message: string, che
             canRetry: true,
         };
     }
+
     if (state.status === 'available') {
         return { ...state, checkedAt, downloadPercent: null, canRetry: true };
     }
+
     return {
         ...state,
         status: 'error',
@@ -229,5 +234,6 @@ export function reduceOnBackgroundError(state: UpdateState, message: string, che
 /** Whether a download at `nextPercent` is worth sending to the page: each 10 % step and the end. */
 export function shouldBroadcastDownloadProgress(state: UpdateState, nextPercent: number): boolean {
     if (state.status !== 'downloading' || state.downloadPercent === null) return true;
+
     return Math.floor(nextPercent / 10) !== Math.floor(state.downloadPercent / 10) || nextPercent === 100;
 }

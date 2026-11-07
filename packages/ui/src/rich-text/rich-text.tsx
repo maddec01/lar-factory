@@ -28,15 +28,20 @@ function rehypeImagesAsLinks() {
     const walk = (node: Root | Element, inLink: boolean): void => {
         node.children = node.children.map((child) => {
             if (child.type !== 'element') return child;
+
             if (child.tagName === 'img') {
                 const src = typeof child.properties.src === 'string' ? child.properties.src : '';
                 const text: ElementContent = { type: 'text', value: String(child.properties.alt || src) };
+
                 return src && !inLink ? link({ href: src }, [text]) : text;
             }
+
             walk(child, inLink || child.tagName === 'a');
+
             return child.tagName === 'a' ? link(child.properties, child.children) : child;
         });
     };
+
     return (tree: Root) => walk(tree, false);
 }
 
@@ -68,6 +73,7 @@ const body = [
 
 export function RichText({ text, format, className }: { text: string; format: RichTextFormat; className?: string }) {
     if (text === '') return null;
+
     return (
         <div className={`${body} ${className ?? ''}`} data-slot="rich-text">
             {format === 'markdown' ? (

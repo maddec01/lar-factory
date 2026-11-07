@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 export function readJsonRecord(path: string): Record<string, unknown> | null {
     try {
         const value: unknown = JSON.parse(readFileSync(path, 'utf8'));
+
         return isRecord(value) ? value : null;
     } catch {
         return null;

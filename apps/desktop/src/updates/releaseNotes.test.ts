@@ -28,6 +28,7 @@ describe('normalizeReleaseNotes', () => {
             '0.4.0',
             'latest',
         );
+
         assert.deepStrictEqual(notes, {
             releaseNotes: [
                 {
@@ -56,6 +57,7 @@ describe('normalizeReleaseNotes', () => {
             '0.2.0',
             'latest',
         );
+
         assert.strictEqual(releaseNotes[0]!.totalItems, 11);
         assert.deepStrictEqual(
             releaseNotes[0]!.items.map((item) => item.split(' by ')[0]),
@@ -66,6 +68,7 @@ describe('normalizeReleaseNotes', () => {
     it('keeps 6 Releases and counts the rest as omitted', () => {
         const releases = Array.from({ length: 9 }, (_, i) => ({ version: `0.${10 - i}.0`, note: body(`fix: ${i}`) }));
         const { releaseNotes, omittedReleaseCount } = normalizeReleaseNotes(releases, '0.10.0', 'latest');
+
         assert.deepStrictEqual(
             releaseNotes.map((note) => note.version),
             ['0.10.0', '0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.0'],
@@ -81,12 +84,14 @@ describe('normalizeReleaseNotes', () => {
         ];
         const versions = (channel: 'latest' | 'nightly') =>
             normalizeReleaseNotes(releases, 'x', channel).releaseNotes.map((note) => note.version);
+
         assert.deepStrictEqual(versions('nightly'), ['0.3.0-nightly.20261024.52', '0.2.0-nightly.20261023.51']);
         assert.deepStrictEqual(versions('latest'), ['0.3.0']);
     });
 
     it("reads a single body as the new version's notes, and ignores notes it can't read", () => {
         const single = normalizeReleaseNotes(body('fix: one'), '0.2.0', 'latest');
+
         assert.deepStrictEqual(
             single.releaseNotes.map((note) => note.version),
             ['0.2.0'],

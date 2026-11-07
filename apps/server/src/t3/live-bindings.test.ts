@@ -1,6 +1,7 @@
 import { expect, it } from 'vite-plus/test';
 
 import { liveBindings } from './item-execution.ts';
+
 it('includes live slice and child worktrees', () => {
     expect(
         liveBindings([

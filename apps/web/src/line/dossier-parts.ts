@@ -16,6 +16,7 @@ import {
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'decision', 'build'] as const;
+
 export type PartKind = (typeof PART_KINDS)[number];
 export const DECISION_KINDS: readonly PartKind[] = ['research', 'grill', 'prototype', 'task', 'decision'];
 
@@ -48,6 +49,7 @@ export const threadAtWork = (thread: ItemThread): boolean =>
 /** The thread a part shows: its running build thread while it is at work again, else the one at work, as running, else its newest. */
 export function shownThread(part: Part, working = false): ItemThread | undefined {
     const atWork = (working ? currentBuildThread(part.item) : undefined) ?? threadsOf(part.item).find(threadAtWork);
+
     return atWork ? { ...atWork, state: 'running' } : part.thread;
 }
 
@@ -62,13 +64,21 @@ export interface PartActivity {
 export function partActivity(part: Part, working = false, unavailable = false): PartActivity {
     const { item } = part;
     const question = openQuestionThread(item);
+
     if (question) return { kind: 'needs you', thread: question };
+
     const thread = shownThread(part, working);
+
     if (unavailable && !working) return { kind: 'none', thread };
+
     if (thread?.state === 'running' || working || delegatedWorkRunning(item)) return { kind: 'working', thread };
+
     const waiting = threadsOf(item).find((t) => !t.observedAt && (t.hasLiveChildren || t.queued));
+
     if (waiting) return { kind: 'child waiting', thread: waiting };
+
     if (!thread) return { kind: 'none', thread };
+
     return { kind: thread.state === 'stopped' ? 'stopped' : 'finished', thread };
 }
 
@@ -80,16 +90,22 @@ export const isHistory = (part: Part): boolean =>
 const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 'Done'];
 
 const started = (item: Item) => STARTED.includes(item.status);
+
 export const isDone = (item: Item): boolean =>
     item.completion?.complete ?? (item.status === 'Done' || item.state === 'closed');
+
 const childOf = (child: Item, parent: Item) => child.parentId === parent.id;
+
 export const threadsOf = (item: Item): ItemThread[] => (Array.isArray(item.threads) ? item.threads : []);
 
 /** Local kind is authoritative. Legacy source labels can still name a decision method. */
 export function partKind(item: Item): PartKind {
     const decision = decisionType(item);
+
     if (item.kind === 'decision') return DECISION_KINDS.find((kind) => kind === decision) ?? 'decision';
+
     if (item.recorded === true) return 'build';
+
     return DECISION_KINDS.find((kind) => kind === decision) ?? 'build';
 }
 
@@ -100,6 +116,7 @@ export const partLabel = (kind: PartKind): string => (kind === 'build' ? 'Build'
 export function upstreamOf(parts: readonly Part[]): (part: Part) => Part[] {
     const byId = new Map(parts.map((p) => [p.item.id, p]));
     const byTicket = new Map(parts.filter((p) => p.item.number).map((p) => [refKey(p.item.repo, p.item.number), p]));
+
     return (part) =>
         part.waitsOn.flatMap(
             (b) =>
@@ -113,13 +130,19 @@ export function partWaves(parts: Part[]): Map<string, number> {
     const depth = new Map<string, number>();
     const at = (p: Part, path: string[]): number => {
         const known = depth.get(p.item.id);
+
         if (known !== undefined) return known;
+
         const before = ups(p).filter((u) => !path.includes(u.item.id));
         const d = before.length ? Math.max(...before.map((u) => at(u, [...path, p.item.id]))) + 1 : 0;
+
         depth.set(p.item.id, d);
+
         return d;
     };
+
     parts.forEach((p) => at(p, []));
+
     return depth;
 }
 
@@ -130,6 +153,7 @@ export function partsOf(parent: Item, all: readonly Item[]): Part[] {
         .map((item) => ({ item, kind: partKind(item), waitsOn: item.blockers, thread: threadsOf(item)[0] }))
         .sort((a, b) => PART_KINDS.indexOf(a.kind) - PART_KINDS.indexOf(b.kind));
     const waves = partWaves(parts);
+
     return parts.sort((a, b) => waves.get(a.item.id)! - waves.get(b.item.id)!);
 }
 
@@ -143,6 +167,7 @@ export const waitText = (item: Item, blockers: readonly Blocker[]) =>
 /** Every open concept and open item with sub-issues on the board, as a dossier, where it or a part is in `items`, the main area's scope. */
 export function dossiersOf(items: readonly Item[], all: readonly Item[]): DossierItems[] {
     const shown = new Set(items.map((i) => i.id));
+
     return all
         .filter((p) => isDossierParent(p, all))
         .map((parent) => ({ parent, parts: partsOf(parent, all) }))

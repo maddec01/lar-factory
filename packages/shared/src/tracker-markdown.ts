@@ -18,14 +18,17 @@ const markdown = new Marked({
                 /<!-- lar-factory:(?:spec|original|end) -->|<!-- lar-factory:create \{"identity":"[a-zA-Z0-9-]+"\} -->|<!-- lar-factory:structure\n\{[^<>\n]*\}\n-->|<details>|<summary>Original<\/summary>|<\/details>/g;
             const parts: string[] = [];
             let end = 0;
+
             for (const match of text.matchAll(marker)) {
                 parts.push(escape(text.slice(end, match.index)), match[0]);
                 end = match.index + match[0].length;
             }
+
             return parts.join('') + escape(text.slice(end));
         },
         link({ href, title, tokens }) {
             const text = this.parser.parseInline(tokens);
+
             return safeUrl(href)
                 ? `<a href="${escape(href)}"${title ? ` title="${escape(title)}"` : ''}>${text}</a>`
                 : text;
@@ -43,10 +46,12 @@ export function trackerMarkdownHtml(text: string): string {
             const payload = JSON.stringify(readTrackerStructure(block))
                 .replaceAll('<', '\\u003c')
                 .replaceAll('>', '\\u003e');
+
             return `<!-- lar-factory:structure\n${payload}\n-->`;
         } catch {
             return block;
         }
     });
+
     return markdown.parse(safe, { async: false });
 }

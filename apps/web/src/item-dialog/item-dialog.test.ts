@@ -46,6 +46,7 @@ const without = (id: string): BoardData => ({ ...sample, items: sample.items.fil
 /** Opens the item dialog on `itemId` through its store, as every list on the page does. */
 async function openItem(itemId: string): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
 
@@ -53,11 +54,15 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
     await mountPage();
     await openItem('I_sample13');
     expect(dialog()!.getAttribute('role')).toBe('dialog');
+
     const summary = inDialog('[data-item-summary] > div')!;
+
     expect(text(summary.querySelector('[data-project-icon]'))).toBe('L');
     expect(textBesideIcon(summary)).toBe('lar-server Ready· updated 1h agoBlocked by #202 until it completes');
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
+
     const parent = inDialog<HTMLAnchorElement>('[data-item-parent] a')!;
+
     expect([text(parent), parent.href]).toEqual([
         '#200 lar cloud: website sign-in and relay',
         'https://github.com/maddec01/lar-server/issues/200',
@@ -76,10 +81,13 @@ test('a cleanup problem shows in the dialog with no button, and never on the car
         ...sample,
         items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, shapingCleanupProblem: problem } : i)),
     };
+
     await mountPage(carrying);
     expect($$('main *').some((el) => text(el).includes(problem))).toBe(false);
     await openItem('I_sample13');
+
     const notice = inDialog('[data-shaping-cleanup-problem]')!;
+
     expect(text(notice)).toBe(problem);
     expect(notice.querySelector('button')).toBeNull();
     expect(inDialog('[data-needs-you-reason]')).toBeNull();
@@ -94,7 +102,9 @@ test('an item with no cleanup problem shows no notice', async () => {
 test('the progress bar names the current step on its segment and every step in a title and an accessible label', async () => {
     await mountPage();
     await openItem('I_sample13');
+
     const current = steps()[3]!;
+
     expect([current.getAttribute('aria-label'), current.getAttribute('aria-current'), text(current)]).toEqual([
         'Step 4 of 8: Ready',
         'step',
@@ -121,7 +131,9 @@ test('the progress bar names the current step on its segment and every step in a
 test('slices show as an overview under the progress bar, not in the sidebar, with a bar of their own while the item is not at work', async () => {
     await mountPage();
     await openItem('I_sample13');
+
     const slices = inDialog('[data-slices]')!;
+
     expect(text(slices.querySelector('p'))).toBe('Slices · 1/3 done');
     expect([...slices.querySelectorAll('ul > li')].map(text)).toEqual([
         '#144Owner table and sign-updone',
@@ -135,6 +147,7 @@ test('slices show as an overview under the progress bar, not in the sidebar, wit
 
 test('an In progress item with slices subdivides its current segment, a mini segment for each slice', async () => {
     const slices = sample.items.find((i) => i.id === 'I_sample13')!.slices;
+
     await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample14' ? { ...i, slices } : i)) });
     await openItem('I_sample14');
     expect([...steps()[4]!.querySelectorAll<HTMLElement>('ol > li')].map((s) => s.title)).toEqual([
@@ -150,7 +163,9 @@ test('an In progress item with slices subdivides its current segment, a mini seg
 test('the labels, people and dates sit in a meta area under the title, and the sidebar holds only relations', async () => {
     await mountPage();
     await openItem('I_sample13');
+
     const meta = text(inDialog('[data-meta]'));
+
     expect(meta).toMatch(/Author.*maddec01.*Assignees.*maddec01.*claude-bot.*Milestone.*Cloud v0\.1.*Created.*Updated/);
     expect(inDialog('[data-meta]')!.closest('aside'), 'not in the sidebar').toBeNull();
     expect(text(inDialog('aside'))).not.toMatch(/Author|Assignees|Labels|Created|Updated|Agent work/);
@@ -165,7 +180,9 @@ test('an item with no slices, pull requests or sub-tickets has no sidebar', asyn
 test('the header bar holds the agent work figures and the close button', async () => {
     await mountPage();
     await openItem('I_sample14');
+
     const close = inDialog<HTMLButtonElement>('header [aria-label="Close"]')!;
+
     expect(inDialog('header')!.contains(inDialog('[data-agent-work]'))).toBe(true);
     expect(dialog()!.querySelectorAll('[aria-label="Close"]'), 'the popup draws no second one').toHaveLength(1);
     await press(close);
@@ -182,7 +199,9 @@ test('the dialog lays out by its own width and never hides an overflow', async (
 test('the dialog shows the hint, each pull request with its checks, and the agent work figures', async () => {
     await mountPage();
     await openItem('I_sample14');
+
     const work = inDialog('header [data-agent-work]')!;
+
     expect(textBesideIcon(inDialog('[data-item-summary]'))).toBe('lar-apple In progress· updated 25m agoFeature');
     expect(text(inDialog('header'))).toBe(
         '#30 Chapter markers in the scrubber$24.18 · 2h 14m · 16.6M tokens · 1h 20m wall',
@@ -193,7 +212,9 @@ test('the dialog shows the hint, each pull request with its checks, and the agen
         'a narrow dialog shows them in the meta area instead',
     ).toContain('@min-[40rem]:hidden');
     expect(work.className, 'a wide one in the header').toContain('@max-[40rem]:hidden');
+
     const pr = section('Pull requests').querySelector('li')!;
+
     expect([text(pr), pr.querySelector('a')!.getAttribute('href')]).toEqual([
         'PR #33 (draft)checks running',
         'https://github.com/maddec01/lar-apple/pull/33',
@@ -242,12 +263,16 @@ test.each([
 test('GitHub opens the item, and Verify build and Merge PR open its pull request, in a new tab', async () => {
     await mountPage();
     await openItem('I_sample16');
+
     const links = [...footer().querySelectorAll('a')].map((a) => [text(a).trim(), a.getAttribute('href'), a.target]);
+
     expect(links).toEqual([
         ['GitHub', 'https://github.com/maddec01/lar-apple/issues/31', '_blank'],
         ['Verify build', 'https://github.com/maddec01/lar-apple/pull/32', '_blank'],
     ]);
+
     const verify = footer().querySelector<HTMLAnchorElement>('[data-pr-link]')!;
+
     expect(
         [verify.dataset.kind, Boolean(verify.querySelector('[data-slot="icon"] .lucide-git-pull-request'))],
         'an Open with the pull request icon',
@@ -259,6 +284,7 @@ test('GitHub opens the item, and Verify build and Merge PR open its pull request
 
 test("an Azure work item's footer opens it on Azure DevOps", async () => {
     const url = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/31';
+
     await mountPage({
         ...sample,
         items: sample.items.map((i) =>
@@ -301,7 +327,9 @@ const statusAction = () => footer().querySelector<HTMLElement>(':scope > span:la
 test('Open thread and Answer in T3 link to the latest thread in T3 Code, in the same tab', async () => {
     await mountPage(withThreads('I_sample10', [thread('new', 'running'), thread('old', 'done')]));
     await openItem('I_sample10');
+
     const open = statusAction() as HTMLAnchorElement;
+
     expect([text(open), open.getAttribute('href'), open.target]).toEqual([
         'Open thread',
         't3code://threads/sample-environment/new',
@@ -309,7 +337,9 @@ test('Open thread and Answer in T3 link to the latest thread in T3 Code, in the 
     ]);
 
     await openItem('I_sample12');
+
     const answerLink = statusAction() as HTMLAnchorElement;
+
     expect([text(answerLink), answerLink.getAttribute('href')]).toEqual([
         'Answer in T3',
         't3code://threads/sample-environment/sample-thread-202',
@@ -323,6 +353,7 @@ test.each(['Verify', 'Ready to merge'] as const)(
             ...fresh(),
             items: sample.items.map((i) => (i.id === 'I_sample10' ? { ...i, status, threads } : i)),
         });
+
         await mountPage(
             change([
                 thread('other', 'done'),
@@ -330,13 +361,17 @@ test.each(['Verify', 'Ready to merge'] as const)(
             ]),
         );
         await openItem('I_sample10');
+
         const open = statusAction() as HTMLAnchorElement;
+
         expect([text(open), open.getAttribute('href')]).toEqual([
             'Open thread',
             't3code://threads/sample-environment/build',
         ]);
         expect(text(inDialog('[data-item-summary]'))).toContain('Working');
+
         const icon = status === 'Verify' ? 'lucide-circle-dot' : 'lucide-git-merge';
+
         expect(inDialog(`[data-item-summary] svg.${icon}.status-pulse`)).not.toBeNull();
         expect(text(inDialog('[data-item-summary]'))).not.toContain(status);
         expect(text(inDialog('[data-steps] [aria-current="step"]'))).toContain('Working');
@@ -345,6 +380,7 @@ test.each(['Verify', 'Ready to merge'] as const)(
         );
 
         const { useBoardStore } = await import('../board/board-store.ts');
+
         await settle(() =>
             useBoardStore.getState().receive(change([{ ...thread('build', 'done'), purpose: 'build' }])),
         );
@@ -432,17 +468,22 @@ test('beside an archived shaping thread, Open thread links the build thread', as
 test("a long thread title truncates alone, keeping the row's archived mark in view", async () => {
     await mountPage(withThreads('I_sample10', [{ ...thread('put-away', 'done'), archived: true }]));
     await openItem('I_sample10');
+
     const row = inDialog('[data-earlier-threads] li')!;
+
     expect(row.querySelector('.truncate')!.textContent).toBe('T3 · Thread put-away');
     expect(row.querySelector('.shrink-0')!.textContent).toBe('· archived');
 });
 
 test('a settled shaping thread keeps a row in details whose link opens it, while Open thread links the build', async () => {
     const shaping = { ...thread('settled', 'done'), title: 'Shape: accounts', purpose: 'shape' };
+
     await mountPage(withThreads('I_sample10', [{ ...thread('build', 'running'), purpose: 'build' }, shaping]));
     await openItem('I_sample10');
     expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/build');
+
     const row = inDialog('[data-earlier-threads] li')!;
+
     expect(text(row)).toBe('T3 · Shape: accounts · shaping');
     expect(row.querySelector('a.truncate')!.getAttribute('href')).toBe('t3code://threads/sample-environment/settled');
     expect(row.querySelector('.shrink-0')!.textContent).toBe('· shaping');
@@ -524,7 +565,9 @@ test('a failed Queue stays in the dialog with a close button, which hands focus 
     await press(button('queue', 'I_sample02'));
     await answer({ error: 'Could not set Queued.' }, 502);
     expect(text(inDialog('.action-error [role="alert"]'))).toBe('Could not set Queued.');
+
     const close = inDialog<HTMLButtonElement>('.action-error button.dismiss')!;
+
     await press(close);
     expect(inDialog('.action-error')).toBeNull();
     expect(document.activeElement).toBe(button('queue', 'I_sample02'));
@@ -533,15 +576,20 @@ test('a failed Queue stays in the dialog with a close button, which hands focus 
 test("Abandon is greyed out with the reason on an item whose type can't be abandoned", async () => {
     const refusal =
         "Issue has no Removed state in Fabrikam Fiber, so the board can't abandon it. Close or delete it in Azure DevOps.";
+
     await mountPage({
         ...sample,
         items: sample.items.map((i) => (i.id === 'I_sample01' ? { ...i, abandonRefusal: refusal } : i)),
     });
     await openItem('I_sample01');
     expect(footerControls()).toEqual([`Abandon (disabled: ${refusal})`, 'GitHub', 'Queue']);
+
     const abandon = button('abandon', 'I_sample01');
+
     expect(abandon.className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
+
     const reason = footer().querySelector<HTMLElement>('[data-abandon-refusal]')!;
+
     expect(text(reason), 'a visible line says why').toBe(refusal);
     expect(abandon.getAttribute('aria-describedby')).toBe(reason.id);
 });
@@ -552,6 +600,7 @@ test('Shape issue opens the model menu, and picking a model starts the item and 
         capture: { session: 's1', enabled: true },
         modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }],
     };
+
     holdPosts(withChoices);
     await mountPage(withChoices);
     await openItem('I_sample05');
@@ -565,8 +614,11 @@ test('Shape issue opens the model menu, and picking a model starts the item and 
     expect(text(button('start', 'I_sample05'))).toBe('Starting…');
 
     const thread = { threadId: 'thread-1', title: 'Other title' };
+
     await answer({ thread, error: null, board: { ...withChoices, started: { I_sample05: thread } } });
+
     const tag = inDialog('[data-start-result="I_sample05"]')!;
+
     expect(text(tag)).toBe('Started');
     expect(document.activeElement, 'focus moves to the dialog’s tag').toBe(tag);
     expect(inDialog('[data-back-to-list], [data-abandon]'), 'a started item can’t go back').toBeNull();
@@ -603,7 +655,9 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
     await settle(() => vi.advanceTimersByTime(20));
     await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
     expect(posted()).toEqual([['/api/start-build', { drift: 'keep', session: 's1', itemId: 'I_sample13' }]]);
+
     const thread = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
+
     await answer({ thread, error: null, board: { ...readyBuild, startedBuilds: { I_sample13: thread } } });
     expect(text(inDialog('[data-start-result="I_sample13"]'))).toBe('Started');
 });
@@ -614,7 +668,9 @@ test('a build the board started, through Start after or from another page, shows
         startedBuilds: { I_sample13: { threadId: 'build-1', title: 'Build maddec01/lar-server#140' } },
     });
     await openItem('I_sample13');
+
     const tag = inDialog('[data-start-result="I_sample13"]')!;
+
     expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread build-1']);
     expect(footerControls()).toEqual(['GitHub', 'Open thread']);
 });
@@ -638,6 +694,7 @@ test('a failed Start build shows in the dialog and offers Retry start', async ()
 
 test('Start build is disabled with the hint while T3 has no project for the repository', async () => {
     const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
+
     await mountPage({ ...readyBuild, repositoryProjects: { 'maddec01/lar-server': hint } });
     await openItem('I_sample13');
     expect(footerControls()).toEqual(['GitHub', 'Open thread', `Start build (disabled: ${hint})`]);
@@ -691,7 +748,9 @@ test('a failed Move to List is a toast, and focus goes back to Move to List', as
 
 test('Abandon in the dialog sets work aside without a follow-up ticket confirmation', async () => {
     holdPosts();
+
     const data: BoardData = { ...sample, capture: { enabled: true, session: 'session-1' } };
+
     await mountPage(data);
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
@@ -775,16 +834,19 @@ async function abandonFromNotice(ticketOpen = false) {
                 : i,
         ),
     };
+
     await mountPage(data);
     holdPosts(data);
     await openItem(id);
     await press(button('abandon', id));
     expect(posted()).toEqual([['/api/inspect-owned-cleanup', { itemId: id }]]);
+
     return id;
 }
 
 test('Abandon on a notice asks with both cleanup boxes unticked and the remote warning, and Cancel changes nothing', async () => {
     const id = await abandonFromNotice();
+
     expect(text($('#abandon-dialog [role="status"]'))).toMatch(/^Checking/);
     expect(abandonButtons()[1]!.disabled, 'Abandon waits for the answer').toBe(true);
     await answer({ token: 't1', plans: [closedPlan] });
@@ -828,6 +890,7 @@ for (const [name, plan] of [
 
 test('Abandon on a notice with no branch or worktree asks nothing about cleanup and sets the work aside', async () => {
     const id = await abandonFromNotice(true);
+
     await answer({ token: 't1', plans: [] });
     expect(boxes()).toEqual([]);
     expect(text($('#abandon-dialog'))).toContain(NOTHING_TO_REMOVE);
@@ -839,6 +902,7 @@ test('Abandon on a notice with no branch or worktree asks nothing about cleanup 
 
 test('ticked cleanup with something to lose confirms the loss, runs first, then closes the ticket', async () => {
     const id = await abandonFromNotice(true);
+
     await answer({
         token: 't1',
         plans: [{ ...closedPlan, dirtyFiles: ['/w: M a.ts'], unpushedCommits: ['build/old: abc Work'] }],
@@ -846,7 +910,9 @@ test('ticked cleanup with something to lose confirms the loss, runs first, then 
     await tick('Remove old');
     await abandonPress('Abandon and close ticket');
     expect(posted(), 'the first press only shows the loss').toHaveLength(1);
+
     const loss = $('#abandon-dialog [data-cleanup-loss]')!;
+
     expect(loss.getAttribute('role'), 'the list is announced').toBe('alert');
     expect(
         vi.mocked(Element.prototype.scrollIntoView).mock.contexts,
@@ -871,6 +937,7 @@ test('ticked cleanup with something to lose confirms the loss, runs first, then 
 
 test('when the board cannot inspect, the confirmation says what stays and still abandons without cleanup', async () => {
     const id = await abandonFromNotice();
+
     await answer({ error: 'T3 is unavailable.' }, 409);
     expect(text($('#abandon-dialog [data-slot="alert"]'))).toBe(
         "The board can't inspect this work's branch or worktree. T3 is unavailable. You can abandon without cleanup, and anything there stays.",
@@ -882,6 +949,7 @@ test('when the board cannot inspect, the confirmation says what stays and still 
 
 test('a cleanup error keeps the item and ticket, and offers a fresh retry or the same Abandon without further cleanup', async () => {
     const id = await abandonFromNotice(true);
+
     await answer({ token: 't1', plans: [closedPlan] });
     await tick('Delete pushed');
     await abandonPress('Abandon and close ticket');
@@ -918,6 +986,7 @@ test('a cleanup error keeps the item and ticket, and offers a fresh retry or the
 
 test('a failed Abandon after cleanup keeps the confirmation, and its retry does not clean up again', async () => {
     const id = await abandonFromNotice();
+
     await answer({ token: 't1', plans: [closedPlan] });
     await tick('Remove old');
     await abandonPress('Abandon');
@@ -943,6 +1012,7 @@ test('after cleanup, a failed Abandon does not say the work has no branch or wor
 
 test('a cancelled loss prompt leaves no trace on the next Abandon', async () => {
     const id = await abandonFromNotice();
+
     await answer({ token: 't1', plans: [{ ...closedPlan, unpushedCommits: ['build/old: abc Work'] }] });
     await tick('Remove old');
     await tick('Delete pushed');
@@ -983,6 +1053,7 @@ test('the closed-PR warning shows only beside a closed PR', async () => {
                 : i,
         ),
     };
+
     await mountPage(data);
     holdPosts(data);
     await openItem(id);
@@ -994,6 +1065,7 @@ test('the closed-PR warning shows only beside a closed PR', async () => {
 
 test('a failed cleanup no longer offers to close a ticket the board has since read closed', async () => {
     const id = await abandonFromNotice(true);
+
     await answer({ token: 't1', plans: [closedPlan] });
     await tick('Delete pushed');
     await abandonPress('Abandon and close ticket');
@@ -1046,6 +1118,7 @@ test('a failed cleanup on work with no ticket says nothing about a ticket', asyn
                 : i,
         ),
     };
+
     await mountPage(data);
     holdPosts(data);
     await openItem(id);
@@ -1069,8 +1142,10 @@ test('in sample mode the dialog’s actions are disabled', async () => {
 test('an item that leaves the board closes the dialog for good: its coming back later opens nothing', async () => {
     await mountPage();
     await openItem('I_sample13');
+
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
     const { useBoardStore } = await import('../board/board-store.ts');
+
     await settle(() => useBoardStore.getState().receive(without('I_sample13')));
     expect(useItemDialogStore.getState().itemId).toBeNull();
     await settle(() => useBoardStore.getState().receive(sample));
@@ -1080,8 +1155,10 @@ test('an item that leaves the board closes the dialog for good: its coming back 
 test('closing the dialog clears the store, and Escape closes it', async () => {
     await mountPage();
     await openItem('I_sample13');
+
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
     const popup = dialog()!;
+
     await settle(() => popup.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(useItemDialogStore.getState().itemId).toBeNull();
     expect(dialog()).toBeNull();
@@ -1089,8 +1166,10 @@ test('closing the dialog clears the store, and Escape closes it', async () => {
 
 test('work that needs you shows why, confirms each choice before posting it, offers no Clear, and sets the work aside through Abandon', async () => {
     holdPosts();
+
     const id = 'I_sample05';
     const reason = 'Its PR closed without merging.';
+
     await mountPage({
         ...sample,
         capture: { enabled: true, session: 'session-1' },
@@ -1145,7 +1224,9 @@ test('work that needs you shows why, confirms each choice before posting it, off
 
 test('Cancel and Escape leave the notice and post nothing, and the choice takes focus back', async () => {
     holdPosts();
+
     const id = 'I_sample05';
+
     await mountPage({
         ...sample,
         capture: { enabled: true, session: 'session-1' },
@@ -1206,6 +1287,7 @@ function dependencyBlocker(
         },
         ...change,
     };
+
     return {
         number: 40,
         repo: 'maddec01/lar-server',
@@ -1214,6 +1296,7 @@ function dependencyBlocker(
         dependency: hold,
     };
 }
+
 const withDependency = (blocker: Blocker): BoardData => ({
     ...sample,
     capture: { enabled: true, session: 'session-1' },
@@ -1233,7 +1316,9 @@ test('a Dependency shows its team, ticket, latest read and evidence, suggests Ma
     expect(text(dependencyRow().querySelector('[data-dependency-read]'))).toBe(
         'maddec01/lar-server#40 closed, read 1h ago',
     );
+
     const ticket = dependencyRow().querySelector<HTMLAnchorElement>('[data-dependency-read] a')!;
+
     expect([text(ticket), ticket.href, ticket.target], 'its ticket opens in the browser').toEqual([
         'maddec01/lar-server#40',
         'https://github.com/maddec01/lar-server/issues/40',
@@ -1278,6 +1363,7 @@ test('a Dependency naming no ticket or PR says it is a handover only', async () 
 
 test('a Dependency whose read failed says how in words, beside the last read that answered', async () => {
     const lastGood = { kind: 'open' as const, observedAt: '2026-10-19T09:00:00Z' };
+
     await mountPage(
         withDependency(
             dependencyBlocker('access-lost', {
@@ -1312,7 +1398,9 @@ test('a met Dependency whose ticket changed since asks for a review, offers to c
     expect(text(dependencyRow().querySelector('[data-dependency-notice]'))).toBe(
         'Its ticket maddec01/lar-server#40 changed to reopened after you marked it met. Review the mark.',
     );
+
     const clear = dependencyRow().querySelector<HTMLButtonElement>('button')!;
+
     expect(text(clear)).toBe('Clear met mark');
     expect(clear.getAttribute('aria-label')).toMatch(/^Clear the met mark on the Dependency on server team: #140 /);
     await press(clear);
@@ -1335,6 +1423,7 @@ test('stopped shaping offers Resume shaping and starts through the existing mode
         capture: { session: 's1', enabled: true },
         started: { I_sample05: { threadId: older.id, title: older.title } },
     };
+
     data.items = data.items.map((item) => (item.id === 'I_sample05' ? { ...item, status: 'Shaping' } : item));
     holdPosts(data);
     await mountPage(data);
@@ -1361,6 +1450,7 @@ test.each(['Shaping', 'Queued'] as const)(
         const data = withThreads('I_sample05', [
             { ...thread('parent', 'stopped'), purpose: 'shape', hasLiveChildren: true },
         ]);
+
         data.items = data.items.map((item) => (item.id === 'I_sample05' ? { ...item, status } : item));
         await mountPage(data);
         await openItem('I_sample05');
@@ -1372,7 +1462,9 @@ test.each(['Shaping', 'Queued'] as const)(
 test('slice details follow live unknown and recovered progress while open', async () => {
     await mountPage();
     await openItem('I_sample13');
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     for (const progress of ['unknown', 'active', 'blocked', 'waiting', 'done'] as const) {
         await settle(() =>
             useBoardStore.getState().receive({
@@ -1387,16 +1479,20 @@ test('slice details follow live unknown and recovered progress while open', asyn
                 ),
             }),
         );
+
         const chip = inDialog('[data-slices] ul')!.children[1]!;
+
         expect(text(chip)).toContain(progress);
         expect(chip.querySelector('.status-pulse') !== null).toBe(progress === 'active');
         expect(text(inDialog('[data-slices] p'))).toBe(progress === 'done' ? 'Slices · 2/3 done' : 'Slices · 1/3 done');
+
         if (progress === 'unknown') expect(text(chip)).toContain('?');
     }
 });
 
 test('deleted work thread offers the later recovery actions without Clear', async () => {
     const id = 'I_sample05';
+
     await mountPage({
         ...sample,
         items: sample.items.map((i) =>
@@ -1426,6 +1522,7 @@ test('deleted work thread offers the later recovery actions without Clear', asyn
 
 test('moving deleted-thread work with a passing brief asks before sending the move', async () => {
     const id = 'I_sample05';
+
     await mountPage({
         ...sample,
         items: sample.items.map((i) =>
@@ -1474,6 +1571,7 @@ test('Back to Queue asks first and sends the move only once confirmed', async ()
                 : i,
         ),
     };
+
     await mountPage(data);
     holdPosts(data);
     await openItem(id);
@@ -1515,15 +1613,18 @@ async function recoveryItem(
                 : i,
         ),
     };
+
     await mountPage(data);
     holdPosts(data);
     await openItem(id);
     await press(button('needs-you', id));
+
     return id;
 }
 
 test('shaping Start again confirms before posting and keeps the notice and the confirmation on failure', async () => {
     const id = await recoveryItem(false);
+
     expect(posted()).toEqual([]);
     await confirmPress('Start again');
     expect(posted()).toEqual([['/api/start-again', { itemId: id, options: {} }]]);
@@ -1546,6 +1647,7 @@ test('a no-thread notice starts again through its confirmation, and a started th
         causes: [{ type: 'no-thread' }],
         offers: ['start-again', 'set-aside'],
     });
+
     expect(text($('#needs-you-detail'))).toContain('This starts a new shaping thread in T3.');
     expect(posted()).toEqual([]);
     await confirmPress('Start again');
@@ -1568,11 +1670,13 @@ test('a no-thread build inspects its branch on opening, and only reads', async (
         causes: [{ type: 'no-thread' }],
         offers: ['start-again', 'set-aside'],
     });
+
     expect(posted()).toEqual([['/api/inspect-recovery', { itemId: id }]]);
 });
 
 test('build recovery inspects before offering branches and explains a missing worktree', async () => {
     const id = await recoveryItem();
+
     expect(posted()).toEqual([['/api/inspect-recovery', { itemId: id }]]);
     expect(text(confirmation())).toContain('Checking the branch and PR...');
     await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
@@ -1589,6 +1693,7 @@ test('open PR recovery offers only continue and preserves the PR in its confirma
 
 test('inspection errors preserve the recovery notice and can be read again', async () => {
     const id = await recoveryItem();
+
     await answer({ error: 'Cannot inspect local worktrees' }, 502);
     expect(text($('#needs-you-dialog [data-slot="alert"]'))).toContain('Cannot inspect local worktrees');
     expect(inDialog('[data-needs-you-reason]')).not.toBeNull();
@@ -1603,6 +1708,7 @@ test('inspection errors preserve the recovery notice and can be read again', asy
 
 test('absent branch starts new once confirmed and receives the successful board', async () => {
     const id = await recoveryItem();
+
     await answer({ inspection: { branch: 'build/old', branchExists: false, worktreePath: null, pr: 'none' } });
     expect(posted(), 'nothing starts until the confirmation').toHaveLength(1);
     await confirmPress('Start again');
@@ -1633,6 +1739,7 @@ test('unknown PR state warns before choosing a new branch', async () => {
 
 test('choosing a branch uses the model menu and sends recovery options', async () => {
     const id = await recoveryItem();
+
     await answer({ inspection: { branch: 'build/old', branchExists: true, worktreePath: null, pr: 'none' } });
     await pressMenu(confirmButtons().find((b) => text(b) === 'Start on new branch')!);
     await press($<HTMLElement>('[data-start-pick]')!);
@@ -1649,11 +1756,13 @@ test('choosing a branch uses the model menu and sends recovery options', async (
 /** The dialog's footer with `threads` on an item at `status`. */
 const footerAt = async (status: Item['status'], threads: Item['threads'], data: BoardData = sample) => {
     const board = withThreads('I_sample16', threads, data);
+
     await mountPage({
         ...board,
         items: board.items.map((i) => (i.id === 'I_sample16' ? { ...i, status, completion: undefined } : i)),
     });
     await openItem('I_sample16');
+
     return footerControls();
 };
 
@@ -1672,6 +1781,7 @@ test("a stopped run's latest thread is linked once, beside Start again", async (
         ...sample,
         startedBuilds: { I_sample13: { threadId: 'stopped-build', title: 'Build' } },
     });
+
     await mountPage({ ...data, items: data.items.map((i) => (i.id === 'I_sample13' ? { ...i, blockers: [] } : i)) });
     await openItem('I_sample13');
     expect(text(footer())).toContain('Run stopped.');
@@ -1737,7 +1847,9 @@ const conceptBoard = (
 test('concept details label its own cost and its total on the board', async () => {
     await mountPage(conceptBoard(stats(1), stats(2)));
     await openItem(CONCEPT);
+
     const meta = text(inDialog('[data-meta]'));
+
     expect(meta).toContain('Own cost: $1.00');
     expect(meta).toContain('Total on the board: $3.00');
     expect(
@@ -1764,7 +1876,9 @@ test("a concept whose usage can't be read says so instead of a number", async ()
 test('concept details list each part with its status, cost and Open thread, and a part opens its own details', async () => {
     await mountPage(conceptBoard(stats(1), stats(2)));
     await openItem(CONCEPT);
+
     const row = inDialog('[data-concept-part="I_sample10"]')!;
+
     expect(text(row)).toContain('#201 Relay: broker only or full TURN?');
     expect(text(row)).toContain('Shaping');
     expect(text(row)).toContain('$2.00');
@@ -1792,6 +1906,7 @@ test('decision details show the method, cost and every thread, and pick up the n
         { ...thread('older', 'done'), purpose: 'research' },
     ];
     const data = decisionBoard({ decisionMethod: 'research', stats: stats(4), threads });
+
     await mountPage(data);
     await openItem('I_sample05');
     expect(text(inDialog('[data-item-kind]'))).toContain('Research');
@@ -1801,7 +1916,9 @@ test('decision details show the method, cost and every thread, and pick up the n
     expect(inDialog<HTMLAnchorElement>('[data-earlier-threads] a')!.getAttribute('href')).toBe(
         't3code://threads/sample-environment/older',
     );
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     await settle(() =>
         useBoardStore.getState().receive(decisionBoard({ decisionMethod: 'research', stats: stats(5), threads })),
     );
@@ -1821,9 +1938,12 @@ test("while T3 can't be read, known figures stay and say they are last known", a
         ...conceptBoard(stats(1), stats(2)),
         usageRead: { readable: false, readAt: '2026-11-03T10:00:00.000Z' },
     };
+
     await mountPage(data);
     await openItem(CONCEPT);
+
     const meta = text(inDialog('[data-meta]'));
+
     expect(meta).toContain('Own cost: $1.00');
     expect(meta).toContain('Total on the board: $3.00');
     expect(meta).toContain('last known');
@@ -1836,6 +1956,7 @@ test("while T3 can't be read, known figures stay and say they are last known", a
 test('an item whose family failed marks its known figures last known though the board reads usage', async () => {
     const board = conceptBoard(stats(1), stats(2));
     const items = board.items.map((i) => (i.id === CONCEPT ? { ...i, usageState: 'failed' as const } : i));
+
     await mountPage({ ...board, items, usageRead: { readable: true, readAt: '2026-11-03T10:00:00.000Z' } });
     await openItem(CONCEPT);
     expect(text(inDialog('[data-meta]'))).toContain('last known');
@@ -1844,6 +1965,7 @@ test('an item whose family failed marks its known figures last known though the 
 
 const withoutFigures = (usageState: 'failed' | 'loading') => {
     const board = conceptBoard(undefined, undefined);
+
     return {
         ...board,
         items: board.items.map((i) =>
@@ -1863,6 +1985,7 @@ test('an item whose family failed with no figures says so though the board reads
 
 test('an item whose threads T3 has not answered for yet says usage is loading, never that it has no thread', async () => {
     const data = withoutFigures('loading');
+
     await mountPage({
         ...data,
         items: data.items.map((item) => (item.id === CONCEPT ? { ...item, threads: 'unavailable' as const } : item)),
@@ -1881,15 +2004,18 @@ test('an item still loading with all-zero figures says it is loading, never zero
 
 test('a concept total with a failed part keeps its known figures and says it is incomplete', async () => {
     const board = conceptBoard(stats(1), stats(2));
+
     await mountPage({
         ...board,
         items: board.items.map((i) => (i.id === 'I_sample10' ? { ...i, usageState: 'failed' as const } : i)),
         usageRead: { readable: true },
     });
     await openItem(CONCEPT);
+
     const total = [...document.querySelectorAll<HTMLElement>('[data-meta] [data-agent-work]')].find((p) =>
         text(p).startsWith('Total on the board'),
     )!;
+
     expect(text(total)).toContain('$3.00');
     expect(text(total)).toContain('incomplete');
     expect(total.title).toContain('usage for part of it is still loading');
@@ -1897,6 +2023,7 @@ test('a concept total with a failed part keeps its known figures and says it is 
 
 test('a concept total with a loading part and no figures for it gives no sum and says it is incomplete', async () => {
     const board = conceptBoard(stats(1), undefined);
+
     await mountPage({
         ...board,
         items: board.items.map((i) =>
@@ -1945,7 +2072,9 @@ test('a concept with no thread of its own says so beside its total', async () =>
         items: conceptBoard(undefined, stats(2)).items.map((i) => (i.id === CONCEPT ? { ...i, threads: [] } : i)),
     });
     await openItem(CONCEPT);
+
     const meta = text(inDialog('[data-meta]'));
+
     expect(meta).toContain('No T3 thread of its own.');
     expect(meta).toContain('Total on the board: $2.00');
     expect(meta).not.toContain('has worked on this yet');
@@ -1971,7 +2100,9 @@ test('a settled decision keeps a link to an older thread that once asked a quest
 test("during a usage outage, work known to have no thread doesn't claim lost usage", async () => {
     await mountPage(decisionBoard({ threads: [], stats: 'unavailable', completion: { complete: true, reasons: [] } }));
     await openItem('I_sample05');
+
     const meta = text(inDialog('[data-meta]'));
+
     expect(meta).not.toContain('Usage details are unavailable.');
     expect(meta).not.toContain('No T3 thread');
 });
@@ -1996,12 +2127,15 @@ test("a concept's Delivery counts its unfinished parts without work IDs, and kee
             ],
         },
     });
+
     await mountPage({
         ...board,
         items: board.items.map((i) => (i.id === 'I_sample13' ? { ...i, id: ID(1), title: 'Owner accounts' } : i)),
     });
     await openItem(CONCEPT);
+
     const meta = text(inDialog('[data-meta]'));
+
     expect(meta).toContain(
         "2 builds remaining. 1 decision unsettled. Its Fog isn't gone. No delivery planned. Dependency on server team isn't met.",
     );
@@ -2018,7 +2152,9 @@ test("a concept's Refinement says what it needs without work IDs", async () => {
         }),
     );
     await openItem(CONCEPT);
+
     const meta = text(inDialog('[data-meta]'));
+
     expect(meta).toContain('1 decision unsettled. Its map is empty.');
     expect(meta).not.toContain(ID(5));
 });
@@ -2049,6 +2185,7 @@ test.each([true, false])(
     'a concept recorded %s draws no diagram from its map, even with details loading',
     async (recorded) => {
         const board = conceptWith({ recorded, map: { destination: '', decisions: [], fog: [] } });
+
         fetchMock.mockImplementation((url: string) =>
             detailsRead(url) ? new Promise<Response>(() => {}) : Promise.resolve(new Response(JSON.stringify(board))),
         );
@@ -2074,12 +2211,17 @@ test('concept parts retain their own status icons while work resumes and stops',
                 : item,
         ),
     });
+
     await mountPage(data(true));
     await openItem(CONCEPT);
+
     const row = () => inDialog('[data-concept-part="I_sample13"]')!;
+
     expect(row().querySelector('svg.lucide-circle-dot.status-pulse')).not.toBeNull();
     expect(text(row())).toContain('Working');
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     await settle(() => useBoardStore.getState().receive(data()));
     expect(row().querySelector('svg.lucide-circle-dot:not(.status-pulse)')).not.toBeNull();
     expect(text(row())).toContain('Verify');
@@ -2126,6 +2268,7 @@ describe('the working agents', () => {
 
     test('details shows no list for a paused or archived item, or with no thread at work', async () => {
         const stopped: ItemThread = { id: 'build', title: 'Build', state: 'stopped', updated: at };
+
         for (const change of [
             { paused: 'Paused' },
             { archived: true },
@@ -2148,6 +2291,7 @@ describe('the working agents', () => {
 
     test('details follows a read going old with no new data', async () => {
         const { ACTIVITY_STALE_MS } = await import('@lar-factory/shared');
+
         await mountPage(board({ threads: [working] }));
         await openItem('I_sample13');
         expect(section()!.querySelector('li')).not.toBeNull();
@@ -2160,12 +2304,15 @@ describe('the working agents', () => {
 
     test('ages tick live and render nothing else in the dialog', async () => {
         let glyphRenders = 0;
+
         vi.doMock('../items/status-glyph.tsx', async (original) => {
             const real = await original<typeof import('../items/status-glyph.tsx')>();
+
             return {
                 ...real,
                 StatusGlyph: (props: Parameters<typeof real.StatusGlyph>[0]) => {
                     glyphRenders += 1;
+
                     return real.StatusGlyph(props);
                 },
             };

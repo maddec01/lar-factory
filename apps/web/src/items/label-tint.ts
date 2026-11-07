@@ -18,6 +18,7 @@ const TEXT_SHARE = 0.55;
 
 const rgbOf = (hex: string): Rgb | null => {
     const digits = /^#?([0-9a-f]{6})$/i.exec(hex)?.[1];
+
     return digits ? ([0, 2, 4].map((at) => parseInt(digits.slice(at, at + 2), 16)) as unknown as Rgb) : null;
 };
 const mixed = (a: Rgb, b: Rgb, share: number): Rgb =>
@@ -27,14 +28,17 @@ const hexOf = (color: Rgb) => `#${color.map((part) => Math.round(part).toString(
 const luminance = (color: Rgb): number => {
     const [r, g, b] = color.map((part) => {
         const linear = part / 255;
+
         return linear <= 0.03928 ? linear / 12.92 : ((linear + 0.055) / 1.055) ** 2.4;
     }) as unknown as Rgb;
+
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
 /** The WCAG contrast ratio of two colours. */
 export function contrastRatio(a: string, b: string): number {
     const [lighter, darker] = [luminance(rgbOf(a)!), luminance(rgbOf(b)!)].sort((x, y) => y - x) as [number, number];
+
     return (lighter + 0.05) / (darker + 0.05);
 }
 
@@ -47,10 +51,13 @@ export function chipText(color: string, mode: Mode): string {
     const label = rgbOf(color)!;
     const foreground = rgbOf(PALETTE[mode].foreground)!;
     const fill = chipFill(color, mode);
+
     for (let share = TEXT_SHARE; share > 0; share -= 0.05) {
         const text = hexOf(mixed(label, foreground, share));
+
         if (contrastRatio(text, fill) >= CONTRAST_FLOOR) return text;
     }
+
     return PALETTE[mode].foreground;
 }
 

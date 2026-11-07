@@ -103,17 +103,22 @@ export async function readGithubItemDetails(
     run?: (args: string[]) => Promise<string>,
 ): Promise<ItemDetails | Refused> {
     let node: RawDetails | null;
+
     try {
         node = (await graphql<{ data: { node: RawDetails | null } }>(ITEM_DETAILS_QUERY, { id: item.id }, run)).data
             .node;
     } catch (err) {
         return { status: 502, error: message(err) };
     }
+
     if (!node) return { status: 404, error: 'GitHub has no such item.' };
+
     const discussion = await skipEmptyCommentPages(commentPage(node.comments), (before) =>
         readGithubCommentPage(item, before, COMMENT_LOOKAHEAD_QUERY, run),
     );
+
     if ('error' in discussion) return discussion;
+
     return {
         body: stripTrackerStructure(node.body ?? ''),
         format: 'markdown',
@@ -147,7 +152,9 @@ export async function readGithubOlderComments(
     run?: (args: string[]) => Promise<string>,
 ): Promise<ItemCommentsPage | Refused> {
     const first = await readGithubCommentPage(item, before, OLDER_COMMENTS_QUERY, run);
+
     if ('error' in first) return first;
+
     return skipEmptyCommentPages(first, (cursor) => readGithubCommentPage(item, cursor, COMMENT_LOOKAHEAD_QUERY, run));
 }
 
@@ -158,12 +165,15 @@ async function readGithubCommentPage(
     run?: (args: string[]) => Promise<string>,
 ): Promise<ItemCommentsPage | Refused> {
     let node: RawDetails | null;
+
     try {
         node = (await graphql<{ data: { node: RawDetails | null } }>(query, { id: item.id, before }, run)).data.node;
     } catch (err) {
         return { status: 502, error: message(err) };
     }
+
     if (!node?.comments) return { status: 404, error: 'GitHub has no such item.' };
+
     return commentPage(node.comments);
 }
 
@@ -174,20 +184,26 @@ export async function saveGithubDescription(
     run?: (args: string[]) => Promise<string>,
 ): Promise<Refused | null> {
     if (!item.repo || item.number === null) return { status: 404, error: 'That item is not a GitHub issue.' };
+
     try {
         if (item.tracker) {
             const current = await readIssue(item.repo, item.number, run);
+
             if (!current?.tracker)
                 return {
                     status: 409,
                     error: 'The saved issue structure changed. Open the latest description before editing.',
                 };
+
             body = writeTrackerStructure(body, current.tracker);
         }
+
         await editIssueBody(item.repo, item.number, body, run);
+
         return null;
     } catch (err) {
         const text = message(err);
+
         return {
             status: /HTTP 403|not accessible|permission/i.test(text) ? 403 : 502,
             error: `Could not save the description. ${text}`,

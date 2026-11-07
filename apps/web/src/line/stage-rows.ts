@@ -32,11 +32,14 @@ export function stageRows(items: readonly Item[], data: BoardData, unavailable: 
         ready: [],
         build: [],
     };
+
     for (const item of items) {
         const { sections, concept } = placed(item);
+
         for (const section of sections)
             if (section !== 'desk' && section !== 'dock') rows[section].push({ item, concept });
     }
+
     return {
         ...rows,
         build: rows.build.sort((a, b) => stageOf(b.item.status) - stageOf(a.item.status)),

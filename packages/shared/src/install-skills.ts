@@ -249,6 +249,7 @@ export function installSkills(
     options: InstallOptions = {},
 ): InstallResult {
     const progress = { changed: false };
+
     try {
         return install(
             home,
@@ -266,6 +267,7 @@ export function installSkills(
         );
     } catch (error) {
         if (error instanceof InstallError) throw error;
+
         throw new InstallError((error as Error).message, progress.changed, { cause: error });
     }
 }
@@ -279,6 +281,7 @@ function install(
     progress: { changed: boolean },
 ): InstallResult {
     confine(join(home, '.agents'), options.root);
+
     const manifestPath = join(home, '.agents', INSTALL_MANIFEST);
     const current = readManifest(home);
 
@@ -304,8 +307,11 @@ function install(
     const replaced = new Set<string>();
     const conflict: Conflict = (path, blocks) => {
         conflicts.push(path);
+
         if (!blocks) return;
+
         const { skill, ...place } = blocks;
+
         blocking.set(skill, [...(blocking.get(skill) ?? []), { ...place, path }]);
     };
 
@@ -313,9 +319,12 @@ function install(
     const agents = join(home, '.agents/skills');
     const agentsKey = targetKey(agents);
     const targets = resolveTargets(options.targets, [], states);
+
     for (const target of targets) {
         const outside = target.active && outsideRoot(target.key, options.root);
+
         if (!outside) continue;
+
         target.active = false;
         target.error = { message: outside, changed: false };
     }
@@ -330,7 +339,9 @@ function install(
                     skills: bundled.map((name) => ({ name, state: 'failed' })),
                     replaced: [],
                 });
+
             const previous = states[target.key];
+
             if (previous)
                 states[target.key] = leave(
                     target,
@@ -338,9 +349,11 @@ function install(
                     bundled,
                     outsideRoot(target.key, options.root) === undefined,
                 );
+
             target.skills = states[target.key]?.skills ?? target.skills;
             continue;
         }
+
         const previous = states[target.key] ?? { kind: target.kind, finished: false, skills: [] };
         const upgrading = previous.release !== version || !previous.finished;
         const replacing = new Set<string>();
@@ -356,31 +369,42 @@ function install(
             });
         const report = (skill: string, state: InstallSkillState) => {
             if (state === 'installing' && operation === 'check') operation = 'install';
+
             skillsProgress.set(skill, state);
             emit(true);
         };
+
         emit(true);
+
         const drift: Drift = (skill, at) => {
             if (upgrading || options.replace) {
                 replacing.add(skill);
+
                 return true;
             }
+
             drifting.set(skill, [...(drifting.get(skill) ?? []), at]);
             report(skill, 'drift');
+
             return false;
         };
         const work: Work = { owned: new Set(previous.skills), digests: { ...previous.digests }, changed: false };
         let error: TargetResult['error'];
+
         try {
             if (target.kind === 'claude') {
                 const linkable = (states[agentsKey]?.skills ?? []).filter((name) => bundled.includes(name));
+
                 linkTarget(target.path, agents, work, linkable, placeOf(target), conflict, drift, report);
                 for (const skill of bundled.filter((name) => !linkable.includes(name))) {
                     const sourceClash = blocking.get(skill)?.some(({ path }) => path === join(agents, skill));
+
                     report(skill, sourceClash ? 'blocked' : 'failed');
                 }
+
                 if ([...skillsProgress.values()].includes('failed')) {
                     const sourceError = targets.find(({ key }) => key === agentsKey)?.error;
+
                     error = {
                         message: `Source copies in ${agents} are unavailable${sourceError ? `: ${sourceError.message}` : ''}`,
                         changed: work.changed,
@@ -390,7 +414,9 @@ function install(
         } catch (cause) {
             error = { message: (cause as Error).message, changed: work.changed };
         }
+
         if (work.changed) progress.changed = true;
+
         const skills = [...work.owned].sort();
         // Only a failed upgrade leaves a target unfinished. A failed check of a target already on this Release keeps it
         // current, or the next check would take it for an upgrade and overwrite its Drift.
@@ -404,6 +430,7 @@ function install(
                 digests: Object.fromEntries(
                     skills.flatMap((name) => {
                         const digest = error ? work.digests[name] : digests[name];
+
                         return digest === undefined ? [] : [[name, digest]];
                     }),
                 ),
@@ -412,16 +439,20 @@ function install(
             ...(target.required && { required: true }),
             ...(previous.references && { references: true }),
         };
+
         states[target.key] = state;
         target.finished = state.finished;
         target.skills = skills;
+
         if (state.release !== undefined) target.release = state.release;
+
         if (error) {
             target.error = error;
             for (const [name, state] of skillsProgress)
                 if (state === 'pending' || state === 'installing' || state === 'checking')
                     skillsProgress.set(name, 'failed');
         }
+
         for (const name of replacing) if (skillsProgress.get(name) === 'installed') replaced.add(name);
         emit(false);
     }
@@ -431,9 +462,13 @@ function install(
     const status = Object.fromEntries(
         bundled.map((name): [string, SkillStatus] => {
             const paths = blocking.get(name);
+
             if (paths) return [name, { state: 'blocked', paths }];
+
             if (replaced.has(name)) return [name, { state: 'restored', restoredAt: replacedAt }];
+
             const previous = current?.status?.[name];
+
             return [name, !upgrading && previous && previous.state !== 'blocked' ? previous : { state: 'matching' }];
         }),
     );
@@ -448,8 +483,10 @@ function install(
     const named = (paths: Map<string, BlockingPath[]>) =>
         bundled.flatMap((skill) => {
             const found = paths.get(skill);
+
             return found ? [{ skill, paths: found }] : [];
         });
+
     return {
         installed: progress.changed || wroteManifest,
         version,
@@ -476,19 +513,24 @@ function resolveTargets(
 ): Target[] {
     const rank = { agents: 0, antigravity: 1, claude: 2 };
     const targets = new Map<string, Target>();
+
     for (const { kind, path, required = false } of offered) {
         const key = targetKey(path);
         const target = targets.get(key);
+
         if (!target) {
             targets.set(key, { key, kind, path, paths: [path], required, skills: [], active: true, finished: false });
             continue;
         }
+
         target.paths.push(path);
         target.required ||= required;
+
         if (rank[kind] < rank[target.kind]) target.kind = kind;
     }
     for (const { kind, path } of known) {
         const key = targetKey(path);
+
         if (!targets.has(key))
             targets.set(key, {
                 key,
@@ -514,12 +556,14 @@ function resolveTargets(
                 finished: false,
             });
     }
+
     return [...targets.values()].map((target) => {
         const state = states[target.key];
         const offeredHere = offered.some(({ path }) => target.paths.includes(path));
         const selected =
             target.required || (offeredHere ? state?.selection !== 'unticked' : state?.selection === 'ticked');
         const homeMissing = selected && target.kind === 'claude' && !isFolder(dirname(target.path));
+
         return {
             ...target,
             ...(state?.selection && { selection: state.selection }),
@@ -542,6 +586,7 @@ function resolveTargets(
 function leave(target: Target, previous: TargetState, bundled: string[], inside: boolean): TargetState {
     const { required: _, ...rest } = previous;
     const work: Work = { owned: new Set(previous.skills), digests: { ...previous.digests }, changed: false };
+
     if (inside) {
         try {
             removeObsolete(target, bundled, work);
@@ -549,7 +594,9 @@ function leave(target: Target, previous: TargetState, bundled: string[], inside:
             /* Kept owned for the next install. */
         }
     }
+
     const skills = [...work.owned].sort();
+
     return {
         ...rest,
         skills,
@@ -567,13 +614,16 @@ function leave(target: Target, previous: TargetState, bundled: string[], inside:
 function removeObsolete(target: InstallTarget, bundled: string[], work: Work): void {
     for (const skill of [...work.owned]) {
         if (bundled.includes(skill)) continue;
+
         const path = join(target.path, skill);
+
         if (target.kind === 'claude') {
             if (removeLink(path)) work.changed = true;
         } else if (isRealFolder(path)) {
             rmSync(path, { recursive: true, force: true });
             work.changed = true;
         }
+
         work.owned.delete(skill);
         delete work.digests[skill];
     }
@@ -582,6 +632,7 @@ function removeObsolete(target: InstallTarget, bundled: string[], work: Work): v
 /** Where a blocking path in `target` is. */
 function placeOf(target: InstallTarget): BlockingPlace {
     if (target.kind === 'claude') return { place: 'profile', profile: basename(dirname(target.path)) };
+
     return { place: target.kind };
 }
 
@@ -606,24 +657,33 @@ function copyTarget(
     const copies: Copy[] = bundled
         .filter((skill) => {
             report(skill, 'checking');
+
             const path = join(target.path, skill);
+
             if (work.owned.has(skill) || !exists(path)) return true;
+
             conflict(path, { skill, ...place });
             report(skill, 'blocked');
+
             return false;
         })
         .filter((skill) => {
             const path = join(target.path, skill);
+
             if (exists(path) && treeDigest(path, false) === digests[skill]) {
                 work.digests[skill] = digests[skill]!;
                 report(skill, 'installed');
+
                 return false;
             }
+
             if (!work.owned.has(skill)) return true;
+
             // An upgrade writes every owned copy; only one that changed since its Release counts as Drift.
             const recorded = previous.digests?.[skill];
             const changed =
                 !upgrading || !exists(path) || (recorded !== undefined && treeDigest(path, false) !== recorded);
+
             return !changed || drift(skill, { ...place, path });
         })
         .map((skill) => ({
@@ -634,6 +694,7 @@ function copyTarget(
         }));
 
     const staged: { copy: Copy; temporary: string }[] = [];
+
     try {
         for (const copy of copies) {
             report(copy.skill, 'installing');
@@ -648,6 +709,7 @@ function copyTarget(
     } finally {
         for (const { temporary } of staged) rmSync(temporary, { recursive: true, force: true });
     }
+
     removeObsolete(target, bundled, work);
 }
 
@@ -719,22 +781,32 @@ export function setTargetTick(
 ): TickResult {
     const manifest = readManifest(home) ?? { targets: {} };
     const target = resolveTargets(targets, known, manifest.targets).find((candidate) => candidate.paths.includes(path));
+
     if (!target) throw new Error(`${path} is not an Install target`);
+
     const agents = join(home, '.agents/skills');
     const agentsKey = targetKey(agents);
+
     if (!ticked && target.required) throw new Error(`T3 Code's provider instances read ${path}, so it stays ticked`);
+
     if (!ticked && target.key === agentsKey) throw new Error(`Claude's skills link to ${path}, so it stays ticked`);
+
     confine(join(home, '.agents'), root);
     confine(target.key, root);
+
     const state = manifest.targets[target.key] ?? { kind: target.kind, finished: false, skills: [] };
     const conflicts: string[] = [];
     const removed = { links: [] as string[], checklists: false };
     const selection: TargetSelection = ticked ? 'ticked' : 'unticked';
     let next: TargetState = { ...state, selection };
+
     if (target.kind === 'claude') {
         const installed = manifest.targets[agentsKey];
+
         if (!installed) throw new Error(`No skills are installed in ${join(home, '.agents')} yet`);
+
         const work: Work = { owned: new Set(state.skills), digests: {}, changed: false };
+
         if (ticked)
             linkTarget(
                 target.path,
@@ -746,6 +818,7 @@ export function setTargetTick(
                 () => true,
             );
         else unlinkTarget(target.path, state, work, removed);
+
         next = {
             kind: 'claude',
             ...(ticked
@@ -762,10 +835,12 @@ export function setTargetTick(
                 exists(join(dirname(target.path), 'references')) && { references: true }),
         };
     }
+
     writeManifest(join(home, '.agents', INSTALL_MANIFEST), {
         ...manifest,
         targets: { ...manifest.targets, [target.key]: next },
     });
+
     return { conflicts, removed };
 }
 
@@ -800,25 +875,32 @@ function linkTarget(
 ): void {
     for (const skill of [...work.owned]) {
         if (skills.includes(skill)) continue;
+
         if (removeLink(join(folder, skill))) work.changed = true;
+
         work.owned.delete(skill);
     }
     for (const skill of skills) {
         report(skill, 'checking');
+
         const path = join(folder, skill);
         const target = join(agents, skill);
         const made = work.owned.has(skill);
+
         if (made && exists(path) && pointsAt(path, target)) {
             report(skill, 'installed');
             continue;
         }
+
         if (exists(path) && (!made || !lstatSync(path).isSymbolicLink())) {
             conflict(path, { skill, ...place });
             work.owned.delete(skill);
             report(skill, 'blocked');
             continue;
         }
+
         if (made && !drift(skill, { ...place, path })) continue;
+
         report(skill, 'installing');
         removeLink(path);
         mkdirSync(folder, { recursive: true });
@@ -833,7 +915,9 @@ function linkTarget(
 function unlinkTarget(folder: string, state: TargetState, work: Work, removed: TickResult['removed']): void {
     for (const skill of state.skills) if (removeLink(join(folder, skill))) removed.links.push(skill);
     work.owned.clear();
+
     const references = join(dirname(folder), 'references');
+
     if (state.references && exists(references)) {
         rmSync(references, { recursive: true, force: true });
         removed.checklists = true;
@@ -847,12 +931,15 @@ function unlinkTarget(folder: string, state: TargetState, work: Work, removed: T
 function targetKey(path: string): string {
     const missing: string[] = [];
     let existing = resolve(path);
+
     for (;;) {
         try {
             return join(realpathSync(existing), ...missing.reverse());
         } catch (error) {
             const code = (error as NodeJS.ErrnoException).code;
+
             if ((code !== 'ENOENT' && code !== 'ENOTDIR') || dirname(existing) === existing) return resolve(path);
+
             missing.push(basename(existing));
             existing = dirname(existing);
         }
@@ -862,15 +949,19 @@ function targetKey(path: string): string {
 /** Why `key`, a real path, can't take writes: it leaves `root`. Undefined without a root or inside it. */
 function outsideRoot(key: string, root: string | undefined): string | undefined {
     if (root === undefined) return undefined;
+
     const limit = targetKey(root);
     const inside = relative(limit, key);
+
     if (inside === '' || (inside.split(sep)[0] !== '..' && !isAbsolute(inside))) return undefined;
+
     return `${key} is outside the install root ${limit}, so Lar Factory left it alone`;
 }
 
 /** Throws an `InstallError` before any write when `path` resolves outside `root`. */
 function confine(path: string, root: string | undefined): void {
     const outside = outsideRoot(targetKey(path), root);
+
     if (outside) throw new InstallError(outside, false);
 }
 
@@ -883,18 +974,23 @@ function confine(path: string, root: string | undefined): void {
 function readManifest(home: string): Manifest | null {
     const path = join(home, '.agents', INSTALL_MANIFEST);
     let manifest: Record<string, unknown>;
+
     try {
         const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+
         if (!isRecord(parsed)) throw new Error('it is not an object');
+
         manifest = parsed;
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+
         throw new InstallError(
             `Couldn't read ${path}: ${(error as Error).message}. Delete that file and start Lar Factory again.`,
             false,
             { cause: error },
         );
     }
+
     const status = isRecord(manifest.status)
         ? Object.fromEntries(
               Object.entries<unknown>(manifest.status).filter(
@@ -903,6 +999,7 @@ function readManifest(home: string): Manifest | null {
           )
         : undefined;
     const targets = isRecord(manifest.targets) ? readTargets(manifest.targets) : migrate(home, manifest);
+
     return {
         ...(typeof manifest.version === 'string' && { version: manifest.version }),
         ...(status && { status }),
@@ -916,9 +1013,12 @@ const KINDS: readonly InstallTargetKind[] = ['agents', 'antigravity', 'claude'];
 /** The manifest's targets, keyed again by their real paths, without entries that aren't a target at an absolute path. */
 function readTargets(entries: Record<string, unknown>): Record<string, TargetState> {
     const targets: Record<string, TargetState> = {};
+
     for (const [path, state] of Object.entries(entries)) {
         if (!isAbsolute(path) || !isRecord(state) || !KINDS.includes(state.kind as InstallTargetKind)) continue;
+
         const key = targetKey(path);
+
         targets[key] ??= {
             kind: state.kind as InstallTargetKind,
             ...(typeof state.release === 'string' && { release: state.release }),
@@ -930,6 +1030,7 @@ function readTargets(entries: Record<string, unknown>): Record<string, TargetSta
             ...(state.references === true && { references: true }),
         };
     }
+
     return targets;
 }
 
@@ -951,8 +1052,10 @@ function migrate(home: string, legacy: Record<string, unknown>): Record<string, 
     const targets: Record<string, TargetState> = {
         [targetKey(join(home, '.agents/skills'))]: copies('agents', names(legacy.skills)),
     };
+
     for (const [name, state] of isRecord(legacy.profiles) ? Object.entries(legacy.profiles) : []) {
         if (!isProfileName(name) || !isRecord(state)) continue;
+
         targets[targetKey(join(home, name, 'skills'))] = {
             kind: 'claude',
             ...release,
@@ -966,6 +1069,7 @@ function migrate(home: string, legacy: Record<string, unknown>): Record<string, 
         if (ANTIGRAVITY_FOLDERS.includes(folder) && Array.isArray(skills))
             targets[targetKey(join(home, folder))] = copies('antigravity', names(skills));
     }
+
     return targets;
 }
 
@@ -986,16 +1090,20 @@ function readDigests(value: Record<string, unknown>): Record<string, string> {
 function removeLink(path: string): boolean {
     try {
         if (!lstatSync(path).isSymbolicLink()) return false;
+
         rmSync(path);
+
         return true;
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+
         return false;
     }
 }
 
 function pointsAt(path: string, target: string): boolean {
     if (!lstatSync(path).isSymbolicLink()) return false;
+
     try {
         return realpathSync(path) === realpathSync(target);
     } catch {
@@ -1009,6 +1117,7 @@ function isRealFolder(path: string): boolean {
         return lstatSync(path).isDirectory();
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+
         throw error;
     }
 }
@@ -1049,15 +1158,20 @@ function writeManifest(path: string, manifest: Manifest): boolean {
             ]),
     );
     const text = `${JSON.stringify({ ...manifest, targets }, null, 2)}\n`;
+
     try {
         if (readFileSync(path, 'utf8') === text) return false;
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
+
     mkdirSync(dirname(path), { recursive: true });
+
     const temporary = `${path}.${process.pid}.tmp`;
+
     writeFileSync(temporary, text);
     renameSync(temporary, path);
+
     return true;
 }
 
@@ -1069,13 +1183,16 @@ function treeDigest(path: string, follow: boolean): string {
     const hash = createHash('sha256');
     const add = (path: string, name: string) => {
         const stats = follow ? statSync(path) : lstatSync(path);
+
         if (stats.isDirectory()) {
             hash.update(`folder ${name}\0`);
             for (const entry of readdirSync(path).sort()) add(join(path, entry), `${name}/${entry}`);
         } else if (stats.isFile()) hash.update(`file ${name} ${stats.mode} ${stats.size}\0`).update(readFileSync(path));
         else hash.update(`other ${name}\0`);
     };
+
     add(path, '.');
+
     return hash.digest('hex');
 }
 
@@ -1083,22 +1200,28 @@ function treeDigest(path: string, follow: boolean): string {
 function exists(path: string): boolean {
     try {
         lstatSync(path);
+
         return true;
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+
         throw error;
     }
 }
 
 function isSkillStatus(value: unknown): value is SkillStatus {
     if (!isRecord(value)) return false;
+
     if (value.state === 'restored') return typeof value.restoredAt === 'string';
+
     if (value.state === 'blocked') return Array.isArray(value.paths) && value.paths.every(isBlockingPath);
+
     return value.state === 'matching';
 }
 
 function isBlockingPath(value: unknown): value is BlockingPath {
     if (!isRecord(value) || typeof value.path !== 'string') return false;
+
     return (
         value.place === 'agents' ||
         value.place === 'antigravity' ||
@@ -1114,8 +1237,11 @@ function isFolderName(name: unknown): name is string {
 /** Copies `copy.source` into a hidden folder beside its target and returns that folder. */
 function stage(copy: Copy): string {
     const parent = dirname(copy.target);
+
     mkdirSync(parent, { recursive: true });
+
     const temporary = mkdtempSync(join(parent, `.${basename(copy.target)}.installing-`));
+
     try {
         cpSync(copy.source, temporary, { recursive: true, dereference: true });
     } catch (error) {
@@ -1124,6 +1250,7 @@ function stage(copy: Copy): string {
             cause: error,
         });
     }
+
     return temporary;
 }
 
@@ -1135,13 +1262,17 @@ function stage(copy: Copy): string {
 function swap(temporary: string, target: string, progress = { changed: false }): void {
     const previous = `${temporary}.previous`;
     let moved = true;
+
     try {
         renameSync(target, previous);
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+
         moved = false;
     }
+
     let keepPrevious = false;
+
     try {
         renameSync(temporary, target);
         progress.changed = true;
@@ -1153,6 +1284,7 @@ function swap(temporary: string, target: string, progress = { changed: false }):
             } catch {
                 keepPrevious = true;
             }
+
         throw error;
     } finally {
         if (!keepPrevious) rmSync(previous, { recursive: true, force: true });

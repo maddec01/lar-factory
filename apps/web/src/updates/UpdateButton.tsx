@@ -37,6 +37,7 @@ function ReleaseNotes({ state }: { state: UpdateState }) {
         <>
             {state.releaseNotes.map((note, index) => {
                 const omitted = note.totalItems - note.items.length;
+
                 return (
                     <section
                         className="not-first:border-base-300 not-first:mt-3 not-first:border-t not-first:pt-3"
@@ -73,7 +74,9 @@ function ReleaseNotes({ state }: { state: UpdateState }) {
 function useHoverOpen() {
     const [open, setOpen] = useState(false);
     const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
     useEffect(() => () => clearTimeout(timer.current), []);
+
     const show = () => {
         clearTimeout(timer.current);
         setOpen(true);
@@ -87,10 +90,12 @@ function useHoverOpen() {
         onPointerEnter: (event: PointerEvent) => event.pointerType !== 'touch' && show(),
         onPointerLeave: (event: PointerEvent) => {
             if (event.pointerType === 'touch') return;
+
             clearTimeout(timer.current);
             timer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
         },
     };
+
     return { open, show, close, hover };
 }
 
@@ -98,6 +103,7 @@ function useHoverOpen() {
  *  tooltip. */
 function Downloading({ state }: { state: UpdateState }) {
     const percent = downloadPercent(state);
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -126,6 +132,7 @@ function NextStep({ state, ready }: { state: UpdateState; ready: boolean }) {
     const { installing, pending, run } = useUpdateStore();
     const { open, show, close, hover } = useHoverOpen();
     const disabled = installing || pending || resolveUpdateButtonAction(state) === 'none';
+
     return (
         <Popover open={open} onOpenChange={(next) => !next && close()}>
             <Popover.Trigger asChild>
@@ -137,6 +144,7 @@ function NextStep({ state, ready }: { state: UpdateState; ready: boolean }) {
                     // The pill runs the step; the changelog opens on hover and focus, not on the click.
                     onClick={(event) => {
                         event.preventDefault();
+
                         if (!disabled) void run();
                     }}
                     onFocus={(event) => event.currentTarget.matches(':focus-visible') && show()}
@@ -178,9 +186,14 @@ function NextStep({ state, ready }: { state: UpdateState; ready: boolean }) {
 
 export function UpdateButton() {
     const { state, follow } = useUpdateStore();
+
     useEffect(follow, [follow]);
+
     const pill = resolveUpdatePill(state);
+
     if (!boardApp() || !state || pill === 'none') return null;
+
     if (pill === 'downloading') return <Downloading state={state} />;
+
     return <NextStep state={state} ready={pill === 'ready'} />;
 }

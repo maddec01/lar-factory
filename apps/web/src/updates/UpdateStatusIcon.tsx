@@ -13,6 +13,7 @@ export type UpdateStatusIconState = 'available' | 'downloading' | 'downloaded';
 
 function UpdateDownloadingIcon({ percent }: { readonly percent: number }) {
     const progressOffset = DOWNLOAD_PROGRESS_CIRCUMFERENCE * (1 - percent / 100);
+
     return (
         <svg aria-hidden="true" className="size-4 shrink-0 -rotate-90" viewBox="0 0 20 20">
             <circle
@@ -48,6 +49,8 @@ export function UpdateStatusIcon({
     readonly status: UpdateStatusIconState;
 }) {
     if (status === 'downloading') return <UpdateDownloadingIcon percent={downloadPercent} />;
+
     const Icon = status === 'downloaded' ? RotateCcw : ArrowDownToLine;
+
     return <Icon className="size-4 shrink-0" aria-hidden="true" />;
 }

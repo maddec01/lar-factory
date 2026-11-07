@@ -42,13 +42,16 @@ export function ExportMarkdown({
 }) {
     const run = async () => {
         setExported({ state: 'exporting' });
+
         const result = await postAction<{ paths: string[] }>('/api/item-export', { itemId });
+
         setExported(
             result.error || !result.paths
                 ? { state: 'failed', error: result.error ?? 'The board did not say what it wrote.' }
                 : { state: 'done', paths: result.paths },
         );
     };
+
     return (
         <Button {...kind('other')} loading={exported.state === 'exporting'} onClick={() => void run()}>
             Export markdown
@@ -64,12 +67,14 @@ export function ExportedLine({ exported }: { exported: Exported }) {
                 Exported to {exported.paths.join(', ')}
             </p>
         );
+
     if (exported.state === 'failed')
         return (
             <p className="m-0 text-xs text-(--error-foreground)" role="alert">
                 {exported.error}
             </p>
         );
+
     return null;
 }
 
@@ -91,6 +96,7 @@ export function RecordText({
             ? record.body.split('\n').slice(1).join('\n').trimStart()
             : record.body;
     const title = spec ? 'Work record' : answer ? 'Outcome' : TITLE[record.bodyKind];
+
     return (
         <section className={`grid min-w-0 gap-2 ${className}`} data-record>
             <div className="flex h-7 items-center justify-between gap-2">

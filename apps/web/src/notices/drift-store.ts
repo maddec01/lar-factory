@@ -49,14 +49,20 @@ export const useDriftStore = create<DriftState>()((set, get) => {
         call: () => Promise<InstallOperationResult>,
     ) => {
         const snapshot = useInstallStore.getState().snapshot;
+
         if (!snapshot?.installs || snapshot.running || get().replacing || get().retrying) return;
+
         set({ [busy]: true, [error]: null });
+
         try {
             const result = await call();
+
             useInstallStore.getState().accept(result.snapshot);
+
             const failures = fromSnapshot(result.snapshot).failures.map(
                 ({ path, reason }) => `${path ? `${path}: ` : ''}${reason}`,
             );
+
             set({ [error]: result.error ?? (failures.length ? failures.join('; ') : null) });
         } catch (cause) {
             set({ [error]: failure(cause) });
@@ -64,6 +70,7 @@ export const useDriftStore = create<DriftState>()((set, get) => {
             set({ [busy]: false });
         }
     };
+
     return {
         skills: [],
         blocked: [],
@@ -75,11 +82,14 @@ export const useDriftStore = create<DriftState>()((set, get) => {
         follow: () => {
             const apply = () => {
                 const snapshot = useInstallStore.getState().snapshot;
+
                 if (snapshot) set(fromSnapshot(snapshot));
             };
             const unsubscribe = useInstallStore.subscribe(apply);
             const unfollow = useInstallStore.getState().follow();
+
             apply();
+
             return () => {
                 unsubscribe();
                 unfollow();

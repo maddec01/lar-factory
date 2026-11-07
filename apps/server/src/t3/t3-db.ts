@@ -10,6 +10,7 @@ import { expandHome } from './t3-settings.ts';
 /** Runs `read` on T3's database at `path`, opened read-only; throws when it is missing or can't be read. */
 export function readT3Db<T>(path: string, read: (db: DatabaseSync) => T): T {
     const db = openT3Db(path);
+
     try {
         return read(db);
     } finally {
@@ -224,6 +225,7 @@ export function projectDefaultSelection(db: DatabaseSync, projectId: string): un
             'SELECT default_model_selection_json AS selection FROM projection_projects WHERE project_id = ? AND deleted_at IS NULL',
         )
         .get(projectId) as { selection: unknown } | undefined;
+
     return typeof row?.selection === 'string' ? (JSON.parse(row.selection) as unknown) : null;
 }
 
@@ -246,7 +248,9 @@ export function threadByTitle(
     const row = readT3Db(db, (open) => open.prepare(THREAD_BY_TITLE).get(projectId, title)) as
         | { id: unknown; latest: unknown }
         | undefined;
+
     if (typeof row?.id !== 'string') return null;
+
     return { threadId: row.id, latest: typeof row.latest === 'string' ? row.latest : null };
 }
 
@@ -292,17 +296,22 @@ export function activityItems(db: DatabaseSync, threadId: string): ActivityItemR
 
 /** Only the four fixed activity queries are cached, by connection. Results are read afresh on every call. */
 const activityStatements = new WeakMap<DatabaseSync, Map<string, StatementSync>>();
+
 function activityStatement(db: DatabaseSync, query: string): StatementSync {
     let statements = activityStatements.get(db);
+
     if (!statements) {
         statements = new Map();
         activityStatements.set(db, statements);
     }
+
     let statement = statements.get(query);
+
     if (!statement) {
         statement = db.prepare(query);
         statements.set(query, statement);
     }
+
     return statement;
 }
 

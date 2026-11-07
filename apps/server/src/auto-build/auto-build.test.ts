@@ -19,6 +19,7 @@ const OFFERED: ModelGroup[] = [
 const OK: Reply = { status: 200, body: { thread: { threadId: 't', title: 't' }, error: null } };
 
 const cleanups: (() => void)[] = [];
+
 afterEach(() => {
     for (const cleanup of cleanups.splice(0)) cleanup();
 });
@@ -28,9 +29,11 @@ const at = (records: WorkRecords, workId: string) => records.read(workId).revisi
 /** Passes the work's brief through its gate, a millisecond after the last one, so gate times order the builds. */
 function gate(records: WorkRecords, workId: string): void {
     const now = Date.now();
+
     while (Date.now() === now) {
         /* the next millisecond */
     }
+
     records.recordGate(workId, at(records, workId), {
         briefDigest: records.gate(workId).briefDigest!,
         approvedBy: 'reviewer',
@@ -41,8 +44,11 @@ function gate(records: WorkRecords, workId: string): void {
 /** A Ready build with a brief; `gated` false leaves its gate unpassed. */
 function ready(records: WorkRecords, title: string, gated = true): string {
     const { workId } = records.create({ title, repository: REPO, kind: 'build', status: 'Ready' });
+
     records.setBody(workId, at(records, workId), 'brief', `Build ${title}.`);
+
     if (gated) gate(records, workId);
+
     return workId;
 }
 
@@ -69,11 +75,13 @@ interface SetUp {
 async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<SetUp> {
     const dir = shared?.dir ?? mkdtempSync(join(tmpdir(), 'auto-build-'));
     const records = shared?.records ?? (await openWorkRecords(join(dir, 'work-records.db')));
+
     if (!shared)
         cleanups.push(() => {
             records.close();
             rmSync(dir, { recursive: true, force: true });
         });
+
     const board = createBoardState({
         items: recordItems(records, [], [REPO]),
         repos: [],
@@ -107,16 +115,22 @@ async function setUp(shared?: { dir: string; records: WorkRecords }): Promise<Se
                 assert.deepEqual(model, s.auto.model);
                 s.started.push(itemId);
                 s.during?.(itemId);
+
                 const answer = s.answers.get(itemId) ?? OK;
+
                 if (answer === OK) records.update(itemId, at(records, itemId), { status: 'In progress' });
+
                 // A start T3 may have made leaves its launch intent unresolved.
                 if ((answer.body as { uncertain?: boolean }).uncertain)
                     records.recordLaunchIntent(itemId, at(records, itemId), 'build');
+
                 s.reread();
+
                 return answer;
             },
         },
     });
+
     return s;
 }
 
@@ -126,25 +140,38 @@ test('Auto-build starts only a Ready build with a current passing gate that noth
     const s = await setUp();
     const { records } = s;
     const eligible = ready(records, 'Eligible');
+
     ready(records, 'No gate', false);
+
     const edited = ready(records, 'Brief edited since its gate');
+
     records.setBody(edited, at(records, edited), 'brief', 'A changed brief.');
+
     const held = ready(records, 'Held Spec edit');
     const spec = records.specState(held);
+
     records.saveSpecState(held, spec.generation, {
         ...spec,
         held: { body: 'Edited', title: 'Held Spec edit', version: '2', digest: 'd' },
     });
+
     const blocked = ready(records, 'Waiting on a blocker');
     const blocker = records.create({ title: 'Blocker', repository: REPO, kind: 'build', status: 'In progress' });
+
     records.addBlocker(blocked, at(records, blocked), blocker.workId);
+
     const aside = ready(records, 'Set aside');
+
     records.setAside(aside, at(records, aside));
+
     const needsYou = ready(records, 'Needs you');
+
     records.setNeedsYouCauses(needsYou, at(records, needsYou), [{ type: 'no-thread' }]);
+
     const armed = ready(records, 'Armed with Start after');
     const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept', status: 'Shaping' });
     const refining = ready(records, 'Under a concept still refining');
+
     records.setParent(refining, at(records, refining), concept.workId);
     records.create({ title: 'Queued', repository: REPO, kind: 'feature', status: 'Queued' });
     s.reread();
@@ -167,6 +194,7 @@ test('Auto-build starts the oldest passing gate first, up to the build limit, an
     const a = ready(records, 'A', false);
     const b = ready(records, 'B', false);
     const c = ready(records, 'C', false);
+
     for (const workId of [c, a, b]) gate(records, workId);
     // A later edit moves updatedAt, which never orders the builds.
     records.setBuildBranch(c, at(records, c), 'build/c');
@@ -184,6 +212,7 @@ test('Auto-build starts the oldest passing gate first, up to the build limit, an
 
 test('with the switch off nothing starts, and the tooltip count says how many would', async () => {
     const s = await setUp();
+
     ready(s.records, 'A');
     ready(s.records, 'B');
     ready(s.records, 'C');
@@ -217,6 +246,7 @@ test('each hold starts nothing, marks nothing on the build, says why, and the ne
             "Auto-build's model isn't offered now. Choose another in Settings.",
         ],
     ];
+
     // Start build's own temporary refusals, as it marks them.
     for (const error of [
         'Waits for onboarding to finish',
@@ -236,6 +266,7 @@ test('each hold starts nothing, marks nothing on the build, says why, and the ne
     for (const [name, cause, reason, waits] of holds) {
         const s = await setUp();
         const workId = ready(s.records, 'Held');
+
         s.reread();
         cause(s, workId);
         await s.pass();
@@ -249,12 +280,14 @@ test('each hold starts nothing, marks nothing on the build, says why, and the ne
         s.answers.clear();
         s.started.length = 0;
         await s.pass();
+
         if (waits) {
             // Each try of Start build rereads the Spec, so its hold waits before it retries.
             assert.deepEqual([s.started, pass(s)?.hold], [[], reason], `${name}: waits`);
             s.clock += HOLD_RETRY_MS;
             await s.pass();
         }
+
         assert.deepEqual([s.started, pass(s)?.hold], [[workId], undefined], `${name}: retried`);
     }
 });
@@ -262,6 +295,7 @@ test('each hold starts nothing, marks nothing on the build, says why, and the ne
 test('Auto-build starts on the model Settings chose', async () => {
     const s = await setUp();
     const workId = ready(s.records, 'A');
+
     s.auto = { on: true, model: OPUS };
     s.reread();
     await s.pass();
@@ -273,6 +307,7 @@ test('a failed start pauses only that build, survives a restart, and ends when S
     const { records } = s;
     const failing = ready(records, 'Failing');
     const other = ready(records, 'Other');
+
     s.answers.set(failing, { status: 502, body: { thread: null, error: 'T3 started no thread.' } });
     s.reread();
     await s.pass();
@@ -281,7 +316,9 @@ test('a failed start pauses only that build, survives a restart, and ends when S
     assert.equal(records.read(failing).status, 'Ready');
 
     await s.stop();
+
     const restarted = await setUp({ dir: s.dir, records });
+
     await restarted.pass();
     assert.deepEqual(restarted.started, [], 'the pause outlasts a restart');
     assert.deepEqual(pass(restarted)?.paused, { [failing]: 'T3 started no thread.' });
@@ -297,6 +334,7 @@ test('a failed start pauses only that build, survives a restart, and ends when S
     assert.deepEqual(restarted.started, [failing], 'a new gate ends the pause');
 
     const person = ready(records, 'Started by hand later');
+
     restarted.answers.set(person, { status: 502, body: { thread: null, error: 'Boom.' } });
     restarted.reread();
     await restarted.pass();
@@ -312,6 +350,7 @@ test('a start T3 may have made keeps its place against the limit and is never st
     const { records } = s;
     const uncertain = ready(records, 'Uncertain');
     const next = ready(records, 'Next');
+
     s.limit = 1;
     s.answers.set(uncertain, {
         status: 502,
@@ -330,14 +369,18 @@ test('a start T3 may have made keeps its place against the limit and is never st
 test('two boards sharing a data folder start a build once', async () => {
     const first = await setUp();
     const workId = ready(first.records, 'Shared');
+
     first.reread();
+
     const second = await setUp({ dir: first.dir, records: first.records });
+
     await Promise.all([first.pass(), second.pass()]);
     assert.deepEqual([...first.started, ...second.started], [workId]);
 
     const owner = first.started.length ? first : second;
     const other = owner === first ? second : first;
     const next = ready(first.records, 'Next');
+
     other.reread();
     await other.pass();
     assert.deepEqual(
@@ -353,9 +396,12 @@ test('a Ready build a blocker held starts once the blocker completes', async () 
     const s = await setUp();
     const { records } = s;
     const blocker = records.create({ title: 'Blocker', repository: REPO, kind: 'build', status: 'In progress' });
+
     records.setPullRequest(blocker.workId, at(records, blocker.workId), `${REPO}#90`);
     records.observe(blocker.workId, at(records, blocker.workId), { of: 'pr', state: 'open' });
+
     const blocked = ready(records, 'Blocked');
+
     records.addBlocker(blocked, at(records, blocked), blocker.workId);
     s.reread();
     await s.pass();
@@ -371,10 +417,13 @@ test('a pause stays while its build is set aside, its brief lacks a passing gate
     const s = await setUp();
     const { records } = s;
     const failing = ready(records, 'Failing');
+
     s.answers.set(failing, { status: 502, body: { thread: null, error: 'T3 started no thread.' } });
     s.reread();
     await s.pass();
+
     const paused = { [failing]: 'T3 started no thread.' };
+
     assert.deepEqual(pass(s)?.paused, paused);
 
     records.setAside(failing, at(records, failing));
@@ -391,17 +440,20 @@ test('a pause stays while its build is set aside, its brief lacks a passing gate
     assert.deepEqual(pass(s)?.paused, paused, 'an edited brief with no gate yet keeps the pause');
 
     await s.stop();
+
     let unreadable = true;
     const failingReads = new Proxy(records, {
         get: (target, key) =>
             key === 'read'
                 ? (workId: string) => {
                       if (unreadable && workId === failing) throw new Error('database is locked');
+
                       return target.read(workId);
                   }
                 : target[key as keyof WorkRecords],
     });
     const restarted = await setUp({ dir: s.dir, records: failingReads });
+
     await restarted.pass();
     assert.deepEqual(pass(restarted)?.paused, paused, 'a read that fails keeps the pause');
     unreadable = false;
@@ -416,6 +468,7 @@ test('a build the board shows blocked waits without a pause, even when its recor
     const { records } = s;
     const blocked = ready(records, 'Blocked');
     const blocker = records.create({ title: 'Blocker', repository: REPO, kind: 'build', status: 'In progress' });
+
     records.addBlocker(blocked, at(records, blocked), blocker.workId);
     s.reread();
     records.removeBlocker(blocked, at(records, blocked), blocker.workId);
@@ -431,6 +484,7 @@ test('Auto-build checks each build again just before it starts it', async () => 
     const { records } = s;
     const first = ready(records, 'First');
     const second = ready(records, 'Second');
+
     s.during = (itemId) => {
         if (itemId === first) records.setAside(second, at(records, second));
     };

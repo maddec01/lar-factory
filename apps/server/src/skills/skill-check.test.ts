@@ -14,6 +14,7 @@ function fakeParent() {
     });
     const answer = (id: number, refusal: string | null, drift?: string[]) =>
         parent.emit('message', { type: 'skills-checked', id, refusal, ...(drift && { drift }) });
+
     return { parent, sent, answer };
 }
 
@@ -27,6 +28,7 @@ test('each check resolves with the answer to its own request', async () => {
     const check = parentSkillCheck({ BOARD_SKILL_CHECK: '1' }, parent)!;
     const first = check();
     const second = check();
+
     assert.deepEqual(sent, [
         { type: 'check-skills', id: 0 },
         { type: 'check-skills', id: 1 },
@@ -41,6 +43,7 @@ test("a check sends the User's Drift choice and resolves with the Drift its answ
     const check = parentSkillCheck({ BOARD_SKILL_CHECK: '1' }, parent)!;
     const asking = check();
     const replacing = check('replace');
+
     assert.deepEqual(sent, [
         { type: 'check-skills', id: 0 },
         { type: 'check-skills', id: 1, drift: 'replace' },
@@ -57,6 +60,7 @@ test('a check refuses when the parent is gone or leaves before it answers', asyn
     const { parent } = fakeParent();
     const check = parentSkillCheck({ BOARD_SKILL_CHECK: '1' }, parent)!;
     const pending = check();
+
     parent.connected = false;
     parent.emit('disconnect');
     assert.match((await pending).refusal!, /didn't answer/);

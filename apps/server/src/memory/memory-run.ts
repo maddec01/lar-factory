@@ -25,7 +25,9 @@ const run = promisify(execFile);
 
 function readSamples(folder: string): MemorySample[] {
     const file = join(folder, SAMPLES);
+
     if (!existsSync(file)) return [];
+
     return readFileSync(file, 'utf8')
         .split('\n')
         .filter(Boolean)
@@ -35,9 +37,11 @@ function readSamples(folder: string): MemorySample[] {
 function writeReport(folder: string): void {
     const captures: Capture[] = readdirSync(folder).flatMap((name) => {
         const match = FOOTPRINT.exec(name);
+
         return match ? [{ time: Number(match[1]), footprint: readFileSync(join(folder, name), 'utf8') }] : [];
     });
     const report = renderReport(readSamples(folder), captures);
+
     writeFileSync(join(folder, 'report.txt'), report);
     console.log(report);
 }
@@ -55,13 +59,16 @@ async function capture(folder: string, pid: number): Promise<void> {
                 ),
         ],
     ];
+
     for (const [tool, take] of tools)
         await take().catch((error: unknown) => console.log(`${tool} failed: ${String(error)}`));
 }
 
 async function measure(app: string, folder: string, minutes: number, forceGc: boolean): Promise<void> {
     if (existsSync(folder)) throw new Error(`${folder} exists; each run takes a new folder`);
+
     mkdirSync(folder, { recursive: true });
+
     const launcherBefore = existsSync(LAUNCHER) ? readFileSync(LAUNCHER, 'utf8') : null;
     const { ELECTRON_RUN_AS_NODE: _, ...inherited } = process.env;
     const child = spawn(join(app, 'Contents/MacOS/Lar Factory'), [], {
@@ -74,12 +81,15 @@ async function measure(app: string, folder: string, minutes: number, forceGc: bo
         },
     });
     let exited = false;
+
     child.once('exit', () => {
         exited = true;
     });
+
     const quit = () => {
         if (!exited) child.kill('SIGTERM');
     };
+
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
         process.once(signal, () => {
             quit();
@@ -88,37 +98,49 @@ async function measure(app: string, folder: string, minutes: number, forceGc: bo
 
     try {
         const waitUntil = Date.now() + FIRST_SAMPLE_MS;
+
         while (!readSamples(folder).length) {
             if (exited || Date.now() > waitUntil)
                 throw new Error('no sample arrived: quit the installed board and try again');
+
             await sleep(1_000);
         }
+
         const { pid } = readSamples(folder)[0]!;
+
         console.log(`board server PID ${pid}, samples in ${join(folder, SAMPLES)}`);
+
         const endAt = Date.now() + minutes * 60_000;
         // A capture as the server starts holds nothing, yet could sit nearest a peak in the first minutes.
         let nextCapture = Date.now() + CAPTURE_MS;
         let restarted = false;
+
         while (Date.now() < endAt && !exited) {
             if (readSamples(folder).some((sample) => sample.pid !== pid)) {
                 console.log('the server restarted, which voids this run');
                 restarted = true;
                 break;
             }
+
             if (Date.now() >= nextCapture) {
                 await capture(folder, pid);
                 nextCapture += CAPTURE_MS;
             }
+
             await sleep(5_000);
         }
+
         if (exited) console.log('the app quit before the run ended');
         // Take a closing capture at the end of the run, before quitting.
         else if (!restarted) await capture(folder, pid);
     } finally {
         quit();
+
         while (!exited) await sleep(200);
     }
+
     const launcherAfter = existsSync(LAUNCHER) ? readFileSync(LAUNCHER, 'utf8') : null;
+
     console.log(
         launcherAfter === launcherBefore ? `${LAUNCHER} is unchanged` : `WARNING: ${LAUNCHER} changed during the run`,
     );
@@ -134,6 +156,7 @@ const { values } = parseArgs({
         report: { type: 'string' },
     },
 });
+
 if (values.report) writeReport(resolve(values.report));
 else if (values.app && values.out)
     await measure(resolve(values.app), resolve(values.out), Number(values.minutes), values['force-gc']);

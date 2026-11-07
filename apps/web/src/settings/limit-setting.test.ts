@@ -84,6 +84,7 @@ test('The row refuses anything but a whole number from 1', async () => {
     for (const value of ['', '0', '-1', '2.5', 'many']) {
         await type(value);
         expect(saveButton().disabled, value).toBe(true);
+
         if (value) expect(text(row()), value).toContain('Enter a whole number from 1.');
     }
     expect(posted()).toEqual([]);
@@ -101,6 +102,7 @@ test('Picking Automatic saves it', async () => {
 test('An invalid file picks no option, with a note, and picking Automatic replaces it', async () => {
     const problem =
         'The heavy command limit setting /data/heavy-command-limit.json needs a limit of "automatic" or a whole number from 1.';
+
     await openGeneral(withLimit({ limit: 'automatic', automatic: 2, problem }));
     expect(picked()).toEqual([]);
     expect(alerts()).toEqual([`${problem} The board uses Automatic until you save a choice.`]);
@@ -161,12 +163,16 @@ test('In sample mode nothing is picked and a save shows why it was refused', asy
 
 test('Builds at once shows Automatic with the heavy command limit it follows, and saves to its own setting', async () => {
     await openGeneral(withLimit({ limit: 4, automatic: 2 }, { limit: 'automatic', automatic: 4 }));
+
     const build = $('.settings-row[data-row="build-limit"]')!;
+
     expect(text(build.querySelector('.settings-row-title'))).toBe('Builds at once');
     expect(text(select('build-limit'))).toBe('Automatic (4)');
     expect(picked('build-limit')).toEqual(['automatic']);
     await pick('number', 'build-limit');
+
     const field = $<HTMLInputElement>('[data-limit="build-limit"] input[aria-label="Build limit"]')!;
+
     expect(field.value).toBe('4');
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '1');
     await settle(() => field.dispatchEvent(new Event('input', { bubbles: true })));
@@ -178,6 +184,7 @@ test('Builds at once shows Automatic with the heavy command limit it follows, an
 
 test('An invalid build limit file picks no option, with a note', async () => {
     const problem = "The build limit setting /data/build-limit.json isn't JSON: Unexpected end of JSON input.";
+
     await openGeneral(withLimit({ limit: 'automatic', automatic: 2 }, { limit: 'automatic', automatic: 2, problem }));
     expect(picked('build-limit')).toEqual([]);
     expect(alerts('build-limit')).toEqual([`${problem} The board uses Automatic until you save a choice.`]);

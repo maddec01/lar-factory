@@ -19,6 +19,7 @@ import { useArchiveStore } from './archive-store.ts';
 /** Where the work stands in Archive: set aside, or finished on its day. */
 export function archivedAs(item: Item): string {
     if (item.archived?.setAside) return 'Set aside';
+
     return item.closedAt ? `Finished ${day(item.closedAt, undefined)}` : 'Finished';
 }
 
@@ -31,15 +32,19 @@ export function ArchiveActions({ item }: { item: Item }) {
     const restore = async () => {
         setRestoring(true);
         setError(null);
+
         const result = await postAction('/api/restore', { itemId: item.id });
+
         // A restored item leaves Archive with this row, once Archive is read again.
         if (!result.error) await useArchiveStore.getState().load();
+
         flushSync(() => {
             receive(result);
             setRestoring(false);
             setError(result.error);
         });
     };
+
     return (
         <span className="flex flex-col items-end gap-1">
             <span className="flex flex-wrap items-center gap-2">
@@ -82,6 +87,7 @@ const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
 /** A whole number of days from 0, or null for anything else. */
 function wholeDays(text: string): number | null {
     const n = Number(text);
+
     return text.trim() !== '' && Number.isSafeInteger(n) && n >= 0 ? n : null;
 }
 
@@ -124,16 +130,20 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
     const save = async (confirmed = false) => {
         setSaving(true);
         setMessage(null);
+
         const result = await postAction<{ saved: boolean; due: Due }>('/api/retention', {
             hideAfterDays: hideDays,
             deleteAfterDays: deleteDays,
             confirmed,
         });
+
         // A saved setting can hide, show or delete work in Archive.
         if (result.saved) await useArchiveStore.getState().load();
+
         flushSync(() => {
             receive(result);
             setSaving(false);
+
             if (result.error) setMessage({ text: result.error, error: true });
             else if (result.saved === false) setDue(result.due ?? []);
             else {
@@ -149,6 +159,7 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                 {retention.problem} The board keeps and shows all work until the setting can be read.
             </p>
         );
+
     return (
         <div className="grid gap-3" data-retention>
             <div className={FIELD_GROUP}>

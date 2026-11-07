@@ -41,9 +41,12 @@ function boardLimit(
                 setting.write(limit as HeavyCommandLimit, dir);
             } catch (err) {
                 if (!(err instanceof WorkRecordError)) throw err;
+
                 return { status: err.code === 'invalid' ? 400 : 500, body: { error: err.message } };
             }
+
             changed();
+
             return { status: 200, body: { error: null } };
         },
     };
@@ -56,6 +59,7 @@ export function createLimitSettings(deps: LimitSettingDeps): {
 } {
     const automatic = deps.automatic ?? automaticHeavyCommandLimit(availableParallelism(), totalmem());
     const heavyCommandLimit = boardLimit(heavyCommandLimitSetting, () => automatic, deps);
+
     return {
         heavyCommandLimit,
         buildLimit: boardLimit(buildLimitSetting, () => limitNumber(heavyCommandLimit.state()), deps),

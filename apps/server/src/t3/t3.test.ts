@@ -11,13 +11,16 @@ function t3With(result: Partial<RunResult>) {
     const calls: { args: string[]; timeout: number }[] = [];
     const run: T3Run = async (args, timeout) => {
         calls.push({ args, timeout });
+
         return { code: 0, stdout: '', stderr: '', detail: '', ...result };
     };
+
     return { run, calls };
 }
 
 test('only the exact unavailable answer releases a thread', async () => {
     const { lookupThread } = await import('./t3.ts');
+
     for (const result of [
         { code: 1, stdout: '', stderr: 'Thread abc is no longer available.' },
         { code: 1, stdout: '{}', stderr: 'Thread abc is no longer available.' },
@@ -25,6 +28,7 @@ test('only the exact unavailable answer releases a thread', async () => {
         { code: 0, stdout: '{}' },
     ]) {
         const answer = await lookupThread('abc', t3With(result).run);
+
         assert.equal(
             answer,
             result.code === 0 && result.stdout.includes('threadId')
@@ -38,6 +42,7 @@ test('only the exact unavailable answer releases a thread', async () => {
 
 test('unconfirmed launch outcomes stay protected, including command failures', async () => {
     const { startThread } = await import('./t3.ts');
+
     for (const result of [
         { code: null },
         { code: 1 },
@@ -46,6 +51,7 @@ test('unconfirmed launch outcomes stay protected, including command failures', a
     ]) {
         assert.equal((await startThread('p', 'm', undefined, undefined, t3With(result).run)).uncertain, true);
     }
+
     const launched = await startThread(
         'p',
         'm',
@@ -53,11 +59,13 @@ test('unconfirmed launch outcomes stay protected, including command failures', a
         { base: 'main', branch: 'build' },
         t3With({ stdout: '{"threadId":"late","title":"Build"}' }).run,
     );
+
     assert.deepEqual(launched, { thread: { threadId: 'late', title: 'Build' }, error: null });
 });
 
 test('recovers one late success and holds ambiguous or absent CLI evidence', async () => {
     const { startThread } = await import('./t3.ts');
+
     for (const count of [0, 1, 2]) {
         const run: T3Run = async (args) => ({
             code: args[1] === 'start' ? null : 0,
@@ -74,6 +82,7 @@ test('recovers one late success and holds ambiguous or absent CLI evidence', asy
                       }),
         });
         const answer = await startThread('project', 'Build\nissue', undefined, undefined, run);
+
         assert.equal(answer.thread?.threadId, count === 1 ? 'late-0' : undefined);
         assert.equal(answer.uncertain, count === 1 ? undefined : true);
     }
@@ -95,6 +104,7 @@ test('finding a started thread skips the recorded ones, and tells absent from un
                           messages: [{ role: 'user', text: 'Build\nissue' }],
                       }),
         });
+
     assert.deepEqual(await findStartedThread('project', ['Build\nissue'], ['old'], listing(['old', 'new'])), {
         threadId: 'new',
         title: 'Build',
@@ -136,6 +146,7 @@ test('finding a started thread considers every message format together, one thre
     const { findStartedThread } = await import('./t3.ts');
     const current = { title: 'Shaping #7 T', text: CURRENT };
     const earlier = { title: '#7 T', text: EARLIER };
+
     assert.deepEqual(await findStartedThread('p', [CURRENT, EARLIER], [], threadsOf({ a: earlier })), {
         threadId: 'a',
         title: '#7 T',
@@ -170,6 +181,7 @@ test('a thread whose long first line T3 cut short is still found by its whole fi
     const { findStartedThread, titledFrom } = await import('./t3.ts');
     const message =
         'Build w1. Read /Users/someone/.agents/skills/lar-build/agents/builder.md and follow it.\n\nexport PATH=/b';
+
     assert.deepEqual(
         await findStartedThread(
             'p',
@@ -188,8 +200,10 @@ function launches(selection: ModelSelection | null, runtimeMode = 'full-access')
     const sent: { project: string; selection: ModelSelection; workspace: LaunchWorkspace; runtimeMode: string }[] = [];
     const launch: LaunchThread = async (project, _text, chosen, workspace, mode) => {
         sent.push({ project, selection: chosen, workspace, runtimeMode: mode });
+
         return { thread: { threadId: 'launched', title: 'T' }, error: null };
     };
+
     return { sent, launch, defaults: () => ({ selection, runtimeMode }) };
 }
 
@@ -200,6 +214,7 @@ test('a choice equal to the T3 Project default launches with its options, in eac
     const { startThread } = await import('./t3.ts');
     const { sent, launch, defaults } = launches({ ...OPUS, options: MEDIUM });
     const { run, calls } = t3With({});
+
     await startThread('p', 'T\nm', OPUS, undefined, run, defaults, launch);
     await startThread('p', 'T\nm', OPUS, { base: 'main', branch: 'build' }, run, defaults, launch);
     await startThread(
@@ -233,6 +248,7 @@ test('a choice equal to the T3 Project default launches with its options, in eac
 test("a T3 Project default stored with no options launches with none, leaving T3 to use the model's default effort", async () => {
     const { startThread } = await import('./t3.ts');
     const { sent, launch, defaults } = launches(OPUS);
+
     await startThread('p', 'T\\nm', OPUS, undefined, t3With({}).run, defaults, launch);
     assert.deepEqual(
         sent.map((s) => s.selection),
@@ -245,6 +261,7 @@ test('another model launches with no options, even on the same provider instance
     const { sent, launch, defaults } = launches({ ...OPUS, options: MEDIUM });
     const sonnet = { instanceId: OPUS.instanceId, model: 'claude-sonnet-5-5' };
     const vi = { instanceId: 'claudeAgent', model: OPUS.model };
+
     await startThread('p', 'T\nm', sonnet, undefined, t3With({}).run, defaults, launch);
     await startThread('p', 'T\nm', vi, undefined, t3With({}).run, defaults, launch);
     assert.deepEqual(
@@ -256,6 +273,7 @@ test('another model launches with no options, even on the same provider instance
 test('new launches keep the project runtime mode the CLI gives; the existing worktree keeps approval-required', async () => {
     const { startThread } = await import('./t3.ts');
     const { sent, launch, defaults } = launches(null, 'auto-accept-edits');
+
     await startThread('p', 'T\nm', OPUS, { base: 'main', branch: 'build' }, t3With({}).run, defaults, launch);
     await startThread(
         'p',
@@ -276,8 +294,10 @@ test('T3 Project default sends no model through the CLI, and an existing worktre
     const { startThread } = await import('./t3.ts');
     const { sent, launch, defaults } = launches({ ...OPUS, options: MEDIUM });
     const { run, calls } = t3With({ stdout: '{"threadId":"t","title":"T"}' });
+
     await startThread('p', 'm', undefined, { base: 'main', branch: 'b' }, run, defaults, launch);
     assert.deepEqual(calls[0]!.args, ['thread', 'start', 'p', 'm', '--worktree', 'main', '--branch', 'b', '--json']);
+
     const refused = await startThread(
         'p',
         'm',
@@ -287,6 +307,7 @@ test('T3 Project default sends no model through the CLI, and an existing worktre
         defaults,
         launch,
     );
+
     assert.deepEqual(refused, { thread: null, error: 'Choose a model before continuing in an existing worktree.' });
     assert.equal(sent.length, 0);
 });
@@ -295,6 +316,7 @@ test('a choice starts nothing when T3 settings cannot be read', async () => {
     const { startThread } = await import('./t3.ts');
     const { sent, launch } = launches(null);
     const answer = await startThread('p', 'm', OPUS, undefined, t3With({}).run, () => null, launch);
+
     assert.equal(answer.thread, null);
     assert.ok(answer.error);
     assert.equal(sent.length, 0);
@@ -313,6 +335,7 @@ test("a lost answer in an existing worktree stays uncertain, as the thread list 
         () => ({ selection: null, runtimeMode: 'full-access' }),
         lost,
     );
+
     assert.equal(answer.uncertain, true);
     assert.match(answer.error!, /could not be confirmed. Check its T3 project/);
     assert.equal(calls.length, 0);
@@ -323,6 +346,7 @@ test('a launch that lost its answer recovers from the thread list, and starts no
     let launched = 0;
     const lost: LaunchThread = async () => {
         launched += 1;
+
         return { thread: null, uncertain: true, error: 'lost' };
     };
     const defaults = () => ({ selection: null, runtimeMode: 'full-access' });
@@ -335,6 +359,7 @@ test('a launch that lost its answer recovers from the thread list, and starts no
                 ? JSON.stringify([{ threadId: 'late', title: 'Build' }])
                 : JSON.stringify({ thread: { threadId: 'late' }, messages: [{ role: 'user', text: 'Build\nissue' }] }),
     });
+
     assert.deepEqual(await startThread('p', 'Build\nissue', OPUS, undefined, found, defaults, lost), {
         thread: { threadId: 'late', title: 'Build' },
         error: null,

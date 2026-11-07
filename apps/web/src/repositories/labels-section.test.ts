@@ -12,6 +12,7 @@ const THIRD = 'third/tracker';
 // A third tracker differs from both real ones and lives only in its adapter's description.
 vi.mock('@lar-factory/shared', async (actual) => {
     const shared = await actual<typeof import('@lar-factory/shared')>();
+
     return {
         ...shared,
         trackerCapabilities: (repo: string) =>
@@ -79,6 +80,7 @@ function serve(
     fail: (body: Record<string, unknown>) => string | undefined = () => undefined,
 ) {
     const tracker = { labels, sent: [] as Record<string, unknown>[] };
+
     fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
         if (url === '/api/repositories/settings')
             return new Response(
@@ -91,21 +93,32 @@ function serve(
                     error: null,
                 }),
             );
+
         if (url !== '/api/repositories/labels') return new Response(JSON.stringify(board));
+
         const body = JSON.parse(String(init?.body)) as Record<string, unknown> & {
             name: string;
             update: Partial<TrackerLabel>;
         };
+
         tracker.sent.push(body);
+
         const error = fail(body);
+
         if (error) return new Response(JSON.stringify({ error }), { status: 400 });
+
         if (body.change === 'list') return new Response(JSON.stringify({ labels: tracker.labels, error: null }));
+
         if (body.change === 'create') tracker.labels = [...tracker.labels, { name: body.name }];
+
         if (body.change === 'update')
             tracker.labels = tracker.labels.map((l) => (l.name === body.name ? { ...l, ...body.update } : l));
+
         if (body.change === 'delete') tracker.labels = tracker.labels.filter((l) => l.name !== body.name);
+
         return new Response(JSON.stringify({ board, error: null }));
     }) as typeof fetchMock);
+
     return tracker;
 }
 
@@ -143,6 +156,7 @@ async function openDialog(board: BoardData): Promise<void> {
 
 test("the table replaces Custom labels and lists the tracker's labels with colour and description", async () => {
     const board = boardWith();
+
     serve(board, [
         { name: 'docs', color: 'ff0000', description: 'Writing' },
         { name: 'area-ui', color: '00ff00' },
@@ -160,6 +174,7 @@ test("the table replaces Custom labels and lists the tracker's labels with colou
 test('create writes to the tracker, refreshes from it and refuses a managed name with the reason', async () => {
     const board = boardWith();
     const tracker = serve(board, [{ name: 'docs' }]);
+
     await openEdit(board);
     await type(creating(), 'linked-work');
     expect(text(section())).toContain("linked-work is reserved for the factory's saved links.");
@@ -173,6 +188,7 @@ test('create writes to the tracker, refreshes from it and refuses a managed name
 
 test("a failed create keeps the typed name and shows the tracker's error", async () => {
     const board = boardWith();
+
     serve(board, [], (body) => (body.change === 'create' ? 'Label already exists.' : undefined));
     await openEdit(board);
     await type(creating(), 'docs');
@@ -184,6 +200,7 @@ test("a failed create keeps the typed name and shows the tracker's error", async
 test('rename, colour and description open in the row and send only what changed', async () => {
     const board = boardWith();
     const tracker = serve(board, [{ name: 'docs', color: 'ff0000', description: 'Writing' }]);
+
     await openEdit(board);
     await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
     await type(section().querySelector<HTMLInputElement>('[aria-label="Label name"]')!, 'status-done');
@@ -205,6 +222,7 @@ test('rename, colour and description open in the row and send only what changed'
 test('delete asks first and states what it removes', async () => {
     const board = boardWith();
     const tracker = serve(board, [{ name: 'docs' }, { name: 'area-ui' }]);
+
     await openEdit(board);
     await settle(() => buttonIn(rowOf('docs')!, 'Delete docs')!.click());
     expect(tracker.sent.some((body) => body.change === 'delete')).toBe(false);
@@ -221,11 +239,14 @@ test('delete asks first and states what it removes', async () => {
 
 test('Escape closes only the delete confirmation', async () => {
     const board = boardWith();
+
     serve(board, [{ name: 'docs' }]);
     await openEdit(board);
     await settle(() => buttonIn(rowOf('docs')!, 'Delete docs')!.click());
     await settle(() => vi.advanceTimersByTime(50));
+
     const focused = document.activeElement ?? document.body;
+
     await settle(() =>
         focused.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })),
     );
@@ -236,6 +257,7 @@ test('Escape closes only the delete confirmation', async () => {
 
 test('managed labels appear locked, with no controls', async () => {
     const board = boardWith();
+
     serve(board, [{ name: 'linked-work' }, { name: 'Bug' }, { name: 'docs' }]);
     await openEdit(board);
     for (const name of ['linked-work', 'Bug']) {
@@ -248,6 +270,7 @@ test('managed labels appear locked, with no controls', async () => {
 
 test("Azure's repo- tags appear locked with the reason, and a GitHub repo- label stays editable", async () => {
     const azure = boardWith({ repo: AZURE, itemSource: { kind: 'azure-board', team: 'Delivery' } });
+
     serve(azure, [{ name: 'repo-lar-api' }, { name: 'docs' }]);
     await openEdit(azure);
     expect(rowOf('repo-lar-api')!.querySelector('[aria-label="Factory-managed"]')).not.toBeNull();
@@ -258,9 +281,12 @@ test("Azure's repo- tags appear locked with the reason, and a GitHub repo- label
 test('a long description or name stays inside its row, which keeps Edit and Delete in view', async () => {
     const board = boardWith();
     const long = 'x'.repeat(200);
+
     serve(board, [{ name: `name-${long}`, description: long }]);
     await openEdit(board);
+
     const row = rowOf(`name-${long}`)!;
+
     expect(row.closest('ul')!.className, 'the track may not grow past the section').toContain(
         'grid-cols-[minmax(0,1fr)]',
     );
@@ -272,6 +298,7 @@ test('a long description or name stays inside its row, which keeps Edit and Dele
 
 test('a GitHub repo- label is an ordinary label', async () => {
     const board = boardWith();
+
     serve(board, [{ name: 'repo-web' }]);
     await openEdit(board);
     expect(rowOf('repo-web')!.querySelector('[aria-label="Factory-managed"]')).toBeNull();
@@ -282,6 +309,7 @@ test('a failed read offers Retry, and each read shows what the tracker holds now
     const board = boardWith();
     let down = true;
     const tracker = serve(board, [{ name: 'docs' }], () => (down ? 'GitHub is unavailable.' : undefined));
+
     await openEdit(board);
     expect(text(section())).toContain('GitHub is unavailable.');
     down = false;
@@ -293,6 +321,7 @@ test('a failed read offers Retry, and each read shows what the tracker holds now
 test('without management access the section is read-only and states the reason', async () => {
     const board = boardWith({ access: { ...SETUP.access, 'manage-labels': 'refused' } });
     const tracker = serve(board, [{ name: 'docs' }]);
+
     await openEdit(board);
     expect(text(section())).toContain('Access to Manage labels was refused.');
     expect(creating().disabled).toBe(true);
@@ -305,6 +334,7 @@ test('without management access the section is read-only and states the reason',
 test('on Azure there is no colour or description, create is disabled with the reason, and delete names pull requests', async () => {
     const board = boardWith({ repo: AZURE, itemSource: { kind: 'azure-board', team: 'Delivery' } });
     const tracker = serve(board, [{ name: 'docs' }]);
+
     await openEdit(board);
     expect(text(section())).toContain('Tags');
     expect(text(section())).toContain('the whole project');
@@ -330,6 +360,7 @@ test('an Azure read-only session leaves the section read-only and states the rea
         itemSource: { kind: 'azure-board', team: 'Delivery' },
         azureReadOnly: true,
     });
+
     serve(board, [{ name: 'docs' }]);
     await openEdit(board);
     expect(text(section())).toContain('Azure DevOps is read-only in this test session.');
@@ -350,6 +381,7 @@ test('a third tracker drives the table with no change outside its adapter', asyn
     );
     const board = boardWith({ repo: THIRD }, items);
     const tracker = serve(board, [{ name: 'shiny', color: '123456', description: 'Not shown' }]);
+
     await mountPage(board);
     await openDialog(board);
     expect(text(section())).toContain('Stickers');
@@ -369,6 +401,7 @@ test('a third tracker drives the table with no change outside its adapter', asyn
 
 test('saved settings holding labels still load', async () => {
     const board = boardWith({ labels: ['area: server'] });
+
     serve(board, []);
     await openEdit(board);
     expect(section()).not.toBeNull();
@@ -378,6 +411,7 @@ test('the delete confirmation says which mappings lose a mapped label, and only 
     const board = boardWith({
         ...effectiveVocabulary({ bug: { type: null, labels: ['docs'] }, feature: { type: null, labels: ['Docs'] } }),
     });
+
     serve(board, [{ name: 'docs' }, { name: 'area-ui' }]);
     await openEdit(board);
     await settle(() => buttonIn(rowOf('docs')!, 'Delete docs')!.click());
@@ -389,6 +423,7 @@ test('the delete confirmation says which mappings lose a mapped label, and only 
 
 test('renaming a mapped label says its mapping updates, once the name changes', async () => {
     const board = boardWith({ ...effectiveVocabulary({ improvement: { type: null, labels: ['docs'] } }) });
+
     serve(board, [{ name: 'docs' }]);
     await openEdit(board);
     await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
@@ -399,6 +434,7 @@ test('renaming a mapped label says its mapping updates, once the name changes', 
 
 test("on a project-wide tracker rename and delete warn about the project's other repositories", async () => {
     const board = boardWith({ repo: AZURE, itemSource: { kind: 'azure-board', team: 'Delivery' } });
+
     serve(board, [{ name: 'docs' }]);
     await openEdit(board);
     await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
@@ -410,15 +446,19 @@ test("on a project-wide tracker rename and delete warn about the project's other
 
 test('an open mapping reads the tracker again after a rename, so the new name is available', async () => {
     const board = boardWith({ ...effectiveVocabulary({ bug: { type: null, labels: ['docs'] } }) });
+
     serve(board, [{ name: 'docs' }], (body) => {
         if (body.change === 'update') board.repos[0]!.setup!.vocabulary.bug.labels = ['guides'];
+
         return undefined;
     });
     await openEdit(board);
     await settle(() => buttonIn(rowOf('docs')!, 'Edit docs')!.click());
     await type(section().querySelector<HTMLInputElement>('[aria-label="Label name"]')!, 'guides');
     await settle(() => buttonIn(rowOf('docs')!, 'Save')!.click());
+
     const bug = $('[data-vocabulary="bug"]')!;
+
     expect(text(bug)).toContain('guides');
     expect(text(bug)).not.toContain('docs');
     expect(text(bug)).not.toContain('unavailable');

@@ -51,15 +51,20 @@ export function createReadTrace(turn: () => Promise<void> = nextTurn): ReadTrace
 
     const endBlock = () => {
         if (!current) return;
+
         const blockMs = performance.now() - blockAt;
+
         steps[current].longestBlockMs = Math.max(steps[current].longestBlockMs, blockMs);
         loopTrace.block(`stats ${current}`, blockMs, spannedAt, cpuMs(process.cpuUsage(blockCpu)));
         spannedAt = loopTrace.spanned();
     };
     const endStep = () => {
         if (!current) return;
+
         endBlock();
+
         const now = performance.now();
+
         steps[current].elapsedMs += now - stepAt;
         steps[current].cpuMs += cpuMs(process.cpuUsage(stepCpu));
         stepAt = now;
@@ -67,6 +72,7 @@ export function createReadTrace(turn: () => Promise<void> = nextTurn): ReadTrace
     };
     const wait = async <T>(work: Promise<T>): Promise<T> => {
         endBlock();
+
         try {
             return await work;
         } finally {
@@ -75,6 +81,7 @@ export function createReadTrace(turn: () => Promise<void> = nextTurn): ReadTrace
             spannedAt = loopTrace.spanned();
         }
     };
+
     return {
         step(name) {
             endStep();
@@ -88,6 +95,7 @@ export function createReadTrace(turn: () => Promise<void> = nextTurn): ReadTrace
         wait,
         pause() {
             if (current) steps[current].pauses++;
+
             return wait(turn());
         },
         finish() {
@@ -102,6 +110,7 @@ export function createReadTrace(turn: () => Promise<void> = nextTurn): ReadTrace
             const step = STEPS.reduce((longest, name) =>
                 steps[name].longestBlockMs > steps[longest].longestBlockMs ? name : longest,
             );
+
             return { ms: steps[step].longestBlockMs, step };
         },
     };

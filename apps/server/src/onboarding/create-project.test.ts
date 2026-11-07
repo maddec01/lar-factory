@@ -11,8 +11,10 @@ import { createProject } from './create-project.ts';
 /** A home with an empty folder `lar-web` in it. */
 function home(t: TestContext): string {
     const dir = mkdtempSync(join(tmpdir(), 'lar-create-home-'));
+
     t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
     mkdirSync(join(dir, 'lar-web'));
+
     return dir;
 }
 
@@ -38,16 +40,20 @@ test("adds the folder to T3 and answers with T3's projects and the new one's id"
         { HOME: dir },
         async (folder) => {
             added.push(folder);
+
             return null;
         },
     );
+
     assert.deepEqual(added, [join(dir, 'lar-web')]);
     assert.deepEqual(answer, { projects, projectId: 'lar-web' });
 });
 
 test('finds the new project when T3 keeps the folder by another path to it', async (t) => {
     const dir = home(t);
+
     symlinkSync(join(dir, 'lar-web'), join(dir, 'link'));
+
     const projects = [choice('lar-web', join(dir, 'lar-web'))];
     const answer = await createProject(
         { folder: join(dir, 'link') },
@@ -55,6 +61,7 @@ test('finds the new project when T3 keeps the folder by another path to it', asy
         { HOME: dir },
         async () => null,
     );
+
     assert.deepEqual(answer, { projects, projectId: 'lar-web' });
 });
 
@@ -69,6 +76,7 @@ test("a project that can't be picked comes back with why", async (t) => {
         { HOME: dir },
         async () => null,
     );
+
     assert.deepEqual(answer, { projects, projectId: 'lar-web' });
 });
 
@@ -77,9 +85,11 @@ test('a folder that is missing, relative or no folder is refused before T3 runs'
     let ran = false;
     const add = async () => {
         ran = true;
+
         return null;
     };
     const create = (folder: unknown) => createProject({ folder }, async () => [], { HOME: dir }, add);
+
     assert.deepEqual(await create(undefined), { status: 400, error: 'Name the folder to add.' });
     assert.deepEqual(await create('  '), { status: 400, error: 'Name the folder to add.' });
     assert.deepEqual(await create('lar-web'), {
@@ -101,6 +111,7 @@ test('a failing t3 project add answers with its message', async (t) => {
         { HOME: dir },
         async () => 't3 could not add the project: Could not reach the T3 Code server.',
     );
+
     assert.deepEqual(answer, {
         status: 502,
         error: 't3 could not add the project: Could not reach the T3 Code server.',
@@ -110,6 +121,7 @@ test('a failing t3 project add answers with its message', async (t) => {
 test("a project T3 doesn't list after adding it, or projects that can't be read, answer with the problem", async (t) => {
     const dir = home(t);
     const folder = join(dir, 'lar-web');
+
     assert.deepEqual(
         await createProject(
             { folder },

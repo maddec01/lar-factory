@@ -6,6 +6,7 @@ import type { BoardData, Item } from '@lar-factory/shared';
 export function AutoBuildNote({ item, data }: { item: Item; data: BoardData }) {
     const pass = data.autoBuildPass;
     const paused = pass?.paused[item.id];
+
     if (paused)
         return (
             <p className="start" data-auto-build-paused={item.id}>
@@ -14,11 +15,13 @@ export function AutoBuildNote({ item, data }: { item: Item; data: BoardData }) {
                 </span>
             </p>
         );
+
     if (data.autoBuild?.on && pass?.waitsForRefinement.includes(item.id))
         return (
             <p className="start" data-auto-build-waits={item.id}>
                 Auto-build waits for Refinement
             </p>
         );
+
     return null;
 }

@@ -30,6 +30,7 @@ const press = async (el: HTMLElement) => {
 /** Opens the item dialog on `itemId` through its store, as every list on the page does. */
 async function openItem(itemId: string): Promise<void> {
     const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
 
@@ -38,7 +39,9 @@ test('Queue shows pending state, then leaves Shape reachable without an overlay'
     await mountPage();
     await openItem('I_sample01');
     await press(button('queue', 'I_sample01'));
+
     const queuing = button('queue', 'I_sample01');
+
     expect([text(queuing), queuing.getAttribute('aria-disabled'), queuing.getAttribute('aria-label')]).toEqual([
         'Queuing…',
         'true',
@@ -68,7 +71,9 @@ test('Move to List shows only its own pending state', async () => {
     holdPosts();
     await mountPage();
     await openItem('I_sample05');
+
     const back = button('back-to-list', 'I_sample05');
+
     await press(back);
     expect([
         text(back),
@@ -93,7 +98,9 @@ test('a failed Move to List shows as a toast naming the item, which stays until 
     expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Move to List');
     await settle(() => vi.advanceTimersByTime(60_000));
     expect(toast(), 'a failure stays').not.toBeNull();
+
     const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;
+
     expect(close.getAttribute('aria-label')).toBe('Dismiss: error for #129');
     await press(close);
     expect(toast()).toBeNull();
@@ -102,10 +109,13 @@ test('a failed Move to List shows as a toast naming the item, which stays until 
 
 test('Abandon asks first, saying it sets the work aside on this Mac and leaves its ticket open; Cancel returns focus', async () => {
     const warnings = vi.spyOn(console, 'warn');
+
     await mountPage();
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
+
     const dialog = $('#abandon-dialog')!;
+
     expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual(
         [],
     );
@@ -150,9 +160,11 @@ test('Abandon opens over an overlay, nothing over the title bar drags, and a cli
     await mountPage();
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
+
     const { noDrag } = addStylesheet();
     const dialog = $('#abandon-dialog')!;
     const overlay = $$('[data-slot="modal-overlay"]').at(-1)!;
+
     expect(dialog.getAttribute('data-slot')).toBe('modal-content');
     expect([dialog, overlay].map(noDrag)).toEqual([true, true]);
     for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
@@ -164,12 +176,16 @@ test('Abandon opens over an overlay, nothing over the title bar drags, and a cli
 
 test('confirming Abandon holds Queue without relabelling it, and announces the close', async () => {
     holdPosts();
+
     const data: BoardData = { ...sample, capture: { enabled: true, session: 'session-1' } as BoardData['capture'] };
+
     await mountPage(data);
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
     await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
+
     const abandoning = button('abandon', 'I_sample01');
+
     expect([text(abandoning), abandoning.getAttribute('aria-disabled')]).toEqual(['Abandoning…', 'true']);
     expect(button('queue', 'I_sample01').getAttribute('aria-disabled')).toBe('true');
     expect(text(button('queue', 'I_sample01')), 'Queue is not relabelled').toBe('Queue');
@@ -193,12 +209,16 @@ test('queuing a source issue switches the open dialog to its new local work ID',
     await mountPage();
     await openItem('I_sample01');
     await press(button('queue', 'I_sample01'));
+
     const board = moved('I_sample01', 'Queued');
+
     board.items = board.items.map((item) =>
         item.id === 'I_sample01' ? { ...item, id: 'I_imported', recorded: true } : item,
     );
     await answer({ error: null, board, itemId: 'I_imported' });
+
     const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+
     expect(useItemDialogStore.getState().itemId).toBe('I_imported');
     expect(button('start', 'I_imported')).not.toBeNull();
     expect($('[data-item-dialog] .action-error')).toBeNull();
@@ -234,7 +254,9 @@ test('two lost combined responses block dismissal and board-only recovery until 
     await mountPage();
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
+
     const buttons = () => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button');
+
     await settle(() => buttons()[2]!.click());
     await answer({ error: "Can't reach the board server. Try again." });
     await answer({ error: "Can't reach the board server. Try again." });
@@ -252,7 +274,9 @@ test('local retry failure preserves the explanation after tracker closure', asyn
     await mountPage();
     await openItem('I_sample01');
     await press(button('abandon', 'I_sample01'));
+
     const buttons = () => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button');
+
     await settle(() => buttons()[2]!.click());
     await answer({
         error: 'The ticket is closed, but the work remains on the board. Try again to finish abandonment. Disk unavailable',
@@ -272,6 +296,7 @@ test.each([
     async (causes, label, choice) => {
         const data = structuredClone(sample);
         const item = data.items[0]!;
+
         item.needsYou = {
             reason: 'Why it waits.',
             causes: [...causes],
@@ -296,6 +321,7 @@ test.each([
 test.each([false, true])('deleted-thread move inspects cleanup and cleans only after success %s', async (success) => {
     const data = structuredClone(sample);
     const item = data.items[0]!;
+
     item.status = 'In progress';
     item.passingBrief = false;
     item.needsYou = {
@@ -329,10 +355,15 @@ test.each([false, true])('deleted-thread move inspects cleanup and cleans only a
             },
         ],
     });
+
     const inputs = $$<HTMLInputElement>('#needs-you-dialog input');
+
     expect(inputs.map((input) => input.checked)).toEqual([false, false]);
+
     if (success) await press(inputs[0]!);
+
     await press($$<HTMLButtonElement>('#needs-you-dialog button').find((el) => text(el) === 'Proceed')!);
+
     if (success) {
         expect(posted().at(-1)?.[0]).toBe('/api/inspect-owned-cleanup');
         expect(text($('#needs-you-dialog'))).toContain('draft.txt');
@@ -340,10 +371,13 @@ test.each([false, true])('deleted-thread move inspects cleanup and cleans only a
             $$<HTMLButtonElement>('#needs-you-dialog button').find((el) => text(el) === 'Confirm loss and proceed')!,
         );
     }
+
     expect(posted().at(-1)?.[0]).toBe('/api/needs-you');
     await answer(success ? { error: null, board: data } : { error: 'Move refused' }, success ? 200 : 409);
     expect(posted().some((call) => call[0] === '/api/execute-owned-cleanup')).toBe(success);
+
     if (!success) expect(text($('#needs-you-dialog [role="alert"]'))).toBe('Move refused');
+
     if (success) {
         expect(posted().at(-1)?.[1]).toEqual({
             itemId: item.id,
@@ -378,16 +412,23 @@ test.each(['replace', 'reopen', 'other', 'closed', 'failure'])(
         await press($<HTMLButtonElement>('.title-bar .list-button')!);
         await press($<HTMLButtonElement>('[data-list-modal] [data-item="I_sample01"]')!);
         await press(button('queue', 'I_sample01'));
+
         const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+
         if (outcome === 'reopen') {
             await settle(() => useItemDialogStore.getState().close());
             await openItem('I_sample01');
         }
+
         if (outcome === 'other') await openItem('I_sample05');
+
         if (outcome === 'closed') await settle(() => useItemDialogStore.getState().close());
+
         const board = moved('I_sample01', 'Queued');
+
         if (outcome === 'replace')
             board.items = board.items.map((item) => (item.id === 'I_sample01' ? { ...item, id: 'I_imported' } : item));
+
         await answer(
             outcome === 'failure'
                 ? { error: 'Queue refused' }
@@ -396,6 +437,7 @@ test.each(['replace', 'reopen', 'other', 'closed', 'failure'])(
         expect(useItemDialogStore.getState().itemId).toBe(
             outcome === 'replace' || outcome === 'closed' ? null : outcome === 'other' ? 'I_sample05' : 'I_sample01',
         );
+
         if (outcome === 'failure') expect(text($('[data-item-dialog] .action-error'))).toContain('Queue refused');
     },
 );

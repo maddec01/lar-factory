@@ -72,12 +72,15 @@ const icon = (Icon: LucideIcon) => <Icon aria-hidden="true" className="size-3.5"
 
 const openSettings = (section?: string) => {
     const store = useSettingsStore.getState();
+
     if (section) store.setSection(section);
+
     store.setOpen(true);
 };
 
 const addItem = (pane: 'new' | 'pick') => {
     const store = useAddItemStore.getState();
+
     store.setPane(pane);
     store.setOpen(true);
 };
@@ -89,6 +92,7 @@ function actions({ query, filtering, update }: SearchInput, { leave, clear }: Se
         icon: icon(Icon),
         select: () => leave(run),
     });
+
     return [
         leaving('action:add', 'Add item', SquarePen, () => addItem('new')),
         leaving('action:list', 'List', Inbox, () => useListStore.getState().setOpen(true)),
@@ -127,6 +131,7 @@ export function settingsOptions(
                 icon: <span className="[&_svg]:size-3.5">{page.icon}</span>,
                 select: () => leave(() => openSettings(page.id)),
             };
+
             return [
                 { ...entry, value: `section:${page.id}`, name: page.label },
                 ...page.groups
@@ -153,6 +158,7 @@ export function settingsOptions(
                         useSettingsStore.getState().setOpen(true);
                     }),
             };
+
             return [
                 { ...entry, value: `project:${repo}`, name, hint: 'Projects' },
                 ...projectSettings(repo).map((setting) => ({
@@ -163,6 +169,7 @@ export function settingsOptions(
                 })),
             ];
         });
+
     return [...general, ...projects];
 }
 
@@ -196,7 +203,9 @@ function ticketOptions(
     const shown = hits.filter(kept);
     const hidden = hits.filter((item) => !kept(item));
     const option = (item: Item) => ticketOption(item, data, leave);
+
     if (widened) return [...shown, ...hidden].map(option);
+
     return [
         ...shown.map(option),
         ...(hidden.length
@@ -208,6 +217,7 @@ function ticketOptions(
                       icon: icon(Search),
                       select: () => {
                           widen();
+
                           return ticketValue(hidden[0]!);
                       },
                   },
@@ -229,6 +239,7 @@ export function searchResults(
         ...(typed ? [{ label: 'Settings', options: settingOptions }] : []),
     ];
     const tickets = typed ? ticketOptions(input, handlers) : [];
+
     return {
         groups: [
             ...matchingGroups(options, query),

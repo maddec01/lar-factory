@@ -5,7 +5,9 @@ import { sendThreadCommand } from './thread-commands.ts';
 
 vi.mock('./board-session.ts');
 vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture/runtime' }));
+
 const runtime = vi.hoisted(() => ({ origin: 'http://127.0.0.1:3773' as string | undefined }));
+
 vi.mock('../json-file.ts', () => ({ readJsonRecord: () => ({ origin: runtime.origin }) }));
 
 class FakeT3Socket extends EventTarget {
@@ -19,7 +21,9 @@ class FakeT3Socket extends EventTarget {
     }
     send(value: string) {
         const frame = JSON.parse(value);
+
         this.sent.push(frame);
+
         if (frame._tag === 'Ping') this.answer({ _tag: 'Pong' });
     }
     close() {
@@ -43,10 +47,14 @@ const issue = vi.fn(async () => ({ token: 'private', sessionId: 'session', expir
 const ticket = vi.fn(async () => Response.json({ ticket: 'fixture' }));
 const opened = async () => {
     await vi.advanceTimersByTimeAsync(0);
+
     const socket = FakeT3Socket.instances.at(-1)!;
+
     socket.dispatchEvent(new Event('open'));
+
     return socket;
 };
+
 beforeEach(() => {
     vi.useFakeTimers();
     FakeT3Socket.instances = [];
@@ -64,6 +72,7 @@ afterEach(() => {
 it('resolves an accepted command on the first answer and revokes the session', async () => {
     const result = sendThreadCommand(command);
     const socket = await opened();
+
     expect(socket.requests()).toEqual([
         {
             _tag: 'Request',
@@ -83,6 +92,7 @@ it('resolves an accepted command on the first answer and revokes the session', a
 it("reports a rejected command with T3's reason, one request and no reconnect", async () => {
     const result = sendThreadCommand({ ...command, type: 'thread.delete' });
     const socket = await opened();
+
     socket.answer({
         _tag: 'Exit',
         requestId: '1',
@@ -102,7 +112,9 @@ it("reports a rejected command with T3's reason, one request and no reconnect", 
         },
     });
     expect(await result).toEqual({ outcome: 'rejected', reason: 'Thread is still running' });
+
     const framesAtAnswer = socket.sent.length;
+
     await vi.advanceTimersByTimeAsync(120_000);
     expect(FakeT3Socket.instances).toHaveLength(1);
     expect(ticket).toHaveBeenCalledTimes(1);
@@ -114,6 +126,7 @@ it("reports a rejected command with T3's reason, one request and no reconnect", 
 
 it('reports a rejection without a reason', async () => {
     const result = sendThreadCommand(command);
+
     (await opened()).answer({
         _tag: 'Exit',
         requestId: '1',
@@ -125,6 +138,7 @@ it('reports a rejection without a reason', async () => {
 it('leaves the command unconfirmed when T3 does not answer in time', async () => {
     const result = sendThreadCommand(command);
     const socket = await opened();
+
     await vi.advanceTimersByTimeAsync(30_000);
     expect(await result).toMatchObject({ outcome: 'unconfirmed', reason: expect.stringContaining('timed out') });
     expect(socket.requests()).toHaveLength(1);
@@ -146,6 +160,7 @@ it.each([
 ])('leaves the command unconfirmed on %s', async (_name, answer) => {
     const result = sendThreadCommand(command);
     const socket = await opened();
+
     answer(socket);
     expect(await result).toMatchObject({ outcome: 'unconfirmed', reason: expect.stringContaining('T3') });
     await vi.advanceTimersByTimeAsync(120_000);
@@ -157,6 +172,7 @@ it.each([
 
 it('leaves the command unconfirmed when the connection drops, without reconnecting', async () => {
     const result = sendThreadCommand(command);
+
     (await opened()).close();
     expect(await result).toMatchObject({ outcome: 'unconfirmed', reason: expect.stringContaining('connection') });
     await vi.advanceTimersByTimeAsync(120_000);
@@ -167,7 +183,9 @@ it('leaves the command unconfirmed when the connection drops, without reconnecti
 
 it('leaves the command unconfirmed when T3 refuses a connection ticket', async () => {
     ticket.mockResolvedValueOnce(new Response('', { status: 401 }));
+
     const result = sendThreadCommand(command);
+
     await vi.advanceTimersByTimeAsync(0);
     expect(await result).toMatchObject({ outcome: 'unconfirmed', reason: expect.stringContaining('connection') });
     expect(FakeT3Socket.instances).toHaveLength(0);
@@ -202,7 +220,9 @@ it('reports an unreadable or non-local T3 origin and revokes the session', async
 
 it('still resolves when revoking the session fails', async () => {
     revoke.mockRejectedValueOnce(Error('secret'));
+
     const result = sendThreadCommand(command);
+
     (await opened()).answer({ _tag: 'Exit', requestId: '1', exit: { _tag: 'Success', value: { sequence: 0 } } });
     expect(await result).toEqual({ outcome: 'accepted', sequence: 0 });
 });

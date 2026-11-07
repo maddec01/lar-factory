@@ -26,19 +26,25 @@ const BOUND = 20;
 /** `cached` says whether an item's provider advances updatedAt on a new comment; both do, so by default every item is kept. */
 export function createDetailsCache(cached: (itemId: string) => boolean = () => true, bound = BOUND) {
     const entries = new Map<string, DetailsEntry>();
+
     return {
         /** The entry read at `updatedAt`, or null when there is none or the item has changed since. */
         get(itemId: string, updatedAt: string): DetailsEntry | null {
             const entry = entries.get(itemId);
+
             if (!entry || entry.updatedAt !== updatedAt) return null;
+
             entries.delete(itemId);
             entries.set(itemId, entry);
+
             return entry;
         },
         put(itemId: string, entry: DetailsEntry): void {
             if (!cached(itemId)) return;
+
             entries.delete(itemId);
             entries.set(itemId, entry);
+
             if (entries.size > bound) entries.delete(entries.keys().next().value!);
         },
         /** Forgets the item's entry, as one a description save has made stale, so the next open reads its details again. */

@@ -37,29 +37,39 @@ export async function executionStats(
     const sessions: (ThreadSession & { createdAt: string })[] = [];
     const facts = (projection: Record<string, unknown>, key: string): Record<string, unknown>[] => {
         const value = projection[key];
+
         if (!Array.isArray(value) || !value.every(isRecord)) throw Error('Invalid execution stats');
+
         return value;
     };
     const string = (value: unknown): string => {
         if (typeof value !== 'string') throw Error('Invalid execution stats field');
+
         return value;
     };
     const timestamp = (value: unknown): string | null => {
         if (value === null) return null;
+
         const text = string(value);
+
         if (!Number.isFinite(Date.parse(text))) throw Error('Invalid execution stats timestamp');
+
         return text;
     };
     let counted = 0;
+
     for (const projection of projections) {
         if (++counted % PROJECTIONS_PER_CHUNK === 0) await pause();
+
         if (!isRecord(projection.thread)) throw Error('Invalid execution stats thread');
+
         const thread = projection.thread;
         const id = string(thread.id);
         const lineage = isRecord(thread.lineage) ? thread.lineage : {};
         const messages = facts(projection, 'messages').sort((a, b) =>
             string(a.createdAt).localeCompare(string(b.createdAt)),
         );
+
         rows.threads.push({
             id,
             title: thread.title,
@@ -75,7 +85,9 @@ export async function executionStats(
         facts(projection, 'providerSessions');
         for (const provider of facts(projection, 'providerThreads')) {
             const providerId = string(provider.id);
+
             if (provider.status === 'active') rows.active.add(providerId);
+
             if (
                 isRecord(provider.nativeThreadRef) &&
                 typeof provider.nativeThreadRef.nativeId === 'string' &&
@@ -101,6 +113,7 @@ export async function executionStats(
             });
         for (const wait of facts(projection, 'runtimeRequests')) {
             if (wait.providerTurnId === null) continue;
+
             rows.waits.push({
                 turn: string(wait.providerTurnId),
                 createdAt: timestamp(wait.createdAt),
@@ -109,6 +122,7 @@ export async function executionStats(
         }
         for (const run of facts(projection, 'subagents')) {
             if (run.childThreadId === null) continue;
+
             rows.runs.push({
                 thread: string(run.childThreadId),
                 startedAt: timestamp(run.startedAt),
@@ -117,5 +131,6 @@ export async function executionStats(
         }
     }
     sessions.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
     return { rows, sessions: sessions.map(({ createdAt: _createdAt, ...session }) => session) };
 }

@@ -36,7 +36,9 @@ export const disabledReason = (app: {
     readonly hasFeedConfig: boolean;
 }): string | null => {
     if (!app.isPackaged) return 'Updates work only in the packaged app.';
+
     if (!app.hasFeedConfig) return 'Updates are off because the app has no update feed.';
+
     return null;
 };
 
@@ -80,6 +82,7 @@ const now = () => new Date().toISOString();
 
 const versionOf = (info: unknown): string | null => {
     const version = (info as { version?: unknown } | null)?.version;
+
     return typeof version === 'string' ? version : null;
 };
 
@@ -100,14 +103,18 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
             // As T3 Code's updater log: each status change, with the version it concerns.
             if (next.status !== state.status) {
                 const about = next.downloadedVersion ?? next.availableVersion ?? next.message;
+
                 Effect.runSync(Effect.logInfo(`update ${next.status}${about ? `: ${about}` : ''}`));
             }
+
             state = next;
             publish(state);
         };
         const tryStart = (action: UpdateAction) => {
             if (activeAction !== null) return false;
+
             activeAction = action;
+
             return true;
         };
         const finish = (action: UpdateAction) =>
@@ -119,6 +126,7 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
             Effect.gen(function* () {
                 // As T3 Code: only nightly takes prereleases and may go back a version.
                 const nightly = channel === 'nightly';
+
                 yield* updater.setChannel(channel);
                 yield* updater.setAllowPrerelease(nightly);
                 yield* updater.setAllowDowngrade(nightly);
@@ -130,7 +138,9 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
         const checkForUpdates = (reservation: 'acquire' | 'held' = 'acquire') =>
             Effect.gen(function* () {
                 if (!enabled || state.status === 'downloading') return false;
+
                 if (reservation === 'acquire' && !tryStart('check')) return false;
+
                 const check = Effect.gen(function* () {
                     setState(Machine.reduceOnCheckStart(state, now()));
                     yield* updater.checkForUpdates.pipe(
@@ -142,13 +152,16 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
                                   ).pipe(Effect.andThen(Effect.logError(error.message))),
                         ),
                     );
+
                     return true;
                 });
+
                 return yield* reservation === 'held' ? check : check.pipe(Effect.ensuring(finish('check')));
             });
 
         const download = Effect.gen(function* () {
             if (!enabled || state.status !== 'available' || !tryStart('download')) return false;
+
             setState(Machine.reduceOnDownloadStart(state));
             yield* updater.downloadUpdate.pipe(
                 Effect.catch((error: ElectronUpdaterError) =>
@@ -158,6 +171,7 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
                 ),
                 Effect.ensuring(finish('download')),
             );
+
             return true;
         });
 
@@ -174,12 +188,14 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
         // A successful install quits the app, so only a failure gives up the action.
         const install = Effect.gen(function* () {
             if (!enabled || state.status !== 'downloaded' || !tryStart('install')) return false;
+
             setState(Machine.reduceOnInstallStart(state));
             yield* board.stop.pipe(
                 Effect.andThen(updater.quitAndInstall({ isSilent: true, isForceRunAfter: true })),
                 Effect.andThen(Effect.sync(() => void (quitting = true))),
                 Effect.catch((error: Error) => failInstall(error.message)),
             );
+
             return true;
         });
 
@@ -191,14 +207,19 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
             // electron-updater emits these while checkForUpdates and downloadUpdate run.
             yield* updater.on('update-available', (info) => {
                 const available = versionOf(info);
+
                 if (available === null) return;
+
                 // A version of the other channel counts as no update, as T3 Code does.
                 if (Machine.defaultChannel(available) !== state.channel) {
                     setState(Machine.reduceOnNoUpdate(state, now()));
+
                     return;
                 }
+
                 const releaseNotes = (info as { releaseNotes?: unknown }).releaseNotes;
                 const notes = normalizeReleaseNotes(releaseNotes, available, state.channel);
+
                 setState(
                     Machine.reduceOnUpdateAvailable(
                         state,
@@ -212,23 +233,30 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
             yield* updater.on('update-not-available', () => setState(Machine.reduceOnNoUpdate(state, now())));
             yield* updater.on('download-progress', (progress) => {
                 const percent = (progress as { percent?: unknown } | null)?.percent;
+
                 if (typeof percent !== 'number') return;
+
                 if (Machine.shouldBroadcastDownloadProgress(state, percent) || state.message !== null) {
                     setState(Machine.reduceOnDownloadProgress(state, percent));
                 }
             });
             yield* updater.on('update-downloaded', (info) => {
                 const downloaded = versionOf(info);
+
                 if (downloaded !== null) setState(Machine.reduceOnDownloadComplete(state, downloaded));
             });
             // During an action its own failure handling sets the state, except for an install that waits to quit.
             yield* updater.on('error', (error) => {
                 const message = (error instanceof Error ? error.message : String(error)).split('\n', 1)[0] ?? '';
+
                 if (quitting) {
                     Effect.runFork(failInstall(message));
+
                     return;
                 }
+
                 if (activeAction !== null) return;
+
                 setState(Machine.reduceOnBackgroundError(state, message, now()));
             });
 
@@ -241,6 +269,7 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
                 Effect.forkScoped,
             );
         }
+
         publish(state);
 
         return {
@@ -256,17 +285,25 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
                 Effect.gen(function* () {
                     if (activeAction !== null)
                         return yield* Effect.fail(new UpdateActionInProgressError(activeAction, channel));
+
                     if (channel === state.channel) return state;
+
                     activeAction = 'channel';
+
                     return yield* Effect.gen(function* () {
                         setState(Machine.createBaseUpdateState(version, channel, options.disabledReason));
                         yield* options.channelSetting.write(channel);
+
                         if (!enabled) return state;
+
                         yield* applyChannel(channel);
+
                         // Switching channels may offer a lower version once, as T3 Code allows.
                         const allowDowngrade = yield* updater.allowDowngrade;
+
                         yield* updater.setAllowDowngrade(true);
                         yield* checkForUpdates('held').pipe(Effect.ensuring(updater.setAllowDowngrade(allowDowngrade)));
+
                         return state;
                     }).pipe(Effect.ensuring(finish('channel')));
                 }),

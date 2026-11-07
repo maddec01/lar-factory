@@ -56,5 +56,6 @@ const shownScope = (saved: string | null, data: BoardData): string | null =>
 
 export function useShownScope(): string | null {
     const saved = useScopeStore((state) => state.savedScope);
+
     return useBoardStore((state) => shownScope(saved, state.data));
 }

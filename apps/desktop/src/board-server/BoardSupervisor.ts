@@ -44,17 +44,21 @@ export const supervise = <R>(
 ): Effect.Effect<never, never, Exclude<R, Scope.Scope>> =>
     Effect.gen(function* () {
         let attempt = 0;
+
         while (true) {
             const reason = yield* Effect.gen(function* () {
                 const board = yield* start;
+
                 attempt = 0;
                 yield* onReady(board.url);
+
                 return `the board server exited ${yield* board.exited}`;
             }).pipe(
                 Effect.scoped,
                 Effect.catch((error) => Effect.succeed(error.message)),
             );
             const delay = restartDelay(attempt, delays);
+
             attempt += 1;
             yield* Effect.logError(`${reason}; restarting in ${Duration.format(delay)}`);
             yield* onRestart(reason);
@@ -77,6 +81,7 @@ export const makeControl = <R>(
     Effect.gen(function* () {
         const handle = yield* FiberHandle.make<never, never>();
         const runFork = yield* FiberHandle.runtime(handle)<R>();
+
         return {
             start: Effect.sync(() => void runFork(run, { onlyIfMissing: true })),
             stop: FiberHandle.clear(handle),

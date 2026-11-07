@@ -53,6 +53,7 @@ export function useDescriptionEdit(
         [],
     );
     const dirty = state?.draft != null && state.draft !== state.baseline;
+
     return {
         editing: state !== null,
         draft: state?.draft ?? null,
@@ -66,6 +67,7 @@ export function useDescriptionEdit(
         setBaseline,
         async save() {
             if (!state || state.draft === null || read.state !== 'loaded') return;
+
             const { bodyField, revision } = read.details;
             const save: DescriptionSave = {
                 itemId,
@@ -73,9 +75,13 @@ export function useDescriptionEdit(
                 ...(bodyField && { bodyField }),
                 ...(revision !== undefined && { revision }),
             };
+
             update({ saving: true, error: null });
+
             const result = await postAction('/api/item-description', save);
+
             if (result.error) return update({ saving: false, error: result.error });
+
             // The cached details predate the save; a reload that works caches the new ones.
             detailsCache.drop(itemId);
             setSaved((await refresh()) ? null : save.body);

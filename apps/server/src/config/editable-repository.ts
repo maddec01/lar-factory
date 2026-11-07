@@ -10,8 +10,11 @@ export type Refused = { status: number; error: string };
 export function notEditable(repo: string, dir = boardDataDir()): Refused | null {
     try {
         const entry = readRepositoryList(dir).find((e) => sameRepo(e.repo, repo));
+
         if (!entry) return { status: 409, error: `${repo} is not on this Mac's list.` };
+
         if (entry.onboarding) return { status: 409, error: `Finish adding ${repo} first.` };
+
         return null;
     } catch (err) {
         return { status: 409, error: message(err) };

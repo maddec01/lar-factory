@@ -209,48 +209,66 @@ export function fakeAz({
     });
     const run = async (args: string[]) => {
         calls.push(args);
+
         const failure = fail?.(args);
+
         if (failure) throw failure;
+
         const command = args.slice(0, 4).join(' ');
+
         if (command === 'boards iteration team list')
             return JSON.stringify(iterations.map((it) => ({ ...it, path: `Fabrikam Fiber\\${it.name}` })));
+
         if (command === 'boards iteration team list-work-items') {
             return JSON.stringify({
                 workItemRelations: sprint.map((id) => {
                     const parent = byId.get(id)?.parent;
+
                     return parent && sprint.includes(parent)
                         ? { rel: 'System.LinkTypes.Hierarchy-Forward', source: { id: parent }, target: { id } }
                         : { rel: null, source: null, target: { id } };
                 }),
             });
         }
+
         if (command === 'repos pr show --id') {
             const pr = pullRequests.find((p) => p.pullRequestId === Number(flag(args, '--id')));
+
             if (!pr) throw new Error('az repos pr show failed: TF401180: The requested pull request was not found.');
+
             return JSON.stringify({
                 mergeStatus: 'succeeded',
                 ...pr,
                 repository: { name: 'lar-api', webUrl: REPO_URL },
             });
         }
+
         if (args[0] === 'rest' && flag(args, '--method') === 'patch') {
             const id = Number(/\/_apis\/wit\/workitems\/(\d+)\?/.exec(flag(args, '--url'))?.[1]);
+
             if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
+
             const ops = JSON.parse(readFileSync(flag(args, '--body').slice(1), 'utf8')) as {
                 op: string;
                 path: string;
                 value: unknown;
             }[];
             const rev = ops.find((o) => o.op === 'test' && o.path === '/rev');
+
             if (rev && rev.value !== (byId.get(id)!.rev ?? 1)) {
                 throw new Error(
                     'az rest failed: Bad Request({"message":"TF26071: This work item has been changed by someone else since you opened it. You will need to refresh it and discard your changes."})',
                 );
             }
+
             patches.push({ id, ops });
+
             const tagged = ops.find((o) => o.path === '/fields/System.Tags');
+
             if (tagged) Object.assign(byId.get(id)!, { tags: tagged.value, rev: (byId.get(id)!.rev ?? 1) + 1 });
+
             const retyped = ops.find((o) => o.path === '/fields/System.WorkItemType');
+
             if (retyped) {
                 const value = (path: string) => ops.find((o) => o.path === path)?.value as string | undefined;
                 const moved = {
@@ -259,24 +277,30 @@ export function fakeAz({
                     reproSteps: value('/fields/Microsoft.VSTS.TCM.ReproSteps'),
                     reproStepsFormat: value('/multilineFieldsFormat/Microsoft.VSTS.TCM.ReproSteps'),
                 };
+
                 Object.assign(
                     byId.get(id)!,
                     Object.fromEntries(Object.entries(moved).filter(([, v]) => v !== undefined)),
                     { type: retyped.value, rev: (byId.get(id)!.rev ?? 1) + 1 },
                 );
             }
+
             return JSON.stringify(raw(byId.get(id)!));
         }
+
         if (args[0] === 'devops' && args[1] === 'invoke') {
             const resource = `${flag(args, '--area')}/${flag(args, '--resource')}`;
             // az turns the version into a number by dropping -preview, and takes wit/workitems' ${type} route over its {id} one.
             const version = flag(args, '--api-version');
+
             if (/-preview\.\d/.test(version))
                 throw new Error(
                     `az devops invoke failed: ERROR: could not convert string to float: '${version.replace('-preview', '')}'`,
                 );
+
             if (resource === 'wit/workitems' && route(args, 'id'))
                 throw new Error("az devops invoke failed: ERROR: 'type'");
+
             if (resource === 'work/backlogconfiguration') {
                 return JSON.stringify({
                     requirementBacklog: {
@@ -287,17 +311,22 @@ export function fakeAz({
                     taskBacklog: { id: 'Microsoft.TaskCategory', workItemTypes: [{ name: 'Task' }] },
                 });
             }
+
             if (resource === 'work/workitems') throw new Error('ERROR: The request is invalid.');
+
             if (resource === 'work/backlogs') {
                 if (route(args, 'id') !== 'Microsoft.RequirementCategory/workItems')
                     throw new Error('fake az: invoke selects the backlog {id} route');
+
                 return JSON.stringify({ workItems: backlog.map((id) => ({ target: { id } })) });
             }
+
             if (resource === 'work/teamsettings')
                 return JSON.stringify({
                     backlogIteration: { path: backlogIteration },
                     defaultIteration: { path: 'Fabrikam Fiber\\Sprint 12' },
                 });
+
             if (resource === 'work/teamfieldvalues') {
                 return JSON.stringify({
                     field: { referenceName: 'System.AreaPath' },
@@ -305,18 +334,26 @@ export function fakeAz({
                     values: areas,
                 });
             }
+
             if (resource === 'wit/workitemsbatch') {
                 const { ids } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { ids: number[] };
+
                 batches.push(ids);
+
                 if (ids.length > 200)
                     throw new Error(`VS403474: You requested ${ids.length} work items which exceeds the limit of 200`);
+
                 const found = ids.flatMap((id) => (byId.has(id) ? [raw(byId.get(id)!, version)] : []));
+
                 return JSON.stringify({ count: found.length, value: found.sort((a, b) => a.id - b.id) });
             }
+
             if (resource === 'wit/comments') {
                 // Newest first, $top at a time; the continuation token is how many it has already given.
                 const id = Number(route(args, 'workItemId'));
+
                 if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
+
                 const query = Object.fromEntries(
                     args
                         .slice(args.indexOf('--query-parameters') + 1)
@@ -328,6 +365,7 @@ export function fakeAz({
                 const top = Number(query['$top']);
                 const page = newest.slice(from, from + top);
                 const withFormat = flag(args, '--api-version').startsWith('7.1-preview');
+
                 return JSON.stringify({
                     totalCount: newest.length,
                     count: page.length,
@@ -344,10 +382,13 @@ export function fakeAz({
                     }),
                 });
             }
+
             if (resource === 'wit/tags' && ['PATCH', 'DELETE'].includes(flag(args, '--http-method'))) {
                 const from = decodeURIComponent(route(args, 'tagIdOrName')!);
                 const at = tags.findIndex((t) => t.toLowerCase() === from.toLowerCase());
+
                 if (at < 0) throw new Error(`az devops invoke failed: TF400516: The tag ${from} does not exist.`);
+
                 const retag = (change: (tag: string) => string[]) => {
                     for (const item of items)
                         if (item.tags)
@@ -357,32 +398,42 @@ export function fakeAz({
                                 .flatMap((t) => (t.toLowerCase() === from.toLowerCase() ? change(t) : [t]))
                                 .join('; ');
                 };
+
                 if (flag(args, '--http-method') === 'DELETE') {
                     tags.splice(at, 1);
                     retag(() => []);
+
                     return '';
                 }
+
                 const { name: to } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { name: string };
+
                 tagRenames.push({ from, to });
                 tags[at] = to;
                 retag(() => [to]);
+
                 return JSON.stringify({ id: `tag-${at}`, name: to });
             }
+
             if (resource === 'wit/tags' && (!args.includes('--http-method') || flag(args, '--http-method') === 'GET'))
                 return JSON.stringify({
                     count: tags.length,
                     value: tags.map((name, at) => ({ id: `tag-${at}`, name, active: true })),
                 });
+
             if (resource === 'wit/workitemtypestates') {
                 const states = STATES[route(args, 'type')!]!;
+
                 return JSON.stringify({
                     count: states.length,
                     value: states.map(([name, category]) => ({ name, color: '000000', category })),
                 });
             }
         }
+
         throw new Error(`fake az: unexpected ${args.join(' ')}`);
     };
+
     return { calls, batches, patches, tags, tagRenames, run };
 }
 
@@ -450,28 +501,39 @@ export function fakeAzRepos({
         JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'lar-api', webUrl: REPO_URL } });
     const byId = (args: string[]) => {
         const pr = prs.find((p) => p.pullRequestId === Number(flag(args, '--id')));
+
         if (!pr) throw new Error('az repos pr show failed: TF401180: The requested pull request was not found.');
+
         return pr;
     };
     const run = async (args: string[]) => {
         calls.push(args);
+
         const failure = fail?.(args);
+
         if (failure) throw failure;
+
         const command = args.slice(0, 3).join(' ');
+
         if (args[0] === 'devops' && args[1] === 'invoke') {
             const resource = `${flag(args, '--area')}/${flag(args, '--resource')}`;
+
             if (resource === 'git/items') {
                 const path = route(args, 'path')!;
                 const version = route(args, 'versionDescriptor.version');
                 const read = version === undefined || version === defaultBranch ? files : (branchFiles[version] ?? {});
+
                 if (!(path in read))
                     throw new Error(
                         `az devops invoke failed: TF401174: The item ${path} could not be found in the repository.`,
                     );
+
                 return JSON.stringify({ path, content: read[path] });
             }
+
             if (resource === 'git/commits')
                 return JSON.stringify({ commitId: route(args, 'commitId'), treeId: `tree-${route(args, 'commitId')}` });
+
             if (resource === 'git/trees') {
                 // A recursive tree lists each folder too, and each entry's path from the tree's root.
                 const folders = [
@@ -484,6 +546,7 @@ export function fakeAzRepos({
                         ),
                     ),
                 ];
+
                 return JSON.stringify({
                     objectId: route(args, 'sha1'),
                     continuation_token: partialTree ? 'more' : null,
@@ -503,10 +566,13 @@ export function fakeAzRepos({
                     ],
                 });
             }
+
             if (resource === 'git/blobs') {
                 writeFileSync(flag(args, '--out-file'), files[route(args, 'sha1')!.replace(/^blob:/, '')]!);
+
                 return '';
             }
+
             if (resource === 'git/pushes') {
                 const body = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as {
                     refUpdates: { name: string; oldObjectId: string }[];
@@ -524,10 +590,12 @@ export function fakeAzRepos({
                 const [commit] = body.commits as [(typeof body.commits)[number]];
                 // A push names the ref's head as it was, or 40 zeros for a new ref, and Azure refuses it when that is not so.
                 const branch = name.replace('refs/heads/', '');
+
                 if (oldObjectId !== (heads.get(branch) ?? '0'.repeat(40)))
                     throw new Error(
                         `az devops invoke failed: TF401028: The reference '${name}' has already been updated by another client.`,
                     );
+
                 pushes.push({
                     ref: name,
                     oldObjectId,
@@ -545,33 +613,43 @@ export function fakeAzRepos({
                     })),
                 });
                 heads.set(branch, `pushed${pushes.length}`);
+
                 return JSON.stringify({ pushId: pushes.length });
             }
+
             if (resource === 'wit/tags' && !args.includes('--http-method')) {
                 return JSON.stringify({
                     count: tags.length,
                     value: tags.map((name, at) => ({ id: `tag-${at}`, name, active: true })),
                 });
             }
+
             if (resource === 'security/permissions')
                 throw new Error('ERROR: --area is not present in current organization');
+
             if (resource === 'git/pullRequestThreads') {
                 const body = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as {
                     comments: { content: string }[];
                 };
+
                 comments.push({ id: Number(route(args, 'pullRequestId')), content: body.comments[0]!.content });
+
                 return '{}';
             }
         }
+
         if (args[0] === 'rest' && flag(args, '--method') === 'get') {
             const url = new URL(flag(args, '--url'));
+
             if (
                 url.pathname !== '/contoso/_apis/permissions/2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87/4' ||
                 url.searchParams.get('tokens') !== 'repoV2/project-1/repo-1'
             )
                 throw new Error(`fake az: unexpected permission GET ${url}`);
+
             return JSON.stringify({ count: 1, value: [canPush] });
         }
+
         if (command === 'repos show --repository') {
             return JSON.stringify({
                 id: 'repo-1',
@@ -581,28 +659,35 @@ export function fakeAzRepos({
                 project: { id: 'project-1', name: 'Fabrikam Fiber' },
             });
         }
+
         if (command === 'repos ref list') {
             // --filter matches the start of each name after refs/.
             const filter = flag(args, '--filter');
+
             return JSON.stringify(
                 [...heads]
                     .filter(([name]) => `heads/${name}`.startsWith(filter))
                     .map(([name, objectId]) => ({ name: `refs/heads/${name}`, objectId })),
             );
         }
+
         if (command === 'repos pr list') {
             const source = `refs/heads/${flag(args, '--source-branch')}`;
+
             return JSON.stringify(
                 prs
                     .filter((p) => p.sourceRefName === source && p.status === 'active')
                     .map((p) => JSON.parse(show(p)) as unknown),
             );
         }
+
         if (command === 'repos pr create') {
             const source = flag(args, '--source-branch');
             const target = flag(args, '--target-branch');
+
             if (!heads.has(source) || !heads.has(target))
                 throw new Error('The source or target branch does not exist.');
+
             const pr: FakePr = {
                 pullRequestId: 100 + prs.length,
                 status: 'active',
@@ -611,19 +696,29 @@ export function fakeAzRepos({
                 title: flag(args, '--title'),
                 description: flag(args, '--description'),
             };
+
             prs.push(pr);
+
             return show(pr);
         }
+
         if (command === 'repos pr show') return show(byId(args));
+
         if (command === 'repos pr update') {
             const pr = byId(args);
+
             if (args.includes('--status')) pr.status = flag(args, '--status') as FakePr['status'];
+
             // The board passes --description=<text> joined, so a description starting with - is no option.
             const description = args.find((a) => a.startsWith('--description='));
+
             if (description !== undefined) pr.description = description.slice('--description='.length);
+
             return show(pr);
         }
+
         throw new Error(`fake az: unexpected ${args.join(' ')}`);
     };
+
     return { calls, pushes, comments, heads, prs, run };
 }

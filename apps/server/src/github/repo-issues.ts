@@ -21,10 +21,13 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     let readOnce = false;
     // The last change check's ETag, so the next one is a free 304 while nothing changed.
     let etag: string | undefined;
+
     return {
         async read() {
             const items = await fetchRepoIssues(repo, Date.now(), { searchRanges: !readOnce });
+
             readOnce = true;
+
             return { title: repo, items };
         },
         readSome: (items) => fetchIssues(items.map((item) => item.id)),
@@ -36,13 +39,17 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
                 etag,
                 run,
             );
+
             if (!answer) return [];
+
             etag = answer.etag;
+
             if (
                 answer.body.length === CHANGES_PAGE &&
                 answer.body.every((issue) => changedSince(issue.updated_at, since))
             )
                 return null;
+
             // An edit to an issue that closed before the check, such as a comment on an old one, changes nothing the board shows.
             return answer.body
                 .filter(
@@ -54,8 +61,11 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
         },
         async searchTickets(_repo, query) {
             const number = ticketNumberOf(query);
+
             if (number === null) return findIssues(repo, query, TICKET_MATCHES, run);
+
             const issue = await readIssue(repo, number, run);
+
             return issue ? [{ number: issue.number, title: issue.title, url: issue.url }] : [];
         },
         readTicket: (_repo, number) => readIssue(repo, number, run),

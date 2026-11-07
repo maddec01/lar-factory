@@ -14,6 +14,7 @@ import { Switch } from '../settings/controls.tsx';
 /** How many builds a pass would start now. */
 function wouldStart(pass: AutoBuildPass | undefined): string {
     const n = pass?.wouldStart ?? 0;
+
     return n === 0
         ? 'No builds would start now.'
         : n === 1
@@ -28,10 +29,13 @@ export function AutoBuildSwitch() {
 
     const save = async (on: boolean) => {
         setSaving(on);
+
         const result = await postAction('/api/auto-build', { on });
+
         flushSync(() => {
             receive(result);
             setSaving(null);
+
             if (result.error)
                 showToast({
                     slot: 'auto-build',
@@ -52,6 +56,7 @@ export function AutoBuildSwitch() {
           ? `${state.problem} Turning it on replaces the file.`
           : wouldStart(pass);
     const hold = state?.on && pass?.hold;
+
     return (
         <span
             className="auto-build inline-flex min-w-0 items-center gap-1.5 text-[11px] whitespace-nowrap text-(--muted-foreground)"

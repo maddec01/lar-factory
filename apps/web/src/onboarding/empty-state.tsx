@@ -6,6 +6,7 @@ import { useWizardStore } from './wizard-store.ts';
 
 export function EmptyState() {
     const start = useWizardStore((s) => s.start);
+
     return (
         <div className="min-h-0 flex-1 overflow-y-auto" data-empty-state>
             <div className="mx-auto grid max-w-xl justify-items-center gap-3 px-6 py-16 text-center">

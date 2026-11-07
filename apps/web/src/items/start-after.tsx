@@ -36,6 +36,7 @@ const SHRINKS = 'min-w-0 max-w-full shrink';
 /** What the title says Start after waits for: every open blocker's work, and the user's mark on each unmet Dependency. */
 function waitsFor(item: Item): string {
     const { work, dependencies } = blockerGroups(item);
+
     return [
         ...(work ? [`${work.names} ${work.many ? 'complete' : 'completes'}`] : []),
         ...(dependencies ? [`you mark ${dependencies.names} met`] : []),
@@ -49,8 +50,10 @@ async function setArmed(item: Item, choice: ModelChoice | undefined | null): Pro
         choice === null
             ? await postAction('/api/disarm', { session, itemId: item.id })
             : await postAction('/api/arm', startRequest(session, item.id, choice));
+
     flushSync(() => {
         receive(result);
+
         if (result.error) notify({ verb: 'Failed', item, message: result.error });
     });
 }
@@ -61,18 +64,22 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
     const [pending, setPending] = useState(false);
     const after = startsAfter(item);
     const label = startsAfter(item, true);
+
     if (!after) return null;
+
     const armed = !!data.armed?.[item.id];
     const writes = pending ? { 'aria-disabled': true as const } : writeState(data);
     const held = Boolean(writes['aria-disabled']);
     const run = async (choice: ModelChoice | undefined | null) => {
         setPending(true);
+
         try {
             await setArmed(item, choice);
         } finally {
             setPending(false);
         }
     };
+
     if (armed) {
         return (
             <Button
@@ -90,10 +97,12 @@ function StartAfter({ item, data, namesBlocker }: { item: Item; data: BoardData;
             </Button>
         );
     }
+
     const pick = (choice: ModelChoice | undefined) => {
         flushSync(() => setOpen(false));
         void run(choice);
     };
+
     // Sample mode keeps the menu open-able, so the model choices can be seen; its entries arm nothing.
     return (
         <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
@@ -145,8 +154,11 @@ export function StartOrAfter({
     namesBlocker?: boolean;
 }) {
     if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} namesBlocker={namesBlocker} />;
+
     const hold = startHold(data, item.repo);
+
     if (!hold) return <StartControl item={item} data={data} label={label} kind={kind} linkedBeside={linkedBeside} />;
+
     // Pointer events stay on while it's disabled, so its title says why.
     return (
         <Button
@@ -166,13 +178,16 @@ export function StartOrAfter({
 export function StartAfterError({ item, data }: { item: Item; data: BoardData }) {
     const el = useRef<HTMLParagraphElement>(null);
     const error = data.armedErrors?.[item.id];
+
     if (!error) return null;
+
     const id = CSS.escape(item.id);
     const close = () =>
         closeKeepingFocus(el.current, () => void setArmed(item, null), [
             `[data-start-after="${id}"]`,
             `[data-start="${id}"]`,
         ]);
+
     return (
         <p className="start" ref={el} data-start-after-error={item.id}>
             <span className="action-error">

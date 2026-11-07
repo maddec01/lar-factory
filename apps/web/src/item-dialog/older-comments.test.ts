@@ -28,10 +28,13 @@ const pageReads = () =>
 
 async function openItem(itemId: string): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
+
 async function closeItem(): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().close());
 }
 
@@ -41,14 +44,20 @@ function serveOlder(): { fail: (count: number) => void; hold: () => () => Promis
     let holding: Promise<void> | null = null;
     let release = () => {};
     const original = fetchMock.getMockImplementation()!;
+
     fetchMock.mockImplementation(async (url: string) => {
         if (!url.startsWith('/api/item-comments')) return original(url);
+
         await holding;
+
         if (failing > 0) {
             failing--;
+
             return new Response(JSON.stringify({ error: 'GitHub is rate limiting the board.' }), { status: 502 });
         }
+
         const from = Number(new URL(url, 'http://board').searchParams.get('before'));
+
         return new Response(
             JSON.stringify({
                 page: {
@@ -58,6 +67,7 @@ function serveOlder(): { fail: (count: number) => void; hold: () => () => Promis
             }),
         );
     });
+
     return {
         fail: (count) => {
             failing = count;
@@ -66,6 +76,7 @@ function serveOlder(): { fail: (count: number) => void; hold: () => () => Promis
             holding = new Promise((resolve) => {
                 release = resolve;
             });
+
             return () => settle(release);
         },
     };
@@ -83,6 +94,7 @@ test('an item with older comments shows Load older comments under its comments, 
 
 test('an unresolved empty discussion offers older comments and only claims no comments after reaching the end', async () => {
     const original = fetchMock.getMockImplementation()!;
+
     fetchMock.mockImplementation(async (url: string) => {
         if (
             url.startsWith('/api/item-details') &&
@@ -90,13 +102,17 @@ test('an unresolved empty discussion offers older comments and only claims no co
         ) {
             const response = await original(url);
             const body = await response.json();
+
             body.details.comments = [];
             body.details.hasOlderComments = true;
             body.details.olderCursor = 'unknown';
+
             return new Response(JSON.stringify(body));
         }
+
         if (url.startsWith('/api/item-comments'))
             return new Response(JSON.stringify({ page: { comments: [], olderCursor: null } }));
+
         return original(url);
     });
     await mountPage();
@@ -110,9 +126,12 @@ test('an unresolved empty discussion offers older comments and only claims no co
 
 test("Load older comments reads the page before the details' cursor and appends it in order, then the last page hides the button", async () => {
     const server = serveOlder();
+
     await mountPage();
     await openItem('I_sample13');
+
     const release = server.hold();
+
     await settle(() => loadMore()!.click());
     expect(pageReads()).toEqual([{ itemId: 'I_sample13', before: '0' }]);
     expect(loadMore()!.disabled, 'disabled while it loads').toBe(true);
@@ -133,6 +152,7 @@ test("Load older comments reads the page before the details' cursor and appends 
 
 test('a failed load shows its error next to the button, keeps the comments shown and lets the button retry', async () => {
     const server = serveOlder();
+
     await mountPage();
     await openItem('I_sample13');
     server.fail(1);
@@ -149,10 +169,12 @@ test('a failed load shows its error next to the button, keeps the comments shown
 
 test('a read that cannot reach the board fails the same way', async () => {
     const original = fetchMock.getMockImplementation()!;
+
     await mountPage();
     await openItem('I_sample13');
     fetchMock.mockImplementation(async (url: string) => {
         if (url.startsWith('/api/item-comments')) throw new TypeError('Failed to fetch');
+
         return original(url);
     });
     await settle(() => loadMore()!.click());
@@ -200,9 +222,12 @@ test('reopening an item whose updatedAt changed starts again at the latest comme
 
 test('a page that lands after the dialog closed and reopened is not added to the new comments', async () => {
     const server = serveOlder();
+
     await mountPage();
     await openItem('I_sample13');
+
     const release = server.hold();
+
     await settle(() => loadMore()!.click());
     await closeItem();
     await openItem('I_sample13');

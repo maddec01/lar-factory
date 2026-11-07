@@ -33,10 +33,12 @@ const item = {
 test('a second moves the age and renders nothing around the line', async () => {
     vi.doMock('../items/status-glyph.tsx', async (original) => {
         const real = await original<typeof import('../items/status-glyph.tsx')>();
+
         return {
             ...real,
             StatusGlyph: (props: Parameters<typeof real.StatusGlyph>[0]): ReactNode => {
                 glyphRenders += 1;
+
                 return real.StatusGlyph(props);
             },
         };
@@ -51,8 +53,11 @@ test('a second moves the age and renders nothing around the line', async () => {
 
 test('a line keeps its tooltip quiet as the connection drops and its list goes', async () => {
     const warned = [vi.spyOn(console, 'error'), vi.spyOn(console, 'warn')];
+
     await mountPage({ ...fresh(), items: [item] });
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     expect($('[data-activity]')!.getAttribute('tabindex')).toBe('0');
     await settle(() => useBoardStore.setState({ clientError: 'Connection lost' }));
     expect($('[data-activity]')!.dataset.activity).toBe('unavailable');
@@ -64,6 +69,7 @@ test('a line keeps its tooltip quiet as the connection drops and its list goes',
 
 test('a minute age skips unchanged second renders but still becomes unavailable on its original deadline', async (t) => {
     await mountPage({ ...fresh(), items: [item] });
+
     const { ActivityLine } = await import('./activity-line.tsx');
     const { TooltipProvider } = await import('@lar-works/design-system');
     const older = {
@@ -72,10 +78,13 @@ test('a minute age skips unchanged second renders but still becomes unavailable 
     } as Item;
     const host = document.createElement('div');
     const root = createRoot(host);
+
     t.onTestFinished(async () => {
         await settle(() => root.unmount());
     });
+
     let commits = 0;
+
     await settle(() =>
         root.render(
             createElement(

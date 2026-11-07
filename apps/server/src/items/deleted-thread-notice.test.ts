@@ -11,13 +11,17 @@ import { recordItems } from './record-items.ts';
 test('confirmed latest deletion survives reopening, but live work and a newer thread suppress its notice', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'deleted-notice-'));
     let records = await openWorkRecords(join(dir, 'records.db'));
+
     try {
         let record = records.create({ title: 'Work', repository: 'owner/repo', kind: 'concept', status: 'Shaping' });
+
         record = records.addThread(record.workId, record.revision, 'old', 'shape');
         record = records.confirmThreadDeleted(record.workId, record.revision, 'old');
         records.close();
         records = await openWorkRecords(join(dir, 'records.db'));
+
         const item = { ...recordItems(records, [], ['owner/repo'])[0]!, threads: [] };
+
         expect(deletedThreadNotice(records, item)).toMatchObject({
             deletedThread: true,
             startAgainPurpose: 'shape',
@@ -38,6 +42,7 @@ test('confirmed latest deletion survives reopening, but live work and a newer th
 test('a shaping thread cleanup deleted after the build thread was recorded raises no notice', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'deleted-notice-'));
     const records = await openWorkRecords(join(dir, 'records.db'));
+
     try {
         const { workId } = records.create({
             title: 'Work',
@@ -45,7 +50,9 @@ test('a shaping thread cleanup deleted after the build thread was recorded raise
             kind: 'build',
             status: 'In progress',
         });
+
         records.addThread(workId, records.read(workId).revision, 'shape', 'shape');
+
         const { intent } = records.recordLaunchIntent(
             workId,
             records.read(workId).revision,
@@ -53,9 +60,12 @@ test('a shaping thread cleanup deleted after the build thread was recorded raise
             undefined,
             'delete',
         );
+
         records.resolveLaunchIntent(workId, records.read(workId).revision, intent.intentId, { threadId: 'build' });
         records.markShapingThreadDeleted('shape');
+
         const item = { ...recordItems(records, [], ['owner/repo'])[0]!, threads: [] };
+
         expect(deletedThreadNotice(records, item)).toBeUndefined();
     } finally {
         records.close();
@@ -74,16 +84,20 @@ async function deletedBuild(dir: string, name: string, pr: 'open' | 'closed' | n
         ticket: 'owner/repo#1',
     }).record;
     let record = records.addThread(made.workId, made.revision, 'old', 'build');
+
     record = records.confirmThreadDeleted(record.workId, record.revision, 'old');
+
     if (pr) {
         record = records.setPullRequest(record.workId, record.revision, 'owner/repo#2');
         record = records.observe(record.workId, record.revision, { of: 'pr', state: pr });
     }
+
     record = records.observe(record.workId, record.revision, {
         of: 'ticket',
         state: causes.some((c) => c.type === 'ticket-closed') ? 'closed' : 'open',
     });
     records.setNeedsYouCauses(record.workId, record.revision, causes);
+
     return {
         records,
         notice: deletedThreadNotice(records, { ...recordItems(records, [], ['owner/repo'])[0]!, threads: [] }),
@@ -93,6 +107,7 @@ async function deletedBuild(dir: string, name: string, pr: 'open' | 'closed' | n
 test('a thread deleted on a closed ticket names both causes and adds Abandon to its offers', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'deleted-notice-'));
     const { records, notice } = await deletedBuild(dir, 'records.db', null, [{ type: 'ticket-closed' }]);
+
     try {
         expect(notice).toEqual({
             reason: 'The latest work thread was deleted. Its ticket owner/repo#1 closed in its provider.',
@@ -111,12 +126,16 @@ test('a thread deleted on a closed ticket names both causes and adds Abandon to 
 test('a thread deleted on work with free text keeps saying the notice has another note', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'deleted-note-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
+
     try {
         let record = records.create({ title: 'Noted', repository: 'owner/repo', kind: 'build', status: 'In progress' });
+
         record = records.addThread(record.workId, record.revision, 'gone', 'build');
         record = records.confirmThreadDeleted(record.workId, record.revision, 'gone');
         records.setNeedsYou(record.workId, record.revision, 'Merge conflict.');
+
         const item = recordItems(records, [], ['owner/repo'])[0]!;
+
         expect(deletedThreadNotice(records, { ...item, threads: [] })).toMatchObject({
             deletedThread: true,
             hasOtherNote: true,
@@ -130,8 +149,11 @@ test('a thread deleted on work with free text keeps saying the notice has anothe
 test('a thread deleted with an open PR offers Start again, plus Abandon on a closed ticket', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'deleted-notice-'));
     const open = await deletedBuild(dir, 'open.db', 'open', []);
+
     open.records.close();
+
     const closed = await deletedBuild(dir, 'closed.db', 'open', [{ type: 'ticket-closed' }]);
+
     try {
         expect(open.notice).toMatchObject({ offers: ['start-again'], ticketOpen: true });
         expect(closed.notice).toMatchObject({ offers: ['start-again', 'set-aside'] });
@@ -144,8 +166,11 @@ test('a thread deleted with an open PR offers Start again, plus Abandon on a clo
 test('a closed PR keeps its PR notice when the thread is deleted, and a stale one does not', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'deleted-notice-'));
     const closed = await deletedBuild(dir, 'closed.db', 'closed', [{ type: 'pr-closed' }]);
+
     closed.records.close();
+
     const stale = await deletedBuild(dir, 'stale.db', 'closed', []);
+
     try {
         expect(closed.notice).toMatchObject({
             reason: 'Its PR owner/repo#2 closed without merging.',

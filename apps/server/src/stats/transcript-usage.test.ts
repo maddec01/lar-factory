@@ -18,6 +18,7 @@ import type { UsageRecord } from './usage-record.ts';
 /** A session's records, as a read of that session alone counts them. */
 async function recordsOf(transcripts: SessionTranscripts, session: string): Promise<UsageRecord[]> {
     const pinned = await warmTranscripts(transcripts.files(session));
+
     return transcripts.records(session, pinned).flat();
 }
 
@@ -53,6 +54,7 @@ function claudeLine(overrides: {
 
 test("a Claude record gives T3's token categories, model, speed and dedupe key", () => {
     const record = parseClaudeLine(claudeLine({ messageId: 'msg_1', contentType: 'text' }));
+
     assert.deepEqual(record, {
         provider: 'claude',
         timestampMs: Date.parse('2026-08-07T04:05:13.944Z'),
@@ -73,7 +75,9 @@ test("a Claude record gives T3's token categories, model, speed and dedupe key",
         parseClaudeLine(claudeLine({ messageId: 'msg_1', contentType: 'text', speed: 'fast' }))?.speed,
         'fast',
     );
+
     const withRequest = JSON.parse(claudeLine({ messageId: 'msg_1', contentType: 'text' }));
+
     assert.equal(
         parseClaudeLine(JSON.stringify({ ...withRequest, requestId: 'req_1', costUSD: 0.42 }))?.dedupeKey,
         'msg_1:req_1',
@@ -87,9 +91,12 @@ test("a Claude record gives T3's token categories, model, speed and dedupe key",
 test('every content block of one message has the same dedupe key, so its usage counts once', () => {
     const text = parseClaudeLine(claudeLine({ messageId: 'msg_2', contentType: 'text' }))!;
     const toolUse = parseClaudeLine(claudeLine({ messageId: 'msg_2', contentType: 'tool_use' }))!;
+
     assert.equal(text.dedupeKey, toolUse.dedupeKey);
+
     const keep = firstCopies();
     const kept = [text, toolUse].filter(keep);
+
     assert.equal(kept.length, 1);
     assert.equal(totalTokens(kept), 2 + 1000 + 66818 + 286, "T3's total for the message");
 });
@@ -100,6 +107,7 @@ test('placeholders, model-less and undated records are dropped; real zero-token 
         timestamp: '2026-08-07T04:05:13.944Z',
         message: { model: 'claude-fable-5', usage: { input_tokens: 0, output_tokens: 0 } },
     };
+
     assert.deepEqual(parseClaudeLine(JSON.stringify(projected))?.totals, {
         uncachedInputTokens: 0,
         cachedInputTokens: 0,
@@ -132,6 +140,7 @@ test("token counts take T3's reading: negative, fractional or non-numeric counts
             },
         },
     });
+
     assert.deepEqual(parseClaudeLine(line)?.totals, {
         uncachedInputTokens: 0,
         cachedInputTokens: 10,
@@ -151,6 +160,7 @@ test('total tokens leave reasoning out, since it is inside output', () => {
             reasoningTokens: 30,
         },
     } as UsageRecord;
+
     assert.equal(totalTokens([record, record]), 92);
     assert.equal(totalTokens([]), 0);
 });
@@ -167,6 +177,7 @@ test("a session's records come from its own transcript and its subagents' transc
         'session-b': { subagents: { b1: [assistant('msg-4', 3, 0, 0, 3)] } },
     });
     const read = await claudeSessions(home);
+
     assert.deepEqual(
         (await recordsOf(read, 'session-a')).map((r) => r.dedupeKey),
         ['msg-1:req-msg-1', 'msg-2:req-msg-2', 'msg-3:req-msg-3'],
@@ -185,9 +196,12 @@ test("a read drops the cached records of transcripts it no longer names, so the 
     const path = join(home, 'projects', '-Users-me--t3-worktrees-lar-factory-feat-60', 'session-a.jsonl');
     const ids = async () => (await recordsOf(await claudeSessions(home), 'session-a')).map((r) => r.dedupeKey);
     const at = 1_760_000_000;
+
     utimesSync(path, at, at);
     assert.deepEqual(await ids(), ['msg-1:req-msg-1']);
+
     const { size } = statSync(path);
+
     renameSync(path, `${path}.gone`);
     assert.deepEqual(await ids(), []);
     // The same name, time and size again, but other records: only a dropped entry reads them.
@@ -204,12 +218,15 @@ test("a warm parses only what isn't cached or changed since, and pins what it re
     });
     const read = await claudeSessions(home);
     const files = read.files('session-a');
+
     assert.deepEqual(
         files.map((file) => file.path.split('/').at(-1)),
         ['session-a.jsonl', 'agent-a1.jsonl'],
         'only the session asked for',
     );
+
     const first = await warmTranscripts(files);
+
     assert.equal(first.parsed, 2);
     assert.equal((await warmTranscripts(files)).parsed, 0);
     appendFileSync(files[0]!.path, JSON.stringify(assistant('msg-9', 1, 0, 0, 1)) + '\n');
@@ -221,7 +238,9 @@ test("a warm parses only what isn't cached or changed since, and pins what it re
         ['msg-1:req-msg-1', 'msg-2:req-msg-2'],
         'the first read stands as it was',
     );
+
     const changed = await warmTranscripts(files);
+
     assert.equal(changed.parsed, 1, 'only the changed file parses again');
     assert.deepEqual(
         read
@@ -240,10 +259,14 @@ test('a warm lets the event loop run while it parses one transcript', async (t) 
     let running = true;
     const turn = () => {
         turns++;
+
         if (running) setImmediate(turn);
     };
+
     setImmediate(turn);
+
     const pinned = await warmTranscripts(read.files('session-a'));
+
     running = false;
     assert.equal(pinned.parsed, 1);
     assert.ok(turns >= 5, `the loop turned ${turns} times during one file`);
@@ -266,8 +289,11 @@ test('the stream keeps every usage record across its chunks: a line far longer t
     });
     const read = await claudeSessions(home);
     const { path } = read.files('session-a')[0]!;
+
     writeFileSync(path, readFileSync(path, 'utf8').trimEnd());
+
     const records = await recordsOf(read, 'session-a');
+
     assert.deepEqual(
         records.map((r) => r.dedupeKey),
         ['first:req-first', 'long:req-long', 'tail:req-tail'],
@@ -286,6 +312,7 @@ test('the prefilter skips only lines no rule counts: a usage line counts whateve
     const read = await claudeSessions(home);
     const keep = firstCopies();
     const kept = [...(await recordsOf(read, 'session-a')), ...(await recordsOf(read, 'session-b'))].filter(keep);
+
     assert.deepEqual(
         kept.map((r) => r.dedupeKey),
         ['shared:req-shared', 'own:req-own'],
@@ -310,6 +337,7 @@ test("a Codex session's records come from its rollout, found by the session ID i
         ],
     });
     const read = await codexSessions(home);
+
     assert.deepEqual(
         (await recordsOf(read, own)).map((r) => [r.sessionId, r.model, totalTokens([r])]),
         [
@@ -333,11 +361,14 @@ test('a Codex session copied into a second rollout counts once, as T3 keys sessi
         codexTokens('2026-10-20T09:01:00.000Z', 200, 0, 5),
     ];
     const home = codexHome(t, { [id]: lines });
+
     writeFileSync(
         join(home, 'sessions', '2026', '10', '20', `rollout-2026-10-20T10-00-00-${id}.jsonl`),
         lines.map((l) => JSON.stringify(l)).join('\n'),
     );
+
     const records = await recordsOf(await codexSessions(home), id);
+
     assert.equal(records.length, 4);
     assert.equal(totalTokens(records.filter(firstCopies())), 105 + 205);
 });

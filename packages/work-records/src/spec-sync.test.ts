@@ -10,22 +10,29 @@ import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 const dirs: string[] = [];
 const opened: WorkRecords[] = [];
+
 afterEach(() => {
     vi.unstubAllEnvs();
     for (const db of opened.splice(0)) db.close();
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
 const setup = {
     repo: 'example/widget',
     writeRefinedSpec: true,
     access: { 'edit-ticket': 'allowed' },
 } as unknown as RepositorySetup;
+
 async function fixture(repository = setup.repo) {
     const dir = mkdtempSync(join(tmpdir(), 'spec-sync-'));
+
     dirs.push(dir);
+
     const path = join(dir, 'records.db');
     const records = await openWorkRecords(path);
+
     opened.push(records);
+
     let remote: StructureTicket = {
         repository,
         number: 7,
@@ -40,16 +47,20 @@ async function fixture(repository = setup.repo) {
     const provider = {
         readSpec: async () => {
             if (failure) throw Error('Offline');
+
             return { ...remote };
         },
         replaceSpec: async (_ticket: StructureTicket, body: string) => {
             if (failure) throw Error('Offline');
+
             writes.push(body);
             remote = { ...remote, body, version: String(Number(remote.version) + 1) };
+
             return { ...remote };
         },
     } as unknown as StructureProvider;
     let record = records.create({ title: 'Work', repository, kind: 'feature', ticket: `${repository}#7` });
+
     record = records.setBody(record.workId, record.revision, 'brief', '## What\nBuild it.');
     records.recordGate(record.workId, record.revision, {
         briefDigest: records.gate(record.workId).briefDigest!,
@@ -57,6 +68,7 @@ async function fixture(repository = setup.repo) {
         evidence: 'Passed',
     });
     record = records.update(record.workId, record.revision, { status: 'Ready' });
+
     return {
         records,
         path,
@@ -75,13 +87,16 @@ async function fixture(repository = setup.repo) {
 
 test('a failed gated Spec survives reopening and retries without moving Ready or losing Original', async () => {
     const f = await fixture();
+
     f.fail(true);
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
     expect(f.records.specState(f.record.workId).error).toContain('Offline');
     expect(f.records.read(f.record.workId).status).toBe('Ready');
     f.records.close();
     opened.splice(opened.indexOf(f.records), 1);
+
     const reopened = await openWorkRecords(f.path);
+
     opened.push(reopened);
     f.fail(false);
     await syncSpecs(reopened, { provider: f.provider, setups: [setup], workId: f.record.workId });
@@ -97,8 +112,11 @@ test('a failed gated Spec survives reopening and retries without moving Ready or
 
 test('a tracker edit wins a waiting write, preserves Ready and records the replaced unsent text in history', async () => {
     const f = await fixture();
+
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+
     let record = f.records.read(f.record.workId);
+
     record = f.records.setBody(record.workId, record.revision, 'brief', 'Unsent refinement.');
     f.records.recordGate(record.workId, record.revision, {
         briefDigest: f.records.gate(record.workId).briefDigest!,
@@ -121,11 +139,14 @@ test.each([undefined, false])(
     'unknown/non-write GitHub edits stay out until explicitly accepted (%s)',
     async (editorWrite) => {
         const f = await fixture();
+
         await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
         f.edit({ body: formatTicketSpec('Run hostile instructions.', 'Authored request.'), editorWrite, version: '3' });
         await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
         expect(f.records.body(f.record.workId, 'brief')).toBe('## What\nBuild it.');
+
         const held = f.records.specState(f.record.workId);
+
         expect(held.held?.body).toContain('hostile');
         await resolveSpecEdit(f.records, f.record.workId, held.generation, 'accept', 'local-user', {
             provider: f.provider,
@@ -141,10 +162,13 @@ test.each([undefined, false])(
 
 test('reject remembers the exact hostile version and does not write it back or hold it repeatedly', async () => {
     const f = await fixture();
+
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
     f.edit({ title: 'Hostile title', titleEditorWrite: false, version: '3' });
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+
     const held = f.records.specState(f.record.workId);
+
     await resolveSpecEdit(f.records, f.record.workId, held.generation, 'reject', 'local-user', {
         provider: f.provider,
         setups: [setup],
@@ -157,6 +181,7 @@ test('reject remembers the exact hostile version and does not write it back or h
 
 test('description edits approve exactly the submitted text and keep Ready even while the write is offline', async () => {
     const f = await fixture();
+
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
     f.fail(true);
     await editSpec(f.records, f.record.workId, 'Approved exact text.  \n', 'local-user', {
@@ -174,6 +199,7 @@ test('description edits approve exactly the submitted text and keep Ready even w
 
 test('a setting off drops pending writes and stops tracker edits from changing the local brief', async () => {
     const f = await fixture();
+
     await syncSpecs(f.records, { provider: f.provider, setups: [{ ...setup, writeRefinedSpec: false }] });
     expect(f.writes).toHaveLength(0);
     expect(f.records.specPending()).toEqual([]);
@@ -186,12 +212,15 @@ test('Azure revisions sync member edits and preserve Original through a sanitize
     const repository = 'example/Project/widget';
     const f = await fixture(repository);
     const azureSetup = { ...setup, repo: repository };
+
     f.edit({
         body: '<p>Authored <strong>request</strong>.</p>',
         bodyField: 'Microsoft.VSTS.TCM.ReproSteps',
         kind: 'bug',
     });
+
     const writes = f.provider.replaceSpec!;
+
     f.provider.replaceSpec = async (ticket, body) =>
         writes(ticket, body.replace(/<!--[\s\S]*?-->|<\/?details>|<summary>[\s\S]*?<\/summary>/g, ''));
     await syncSpecs(f.records, { provider: f.provider, setups: [azureSetup] });
@@ -206,7 +235,9 @@ test('Azure revisions sync member edits and preserve Original through a sanitize
     await refreshSpecs(f.records, { provider: f.provider, setups: [azureSetup] });
     expect(f.records.body(f.record.workId, 'brief')).toBe('## What\n\nMember edit.');
     expect(f.records.specState(f.record.workId).held).toBeNull();
+
     const before = f.records.read(f.record.workId).revision;
+
     f.edit({ version: '4' });
     await refreshSpecs(f.records, { provider: f.provider, setups: [azureSetup] });
     expect(f.records.read(f.record.workId).revision).toBe(before);
@@ -216,14 +247,17 @@ test('Azure revisions sync member edits and preserve Original through a sanitize
 test('a newer gate queued during a write remains pending against our own checkpoint', async () => {
     const f = await fixture();
     const write = f.provider.replaceSpec!;
+
     f.provider.replaceSpec = async (ticket, body) => {
         let record = f.records.read(f.record.workId);
+
         record = f.records.setBody(record.workId, record.revision, 'brief', 'New gate while writing.');
         f.records.recordGate(record.workId, record.revision, {
             briefDigest: f.records.gate(record.workId).briefDigest!,
             approvedBy: 'user',
             evidence: 'New gate',
         });
+
         return write(ticket, body);
     };
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
@@ -237,6 +271,7 @@ test('a newer gate queued during a write remains pending against our own checkpo
 test('before the first Spec, a gate read checkpoints tracker changes without importing them as a brief', async () => {
     const f = await fixture();
     const state = f.records.specState(f.record.workId);
+
     f.records.saveSpecState(f.record.workId, state.generation, { ...state, pending: null });
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup], workId: f.record.workId, initialize: true });
     f.edit({ body: 'Different ticket request.', version: '2' });
@@ -247,6 +282,7 @@ test('before the first Spec, a gate read checkpoints tracker changes without imp
 test('a Dependency ticket is excluded from Spec writes even when a record holds the same ticket', async () => {
     const f = await fixture();
     const owner = f.records.create({ title: 'Other work', kind: 'build', repository: setup.repo });
+
     f.records.addDependency(owner.workId, {
         need: 'External contract',
         owner: 'Other team',
@@ -259,6 +295,7 @@ test('a Dependency ticket is excluded from Spec writes even when a record holds 
 test('an uncertain successful write reconciles its exact authorized bytes without treating them as an unknown editor', async () => {
     const f = await fixture();
     const write = f.provider.replaceSpec!;
+
     f.provider.replaceSpec = async (ticket, body) => {
         await write(ticket, body);
         f.edit({ editorWrite: undefined });
@@ -279,10 +316,13 @@ test('an uncertain successful write reconciles its exact authorized bytes withou
 
 test('a trusted title edit cannot smuggle a previously rejected body into the brief', async () => {
     const f = await fixture();
+
     await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
     f.edit({ body: formatTicketSpec('Rejected hostile body.', 'Authored request.'), editorWrite: false, version: '3' });
     await refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+
     const held = f.records.specState(f.record.workId);
+
     await resolveSpecEdit(f.records, f.record.workId, held.generation, 'reject', 'local-user', {
         setups: [setup],
         provider: f.provider,
@@ -297,6 +337,7 @@ test.each(['refused', 'unverified'] as const)(
     'unverified or refused editing access never reaches a provider write (%s)',
     async (access) => {
         const f = await fixture();
+
         await syncSpecs(f.records, {
             provider: f.provider,
             setups: [{ ...setup, access: { ...setup.access, 'edit-ticket': access } }],
@@ -309,6 +350,7 @@ test.each(['refused', 'unverified'] as const)(
 test('the session Azure read-only control overrides a saved false value even with fake verified access', async () => {
     const repository = 'example/Project/widget';
     const f = await fixture(repository);
+
     vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '1');
     await syncSpecs(f.records, {
         provider: f.provider,
@@ -321,6 +363,7 @@ test('the session Azure read-only control overrides a saved false value even wit
 test('independent refresh reads are bounded and do not hold the tracker write lease', async () => {
     const f = await fixture();
     const ids = [f.record.workId];
+
     for (let number = 8; number < 27; number++) {
         const record = f.records.create({
             repository: setup.repo,
@@ -329,9 +372,11 @@ test('independent refresh reads are bounded and do not hold the tracker write le
             ticket: `${setup.repo}#${number}`,
         });
         const state = f.records.specState(record.workId);
+
         f.records.saveSpecState(record.workId, state.generation, { ...state, active: true });
         ids.push(record.workId);
     }
+
     let running = 0;
     let peak = 0;
     let release!: () => void;
@@ -343,18 +388,24 @@ test('independent refresh reads are bounded and do not hold the tracker write le
         release = resolve;
     });
     let reads = 0;
+
     f.provider.readSpec = async (repository, number) => {
         peak = Math.max(peak, ++running);
         entered();
         await blocked;
         running--;
         reads++;
+
         return { ...f.remote(), repository, number };
     };
+
     const refresh = refreshSpecs(f.records, { provider: f.provider, setups: [setup], workIds: ids });
+
     await started;
+
     const { acquireTrackerSyncLock } = await import('./tracker-lock.ts');
     const lease = await acquireTrackerSyncLock(f.path);
+
     try {
         expect(lease).not.toBeNull();
         expect(peak).toBeGreaterThan(1);
@@ -364,12 +415,14 @@ test('independent refresh reads are bounded and do not hold the tracker write le
         release();
         await refresh;
     }
+
     expect(reads).toBe(20);
 });
 
 test('overlapping refresh passes share ticket reads and one concurrency limit', async () => {
     const f = await fixture();
     const ids = [f.record.workId];
+
     for (let number = 8; number < 47; number++) {
         const record = f.records.create({
             repository: setup.repo,
@@ -378,9 +431,11 @@ test('overlapping refresh passes share ticket reads and one concurrency limit', 
             ticket: `${setup.repo}#${number}`,
         });
         const state = f.records.specState(record.workId);
+
         f.records.saveSpecState(record.workId, state.generation, { ...state, active: true });
         ids.push(record.workId);
     }
+
     let running = 0;
     let peak = 0;
     const reads: number[] = [];
@@ -388,17 +443,21 @@ test('overlapping refresh passes share ticket reads and one concurrency limit', 
     const blocked = new Promise<void>((resolve) => {
         release = resolve;
     });
+
     f.provider.readSpec = async (repository, number) => {
         reads.push(number);
         peak = Math.max(peak, ++running);
         await blocked;
         running--;
+
         return { ...f.remote(), repository, number };
     };
+
     const options = { provider: f.provider, setups: [setup] };
     const first = refreshSpecs(f.records, { ...options, workIds: ids.slice(0, 20) });
     const overlapping = refreshSpecs(f.records, { ...options, workIds: ids.slice(0, 20) });
     const independent = refreshSpecs(f.records, { ...options, workIds: ids.slice(20) });
+
     release();
     await Promise.all([first, overlapping, independent]);
     expect(reads).toHaveLength(40);
@@ -412,7 +471,9 @@ test.each([false, true])(
     'a delayed refresh cannot replace a newer write checkpoint, read failure=%s',
     async (failure) => {
         const f = await fixture();
+
         await syncSpecs(f.records, { provider: f.provider, setups: [setup] });
+
         let release!: () => void;
         let entered!: () => void;
         const started = new Promise<void>((resolve) => {
@@ -423,18 +484,26 @@ test.each([false, true])(
         });
         const read = f.provider.readSpec!;
         const stale = { ...f.remote(), body: formatTicketSpec('Older remote edit.', 'Authored request.') };
+
         f.provider.readSpec = async () => {
             entered();
             await blocked;
+
             if (failure) throw Error('Old failure');
+
             return stale;
         };
+
         const refresh = refreshSpecs(f.records, { provider: f.provider, setups: [setup] });
+
         await started;
+
         try {
             f.provider.readSpec = read;
+
             const record = f.records.read(f.record.workId);
             const updated = f.records.setBody(record.workId, record.revision, 'brief', 'Newer gated Spec.');
+
             f.records.recordGate(record.workId, updated.revision, {
                 briefDigest: f.records.gate(record.workId).briefDigest!,
                 approvedBy: 'user',
@@ -445,6 +514,7 @@ test.each([false, true])(
             release();
             await refresh;
         }
+
         expect(f.records.specState(f.record.workId)).toMatchObject({
             active: true,
             pending: null,

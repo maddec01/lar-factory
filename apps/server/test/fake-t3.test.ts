@@ -15,9 +15,12 @@ for (const [message, title] of [
 ] as const) {
     test(`fake T3 titles ${JSON.stringify(message)}`, () => {
         const dir = mkdtempSync(join(tmpdir(), 'fake-t3-title-'));
+
         try {
             const state = join(dir, 'state.json');
+
             writeFileSync(state, JSON.stringify({ t3: { recover: 'late', firstMessage: message } }));
+
             const call = (...args: string[]) =>
                 JSON.parse(
                     execFileSync(process.execPath, ['test/fake-t3.cjs', 'thread', ...args], {
@@ -25,6 +28,7 @@ for (const [message, title] of [
                         encoding: 'utf8',
                     }),
                 );
+
             assert.equal(call('start', '--message', message).title, title);
             assert.equal(call('list')[0].title, title);
             assert.equal(call('show', 'thread-1').messages[0].text, message);

@@ -14,7 +14,9 @@ export async function importPickedTicket(
     const held = records
         .list({ repository })
         .find((record) => record.ticket?.toLowerCase() === reference.toLowerCase());
+
     if (held && !requestId) return { record: held, created: false };
+
     if (ticket.tracker?.snapshot) {
         const provider = structureProvider();
         const current = await provider.read(repository, ticket.number);
@@ -33,22 +35,30 @@ export async function importPickedTicket(
                         .replace(/<!-- lar-factory:create [^\n]*? -->/g, '')
                         .trimEnd();
                     const parsed = readTicketSpec(body);
+
                     return [node.ticket!, parsed.marked ? (parsed.original ?? '') : body] as const;
                 },
             ),
         );
+
         records.trackerRestore(snapshot, digest, contexts);
+
         const repositories = [...new Set(snapshot.nodes.map((node) => node.repository))].filter((repo) =>
             setups.some((setup) => setup.repo.toLowerCase() === repo.toLowerCase()),
         );
+
         for (const repo of repositories)
             saveConnections(repo, [...readConnections(repo), ...repositories.filter((other) => other !== repo)]);
+
         const restored = records
             .list({ repository })
             .find((record) => record.ticket?.toLowerCase() === reference.toLowerCase());
+
         if (!restored) throw Error('The saved structure does not contain this issue.');
+
         return { record: restored, created: true };
     }
+
     const context = requestId
         ? ticket.text
         : ticket.text
@@ -64,9 +74,12 @@ export async function importPickedTicket(
         ticket: reference,
     };
     const imported = requestId ? records.completeCapture(requestId, input) : records.importTicket(input);
+
     if (ticket.kind === 'concept') {
         const map = ticket.tracker?.map ?? context;
+
         if (map.trim()) imported.record = records.setBody(imported.record.workId, imported.record.revision, 'map', map);
     }
+
     return imported;
 }

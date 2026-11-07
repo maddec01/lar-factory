@@ -34,6 +34,7 @@ const SLOT = 'notice';
 /** Opens the item, as it is in the latest data, in the item dialog. Does nothing once it's gone. */
 function viewItem(itemId: string): void {
     if (!useBoardStore.getState().data.items.some((i) => i.id === itemId)) return;
+
     // Its toast has done its job.
     clearToast(SLOT);
     useItemDialogStore.getState().open(itemId);
@@ -47,6 +48,7 @@ const viewButton = (item: Item) => (
 
 function toastOf(notice: Notice): Toast {
     const { item } = notice;
+
     switch (notice.verb) {
         // The issue is gone, so there is nothing to link to.
         case 'Abandoned':
@@ -88,6 +90,7 @@ function toastOf(notice: Notice): Toast {
             };
         case 'Started': {
             const environment = useBoardStore.getState().data.t3EnvironmentId;
+
             return {
                 slot: SLOT,
                 what: `started ${ref(item)}`,
@@ -106,6 +109,7 @@ function toastOf(notice: Notice): Toast {
         default:
             if (notice.verb === 'Added' && notice.to === 'List')
                 return { slot: SLOT, what: `Added ${ref(item)}`, body: <AddedNotice item={item} /> };
+
             return {
                 slot: SLOT,
                 what: `${notice.verb} ${ref(item)}`,
@@ -132,8 +136,10 @@ function AddedNotice({ item }: { item: Item }) {
     const mounted = useRef(true);
     const queue = useRef<HTMLButtonElement>(null);
     const view = useRef<HTMLSpanElement>(null);
+
     useEffect(() => {
         mounted.current = true;
+
         return () => {
             mounted.current = false;
         };
@@ -141,28 +147,38 @@ function AddedNotice({ item }: { item: Item }) {
     useEffect(() => {
         hold(result !== 'added' && result !== 'success');
     }, [hold, result]);
+
     const failed = !['added', 'pending', 'success'].includes(result);
+
     useEffect(() => {
         fail(failed);
     }, [fail, failed]);
+
     const eligible = current?.status === 'List';
     const pending = action?.phase === 'pending';
     const activate = async () => {
         const latest = useBoardStore.getState().data.items.find((value) => value.id === item.id);
+
         if (latest?.status !== 'List' || useActionStore.getState().actions[item.id]?.phase === 'pending') return;
+
         useActionStore.getState().set(item.id, { phase: 'pending', kind: 'queue' });
         setResult('pending');
+
         const answer = await postAction('/api/queue', { itemId: item.id });
         const focused = document.activeElement === queue.current;
+
         flushSync(() => {
             receive(answer);
             useActionStore
                 .getState()
                 .set(item.id, answer.error ? { phase: 'error', kind: 'queue', message: answer.error } : undefined);
+
             if (mounted.current) setResult(answer.error ?? 'success');
         });
+
         if (mounted.current && focused && !answer.error) view.current?.querySelector('button')?.focus();
     };
+
     return (
         <>
             <span role={failed ? 'alert' : 'status'}>

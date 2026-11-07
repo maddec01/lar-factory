@@ -10,15 +10,20 @@ export function createActivityDatabase(path: string) {
     let current: { db: DatabaseSync; dev: number; ino: number } | undefined;
     const close = () => {
         const before = current;
+
         current = undefined;
         before?.db.close();
     };
+
     return {
         open(): DatabaseSync {
             try {
                 const { dev, ino } = statSync(path);
+
                 if (current && (current.dev !== dev || current.ino !== ino)) close();
+
                 current ??= { db: openT3Db(path), dev, ino };
+
                 return current.db;
             } catch (error) {
                 close();

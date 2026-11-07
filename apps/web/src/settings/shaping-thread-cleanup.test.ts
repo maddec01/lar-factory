@@ -33,7 +33,9 @@ function answerSave(status: number, body: object): void {
 
 test('General has the row in its own group, with the four choices and what each does', async () => {
     await openGeneral(withChoice({ choice: 'archive' }));
+
     const group = row().closest('section')!;
+
     expect(group.querySelectorAll('.settings-row')).toHaveLength(1);
     expect(text(row().querySelector('.settings-row-title'))).toBe('Shaping threads after Start build');
     expect(await openOptions(select())).toEqual(['Keep', 'Settle', 'Archive', 'Delete']);
@@ -42,7 +44,9 @@ test('General has the row in its own group, with the four choices and what each 
     );
     await settle(() => row().querySelector<HTMLButtonElement>('[aria-label^="About"]')!.click());
     expect(picked()).toEqual(['archive']);
+
     const description = text(document.querySelector('[data-help-text]'));
+
     for (const said of [
         'Keep changes nothing',
         'Item details still links to a settled thread',
@@ -75,6 +79,7 @@ test('A refused save shows why and keeps the saved choice', async () => {
 
 test('An unreadable setting shows why, and saving a choice clears it', async () => {
     const problem = "The shaping thread cleanup setting /data/shaping-thread-cleanup.json isn't JSON: bad.";
+
     await openGeneral(withChoice({ problem }));
     expect(picked()).toEqual([]);
     expect(text($('[data-shaping-thread-cleanup] [role="alert"]'))).toBe(

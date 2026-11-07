@@ -128,13 +128,16 @@ export function missingSigningVariables(env: Env): string[] {
 // electron-builder reads several set-but-empty variables (CSC_LINK="") as set.
 export function buildEnvironment(env: Env, signed: boolean): Record<string, string> {
     const result: Record<string, string> = {};
+
     for (const [key, value] of Object.entries(env)) {
         if (value) result[key] = value;
     }
+
     if (!signed) {
         for (const name of SIGNING_ONLY_VARIABLES) delete result[name];
         result.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
     }
+
     return result;
 }
 
@@ -153,6 +156,7 @@ export function parseBuildArgs(argv: readonly string[]): BuildArgs {
             unsigned: { type: 'boolean', default: false },
         },
     });
+
     return { version: values['build-version'], signed: !values.unsigned, outputDir: values['output-dir'] };
 }
 
@@ -163,15 +167,19 @@ function fail(message: string): never {
 
 async function main(argv: readonly string[]): Promise<void> {
     const args = parseBuildArgs(argv);
+
     if (args.signed) {
         const missing = missingSigningVariables(process.env);
+
         if (missing.length > 0) {
             fail(`${missing.join(', ')} not set. Set every signing variable, or pass --unsigned for a test build.`);
         }
+
         if (!NodeFS.existsSync(process.env.APPLE_API_KEY ?? '')) {
             fail("APPLE_API_KEY must be the path of the App Store Connect API key's .p8 file.");
         }
     }
+
     const packageJson = JSON.parse(NodeFS.readFileSync(NodePath.join(APP_DIR, 'package.json'), 'utf8')) as {
         version: string;
     };
@@ -180,10 +188,12 @@ async function main(argv: readonly string[]): Promise<void> {
 
     // Replace the environment before electron-builder loads, as it reads process.env.
     const env = buildEnvironment(process.env, args.signed);
+
     for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, env);
 
     const { build } = await import('electron-builder');
+
     await build({
         projectDir: APP_DIR,
         publish: 'never',
@@ -191,7 +201,9 @@ async function main(argv: readonly string[]): Promise<void> {
     });
 
     const feed = NodePath.join(outputDir, updateFeedFile(version));
+
     if (!NodeFS.existsSync(feed)) fail(`electron-builder wrote no update feed at ${feed}.`);
+
     console.log(`build-desktop-artifact: built ${version} (${args.signed ? 'signed' : 'unsigned'}) in ${outputDir}`);
 }
 

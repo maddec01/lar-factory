@@ -25,9 +25,11 @@ export interface VocabularyDiscovery {
 /** Suggestions are optional drafts for Settings. Saving requires an explicit user choice. */
 export function suggestVocabularyLabels(labels: VocabularyCapability): VocabularyMapping {
     if (labels.state !== 'available') return {};
+
     return Object.fromEntries(
         (['bug', 'feature', 'improvement'] as const).flatMap((key) => {
             const matches = labels.choices.filter((label) => label.toLowerCase() === key);
+
             return matches.length === 1 ? [[key, { type: null, labels: matches }]] : [];
         }),
     );
@@ -94,10 +96,13 @@ export function resolveVocabulary(
     const requests = keys.flatMap((key) => (mapping[key].type === null ? [] : [{ key, type: mapping[key].type! }]));
     const candidates = [...new Set(requests.map((r) => r.type))];
     const labels = [...new Set(keys.flatMap((key) => mapping[key].labels))];
+
     if (selected !== undefined && selected !== null && !candidates.includes(selected))
         throw new Error('Choose one requested type or none.');
+
     if (candidates.length > 1 && selected === undefined)
         return { ready: false, vocabulary, labels, candidates, requests };
+
     return {
         ready: true,
         vocabulary,
@@ -129,9 +134,11 @@ export interface VocabularySettingsResponse {
 export function vocabularySelectionProblem(term: VocabularyTerm, discovery: VocabularyDiscovery): string | null {
     if (term.type !== null && (discovery.types.state !== 'available' || !discovery.types.choices.includes(term.type)))
         return 'Choose an existing issue type or none.';
+
     if (
         term.labels.some((label) => discovery.labels.state !== 'available' || !discovery.labels.choices.includes(label))
     )
         return 'Choose existing labels or none.';
+
     return null;
 }

@@ -71,11 +71,15 @@ export function validateDraft(
     kinds: readonly string[] = ITEM_KINDS,
 ): Omit<ItemDraft, 'kind'> & { kind: string } {
     if (!input || typeof input !== 'object') throw new Error('Enter the item details.');
+
     const value = input as Record<string, unknown>;
     const repo = repos.find((r) => r.repo === value.repo);
+
     if (!repo) throw new Error('Choose a configured Project.');
+
     if (!kinds.includes(value.kind as string))
         throw new Error(kinds === ITEM_KINDS ? 'Choose bug, feature or improvement.' : 'Choose a valid work kind.');
+
     if (
         typeof value.title !== 'string' ||
         !value.title.trim() ||
@@ -84,22 +88,29 @@ export function validateDraft(
     ) {
         throw new Error('Enter a nonblank title of at most 256 characters.');
     }
+
     if (typeof value.description !== 'string' || value.description.length > 65_536) {
         throw new Error('Description must be text of at most 65,536 characters.');
     }
+
     if (value.createIssue !== undefined && typeof value.createIssue !== 'boolean')
         throw new Error('Choose whether to create an issue.');
+
     let options: TicketOptions | undefined;
+
     if (value.options !== undefined) {
         if (!value.options || typeof value.options !== 'object' || Array.isArray(value.options))
             throw new Error('Choose valid issue options.');
+
         const raw = value.options as Record<string, unknown>;
+
         if (
             Object.keys(raw).some(
                 (key) => !['labels', 'newLabels', 'type', 'assignee', 'milestone', 'iteration'].includes(key),
             )
         )
             throw new Error('Choose valid issue options.');
+
         if (
             raw.labels !== undefined &&
             (!Array.isArray(raw.labels) ||
@@ -107,6 +118,7 @@ export function validateDraft(
                 raw.labels.some((label) => typeof label !== 'string' || !label.trim() || label.length > 256))
         )
             throw new Error('Choose valid labels.');
+
         if (raw.newLabels !== undefined) {
             if (
                 !Array.isArray(raw.newLabels) ||
@@ -114,9 +126,12 @@ export function validateDraft(
                 raw.newLabels.some((label) => typeof label !== 'string')
             )
                 throw new Error('Choose valid labels.');
+
             const problem = (raw.newLabels as string[]).map(trackerCapabilities(repo.repo).nameProblem).find(Boolean);
+
             if (problem) throw new Error(problem);
         }
+
         if (
             ['type', 'assignee', 'milestone', 'iteration'].some(
                 (key) =>
@@ -127,9 +142,12 @@ export function validateDraft(
             )
         )
             throw new Error('Choose valid issue options.');
+
         if (raw.milestone && !/^[1-9]\d*$/.test(String(raw.milestone))) throw new Error('Choose a valid milestone.');
+
         options = raw as TicketOptions;
     }
+
     return {
         ...(value.createIssue === undefined ? {} : { createIssue: value.createIssue }),
         ...(options === undefined ? {} : { options }),

@@ -35,8 +35,10 @@ function fakeGh(reply: (args: string[]) => string = () => '{}') {
     const calls: string[][] = [];
     const run = async (args: string[]) => {
         calls.push(args);
+
         return reply(args);
     };
+
     return { calls, run };
 }
 
@@ -54,6 +56,7 @@ test("a ticket search lists the repository's open issues matching the words, and
               }),
     );
     const issues = repoIssues(REPO, gh.run);
+
     assert.deepEqual(await issues.searchTickets(REPO, 'stall'), [
         { number: 8, title: 'Stall on seek', url: `https://github.com/${REPO}/issues/8` },
     ]);
@@ -106,6 +109,7 @@ test("a ticket read gives an open issue's text and kind, and nothing for a close
         },
     };
     const issues = repoIssues(REPO, fakeGh((args) => answers[args[1]!.split('/').at(-1)!]!()).run);
+
     assert.deepEqual(await issues.readTicket(REPO, 7), {
         number: 7,
         title: 'Stall',
@@ -132,6 +136,7 @@ test('a ticket observation reads its state and assignees, and a confirmed not-fo
     };
     const gh = fakeGh((args) => answers[args[2]!]!());
     const issues = repoIssues(REPO, gh.run);
+
     assert.deepEqual(await issues.observeTicket(REPO, 7), { state: 'open', assignee: 'ana, pedro' });
     assert.deepEqual(gh.calls[0], ['issue', 'view', '7', '-R', REPO, '--json', 'state,assignees']);
     assert.deepEqual(await issues.observeTicket(REPO, 8), { state: 'closed' });
@@ -152,6 +157,7 @@ test("a change check lists the issues and PRs updated since, and can't tell once
     ];
     const gh = fakeGh((args) => `HTTP/2.0 200 OK\r\nEtag: W/"${args.length}"\r\n\r\n${JSON.stringify(page)}`);
     const issues = repoIssues(REPO, gh.run);
+
     assert.deepEqual(
         await issues.changes!(Date.parse('2026-10-21T08:10:00Z')),
         [`https://github.com/${REPO}/pull/9`, `https://github.com/${REPO}/issues/7`],
@@ -181,6 +187,7 @@ test('a change check leaves out an edit to an issue that closed before it, as a 
         },
     ];
     const issues = repoIssues(REPO, fakeGh(() => `HTTP/2.0 200 OK\r\n\r\n${JSON.stringify(page)}`).run);
+
     assert.deepEqual(await issues.changes!(Date.parse('2026-10-21T08:10:00Z')), [
         `https://github.com/${REPO}/issues/4`,
     ]);
@@ -188,11 +195,14 @@ test('a change check leaves out an edit to an issue that closed before it, as a 
 
 test('Abandon closes an issue as not planned and reports close failures', async () => {
     const gh = fakeGh();
+
     assert.equal(await repoIssues(REPO, gh.run).abandon(item(['List'])), null);
     assert.deepEqual(gh.calls, [['issue', 'close', '7', '-R', REPO, '--reason', 'not planned']]);
+
     const failed = fakeGh(() => {
         throw new Error('GitHub unavailable');
     });
+
     assert.equal(
         await repoIssues(REPO, failed.run).abandon(item(['Queued'])),
         'Could not abandon #7. GitHub unavailable',

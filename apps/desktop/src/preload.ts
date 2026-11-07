@@ -23,9 +23,12 @@ const bridge: BoardAppBridge = {
     onInstallState: (listener) => {
         const wrappedListener = (_event: Electron.IpcRendererEvent, snapshot: unknown) => {
             if (typeof snapshot !== 'object' || snapshot === null) return;
+
             listener(snapshot as Parameters<typeof listener>[0]);
         };
+
         ipcRenderer.on(IpcChannels.INSTALL_STATE, wrappedListener);
+
         return () => {
             ipcRenderer.removeListener(IpcChannels.INSTALL_STATE, wrappedListener);
         };
@@ -39,9 +42,12 @@ const bridge: BoardAppBridge = {
     onWindowFullscreenStateChange: (listener) => {
         const wrappedListener = (_event: Electron.IpcRendererEvent, fullscreen: unknown) => {
             if (typeof fullscreen !== 'boolean') return;
+
             listener(fullscreen);
         };
+
         ipcRenderer.on(IpcChannels.WINDOW_FULLSCREEN_STATE, wrappedListener);
+
         return () => {
             ipcRenderer.removeListener(IpcChannels.WINDOW_FULLSCREEN_STATE, wrappedListener);
         };
@@ -50,9 +56,12 @@ const bridge: BoardAppBridge = {
     onUpdateState: (listener) => {
         const wrappedListener = (_event: Electron.IpcRendererEvent, state: unknown) => {
             if (typeof state !== 'object' || state === null) return;
+
             listener(state as Parameters<typeof listener>[0]);
         };
+
         ipcRenderer.on(IpcChannels.UPDATE_STATE, wrappedListener);
+
         return () => {
             ipcRenderer.removeListener(IpcChannels.UPDATE_STATE, wrappedListener);
         };

@@ -28,15 +28,19 @@ export const useCreateTicketStore = create<CreateTicketState>()(
             attempts: {},
             submit: async (itemId, preview, options) => {
                 const prior = get().attempts[itemId];
+
                 if (prior?.phase === 'pending' || prior?.phase === 'uncertain') return;
+
                 const attempt =
                     prior?.phase === 'retry'
                         ? prior
                         : { requestId: crypto.randomUUID(), preview, options, phase: 'pending' as const, message: '' };
                 const keep = (phase: Attempt['phase'], message: string) =>
                     set((state) => ({ attempts: { ...state.attempts, [itemId]: { ...attempt, phase, message } } }));
+
                 keep('pending', 'Creating issue…');
                 useBoardStore.getState().beginWrite();
+
                 try {
                     const response = await fetch('/api/create-ticket', {
                         method: 'POST',
@@ -56,11 +60,14 @@ export const useCreateTicketStore = create<CreateTicketState>()(
                         error: string | null;
                         uncertain?: boolean;
                     };
+
                     if (result.item && result.board) {
                         receive(result);
                         set((state) => {
                             const attempts = { ...state.attempts };
+
                             delete attempts[itemId];
+
                             return { attempts };
                         });
                     } else

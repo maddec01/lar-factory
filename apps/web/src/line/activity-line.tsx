@@ -16,12 +16,14 @@ export function useActivityState(item: Item): ThreadActivityState | undefined {
     const disconnected = useBoardStore((state) => !!state.clientError);
     const { label } = useActivityFeedback(item);
     const state = useClock((now) => itemActivityLine(item, now, disconnected)?.state);
+
     return label === 'Starting' || label === 'May have started' ? undefined : state;
 }
 
 /** Whether `item`'s row stops animating, which a read going old changes with no new data. */
 export function useActivityStill(item: Item): boolean {
     const disconnected = useBoardStore((state) => !!state.clientError);
+
     return useClock((now) => itemActivityStill(item, now, disconnected));
 }
 
@@ -105,10 +107,14 @@ function AgentList({ agents, details = false }: { agents: ThreadAgent[]; details
 /** `item`'s agents at work in its details; nothing with none to list. */
 export function ItemAgents({ item }: { item: Item }) {
     const disconnected = useBoardStore((state) => !!state.clientError);
+
     // Renders when the list goes unavailable; the ages in it move with their own clock.
     useClock((now) => itemActivityAgents(item, now, disconnected) === 'unavailable');
+
     const agents = itemActivityAgents(item, Date.now(), disconnected);
+
     if (!agents) return null;
+
     return (
         <section data-working-agents className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 text-xs">
             {agents === 'unavailable' ? (
@@ -126,9 +132,11 @@ export function ItemAgents({ item }: { item: Item }) {
 /** `item`'s line; nothing when it has none. */
 export function ActivityLine({ item }: { item: Item }) {
     const disconnected = useBoardStore((state) => !!state.clientError);
+
     // Keep checking every second, including the quiet/stale deadlines, but render only when the shown words change.
     useClock((now) => {
         const line = itemActivityLine(item, now, disconnected);
+
         return (
             line &&
             JSON.stringify([
@@ -139,9 +147,12 @@ export function ActivityLine({ item }: { item: Item }) {
             ])
         );
     });
+
     const now = Date.now();
     const line = itemActivityLine(item, now, disconnected);
+
     if (!line) return null;
+
     const agents = itemActivityAgents(item, now, disconnected);
     const listed = Array.isArray(agents) ? agents : undefined;
     const shown = (
@@ -164,7 +175,9 @@ export function ActivityLine({ item }: { item: Item }) {
             )}
         </span>
     );
+
     if (!listed) return shown;
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>{shown}</TooltipTrigger>

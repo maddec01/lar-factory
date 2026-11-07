@@ -17,6 +17,7 @@ export const helperStart = (folder: string) =>
 export const alive = (pid: number) => {
     try {
         process.kill(pid, 0);
+
         return true;
     } catch {
         return false;
@@ -35,24 +36,30 @@ type HelperRunning = (pid: number, folder: string) => boolean;
 /** The pid's command line, empty once it's gone, or null when `ps` can't say. */
 const commandOf = (pid: number) => {
     const ps = spawnSync('ps', ['-ww', '-o', 'command=', '-p', String(pid)], { encoding: 'utf8', timeout: 1000 });
+
     return ps.error ? null : ps.stdout;
 };
 const names = (command: string | null, folder: string) => command?.includes(`${folder}/`) ?? false;
 const helperRunning: HelperRunning = (pid, folder) => {
     const command = commandOf(pid);
+
     return command === null || names(command, folder);
 };
 const loggedPids = (folder: string) => {
     let log: string;
+
     try {
         log = readFileSync(join(folder, 'log'), 'utf8');
     } catch {
         return [];
     }
+
     return [...log.matchAll(/^start \S+ (\d+)/gm)].map((match) => Number(match[1]));
 };
+
 async function waitFor(done: () => boolean, ms: number) {
     const deadline = Date.now() + ms;
+
     while (!done() && Date.now() < deadline) await new Promise((wake) => setTimeout(wake, 50));
 }
 
@@ -68,6 +75,7 @@ export async function stopHelpers({ folders, wrappers, gates }: Helpers, running
         } catch {
             /* Its folder is gone. */
         }
+
     const liveWrappers = () => wrappers.filter((wrapper) => wrapper.exitCode === null && wrapper.signalCode === null);
     const liveHelpers = () =>
         folders.flatMap((folder) =>
@@ -75,6 +83,7 @@ export async function stopHelpers({ folders, wrappers, gates }: Helpers, running
                 .filter((pid) => running(pid, folder))
                 .map((pid) => ({ pid, folder })),
         );
+
     // One deadline per step across all wrappers, since a test can start six.
     await waitFor(() => !liveWrappers().length, 1000);
     for (const wrapper of liveWrappers()) wrapper.kill('SIGTERM');
@@ -83,6 +92,7 @@ export async function stopHelpers({ folders, wrappers, gates }: Helpers, running
     for (const wrapper of liveWrappers()) wrapper.kill('SIGKILL');
     for (const { pid, folder } of liveHelpers()) {
         if (!names(commandOf(pid), folder)) continue;
+
         try {
             process.kill(pid, 'SIGKILL');
         } catch {
@@ -90,11 +100,15 @@ export async function stopHelpers({ folders, wrappers, gates }: Helpers, running
         }
     }
     await waitFor(() => !liveWrappers().length && !liveHelpers().length, 1000);
+
     const wrappersLeft = liveWrappers();
     const helpersLeft = liveHelpers();
     const kept = wrappersLeft.length ? folders : helpersLeft.map((helper) => helper.folder);
+
     for (const folder of folders) if (!kept.includes(folder)) rmSync(folder, { recursive: true, force: true });
+
     const pids = [...wrappersLeft.map((wrapper) => wrapper.pid), ...helpersLeft.map((helper) => helper.pid)];
+
     if (pids.length)
         throw Error(
             `Test helper still running after SIGKILL: pid ${pids.join(', ')}. Kept ${[...new Set(kept)].join(', ')}.`,

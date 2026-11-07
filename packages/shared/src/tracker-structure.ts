@@ -43,6 +43,7 @@ export interface TrackerStructure {
 const KINDS = ['bug', 'feature', 'improvement', 'concept', 'decision', 'build', 'issue'];
 const START = '<!-- lar-factory:structure';
 const BLOCK = /<!-- lar-factory:structure\s*\n([\s\S]*?)\n-->/g;
+
 export const STRUCTURE_LABEL = 'linked-work';
 /** The start of a decision's label, such as `decision-grill`. */
 export const DECISION_LABEL_PREFIX = 'decision-';
@@ -56,6 +57,7 @@ export const TRACKER_KIND_NAMES: readonly (readonly [Kind, readonly string[]])[]
     ['build', ['build']],
 ];
 export const MAX_TRACKER_STRUCTURE = 262_144;
+
 const text = (value: unknown, limit = 16_384): value is string => typeof value === 'string' && value.length <= limit;
 
 /** Typed tracker URLs keep an Azure work item distinct from a repository PR. */
@@ -67,24 +69,35 @@ export const trackerPullRequestUrl = (repository: string, number: number): strin
     repository.split('/').length === 2
         ? `https://github.com/${repository}/pull/${number}`
         : `https://dev.azure.com/${repository.split('/')[0]}/${repository.split('/')[1]}/_git/${repository.split('/')[2]}/pullrequest/${number}`;
+
 const safeNumber = (value: string) => Number.isSafeInteger(Number(value)) && Number(value) > 0;
+
 export function trackerReference(url: unknown): { repository: string; number: number } | null {
     if (typeof url !== 'string' || url.length > 2048) return null;
+
     const github = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/issues\/([1-9]\d*)\/?$/i.exec(url);
+
     if (github && safeNumber(github[2]!)) return { repository: github[1]!, number: Number(github[2]) };
+
     const azure = /^https:\/\/dev\.azure\.com\/([\w.-]+)\/([\w.%~-]+)\/_workitems\/edit\/([1-9]\d*)\/?$/i.exec(url);
+
     return azure && safeNumber(azure[3]!) ? { repository: `${azure[1]}/${azure[2]}`, number: Number(azure[3]) } : null;
 }
 export function trackerPullRequestReference(url: unknown): { repository: string; number: number } | null {
     if (typeof url !== 'string' || url.length > 2048) return null;
+
     const github = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/([1-9]\d*)\/?$/i.exec(url);
+
     if (github && safeNumber(github[2]!)) return { repository: github[1]!, number: Number(github[2]) };
+
     const azure =
         /^https:\/\/dev\.azure\.com\/([\w.-]+)\/([\w.%~-]+)\/_git\/([\w.%~-]+)\/pullrequest\/([1-9]\d*)\/?$/i.exec(url);
+
     return azure && safeNumber(azure[4]!)
         ? { repository: `${azure[1]}/${azure[2]}/${azure[3]}`, number: Number(azure[4]) }
         : null;
 }
+
 const part = (value: unknown): value is TrackerPart =>
     isRecord(value) &&
     !!trackerReference(value.url) &&
@@ -145,6 +158,7 @@ export function validateTrackerStructure(value: unknown): TrackerStructure {
     ) {
         throw Error('This issue has invalid factory structure.');
     }
+
     if (
         value.dependencies !== undefined &&
         (!Array.isArray(value.dependencies) ||
@@ -182,29 +196,39 @@ export function validateTrackerStructure(value: unknown): TrackerStructure {
             ))
     )
         throw Error('This issue has invalid factory dependencies.');
+
     if (JSON.stringify(value).length > MAX_TRACKER_STRUCTURE) throw Error('This issue has too much factory structure.');
+
     return value as unknown as TrackerStructure;
 }
 
 export function readTrackerStructure(body: string): TrackerStructure | undefined {
     if (!body.includes(START)) return undefined;
+
     const matches = [...body.matchAll(BLOCK)];
+
     if (matches.length !== 1 || body.split(START).length !== 2 || matches[0]![1]!.length > MAX_TRACKER_STRUCTURE)
         throw Error('This issue has an invalid factory structure block.');
+
     let value: unknown;
+
     try {
         value = JSON.parse(matches[0]![1]!);
     } catch {
         throw Error('This issue has invalid factory structure JSON.');
     }
+
     return validateTrackerStructure(value);
 }
 
 /** Replace only the unique managed block, preserving every authored byte outside it. */
 export function writeTrackerStructure(body: string, structure: TrackerStructure): string {
     const validated = validateTrackerStructure(structure);
+
     readTrackerStructure(body);
+
     const block = `${START}\n${JSON.stringify(validated).replaceAll('<', '\\u003c')}\n-->`;
+
     return body.includes(START)
         ? body.replace(BLOCK, () => block)
         : `${body}${body.endsWith('\n') ? '\n' : '\n\n'}${block}\n`;
@@ -218,6 +242,7 @@ export function trackerKind(labels: readonly string[], nativeType?: string | nul
             (name) => kindNames.includes(name) || (kind === 'decision' && name.startsWith(DECISION_LABEL_PREFIX)),
         ),
     );
+
     return found?.[0] ?? 'issue';
 }
 

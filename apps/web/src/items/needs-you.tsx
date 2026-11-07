@@ -24,7 +24,9 @@ const LABELS: Record<NeedsYouOffer, string> = {
 
 export function NeedsYou({ item, data }: { item: Item; data: BoardData }) {
     const cleanupResult = useActionStore((state) => state.cleanupResults[item.id]);
+
     if (!item.needsYou) return cleanupResult ? <p role="alert">{cleanupResult}</p> : null;
+
     return <Notice item={item} notice={item.needsYou} data={data} cleanupResult={cleanupResult} />;
 }
 
@@ -41,6 +43,7 @@ function Notice({
 }) {
     const [asking, setAsking] = useState<NeedsYouAction | null>(null);
     const state = writeState(data, useItemAction(item.id));
+
     return (
         <div
             className="grid gap-2 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5"

@@ -16,10 +16,12 @@ const item = (id: string): Item => ({ id }) as Item;
 /** A fake gh whose one GraphQL answer is `node`; `calls` holds each call's arguments. */
 function fakeGh(node: unknown) {
     const calls: string[][] = [];
+
     return {
         calls,
         run: async (args: string[]) => {
             calls.push(args);
+
             return JSON.stringify({ data: { node } });
         },
     };
@@ -56,6 +58,7 @@ test('an issue answers its body, people, milestone, sub-tickets and comments, ne
             nodes: [comment(1), comment(2, null), comment(3)],
         },
     });
+
     assert.deepEqual(await readGithubItemDetails(item('I_1'), gh.run), {
         body: '## Owner accounts',
         format: 'markdown',
@@ -112,6 +115,7 @@ test('an item with no body, author or comments answers empty details', async () 
         subIssues: { nodes: [] },
         comments: { pageInfo: { hasPreviousPage: false, startCursor: null }, nodes: [] },
     });
+
     assert.deepEqual(await readGithubItemDetails(item('I_2'), gh.run), {
         body: '',
         format: 'markdown',
@@ -133,10 +137,13 @@ test('opening an item makes one GraphQL call, by node id, for the last 10 commen
         subIssues: { nodes: [] },
         comments: { pageInfo: { hasPreviousPage: true, startCursor: 'CUR_1' }, nodes: [comment(1)] },
     });
+
     await readGithubItemDetails(item('I_3'), gh.run);
     assert.equal(gh.calls.length, 1);
     assert.deepEqual(gh.calls[0], ['api', 'graphql', '-f', `query=${ITEM_DETAILS_QUERY}`, '-f', 'id=I_3']);
+
     const connections = ITEM_DETAILS_QUERY.match(/comments\([^)]*\)/g) ?? [];
+
     assert.ok(
         connections.length > 0 && connections.every((c) => c === 'comments(last: 10)'),
         'each comments connection reads the last 10, with no cursor',
@@ -148,9 +155,11 @@ test('an item GitHub does not know says so, and a failed gh call answers its mes
         status: 404,
         error: 'GitHub has no such item.',
     });
+
     const failing = async () => {
         throw new Error('gh api graphql failed: HTTP 403: API rate limit exceeded');
     };
+
     assert.deepEqual(await readGithubItemDetails(item('I_4'), failing), {
         status: 502,
         error: 'gh api graphql failed: HTTP 403: API rate limit exceeded',
@@ -162,6 +171,7 @@ test('older comments are one graphql call for the 10 before the cursor, newest f
         __typename: 'Issue',
         comments: { pageInfo: { hasPreviousPage: true, startCursor: 'CUR_0' }, nodes: [comment(1), comment(2, null)] },
     });
+
     assert.deepEqual(await readGithubOlderComments(item('I_5'), 'CUR_1', gh.run), {
         comments: [
             { id: 'IC_2', author: 'ghost', createdAt: '2026-10-12T08:00:00Z', body: 'Comment 2', format: 'markdown' },
@@ -178,7 +188,9 @@ test('older comments are one graphql call for the 10 before the cursor, newest f
     assert.deepEqual(gh.calls, [
         ['api', 'graphql', '-f', `query=${OLDER_COMMENTS_QUERY}`, '-f', 'id=I_5', '-f', 'before=CUR_1'],
     ]);
+
     const connections = OLDER_COMMENTS_QUERY.match(/comments\([^)]*\)/g) ?? [];
+
     assert.ok(connections.length > 0 && connections.every((c) => c === 'comments(last: 10, before: $before)'));
 });
 
@@ -187,9 +199,11 @@ test('older comments of an item GitHub no longer has or of a failed call answer 
         status: 404,
         error: 'GitHub has no such item.',
     });
+
     const failing = async () => {
         throw new Error('gh api graphql failed: HTTP 403');
     };
+
     assert.deepEqual(await readGithubOlderComments(item('I_7'), 'CUR_1', failing), {
         status: 502,
         error: 'gh api graphql failed: HTTP 403',
@@ -201,10 +215,12 @@ function historyGh(history: ReturnType<typeof comment>[]) {
     const calls: string[][] = [];
     const run = async (args: string[]) => {
         calls.push(args);
+
         const query = args.find((arg) => arg.startsWith('query='))!;
         const limit = Number(query.match(/comments\(last: (\d+)/)![1]);
         const end = Number(args.find((arg) => arg.startsWith('before='))?.slice(7) ?? history.length);
         const start = Math.max(0, end - limit);
+
         return JSON.stringify({
             data: {
                 node: {
@@ -217,6 +233,7 @@ function historyGh(history: ReturnType<typeof comment>[]) {
             },
         });
     };
+
     return { calls, run };
 }
 
@@ -227,15 +244,19 @@ const managed = (n: number) => ({
 
 test('details and older pages skip managed-only history to its end without exposing transport comments', async () => {
     const history = Array.from({ length: 125 }, (_, i) => managed(i));
+
     for (const older of [false, true]) {
         const gh = historyGh(history);
         const page = older
             ? await readGithubOlderComments(item('I_managed'), '125', gh.run)
             : await readGithubItemDetails(item('I_managed'), gh.run);
+
         assert.ok(!('error' in page));
         assert.deepEqual([page.comments, page.olderCursor], [[], null]);
+
         if ('hasOlderComments' in page && 'body' in page)
             assert.deepEqual([page.hasOlderComments, page.body], [false, 'Human description.']);
+
         assert.equal(gh.calls.length, 3);
         assert.doesNotMatch(JSON.stringify(page), /lar-factory:|c2VjcmV0/);
     }
@@ -244,11 +265,13 @@ test('details and older pages skip managed-only history to its end without expos
 test('managed-only leading pages reveal all ordinary discussion from the larger lookahead page', async () => {
     const human = Array.from({ length: 30 }, (_, i) => comment(i + 1));
     const history = [...human, ...Array.from({ length: 15 }, (_, i) => managed(i + 31))];
+
     for (const older of [false, true]) {
         const gh = historyGh(history);
         const page = older
             ? await readGithubOlderComments(item('I_mixed'), '45', gh.run)
             : await readGithubItemDetails(item('I_mixed'), gh.run);
+
         assert.ok(!('error' in page));
         assert.deepEqual(
             page.comments.map((c) => c.id),
@@ -262,18 +285,23 @@ test('managed-only leading pages reveal all ordinary discussion from the larger 
 test('large managed histories stop after three calls and preserve a cursor for continued discussion reads', async () => {
     const gh = historyGh([comment(1), ...Array.from({ length: 999 }, (_, i) => managed(i + 2))]);
     const details = await readGithubItemDetails(item('I_large'), gh.run);
+
     assert.ok(!('error' in details));
     assert.deepEqual(
         [details.comments, details.hasOlderComments, details.olderCursor, gh.calls.length],
         [[], true, '790', 3],
     );
+
     let cursor = details.olderCursor;
+
     while (cursor !== null) {
         const before = gh.calls.length;
         const page = await readGithubOlderComments(item('I_large'), cursor, gh.run);
+
         assert.ok(!('error' in page));
         assert.ok(gh.calls.length - before <= 3);
         cursor = page.olderCursor;
+
         if (cursor === null)
             assert.deepEqual(
                 page.comments.map((c) => c.id),
@@ -285,15 +313,20 @@ test('large managed histories stop after three calls and preserve a cursor for c
 test('ordinary history keeps ten-comment pages in order without gaps or duplicate comments', async () => {
     const gh = historyGh(Array.from({ length: 23 }, (_, i) => comment(i + 1)));
     const details = await readGithubItemDetails(item('I_ordinary'), gh.run);
+
     assert.ok(!('error' in details));
+
     const ids = details.comments.map((c) => c.id);
     let cursor = details.olderCursor;
+
     while (cursor !== null) {
         const page = await readGithubOlderComments(item('I_ordinary'), cursor, gh.run);
+
         assert.ok(!('error' in page));
         ids.push(...page.comments.map((c) => c.id));
         cursor = page.olderCursor;
     }
+
     assert.deepEqual(
         ids,
         Array.from({ length: 23 }, (_, i) => `IC_${23 - i}`),
@@ -307,8 +340,10 @@ test('a saved description is the issue body, through gh issue edit --body-file',
     const calls: { args: string[]; body: string }[] = [];
     const run = async (args: string[]) => {
         calls.push({ args, body: readFileSync(args[args.indexOf('--body-file') + 1]!, 'utf8') });
+
         return '';
     };
+
     assert.equal(await saveGithubDescription(issue(12), '- a\n- b', run), null);
     assert.deepEqual(
         calls.map((c) => [c.args.filter((a, i) => c.args[i - 1] !== '--body-file'), c.body]),
@@ -321,6 +356,7 @@ test('a failed edit answers its message, and no right to edit the issue is 403',
     const failing = (message: string) => async () => {
         throw new Error(message);
     };
+
     assert.deepEqual(
         await saveGithubDescription(issue(12), 'x', failing('HTTP 403: Resource not accessible by integration')),
         { status: 403, error: 'Could not save the description. HTTP 403: Resource not accessible by integration' },

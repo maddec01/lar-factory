@@ -57,6 +57,7 @@ export function StatusGlyph({
         style,
         strokeWidth: 2.25,
     };
+
     switch (status) {
         case 'List':
             return <List {...props} />;
@@ -106,16 +107,21 @@ export function useStatusActivity() {
     );
     const starts = useStartStore((state) => state.starts);
     const builds = useStartStore((state) => state.builds);
+
     return (item: Item): boolean => {
         if (unavailable || item.paused || item.archived || item.needsYou || item.threads === 'unavailable')
             return false;
+
         // A thread waiting on the user, stopped, or whose activity T3 couldn't give isn't known to be moving.
         const now = Date.now();
         const line = itemActivityLine(item, now)?.state;
+
         if (line === 'waiting' || line === 'stopped' || activityLost(itemActivityThread(item)?.activity, now))
             return false;
+
         if (starts[item.id]?.phase === 'pending' || builds[item.id]?.phase === 'pending' || starting.includes(item.id))
             return false;
+
         if (item.status === 'Shaping') {
             return !!item.threads?.some(
                 (thread) =>
@@ -125,6 +131,7 @@ export function useStatusActivity() {
                     (thread.currentRunning || thread.hasRunningChildren),
             );
         }
+
         return (
             ['In progress', 'Review', 'Verify', 'Ready to merge'].includes(item.status) && buildActivity(item).running
         );
@@ -142,7 +149,9 @@ export function ItemStatusGlyph({
     className?: string;
 }) {
     const running = useStatusActivity();
+
     // A read going old changes the answer with no new data.
     useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
+
     return <StatusGlyph status={status} running={running(item)} className={className} />;
 }

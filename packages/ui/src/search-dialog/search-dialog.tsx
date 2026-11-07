@@ -79,6 +79,7 @@ export function SearchDialog({
     const activeValue = chosen !== undefined && options.includes(chosen) ? chosen : options[0];
     const select = (value: string) => {
         const next = onSelect(value);
+
         if (next) setActiveValue(next);
     };
 
@@ -152,13 +153,16 @@ export function SearchDialog({
                             onChange={(event) => onQueryChange(event.target.value)}
                             onKeyDown={(event) => {
                                 if (event.nativeEvent.isComposing) return;
+
                                 if (event.key === 'Backspace' && !query) {
                                     event.preventDefault();
                                     onBackspaceEmpty?.();
                                 } else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && options.length) {
                                     event.preventDefault();
+
                                     const index = activeValue !== undefined ? options.indexOf(activeValue) : -1;
                                     const step = event.key === 'ArrowDown' ? 1 : -1;
+
                                     setActiveValue(options[(index + step + options.length) % options.length]);
                                 } else if (event.key === 'Enter' && activeValue !== undefined) {
                                     event.preventDefault();
@@ -217,6 +221,7 @@ export function SearchDialog({
 /** A labelled run of options in the dialog's list. */
 export function SearchDialogGroup({ label, children }: { label: string; children: ReactNode }) {
     const labelId = useId();
+
     return (
         <div role="group" aria-labelledby={labelId} className="flex flex-col gap-1 not-first:pt-2">
             <Text
@@ -237,7 +242,9 @@ export function SearchDialogGroup({ label, children }: { label: string; children
  *  in the field, since a filter's option keeps the dialog open. */
 export function useSearchDialogOption(value: string) {
     const context = useContext(OptionContext);
+
     if (!context) throw new Error('useSearchDialogOption must be used inside SearchDialog');
+
     return {
         id: optionId(context.listId, value),
         role: 'option',

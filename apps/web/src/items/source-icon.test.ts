@@ -57,8 +57,10 @@ test.each<[string, Partial<Item>, string]>([
     ],
 ])('a desk card identifies %s with an accessible source icon', async (_name, change, label) => {
     await mountPage(board({ ...local, ...change }));
+
     const card = $('.desk-card')!;
     const source = card.querySelector('[role="img"]');
+
     expect(source?.getAttribute('aria-label')).toBe(label);
     expect(source?.getAttribute('title')).toBe(label);
     expect(source?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
@@ -68,7 +70,9 @@ test.each<[string, Partial<Item>, string]>([
 
 test("planning saved only on this Mac is a note in the source icon's tooltip, not a line on the card", async () => {
     await mountPage(board({ ...local, number: 17, sync: { state: 'pending', message: 'Waiting on GitHub' } } as Item));
+
     const source = $('.desk-card [role="img"]')!;
+
     expect(source.getAttribute('title')).toBe('GitHub issue. Saved on GitHub. Planning is saved on this Mac.');
     expect($('.desk-card')!.querySelector('[data-structure-sync]')).toBeNull();
 });
@@ -93,17 +97,22 @@ test.each(['map', 'list'])('dossier parts identify their own source in the %s vi
         },
         { ...local, id: 'local-part', parentId: parent.id },
     ];
+
     localStorage.setItem('lar-board:dossier-view:source-concept', view);
     localStorage.removeItem('lar-board:dossier-open:source-concept');
     await mountPage({ ...board(parent), items: [parent, ...children] });
     await settle(() => $<HTMLButtonElement>('[data-dossier-open]')!.click());
+
     const row = view === 'map' ? 'data-map-part' : 'data-part';
+
     expect($(`[${row}="github-part"] [role="img"]`)?.getAttribute('aria-label')).toBe('GitHub issue. Saved on GitHub.');
     expect($(`[${row}="azure-part"] [role="img"]`)?.getAttribute('aria-label')).toBe(
         'Azure DevOps work item. Saved in Azure DevOps.',
     );
     expect($(`[${row}="local-part"] [role="img"]`)?.getAttribute('aria-label')).toBe('Saved only on this machine.');
+
     const source = $(`[${row}="local-part"] [role="img"]`)!;
+
     expect(source.classList.contains('absolute')).toBe(view === 'map');
     expect(source.classList.contains('shrink-0')).toBe(view === 'list');
 });
@@ -111,7 +120,9 @@ test.each(['map', 'list'])('dossier parts identify their own source in the %s vi
 test('List and the details it opens identify local work even in an Azure repository', async () => {
     await mountPage(board({ ...local, repo: 'example/project/product', status: 'List', statuses: ['List'] }));
     await settle(() => $<HTMLButtonElement>('.list-button')!.click());
+
     const row = $<HTMLButtonElement>('[data-list-modal] button[data-item]')!;
+
     expect(row.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
     await settle(() => row.click());
     expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
@@ -123,14 +134,18 @@ test.each<[string, Partial<Item>, string]>([
     ['dossier', { status: 'Shaping', statuses: ['Shaping'], kind: 'concept' }, '[data-dossier] [data-item]'],
 ])('%s identifies its source alongside the title', async (_name, change, selector) => {
     await mountPage(board({ ...local, number: 17, url: 'https://github.com/example/product/issues/17', ...change }));
+
     const row = $(selector)!;
+
     expect(row.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('GitHub issue. Saved on GitHub.');
 });
 
 test('the title-bar item rows identify their source and still open details', async () => {
     await mountPage(board(local));
     await settle(() => $<HTMLButtonElement>('.counters button[aria-label^="need you:"]')!.click());
+
     const row = $<HTMLButtonElement>('.counter-popup button[data-item]')!;
+
     expect(row.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
     await settle(() => row.click());
     expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
@@ -169,10 +184,13 @@ test('expanded slice rows and their details keep each slice source', async () =>
             },
         ],
     };
+
     await mountPage(board(item));
     await settle(() => $<HTMLButtonElement>('[data-stage="build"] button[aria-label="Show slices"]')!.click());
+
     const labels = (selector: string) =>
         [...$(selector)!.querySelectorAll('[role="img"]')].map((icon) => icon.getAttribute('aria-label'));
+
     expect(labels('[data-stage="build"] [data-slices]')).toEqual([
         'Saved only on this machine.',
         'GitHub issue. Saved on GitHub.',
@@ -205,9 +223,13 @@ test.each<[Item['status'], string, number, string, string]>([
     ],
 ])('conversion in %s updates %s and its open details without a reload', async (status, repo, number, url, label) => {
     const item: Item = { ...local, status, statuses: [status], repo };
+
     await mountPage(board(item));
+
     if (status === 'List') await settle(() => $<HTMLButtonElement>('.list-button')!.click());
+
     const row = $<HTMLElement>(status === 'List' ? '[data-list-modal] button[data-item]' : '.desk-card')!;
+
     expect(row.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');
     await settle(() => row.click());
     expect($('[data-item-summary] [role="img"]')?.getAttribute('aria-label')).toBe('Saved only on this machine.');

@@ -12,6 +12,7 @@ export type SavedHeavyCommandLimit = SavedLimit;
  */
 export function automaticHeavyCommandLimit(cpus: number, totalMemoryBytes: number): number {
     const gb = Math.round(totalMemoryBytes / 2 ** 30);
+
     return Math.max(1, Math.floor(Math.min(cpus / 4, gb / 8)));
 }
 

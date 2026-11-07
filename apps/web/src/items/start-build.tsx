@@ -27,16 +27,20 @@ export function StartBuild({
 }) {
     const short = useOnRow();
     const label = given ?? (short ? 'Start' : 'Start build');
+
     // A thread already at work on the item would get a second one.
     if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
+
     const setup = data.repos.find((repo) => sameRepo(repo.repo, item.repo))?.setup;
     const problem = setup && buildAccessProblem(setup.access);
+
     if (problem)
         return (
             <Button {...kind('start')} leftIcon={ICON.play} disabled title={problem} data-build-unavailable={item.id}>
                 {label}
             </Button>
         );
+
     return (
         <StartOrAfter
             item={item}

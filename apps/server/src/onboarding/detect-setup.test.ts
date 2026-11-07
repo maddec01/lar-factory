@@ -41,6 +41,7 @@ const detect = async (
     input: Record<string, unknown> = {},
 ) => {
     const answer = await detectSetup({ repo: 'maddec01/lar-web', projectId: 'web', ...input }, reads(files, parts));
+
     return (answer as { detection: SetupDetection }).detection;
 };
 
@@ -49,12 +50,14 @@ test('detection exposes the Azure session write restriction separately from veri
     t.onTestFinished(() => {
         vi.unstubAllEnvs();
     });
+
     const repo = 'organization/project/repository';
     const result = await detect(
         {},
         { azureAccess: async () => ({ 'publish-ticket': 'allowed', 'edit-ticket': 'allowed' }) },
         { repo, projectId: 'app' },
     );
+
     assert.equal(result.azureReadOnly, true);
     assert.equal(result.access['publish-ticket'], 'allowed');
     assert.notEqual((await detect()).azureReadOnly, true);
@@ -69,15 +72,18 @@ test('detection reads doc and skill paths without reading factory configuration 
         '.lar-factory.json': '',
     });
     const tree = found.tree;
+
     found.tree = async (repo) => ({
         ...(await tree(repo)),
         read: async () => {
             throw new Error('No file content should be read');
         },
     });
+
     const result = (await detectSetup({ repo: 'maddec01/lar-web', projectId: 'web' }, found)) as {
         detection: SetupDetection;
     };
+
     assert.deepEqual(result.detection.domainDocs, {
         found: { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' },
     });
@@ -89,6 +95,7 @@ test('detection reads doc and skill paths without reading factory configuration 
 
 test("a login without push or triage access marks those operations Refused and leaves what it can't settle unverified", async () => {
     const detection = await detect({}, { github: async () => ({ push: false, triage: false, issues: true }) });
+
     assert.deepEqual(detection.access, {
         'push-branch': 'refused',
         'open-pr': 'unverified',
@@ -104,10 +111,12 @@ test("a login without push or triage access marks those operations Refused and l
 
 test("a repository with issues turned off has its issues Refused, and one the login can't read Refuses every fact it reads", async () => {
     const off = await detect({}, { github: async () => ({ push: true, triage: true, issues: false }) });
+
     assert.deepEqual(
         [off.itemSources, off.access['publish-ticket']],
         [{ refused: 'maddec01/lar-web has issues turned off.' }, 'refused'],
     );
+
     const blocked = await detect(
         {},
         {
@@ -120,6 +129,7 @@ test("a repository with issues turned off has its issues Refused, and one the lo
         },
     );
     const refused = { refused: "Can't read maddec01/lar-web with gh: HTTP 404: Not Found" };
+
     assert.deepEqual([blocked.itemSources, blocked.domainDocs, blocked.projectSkills], [refused, refused, refused]);
     assert.deepEqual(Object.values(blocked.access), [
         'unverified',
@@ -137,6 +147,7 @@ test("a repository with issues turned off has its issues Refused, and one the lo
 test("an Azure DevOps repository detects its teams' boards and push access, with ticket access unverified", async () => {
     const repo = 'contoso/Retail/shop';
     const detection = await detect({}, {}, { repo, projectId: 'shop' });
+
     assert.deepEqual(
         [detection.provider, detection.checkout, detection.itemSources],
         [
@@ -161,6 +172,7 @@ test("an Azure DevOps repository detects its teams' boards and push access, with
         'type-ticket': 'unverified',
         'relate-ticket': 'unverified',
     });
+
     const refused = await detect(
         {},
         {
@@ -171,6 +183,7 @@ test("an Azure DevOps repository detects its teams' boards and push access, with
         },
         { repo, projectId: 'shop' },
     );
+
     assert.deepEqual(
         [refused.access['push-branch'], refused.access['open-pr'], refused.itemSources],
         [
@@ -184,6 +197,7 @@ test("an Azure DevOps repository detects its teams' boards and push access, with
 test("the checkout is Refused with its fix for another origin, a second checkout or T3's projects unread", async () => {
     const checkout = async (projects: () => Promise<Checkout[]>) =>
         (await detect({}, { checkouts: projects })).checkout;
+
     assert.deepEqual(await checkout(async () => [{ ...WEB, origin: 'https://github.com/maddec01/lar-cli.git' }]), {
         refused:
             '/Users/me/Developer/lar-web connects to maddec01/lar-cli instead of maddec01/lar-web. Go back and choose the main repository folder for maddec01/lar-web.',
@@ -212,16 +226,20 @@ test('a triage login can set labels but not manage them, and a write login can d
         {},
         { github: async () => ({ push: false, triage: true, issues: true, tokenWrites: true }) },
     );
+
     assert.deepEqual([triage.access['tag-ticket'], triage.access['manage-labels']], ['allowed', 'refused']);
+
     const write = await detect(
         {},
         { github: async () => ({ push: true, triage: true, issues: true, tokenWrites: true }) },
     );
+
     assert.deepEqual([write.access['tag-ticket'], write.access['manage-labels']], ['allowed', 'allowed']);
 });
 
 test('a push-capable user with an unverified token gets no positive write access', async () => {
     const detection = await detect({}, { github: async () => ({ push: true, triage: true, issues: true }) });
+
     assert.ok(Object.values(detection.access).every((access) => access === 'unverified'));
     assert.deepEqual(detection.itemSources, { found: [{ kind: 'issues' }] });
 });

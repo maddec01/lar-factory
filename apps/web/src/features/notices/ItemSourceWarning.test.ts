@@ -1,0 +1,57 @@
+// The warning for each onboarded repository whose items the latest read left off, such as one reading through a logged-out az.
+
+import { expect, test } from 'vite-plus/test';
+
+import { $$, fresh, warningText, mountPage, push, sample, toolChecks } from '@/test/PageTest';
+
+const problems = [
+    { repo: 'contoso/Fabrikam/lar-api', problem: 'az is logged out.', fix: 'az login' },
+    {
+        repo: 'contoso/Fabrikam/lar-web',
+        problem:
+            'Team Web has no current iteration in contoso/Fabrikam. Give the team a sprint whose dates cover today in its project settings.',
+    },
+];
+
+test("each repository whose items can't be read gets a warning naming it as the List modal does, why and its fix, which clears once it reads", async () => {
+    await mountPage({ ...sample, itemSourceProblems: problems });
+
+    const warnings = () => $$('[data-slot="notice"]');
+
+    expect(warnings().map(warningText)).toEqual([
+        [
+            "lar-api's items could not be refreshed.",
+            'az is logged out. Run az login Copy in a terminal. The board reads it again on each refresh.',
+        ],
+        [
+            "lar-web's items could not be refreshed.",
+            'Team Web has no current iteration in contoso/Fabrikam. Give the team a sprint whose dates cover today in its project settings. ' +
+                'The board reads it again on each refresh.',
+        ],
+    ]);
+    expect(warnings()[0]!.closest('[data-board-notices]')).not.toBeNull();
+
+    await push({ ...sample, itemSourceProblems: [] });
+    expect(warnings()).toEqual([]);
+});
+
+test("a repository whose problem the failed az check's fix covers shows no warning of its own beside the az warning", async () => {
+    await mountPage({
+        ...sample,
+        tools: toolChecks({ az: { result: 'logged-out', fix: 'az login' } }),
+        itemSourceProblems: problems,
+    });
+    expect($$('[data-slot="notice"]').map((b) => warningText(b)[0])).toEqual([
+        'Azure CLI is logged out.',
+        "lar-web's items could not be refreshed.",
+    ]);
+});
+
+test('failed sources mark retained data stale and expose diagnostics until recovery', async () => {
+    await mountPage({ ...fresh(), itemSourceProblems: problems });
+    expect(document.querySelector('[data-dot]')?.className).toContain('bg-amber-500');
+    expect(document.querySelector('[data-board-notices]')?.textContent).toContain('Diagnostics');
+    await push({ ...fresh(), itemSourceProblems: [] });
+    expect(document.querySelector('[data-board-notices]')).toBeNull();
+    expect(document.querySelector('[data-dot]')?.className).toContain('bg-success');
+});

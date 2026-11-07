@@ -22,27 +22,32 @@ test("the board's link rules sit in the base layer, so a link styled as a button
     expect(baseLayer()).toMatch(/^\s*a \{\s*color: inherit;/m);
 });
 
-// A feature folder with no sheet of its own has no page class names, so its class names are all Tailwind utilities.
-const sources = [...rules('index.css').matchAll(/^@source "\.\/(.+)";$/gm)].map((m) => m[1]);
-const folders = readdirSync(src, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name);
+// A folder with no sheet of its own has no page class names, so its class names are all Tailwind utilities.
+const sources = [...rules('index.css').matchAll(/^@source "\.\/(.+)";$/gm)].map((m) => m[1]!);
+const folders = [
+    ...new Set(
+        readdirSync(src, { recursive: true, encoding: 'utf8' })
+            .filter((path) => path.endsWith('.tsx'))
+            .map((path) => path.slice(0, path.lastIndexOf('/') + 1)),
+    ),
+];
 const utilityFiles = folders
     .filter((folder) => !readdirSync(src + folder).some((name) => name.endsWith('.css')))
     .flatMap((folder) =>
         readdirSync(src + folder)
             .filter((name) => name.endsWith('.tsx'))
-            .map((name) => `${folder}/${name}`),
+            .map((name) => `${folder}${name}`),
     )
     .filter((path) => readFileSync(src + path, 'utf8').includes('className="'));
 
 test.each(utilityFiles)('Tailwind scans %s, a file in a folder with no sheet of its own', (path) => {
-    expect(sources.some((source) => source === path || source === path.split('/')[0])).toBe(true);
+    expect(sources.some((source) => source === path || path.startsWith(`${source}/`))).toBe(true);
 });
 
 test('reduced motion stops both status spin and pulse without hiding their icons', () => {
     const reduced =
-        rules('items/items.css').match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+        rules('features/items/items.css').match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/)?.[1] ??
+        '';
 
     expect(reduced).toMatch(/\.status-spin[^}]*animation: none/);
     expect(reduced).toMatch(/\.status-pulse[^}]*animation: none/);

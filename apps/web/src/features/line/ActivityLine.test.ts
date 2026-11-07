@@ -1,0 +1,113 @@
+// What the line's clock costs the row around it: a second moves the age and renders no status glyph. The glyphs are
+// counted through their module, mocked here rather than hoisted, so they keep the store of the page PageTest.ts mounts.
+
+import type { Item, ItemThread } from '@lar-factory/shared';
+import { createElement, Profiler, type ReactNode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { expect, test, vi } from 'vite-plus/test';
+
+import { $, NOW, fresh, mountPage, sample, settle, text } from '@/test/PageTest';
+
+let glyphRenders = 0;
+
+const at = new Date(NOW).toISOString();
+const thread: ItemThread = {
+    id: 't',
+    title: 'Build',
+    state: 'running',
+    updated: at,
+    activity: { available: true, readAt: at, action: 'Read a.ts', actionAt: at, toolRunning: false, agents: [] },
+};
+const item = {
+    ...sample.items[0],
+    id: 'I_build',
+    number: null,
+    parent: null,
+    parentId: null,
+    status: 'In progress',
+    blockers: [],
+    slices: [],
+    threads: [thread],
+} as unknown as Item;
+
+test('a second moves the age and renders nothing around the line', async () => {
+    vi.doMock('@/features/items/StatusGlyph', async (original) => {
+        const real = await original<typeof import('@/features/items/StatusGlyph')>();
+
+        return {
+            ...real,
+            StatusGlyph: (props: Parameters<typeof real.StatusGlyph>[0]): ReactNode => {
+                glyphRenders += 1;
+
+                return real.StatusGlyph(props);
+            },
+        };
+    });
+    await mountPage({ ...fresh(), items: [item] });
+    expect(text($('[data-age]'))).toBe('· 0s');
+    glyphRenders = 0;
+    await settle(() => vi.advanceTimersByTime(3_000));
+    expect(text($('[data-age]'))).toBe('· 3s');
+    expect(glyphRenders).toBe(0);
+});
+
+test('a line keeps its tooltip quiet as the connection drops and its list goes', async () => {
+    const warned = [vi.spyOn(console, 'error'), vi.spyOn(console, 'warn')];
+
+    await mountPage({ ...fresh(), items: [item] });
+
+    const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    expect($('[data-activity]')!.getAttribute('tabindex')).toBe('0');
+    await settle(() => useBoardStore.setState({ clientError: 'Connection lost' }));
+    expect($('[data-activity]')!.dataset.activity).toBe('unavailable');
+    expect($('[data-activity]')!.hasAttribute('tabindex')).toBe(false);
+    await settle(() => useBoardStore.setState({ clientError: null }));
+    expect($('[data-activity]')!.dataset.activity).toBe('working');
+    expect(warned.flatMap((spy) => spy.mock.calls.flat()).join(' ')).not.toContain('controlled');
+});
+
+test('a minute age skips unchanged second renders but still becomes unavailable on its original deadline', async (t) => {
+    await mountPage({ ...fresh(), items: [item] });
+
+    const { ActivityLine } = await import('./ActivityLine');
+    const { TooltipProvider } = await import('@lar-works/design-system');
+    const older = {
+        ...item,
+        threads: [{ ...thread, activity: { ...thread.activity!, actionAt: new Date(NOW - 65_000).toISOString() } }],
+    } as Item;
+    const host = document.createElement('div');
+    const root = createRoot(host);
+
+    t.onTestFinished(async () => {
+        await settle(() => root.unmount());
+    });
+
+    let commits = 0;
+
+    await settle(() =>
+        root.render(
+            createElement(
+                TooltipProvider,
+                null,
+                createElement(
+                    Profiler,
+                    {
+                        id: 'line',
+                        onRender: () => {
+                            commits++;
+                        },
+                    },
+                    createElement(ActivityLine, { item: older }),
+                ),
+            ),
+        ),
+    );
+    expect(host.querySelector('[data-age]')!.textContent).toBe('· 1m');
+    commits = 0;
+    await settle(() => vi.advanceTimersByTime(3_000));
+    expect(commits, 'the second still checks freshness, but the words have not changed').toBe(0);
+    await settle(() => vi.advanceTimersByTime(28_000));
+    expect(host.querySelector('[data-activity]')!.getAttribute('data-activity')).toBe('unavailable');
+    expect(commits).toBeGreaterThan(0);
+});

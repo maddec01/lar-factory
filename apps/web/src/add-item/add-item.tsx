@@ -30,7 +30,11 @@ const KIND_CHOICES = ITEM_KINDS.map((value) => {
 /** The form's values, the editor's `description` and the Create issue `createChoice`, for the store to keep. */
 function valuesOf(form: HTMLFormElement, description: string, createChoice: boolean | null): DraftValues {
     const values = new FormData(form);
-    const value = (name: string) => String(values.get(name) ?? '');
+    const value = (name: string) => {
+        const entry = values.get(name);
+
+        return typeof entry === 'string' ? entry : '';
+    };
     const createIssue = values.has('createIssue');
     const options = createIssue ? ticketOptions(form) : undefined;
 

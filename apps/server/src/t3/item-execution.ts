@@ -43,7 +43,9 @@ const isSettled = (shell: Record<string, unknown>): boolean => !!shell.settledAt
 /** What orders a thread among the item's. Settling moves `updatedAt`, so a settled thread goes by its last run, and with no run known behind every thread with a time. */
 const orderedBy = (shell: Record<string, unknown>): string =>
     isSettled(shell)
-        ? String(shell.latestRunCompletedAt ?? shell.latestRunStartedAt ?? shell.latestRunRequestedAt ?? '')
+        ? ([shell.latestRunCompletedAt, shell.latestRunStartedAt, shell.latestRunRequestedAt].find(
+              (at) => typeof at === 'string',
+          ) ?? '')
         : String(shell.updatedAt);
 
 const RUNNING = new Set(['preparing', 'starting', 'running', 'waiting']);

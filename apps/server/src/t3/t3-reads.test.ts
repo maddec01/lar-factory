@@ -22,7 +22,7 @@ const REPO = 'maddec01/lar-factory';
 
 /** A lookup's result once it's read, failing the test when there was none or it was unavailable. */
 function found<T>(value: T | 'unavailable' | undefined): T {
-    assert.ok(value !== undefined && value !== 'unavailable', `expected a read, got ${value}`);
+    assert.ok(value !== undefined && value !== 'unavailable', `expected a read, got ${String(value)}`);
 
     return value;
 }

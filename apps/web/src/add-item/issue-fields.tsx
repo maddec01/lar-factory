@@ -250,7 +250,11 @@ export function ticketOptions(form: HTMLFormElement): TicketOptions {
         ...Object.fromEntries(
             ['type', 'assignee', 'milestone', 'iteration']
                 .filter((name) => values.has(name))
-                .map((name) => [name, String(values.get(name) ?? '')]),
+                .map((name) => {
+                    const entry = values.get(name);
+
+                    return [name, typeof entry === 'string' ? entry : ''];
+                }),
         ),
     };
 }

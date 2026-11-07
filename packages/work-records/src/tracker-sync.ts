@@ -63,6 +63,8 @@ export interface StructureProvider {
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 const fail = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const numberOf = (reference: string) => Number(reference.slice(reference.lastIndexOf('#') + 1));
+/** A text field of a GitHub or Azure DevOps reply; anything but text reads as empty. */
+const textField = (value: unknown): string => (typeof value === 'string' ? value : '');
 
 export const structureIssueUrl = (repository: string, number: number) =>
     repository.split('/').length === 2
@@ -265,15 +267,15 @@ export function structureProvider(): StructureProvider {
             repository,
             number: Number(raw[azure ? 'id' : 'number']),
             body: azure
-                ? String(
+                ? textField(
                       (raw.fields as Record<string, unknown>)[
                           spec &&
                           String((raw.fields as Record<string, unknown>)['System.WorkItemType']).toLowerCase() === 'bug'
                               ? 'Microsoft.VSTS.TCM.ReproSteps'
                               : 'System.Description'
-                      ] ?? '',
+                      ],
                   )
-                : String(raw.body ?? ''),
+                : textField(raw.body),
             ...(azure
                 ? {
                       bodyField:
@@ -283,11 +285,9 @@ export function structureProvider(): StructureProvider {
                               : ('System.Description' as const),
                   }
                 : {}),
-            title: azure
-                ? String((raw.fields as Record<string, unknown>)['System.Title'] ?? '')
-                : String(raw.title ?? ''),
+            title: azure ? textField((raw.fields as Record<string, unknown>)['System.Title']) : textField(raw.title),
             kind: azure
-                ? trackerKind([], String((raw.fields as Record<string, unknown>)['System.WorkItemType'] ?? ''))
+                ? trackerKind([], textField((raw.fields as Record<string, unknown>)['System.WorkItemType']))
                 : trackerKind(
                       ((raw.labels as { name: string }[]) ?? []).map((label) => label.name),
                       String((raw.type as { name?: string } | undefined)?.name ?? ''),
@@ -479,7 +479,7 @@ export function structureProvider(): StructureProvider {
 
                 return pages
                     .flat()
-                    .filter((raw) => !raw.pull_request && String(raw.body ?? '').includes(`"identity":"${identity}"`))
+                    .filter((raw) => !raw.pull_request && textField(raw.body).includes(`"identity":"${identity}"`))
                     .map((raw) => asTicket(repository, raw));
             }
 
@@ -590,7 +590,7 @@ export function structureProvider(): StructureProvider {
                     ? await github(`repos/${ticket.repository}/issues/comments/${id}`)
                     : await azure(ticket.repository, 'comments', [`workItemId=${ticket.number}`, `commentId=${id}`]);
 
-            return String(raw[ticket.repository.split('/').length === 2 ? 'body' : 'text'] ?? '');
+            return textField(raw[ticket.repository.split('/').length === 2 ? 'body' : 'text']);
         },
         replace: async (ticket, body) => {
             const fresh = await read(ticket.repository, ticket.number);

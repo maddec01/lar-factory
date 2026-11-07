@@ -39,7 +39,7 @@ export function serve(
         if (route) {
             const answer =
                 typeof route === 'function'
-                    ? route(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>)
+                    ? route(JSON.parse((init?.body as string | undefined) ?? '{}') as Record<string, unknown>)
                     : route;
 
             return answer instanceof Response
@@ -61,7 +61,7 @@ export function serve(
 export const posted = (url: string) =>
     (fetchMock.mock.calls as unknown as [string, RequestInit?][])
         .filter(([u, init]) => u === url && init?.body !== undefined)
-        .map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>);
+        .map(([, init]) => JSON.parse(init?.body as string) as Record<string, unknown>);
 
 /** A GitHub repository the login owns, with no domain docs, factory files, shared config or project skills. */
 export const detection = (parts: Partial<SetupDetection> = {}): SetupDetection => ({

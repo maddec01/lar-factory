@@ -139,7 +139,7 @@ export function validateTrackerStructure(value: unknown): TrackerStructure {
                 !trackerReference(value.snapshot.root) ||
                 (value.snapshot.previous !== undefined &&
                     value.snapshot.previous !== null &&
-                    !/^[a-f0-9]{64}$/.test(String(value.snapshot.previous))) ||
+                    (typeof value.snapshot.previous !== 'string' || !/^[a-f0-9]{64}$/.test(value.snapshot.previous))) ||
                 !text(value.snapshot.generation, 128) ||
                 !/^[a-f0-9]{64}$/.test(String(value.snapshot.digest)) ||
                 !Array.isArray(value.snapshot.chunks) ||

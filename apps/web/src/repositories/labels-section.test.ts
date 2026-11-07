@@ -96,7 +96,7 @@ function serve(
 
         if (url !== '/api/repositories/labels') return new Response(JSON.stringify(board));
 
-        const body = JSON.parse(String(init?.body)) as Record<string, unknown> & {
+        const body = JSON.parse(init?.body as string) as Record<string, unknown> & {
             name: string;
             update: Partial<TrackerLabel>;
         };

@@ -507,7 +507,7 @@ test('Spec details show Original collapsed and expose retry plus exact-generatio
             );
 
         if (url === '/api/item-spec') {
-            actions.push(JSON.parse(String(init?.body)));
+            actions.push(JSON.parse(init?.body as string));
 
             return new Response(JSON.stringify({ error: null }));
         }

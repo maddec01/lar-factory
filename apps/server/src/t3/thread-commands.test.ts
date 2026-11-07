@@ -4,11 +4,10 @@ import { boardSessionAuthority } from './board-session.ts';
 import { sendThreadCommand } from './thread-commands.ts';
 
 vi.mock('./board-session.ts');
-vi.mock('./t3-settings.ts', () => ({ serverRuntimePath: () => '/fixture/runtime' }));
 
 const runtime = vi.hoisted(() => ({ origin: 'http://127.0.0.1:3773' as string | undefined }));
 
-vi.mock('../json-file.ts', () => ({ readJsonRecord: () => ({ origin: runtime.origin }) }));
+vi.mock('./t3-settings.ts', () => ({ serverRuntimeOrigin: () => runtime.origin ?? '' }));
 
 class FakeT3Socket extends EventTarget {
     static OPEN = 1;

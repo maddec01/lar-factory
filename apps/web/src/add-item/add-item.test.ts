@@ -63,7 +63,7 @@ async function fillDraft(): Promise<void> {
 const respond = (body: object, status = 200) =>
     fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify(body), { status }));
 const posted = () =>
-    JSON.parse(String((fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit])[1].body)) as Record<
+    JSON.parse((fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit])[1].body as string) as Record<
         string,
         unknown
     >;
@@ -462,7 +462,7 @@ const calls = (path: string) =>
     fetchMock.mock.calls
         .map((call) => call as unknown as [string, RequestInit | undefined])
         .filter(([url]) => url.startsWith(path))
-        .map(([url, init]) => [url, init?.body ? JSON.parse(String(init.body)) : null]);
+        .map(([url, init]) => [url, init?.body ? JSON.parse(init.body as string) : null]);
 const ticketButton = (number: number) => $<HTMLButtonElement>(`[data-ticket="${number}"]`)!;
 
 async function searchFor(query: string): Promise<void> {

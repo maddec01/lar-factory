@@ -7,7 +7,7 @@ import { Badge } from '@lar-works/design-system';
 import { memo } from 'react';
 
 import { partKind } from './DossierParts';
-import { PartKindLabel } from './WorkMap';
+import { PartKindLabel } from './WorkMapParts';
 import { KIND_BADGES, KindBadge, RepoCell, SourceIcon } from '@/features/items';
 
 /** A row's kind: its badge, a decision's method or Build, with or without a ticket; a ticket with no recognised kind has none. */

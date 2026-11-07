@@ -45,7 +45,6 @@ test("The design system's Modal opens a titled dialog with its close button and 
 
 test('a FormSelect gives its form an empty value for None, the picked value after a pick, and an input event by then', async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    Element.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal(
         'ResizeObserver',
         class {

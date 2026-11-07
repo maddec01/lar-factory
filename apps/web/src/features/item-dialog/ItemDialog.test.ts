@@ -916,7 +916,7 @@ test('ticked cleanup with something to lose confirms the loss, runs first, then 
     expect(loss.getAttribute('role'), 'the list is announced').toBe('alert');
     expect(
         // oxlint-disable-next-line typescript/unbound-method -- reads the mock's recorded calls; nothing calls it unbound
-        vi.mocked(Element.prototype.scrollIntoView).mock.contexts,
+        vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts,
         'the list scrolls into view above the buttons',
     ).toContain(loss.parentElement);
     expect(text(loss.querySelector('li > span'))).toBe('build/old');

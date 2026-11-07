@@ -1,7 +1,7 @@
 // What Settings says of each command the board checks: its state, and what it does or how to fix its check.
 
 import { GH_FLOOR, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
-import { CodeText } from '@lar-works/design-system';
+import { Code } from '@lar-works/design-system';
 import type { ComponentProps, ReactNode } from 'react';
 
 import type { SettingsData } from './SettingsModel';
@@ -71,7 +71,7 @@ export function toolDescription(does: string, check: ToolCheck | undefined): Rea
 
     return (
         <>
-            {where}Fix: <CodeText wrap="never">{check.fix}</CodeText>
+            {where}Fix: <Code wrap="never">{check.fix}</Code>
         </>
     );
 }

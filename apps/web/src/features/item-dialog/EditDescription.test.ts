@@ -454,7 +454,7 @@ test('opening a concept part with unsaved changes asks first: Keep editing stays
     await press(editButton());
     await typeAtEnd(' More.');
 
-    const part = () => inDialog<HTMLButtonElement>('[data-concept-part="I_sample14"] button')!;
+    const part = () => inDialog<HTMLButtonElement>('[data-part="I_sample14"] button')!;
 
     await press(part());
     expect(prompt(), 'the prompt asks first').toBeDefined();
@@ -463,7 +463,7 @@ test('opening a concept part with unsaved changes asks first: Keep editing stays
     await press(part());
     await press(buttonIn(prompt()!, 'Discard'));
     expect(prompt()).toBeUndefined();
-    expect(inDialog('[data-concept-part]')).toBeNull();
+    expect(inDialog('[data-concept-parts] [data-part]')).toBeNull();
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toContain(
         concept.items.find((i) => i.id === 'I_sample14')!.title,
     );

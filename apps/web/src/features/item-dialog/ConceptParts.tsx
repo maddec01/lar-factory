@@ -4,7 +4,7 @@
 
 import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { ConceptPart, ConceptPartList, DetailsSection, Text } from '@lar-works/design-system';
+import { DetailsSection, PartName, PartRow, PartsList, Text } from '@lar-works/design-system';
 
 import {
     AgentWork,
@@ -82,30 +82,39 @@ export function ConceptWork({ item }: { item: Item }) {
     );
 }
 
-function PartRow({ item, data, openPart }: { item: Item; data: BoardData; openPart: (itemId: string) => void }) {
+function ConceptPartRow({ item, data, openPart }: { item: Item; data: BoardData; openPart: (itemId: string) => void }) {
     const shown = useShownStatus(item);
     const complete = isDone(item);
     const hasThread = item.threads === 'unavailable' || Boolean(item.threads?.length);
 
     return (
-        <ConceptPart
+        <PartRow
             id={item.id}
+            picked={false}
             title={item.title}
             onOpen={() => openPart(item.id)}
-            source={<SourceIcon item={item} />}
-            glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} />}
-            name={<ItemTitle item={item} />}
-            state={complete ? 'Complete' : shown.word}
-        >
-            {usageUnreadable(item) ? (
-                <Text as="span" variant="caption" tone="muted">
-                    {UNREADABLE}
-                </Text>
-            ) : (
-                <AgentWork item={item} />
-            )}
-            {hasThread && <OpenThread item={item} data={data} />}
-        </ConceptPart>
+            name={
+                <PartName
+                    source={<SourceIcon item={item} />}
+                    glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} />}
+                >
+                    <ItemTitle item={item} />
+                </PartName>
+            }
+            meta={complete ? 'Complete' : shown.word}
+            action={
+                <>
+                    {usageUnreadable(item) ? (
+                        <Text as="span" variant="caption" tone="muted">
+                            {UNREADABLE}
+                        </Text>
+                    ) : (
+                        <AgentWork item={item} />
+                    )}
+                    {hasThread && <OpenThread item={item} data={data} />}
+                </>
+            }
+        />
     );
 }
 
@@ -124,11 +133,11 @@ export function ConceptParts({
 
     return (
         <DetailsSection heading="Parts" data-concept-parts>
-            <ConceptPartList>
+            <PartsList>
                 {parts.map((part) => (
-                    <PartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />
+                    <ConceptPartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />
                 ))}
-            </ConceptPartList>
+            </PartsList>
         </DetailsSection>
     );
 }

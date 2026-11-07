@@ -20,7 +20,7 @@ interface Attempt {
 }
 interface CreateTicketState {
     attempts: Record<string, Attempt>;
-    submit(itemId: string, preview: TicketPreview, options: TicketOptions): Promise<void>;
+    submit: (itemId: string, preview: TicketPreview, options: TicketOptions) => Promise<void>;
 }
 export const useCreateTicketStore = create<CreateTicketState>()(
     persist(

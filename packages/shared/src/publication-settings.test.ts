@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from 'vite-plus/test';
 
 import { discoverVocabulary, type VocabularyReads } from './publication-settings.ts';
@@ -68,9 +72,6 @@ test('personal GitHub repositories have no issue types, without disguising a ref
 });
 
 test('the command reads the board settings while it is closed and detects mapping and destination changes', async (t) => {
-    const { mkdtemp, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const { writeListFile, setVocabularyOverride, setOverride } = await import('./repository-settings.ts');
     const { readPublicationSettings } = await import('./publication-settings.ts');
     const dir = await mkdtemp(join(tmpdir(), 'publication settings '));
@@ -141,9 +142,6 @@ test('issue defaults require boolean values', async () => {
 });
 
 test('legacy settings load default preferences and private domain docs as off', async (t) => {
-    const { mkdtempSync, rmSync } = await import('node:fs');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const { writeListFile, readRepositorySetups, setOverride, replaceAccess } =
         await import('./repository-settings.ts');
     const { effectiveIssueSettings } = await import('./write-access.ts');

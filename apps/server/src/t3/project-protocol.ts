@@ -7,8 +7,8 @@ export interface BoardSession {
 }
 /** Implementations must persist only in the operating system credential store. */
 export interface SessionVault {
-    read(): Promise<BoardSession | undefined>;
-    write(session: BoardSession): Promise<void>;
+    read: () => Promise<BoardSession | undefined>;
+    write: (session: BoardSession) => Promise<void>;
 }
 export interface SessionAuthority {
     issue(): Promise<BoardSession>;

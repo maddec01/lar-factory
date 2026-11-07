@@ -101,7 +101,7 @@ export interface ItemCommands {
      * deleted. It writes a launch intent on the work record before it asks T3, and settles an unresolved one through T3
      * before starting again. `quiet` leaves a failure to the caller to show, as Start after does.
      */
-    start(itemId: string, model: unknown, quiet?: boolean): Promise<Reply>;
+    start: (itemId: string, model: unknown, quiet?: boolean) => Promise<Reply>;
     /**
      * Starts a Ready build's thread in a new worktree, or retries a confirmed stopped or deleted one, once nothing open
      * blocks it, as lar-shape's step 5 does after Go: it fetches the default branch, refusing the start with no write when
@@ -173,13 +173,13 @@ export interface ItemCommandsDeps {
     /** Where the commands write Status moves; null in sample mode, which moves nothing. */
     records: WorkRecords | null;
     /** Shows the work records as they are now, after a write or a refused one. */
-    reread(): void;
+    reread: () => void;
     /** Shows the writes of the board's own observations it doesn't show yet, so a write at a shown revision isn't refused for them. */
-    showObservations?(): void;
+    showObservations?: () => void;
     /** Archive's work as the records are now: set aside, or finished and hidden by retention. */
-    archive(): Item[];
+    archive: () => Item[];
     /** Reads the model choices T3 offers now into the board data. */
-    offerModelChoices(): ModelGroup[];
+    offerModelChoices: () => ModelGroup[];
     /**
      * Checks the installed skills against the bundle before Start build, replacing Drift if `drift` says so: resolves
      * with why the build can't start, or null, and the skills with Drift while it waits for a choice. Missing without a

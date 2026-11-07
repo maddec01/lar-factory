@@ -789,9 +789,10 @@ it.each([
 it('refuses a URL that leaves the T3 origin', async () => {
     t3.read = listed(fact('factory'));
 
-    const send = FakeT3Socket.prototype.send;
-
-    FakeT3Socket.prototype.send = function (value: string) {
+    const send = vi.spyOn(FakeT3Socket.prototype, 'send').mockImplementation(function (
+        this: FakeT3Socket,
+        value: string,
+    ) {
         if ((JSON.parse(value) as { _tag: string })._tag !== 'Request') return;
 
         queueMicrotask(() =>
@@ -805,12 +806,12 @@ it('refuses a URL that leaves the T3 origin', async () => {
                 }),
             ),
         );
-    };
+    });
 
     const board = boardOf('lar-factory');
 
     await createProjectIcons(board).refresh();
-    FakeT3Socket.prototype.send = send;
+    send.mockRestore();
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => (url as URL).host === 'elsewhere.example')).toEqual([]);
     expect(board.snapshot().projectIcons).toBeUndefined();
 });

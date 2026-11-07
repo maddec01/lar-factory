@@ -25,9 +25,9 @@ interface KindAnswering {
 interface KindChangeState {
     changes: Record<string, KindChange>;
     answers: Record<string, KindAnswering>;
-    start(itemId: string, kind: SwapKind): Promise<void>;
+    start: (itemId: string, kind: SwapKind) => Promise<void>;
     /** Keeps both kinds, or gives the item `ticketKind`, the kind the user saw on the ticket. */
-    answer(itemId: string, answer: 'keep' | 'update-item', ticketKind: SwapKind | null): Promise<void>;
+    answer: (itemId: string, answer: 'keep' | 'update-item', ticketKind: SwapKind | null) => Promise<void>;
 }
 
 export const useKindChangeStore = create<KindChangeState>((set, get) => ({

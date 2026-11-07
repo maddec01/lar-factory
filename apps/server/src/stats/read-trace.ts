@@ -22,9 +22,9 @@ export interface ReadTrace {
     /** Waits for `work`, which ends the running block. */
     wait<T>(work: Promise<T>): Promise<T>;
     /** Lets the event loop turn, between two chunks of a step's work. */
-    pause(): Promise<void>;
+    pause: () => Promise<void>;
     /** Ends the read's last step. */
-    finish(): void;
+    finish: () => void;
     readonly steps: Readonly<Record<StatsStep, StepTrace>>;
     /** The whole read, in milliseconds. */
     elapsedMs(): number;

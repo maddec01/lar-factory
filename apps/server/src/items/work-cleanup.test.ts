@@ -1,4 +1,7 @@
 import type { Item } from '@lar-factory/shared';
+import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, it } from 'vite-plus/test';
 
 import { executeCleanup, inspectCleanup, inspectCleanups } from './work-cleanup.ts';
@@ -194,9 +197,6 @@ it('requires explicit confirmation before discarding local losses', async () => 
 });
 
 it('deletes an owned branch in a disposable repository and preserves main', async () => {
-    const { mkdtemp, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const { runTool } = await import('../tools/run-tool.ts');
     const checkout = await mkdtemp(join(tmpdir(), 'cleanup-'));
     const git = async (args: string[]) => {
@@ -252,9 +252,6 @@ it('deletes an owned branch in a disposable repository and preserves main', asyn
 });
 
 it('resolves only a branch that is gone everywhere, and still reports each held branch as remaining', async () => {
-    const { mkdtemp, mkdir, realpath, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const { runTool } = await import('../tools/run-tool.ts');
     const root = await realpath(await mkdtemp(join(tmpdir(), 'cleanup-gone-')));
     const checkout = join(root, 'project');
@@ -403,9 +400,6 @@ it('keeps a branch remaining when deleting it fails', async () => {
 });
 
 it('refuses unsafe root and symlink worktrees before invoking Git', async () => {
-    const { mkdtemp, symlink, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const root = await mkdtemp(join(tmpdir(), 'cleanup-path-'));
 
     try {
@@ -481,9 +475,6 @@ it('passes the inspected head through the provider and retains failed remote del
 });
 
 it('removes only a verified sibling worktree of the same repository', async () => {
-    const { mkdtemp, mkdir, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
     const { runTool } = await import('../tools/run-tool.ts');
     const root = await mkdtemp(join(tmpdir(), 'cleanup-worktree-'));
     const checkout = join(root, 'project');

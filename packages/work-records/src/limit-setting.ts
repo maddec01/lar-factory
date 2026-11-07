@@ -9,9 +9,9 @@ export type SavedLimit = Saved<{ limit: HeavyCommandLimit }>;
 
 export interface LimitSetting {
     /** This machine's limit in `dir`. A missing file is Automatic; so is one it can't use, with the reason. */
-    read(dir?: string): SavedLimit;
+    read: (dir?: string) => SavedLimit;
     /** Saves `limit` as this machine's setting in `dir`, replacing the old file whole. */
-    write(limit: HeavyCommandLimit, dir?: string): HeavyCommandLimit;
+    write: (limit: HeavyCommandLimit, dir?: string) => HeavyCommandLimit;
 }
 
 const validLimit = (limit: unknown): limit is HeavyCommandLimit =>

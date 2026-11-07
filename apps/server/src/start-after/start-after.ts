@@ -31,11 +31,11 @@ export interface StartAfterDeps {
     /** Start after passes `quiet`, as it shows a failure itself. */
     commands: Pick<ItemCommands, 'start' | 'startBuild'>;
     /** Reads the model choices T3 offers now into the board data. */
-    offerModelChoices(): ModelGroup[];
+    offerModelChoices: () => ModelGroup[];
     /** The file armed starts live in; null in sample mode, which keeps none. */
     file: string | null;
     /** Whether an armed item the board doesn't show has nothing left to start, as `armedWorkGone` answers. */
-    gone(itemId: string): boolean;
+    gone: (itemId: string) => boolean;
 }
 
 const ARMABLE = ['Ready', 'Queued'];

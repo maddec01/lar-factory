@@ -16,7 +16,7 @@ export function createActivityDatabase(path: string) {
     };
 
     return {
-        open(): DatabaseSync {
+        open: (): DatabaseSync => {
             try {
                 const { dev, ino } = statSync(path);
 
@@ -30,7 +30,7 @@ export function createActivityDatabase(path: string) {
                 throw error;
             }
         },
-        release(db: DatabaseSync | undefined, failed: boolean): void {
+        release: (db: DatabaseSync | undefined, failed: boolean): void => {
             // An idle pass or a T3 outage should hold no database open.
             if (!db || (failed && current?.db === db)) close();
         },

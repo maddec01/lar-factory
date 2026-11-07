@@ -17,12 +17,12 @@ export function createShownStats(overcounted: ReadonlySet<string>) {
          * The figures an item shows: the ones frozen in its latest merged linked PR's block once no linked PR is open, else those of
          * `read`, the latest stats read, when there is one to show, else those it already showed. `withStats` false leaves them alone.
          */
-        shown(
+        shown: (
             item: Item,
             before: Item['stats'],
             withStats: boolean,
             read?: { live: Item['stats']; provisional: boolean },
-        ): Item['stats'] {
+        ): Item['stats'] => {
             const recount = withStats && overcounted.has(item.id);
             const previous = recount ? undefined : isProvisional(before) ? held.get(item.id) : before;
             const carried = isProvisional(item.stats) ? undefined : item.stats;
@@ -54,7 +54,7 @@ export function createShownStats(overcounted: ReadonlySet<string>) {
             return stats;
         },
         /** Forgets the figures held for items no longer on the board, `ids`. */
-        prune(ids: ReadonlySet<string>): void {
+        prune: (ids: ReadonlySet<string>): void => {
             for (const id of held.keys()) if (!ids.has(id)) held.delete(id);
         },
     };

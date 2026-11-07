@@ -7,10 +7,12 @@ import { SearchDialog, type SearchDialogProps, SearchDialogGroup, useSearchDialo
 
 let root: Root | undefined;
 let host: HTMLElement | undefined;
+const scrollIntoView = vi.fn();
 
 beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    Element.prototype.scrollIntoView = vi.fn();
+    scrollIntoView.mockClear();
+    Element.prototype.scrollIntoView = scrollIntoView;
     vi.stubGlobal(
         'ResizeObserver',
         class {
@@ -104,9 +106,7 @@ test('the arrow keys move the highlight, wrap at both ends and scroll it into vi
     await press('ArrowUp');
     expect(active()).toBe('Archive');
     expect(document.querySelector('[aria-selected="true"]')?.textContent).toBe('Archive');
-    expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts.at(-1)).toBe(
-        document.querySelector('[aria-selected="true"]'),
-    );
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(document.querySelector('[aria-selected="true"]'));
 
     await press('ArrowDown');
     expect(active()).toBe('Add item');

@@ -8,7 +8,7 @@ import { publicationSettingsSnapshot, type VocabularyCapability, type Vocabulary
 
 /** Authenticated GETs. GitHub list reads include every page; Azure reads return its JSON envelope. */
 export interface VocabularyReads {
-    github(path: string): Promise<unknown>;
+    github: (path: string) => Promise<unknown>;
     azure(repo: string, resource: 'workitemtypes' | 'tags'): Promise<unknown>;
 }
 

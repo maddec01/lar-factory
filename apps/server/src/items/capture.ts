@@ -33,9 +33,9 @@ export interface CaptureDeps {
     /** Where the commands record work; null in sample mode, which records nothing. */
     records: WorkRecords | null;
     /** Shows the work records as they are now. */
-    reread(): void;
+    reread: () => void;
     /** The onboarded repositories as the last read found them. */
-    repos(): RepoConfig[];
+    repos: () => RepoConfig[];
 }
 
 const NO_RECORDS = 'The board has no work records to add to.';

@@ -33,7 +33,7 @@ export interface AutoBuild {
      */
     pass(): Promise<void>;
     /** Gives up the Auto-build lock, so another board may own it. */
-    release(): Promise<void>;
+    release: () => Promise<void>;
 }
 
 export interface AutoBuildDeps {
@@ -43,11 +43,11 @@ export interface AutoBuildDeps {
     /** Auto-build passes `quiet`, as it shows a failure itself. */
     commands: Pick<ItemCommands, 'startBuild'>;
     /** The saved switch and model. */
-    setting(): AutoBuildState;
+    setting: () => AutoBuildState;
     /** How many builds may work at once. */
-    limit(): number;
+    limit: () => number;
     /** Reads the model choices T3 offers now into the board data; none when they can't be read. */
-    offerModelChoices(): ModelGroup[];
+    offerModelChoices: () => ModelGroup[];
     /** The data folder, which holds the pauses and the lock; tests give their own. */
     dir?: string;
     /** The clock; tests give their own. */

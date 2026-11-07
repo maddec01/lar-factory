@@ -14,8 +14,12 @@ import type { LexicalEditor } from 'lexical';
 import { act } from 'react';
 
 // jsdom lays nothing out, and Lexical measures the selection to scroll it into view.
-Range.prototype.getBoundingClientRect ??= () => new DOMRect();
-Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
+if (!('getBoundingClientRect' in (Range.prototype as object)))
+    Range.prototype.getBoundingClientRect = () => new DOMRect();
+
+if (!('getClientRects' in (Range.prototype as object)))
+    Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+
 // jsdom reports a DOM selection that markup changes have collapsed, and Lexical would take it as the user's. The tests
 // set the selection through the editor alone.
 document.addEventListener('selectionchange', (event) => event.stopImmediatePropagation(), true);

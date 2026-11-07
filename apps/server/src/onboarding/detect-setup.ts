@@ -24,8 +24,8 @@ import { readProjectTeams } from './project-teams.ts';
 /** What detection reads: T3's projects, the default branch's tree, and the login's permissions and teams. */
 export interface DetectReads {
     checkouts(): Promise<Checkout[]>;
-    tree(repo: string): Promise<{ tree: CommitTree }>;
-    github(repo: string): Promise<RepositoryAccess>;
+    tree: (repo: string) => Promise<{ tree: CommitTree }>;
+    github: (repo: string) => Promise<RepositoryAccess>;
     azurePush(repo: string): Promise<boolean>;
     azureAccess?(repo: string): Promise<Access>;
     teams(repo: string): Promise<string[]>;

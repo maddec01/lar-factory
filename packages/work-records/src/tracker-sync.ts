@@ -40,13 +40,13 @@ export interface StructureTicket {
     titleEditorWrite?: boolean;
 }
 export interface StructureProvider {
-    readSpec?(
+    readSpec?: (
         repository: string,
         number: number,
         previous?: Pick<StructureTicket, 'body' | 'title'>,
-    ): Promise<StructureTicket>;
-    replaceSpec?(ticket: StructureTicket, body: string): Promise<StructureTicket>;
-    read(repository: string, number: number): Promise<StructureTicket>;
+    ) => Promise<StructureTicket>;
+    replaceSpec?: (ticket: StructureTicket, body: string) => Promise<StructureTicket>;
+    read: (repository: string, number: number) => Promise<StructureTicket>;
     find(repository: string, identity: string): Promise<StructureTicket[]>;
     create(
         repository: string,

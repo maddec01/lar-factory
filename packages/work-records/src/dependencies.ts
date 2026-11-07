@@ -193,14 +193,14 @@ export function dependencyRecords(
     bump: (workId: string) => void,
 ): DependencyRecords & {
     /** Why moving `workId` under `parentId` (null to clear it) would leave a Dependency blocking a build outside its work tree; null when it wouldn't. */
-    treeConflict(workId: string, parentId: string | null): string | null;
+    treeConflict: (workId: string, parentId: string | null) => string | null;
     /** Why a build couldn't become another kind; null when no Dependency blocks it. */
-    kindConflict(buildId: string): string | null;
+    kindConflict: (buildId: string) => string | null;
     /** Why retention keeps the due record: it holds an unmet Dependency or one blocking a record that isn't due, or an
      * unmet Dependency blocks it. Null when no Dependency needs it. */
-    retentionReason(workId: string, due: (workId: string) => boolean): string | null;
+    retentionReason: (workId: string, due: (workId: string) => boolean) => string | null;
     /** Records the ticket that received the Dependency's request, inside the caller's write. Bumps it and its holder. */
-    recordDependencyTicket(dependencyId: string, ticket: string): void;
+    recordDependencyTicket: (dependencyId: string, ticket: string) => void;
 } {
     const { db } = database;
     const select = db.prepare('SELECT * FROM dependencies WHERE dependency_id = ?');

@@ -19,8 +19,8 @@ import {
 
 /** Runs each CLI; tests stand in for them. */
 interface LabelCommands {
-    gh(args: string[], input?: string): Promise<string>;
-    az(args: string[]): Promise<string>;
+    gh: (args: string[], input?: string) => Promise<string>;
+    az: (args: string[]) => Promise<string>;
 }
 
 const COMMANDS: LabelCommands = {

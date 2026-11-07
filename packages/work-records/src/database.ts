@@ -44,9 +44,9 @@ export class WorkRecordError extends Error {
 export interface Database {
     readonly db: DatabaseSync;
     /** Runs `change` in one write transaction: it commits whole or not at all. */
-    write<T>(change: () => T): T;
+    write: <T>(change: () => T) => T;
     /** Runs `query` after checking the schema is still the one this process knows. */
-    read<T>(query: () => T): T;
+    read: <T>(query: () => T) => T;
     /**
      * Runs `read` against one state of the database, though it awaits turns of the event loop: other connections' commits
      * meanwhile stay out of it. Only for a connection that writes nothing until it ends, as its write would join the read.

@@ -34,7 +34,7 @@ interface SlotOwner extends Owner {
 interface HeavySlot {
     /** The environment the command runs with. */
     env: NodeJS.ProcessEnv;
-    release(): Promise<void>;
+    release: () => Promise<void>;
 }
 
 const slotName = /^slot-\d+$/;

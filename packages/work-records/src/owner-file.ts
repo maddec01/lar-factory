@@ -218,7 +218,7 @@ export async function claimPath(base: string, owner: Owner, target: string, dept
 
 export interface OwnerLease {
     assertOwned(): Promise<void>;
-    release(): Promise<void>;
+    release: () => Promise<void>;
 }
 
 /**

@@ -93,13 +93,13 @@ export interface ShapingThreadSweepDeps {
     /** The board's data folder, where the setting lives; tests give their own. */
     dir?: string;
     /** One thread's state in T3's current snapshot. */
-    stateOf(threadId: string): ThreadCleanupState;
+    stateOf: (threadId: string) => ThreadCleanupState;
     /** Confirms a deletion, which a thread's absence from a snapshot doesn't prove. */
     lookup: typeof lookupThread;
     /** Issues a T3 session, so it runs only for a command the sweep will send. */
-    send(command: ThreadCommand): Promise<ThreadCommandResult>;
+    send: (command: ThreadCommand) => Promise<ThreadCommandResult>;
     /** Told once a deletion is recorded, so the work's stats stop counting that thread. */
-    deleted(workId: string): void;
+    deleted: (workId: string) => void;
     now?: () => number;
 }
 

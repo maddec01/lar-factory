@@ -47,8 +47,8 @@ interface PrObserverOptions {
     repositories(): readonly string[];
     hidden(): ReadonlySet<string>;
     waits(repo: string): boolean;
-    changed(): void;
-    read?(repo: string, number: number): Promise<PullRequestState>;
+    changed: () => void;
+    read?: (repo: string, number: number) => Promise<PullRequestState>;
 }
 
 /** A low-cost PR pass independent of the five-minute ticket and dependency safety read. */

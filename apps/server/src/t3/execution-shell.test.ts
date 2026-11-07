@@ -11,7 +11,7 @@ vi.mock('./project-subscription.ts', () => ({
         _version: string,
         _protocol: unknown,
         _change: unknown,
-        execution: { tag: string; payload: unknown; accept(value: unknown): void },
+        execution: { tag: string; payload: unknown; accept: (value: unknown) => void },
     ) => {
         fixture.accept = execution.accept;
         fixture.tag = execution.tag;

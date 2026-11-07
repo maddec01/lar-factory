@@ -153,7 +153,7 @@ export interface ProjectIcons {
     /** Reads T3 once and updates the board when an icon changed. Calls during a refresh share it. */
     refresh(): Promise<void>;
     /** Refreshes now, on a timer of its own and when the repositories or T3's projects change, until the returned function is called. Reads for T3's changes start at least 30 seconds apart. */
-    start(): () => void;
+    start: () => () => void;
     /** The icon of every project T3 lists, by project ID, once a read started by this call ends or after 2 seconds. */
     byProject(): Promise<ReadonlyMap<string, ProjectIcon>>;
     /** The favicon's bytes for a project in T3's current or retained observation. */

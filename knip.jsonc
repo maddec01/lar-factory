@@ -32,6 +32,6 @@
     "ignoreIssues": {
         "apps/desktop/src/updates/AppUpdates.ts": ["exports", "types"],
         "apps/desktop/src/updates/updateMachine.ts": ["exports"],
-        "apps/web/src/updates/update-button-logic.ts": ["exports"],
+        "apps/web/src/features/updates/UpdateButtonLogic.ts": ["exports"],
     },
 }

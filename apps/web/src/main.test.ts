@@ -4,19 +4,7 @@ import { BRAND_BLOCK_COLOR, BRAND_MARK_BLOCK, BRAND_MARK_L } from '@lar-factory/
 import type { BoardData } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import {
-    $,
-    $$,
-    warningText,
-    fetchMock,
-    fresh,
-    mountPage,
-    push,
-    sample,
-    settle,
-    stream,
-    text,
-} from '../test/support.ts';
+import { $, $$, warningText, fetchMock, fresh, mountPage, push, sample, settle, stream, text } from '@/test/PageTest';
 
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
     await mountPage(fresh());

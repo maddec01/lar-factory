@@ -7,8 +7,9 @@ import { StrictMode } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
-import { App } from './app.tsx';
-import { startLiveData } from './board/live-data.ts';
+import { App } from '@/app/App';
+import { AppProviders } from '@/app/providers/AppProviders';
+import { startLiveData } from '@/services/board/board.service';
 
 // The script holds the first paint (vite.config.ts), so render now, not in a later task: the first
 // frame then shows the board.
@@ -17,7 +18,9 @@ const root = createRoot(document.getElementById('app')!);
 flushSync(() =>
     root.render(
         <StrictMode>
-            <App />
+            <AppProviders>
+                <App />
+            </AppProviders>
         </StrictMode>,
     ),
 );

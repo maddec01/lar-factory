@@ -35,8 +35,9 @@ export default defineConfig({
             },
             {
                 files: ['apps/web/src/**/*.ts', 'apps/web/src/**/*.tsx'],
-                // Step 2 of the lar-web alignment turns these on.
-                rules: { 'lar/boundaries': 'off', 'lar/no-visual-recipes': 'off', 'max-lines': 'off' },
+                // The board's visual code still sits in apps/web (shared/ui and the features' class names and sheets);
+                // step 2b of the lar-web alignment moves it into the design system and turns this on.
+                rules: { 'lar/no-visual-recipes': 'off' },
             },
         ],
     },

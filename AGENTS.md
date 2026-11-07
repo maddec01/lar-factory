@@ -17,6 +17,12 @@ the flow and `docs/plan.md` for how it was set up.
   `src/items/`) with no wrapper folders such as `services/`. File names are
   kebab-case, except Copies and code Ports, which keep their source's names. Skill-text Ports use kebab-case names for their lar step. Unit
   tests sit next to the file they test.
+- `apps/web/src` is laid out like Lar's other web apps (lar-server's and lar-platform's `web/src`), not as above:
+  `app/` is the composition root (providers, the shell with the title bar and loading screen), `features/<feature>/`
+  holds one user-facing area with an `index.ts` public API, `services/<domain>/` the board's data and server calls
+  (`<domain>.service.ts`, `<domain>.hooks.ts`, never UI), `shared/` cross-cutting foundations (`shared/ui/` holds
+  the board's own visual building blocks, on their way into the design system) and `test/` the test support. Components are PascalCase (`ItemDialog.tsx`), hooks `useX.ts`; imports across those folders use the `@/`
+  alias, with no file extensions. `lar/boundaries` and `max-lines` (in `@lar-works/config`) enforce it.
 - Components, tokens and styles come from `@lar-works/design-system` (lar-web); import icons from
   `@lar-works/design-system/icons`, never from `lucide-react` (only `DynamicIcon`, which it doesn't re-export, comes
   from `lucide-react/dynamic`). `packages/ui` holds the board's own UI on top of it

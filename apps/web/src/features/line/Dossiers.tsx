@@ -1,0 +1,134 @@
+// The dock, Concepts and linked work: each started concept, and each open item with sub-issues on the board, as a row:
+// its source, repository, kind and title with any other repositories, its most important chip (parts that need you, open
+// decisions, blocked slices, whether it is refined, fog) in a stage row's state column, and its Start and an expanded row's
+// view controls in the action slot, then a second line of its part bar, parts done, what's next and agent figures, in the
+// columns the board's stage rows keep. Its chevron expands it in place under that same line, in the page's scroll, on its Work map,
+// with the concept's own question above and its Dependencies and fog below. Its parts list instead lists what keeps the
+// work moving (parts that need you, parts to verify or merge, open decisions, blocked slices, waiting parts, parts ready to
+// start, Dependencies and fog) or says nothing holds it up, then each part with what it asks next, its stage track, figures,
+// thread and slices, the done parts folded away. The browser remembers which dossiers are expanded and which view each shows.
+
+import { plural, itemName, repoKey } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
+import { ChevronRight } from '@lar-works/design-system/icons';
+import type { MouseEvent } from 'react';
+
+import { Attention } from './Attention';
+import { ROW_RULE } from './Columns';
+import { stop } from './DossierHelpers';
+import type { FindRef } from './DossierHelpers';
+import { DossierLine } from './DossierLine';
+import type { DossierItems, Part } from './DossierParts';
+import { NO_DELIVERY, noDelivery } from './DossierSummary';
+import { ViewToggle, LocalPlanning } from './DossierTools';
+import { Pane } from './Pane';
+import { PartsList } from './PartsList';
+import { ROW_OPENS } from './StageTrack';
+import { OPEN, VIEW, useStored } from './useStored';
+import type { View } from './useStored';
+import { WorkMap } from './WorkMap';
+import { StructureSync } from '@/features/items';
+import { useBoardStore } from '@/services/board/board.hooks';
+
+/** What the Work map can't draw: the concept's own question over it, what it depends on and doesn't know yet under it. */
+const ABOVE_MAP = ['you'];
+const BELOW_MAP = ['dependencies', 'fog'];
+
+/** What an expanded dossier holds, at its natural height: its parts as a Work map or a list, with what keeps them moving. */
+function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[]; data: BoardData; view: View }) {
+    const find: FindRef = (repo = parent.repo ?? '', n) =>
+        data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
+    const missing = Math.max(parent.subIssues.total, parts.length) - parts.length;
+    // The line's own label says the planning is local; a spec waiting to save still speaks up here.
+    const { sync: _, ...unsynced } = parent;
+
+    return (
+        <div className="grid gap-3 border-t border-(--border) p-3" data-dossier-body>
+            {noDelivery(parent) && (
+                <p className="m-0 text-xs text-(--muted-foreground)" data-no-delivery>
+                    {NO_DELIVERY}
+                </p>
+            )}
+            {missing > 0 && (
+                <p className="m-0 text-xs text-(--muted-foreground)" data-unread-parts>
+                    {plural(missing, 'part')} the board doesn't read. A Project may no longer be on the board.
+                </p>
+            )}
+            <StructureSync item={unsynced} />
+            {view === 'map' ? (
+                <>
+                    <Attention parent={parent} parts={parts} data={data} find={find} only={ABOVE_MAP} />
+                    <WorkMap parts={parts} check={parent.map?.check} data={data} home={repoKey(parent)} />
+                    <Attention parent={parent} parts={parts} data={data} find={find} only={BELOW_MAP} />
+                </>
+            ) : (
+                <>
+                    <Attention parent={parent} parts={parts} data={data} find={find} />
+                    <PartsList parts={parts} data={data} home={repoKey(parent)} />
+                </>
+            )}
+        </div>
+    );
+}
+
+/** A dossier in the dock: the title opens the item; the chevron, or anywhere else on the line but its controls, expands it in place. */
+function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data: BoardData }) {
+    const [on, setOn] = useStored(OPEN, parent);
+    const [view, setView] = useStored(VIEW, parent);
+    // Letting go of a drag that selected text in the line leaves it as it was; a selection elsewhere on the page still toggles it.
+    const toggle = (e: MouseEvent<HTMLDivElement>) => {
+        const selection = window.getSelection();
+
+        if (selection && !selection.isCollapsed && e.currentTarget.contains(selection.anchorNode)) return;
+
+        setOn(!on);
+    };
+    const lead = (
+        <button
+            type="button"
+            data-dossier-open
+            aria-expanded={on}
+            aria-label={`${on ? 'Collapse' : 'Expand'} ${itemName(parent)}`}
+            onClick={(e) => {
+                stop(e);
+                setOn(!on);
+            }}
+            className={`grid size-6 shrink-0 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground) ${ROW_OPENS}`}
+        >
+            <ChevronRight className={`size-4 ${on ? 'rotate-90' : ''}`} />
+        </button>
+    );
+
+    return (
+        <article className={`@container ${ROW_RULE}`} data-dossier={parent.id} aria-label={itemName(parent)}>
+            <DossierLine
+                parent={parent}
+                parts={parts}
+                data={data}
+                lead={lead}
+                onClick={toggle}
+                className="cursor-pointer hover:bg-(--accent)"
+                note={on && <LocalPlanning item={parent} />}
+                tools={on && <ViewToggle view={view} onView={setView} />}
+            />
+            {on && <DossierBody parent={parent} parts={parts} data={data} view={view} />}
+        </article>
+    );
+}
+
+/** The dossiers the filters leave; a dossier follows its parent's row. With none, the dock takes no height. */
+export function Dossiers({ dossiers }: { dossiers: DossierItems[] }) {
+    const data = useBoardStore((state) => state.data);
+
+    if (!dossiers.length) return null;
+
+    return (
+        <Pane id="dock" title="Concepts and linked work" count={dossiers.length}>
+            <div data-dossiers>
+                {dossiers.map(({ parent, parts }) => (
+                    <DossierRow key={parent.id} parent={parent} parts={parts} data={data} />
+                ))}
+            </div>
+        </Pane>
+    );
+}

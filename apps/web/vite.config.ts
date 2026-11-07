@@ -3,8 +3,12 @@
 
 import { test } from '@lar-works/config';
 import tailwindcss from '@tailwindcss/vite';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite-plus';
 import type { Plugin } from 'vite-plus';
+
+const webRoot = dirname(fileURLToPath(import.meta.url));
 
 /** Holds the first paint until the page script has run, so it shows the board rather than an empty
  *  page. Vite drops the attribute from index.html, so it goes on the built tag. */
@@ -62,6 +66,7 @@ function lazyLucideIcons() {
 const lucideIcons = lazyLucideIcons();
 
 export default defineConfig({
+    resolve: { alias: { '@': resolve(webRoot, 'src') } },
     plugins: [tailwindcss(), renderBlockingEntry, lucideIcons.plugin],
     build: {
         outDir: 'dist',
@@ -91,8 +96,9 @@ export default defineConfig({
         environment: 'jsdom',
         maxWorkers: 2,
         include: ['src/**/*.test.ts'],
+        setupFiles: ['./src/test/setup.ts'],
         // Each test's mountPage loads src/main.tsx afresh, which is slow while the root `pnpm test` runs packages
-        // at once. The warm-up in test/support.ts runs in a beforeAll, so hooks get the same time.
+        // at once. The warm-up in src/test/PageTest.ts runs in a beforeAll, so hooks get the same time.
         testTimeout: 15_000,
         hookTimeout: 60_000,
         // Every test's page stays mounted, and ninna-ui's toast list is global to its module. Run through Vite, the

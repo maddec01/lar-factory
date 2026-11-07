@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite-plus';
-import { sharedTest } from '../../vitest.shared.ts';
+import { test } from '@lar-works/config';
 
 export default defineConfig({
   test: {
-    ...sharedTest,
+    ...test,
     include: ['src/**/*.test.ts'],
   },
 });

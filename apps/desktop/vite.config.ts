@@ -4,7 +4,7 @@
 // packaged app, which has no node_modules. The dev window runs apps/server/src/server.ts as source.
 import { compiledCss } from "@lar-factory/ui/compiled-css";
 import { defineConfig, type UserConfig } from "vite-plus";
-import { sharedTest } from "../../vitest.shared.ts";
+import { test } from "@lar-works/config";
 
 const electronOnly = (id: string) => id === "electron" || id.startsWith("electron/");
 
@@ -96,7 +96,7 @@ export default defineConfig({
   ],
   plugins: [compiledCss()],
   test: {
-    ...sharedTest,
+    ...test,
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
     testTimeout: 15_000,
   },

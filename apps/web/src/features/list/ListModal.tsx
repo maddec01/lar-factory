@@ -14,11 +14,11 @@ import {
     ListGroupItem as GroupItem,
     ListHeader,
     ListNote,
-    ListSortMenu,
     Loading,
     Modal,
     SidebarNavigationGroup,
     SidebarPane,
+    SortMenu,
 } from '@lar-works/design-system';
 import { Inbox, SquarePen } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
@@ -145,7 +145,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             </Button>
                         )
                     }
-                    sort={<ListSortMenu value={effectiveSort} options={SORT_OPTIONS} onChange={setSort} />}
+                    sort={<SortMenu value={effectiveSort} options={SORT_OPTIONS} onChange={setSort} />}
                     filters={
                         <ItemFilterBar
                             filters={filters}

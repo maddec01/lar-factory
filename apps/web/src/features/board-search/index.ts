@@ -1,0 +1,1 @@
+export { BoardSearch } from './BoardSearch';

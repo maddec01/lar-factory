@@ -13,7 +13,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 
 import type { DraftValues } from './AddItemStore';
 import { DraftLabels } from './DraftLabels';
-import { useEditStore } from '@/features/repositories/EditStore';
+import { useEditStore } from '@/features/repositories';
 
 const HINT = 'm-0 text-xs leading-snug text-(--muted-foreground)';
 const SMALL_HEADING = 'm-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)';

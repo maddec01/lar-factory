@@ -8,7 +8,7 @@ import { createContext, useEffect, useLayoutEffect, useRef, useState } from 'rea
 import type { MouseEvent, ReactNode, RefObject } from 'react';
 import { flushSync } from 'react-dom';
 
-import { OPEN_ITEM_DIALOG } from '@/features/item-dialog/ItemDialogStore';
+import { OPEN_ITEM_DIALOG } from '@/features/item-dialog';
 
 /** How long a success toast stays. */
 const TOAST_MS = 5_000;

@@ -41,14 +41,7 @@ import type { DescriptionEdit } from './useDescriptionEdit';
 import type { ItemDetailsRead } from './useItemDetails';
 import { useLabelEdit } from './useLabelEdit';
 import { useOlderComments } from './useOlderComments';
-import {
-    AzureFields,
-    AgentWork,
-    AgentWorkNote,
-    KIND_BADGES,
-    LabelChips,
-    useShownLabels,
-} from '@/features/items/ItemParts';
+import { AzureFields, AgentWork, AgentWorkNote, KIND_BADGES, LabelChips, useShownLabels } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';

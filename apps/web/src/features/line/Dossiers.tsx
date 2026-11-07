@@ -57,9 +57,9 @@ import { PartStart, startable } from './PartStart';
 import { RowKind, RowSource } from './RowIdentity';
 import { OnYourDesk, ROW_OPENS, Track, lastSeen, stageOf, YOURS, picked } from './StageTrack';
 import { PartKindLabel, WorkMap } from './WorkMap';
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { dependenciesOf } from '@/features/items/Dependencies';
+import { useItemDialogStore } from '@/features/item-dialog';
 import {
+    dependenciesOf,
     AzureFields,
     ItemTitle,
     RepoCell,
@@ -70,14 +70,17 @@ import {
     usageLoading,
     usageUnreadable,
     useShownStatus,
-} from '@/features/items/ItemParts';
-import { KeepClicks } from '@/features/items/KeepClicks';
-import { OpenThread } from '@/features/items/OpenThread';
-import { SourceIcon } from '@/features/items/SourceIcon';
-import { StartAfterError } from '@/features/items/StartAfter';
-import { StartBuild } from '@/features/items/StartBuild';
-import { StartMessage } from '@/features/items/StartControl';
-import { ItemStatusGlyph, StatusGlyph, STATUS_COLOR, useStatusActivity } from '@/features/items/StatusGlyph';
+    KeepClicks,
+    OpenThread,
+    SourceIcon,
+    StartAfterError,
+    StartBuild,
+    StartMessage,
+    ItemStatusGlyph,
+    StatusGlyph,
+    STATUS_COLOR,
+    useStatusActivity,
+} from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { ambientMotion } from '@/shared/motion/AmbientMotion';
 

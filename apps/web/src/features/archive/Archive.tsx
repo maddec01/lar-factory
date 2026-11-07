@@ -8,8 +8,8 @@ import { Button, Input } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { ExportedLine, ExportMarkdown, type Exported } from '@/features/item-dialog/RecordText';
-import { useAbandonStore } from '@/features/items/AbandonStore';
+import { ExportedLine, ExportMarkdown, type Exported } from '@/features/item-dialog';
+import { useAbandonStore } from '@/features/items';
 import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';

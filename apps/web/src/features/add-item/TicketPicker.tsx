@@ -7,7 +7,7 @@ import { Button } from '@lar-works/design-system';
 import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
 
-import { FormResult } from '@/features/notices/FormResult';
+import { FormResult } from '@/features/notices';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 type Phase = 'idle' | 'searching' | 'found' | 'picking';

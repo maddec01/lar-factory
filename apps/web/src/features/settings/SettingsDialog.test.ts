@@ -1629,10 +1629,13 @@ test('unticking reports removed owned links and retained unowned paths', async (
 /** Opens Settings on its own root at `label`'s section, and counts its renders after the first. */
 async function renderCounted(label: string, data: BoardData = sample) {
     const { useBoardStore } = await import('@/services/board/board.hooks');
+
+    // Before Settings loads: through the features it imports, stores that read the board as they load come with it.
+    useBoardStore.setState({ data });
+
     const { useSettingsStore } = await import('./SettingsStore');
     const { SettingsDialog } = await import('./SettingsDialog');
 
-    useBoardStore.setState({ data });
     useSettingsStore.setState({ open: true, section: label });
 
     const onRender = vi.fn();

@@ -7,7 +7,7 @@ import { AutoBuildSwitch } from './AutoBuildSwitch';
 import { Pane, PaneEmpty } from './Pane';
 import { StageRow } from './StageRow';
 import type { StageRow as Row } from './StageRows';
-import { STATUS_COLOR, useStatusActivity } from '@/features/items/StatusGlyph';
+import { STATUS_COLOR, useStatusActivity } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 
 type Shows = (row: Row) => boolean;

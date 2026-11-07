@@ -11,8 +11,8 @@ import { useEffect, useRef } from 'react';
 import { StepBody } from './Steps';
 import { STEP_TITLES } from './WizardChoices';
 import { type Run, pickedProject, runSteps, stepReady, useWizardStore } from './WizardStore';
-import { ProjectChoiceIcon, ProjectIcon } from '@/features/repositories/ProjectIcon';
-import { useSettingsStore } from '@/features/settings/SettingsStore';
+import { ProjectChoiceIcon, ProjectIcon } from '@/features/repositories';
+import { useSettingsStore } from '@/features/settings';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /**

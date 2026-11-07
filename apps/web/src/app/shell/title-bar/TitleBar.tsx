@@ -16,11 +16,11 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Counters } from './Counters';
 import { TrafficLights, useWindowControlsInset } from './WindowControls';
-import { AddItem } from '@/features/add-item/AddItem';
-import { BoardSearch } from '@/features/board-search/BoardSearch';
-import { ListButton } from '@/features/list/ListModal';
-import { SettingsButton } from '@/features/settings/SettingsDialog';
-import { UpdateButton } from '@/features/updates/UpdateButton';
+import { AddItem } from '@/features/add-item';
+import { BoardSearch } from '@/features/board-search';
+import { ListButton } from '@/features/list';
+import { SettingsButton } from '@/features/settings';
+import { UpdateButton } from '@/features/updates';
 import { useBoardStore } from '@/services/board/board.hooks';
 
 /** "Lar Factory": the design system's BrandMark, the mark as the L and "ar", then a muted "Factory" on the same baseline, in

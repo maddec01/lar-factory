@@ -28,18 +28,16 @@ import type { LucideIcon } from '@lar-works/design-system/icons';
 import { KindIcon } from './BoardFilters';
 import { matchingGroups, wordsOf } from './SearchOptions';
 import type { SearchGroup, SearchOption } from './SearchOptions';
-import { useAddItemStore } from '@/features/add-item/AddItemStore';
-import { kindFilterOf, rowFilter } from '@/features/filters/ItemFilters';
-import type { ItemFilters } from '@/features/filters/ItemFilters';
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { matchesSearch } from '@/features/list/ListSearch';
-import { useListStore } from '@/features/list/ListStore';
-import { projectSettings } from '@/features/repositories/ProjectPage';
-import { pages, settingsData } from '@/features/settings/SettingsPages';
-import type { PagesInput } from '@/features/settings/SettingsPages';
-import { useSettingsStore } from '@/features/settings/SettingsStore';
-import type { UpdateButtonAction } from '@/features/updates/UpdateButtonLogic';
-import { useUpdateStore } from '@/features/updates/UpdateStore';
+import { useAddItemStore } from '@/features/add-item';
+import { kindFilterOf, rowFilter } from '@/features/filters';
+import type { ItemFilters } from '@/features/filters';
+import { useItemDialogStore } from '@/features/item-dialog';
+import { matchesSearch, useListStore } from '@/features/list';
+import { projectSettings } from '@/features/repositories';
+import { pages, settingsData, useSettingsStore } from '@/features/settings';
+import type { PagesInput } from '@/features/settings';
+import { useUpdateStore } from '@/features/updates';
+import type { UpdateButtonAction } from '@/features/updates';
 
 export interface SearchInput {
     data: BoardData;

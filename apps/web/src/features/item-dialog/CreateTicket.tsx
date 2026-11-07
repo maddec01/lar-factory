@@ -4,8 +4,8 @@ import { Button } from '@lar-works/design-system';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { useCreateTicketStore, type TicketPreview } from './CreateTicketStore';
-import { TicketOptionFields, ticketOptions } from '@/features/add-item/IssueFields';
-import { useEditStore } from '@/features/repositories/EditStore';
+import { TicketOptionFields, ticketOptions } from '@/features/add-item';
+import { useEditStore } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 

@@ -3,7 +3,7 @@
 // use it from any folder while the board app is closed. It prints each result as JSON on stdout, a body as its markdown,
 // and each error as one line on stderr.
 
-import { isRecord, sameRepo } from '@lar-factory/shared';
+import { sameRepo } from '@lar-factory/shared';
 import type { Status, SwapKind } from '@lar-factory/shared';
 import { readRepositorySetups } from '@lar-factory/shared/repository-settings';
 import { readFileSync } from 'node:fs';

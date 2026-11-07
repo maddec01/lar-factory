@@ -1,7 +1,6 @@
 // The Queue rail: Queued items as numbered rows that open the item dialog, Shape issue with its model menu, and what
 // a start shows on the row. Ported from the Queued cases of the old Board view's tests.
 
-import { effectiveVocabulary } from '@lar-factory/shared';
 import type { BoardData, Item, KindDisagreement, ModelGroup } from '@lar-factory/shared';
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 

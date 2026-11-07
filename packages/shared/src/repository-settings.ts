@@ -14,7 +14,6 @@ import {
     type DomainDocLocation,
     type OperationAccess,
     type LocalSetupAnswers,
-    type RepositoryItemSource,
     type RepositoryOperation,
     type RepositorySetup,
     type SharedRepositorySettings,

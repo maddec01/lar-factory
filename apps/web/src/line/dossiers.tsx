@@ -19,21 +19,19 @@ import {
     canRetryBuild,
     currentBuildThread,
     plural,
-    prLabel,
     itemName,
     ref,
     repoKey,
     repoName,
     workingAgain,
 } from '@lar-factory/shared';
-import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import {
     Ban,
     Check,
     ChevronRight,
     CircleHelp,
-    GitPullRequest,
     ListChecks,
     Map as MapIcon,
     MessagesSquare,

@@ -4,7 +4,7 @@
 import type { BoardData, ShapingThreadCleanupState } from '@lar-factory/shared';
 import { expect, test, vi } from 'vite-plus/test';
 
-import { $, $$, fetchMock, mountPage, chooseOption, openOptions, sample, settle, text } from '../../test/support.ts';
+import { $, fetchMock, mountPage, chooseOption, openOptions, sample, settle, text } from '../../test/support.ts';
 
 const row = () => $('.settings-row[data-row="shaping-thread-cleanup"]')!;
 const select = () => $('[data-shaping-thread-cleanup] [role="combobox"]')!;

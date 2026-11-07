@@ -2,15 +2,14 @@ import type { BoardData, RawItem } from '@lar-factory/shared';
 import { rawIssue } from '@lar-factory/shared/test/raw-items';
 import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 
 import {
     shapePrompt,
-    NOT_LANDED,
     SAMPLE_MODELS,
     changeRecords,
     recordBlockers,
@@ -18,7 +17,6 @@ import {
     startableEnv,
     startBoard,
     until,
-    writeOnboarding,
     writeRepositoryList,
 } from './server-support.ts';
 import type { Board } from './server-support.ts';

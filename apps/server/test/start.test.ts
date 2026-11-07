@@ -9,16 +9,7 @@ import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 
 import { checkouts } from './repo-support.ts';
-import {
-    shapePrompt,
-    NOT_LANDED,
-    recordBlockers,
-    SAMPLE_MODELS,
-    startBoard,
-    until,
-    writeOnboarding,
-    writeRepositoryList,
-} from './server-support.ts';
+import { shapePrompt, recordBlockers, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';

@@ -7,14 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, type TestContext } from 'vite-plus/test';
 
-import {
-    BUNDLE_URL,
-    bundleUrl,
-    bundledSkillNames,
-    installHome,
-    readBundledSkills,
-    withInstallState,
-} from './bundled-skills.ts';
+import { BUNDLE_URL, bundledSkillNames, installHome, readBundledSkills, withInstallState } from './bundled-skills.ts';
 
 const UPSTREAM = `# Upstream
 

@@ -1,13 +1,12 @@
 import type { BoardData, SetupDetection } from '@lar-factory/shared';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test, type TestContext } from 'vite-plus/test';
+import { test } from 'vite-plus/test';
 
 import { checkouts } from './repo-support.ts';
-import { readsRepositoryConfig, SAMPLE_MODELS, startBoard, until, writesRepository } from './server-support.ts';
+import { readsRepositoryConfig, startBoard, until, writesRepository } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 
 /** Writes this Mac's list of repositories under `home` with the entries as given. */

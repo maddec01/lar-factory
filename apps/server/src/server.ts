@@ -16,7 +16,6 @@ import {
     type FirstRead,
     type Item,
     type ItemSource,
-    type ItemStats,
     type LabelChange,
     type ModelGroup,
     type ProviderTool,

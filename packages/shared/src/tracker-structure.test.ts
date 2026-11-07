@@ -23,14 +23,22 @@ test('managed structure round trips Markdown and HTML without changing original 
 test('duplicate, malformed, excessive and newer structure blocks refuse reads and writes', () => {
     const good = writeTrackerStructure('', { version: 1, kind: 'concept' });
 
-    for (const bad of [
-        good + good,
-        '<!-- lar-factory:structure\n{bad}\n-->',
-        '<!-- lar-factory:structure\n{"version":2,"kind":"concept"}\n-->',
-        '<!-- lar-factory:structure\n' + 'a'.repeat(270_000) + '\n-->',
-    ]) {
-        expect(() => readTrackerStructure(bad)).toThrow();
-        expect(() => writeTrackerStructure(bad, { version: 1, kind: 'concept' })).toThrow();
+    const cases: [string, string][] = [
+        [good + good, 'This issue has an invalid factory structure block.'],
+        ['<!-- lar-factory:structure\n{bad}\n-->', 'This issue has invalid factory structure JSON.'],
+        [
+            '<!-- lar-factory:structure\n{"version":2,"kind":"concept"}\n-->',
+            'This issue has invalid factory structure.',
+        ],
+        [
+            '<!-- lar-factory:structure\n' + 'a'.repeat(270_000) + '\n-->',
+            'This issue has an invalid factory structure block.',
+        ],
+    ];
+
+    for (const [bad, message] of cases) {
+        expect(() => readTrackerStructure(bad)).toThrow(message);
+        expect(() => writeTrackerStructure(bad, { version: 1, kind: 'concept' })).toThrow(message);
     }
     expect(() =>
         writeTrackerStructure('', {
@@ -38,7 +46,7 @@ test('duplicate, malformed, excessive and newer structure blocks refuse reads an
             kind: 'concept',
             parent: { url: 'https://github.com@evil.test/team/app/issues/2', kind: 'concept', title: 'bad' },
         }),
-    ).toThrow();
+    ).toThrow('This issue has invalid factory structure.');
 });
 test('tracker URLs and native issue types work without factory labels', () => {
     expect(trackerReference('https://github.com/team/app/issues/2')).toEqual({ repository: 'team/app', number: 2 });

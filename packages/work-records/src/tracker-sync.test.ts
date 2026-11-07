@@ -304,12 +304,17 @@ test('untrusted snapshot shape and repository mismatches fail before any context
         dependencies: [],
     };
 
-    for (const payload of [
-        { ...valid, nodes: [null] },
-        { ...valid, nodes: [{ ...valid.nodes[0], ticket: 'unrelated/secret#1' }] },
-        { ...valid, nodes: Array.from({ length: 1001 }, () => valid.nodes[0]) },
-        { ...valid, nodes: [{ ...valid.nodes[0], brief: 'PRIVATE ORDINARY BRIEF' }] },
-    ]) {
+    const mismatch = 'The saved structure has invalid parts or a repository/ticket mismatch.';
+
+    for (const [payload, message] of [
+        [{ ...valid, nodes: [null] }, mismatch],
+        [{ ...valid, nodes: [{ ...valid.nodes[0], ticket: 'unrelated/secret#1' }] }, mismatch],
+        [
+            { ...valid, nodes: Array.from({ length: 1001 }, () => valid.nodes[0]) },
+            'The saved structure has an unsupported format.',
+        ],
+        [{ ...valid, nodes: [{ ...valid.nodes[0], brief: 'PRIVATE ORDINARY BRIEF' }] }, mismatch],
+    ] as const) {
         const raw = JSON.stringify(payload);
         const encoded = gzipSync(raw).toString('base64');
         let contextReads = 0;
@@ -345,7 +350,7 @@ test('untrusted snapshot shape and repository mismatches fail before any context
                     fresh.trackerRestore(saved.snapshot, saved.digest),
                 );
             }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(message);
         expect(contextReads).toBe(0);
         expect(fresh.list({})).toEqual([]);
     }

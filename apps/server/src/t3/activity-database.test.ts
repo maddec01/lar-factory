@@ -61,10 +61,10 @@ test('a replaced or removed database closes the old connection before the next r
 
     expect(second === first).toBe(false);
     expect(value(second)).toBe(2);
-    expect(() => value(first)).toThrow();
+    expect(() => value(first)).toThrow('database is not open');
     rmSync(path);
-    expect(() => database.open()).toThrow();
-    expect(() => value(second)).toThrow();
+    expect(() => database.open()).toThrow(/ENOENT: no such file or directory/);
+    expect(() => value(second)).toThrow('database is not open');
     seed(path, 3);
     expect(value(database.open())).toBe(3);
 });
@@ -74,13 +74,13 @@ test('a failed activity pass drops its connection and a missing database can rec
     const database = createActivityDatabase(path);
 
     t.onTestFinished(database.close);
-    expect(() => database.open()).toThrow();
+    expect(() => database.open()).toThrow(/ENOENT: no such file or directory/);
     seed(path, 1);
 
     const first = database.open();
 
     database.release(first, true);
-    expect(() => value(first)).toThrow();
+    expect(() => value(first)).toThrow('database is not open');
 
     const next = database.open();
 
@@ -89,7 +89,7 @@ test('a failed activity pass drops its connection and a missing database can rec
     database.release(first, true);
     expect(value(next)).toBe(1);
     database.release(undefined, false);
-    expect(() => value(next)).toThrow();
+    expect(() => value(next)).toThrow('database is not open');
     database.close();
     database.close();
 });

@@ -1531,7 +1531,7 @@ it('restores imported refinement and relationships atomically and preserves late
             parentId: concept.workId,
             blockerIds: [blocker.workId, 'missing'],
         }),
-    ).toThrow();
+    ).toThrow('No work record has the work ID "missing".');
     expect(records.body(build.workId, 'brief')).toBe(null);
     expect(records.read(build.workId)).toEqual(build);
     expect(records.children(concept.workId)).toEqual([]);
@@ -1573,7 +1573,9 @@ it('persists confirmed deletion and launched branch with revision checks', async
 
     records.addThread(build.workId, 1, 'thread-1', 'build');
     records.confirmThreadDeleted(build.workId, 2, 'thread-1');
-    expect(() => records.setBuildBranch(build.workId, 2, 'feat/build')).toThrow();
+    expect(() => records.setBuildBranch(build.workId, 2, 'feat/build')).toThrow(
+        /is at revision 3, not 2; read it again/,
+    );
     records.setBuildBranch(build.workId, 3, 'feat/build');
 
     const reopened = await open(path);
@@ -1598,7 +1600,7 @@ it('invalidates gates without losing evidence or brief text', async () => {
     records.recordGate(build.workId, 2, { briefDigest: gate.briefDigest!, approvedBy: 'person', evidence: 'Passed' });
     records.invalidateGate(build.workId, 2);
     expect(records.gate(build.workId)).toMatchObject({ current: false, evidence: [expect.any(Object)] });
-    expect(() => records.invalidateGate(build.workId, 2)).toThrow();
+    expect(() => records.invalidateGate(build.workId, 2)).toThrow(/is at revision 3, not 2; read it again/);
     records.recordGate(build.workId, 3, {
         briefDigest: gate.briefDigest!,
         approvedBy: 'person',
@@ -1614,9 +1616,9 @@ it('resets only slices owned by the selected build', async () => {
     const other = records.create({ title: 'Other', repository: 'a/b', kind: 'slice' });
 
     records.setParent(slice.workId, 1, build.workId);
-    expect(() => records.resetBuild(build.workId, 1)).toThrow();
+    expect(() => records.resetBuild(build.workId, 1)).toThrow(/is at revision 2, not 1; read it again/);
     records.resetBuild(build.workId, 2);
-    expect(() => records.read(slice.workId)).toThrow();
+    expect(() => records.read(slice.workId)).toThrow(/No work record has the work ID/);
     expect(records.read(other.workId).workId).toBe(other.workId);
 });
 
@@ -1631,8 +1633,12 @@ it('preserves cleanup names across reset and database reopen with revision prote
 
     const name = `slice/${slice.workId.slice(0, 8)}-work`;
 
-    expect(() => records.captureCleanup(build.workId, 2, 'fallback', [name])).toThrow();
-    expect(() => records.captureCleanup(build.workId, 3, 'fallback', ['slice/unrelated-work'])).toThrow();
+    expect(() => records.captureCleanup(build.workId, 2, 'fallback', [name])).toThrow(
+        /is at revision 3, not 2; read it again/,
+    );
+    expect(() => records.captureCleanup(build.workId, 3, 'fallback', ['slice/unrelated-work'])).toThrow(
+        'Cleanup branch is not owned by this build.',
+    );
     records.captureCleanup(build.workId, 3, 'fallback', [name]);
     records.resetBuild(build.workId, 4);
     records.setBuildBranch(build.workId, 5, 'new-build');
@@ -1649,10 +1655,14 @@ it('resolves only named cleanup targets and rejects stale revisions', async () =
     const build = records.create({ title: 'Build', repository: 'a/b', kind: 'build' });
 
     records.captureCleanup(build.workId, 1, 'old-build', []);
-    expect(() => records.resolveCleanup(build.workId, 1, ['old-build'])).toThrow();
+    expect(() => records.resolveCleanup(build.workId, 1, ['old-build'])).toThrow(
+        /is at revision 2, not 1; read it again/,
+    );
     records.resolveCleanup(build.workId, 2, []);
     expect(records.cleanupOwnership(build.workId)).toHaveLength(1);
-    expect(() => records.resolveCleanup(build.workId, 3, ['unowned'])).toThrow();
+    expect(() => records.resolveCleanup(build.workId, 3, ['unowned'])).toThrow(
+        'Cleanup branch is not owned by this build.',
+    );
     records.resolveCleanup(build.workId, 3, ['old-build']);
     expect(records.cleanupOwnership(build.workId)).toEqual([]);
 });

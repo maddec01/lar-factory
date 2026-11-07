@@ -71,7 +71,7 @@ it('rejects malformed metadata markers without changing the observation', () => 
             resolvedRepositoryIdentityRoots: 'invalid',
             snapshot: { snapshotSequence: 4, projects: [] },
         }),
-    ).toThrow();
+    ).toThrow('Invalid project metadata roots');
     expect(recovery.observation().projects).toEqual([first]);
 });
 

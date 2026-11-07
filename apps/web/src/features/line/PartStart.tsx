@@ -1,0 +1,43 @@
+// A dossier part's Start, in its checklist step, its map node and the dossier's header: Start build on a Ready build,
+// today's Start on a Queued decision, Open thread while it has a live thread. While an issue it's blocked by is open,
+// Start after takes Start's place.
+
+import type { BoardData } from '@lar-factory/shared';
+
+import { openWaits } from './DossierParts';
+import type { Part } from './DossierParts';
+import { OpenThread, hasLiveThread } from '@/features/items/OpenThread';
+import { StartOrAfter } from '@/features/items/StartAfter';
+import { StartBuild } from '@/features/items/StartBuild';
+
+/** Whether PartStart offers the part a Start now: it is Ready or Queued, waits on no open issue, has no live thread
+ *  and carries one status. The dossier's "Ready to start" row and its header's "what's next" both read it. */
+export const startable = (part: Part): boolean =>
+    (part.item.status === 'Ready' || part.item.status === 'Queued') &&
+    !openWaits(part).length &&
+    !hasLiveThread(part.item);
+
+/** `label` names the Start, StartBuild's own on a Ready build and Start on a Queued one by default; other statuses get none. The Work map's state line names the blockers, so its Start after leaves them out. */
+export function PartStart({
+    part,
+    data,
+    label,
+    namesBlocker = true,
+}: {
+    part: Part;
+    data: BoardData;
+    label?: string;
+    namesBlocker?: boolean;
+}) {
+    const { item } = part;
+
+    if (item.status === 'Ready')
+        return <StartBuild item={item} data={data} label={label} namesBlocker={namesBlocker} />;
+
+    if (item.status !== 'Queued') return null;
+
+    // A thread already at work on the item would get a second one.
+    if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
+
+    return <StartOrAfter item={item} data={data} label={label} namesBlocker={namesBlocker} />;
+}

@@ -1,5 +1,5 @@
 // The page the window shows from launch until the board server is ready, so an app opened from Finder always has
-// a window. It is the loading screen apps/web/src/loading draws on the board page: the L draws itself once, here,
+// a window. It is the loading screen apps/web/src/app/shell/loading draws on the board page: the L draws itself once, here,
 // and the board page opens on it finished (boardUrl). The main process sends each step and a failed start's error
 // to the open page without reloading it, so the mark never redraws.
 import {
@@ -21,7 +21,7 @@ export const STEPS = {
     tools: 'Checking gh and tools',
 } as const;
 
-/** How long the old line rolls out, as the board page's (apps/web/src/loading/loading-screen.tsx). */
+/** How long the old line rolls out, as the board page's (apps/web/src/app/shell/loading/LoadingScreen.tsx). */
 const ROLL_MS = 380;
 
 // The page's one script. `step` rolls the new line in as the old rolls out, or swaps it with reduced motion;
@@ -80,7 +80,7 @@ export const stepScript = (step: string): string => `window.larLoading?.step(${J
 export const errorScript = (reason: string): string =>
     `window.larLoading?.error(${JSON.stringify(`The board server didn't start: ${reason}. Trying again.`)})`;
 
-/** How long the mark takes to draw, as the board page's (apps/web/src/loading/loading-screen.tsx). */
+/** How long the mark takes to draw, as the board page's (apps/web/src/app/shell/loading/LoadingScreen.tsx). */
 export const DRAW_MS = 1750;
 
 /**

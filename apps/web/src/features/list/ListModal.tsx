@@ -4,153 +4,27 @@
 // the board's scope. An item opens the item dialog and Add item opens the Add item flow, each over the List modal, so
 // closing them comes back to the List as it was.
 
-import { boardSections, readingScope, ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
-import type { Item, ListGroup } from '@lar-factory/shared';
-import {
-    Button,
-    Badge,
-    DropdownMenu,
-    Input,
-    Modal,
-    SidebarNavigationItem,
-    SidebarNavigationGroup,
-    SidebarPane,
-} from '@lar-works/design-system';
-import { ChevronDown, Inbox, SquarePen } from '@lar-works/design-system/icons';
-import { useEffect, useRef, useState } from 'react';
+import { boardSections, readingScope } from '@lar-factory/shared';
+import type { ListGroup } from '@lar-factory/shared';
+import { Button, Badge, Input, Modal, SidebarNavigationGroup, SidebarPane } from '@lar-works/design-system';
+import { Inbox, SquarePen } from '@lar-works/design-system/icons';
+import { useRef, useState } from 'react';
 
+import { GroupItem, ItemRow } from './ListRows';
 import { matchesSearch } from './ListSearch';
+import { SORTS } from './ListSorts';
+import type { Sort } from './ListSorts';
 import { useListStore } from './ListStore';
+import { SortMenu } from './SortMenu';
+import { useFocusSearchWhenOpenerGoes } from './useFocusSearchWhenOpenerGoes';
 import { useAddItemStore } from '@/features/add-item';
 import { ItemFilterBar, filtering, rowFilter, useItemFilters, useScopeStore, useShownScope } from '@/features/filters';
 import { useItemDialogStore } from '@/features/item-dialog';
-import { AzureFields, ItemKind, LabelChips, StructureSync, SourceIcon } from '@/features/items';
 import { ProjectIcon } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { EXPANDED, ExpandButton, useExpand, dialogPreference } from '@/shared/ui/expand-dialog/ExpandDialog';
 import { Loader } from '@/shared/ui/loading/Loader';
-
-const SORTS = {
-    updated: { label: 'Recently updated', compare: (a: Item, b: Item) => b.updatedAt.localeCompare(a.updatedAt) },
-    oldest: { label: 'Oldest', compare: (a: Item, b: Item) => a.updatedAt.localeCompare(b.updatedAt) },
-    title: { label: 'Title', compare: (a: Item, b: Item) => a.title.localeCompare(b.title) },
-    priority: {
-        label: 'Backlog priority',
-        compare: (a: Item, b: Item) => (a.sourceOrder ?? Infinity) - (b.sourceOrder ?? Infinity),
-    },
-} as const;
-
-type Sort = keyof typeof SORTS;
-
-const isSort = (value: string): value is Sort => value in SORTS;
-
-/** A group in the left pane; one with no `count`, as a repository still reading, shows none. */
-function GroupItem({
-    label,
-    count,
-    icon,
-    active,
-    onPick,
-}: {
-    label: string;
-    count?: number;
-    icon: React.ReactNode;
-    active: boolean;
-    onPick: () => void;
-}) {
-    return (
-        <SidebarNavigationItem active={active} onClick={onPick}>
-            {icon}
-            <span className="name min-w-0 flex-1 truncate text-left">{label}</span>
-            {count !== undefined && <span className="count text-base-700 text-xs tabular-nums">{count}</span>}
-        </SidebarNavigationItem>
-    );
-}
-
-function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; showRepo: boolean; onOpen: () => void }) {
-    const repos = useBoardStore((state) => state.data.repos);
-
-    return (
-        <button
-            type="button"
-            onClick={onOpen}
-            data-item={item.id}
-            title={item.title}
-            className="hover:bg-base-200/70 focus-visible:outline-primary flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2"
-        >
-            <SourceIcon item={item} />
-            <span className="min-w-0 flex-1">
-                <span className="text-base-content block truncate text-[13px] leading-5 font-medium">
-                    {item.number ? <span className="text-base-700 font-normal">{ref(item)} </span> : null}
-                    {item.title}
-                </span>
-                <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-                    <span className="text-base-700 me-1 flex min-w-0 items-center gap-1 text-[11px] leading-4">
-                        {showRepo && <ProjectIcon repo={repoKey(item)} size="small" />}
-                        <span className="min-w-0 truncate tabular-nums">
-                            {showRepo && `${repoName(repoKey(item), repos)} · `}
-                            {shortAgo(item.updatedAt, now)}
-                        </span>
-                    </span>
-                    <ItemKind item={item} onRow />
-                    <LabelChips item={item} />
-                    <StructureSync item={item} />
-                </span>
-                <AzureFields azure={item.azure} />
-            </span>
-        </button>
-    );
-}
-
-function SortMenu({ sort, onSort }: { sort: Sort; onSort: (sort: Sort) => void }) {
-    return (
-        <DropdownMenu>
-            <DropdownMenu.Trigger asChild>
-                <Button {...kind('other')} className="sort ml-auto" rightIcon={<ChevronDown />}>
-                    {SORTS[sort].label}
-                </Button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end">
-                <DropdownMenu.RadioGroup value={sort} onValueChange={(value) => isSort(value) && onSort(value)}>
-                    {Object.entries(SORTS).map(([value, { label }]) => (
-                        <DropdownMenu.RadioItem key={value} value={value}>
-                            {label}
-                        </DropdownMenu.RadioItem>
-                    ))}
-                </DropdownMenu.RadioGroup>
-            </DropdownMenu.Content>
-        </DropdownMenu>
-    );
-}
-
-/**
- * When the item dialog closes and the design system's Modal had nowhere to return focus, as when its item left List while it
- * was open and took its row along, focus goes to the List's search field.
- */
-function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElement | null>) {
-    const itemOpen = useItemDialogStore((state) => state.itemId !== null);
-    const wasOpen = useRef(false);
-
-    useEffect(() => {
-        const closed = wasOpen.current && !itemOpen;
-
-        wasOpen.current = itemOpen;
-
-        if (!closed) return;
-
-        // The design system's Modal returns focus on the next task when the element that had it is still on the page.
-        const timer = setTimeout(() => {
-            if (
-                document.activeElement === document.body ||
-                document.activeElement === searchField.current?.closest('[data-list-modal]')
-            )
-                searchField.current?.focus({ preventScroll: true });
-        });
-
-        return () => clearTimeout(timer);
-    }, [itemOpen, searchField]);
-}
 
 function ListModal({ onClose }: { onClose: () => void }) {
     const childOpen = useItemDialogStore((state) => state.itemId !== null);

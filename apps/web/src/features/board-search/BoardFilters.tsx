@@ -4,7 +4,7 @@
 
 import { boardSections, deskItems, inRepo, repoName, sameLabel, sameRepo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { ColorDot, type CommandPaletteToken } from '@lar-works/design-system';
+import { type CommandPaletteToken, StatusIndicator } from '@lar-works/design-system';
 import { CircleDashed, Layers } from '@lar-works/design-system/icons';
 import { useMemo } from 'react';
 
@@ -36,7 +36,7 @@ export function KindIcon({ choice }: { choice: KindFilter }) {
 }
 
 function LabelDot({ color }: { color: string | undefined }) {
-    return <ColorDot color={color} />;
+    return <StatusIndicator tone="neutral" color={color} />;
 }
 
 /** The colour any item on the board gives each picked label, which a label no item in view shows still has. */

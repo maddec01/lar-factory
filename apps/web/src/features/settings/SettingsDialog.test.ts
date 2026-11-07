@@ -374,18 +374,18 @@ const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];
 
 test('Diagnostics shows every command Not checked before the first check, then OK, and az not checked', async () => {
     await open('Diagnostics');
-    expect([...DIAGNOSED, 'd-az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(
-        Array(6).fill('● Not checked'),
+    expect([...DIAGNOSED, 'd-az'].map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual(
+        Array(6).fill('Not checked'),
     );
     await push({ ...sample, tools: toolChecks(), toolProgress: { checking: [], skipped: ['az'] } });
-    expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual([
-        '● OK',
-        '● OK',
-        '● OK',
-        '● OK',
-        '● OK',
+    expect(DIAGNOSED.map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual([
+        'OK',
+        'OK',
+        'OK',
+        'OK',
+        'OK',
     ]);
-    expect(text(row('d-az').querySelector('.tool-state'))).toBe('● Not checked');
+    expect(text(row('d-az').querySelector('[data-slot="status-indicator"]'))).toBe('Not checked');
     expect(text(row('d-az'))).toContain('Not checked: no listed Project uses Azure DevOps.');
 });
 
@@ -397,16 +397,16 @@ test('Integrations shows provider logins and the fix for missing access tools', 
             az: { result: 'no-extension', version: '2.67.0', fix: 'az extension add --name azure-devops' },
         }),
     });
-    expect(['gh', 'az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual([
-        '● Signed out',
-        '● No azure-devops extension',
+    expect(['gh', 'az'].map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual([
+        'Signed out',
+        'No azure-devops extension',
     ]);
     expect(text(row('gh'))).toContain('Fix: gh auth login');
     expect(text(row('az'))).toContain('Fix: az extension add --name azure-devops');
     await push({ ...sample, tools: toolChecks({ az: { result: 'ok', version: '2.67.0' } }) });
-    expect(text(row('az').querySelector('.tool-state'))).toBe('● Signed in');
+    expect(text(row('az').querySelector('[data-slot="status-indicator"]'))).toBe('Signed in');
     await push({ ...sample, tools: toolChecks({ az: { result: 'missing', fix: 'brew install azure-cli' } }) });
-    expect(text(row('az').querySelector('.tool-state'))).toBe('● Not found');
+    expect(text(row('az').querySelector('[data-slot="status-indicator"]'))).toBe('Not found');
     expect(text(row('az'))).toContain('Fix: brew install azure-cli');
 });
 
@@ -415,10 +415,10 @@ test('Integrations keeps both providers available while Diagnostics omits unused
 
     await open('Integrations', { ...sample, tools: withoutGh, toolProgress: { checking: [], skipped: ['gh'] } });
     expect(groups()[0]).toEqual(['Issue trackers', ['gh', 'az']]);
-    expect(text(row('gh').querySelector('.tool-state'))).toBe('● Not checked');
+    expect(text(row('gh').querySelector('[data-slot="status-indicator"]'))).toBe('Not checked');
     await settle(() => section('Diagnostics').click());
     expect($('.settings-row[data-row="d-gh"]')).toBeNull();
-    expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');
+    expect(text(row('d-az').querySelector('[data-slot="status-indicator"]'))).toBe('2.67.0');
 });
 
 test('Settings shows gh and az Checking while their checks run, though other checks landed, and never as left out', async () => {
@@ -431,16 +431,16 @@ test('Settings shows gh and az Checking while their checks run, though other che
 
     await open('Integrations', data);
     expect(groups()[0]).toEqual(['Issue trackers', ['gh', 'az']]);
-    expect(['gh', 'az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● Checking', '● Checking']);
+    expect(['gh', 'az'].map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual(['Checking', 'Checking']);
     expect(text(row('az'))).not.toContain('no listed repository');
     await settle(() => section('Diagnostics').click());
-    expect([...DIAGNOSED, 'd-az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual([
-        '● Checking',
-        '● Checking',
-        '● OK',
-        '● Checking',
-        '● Checking',
-        '● Checking',
+    expect([...DIAGNOSED, 'd-az'].map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual([
+        'Checking',
+        'Checking',
+        'OK',
+        'Checking',
+        'Checking',
+        'Checking',
     ]);
     expect(text(row('d-az'))).not.toContain('no listed repository');
     await push({
@@ -448,14 +448,14 @@ test('Settings shows gh and az Checking while their checks run, though other che
         tools: { ...landed, az: { result: 'ok', version: '2.67.0' } },
         toolProgress: { ...data.toolProgress, checking: ['gh', 't3', 'jq', 'curl'] },
     });
-    expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');
+    expect(text(row('d-az').querySelector('[data-slot="status-indicator"]'))).toBe('2.67.0');
 });
 
 test('Diagnostics shows az with its version or its problem and fix', async () => {
     await open('Diagnostics', { ...sample, tools: toolChecks({ az: { result: 'ok', version: '2.67.0' } }) });
-    expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');
+    expect(text(row('d-az').querySelector('[data-slot="status-indicator"]'))).toBe('2.67.0');
     await push({ ...sample, tools: toolChecks({ az: { result: 'logged-out', version: '2.67.0', fix: 'az login' } }) });
-    expect(text(row('d-az').querySelector('.tool-state'))).toBe('● Logged out');
+    expect(text(row('d-az').querySelector('[data-slot="status-indicator"]'))).toBe('Logged out');
     expect(text(row('d-az'))).toContain('Fix: az login');
 });
 
@@ -469,12 +469,12 @@ test('Diagnostics shows the version each command printed', async () => {
             jq: { result: 'ok', version: '1.7.1' },
         }),
     });
-    expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual([
-        '● 2.102.0',
-        '● 0.1.3-nightly.1',
-        '● 2.56.0',
-        '● 1.7.1',
-        '● OK',
+    expect(DIAGNOSED.map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual([
+        '2.102.0',
+        '0.1.3-nightly.1',
+        '2.56.0',
+        '1.7.1',
+        'OK',
     ]);
     expect(text(row('d-jq'))).toContain("lar-shape's scripts read gh's answers with it.");
 });
@@ -487,9 +487,9 @@ test('Diagnostics shows what the lookup found wrong with gh and t3', async () =>
             t3: { result: 'missing', override: 'T3_BIN=/nowhere/t3' },
         }),
     });
-    expect(['d-gh', 'd-t3'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual([
-        '● Logged out',
-        '● Not found',
+    expect(['d-gh', 'd-t3'].map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual([
+        'Logged out',
+        'Not found',
     ]);
     expect(text(row('d-t3'))).toContain('Nothing runnable at T3_BIN=/nowhere/t3. Install T3 Code.');
     expect(text(row('d-gh'))).toContain('Fix: gh auth login');
@@ -500,7 +500,7 @@ test('Diagnostics shows T3 Code not running, with its fix', async () => {
         ...sample,
         tools: toolChecks({ t3: { result: 'not-running', version: '0.1.3-nightly.1' } }),
     });
-    expect(text(row('d-t3').querySelector('.tool-state'))).toBe('● Not running');
+    expect(text(row('d-t3').querySelector('[data-slot="status-indicator"]'))).toBe('Not running');
     expect(text(row('d-t3'))).toContain('Open T3 Code.');
 });
 
@@ -509,7 +509,7 @@ test('Diagnostics shows a gh older than 2.94.0 with its fix', async () => {
         ...sample,
         tools: toolChecks({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }),
     });
-    expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● 2.93.1, older than 2.94.0');
+    expect(text(row('d-gh').querySelector('[data-slot="status-indicator"]'))).toBe('2.93.1, older than 2.94.0');
     expect(text(row('d-gh'))).toContain('Fix: brew upgrade gh');
 });
 
@@ -518,7 +518,7 @@ test('Integrations shows a gh too old as signed in as well', async () => {
         ...sample,
         tools: toolChecks({ gh: { result: 'outdated', version: '2.90.0', fix: 'brew upgrade gh' } }),
     });
-    expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in, 2.90.0, older than 2.94.0');
+    expect(text(row('gh').querySelector('[data-slot="status-indicator"]'))).toBe('Signed in, 2.90.0, older than 2.94.0');
     expect(text(row('gh'))).toContain('Fix: brew upgrade gh');
 });
 
@@ -527,7 +527,7 @@ test('Diagnostics shows a missing git, jq or curl with its fix', async () => {
         ...sample,
         tools: toolChecks({ jq: { result: 'missing', override: 'JQ_PATH=/nowhere/jq', fix: 'brew install jq' } }),
     });
-    expect(text(row('d-jq').querySelector('.tool-state'))).toBe('● Not found');
+    expect(text(row('d-jq').querySelector('[data-slot="status-indicator"]'))).toBe('Not found');
     expect(text(row('d-jq'))).toContain('Nothing runnable at JQ_PATH=/nowhere/jq. Fix: brew install jq');
 });
 
@@ -596,7 +596,7 @@ const restoredAt = '2026-10-26T09:30:00.000Z';
 /** Each bundled row's state, or null for none, and its tooltip. */
 const states = (...names: string[]) =>
     names.map((name) => {
-        const state = row(`bundled-${name}`).querySelector('.tool-state');
+        const state = row(`bundled-${name}`).querySelector('[data-slot="status-indicator"]');
 
         return state && [text(state), state.closest('[title]')?.getAttribute('title') ?? null];
     });
@@ -615,13 +615,13 @@ test("Skills shows each skill's install state: matching, restored with its time,
         ],
     });
     expect(states('lar-work', 'tdd', 'grill')).toEqual([
-        ['● Installed', 'Matches this version of Lar Factory.'],
+        ['Installed', 'Matches this version of Lar Factory.'],
         [
-            `● Restored ${day(restoredAt, undefined)}, ${clock(restoredAt, undefined)}`,
+            `Restored ${day(restoredAt, undefined)}, ${clock(restoredAt, undefined)}`,
             'Lar Factory put back its copy, which had changed.',
         ],
         [
-            '● Blocked',
+            'Blocked',
             "Blocked by a path Lar Factory didn't install: /home/.agents/skills/grill (the skill isn't installed). Move that path away to install this skill.",
         ],
     ]);
@@ -711,8 +711,8 @@ test('a Date or restore from another year shows its year', async () => {
         ],
     });
     expect(text(row('bundled-tdd').querySelector('.text-xs'))).toBe(`Matt Pocock · MIT · updated 19 Oct ${lastYear}`);
-    expect(text(row('bundled-tdd').querySelector('.tool-state'))).toMatch(
-        new RegExp(`^● Restored 15 Jun ${lastYear}, `),
+    expect(text(row('bundled-tdd').querySelector('[data-slot="status-indicator"]'))).toMatch(
+        new RegExp(`^Restored 15 Jun ${lastYear}, `),
     );
 });
 

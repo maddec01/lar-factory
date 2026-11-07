@@ -1,6 +1,6 @@
 // The settings rows' working controls, on the design system's Switch, FormSelect, Button and StatusText.
 
-import { Button, buttonKind, FormSelect, StatusText, Switch as DesignSwitch } from '@lar-works/design-system';
+import { Button, buttonKind, FormSelect, StatusIndicator, Switch as DesignSwitch } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 /** A working row renders its control. Unbuilt settings carry no value. */
@@ -89,6 +89,8 @@ export function SmallButton({
 /** A state's colour; muted for a check that didn't run. */
 type ToolTone = 'success' | 'warning' | 'error' | 'muted';
 
+const tones = { success: 'success', warning: 'warning', error: 'danger', muted: 'neutral' } as const;
+
 export function ToolState({ text, tone }: { text: string; tone: ToolTone }) {
-    return <StatusText text={text} tone={tone === 'error' ? 'danger' : tone} />;
+    return <StatusIndicator tone={tones[tone]} label={text} />;
 }

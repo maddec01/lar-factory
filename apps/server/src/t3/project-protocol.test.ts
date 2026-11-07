@@ -241,7 +241,7 @@ it('recovers after storage failure and ignores rejection of an older session', a
         '',
     );
 
-    await expect(adapter.subscriptionSession()).rejects.toThrow();
+    await expect(adapter.subscriptionSession()).rejects.toThrow('Session renewal failed');
     locked = false;
 
     const first = await adapter.subscriptionSession();

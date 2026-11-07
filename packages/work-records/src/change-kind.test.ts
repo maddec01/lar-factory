@@ -397,10 +397,10 @@ test('an answer can say the ticket has no kind, and refuses anything else', asyn
     });
     expect(() =>
         records.recordKindAnswer(workId, revision + 1, { answer: 'maybe' as 'keep', ticketKind: null }),
-    ).toThrow();
+    ).toThrow('The answer "maybe" isn\'t one of keep, update.');
     expect(() =>
         records.recordKindAnswer(workId, revision + 1, { answer: 'keep', ticketKind: 'concept' as 'bug' }),
-    ).toThrow();
+    ).toThrow('The ticket kind "concept" isn\'t one of bug, feature, improvement.');
 });
 
 test('a record from before the migration has no agreed kind or answer, and keeps its kind', async () => {

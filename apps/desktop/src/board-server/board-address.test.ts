@@ -121,7 +121,7 @@ test('interrupts a live event stream so reconnect can reach the replacement chil
 
         expect(new TextDecoder().decode((await reader.read()).value)).toBe('data: loaded\n\n');
         address.disconnect();
-        await expect(reader.read()).rejects.toThrow();
+        await expect(reader.read()).rejects.toThrow('terminated');
         expect((await fetch(new URL('/api/events', address.url))).status).toBe(503);
     } finally {
         address.close();

@@ -70,7 +70,7 @@ test('reauthorization coalesces calls, restarts discovery and retains data on fa
     expect(fixture.stop).toHaveBeenCalled();
     fixture.notify({ availability: 'renewal-required' });
     fixture.renew.mockRejectedValueOnce(new Error('private credential detail'));
-    await expect(reauthorizeRepositoryProjects()).rejects.toThrow();
+    await expect(reauthorizeRepositoryProjects()).rejects.toThrow('private credential detail');
     expect((await repositoryProjects()).observation?.observedAt).toBe('2026-10-31T00:00:00Z');
 });
 

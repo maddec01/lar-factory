@@ -81,10 +81,19 @@ test.each(['backlogconfiguration', 'teamfieldvalues', 'wiql', 'workitemsbatch'])
 );
 
 test('unbounded or unreadable samples and invalid field names fail without a broad fallback', async () => {
-    for (const options of [{ ids: [7, 8] }, { unreadable: true }, { field: "System.AreaPath] = 'x' OR [System.Id" }]) {
+    const cases: [Parameters<typeof source>[0], string][] = [
+        [{ ids: [7, 8] }, 'Azure did not return a bounded issue-list check.'],
+        [{ unreadable: true }, "Azure did not allow reading the selected team's sample work item."],
+        [
+            { field: "System.AreaPath] = 'x' OR [System.Id" },
+            "Azure did not return the selected team's backlog and area settings.",
+        ],
+    ];
+
+    for (const [options, message] of cases) {
         const fake = source(options);
 
-        await expect(checkAzureSourceAccess('sample/Project/app', 'App Team', fake.run)).rejects.toThrow();
+        await expect(checkAzureSourceAccess('sample/Project/app', 'App Team', fake.run)).rejects.toThrow(message);
         expect(fake.calls.filter((args) => args.includes('workitemsbatch')).length).toBeLessThanOrEqual(1);
     }
 });

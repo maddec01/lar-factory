@@ -52,10 +52,10 @@ it('keeps failures open after a pass and validates reuse against the explicit ta
                 reason: 'Reviewed',
                 tree: start.tree,
             }),
-        ).toThrow();
+        ).toThrow('Reuse requires an eligible non-live pass belonging to this build.');
         expect(() =>
             records.reuseCheck(build.workId, pass.checkId, { role: 'approver', reason: ' ', tree: start.tree }),
-        ).toThrow();
+        ).toThrow('Expected nonempty text without NUL.');
         expect(
             records.reuseCheck(build.workId, pass.checkId, {
                 role: 'approver',
@@ -97,7 +97,7 @@ it('distinguishes interrupted, unfinished, changed snapshots, missing snapshots 
                     reason: 'same',
                     tree: 'a'.repeat(40),
                 }),
-            ).toThrow();
+            ).toThrow('Reuse requires an eligible non-live pass belonging to this build.');
         }
         records.startCheck(build.workId, { role: 'builder', command: ['test'], folder: '.', tree: null });
 
@@ -172,28 +172,32 @@ it('rejects malformed input atomically and removes expired records and logs', as
         const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
         const start = { role: 'builder', command: ['test'], folder: '.', tree: 'a'.repeat(40) };
 
-        for (const input of [
-            { ...start, folder: '../escape' },
-            { ...start, tree: 'invalid' },
-            { ...start, role: '' },
-            { ...start, command: [] },
-        ])
-            expect(() => records.startCheck(build.workId, input)).toThrow();
-        expect(() => records.setCheckList(build.workId, [start, start])).toThrow();
+        const invalidStarts: [typeof start, string][] = [
+            [{ ...start, folder: '../escape' }, 'The folder must be a normalized repository-relative path.'],
+            [{ ...start, tree: 'invalid' }, 'Expected a git tree object ID or null.'],
+            [{ ...start, role: '' }, 'Expected nonempty text without NUL.'],
+            [{ ...start, command: [] }, 'A command must be a nonempty argument array without NUL.'],
+        ];
+
+        for (const [input, message] of invalidStarts)
+            expect(() => records.startCheck(build.workId, input)).toThrow(message);
+        expect(() => records.setCheckList(build.workId, [start, start])).toThrow('The check list contains duplicates.');
         expect(records.checks(build.workId).runs).toEqual([]);
 
         const run = records.startCheck(build.workId, start);
 
         expect(() =>
             records.finishCheck(run.checkId, { tree: start.tree, exitStatus: 256, interrupted: false, log: null }),
-        ).toThrow();
-        expect(() => records.describeFailure(run.checkId, { tests: ['test'], diagnosis: 'cause' })).toThrow();
-        expect(() => records.resolveFailure(run.checkId, 'cause')).toThrow();
+        ).toThrow('Expected an exit status from 0 to 255, or null for interruption.');
+        expect(() => records.describeFailure(run.checkId, { tests: ['test'], diagnosis: 'cause' })).toThrow(
+            'Only a failed check can have a failure description.',
+        );
+        expect(() => records.resolveFailure(run.checkId, 'cause')).toThrow('Only a failed check can be resolved.');
         expect(records.checks(build.workId).runs[0]?.outcome).toBe('unfinished');
         records.finishCheck(run.checkId, { tree: start.tree, exitStatus: 0, interrupted: false, log: null });
         expect(() =>
             records.finishCheck(run.checkId, { tree: start.tree, exitStatus: 1, interrupted: false, log: null }),
-        ).toThrow();
+        ).toThrow('The check is already finished.');
 
         const logs = join(dir, 'check-logs', build.workId);
 

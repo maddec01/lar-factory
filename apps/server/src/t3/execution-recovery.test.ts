@@ -39,5 +39,5 @@ it('retains thread facts across stale snapshots and accepts equal-sequence fragm
             snapshotSequence: 5,
             projection: { ...projection, thread: { id: 'other' } },
         }),
-    ).toThrow();
+    ).toThrow('Invalid execution projection');
 });

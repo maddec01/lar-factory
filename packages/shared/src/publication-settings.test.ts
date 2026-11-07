@@ -200,7 +200,9 @@ test('explicit label creation requires verified access and reuses existing label
         return name;
     };
 
-    await expect(saveVocabularyLabels('org/repo', ['new'], discovery, {}, create)).rejects.toThrow();
+    await expect(saveVocabularyLabels('org/repo', ['new'], discovery, {}, create)).rejects.toThrow(
+        'Access to manage-labels is not checked yet. GitHub permissions require a classic token or gh OAuth login to verify. Recheck access in Settings.',
+    );
     expect(created).toEqual([]);
     await expect(
         saveVocabularyLabels('org/repo', ['new'], discovery, { 'tag-ticket': 'allowed' }, create),

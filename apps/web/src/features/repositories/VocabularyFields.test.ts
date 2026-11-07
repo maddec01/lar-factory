@@ -102,14 +102,14 @@ test('Azure uses work item types and tags and excludes repository routing tags',
 
     const popover = await picker();
 
-    expect([...popover.querySelectorAll('[role="option"]')].map(text)).toEqual(['docs']);
+    expect([...popover.querySelectorAll('[data-label-choice]')].map(text)).toEqual(['docs']);
     await type(popover.querySelector('input')!, 'brand-new');
 
     const create = [...popover.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
         text(button).startsWith('Create'),
     )!;
 
-    expect(create.disabled).toBe(true);
+    expect(create).toBeUndefined();
     expect(text(popover)).toContain('Azure DevOps has no way to create a tag on its own.');
 });
 

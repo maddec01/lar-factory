@@ -132,7 +132,7 @@ async function picker(key = 'bug') {
     await settle(() => pickButton(key).click());
     await settle(() => vi.advanceTimersByTime(50));
 
-    return $(`[data-label-picker="${key}"]`)!;
+    return $(`[data-label-picker="${key}"]`)!.closest('[data-slot="popover-content"]')!;
 }
 
 test('Projects opens a long page with a back link and no Edit dialog or publication notice', async () => {
@@ -259,7 +259,7 @@ test('domain docs requires branch and PR access and keeps its saved paths', asyn
     expect(text(setting('domainDocs'))).toContain('Open PRs');
 });
 
-test('a label search finds one of 150 choices by keyboard and saves the complete kind once on close', async () => {
+test('a label search finds one of 150 choices with checkboxes and saves the complete kind once on close', async () => {
     const board = allowed();
     const sent = serve(board);
 
@@ -269,14 +269,10 @@ test('a label search finds one of 150 choices by keyboard and saves the complete
     const input = popover.querySelector<HTMLInputElement>('input')!;
 
     await type(input, 'label-149');
-    expect(popover.querySelectorAll('[role="option"]')).toHaveLength(1);
-    await settle(() =>
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })),
-    );
+    expect(popover.querySelectorAll('[data-label-choice]')).toHaveLength(1);
+    await settle(() => popover.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
     await type(input, 'triage');
-    await settle(() =>
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })),
-    );
+    await settle(() => popover.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
     expect(sent).toHaveLength(0);
     await settle(() => buttonIn(popover, 'Done')!.click());
     expect(sent).toEqual([
@@ -307,7 +303,7 @@ test('typing a new label creates nothing and explicit Create preserves a failed 
     ]);
     expect(text(vocabularyRow('bug'))).toContain('Label creation refused.');
     expect(text(vocabularyRow('bug'))).toContain('needs review');
-    expect(input.value).toBe('needs review');
+    expect(input.value).toBe('');
 });
 
 test('a type choice saves immediately while the suggested label stays optional', async () => {
@@ -388,9 +384,7 @@ test('leaving the Project page closes a dirty label picker with one complete kin
     const input = popover.querySelector<HTMLInputElement>('input')!;
 
     await type(input, 'triage');
-    await settle(() =>
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })),
-    );
+    await settle(() => popover.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
     expect(sent).toHaveLength(0);
 
     const { useSettingsStore } = await import('@/features/settings/SettingsStore');

@@ -431,7 +431,10 @@ test('Settings shows gh and az Checking while their checks run, though other che
 
     await open('Integrations', data);
     expect(groups()[0]).toEqual(['Issue trackers', ['gh', 'az']]);
-    expect(['gh', 'az'].map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual(['Checking', 'Checking']);
+    expect(['gh', 'az'].map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual([
+        'Checking',
+        'Checking',
+    ]);
     expect(text(row('az'))).not.toContain('no listed repository');
     await settle(() => section('Diagnostics').click());
     expect([...DIAGNOSED, 'd-az'].map((id) => text(row(id).querySelector('[data-slot="status-indicator"]')))).toEqual([
@@ -518,7 +521,9 @@ test('Integrations shows a gh too old as signed in as well', async () => {
         ...sample,
         tools: toolChecks({ gh: { result: 'outdated', version: '2.90.0', fix: 'brew upgrade gh' } }),
     });
-    expect(text(row('gh').querySelector('[data-slot="status-indicator"]'))).toBe('Signed in, 2.90.0, older than 2.94.0');
+    expect(text(row('gh').querySelector('[data-slot="status-indicator"]'))).toBe(
+        'Signed in, 2.90.0, older than 2.94.0',
+    );
     expect(text(row('gh'))).toContain('Fix: brew upgrade gh');
 });
 

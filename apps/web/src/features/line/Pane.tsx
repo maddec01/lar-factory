@@ -46,6 +46,8 @@ export function PaneEmpty({ filtered, none, children }: { filtered: boolean; non
     const reading = useBoardStore((state) => readingScope(state.data, scope ?? undefined));
 
     return (
-        <StagePaneEmpty>{reading ? <Loading presentation="inline" label="Loading Projects…"  /> : filtered ? children : none}</StagePaneEmpty>
+        <StagePaneEmpty>
+            {reading ? <Loading presentation="inline" label="Loading Projects…" /> : filtered ? children : none}
+        </StagePaneEmpty>
     );
 }

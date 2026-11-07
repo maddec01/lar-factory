@@ -2,7 +2,7 @@
 
 import { SWAP_KINDS, kindCanChange } from '@lar-factory/shared';
 import type { Item, SwapKind } from '@lar-factory/shared';
-import { Button, buttonKind, ChangeFailed, DetailFact as Fact, FormSelect, Text } from '@lar-works/design-system';
+import { Button, buttonKind, ChangeFailed, DetailFact as Fact, OptionSelect, Text } from '@lar-works/design-system';
 import { useEffect, useRef } from 'react';
 
 import { OPEN_ITEM_DIALOG } from './ItemDialogStore';
@@ -12,7 +12,7 @@ import { KIND_BADGES } from '@/features/items';
 const KIND_CHOICES = SWAP_KINDS.map((value) => {
     const { name, icon: Icon } = KIND_BADGES[value]!;
 
-    return { value, name, icon: <Icon aria-hidden="true" /> };
+    return { value, label: name, icon: <Icon aria-hidden="true" /> };
 });
 
 /**
@@ -47,14 +47,14 @@ export function ItemKindControl({ item }: { item: Item }) {
     return (
         <>
             <Fact label="Kind">
-                <FormSelect
+                <OptionSelect
                     presentation="setting"
                     ref={control}
                     writesOnPick
-                    aria-label="Kind"
+                    label="Kind"
                     placeholder="No kind"
                     value={item.kind === 'issue' ? '' : item.kind}
-                    choices={KIND_CHOICES}
+                    options={KIND_CHOICES}
                     disabled={change?.saving}
                     onChange={(kind) => void start(item.id, kind as SwapKind)}
                 />

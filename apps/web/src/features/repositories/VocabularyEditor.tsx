@@ -5,8 +5,8 @@ import {
     Button,
     buttonKind,
     ButtonRow,
-    FormSelect,
     InlineLink,
+    OptionSelect,
     Text,
     VocabularyChip,
     VocabularyMore,
@@ -85,18 +85,18 @@ export function VocabularyFields({
             data-vocabulary={name}
             title={title}
             type={
-                <FormSelect
-                    aria-label={`${title} type`}
+                <OptionSelect
+                    label={`${title} type`}
                     writesOnPick
                     value={value.type ?? ''}
                     none="No type"
                     disabled={disabled || (!types.length && !value.type)}
                     onChange={(type) => update({ ...value, type: type || null }, newLabels, true)}
-                    choices={[
+                    options={[
                         ...(value.type && !types.includes(value.type)
-                            ? [{ value: value.type, name: `${value.type} (unavailable)`, disabled: true }]
+                            ? [{ value: value.type, label: `${value.type} (unavailable)`, disabled: true }]
                             : []),
-                        ...types.map((type) => ({ value: type, name: type, disabled: !!typesProblem })),
+                        ...types.map((type) => ({ value: type, label: type, disabled: !!typesProblem })),
                     ]}
                 />
             }

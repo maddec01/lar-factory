@@ -3,9 +3,9 @@ import {
     Button,
     buttonKind,
     FormSection,
-    FormSelect,
     Input,
     InsetPanel,
+    OptionSelect,
     SettingsGroups,
     Text,
 } from '@lar-works/design-system';
@@ -168,8 +168,8 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                             )
                         }
                     >
-                        <FormSelect
-                            aria-label="Domain docs"
+                        <OptionSelect
+                            label="Domain docs"
                             presentation="setting"
                             writesOnPick
                             value={docsProblem ? 'off' : drafts.domainDocs}
@@ -178,9 +178,9 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                                 type(repo, 'domainDocs', value);
                                 void save(repo, 'domainDocs', latest.current);
                             }}
-                            choices={[
-                                { value: 'off', name: 'Off' },
-                                { value: 'repository', name: 'Write in build PRs' },
+                            options={[
+                                { value: 'off', label: 'Off' },
+                                { value: 'repository', label: 'Write in build PRs' },
                             ]}
                         />
                         {resetButton('domainDocs')}

@@ -171,7 +171,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                             {q || filtering(filters) ? (
                                 'Nothing here matches.'
                             ) : reading ? (
-                                <Loading presentation="inline" label="Loading Projects…"  />
+                                <Loading presentation="inline" label="Loading Projects…" />
                             ) : (
                                 'Nothing in List.'
                             )}
@@ -179,7 +179,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                     )}
                     {items.length > 0 && reading && (
                         <ListNote reading>
-                            <Loading presentation="inline" label="Loading more Projects…"  />
+                            <Loading presentation="inline" label="Loading more Projects…" />
                         </ListNote>
                     )}
                 </Modal.Body>

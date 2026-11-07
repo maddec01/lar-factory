@@ -3,12 +3,7 @@
 
 import { duration, formatTokens, formatUsd, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats, LinkedPr } from '@lar-factory/shared';
-import {
-    Loading,
-    PullRequestRef,
-    RowSecondLine as DesignRowSecondLine,
-    UsageFigures,
-} from '@lar-works/design-system';
+import { Loading, PullRequestRef, RowSecondLine as DesignRowSecondLine, UsageFigures } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { useActivityStill } from './ActivityLine';
@@ -72,7 +67,7 @@ export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; t
         (!!total && itemMembers(item, data.items).some((member) => usageLoading(member, data)));
 
     if (!s || (!hasFigures(s) && (loading || !s.incomplete)))
-        return loading ? <Loading presentation="inline" label="Loading usage" still={still}  /> : <span />;
+        return loading ? <Loading presentation="inline" label="Loading usage" still={still} /> : <span />;
 
     const cost = s.costUsd !== undefined ? formatUsd(s.costUsd) : null;
     const all = hasFigures(s) ? [duration(s.agentMs), formatTokens(s.tokens), cost].filter(Boolean).join(' · ') : null;

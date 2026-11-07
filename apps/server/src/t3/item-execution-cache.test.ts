@@ -839,7 +839,7 @@ it('answers per family: a failed read fails only the family holding that thread,
     const inputs = (await protocolStatsInputs())!;
 
     expect(inputs.familyReads(['own'])).toEqual(['current']);
-    expect(countedThreads(inputs).sort()).toEqual(['child', 'own']);
+    expect(countedThreads(inputs).map(String).sort()).toEqual(['child', 'own']);
     expect(inputs.allObserved, 'a thread never read successfully is not observed').toBe(false);
 });
 

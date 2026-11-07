@@ -146,11 +146,11 @@ test(
         const shown = await until(after, (d) => d.items.length === 2);
 
         assert.deepEqual(
-            shown.items.map((i) => [i.id, i.status]).sort(),
+            shown.items.map((i) => [i.id, i.status]).sort((a, b) => String(a).localeCompare(String(b))),
             [
                 [kept.workId, 'Shaping'],
                 [added.workId, 'List'],
-            ].sort(),
+            ].sort((a, b) => String(a).localeCompare(String(b))),
         );
         assert.equal(moved.revision, kept.revision + 1);
         assert.deepEqual([...(await before.calls()), ...(await after.calls())].filter(writesRepository), []);

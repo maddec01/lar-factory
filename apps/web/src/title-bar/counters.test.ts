@@ -207,7 +207,7 @@ test("shaping lists what the board's Shaping section holds, across the whole fac
     const pop = await openCounter('shaping');
 
     expect(head(pop)).toBe(`Shaping${board.length}`);
-    expect(listed().sort()).toEqual([...board].sort());
+    expect(listed().map(String).sort()).toEqual([...board].map(String).sort());
     await close();
 
     const { useScopeStore } = await import('../board/scope-store.ts');
@@ -217,7 +217,7 @@ test("shaping lists what the board's Shaping section holds, across the whole fac
     expect(section().length, "the board's section narrows").toBeLessThan(board.length);
     expect(text(counter('shaping'))).toBe(String(board.length));
     await openCounter('shaping');
-    expect(listed().sort()).toEqual([...board].sort());
+    expect(listed().map(String).sort()).toEqual([...board].map(String).sort());
 });
 
 test('an item waiting on you during shaping counts in both need you and shaping', async () => {

@@ -13,8 +13,12 @@ import {
     saveVocabularyLabels,
     type VocabularyReads,
 } from '@lar-factory/shared/publication-settings';
-import { setVocabularyOverride } from '@lar-factory/shared/repository-settings';
-import { readRepositorySetups, setOverride, replaceAccess } from '@lar-factory/shared/repository-settings';
+import {
+    setVocabularyOverride,
+    readRepositorySetups,
+    setOverride,
+    replaceAccess,
+} from '@lar-factory/shared/repository-settings';
 import {
     isVocabularyMapping,
     vocabularySelectionProblem,

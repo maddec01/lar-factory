@@ -1618,10 +1618,12 @@ test('an edge label counts each finished blocker once, names them on focus, and 
     const label = map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
 
     expect(text(label), 'the same part listed twice counts once').toBe('2 completed prerequisites');
-    expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge')).sort()).toEqual([
-        'W_open W_next',
-        'history W_next',
-    ]);
+    expect(
+        [...map.querySelectorAll('path[data-edge]')]
+            .map((p) => p.getAttribute('data-edge'))
+            .map(String)
+            .sort(),
+    ).toEqual(['W_open W_next', 'history W_next']);
     expect(text(map.querySelector('[data-map-part="W_next"] [data-map-facts]'))).toBe('Ready · Waiting on Part W_open');
     await settle(() => label.focus());
     await settle(() => vi.advanceTimersByTime(1000));

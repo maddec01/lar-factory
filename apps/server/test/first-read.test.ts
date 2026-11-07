@@ -298,10 +298,13 @@ test("each repository's items show once its own read lands, while another reposi
 
     const data = await settled(board);
 
-    assert.deepEqual(data.items.map((i) => [i.repo, i.number]).sort(), [
-        [apple, 7],
-        ['maddec01/lar-factory', 1],
-    ]);
+    assert.deepEqual(
+        data.items.map((i) => [i.repo, i.number]).sort((a, b) => String(a).localeCompare(String(b))),
+        [
+            [apple, 7],
+            ['maddec01/lar-factory', 1],
+        ],
+    );
     assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
 });
 
@@ -415,7 +418,7 @@ test('an item with recorded threads shows figures while another repository still
     );
 
     assert.deepEqual(
-        data.items.map((i) => (i.stats as ItemStats).tokens).sort(),
+        data.items.map((i) => (i.stats as ItemStats).tokens).sort((a, b) => a - b),
         [7, 9],
         'the figures settle once the first read does',
     );

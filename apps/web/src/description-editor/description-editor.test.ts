@@ -1,8 +1,7 @@
 // The description editor: Markdown shortcuts as you type, pasted Markdown, the toolbar, and the Markdown it reports.
 
 import { TooltipProvider } from '@lar-works/design-system';
-import { createElement } from 'react';
-import { act } from 'react';
+import { createElement, act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, expect, test, vi } from 'vite-plus/test';

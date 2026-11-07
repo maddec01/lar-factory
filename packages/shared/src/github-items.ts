@@ -160,8 +160,8 @@ export function normalizeChecks(rollup: RawLinkedPr['statusCheckRollup']): Check
                     (n.state && STATUS_CONTEXT_OUTCOMES[n.state] === 'running'),
             )
             .map((n) => n.startedAt ?? n.checkSuite?.createdAt ?? n.createdAt)
-            .filter((at) => !!at)
-            .sort()[0] ?? null;
+            .filter((at): at is string => !!at)
+            .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))[0] ?? null;
 
     return checks;
 }

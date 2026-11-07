@@ -398,7 +398,7 @@ test("a build's slices show their records' progress, and its build sub-issue sta
     const read = await readItems(board);
 
     assert.deepEqual(
-        read.map((i) => i.number).sort(),
+        read.map((i) => i.number).sort((a, b) => a - b),
         [12, 13],
         'the build sub-issue stays a board item; the slice does not',
     );
@@ -431,7 +431,10 @@ test('a build sub-issue on the board stays a board item while the issue search s
     ];
     const read = await readItems(await startBoard(t, { items, builds: [] }));
 
-    assert.deepEqual(read.map((i) => i.number).sort(), [12, 13]);
+    assert.deepEqual(
+        read.map((i) => i.number).sort((a, b) => a - b),
+        [12, 13],
+    );
 });
 
 test("each refresh attaches item stats from T3 Code's database and Claude transcripts, and a missing database leaves them out", async (t) => {

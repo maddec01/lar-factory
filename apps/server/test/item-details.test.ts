@@ -107,7 +107,10 @@ test('outside sample mode a GitHub item reads its details from GitHub in one gra
 
         answers.push([response.status, ((await response.json()) as { details: ItemDetails }).details.body]);
     }
-    assert.deepEqual(answers.sort(), [[200, 'The **description**.']]);
+    assert.deepEqual(
+        answers.sort((a, b) => String(a).localeCompare(String(b))),
+        [[200, 'The **description**.']],
+    );
     assert.equal((await itemCalls()) - before, 1, 'one call per open');
 });
 

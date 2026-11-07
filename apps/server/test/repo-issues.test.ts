@@ -98,12 +98,15 @@ test("closed issues are searched in close-date ranges at once, and one the searc
     const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups, unindexed: ['I_27'] });
     const data = await until(board, (d) => d.fetchedAt !== null);
 
-    assert.deepEqual(data.items.map((i) => [i.number, i.status]).sort(), [
-        [22, 'Done'],
-        [25, 'Done'],
-        [26, 'Done'],
-        [27, 'Done'],
-    ]);
+    assert.deepEqual(
+        data.items.map((i) => [i.number, i.status]).sort((a, b) => String(a).localeCompare(String(b))),
+        [
+            [22, 'Done'],
+            [25, 'Done'],
+            [26, 'Done'],
+            [27, 'Done'],
+        ],
+    );
 
     const ranges = (await board.calls()).flatMap((args) =>
         args.filter((a) => a.startsWith('q=') && a.includes('is:closed')).map((a) => /closed:(\S+)/.exec(a)![1]),
@@ -153,7 +156,10 @@ test('after the first read, a whole read searches the close-date ranges only whe
 
     assert.ok(read.pages >= 3, 'the board read whole again');
     assert.equal(read.ranges, 10, 'only the first read searched the ranges');
-    assert.deepEqual(((await few.board()) as BoardData).items.map((i) => i.number).sort(), [22, 25]);
+    assert.deepEqual(
+        ((await few.board()) as BoardData).items.map((i) => i.number).sort((a, b) => a - b),
+        [22, 25],
+    );
 
     const full = await startBoard(
         t,
@@ -241,7 +247,10 @@ test('open and kept closed issues normalize together: a closed dossier keeps its
     const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
     const data = await until(board, (d) => d.fetchedAt !== null);
 
-    assert.deepEqual(data.items.map((i) => i.number).sort(), [40, 41, 50]);
+    assert.deepEqual(
+        data.items.map((i) => i.number).sort((a, b) => a - b),
+        [40, 41, 50],
+    );
     assert.equal(data.items.find((i) => i.number === 40)!.map?.destination, 'There.');
     assert.deepEqual(
         data.items.find((i) => i.number === 50)!.slices.map((s) => s.number),
@@ -301,7 +310,10 @@ test('in a repository with no factory labels or config, Add item records work lo
     const again = (await (await pick()).json()) as { item: { id: string }; board: BoardData };
 
     assert.equal(again.item.id, first.item.id);
-    assert.deepEqual(again.board.items.map((i) => i.number).sort(), [0, 8]);
+    assert.deepEqual(
+        again.board.items.map((i) => i.number).sort((a, b) => a - b),
+        [0, 8],
+    );
 
     const searched = (await (await fetch(`${board.url}/api/tickets?repo=${APPLE}&q=seek`)).json()) as {
         tickets: { workId?: string }[];

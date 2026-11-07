@@ -6,7 +6,6 @@
 // settled. Later reads keep the loaded board visible. Every screen shares the notification stack.
 
 import { failedCheck, inRepo, noneOnboarded, stillReading } from '@lar-factory/shared';
-import { TooltipProvider } from '@lar-works/design-system';
 
 import { LoadingScreen } from './shell/loading/LoadingScreen';
 import { TitleBar } from './shell/title-bar/TitleBar';
@@ -50,23 +49,20 @@ export function App() {
     const empty = useBoardStore((state) => noneOnboarded(state.data));
 
     return (
-        // The design system's Tooltip needs a provider above it.
-        <TooltipProvider>
-            <div className="fixed inset-0 flex flex-col bg-(--background) text-(--foreground)">
-                <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-                    <TitleBar />
-                    <Warnings />
-                    {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
-                </main>
-                {/* Outside main, so the announcement sits apart from the page. */}
-                <CopyStatus />
-                <NotificationStack />
-                <ItemDialog />
-                <SettingsDialog />
-                <AbandonDialog />
-                <WizardDialog />
-                <LoadingScreen />
-            </div>
-        </TooltipProvider>
+        <div className="fixed inset-0 flex flex-col bg-(--background) text-(--foreground)">
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <TitleBar />
+                <Warnings />
+                {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
+            </main>
+            {/* Outside main, so the announcement sits apart from the page. */}
+            <CopyStatus />
+            <NotificationStack />
+            <ItemDialog />
+            <SettingsDialog />
+            <AbandonDialog />
+            <WizardDialog />
+            <LoadingScreen />
+        </div>
     );
 }

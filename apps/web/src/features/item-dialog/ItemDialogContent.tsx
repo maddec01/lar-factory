@@ -3,7 +3,17 @@
 
 import { HINTS, itemName, needsAnswer, onAzure, sameRepo, writeAccessProblem } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button, ButtonLink, buttonKind, Modal } from '@lar-works/design-system';
+import {
+    AccessNotice,
+    Button,
+    ButtonLink,
+    buttonKind,
+    DialogActions,
+    ItemDialogBody,
+    ItemDialogColumns,
+    Modal,
+    WarningNote,
+} from '@lar-works/design-system';
 
 import { ConceptParts } from './ConceptParts';
 import { ItemAside } from './ItemAside';
@@ -67,11 +77,6 @@ export function ItemDialogContent({
     const editable = accessProblem === null;
     // The open editor in an expanded dialog takes the height the rest leaves.
     const fill = expanded && edit.editing;
-    const rows = fill
-        ? 'min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]'
-        : aside
-          ? '@min-[45rem]:grid-rows-[auto_1fr]'
-          : '';
 
     return (
         <Modal.Content
@@ -90,58 +95,39 @@ export function ItemDialogContent({
             <ItemSummary item={item} data={data} now={now} />
             <Modal.Body layout={fill ? 'fill' : 'scroll'}>
                 {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
-                <div
-                    className={`@container gap-3 pt-2 ${fill ? 'flex min-h-0 flex-1 flex-col' : 'grid grid-cols-[minmax(0,1fr)]'}`}
-                    data-item-body
-                >
+                <ItemDialogBody fill={fill} data-item-body>
                     <ItemProgress item={item} />
                     <ItemAgents item={item} />
                     {hint && (
-                        <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
-                            <ItemStatusGlyph item={item} presentation="title" />
-                            <span className="min-w-0 flex-1 font-medium text-(--warning-foreground)">{hint}</span>
-                        </div>
+                        <WarningNote icon={<ItemStatusGlyph item={item} presentation="title" />}>{hint}</WarningNote>
                     )}
                     {ticket && accessProblem && (
-                        <div role="status">
-                            <p>{accessProblem}</p>
-                            <Button
-                                {...buttonKind('other')}
-                                onClick={() => void useEditStore.getState().recheck(item.repo)}
-                            >
-                                Recheck access
-                            </Button>
-                        </div>
+                        <AccessNotice
+                            message={accessProblem}
+                            action={
+                                <Button
+                                    {...buttonKind('other')}
+                                    onClick={() => void useEditStore.getState().recheck(item.repo)}
+                                >
+                                    Recheck access
+                                </Button>
+                            }
+                        />
                     )}
-                    {item.paused && (
-                        <p
-                            data-paused
-                            className="m-0 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5 font-medium text-(--warning-foreground)"
-                        >
-                            Paused: {item.paused}
-                        </p>
-                    )}
+                    {item.paused && <WarningNote data-paused>Paused: {item.paused}</WarningNote>}
                     {item.shapingCleanupProblem && (
-                        <p
-                            data-shaping-cleanup-problem
-                            className="m-0 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5 font-medium text-(--warning-foreground)"
-                        >
-                            {item.shapingCleanupProblem}
-                        </p>
+                        <WarningNote data-shaping-cleanup-problem>{item.shapingCleanupProblem}</WarningNote>
                     )}
                     <NeedsYou item={item} data={data} />
                     <ItemMeta item={item} read={read} refresh={refresh} now={now} />
                     <EarlierThreads item={item} data={data} />
                     {item.kind === 'concept' && <ConceptParts item={item} data={data} openPart={openPart} />}
-                    <div
-                        className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}
-                    >
+                    <ItemDialogColumns aside={aside} fill={fill}>
                         {record && (
                             <RecordText
                                 item={item}
                                 record={record}
                                 spec={read.state === 'loaded' && Boolean(read.details.spec)}
-                                className="@min-[45rem]:col-start-1"
                             />
                         )}
                         {ticket && (
@@ -153,43 +139,36 @@ export function ItemDialogContent({
                                 editable={editable}
                                 fill={fill}
                                 ticketContext={Boolean(record)}
-                                className="@min-[45rem]:col-start-1"
                             />
                         )}
                         {aside && <ItemAside item={item} data={data} now={now} read={read} />}
                         {ticket && (
-                            <ItemComments
-                                itemId={item.id}
-                                read={read}
-                                now={now}
-                                ticketContext={Boolean(record)}
-                                className="@min-[45rem]:col-start-1"
-                            />
+                            <ItemComments itemId={item.id} read={read} now={now} ticketContext={Boolean(record)} />
                         )}
-                    </div>
+                    </ItemDialogColumns>
                     <ActionError item={item} />
                     <StartMessage
                         item={item}
                         kind={item.status === 'Ready' || item.status === 'In progress' ? 'build' : 'refine'}
                     />
                     <StartAfterError item={item} data={data} />
-                </div>
+                </ItemDialogBody>
             </Modal.Body>
             <Modal.Footer
                 leading={
-                    <span className="inline-flex items-center gap-3 text-xs">
+                    <DialogActions presentation="leading">
                         <MoveActions item={item} data={data} />
-                    </span>
+                    </DialogActions>
                 }
             >
-                <span className="inline-flex items-center gap-1.5">
+                <DialogActions>
                     {item.url && (
                         <ButtonLink {...buttonKind('other')} href={item.url} target="_blank" rel="noopener">
                             {item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}
                         </ButtonLink>
                     )}
                     <StatusActions item={item} data={data} />
-                </span>
+                </DialogActions>
             </Modal.Footer>
         </Modal.Content>
     );

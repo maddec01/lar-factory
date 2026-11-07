@@ -35,7 +35,7 @@ export {
     useShownLabels,
 } from './ItemParts';
 export { PrList } from './PrList';
-export { SliceBar, SliceList, SliceMark } from './SliceParts';
+export { SliceBar, SliceList } from './SliceParts';
 export { ModelEntries, opensOnChecked } from './ModelEntries';
 export { NeedsYou } from './NeedsYou';
 export { EarlierThreads, OpenThread, hasLiveThread } from './OpenThread';

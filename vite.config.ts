@@ -31,12 +31,6 @@ export default defineConfig({
                 files: ['**/*.cjs'],
                 rules: { 'typescript/no-require-imports': 'off' },
             },
-            {
-                files: ['apps/web/src/**/*.ts', 'apps/web/src/**/*.tsx'],
-                // The board's visual code still sits in apps/web (shared/ui and the features' class names and sheets);
-                // step 2b of the lar-web alignment moves it into the design system and turns this on.
-                rules: { 'lar/no-visual-recipes': 'off' },
-            },
         ],
     },
     test: {

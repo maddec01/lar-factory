@@ -2,11 +2,19 @@
 
 import { STRUCTURE_LABEL, kindLabels, sameRepo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Popover } from '@lar-works/design-system';
-import { Lock, Pencil } from '@lar-works/design-system/icons';
+import {
+    BoardNote,
+    ChipGroup,
+    DetailFact as Fact,
+    IconButton,
+    LabelEditorPanel,
+    LabelsValue,
+    LockedLabel,
+    Popover,
+} from '@lar-works/design-system';
+import { Pencil } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
-import { Fact, LABEL_ERROR } from './DetailsParts';
 import { useLabelEdit } from './useLabelEdit';
 import { LabelChips, useShownLabels } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -37,37 +45,33 @@ export function ItemLabels({ item }: { item: Item }) {
 
     return (
         <Fact label={heading}>
-            <span className="flex flex-wrap items-center gap-1">
+            <LabelsValue>
                 {(shown.length > 0 || linked) && (
-                    <span className="contents" data-labels>
+                    <ChipGroup data-labels>
                         <LabelChips item={item} />
                         {linked && (
-                            <span
+                            <LockedLabel
                                 data-locked-label
                                 title="The factory manages this for saved links, so it can't be edited."
-                                className="inline-flex items-center gap-1 text-xs text-(--muted-foreground)"
                             >
-                                <Lock className="size-3 shrink-0" aria-hidden="true" />
                                 {STRUCTURE_LABEL}
-                            </span>
+                            </LockedLabel>
                         )}
-                    </span>
+                    </ChipGroup>
                 )}
                 <Popover open={open} onOpenChange={openChange}>
                     <Popover.Trigger asChild>
-                        <button
-                            type="button"
+                        <IconButton
+                            variant="inline"
                             data-edit-labels
                             disabled={problem !== null}
                             title={problem ?? undefined}
                             aria-label={`Edit ${heading.toLowerCase()}`}
-                            className="grid size-5 place-items-center rounded text-(--muted-foreground) hover:bg-(--accent) disabled:opacity-50 disabled:hover:bg-transparent"
-                        >
-                            <Pencil className="size-3" />
-                        </button>
+                            icon={<Pencil />}
+                        />
                     </Popover.Trigger>
                     <Popover.Content side="bottom" align="start">
-                        <div className="grid w-72 gap-2">
+                        <LabelEditorPanel>
                             {edit.choices ? (
                                 <LabelPicker
                                     heading={heading}
@@ -78,26 +82,22 @@ export function ItemLabels({ item }: { item: Item }) {
                                     onToggle={(name) => void edit.toggle(name)}
                                 />
                             ) : (
-                                !edit.error && (
-                                    <p role="status" className="m-0 text-xs text-(--muted-foreground)">
-                                        Reading {noun}s…
-                                    </p>
-                                )
+                                !edit.error && <BoardNote role="status">Reading {noun}s…</BoardNote>
                             )}
                             {edit.error && (
-                                <p role="alert" className={LABEL_ERROR}>
+                                <BoardNote tone="error" role="alert">
                                     {edit.error}
-                                </p>
+                                </BoardNote>
                             )}
-                        </div>
+                        </LabelEditorPanel>
                     </Popover.Content>
                 </Popover>
                 {edit.error && !open && (
-                    <span role="alert" className={LABEL_ERROR}>
+                    <BoardNote tone="error" role="alert">
                         {edit.error}
-                    </span>
+                    </BoardNote>
                 )}
-            </span>
+            </LabelsValue>
         </Fact>
     );
 }

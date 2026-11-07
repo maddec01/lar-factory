@@ -74,7 +74,7 @@ async function openItem(itemId = ID): Promise<void> {
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
 
-const control = () => $('[data-item-dialog] [data-item-kind-control] [role="combobox"]');
+const control = () => $('[data-item-dialog] [data-meta] [role="combobox"][aria-label="Kind"]');
 const shownKind = () => text(control());
 const choose = (name: string) => chooseOption(control()!, name);
 const options = async () => {

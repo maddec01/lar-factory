@@ -1,16 +1,11 @@
 // What an onboarding step shows while what it needs is still loading.
 
-import { Alert, Button, buttonKind, SpinnerIcon } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, Spinner } from '@lar-works/design-system';
 
 import { useWizardStore } from './WizardStore';
 
-export function Pending({ children }: { children: React.ReactNode }) {
-    return (
-        <p role="status" className="text-base-700 m-0 flex items-center gap-2 py-4 text-sm">
-            <SpinnerIcon motion="always" className="size-4" />
-            {children}
-        </p>
-    );
+export function Pending({ children }: { children: string }) {
+    return <Spinner presentation="status" label={children} />;
 }
 
 export function DetectionPending() {

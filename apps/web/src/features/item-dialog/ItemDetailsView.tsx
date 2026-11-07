@@ -7,10 +7,11 @@
 
 import { onAzure } from '@lar-factory/shared';
 import type { Item, ItemDetails } from '@lar-factory/shared';
+import { DetailFact as Fact, MetaArea, PeopleList, Person } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { ConceptState, ConceptWork } from './ConceptParts';
-import { Fact, Person, Placeholder, When } from './DetailsParts';
+import { Placeholder, When } from './DetailsParts';
 import { ItemChecksSection } from './ItemChecks';
 import { ItemKindControl } from './ItemKindControl';
 import { ItemLabels } from './ItemLabels';
@@ -31,7 +32,7 @@ function FromDetails({
     if (read.state === 'loading')
         return (
             <Fact label={label}>
-                <Placeholder className="h-4 w-20" />
+                <Placeholder />
             </Fact>
         );
 
@@ -61,7 +62,7 @@ export function ItemMeta({
     const azure = Boolean(item.repo && onAzure(item.repo));
 
     return (
-        <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2" data-meta>
+        <MetaArea data-meta>
             {item.azure && (
                 <>
                     <Fact label="Azure type">{item.azure.type}</Fact>
@@ -74,11 +75,11 @@ export function ItemMeta({
                 label="Assignees"
                 show={(d) =>
                     d.assignees.length > 0 && (
-                        <span className="flex flex-wrap gap-x-3 gap-y-1">
+                        <PeopleList>
                             {d.assignees.map((a) => (
                                 <Person key={a} name={a} />
                             ))}
-                        </span>
+                        </PeopleList>
                     )
                 }
             />
@@ -114,6 +115,6 @@ export function ItemMeta({
             {item.kind === 'concept' ? <ConceptWork item={item} /> : <AgentWork item={item} only="narrow" />}
             {item.kind === 'build' && <ItemChecksSection key={item.id} itemId={item.id} />}
             <KindNotice key={`${item.id} notice`} item={item} read={read} refresh={refresh} />
-        </div>
+        </MetaArea>
     );
 }

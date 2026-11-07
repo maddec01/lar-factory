@@ -4,6 +4,7 @@
 
 import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+import { BoardNote, ConceptPart, ConceptPartList, DetailsSection, ItemNote } from '@lar-works/design-system';
 
 import {
     AgentWork,
@@ -71,9 +72,7 @@ export function ConceptWork({ item }: { item: Item }) {
         <>
             <AgentWork item={item} label="Own cost" />
             {total === 'unavailable' ? (
-                <p data-total-incomplete className="m-0 text-xs text-(--muted-foreground)">
-                    {INCOMPLETE_TOTAL}
-                </p>
+                <BoardNote data-total-incomplete>{INCOMPLETE_TOTAL}</BoardNote>
             ) : (
                 total && <AgentWork item={item} stats={total} label="Total on the board" />
             )}
@@ -87,32 +86,18 @@ function PartRow({ item, data, openPart }: { item: Item; data: BoardData; openPa
     const hasThread = item.threads === 'unavailable' || Boolean(item.threads?.length);
 
     return (
-        <li
-            data-concept-part={item.id}
-            className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-1 hover:bg-(--soft)"
+        <ConceptPart
+            id={item.id}
+            title={item.title}
+            onOpen={() => openPart(item.id)}
+            source={<SourceIcon item={item} />}
+            glyph={<ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} />}
+            name={<ItemTitle item={item} />}
+            state={complete ? 'Complete' : shown.word}
         >
-            <button
-                type="button"
-                onClick={() => openPart(item.id)}
-                title={item.title}
-                className="flex min-w-0 flex-1 basis-56 items-start gap-1.5 text-left text-[13px] hover:underline"
-            >
-                <SourceIcon item={item} />
-                <span className="mt-0.5 inline-flex">
-                    <ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} />
-                </span>
-                <span className="line-clamp-2">
-                    <ItemTitle item={item} />
-                </span>
-            </button>
-            <span className="shrink-0 text-xs text-(--muted-foreground)">{complete ? 'Complete' : shown.word}</span>
-            {usageUnreadable(item) ? (
-                <span className="text-xs text-(--muted-foreground)">{UNREADABLE}</span>
-            ) : (
-                <AgentWork item={item} />
-            )}
+            {usageUnreadable(item) ? <ItemNote>{UNREADABLE}</ItemNote> : <AgentWork item={item} />}
             {hasThread && <OpenThread item={item} data={data} />}
-        </li>
+        </ConceptPart>
     );
 }
 
@@ -130,13 +115,12 @@ export function ConceptParts({
     if (!parts.length) return null;
 
     return (
-        <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-concept-parts>
-            <h2 className="m-0 text-[13px] font-medium">Parts</h2>
-            <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-0.5 p-0">
+        <DetailsSection heading="Parts" data-concept-parts>
+            <ConceptPartList>
                 {parts.map((part) => (
                     <PartRow key={part.item.id} item={part.item} data={data} openPart={openPart} />
                 ))}
-            </ul>
-        </section>
+            </ConceptPartList>
+        </DetailsSection>
     );
 }

@@ -1,7 +1,7 @@
 // Onboarding screens built from the board's existing controls.
 
 import { shownRepo } from '@lar-factory/shared';
-import { Alert } from '@lar-works/design-system';
+import { Alert, Stack } from '@lar-works/design-system';
 
 import { AccessStep } from './AccessStep';
 import { DetectionPending } from './Pending';
@@ -21,7 +21,7 @@ export function StepBody({ run }: { run: Run }) {
         );
 
     return (
-        <div className="grid gap-4">
+        <Stack space="section">
             {finish.state === 'failed' && (
                 <Alert tone="danger" title="Could not add Project">
                     {finish.error}
@@ -40,6 +40,6 @@ export function StepBody({ run }: { run: Run }) {
             ) : (
                 <AccessStep run={run} detection={detection} />
             )}
-        </div>
+        </Stack>
     );
 }

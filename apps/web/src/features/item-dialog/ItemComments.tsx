@@ -2,33 +2,35 @@
 
 import type { ItemComment } from '@lar-factory/shared';
 import { shortAgo } from '@lar-factory/shared';
-import { Button, buttonKind, RichText } from '@lar-works/design-system';
+import {
+    BoardNote,
+    Button,
+    ButtonRow,
+    buttonKind,
+    Comment as CommentCard,
+    CommentList,
+    DetailsHeading,
+    DetailsText,
+    MainSection,
+    RichText,
+} from '@lar-works/design-system';
 
 import type { DetailsEntry } from './DetailsCache';
-import { Avatar, Heading } from './DetailsParts';
 import type { ItemDetailsRead } from './useItemDetails';
 import { useOlderComments } from './useOlderComments';
 
 function Comment({ comment, now }: { comment: ItemComment; now: number }) {
     return (
-        <li className="flex gap-3">
-            <Avatar name={comment.author} />
-            <div className="min-w-0 flex-1 rounded-(--radius-lg) border border-(--border) bg-(--card)">
-                <div className="flex items-center gap-2 border-b border-(--border) px-3 py-1.5 text-xs">
-                    <span className="font-medium">{comment.author}</span>
-                    <time
-                        className="text-(--muted-foreground)"
-                        dateTime={comment.createdAt}
-                        title={new Date(comment.createdAt).toLocaleString()}
-                    >
-                        {shortAgo(comment.createdAt, now)}
-                    </time>
-                </div>
-                <div className="px-3 py-2">
-                    <RichText text={comment.body} format={comment.format} />
-                </div>
-            </div>
-        </li>
+        <CommentCard
+            author={comment.author}
+            time={
+                <time dateTime={comment.createdAt} title={new Date(comment.createdAt).toLocaleString()}>
+                    {shortAgo(comment.createdAt, now)}
+                </time>
+            }
+        >
+            <RichText text={comment.body} format={comment.format} />
+        </CommentCard>
     );
 }
 
@@ -38,45 +40,47 @@ function Comments({
     entry,
     now,
     ticketContext,
-    className,
 }: {
     itemId: string;
     entry: DetailsEntry;
     now: number;
     ticketContext: boolean;
-    className: string;
 }) {
     const older = useOlderComments(itemId, entry);
     const comments = [...entry.details.comments, ...older.comments];
 
     return (
-        <div className={`grid min-w-0 gap-2 ${className}`} data-comments>
-            <Heading>
-                {ticketContext ? 'Ticket comments' : 'Comments'}
-                {comments.length > 0 && ` · ${comments.length}`}
-            </Heading>
+        <MainSection
+            header={
+                <DetailsHeading presentation="muted">
+                    {ticketContext ? 'Ticket comments' : 'Comments'}
+                    {comments.length > 0 && ` · ${comments.length}`}
+                </DetailsHeading>
+            }
+            data-comments
+        >
             {comments.length > 0 ? (
-                <ol className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-3 p-0">
+                <CommentList>
                     {comments.map((c) => (
                         <Comment key={c.id} comment={c} now={now} />
                     ))}
-                </ol>
+                </CommentList>
             ) : (
-                !older.hasMore && <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>
+                !older.hasMore && <DetailsText>No comments.</DetailsText>
             )}
             {older.hasMore && (
-                <div className="flex flex-wrap items-center gap-3">
+                <ButtonRow layout="status">
                     <Button {...buttonKind('other')} loading={older.loading} onClick={older.loadMore}>
                         Load older comments
                     </Button>
                     {older.error && (
-                        <p className="m-0 text-xs text-(--error-foreground)" role="alert">
+                        <BoardNote tone="error" role="alert">
                             Could not load older comments: {older.error}
-                        </p>
+                        </BoardNote>
                     )}
-                </div>
+                </ButtonRow>
             )}
-        </div>
+        </MainSection>
     );
 }
 
@@ -86,15 +90,13 @@ export function ItemComments({
     read,
     now,
     ticketContext = false,
-    className,
 }: {
     itemId: string;
     read: ItemDetailsRead;
     now: number;
     ticketContext?: boolean;
-    className: string;
 }) {
     return read.state === 'loaded' ? (
-        <Comments itemId={itemId} entry={read.entry} now={now} ticketContext={ticketContext} className={className} />
+        <Comments itemId={itemId} entry={read.entry} now={now} ticketContext={ticketContext} />
     ) : null;
 }

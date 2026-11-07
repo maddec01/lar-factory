@@ -1,6 +1,6 @@
 // Skill work and retained results, with recovery through the desktop-owned installer.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import { BoardNote, Button, ButtonRow, buttonKind, Progress, SettingDetails, Text } from '@lar-works/design-system';
 
 import { useSettingsStore } from './SettingsStore';
 import { useDriftStore } from '@/services/install/drift.hooks';
@@ -17,9 +17,9 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
     const busy = !!snapshot.running || pending !== null || replacing || retrying;
 
     return (
-        <div className="grid gap-2 text-xs">
-            <p className="m-0 text-(--muted-foreground)">Retry and Replace apply to all active targets.</p>
-            <div className="flex flex-wrap gap-2">
+        <SettingDetails>
+            <BoardNote>Retry and Replace apply to all active targets.</BoardNote>
+            <ButtonRow layout="wrap">
                 {failed && (
                     <Button
                         {...buttonKind('other')}
@@ -42,9 +42,9 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
                         {replacing ? 'Replacing…' : 'Restore bundled skills'}
                     </Button>
                 )}
-            </div>
+            </ButtonRow>
             {(error || retryError) && <span role="alert">{error || retryError}</span>}
-        </div>
+        </SettingDetails>
     );
 }
 
@@ -107,20 +107,19 @@ export function TargetProgress({ target, showProgress = true }: { target: Target
                   : 'Not installed';
 
     return (
-        <div className="grid gap-2 text-xs [overflow-wrap:anywhere]">
-            <p className="m-0" role={showProgress ? 'status' : undefined}>
+        <SettingDetails breaks>
+            <Text variant="inherit" role={showProgress ? 'status' : undefined}>
                 {target.release ? `Release ${target.release}` : 'No Release installed'} · {status}
-            </p>
+            </Text>
             {showProgress && target.operation && target.operation !== 'check' && (
-                <progress
-                    className="w-full"
+                <Progress
                     aria-label={`Skills installed in ${target.path}`}
                     value={successful}
                     max={target.skills.length || 1}
                 />
             )}
             {target.skills.length > 0 && (
-                <ul className="m-0 list-none p-0">
+                <ul>
                     {target.skills.map(({ name, state }) => (
                         <li key={name}>
                             {name}:{' '}
@@ -129,18 +128,18 @@ export function TargetProgress({ target, showProgress = true }: { target: Target
                     ))}
                 </ul>
             )}
-            {!!target.replaced?.length && <p className="m-0">Restored skills: {target.replaced.join(', ')}</p>}
+            {!!target.replaced?.length && <Text variant="inherit">Restored skills: {target.replaced.join(', ')}</Text>}
             {target.error && (
-                <p className="m-0">
+                <Text variant="inherit">
                     {target.path}: {target.error}. Check access to the reported paths, then Retry.
-                </p>
+                </Text>
             )}
             {clashes.map((path) => (
-                <p className="m-0" key={path}>
+                <Text variant="inherit" key={path}>
                     Existing skill at {path}. Lar Factory does not own this path. Rename or remove it, then Retry.
-                </p>
+                </Text>
             ))}
             <InstallRecovery failed={failed || blocked.length > 0} drift={drift} />
-        </div>
+        </SettingDetails>
     );
 }

@@ -1,6 +1,19 @@
 import { trackerCapabilities, type VocabularyTerm } from '@lar-factory/shared';
 import type { VocabularyDiscovery } from '@lar-factory/shared/vocabulary';
-import { Alert, Badge, Button, buttonKind, FormSelect } from '@lar-works/design-system';
+import {
+    Alert,
+    BoardNote,
+    Button,
+    ButtonRow,
+    buttonKind,
+    FormSelect,
+    InlineButton,
+    Text,
+    VocabularyChip,
+    VocabularyMore,
+    VocabularyRow,
+    VocabularySuggestion,
+} from '@lar-works/design-system';
 
 import { AccessReason } from './AccessList';
 import { useVocabularyFields } from './useVocabularyFields';
@@ -21,9 +34,9 @@ export function VocabularyRead({ repo, error, retry }: { repo: string; error: st
             {error}
         </Alert>
     ) : (
-        <p role="status" className="text-base-700 m-0 text-sm">
+        <Text tone="muted" role="status">
             Reading existing {trackerCapabilities(repo).heading.toLowerCase()} and types…
-        </p>
+        </Text>
     );
 }
 
@@ -69,9 +82,10 @@ export function VocabularyFields({
     } = fields;
 
     return (
-        <div data-vocabulary={name} className="grid min-w-0 gap-2 px-3 py-3">
-            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_8.5rem] items-center gap-x-3 gap-y-2 sm:grid-cols-[5.5rem_8.5rem_minmax(0,1fr)]">
-                <span className="text-[13px] font-medium">{title}</span>
+        <VocabularyRow
+            data-vocabulary={name}
+            title={title}
+            type={
                 <FormSelect
                     aria-label={`${title} type`}
                     writesOnPick
@@ -86,63 +100,54 @@ export function VocabularyFields({
                         ...types.map((type) => ({ value: type, name: type, disabled: !!typesProblem })),
                     ]}
                 />
-                <div
-                    role="group"
-                    aria-label={`${title} ${plural}`}
-                    className="col-span-2 flex min-w-0 flex-wrap items-center gap-1 sm:col-span-1"
-                >
+            }
+            labelsLabel={`${title} ${plural}`}
+            labels={
+                <>
                     {chosen.slice(0, 2).map((label) => (
-                        <Badge key={label} className="max-w-40 min-w-0">
-                            <span className="inline-flex min-w-0 items-center gap-1">
-                                <span className="truncate" title={label}>
-                                    {label}
-                                    {newLabels.includes(label) ? ' (new)' : gone(label) ? ' (unavailable)' : ''}
-                                </span>
-                                <button
-                                    type="button"
-                                    className="cursor-pointer bg-transparent p-0"
-                                    aria-label={`Remove ${label} from ${title}`}
-                                    disabled={disabled}
-                                    onClick={() => toggle(label)}
-                                >
-                                    ×
-                                </button>
-                            </span>
-                        </Badge>
+                        <VocabularyChip
+                            key={label}
+                            label={label}
+                            removeLabel={`Remove ${label} from ${title}`}
+                            disabled={disabled}
+                            onRemove={() => toggle(label)}
+                        >
+                            {label}
+                            {newLabels.includes(label) ? ' (new)' : gone(label) ? ' (unavailable)' : ''}
+                        </VocabularyChip>
                     ))}
                     {chosen.length > 2 && (
-                        <button
-                            type="button"
-                            className="cursor-pointer rounded-full bg-(--muted) px-2 text-xs"
-                            aria-label={`${chosen.length - 2} more ${title} ${plural}`}
+                        <VocabularyMore
+                            label={`${chosen.length - 2} more ${title} ${plural}`}
                             onClick={() => close(true)}
                         >
-                            +{chosen.length - 2}
-                        </button>
+                            {`+${chosen.length - 2}`}
+                        </VocabularyMore>
                     )}
-                    {!chosen.length && !suggested && <span className="text-xs text-(--muted-foreground)">None</span>}
+                    {!chosen.length && !suggested && <BoardNote>None</BoardNote>}
                     {suggested && (
-                        <button
-                            type="button"
+                        <VocabularySuggestion
                             disabled={disabled}
-                            className="cursor-pointer rounded-full border border-dashed border-(--border) px-2 py-0.5 text-xs"
                             onClick={() => update({ ...value, labels: [suggested] })}
                         >
                             + {suggested} · suggested
-                        </button>
+                        </VocabularySuggestion>
                     )}
-                    <VocabularyLabelPopover
-                        name={name}
-                        repo={setup.repo}
-                        value={value}
-                        newLabels={newLabels}
-                        disabled={disabled}
-                        onCommit={onCommit}
-                        onRecheck={onRecheck}
-                        fields={fields}
-                    />
-                </div>
-            </div>
+                </>
+            }
+            chooser={
+                <VocabularyLabelPopover
+                    name={name}
+                    repo={setup.repo}
+                    value={value}
+                    newLabels={newLabels}
+                    disabled={disabled}
+                    onCommit={onCommit}
+                    onRecheck={onRecheck}
+                    fields={fields}
+                />
+            }
+        >
             {labelsProblem && <AccessReason repo={setup.repo} reason={labelsProblem} onRecheck={onRecheck} />}
             {newLabels.length > 0 && access.newLabels && (
                 <AccessReason repo={setup.repo} reason={access.newLabels} onRecheck={onRecheck} />
@@ -155,29 +160,26 @@ export function VocabularyFields({
                 />
             )}
             {!types.length && !typesProblem && (
-                <span className="text-xs text-(--muted-foreground)">
+                <BoardNote>
                     This Project has no {discovery.provider === 'azure' ? 'work item' : 'issue'} types.
-                </span>
+                </BoardNote>
             )}
             {value.type && (typesProblem || !types.includes(value.type)) && (
-                <span className="text-xs">
+                <ButtonRow>
                     <Button
                         {...buttonKind('other')}
-                        className="h-auto min-h-8 max-w-full py-1 text-left wrap-anywhere whitespace-normal"
+                        wrap
                         onClick={() => update({ ...value, type: null }, newLabels, true)}
                     >
                         Remove {value.type}
                     </Button>
-                </span>
+                </ButtonRow>
             )}
             {error && (
-                <p role="alert" className="m-0 text-xs text-(--error-foreground)">
-                    {error}{' '}
-                    <button type="button" className="cursor-pointer bg-transparent p-0 underline" onClick={retryCommit}>
-                        Retry
-                    </button>
-                </p>
+                <BoardNote tone="error" role="alert">
+                    {error} <InlineButton onClick={retryCommit}>Retry</InlineButton>
+                </BoardNote>
             )}
-        </div>
+        </VocabularyRow>
     );
 }

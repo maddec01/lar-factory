@@ -3,9 +3,8 @@
 // the item dialog attaches one to captured work.
 
 import type { TicketMatch } from '@lar-factory/shared';
-import { Button, buttonKind, FormResult } from '@lar-works/design-system';
+import { TicketSearch } from '@lar-works/design-system';
 import { useState } from 'react';
-import type { KeyboardEvent } from 'react';
 
 type Phase = 'idle' | 'searching' | 'found' | 'picking';
 
@@ -60,7 +59,11 @@ export function TicketPicker({
             setMessage(found.length ? '' : 'No open ticket matches.');
         }
     };
-    const pick = async (ticket: TicketMatch) => {
+    const pick = async (number: number) => {
+        const ticket = tickets.find((match) => match.number === number);
+
+        if (!ticket) return;
+
         setPhase('picking');
         setMessage('');
 
@@ -70,65 +73,28 @@ export function TicketPicker({
 
         if (error) setMessage(error);
     };
-    const onKey = (event: KeyboardEvent<HTMLInputElement>) => {
-        if (event.key !== 'Enter') return;
-
-        event.preventDefault();
-        void search();
-    };
 
     return (
-        <div className="grid gap-2" data-ticket-picker>
-            <div className="flex gap-2">
-                <input
-                    id={`${id}-query`}
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.currentTarget.value)}
-                    onKeyDown={onKey}
-                    disabled={disabled}
-                    autoComplete="off"
-                    aria-label="Search open tickets"
-                    placeholder="Words from the title, or #12"
-                    className="border-base-300 bg-base-100 focus-visible:ring-primary h-8 min-w-0 flex-1 rounded-md border px-2.5 text-sm outline-none focus-visible:ring-2"
-                />
-                <Button
-                    {...buttonKind('other')}
-                    id={`${id}-search`}
-                    disabled={disabled || busy}
-                    onClick={() => void search()}
-                >
-                    Search
-                </Button>
-            </div>
-            {tickets.length > 0 && (
-                <ul
-                    className="m-0 grid list-none gap-0.5 p-0"
-                    aria-label="Open tickets"
-                    aria-busy={phase === 'picking'}
-                >
-                    {tickets.map((ticket) => (
-                        <li key={ticket.number}>
-                            <button
-                                type="button"
-                                data-ticket={ticket.number}
-                                disabled={busy}
-                                onClick={() => void pick(ticket)}
-                                className="hover:bg-base-200/70 focus-visible:outline-primary flex w-full min-w-0 items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-sm focus-visible:outline-2 disabled:opacity-60"
-                            >
-                                <span className="shrink-0 text-(--muted-foreground) tabular-nums">
-                                    #{ticket.number}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate">{ticket.title}</span>
-                                {ticket.workId && (
-                                    <span className="shrink-0 text-xs text-(--muted-foreground)">Already added</span>
-                                )}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
-            <FormResult id={`${id}-result`} text={message} />
-        </div>
+        <TicketSearch
+            id={id}
+            query={query}
+            onQueryChange={setQuery}
+            onSearch={() => void search()}
+            fieldLabel="Search open tickets"
+            placeholder="Words from the title, or #12"
+            searchLabel="Search"
+            disabled={disabled}
+            searchDisabled={disabled || busy}
+            tickets={tickets.map((ticket) => ({
+                number: ticket.number,
+                title: ticket.title,
+                note: ticket.workId ? 'Already added' : undefined,
+            }))}
+            listLabel="Open tickets"
+            busy={busy}
+            picking={phase === 'picking'}
+            onPick={(number) => void pick(number)}
+            result={message}
+        />
     );
 }

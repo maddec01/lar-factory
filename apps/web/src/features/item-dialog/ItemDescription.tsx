@@ -2,12 +2,30 @@
 // the description editor with Save and Cancel under it once Edit opens it.
 
 import type { ItemDetails, TextFormat } from '@lar-factory/shared';
-import { Button, buttonKind, MarkdownEditor, RichText } from '@lar-works/design-system';
+import {
+    Button,
+    ButtonRow,
+    buttonKind,
+    DetailsText,
+    Disclosure,
+    EditActions,
+    EditorSlot,
+    HeaderStatus,
+    Heading,
+    MainColumnSlot,
+    MainSection,
+    MarkdownEditor,
+    RichText,
+    SectionHeader,
+    SkeletonLoader,
+    SpecSync,
+    Stack,
+    TextSection,
+} from '@lar-works/design-system';
 import { Pencil } from '@lar-works/design-system/icons';
 import { useState } from 'react';
 
 import { detailsCache } from './DetailsCache';
-import { Heading, Placeholder } from './DetailsParts';
 import type { DescriptionEdit } from './useDescriptionEdit';
 import type { ItemDetailsRead } from './useItemDetails';
 import { postAction } from '@/services/board/board.service';
@@ -16,12 +34,15 @@ import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 /** A fixed-width placeholder for the main column while the details load. */
 function Loading() {
     return (
-        <div className="grid gap-3" aria-busy="true" aria-label="Loading details">
-            {['w-11/12', 'w-3/4', 'w-5/6', 'w-2/5'].map((w) => (
-                <Placeholder key={w} className={`h-3.5 ${w}`} />
-            ))}
-            <Placeholder className="mt-2 h-20 w-full" />
-        </div>
+        <SkeletonLoader label="Loading details">
+            <Stack>
+                <SkeletonLoader.Shape width="full" />
+                <SkeletonLoader.Shape width="wide" />
+                <SkeletonLoader.Shape width="full" />
+                <SkeletonLoader.Shape width="short" />
+                <SkeletonLoader.Shape presentation="card" />
+            </Stack>
+        </SkeletonLoader>
     );
 }
 
@@ -39,7 +60,7 @@ function EditDescription({
 }) {
     return (
         <>
-            <div className={fill ? 'flex min-h-0 flex-col' : 'contents'}>
+            <EditorSlot fill={fill}>
                 <MarkdownEditor
                     label="Description"
                     placeholder="Add a description…"
@@ -51,18 +72,9 @@ function EditDescription({
                     disabled={edit.saving}
                     fill={fill}
                 />
-            </div>
+            </EditorSlot>
             {/* A save error takes the status's place and wraps under it, so Cancel and Save stay where they were. */}
-            <div className="flex items-start gap-2" data-edit-actions>
-                {edit.error ? (
-                    <p className="m-0 me-auto min-w-0 flex-1 py-1.5 text-xs text-(--error-foreground)" role="alert">
-                        {edit.error}
-                    </p>
-                ) : (
-                    <span className="me-auto min-w-0 flex-1 py-1.5 text-xs text-(--muted-foreground)">
-                        {edit.dirty ? 'Unsaved changes' : 'No changes'}
-                    </span>
-                )}
+            <EditActions status={edit.dirty ? 'Unsaved changes' : 'No changes'} error={edit.error} data-edit-actions>
                 <Button {...buttonKind('other')} disabled={edit.saving} onClick={edit.cancel}>
                     Cancel
                 </Button>
@@ -74,7 +86,7 @@ function EditDescription({
                 >
                     Save
                 </Button>
-            </div>
+            </EditActions>
         </>
     );
 }
@@ -107,27 +119,30 @@ function SpecNotice({
     };
 
     return (
-        <div className="grid gap-2 text-sm" data-spec-sync>
-            {(spec.error || spec.warning || spec.pending) && (
-                <p className="m-0" role="status">
-                    {spec.warning ?? spec.error ?? 'The Spec is waiting to save to the tracker.'}
-                </p>
-            )}
+        <SpecSync
+            status={
+                spec.error || spec.warning || spec.pending
+                    ? (spec.warning ?? spec.error ?? 'The Spec is waiting to save to the tracker.')
+                    : undefined
+            }
+            error={error}
+        >
             {spec.held ? (
                 <>
-                    <details>
-                        <summary className="cursor-pointer">Review held GitHub edit</summary>
-                        <h3>{spec.held.title}</h3>
+                    <Disclosure label="Review held GitHub edit" presentation="section">
+                        <Heading as="h3" variant="title">
+                            {spec.held.title}
+                        </Heading>
                         <RichText text={spec.held.body} format="markdown" />
-                    </details>
-                    <div className="flex gap-2">
+                    </Disclosure>
+                    <ButtonRow>
                         <Button {...buttonKind('other')} disabled={busy} onClick={() => void act('accept')}>
                             Accept edit
                         </Button>
                         <Button {...buttonKind('other')} disabled={busy} onClick={() => void act('reject')}>
                             Reject edit
                         </Button>
-                    </div>
+                    </ButtonRow>
                 </>
             ) : (
                 (spec.pending || spec.error) && (
@@ -136,12 +151,7 @@ function SpecNotice({
                     </Button>
                 )
             )}
-            {error && (
-                <p className="m-0 text-(--error-foreground)" role="alert">
-                    {error}
-                </p>
-            )}
-        </div>
+        </SpecSync>
     );
 }
 
@@ -160,7 +170,6 @@ export function ItemDescription({
     editable,
     fill,
     ticketContext = false,
-    className,
 }: {
     itemId: string;
     refresh: () => Promise<boolean>;
@@ -169,20 +178,19 @@ export function ItemDescription({
     editable: boolean;
     fill: boolean;
     ticketContext?: boolean;
-    className: string;
 }) {
     if (read.state === 'loading')
         return (
-            <div className={className}>
+            <MainColumnSlot>
                 <Loading />
-            </div>
+            </MainColumnSlot>
         );
 
     if (read.state === 'failed')
         return (
-            <p className={`m-0 text-sm text-(--error-foreground) ${className}`} role="alert">
+            <DetailsText tone="error" mainColumn>
                 Could not load the details: {read.error}
-            </p>
+            </DetailsText>
         );
 
     const { sections } = read.details;
@@ -191,33 +199,26 @@ export function ItemDescription({
         edit.saved === null ? [read.details.body, read.details.format] : [edit.saved, 'markdown'];
 
     return (
-        <div
-            className={`grid min-w-0 gap-2 ${fill ? 'min-h-0 grid-rows-[auto_minmax(0,1fr)]' : ''} ${className}`}
+        <MainSection
+            fill={fill}
+            header={
+                <SectionHeader
+                    heading={read.details.spec ? 'Spec' : ticketContext ? 'Ticket description' : 'Description'}
+                >
+                    {!edit.editing && (
+                        <>
+                            {edit.saved !== null && <HeaderStatus>{RELOAD_FAILED}</HeaderStatus>}
+                            {editable && (
+                                <Button {...buttonKind('other')} leftIcon={<Pencil />} onClick={edit.start}>
+                                    Edit
+                                </Button>
+                            )}
+                        </>
+                    )}
+                </SectionHeader>
+            }
             data-description
         >
-            <div className="flex h-7 items-center justify-between gap-2">
-                <h2 className="m-0 text-[11px] font-medium tracking-wider text-(--muted-foreground) uppercase">
-                    {read.details.spec ? 'Spec' : ticketContext ? 'Ticket description' : 'Description'}
-                </h2>
-                {!edit.editing && (
-                    <span className="flex min-w-0 items-center gap-3">
-                        {edit.saved !== null && (
-                            <span
-                                className="truncate text-xs text-(--muted-foreground)"
-                                role="status"
-                                title={RELOAD_FAILED}
-                            >
-                                {RELOAD_FAILED}
-                            </span>
-                        )}
-                        {editable && (
-                            <Button {...buttonKind('other')} leftIcon={<Pencil />} onClick={edit.start}>
-                                Edit
-                            </Button>
-                        )}
-                    </span>
-                )}
-            </div>
             {read.details.spec && <SpecNotice itemId={itemId} spec={read.details.spec} refresh={refresh} />}
             {edit.editing ? (
                 <EditDescription
@@ -235,20 +236,18 @@ export function ItemDescription({
                     )}
                 </>
             ) : (
-                <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>
+                <DetailsText>No description.</DetailsText>
             )}
             {read.details.spec?.original && (
-                <details>
-                    <summary className="cursor-pointer text-sm text-(--muted-foreground)">Original</summary>
+                <Disclosure label="Original" presentation="section">
                     <RichText text={read.details.spec.original} format={read.details.spec.originalFormat} />
-                </details>
+                </Disclosure>
             )}
             {sections?.map((section) => (
-                <section key={section.title} className="grid min-w-0 gap-2">
-                    <Heading>{section.title}</Heading>
+                <TextSection key={section.title} heading={section.title}>
                     <RichText text={section.body} format={section.format} />
-                </section>
+                </TextSection>
             ))}
-        </div>
+        </MainSection>
     );
 }

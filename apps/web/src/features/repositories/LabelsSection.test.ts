@@ -145,7 +145,7 @@ async function openEdit(board: BoardData): Promise<void> {
 async function openDialog(board: BoardData): Promise<void> {
     await settle(() => $<HTMLButtonElement>('.open-settings')!.click());
     await settle(() =>
-        $$<HTMLButtonElement>('.settings-nav button')
+        $$<HTMLButtonElement>('[data-settings-nav] button')
             .find((b) => text(b) === 'Projects')!
             .click(),
     );

@@ -2,7 +2,7 @@
 // The work keeps its work ID, and its ticket then adds the ticket's link and context.
 
 import type { Item } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import { Button, buttonKind, SummaryPanel } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { TicketPicker } from '@/features/add-item';
@@ -17,12 +17,7 @@ export function AttachTicket({ item }: { item: Item }) {
 
     if (!open)
         return (
-            <Button
-                {...buttonKind('other')}
-                className="justify-self-start"
-                data-attach-ticket={item.id}
-                onClick={() => setOpen(true)}
-            >
+            <Button {...buttonKind('other')} data-attach-ticket={item.id} onClick={() => setOpen(true)}>
                 Attach a ticket
             </Button>
         );
@@ -36,9 +31,8 @@ export function AttachTicket({ item }: { item: Item }) {
     };
 
     return (
-        <section aria-label="Attach a ticket" className="grid gap-1.5 pt-1">
-            <span className="text-base-content text-xs font-medium">Attach a ticket</span>
+        <SummaryPanel label="Attach a ticket">
             <TicketPicker id="attach" repo={item.repo} onPick={(ticket) => attach(ticket.number)} />
-        </section>
+        </SummaryPanel>
     );
 }

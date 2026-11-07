@@ -12,7 +12,7 @@ import { $, $$, fetchMock, mountPage, push, sample, settle, text } from '@/test/
 const OLDER = (sampleDetailsJson as unknown as { $older: Record<string, ItemComment[]> }).$older['I_sample13']!;
 
 const dialog = () => $('[data-item-dialog]')!;
-const authors = () => $$('[data-comments] li').map((li) => text(li.querySelector('.font-medium')));
+const authors = () => $$('[data-comments] li').map((li) => text(li.querySelector('[data-comment-author]')));
 const bodies = () => $$('[data-comments] li [data-slot="rich-text"]').map(text);
 const loadMore = () =>
     [...dialog().querySelectorAll<HTMLButtonElement>('[data-comments] button')].find((b) =>

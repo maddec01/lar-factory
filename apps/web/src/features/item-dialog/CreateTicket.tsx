@@ -1,5 +1,15 @@
 import { writeAccessProblem, type Item } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import {
+    AccessNotice,
+    Button,
+    ButtonRow,
+    buttonKind,
+    FocusPanel,
+    FormFieldset,
+    OutgoingTicket,
+    Stack,
+    Text,
+} from '@lar-works/design-system';
 // Local work previews its authoritative outgoing text and reuses Add item's provider options.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
@@ -81,48 +91,62 @@ export function CreateTicket({ item }: { item: Item }) {
     };
 
     return (
-        <section
-            ref={section}
-            tabIndex={-1}
-            aria-label="Create issue"
-            className="grid max-h-[50dvh] w-full gap-3 overflow-y-auto pt-1"
-        >
+        <FocusPanel ref={section} label="Create issue">
             {reason && (
-                <div role="status">
-                    <p>{reason}</p>
-                    <Button {...buttonKind('other')} onClick={() => void useEditStore.getState().recheck(item.repo)}>
-                        Recheck access
-                    </Button>
-                </div>
+                <AccessNotice
+                    message={reason}
+                    action={
+                        <Button
+                            {...buttonKind('other')}
+                            onClick={() => void useEditStore.getState().recheck(item.repo)}
+                        >
+                            Recheck access
+                        </Button>
+                    }
+                />
             )}
-            {error && <p role="alert">{error}</p>}
-            {!outgoing && !error && <p role="status">Reading outgoing issue text…</p>}
+            {error && (
+                <Text variant="inherit" role="alert">
+                    {error}
+                </Text>
+            )}
+            {!outgoing && !error && (
+                <Text variant="inherit" role="status">
+                    Reading outgoing issue text…
+                </Text>
+            )}
             {!outgoing && (
-                <Button {...buttonKind('other')} className="justify-self-start" onClick={() => setOpen(false)}>
-                    Cancel
-                </Button>
+                <ButtonRow>
+                    <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
+                        Cancel
+                    </Button>
+                </ButtonRow>
             )}
             {outgoing && (
-                <form className="grid gap-3" onSubmit={onSubmit} aria-busy={attempt?.phase === 'pending'}>
-                    <div aria-label="Outgoing title" className="font-medium wrap-anywhere">
-                        {outgoing.title}
-                    </div>
-                    <pre
-                        aria-label="Outgoing text"
-                        className="m-0 max-h-64 overflow-auto text-xs wrap-anywhere whitespace-pre-wrap"
+                <Stack as="form" onSubmit={onSubmit} aria-busy={attempt?.phase === 'pending'}>
+                    <OutgoingTicket
+                        title={outgoing.title}
+                        text={outgoing.description}
+                        titleLabel="Outgoing title"
+                        textLabel="Outgoing text"
+                    />
+                    <FormFieldset
+                        presentation="group"
+                        disabled={locked || !!reason}
+                        legend="Issue options"
+                        hiddenLegend
                     >
-                        {outgoing.description}
-                    </pre>
-                    <fieldset disabled={locked || !!reason} className="m-0 grid min-w-0 gap-3 border-0 p-0">
-                        <legend className="sr-only">Issue options</legend>
                         {!reason && <TicketOptionFields repo={repo} kind={item.kind} kept={attempt?.options} />}
-                    </fieldset>
+                    </FormFieldset>
                     {attempt?.message && (
-                        <p role={attempt.phase === 'failed' || attempt.phase === 'uncertain' ? 'alert' : 'status'}>
+                        <Text
+                            variant="inherit"
+                            role={attempt.phase === 'failed' || attempt.phase === 'uncertain' ? 'alert' : 'status'}
+                        >
                             {attempt.message}
-                        </p>
+                        </Text>
                     )}
-                    <div className="flex gap-2">
+                    <ButtonRow>
                         <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
@@ -137,9 +161,9 @@ export function CreateTicket({ item }: { item: Item }) {
                                   ? 'Retry this submission'
                                   : 'Create issue'}
                         </Button>
-                    </div>
-                </form>
+                    </ButtonRow>
+                </Stack>
             )}
-        </section>
+        </FocusPanel>
     );
 }

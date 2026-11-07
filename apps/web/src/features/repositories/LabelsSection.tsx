@@ -1,5 +1,5 @@
 import { trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
-import { Alert, Button, buttonKind } from '@lar-works/design-system';
+import { Alert, BoardNote, Button, buttonKind, FormSection, Text, TrackerLabelList } from '@lar-works/design-system';
 // Settings' Labels section. The tracker holds the only copy, so the section reads it each time and keeps no list. It reads
 // the capability description for what the tracker's labels have, and never checks a provider's name.
 import { useState } from 'react';
@@ -40,14 +40,17 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
     };
 
     return (
-        <section data-labels aria-label={heading} className="grid gap-3">
-            <div className="grid gap-0.5">
-                <h3 className="m-0 text-sm font-medium">{heading}</h3>
-                <p className="text-base-700 m-0 text-xs">
+        <FormSection
+            presentation="dense"
+            data-labels
+            title={heading}
+            description={
+                <>
                     Changes here write to the tracker straight away, for everyone using{' '}
                     {changeScope === 'project' ? 'the whole project' : 'the repository'}.
-                </p>
-            </div>
+                </>
+            }
+        >
             {readOnly && (
                 <AccessReason
                     repo={repo}
@@ -70,9 +73,9 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
                     {error}
                 </Alert>
             ) : !labels ? (
-                <p role="status" className="text-base-700 m-0 text-sm">
+                <Text tone="muted" role="status">
                     Reading {heading.toLowerCase()}…
-                </p>
+                </Text>
             ) : (
                 <>
                     <CreateLabel
@@ -82,7 +85,7 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
                         onCreate={(name) => change({ change: 'create', name })}
                     />
                     {labels.length ? (
-                        <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] overflow-hidden rounded-lg border p-0">
+                        <TrackerLabelList>
                             {labels.map((label) => (
                                 <LabelRow
                                     key={label.name}
@@ -96,9 +99,9 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
                                     onSave={change}
                                 />
                             ))}
-                        </ul>
+                        </TrackerLabelList>
                     ) : (
-                        <p className="text-base-700 m-0 text-xs">No {heading.toLowerCase()} yet.</p>
+                        <BoardNote>No {heading.toLowerCase()} yet.</BoardNote>
                     )}
                 </>
             )}
@@ -111,6 +114,6 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
                     onClose={() => setDeleting(null)}
                 />
             )}
-        </section>
+        </FormSection>
     );
 }

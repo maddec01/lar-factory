@@ -1,8 +1,15 @@
 // The item dialog's sidebar relations: children, named attachments, blockers and Related work.
 
 import type { IssueRef, Item } from '@lar-factory/shared';
-import { CircleCheck, CircleDot } from '@lar-works/design-system/icons';
-import type { ReactNode } from 'react';
+import {
+    AttachmentLink,
+    DetailsSection,
+    DetailsText,
+    Disclosure,
+    SprintCount,
+    TicketLink,
+    TicketLinkList,
+} from '@lar-works/design-system';
 
 import { Placeholder } from './DetailsParts';
 import type { ItemDetailsRead } from './useItemDetails';
@@ -11,32 +18,19 @@ import { AzureFields } from '@/features/items';
 /** Named work item links share the child list's native fields and completion marks. */
 function TicketLinks({ tickets }: { tickets: IssueRef[] }) {
     return (
-        <ul className="m-0 grid list-none gap-1.5 p-0">
+        <TicketLinkList>
             {tickets.map((s) => (
-                <li key={s.url} className="flex items-start gap-2 text-sm">
-                    {s.state === 'closed' ? (
-                        <CircleCheck aria-label="Done" className="mt-0.5 size-3.5 shrink-0 text-(--success)" />
-                    ) : (
-                        <CircleDot aria-label="Open" className="mt-0.5 size-3.5 shrink-0 text-(--muted-foreground)" />
-                    )}
-                    <span className="min-w-0">
-                        <a href={s.url} target="_blank" rel="noopener" className="wrap-anywhere hover:underline">
-                            <span className="text-(--muted-foreground)">#{s.number}</span> {s.title}
-                        </a>
-                        <AzureFields azure={s.azure} />
-                    </span>
-                </li>
+                <TicketLink
+                    key={s.url}
+                    closed={s.state === 'closed'}
+                    stateLabel={s.state === 'closed' ? 'Done' : 'Open'}
+                    href={s.url}
+                    reference={`#${s.number}`}
+                    title={s.title}
+                    fields={<AzureFields azure={s.azure} />}
+                />
             ))}
-        </ul>
-    );
-}
-
-function RelationSection({ title, children }: { title: string; children: ReactNode }) {
-    return (
-        <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
-            <h2 className="m-0 text-[13px] font-medium">{title}</h2>
-            {children}
-        </section>
+        </TicketLinkList>
     );
 }
 
@@ -46,9 +40,9 @@ export function ItemRelations({ item, read }: { item: Item; read: ItemDetailsRea
 
     if (read.state === 'loading')
         return (
-            <RelationSection title="Sub-tickets">
-                <Placeholder className="h-4 w-24" />
-            </RelationSection>
+            <DetailsSection heading="Sub-tickets">
+                <Placeholder />
+            </DetailsSection>
         );
 
     const { subTickets, attachments, blockers, related, relationsError } = read.details;
@@ -59,56 +53,42 @@ export function ItemRelations({ item, read }: { item: Item; read: ItemDetailsRea
     return (
         <>
             {relationsError && (
-                <p role="alert" className="m-0 text-sm text-(--error-foreground)">
-                    Could not load linked work items: {relationsError}
-                </p>
+                <DetailsText tone="error">Could not load linked work items: {relationsError}</DetailsText>
             )}
             {subTickets.length > 0 && (
-                <RelationSection title={sprint ? 'Children' : 'Sub-tickets'}>
+                <DetailsSection heading={sprint ? 'Children' : 'Sub-tickets'}>
                     {sprint && (
-                        <div className="text-sm">
-                            <p className="m-0 font-medium">
-                                This sprint: {current.filter((s) => s.state === 'closed').length} of {current.length}{' '}
-                                done
-                            </p>
-                            <p className="m-0 text-xs text-(--muted-foreground)">{sprint.name}</p>
-                        </div>
+                        <SprintCount
+                            count={`This sprint: ${current.filter((s) => s.state === 'closed').length} of ${current.length} done`}
+                            name={sprint.name}
+                        />
                     )}
                     <TicketLinks tickets={current} />
                     {other.length > 0 && (
-                        <details className="grid min-w-0 gap-2">
-                            <summary className="cursor-pointer text-sm text-(--muted-foreground)">
-                                Other children ({other.length})
-                            </summary>
-                            <div className="pt-2">
-                                <TicketLinks tickets={other} />
-                            </div>
-                        </details>
+                        <Disclosure label={`Other children (${other.length})`} presentation="section">
+                            <TicketLinks tickets={other} />
+                        </Disclosure>
                     )}
-                </RelationSection>
+                </DetailsSection>
             )}
             {Boolean(attachments?.length) && (
-                <RelationSection title="Attachments">
-                    <ul className="m-0 grid list-none gap-1.5 p-0">
+                <DetailsSection heading="Attachments">
+                    <TicketLinkList>
                         {attachments!.map((a) => (
-                            <li key={a.url} className="text-sm">
-                                <a href={a.url} target="_blank" rel="noopener" className="wrap-anywhere underline">
-                                    {a.name}
-                                </a>
-                            </li>
+                            <AttachmentLink key={a.url} href={a.url} name={a.name} />
                         ))}
-                    </ul>
-                </RelationSection>
+                    </TicketLinkList>
+                </DetailsSection>
             )}
             {Boolean(blockers?.length) && (
-                <RelationSection title="Blocked by">
+                <DetailsSection heading="Blocked by">
                     <TicketLinks tickets={blockers!} />
-                </RelationSection>
+                </DetailsSection>
             )}
             {Boolean(related?.length) && (
-                <RelationSection title="Related work">
+                <DetailsSection heading="Related work">
                     <TicketLinks tickets={related!} />
-                </RelationSection>
+                </DetailsSection>
             )}
         </>
     );

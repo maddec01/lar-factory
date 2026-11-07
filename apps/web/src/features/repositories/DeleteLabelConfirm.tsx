@@ -1,5 +1,5 @@
 import type { TrackerCapabilities } from '@lar-factory/shared';
-import { Alert, Button, buttonKind, Modal, Text } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, Modal, Stack, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { useEditStore } from './EditStore';
@@ -40,7 +40,7 @@ export function DeleteConfirm({
                 closeOnOverlayClick={false}
             >
                 <Modal.Body>
-                    <div className="grid gap-3">
+                    <Stack space="group">
                         <Alert tone="danger" title={capabilities.deleteWarning}>
                             <Text id="delete-label-detail" tone="muted">
                                 {mappings && `This also removes it from ${mappings}. `}
@@ -50,7 +50,7 @@ export function DeleteConfirm({
                             </Text>
                         </Alert>
                         <ProblemText>{failure}</ProblemText>
-                    </div>
+                    </Stack>
                 </Modal.Body>
                 <Modal.Footer>
                     <Button {...buttonKind('other')} disabled={running !== null} onClick={onClose}>

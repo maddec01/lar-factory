@@ -2,7 +2,7 @@
 
 import { expect, test } from 'vite-plus/test';
 
-import { repoTone } from './ProjectIcon';
+import { repoPlace } from './ProjectIcon';
 
 test('a repository takes its board colour whatever the case of its owner/name, and one off the board the muted colour', () => {
     const repos = [
@@ -10,6 +10,6 @@ test('a repository takes its board colour whatever the case of its owner/name, a
         { repo: 'Maddec01/lar-factory', role: 'factory', labels: [] },
     ];
 
-    expect(repoTone('maddec01/lar-factory', repos)).toBe('repo-tone-1');
-    expect(repoTone('someone/elsewhere', repos)).toBe('repo-tone-none');
+    expect(repoPlace('maddec01/lar-factory', repos)).toBe(1);
+    expect(repoPlace('someone/elsewhere', repos)).toBeUndefined();
 });

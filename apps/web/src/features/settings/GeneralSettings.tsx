@@ -1,5 +1,6 @@
 // Settings' General page: dialogs, threads, commands, Auto-build and refresh.
 
+import { BoardNote } from '@lar-works/design-system';
 import { useState } from 'react';
 
 import { AutoBuildModelSetting } from './AutoBuildModel';
@@ -33,7 +34,7 @@ function refreshEvery(seconds: number): Control {
             ? `${seconds} seconds`
             : `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 
-    return custom(() => <span className="text-xs text-(--muted-foreground)">{value}</span>);
+    return custom(() => <BoardNote>{value}</BoardNote>);
 }
 
 export const generalGroups = (data: SettingsData): Group[] => [

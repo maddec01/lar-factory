@@ -7,8 +7,6 @@ import { SliceBar as DesignSliceBar, SliceList as DesignSliceList, SliceRow } fr
 
 import { SourceIcon } from './SourceIcon';
 
-export { SliceMark } from '@lar-works/design-system';
-
 /** A 6px segment for each recorded slice; waiting segments are faint. `still` stops an active one pulsing. */
 export function SliceBar({ item, still = false }: { item: Item; thick?: boolean; still?: boolean }) {
     return (

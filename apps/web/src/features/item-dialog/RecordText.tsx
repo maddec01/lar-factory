@@ -3,26 +3,25 @@
 // writes it to Downloads as `lar-work export` does and names the files it wrote, or says why it couldn't.
 
 import { parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory/shared';
-import { Button, buttonKind, RichText } from '@lar-works/design-system';
-import { useState, type ReactNode } from 'react';
+import {
+    BoardNote,
+    Button,
+    buttonKind,
+    DetailFact,
+    DetailsText,
+    Disclosure,
+    FactList,
+    InlineList,
+    MainSection,
+    RichText,
+    SectionHeader,
+} from '@lar-works/design-system';
+import { useState } from 'react';
 
 import { postAction } from '@/services/board/board.service';
 import { MarkdownDiagrams } from '@/shared/diagrams/MarkdownDiagrams';
 
 const TITLE: Record<RecordDetails['bodyKind'], string> = { brief: 'Brief', map: 'Map', decision: 'Decision' };
-
-function Fact({
-    label,
-    children,
-    ...rest
-}: { label: string; children: ReactNode } & Record<`data-${string}`, boolean>) {
-    return (
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm" {...rest}>
-            <span className="shrink-0 text-xs text-(--muted-foreground)">{label}</span>
-            {children}
-        </div>
-    );
-}
 
 export type Exported =
     | { state: 'idle' | 'exporting' }
@@ -61,32 +60,22 @@ export function ExportMarkdown({
 export function ExportedLine({ exported }: { exported: Exported }) {
     if (exported.state === 'done')
         return (
-            <p className="m-0 text-xs wrap-anywhere text-(--muted-foreground)" role="status">
+            <BoardNote role="status" breaks>
                 Exported to {exported.paths.join(', ')}
-            </p>
+            </BoardNote>
         );
 
     if (exported.state === 'failed')
         return (
-            <p className="m-0 text-xs text-(--error-foreground)" role="alert">
+            <BoardNote tone="error" role="alert">
                 {exported.error}
-            </p>
+            </BoardNote>
         );
 
     return null;
 }
 
-export function RecordText({
-    item,
-    record,
-    className,
-    spec = false,
-}: {
-    spec?: boolean;
-    item: Item;
-    record: RecordDetails;
-    className: string;
-}) {
+export function RecordText({ item, record, spec = false }: { spec?: boolean; item: Item; record: RecordDetails }) {
     const [exported, setExported] = useState<Exported>({ state: 'idle' });
     const answer = record.bodyKind === 'decision' ? record.answer?.trim() : undefined;
     const body =
@@ -96,13 +85,15 @@ export function RecordText({
     const title = spec ? 'Work record' : answer ? 'Outcome' : TITLE[record.bodyKind];
 
     return (
-        <section className={`grid min-w-0 gap-2 ${className}`} data-record>
-            <div className="flex h-7 items-center justify-between gap-2">
-                <h2 className="m-0 text-[11px] font-medium tracking-wider text-(--muted-foreground) uppercase">
-                    {title}
-                </h2>
-                <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
-            </div>
+        <MainSection
+            as="section"
+            header={
+                <SectionHeader heading={title}>
+                    <ExportMarkdown itemId={item.id} exported={exported} setExported={setExported} />
+                </SectionHeader>
+            }
+            data-record
+        >
             <ExportedLine exported={exported} />
             {!spec && (
                 <div data-record-body>
@@ -111,47 +102,39 @@ export function RecordText({
                     ) : body ? (
                         <MarkdownDiagrams text={body} />
                     ) : (
-                        <p className="m-0 text-sm text-(--muted-foreground)">No {title.toLowerCase()} written yet.</p>
+                        <DetailsText>No {title.toLowerCase()} written yet.</DetailsText>
                     )}
                 </div>
             )}
             {!spec && answer && body && (
-                <details>
-                    <summary className="cursor-pointer text-sm text-(--muted-foreground)">Original question</summary>
-                    <div className="pt-2">
-                        <MarkdownDiagrams text={body} />
-                    </div>
-                </details>
+                <Disclosure label="Original question" presentation="section">
+                    <MarkdownDiagrams text={body} />
+                </Disclosure>
             )}
             {record.buildPhase && (
-                <Fact label="Build phase" data-build-phase>
+                <DetailFact label="Build phase" presentation="record" data-build-phase>
                     {record.buildPhase}
-                </Fact>
+                </DetailFact>
             )}
             {record.reviewRounds.length > 0 && (
-                <div className="grid gap-1" data-review-rounds>
+                <FactList data-review-rounds>
                     {record.reviewRounds.map((r) => (
-                        <Fact key={r.round} label={`Review round ${r.round}`}>
-                            <ul className="m-0 flex list-none flex-wrap gap-x-3 p-0">
-                                {r.reviewers.map((v) => (
-                                    <li key={v.axis}>
-                                        {v.axis}: {v.verdict}
-                                        {v.open > 0 && `, ${v.open} of ${v.findings} findings open`}
-                                    </li>
-                                ))}
-                            </ul>
-                        </Fact>
+                        <DetailFact key={r.round} label={`Review round ${r.round}`} presentation="record">
+                            <InlineList
+                                items={r.reviewers.map(
+                                    (v) =>
+                                        `${v.axis}: ${v.verdict}${v.open > 0 ? `, ${v.open} of ${v.findings} findings open` : ''}`,
+                                )}
+                            />
+                        </DetailFact>
                     ))}
-                </div>
+                </FactList>
             )}
             {!spec && record.context && (
-                <details className="grid min-w-0 gap-2">
-                    <summary className="cursor-pointer text-sm text-(--muted-foreground)">Initial context</summary>
-                    <div className="pt-2">
-                        <RichText text={record.context} format="markdown" />
-                    </div>
-                </details>
+                <Disclosure label="Initial context" presentation="section">
+                    <RichText text={record.context} format="markdown" />
+                </Disclosure>
             )}
-        </section>
+        </MainSection>
     );
 }

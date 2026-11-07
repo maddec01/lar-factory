@@ -1,7 +1,18 @@
 // Onboarding's work step: where the Project's work comes from and how it is set up.
 
 import { writeAccessProblem, type SetupDetection } from '@lar-factory/shared';
-import { Button, buttonKind, Checkbox, FormSelect, Input, InsetPanel } from '@lar-works/design-system';
+import {
+    Button,
+    ButtonRow,
+    buttonKind,
+    Checkbox,
+    Disclosure,
+    FormSelect,
+    Input,
+    InsetPanel,
+    SetupStep,
+    Text,
+} from '@lar-works/design-system';
 
 import { KindMapping } from './KindMapping';
 import {
@@ -37,7 +48,7 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
     };
 
     return (
-        <div data-work-step className="grid min-w-0 gap-5">
+        <SetupStep data-work-step presentation="form">
             <InsetPanel presentation="settings">
                 <FieldRow
                     label="Show in the list"
@@ -50,17 +61,18 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
                     }
                 >
                     {detection.provider === 'GitHub' ? (
-                        <span className="text-xs">GitHub issues</span>
+                        <Text as="span" variant="caption">
+                            GitHub issues
+                        </Text>
                     ) : (
-                        <span className="w-44 max-w-full">
-                            <FormSelect
-                                aria-label="Team"
-                                placeholder="Choose a team"
-                                value={answers.itemSource?.kind === 'azure-board' ? answers.itemSource.team : ''}
-                                onChange={(team) => choose({ itemSource: { kind: 'azure-board', team } })}
-                                choices={sources.map((source) => ({ value: source.id, name: source.title }))}
-                            />
-                        </span>
+                        <FormSelect
+                            presentation="setting"
+                            aria-label="Team"
+                            placeholder="Choose a team"
+                            value={answers.itemSource?.kind === 'azure-board' ? answers.itemSource.team : ''}
+                            onChange={(team) => choose({ itemSource: { kind: 'azure-board', team } })}
+                            choices={sources.map((source) => ({ value: source.id, name: source.title }))}
+                        />
                     )}
                 </FieldRow>
                 <FieldRow
@@ -82,63 +94,60 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
             </InsetPanel>
             <IssueDefaults setup={issueSetup} onChange={(key, value) => choose({ [key]: value })} onRecheck={recheck} />
             <KindMapping key={run.repo} run={run} detection={detection} />
-            <details className="min-w-0">
-                <summary className="cursor-pointer text-[13px] font-semibold">Optional settings</summary>
-                <div className="mt-3">
-                    <InsetPanel presentation="settings">
-                        <FieldRow label="What this Project does" help="Helps agents place work across Projects.">
-                            <Input
-                                className="w-64 max-w-full"
-                                aria-label="What this Project does"
-                                placeholder="API used by the mobile app"
-                                value={answers.role}
-                                onChange={(event) => choose({ role: event.target.value })}
-                            />
+            <Disclosure presentation="group" label="Optional settings">
+                <InsetPanel presentation="settings">
+                    <FieldRow label="What this Project does" help="Helps agents place work across Projects.">
+                        <Input
+                            presentation="setting"
+                            aria-label="What this Project does"
+                            placeholder="API used by the mobile app"
+                            value={answers.role}
+                            onChange={(event) => choose({ role: event.target.value })}
+                        />
+                    </FieldRow>
+                    {connections.length > 0 && (
+                        <FieldRow label="Related Projects">
+                            {connections.map((option) => (
+                                <Checkbox
+                                    key={option.id}
+                                    label={option.title}
+                                    checked={selected.includes(option.value)}
+                                    onChange={() =>
+                                        choose({
+                                            connections: selected.includes(option.value)
+                                                ? selected.filter((repo) => repo !== option.value)
+                                                : [...selected, option.value],
+                                        })
+                                    }
+                                />
+                            ))}
                         </FieldRow>
-                        {connections.length > 0 && (
-                            <FieldRow label="Related Projects">
-                                {connections.map((option) => (
-                                    <Checkbox
-                                        key={option.id}
-                                        label={option.title}
-                                        checked={selected.includes(option.value)}
-                                        onChange={() =>
-                                            choose({
-                                                connections: selected.includes(option.value)
-                                                    ? selected.filter((repo) => repo !== option.value)
-                                                    : [...selected, option.value],
-                                            })
-                                        }
-                                    />
-                                ))}
-                            </FieldRow>
-                        )}
-                        {skills.length > 0 && (
-                            <FieldRow label="Project skills" help="Coding guidance for builds.">
-                                {skills.map((option) => (
-                                    <Checkbox
-                                        key={option.id}
-                                        label={option.title}
-                                        checked={answers.skills.includes(option.value)}
-                                        onChange={() =>
-                                            choose({
-                                                skills: answers.skills.includes(option.value)
-                                                    ? answers.skills.filter((skill) => skill !== option.value)
-                                                    : [...answers.skills, option.value],
-                                            })
-                                        }
-                                    />
-                                ))}
-                            </FieldRow>
-                        )}
-                    </InsetPanel>
-                </div>
-            </details>
-            <span>
+                    )}
+                    {skills.length > 0 && (
+                        <FieldRow label="Project skills" help="Coding guidance for builds.">
+                            {skills.map((option) => (
+                                <Checkbox
+                                    key={option.id}
+                                    label={option.title}
+                                    checked={answers.skills.includes(option.value)}
+                                    onChange={() =>
+                                        choose({
+                                            skills: answers.skills.includes(option.value)
+                                                ? answers.skills.filter((skill) => skill !== option.value)
+                                                : [...answers.skills, option.value],
+                                        })
+                                    }
+                                />
+                            ))}
+                        </FieldRow>
+                    )}
+                </InsetPanel>
+            </Disclosure>
+            <ButtonRow>
                 <Button {...buttonKind('other')} onClick={recheck}>
                     Recheck access
                 </Button>
-            </span>
-        </div>
+            </ButtonRow>
+        </SetupStep>
     );
 }

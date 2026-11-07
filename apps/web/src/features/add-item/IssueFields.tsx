@@ -6,36 +6,22 @@ import {
     type TicketCreationOptions,
     type TicketOptions,
 } from '@lar-factory/shared';
-import { Checkbox, FormSelect } from '@lar-works/design-system';
 // Add item's Create issue checkbox follows the repository's default until this item changes it, and shows the optional provider fields.
-import { useEffect, useState, type ReactNode } from 'react';
+import {
+    BoardNote,
+    Checkbox,
+    CreateIssueChoice,
+    DraftTicketPart,
+    FormSelect,
+    InlineButton,
+    PanelField,
+    Stack,
+} from '@lar-works/design-system';
+import { useEffect, useState } from 'react';
 
 import type { DraftValues } from './AddItemStore';
 import { DraftLabels } from './DraftLabels';
 import { useEditStore } from '@/features/repositories';
-
-const HINT = 'm-0 text-xs leading-snug text-(--muted-foreground)';
-const SMALL_HEADING = 'm-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)';
-
-/** A side panel section under a small uppercase heading, which labels the field `htmlFor` names. */
-export function PanelSection({
-    heading,
-    htmlFor,
-    children,
-}: {
-    heading: string;
-    htmlFor: string;
-    children: ReactNode;
-}) {
-    return (
-        <div className="grid gap-1.5">
-            <label htmlFor={htmlFor} className={SMALL_HEADING}>
-                {heading}
-            </label>
-            {children}
-        </div>
-    );
-}
 
 /** An optional ticket field, for a form to read; a value no longer among its choices starts at None. */
 function OptionField({
@@ -53,7 +39,7 @@ function OptionField({
 
     return (
         choices.length > 0 && (
-            <PanelSection heading={label} htmlFor={`item-${name}`}>
+            <PanelField heading={label} htmlFor={`item-${name}`}>
                 <FormSelect
                     id={`item-${name}`}
                     name={name}
@@ -62,7 +48,7 @@ function OptionField({
                     onChange={setValue}
                     choices={choices}
                 />
-            </PanelSection>
+            </PanelField>
         )
     );
 }
@@ -91,19 +77,9 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
         };
     }, [repo.repo]);
 
-    if (error)
-        return (
-            <p role="status" className={HINT}>
-                {error}
-            </p>
-        );
+    if (error) return <BoardNote role="status">{error}</BoardNote>;
 
-    if (!read)
-        return (
-            <p role="status" className={HINT}>
-                Reading issue options… You can submit while they load.
-            </p>
-        );
+    if (!read) return <BoardNote role="status">Reading issue options… You can submit while they load.</BoardNote>;
 
     const setup = repo.setup;
     const access = setup?.access ?? {};
@@ -116,15 +92,13 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
         (read.labels.length > 0 || !writeAccessProblem(repo.repo, 'manage-labels', access, safety));
 
     return (
-        <div className="grid gap-3">
+        <Stack>
             {read.problems.length > 0 && (
-                <p role="status" className={HINT}>
+                <BoardNote role="status">
                     Some issue options could not be read. You can still submit the title and description.
-                </p>
+                </BoardNote>
             )}
-            {labelsShown && (
-                <DraftLabels repo={repo} kind={kind} read={read} kept={kept} headingClass={SMALL_HEADING} />
-            )}
+            {labelsShown && <DraftLabels repo={repo} kind={kind} read={read} kept={kept} />}
             {!writeAccessProblem(repo.repo, 'type-ticket', access, safety) && (
                 <OptionField
                     key={kind}
@@ -146,7 +120,7 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
                     value={kept?.iteration}
                 />
             )}
-        </div>
+        </Stack>
     );
 }
 
@@ -176,35 +150,33 @@ export function CreateIssueBox({
     const { checked, reason } = createIssueState(repo, choice);
 
     return (
-        <div className="grid gap-1">
-            <Checkbox
-                id="item-create-issue"
-                name="createIssue"
-                label="Create issue"
-                checked={checked}
-                disabled={disabled || !!reason}
-                aria-describedby={reason ? 'item-create-reason' : undefined}
-                onChange={(event) => onChoice(event.target.checked)}
-            />
-            {reason && (
-                <p id="item-create-reason" className={`${HINT} max-w-md`}>
-                    {reason}{' '}
-                    <button
-                        type="button"
-                        disabled={disabled || running !== null}
-                        className="underline underline-offset-2 hover:text-(--foreground) disabled:opacity-50"
-                        onClick={() => void useEditStore.getState().recheck(repo.repo)}
-                    >
-                        Recheck access
-                    </button>
-                </p>
-            )}
-            {error && (
-                <p role="status" className={HINT}>
-                    {error}
-                </p>
-            )}
-        </div>
+        <CreateIssueChoice
+            checkbox={
+                <Checkbox
+                    id="item-create-issue"
+                    name="createIssue"
+                    label="Create issue"
+                    checked={checked}
+                    disabled={disabled || !!reason}
+                    aria-describedby={reason ? 'item-create-reason' : undefined}
+                    onChange={(event) => onChoice(event.target.checked)}
+                />
+            }
+            reason={
+                reason && (
+                    <BoardNote id="item-create-reason">
+                        {reason}{' '}
+                        <InlineButton
+                            disabled={disabled || running !== null}
+                            onClick={() => void useEditStore.getState().recheck(repo.repo)}
+                        >
+                            Recheck access
+                        </InlineButton>
+                    </BoardNote>
+                )
+            }
+            error={error && <BoardNote role="status">{error}</BoardNote>}
+        />
     );
 }
 
@@ -223,19 +195,19 @@ export function IssueFields({
     const { checked, reason } = createIssueState(repo, choice);
 
     return (
-        <div className="border-base-300 grid gap-3 border-t pt-4">
+        <DraftTicketPart>
             {checked ? (
                 <TicketOptionFields repo={repo} kind={kind} kept={kept?.kind === kind ? kept.options : undefined} />
             ) : (
-                <p className={HINT}>
+                <BoardNote>
                     Local work has its kind alone.
                     {reason
                         ? ''
                         : ` Tick Create issue to add ${trackerCapabilities(repo.repo).heading.toLowerCase()}.`}{' '}
                     Saved only on this machine.
-                </p>
+                </BoardNote>
             )}
-        </div>
+        </DraftTicketPart>
     );
 }
 

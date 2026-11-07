@@ -575,7 +575,7 @@ describe('project icons', () => {
             );
 
         afterEach(() => {
-            vi.doUnmock('lucide-react/dynamic');
+            vi.doUnmock('@lar-works/design-system/icons/dynamic');
         });
 
         test('shows in its T3 color over the toned initial once its chunk loads, in a square that keeps its size', async () => {
@@ -584,7 +584,7 @@ describe('project icons', () => {
                 release = resolve;
             });
 
-            vi.doMock('lucide-react/dynamic', async (importOriginal) => {
+            vi.doMock('@lar-works/design-system/icons/dynamic', async (importOriginal) => {
                 await held;
 
                 return importOriginal();
@@ -617,7 +617,7 @@ describe('project icons', () => {
         });
 
         test('a chunk that fails to load leaves the toned initial', async () => {
-            vi.doMock('lucide-react/dynamic', () => Promise.reject(new Error('chunk failed')));
+            vi.doMock('@lar-works/design-system/icons/dynamic', () => Promise.reject(new Error('chunk failed')));
             await mountPage({ ...sample, projectIcons: { [REPO]: lucide } });
             await open();
             await settle();

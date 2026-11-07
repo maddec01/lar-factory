@@ -1,5 +1,14 @@
 import { onAzure, trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
-import { Button, buttonKind, FormSelect, Input, InsetPanel } from '@lar-works/design-system';
+import {
+    BoardNote,
+    Button,
+    buttonKind,
+    FormSection,
+    FormSelect,
+    Input,
+    InsetPanel,
+    SettingsGroups,
+} from '@lar-works/design-system';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 
 import { AccessList, AccessReason, accessRows } from './AccessList';
@@ -77,7 +86,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
         writeAccessProblem(repo, 'open-pr', setup.access, { azureReadOnly: setup.azureReadOnly });
     const text = (field: keyof Drafts, label: string, key: DraftSetting) => (
         <Input
-            className="w-64 max-w-full"
+            presentation="setting"
             aria-label={label}
             aria-invalid={!!errors[field]}
             aria-describedby={errors[field] ? `${field === 'team' ? 'itemSource' : field}-error` : undefined}
@@ -98,9 +107,8 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
         );
 
     return (
-        <div data-project-page={repo} className="grid min-w-0 gap-7">
-            <section className="grid min-w-0 gap-3">
-                <h3 className="m-0 text-[13px] font-semibold">Project</h3>
+        <SettingsGroups data-project-page={repo}>
+            <FormSection presentation="dense" title="Project">
                 <InsetPanel presentation="settings">
                     <FieldRow
                         id="role"
@@ -112,9 +120,8 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                         {resetButton('role')}
                     </FieldRow>
                 </InsetPanel>
-            </section>
-            <section className="grid min-w-0 gap-3">
-                <h3 className="m-0 text-[13px] font-semibold">Work</h3>
+            </FormSection>
+            <FormSection presentation="dense" title="Work">
                 <InsetPanel presentation="settings">
                     <FieldRow
                         id="itemSource"
@@ -127,7 +134,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                                 {resetButton('itemSource')}
                             </>
                         ) : (
-                            <span className="text-xs text-(--muted-foreground)">This repository's GitHub issues.</span>
+                            <BoardNote>This repository's GitHub issues.</BoardNote>
                         )}
                     </FieldRow>
                 </InsetPanel>
@@ -138,11 +145,10 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                     checking={running === 'recheck'}
                     errors={errors}
                 />
-            </section>
+            </FormSection>
             <EditVocabulary key={repo} setup={setup} />
             <LabelsSection key={repo} repo={repo} setup={setup} />
-            <section className="grid min-w-0 gap-3">
-                <h3 className="m-0 text-[13px] font-semibold">Docs and skills</h3>
+            <FormSection presentation="dense" title="Docs and skills">
                 <InsetPanel presentation="settings">
                     <FieldRow
                         id="domainDocs"
@@ -160,22 +166,21 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                             )
                         }
                     >
-                        <span className="w-44 max-w-full">
-                            <FormSelect
-                                aria-label="Domain docs"
-                                writesOnPick
-                                value={docsProblem ? 'off' : drafts.domainDocs}
-                                disabled={!!docsProblem}
-                                onChange={(value) => {
-                                    type(repo, 'domainDocs', value);
-                                    void save(repo, 'domainDocs', latest.current);
-                                }}
-                                choices={[
-                                    { value: 'off', name: 'Off' },
-                                    { value: 'repository', name: 'Write in build PRs' },
-                                ]}
-                            />
-                        </span>
+                        <FormSelect
+                            aria-label="Domain docs"
+                            presentation="setting"
+                            writesOnPick
+                            value={docsProblem ? 'off' : drafts.domainDocs}
+                            disabled={!!docsProblem}
+                            onChange={(value) => {
+                                type(repo, 'domainDocs', value);
+                                void save(repo, 'domainDocs', latest.current);
+                            }}
+                            choices={[
+                                { value: 'off', name: 'Off' },
+                                { value: 'repository', name: 'Write in build PRs' },
+                            ]}
+                        />
                         {resetButton('domainDocs')}
                     </FieldRow>
                     {drafts.domainDocs === 'repository' && (
@@ -198,16 +203,15 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                         {resetButton('skills')}
                     </FieldRow>
                 </InsetPanel>
-            </section>
-            <section className="grid min-w-0 gap-3">
-                <h3 className="m-0 text-[13px] font-semibold">Access</h3>
+            </FormSection>
+            <FormSection presentation="dense" title="Access">
                 <AccessList rows={accessRows(setup)} checking={running === 'recheck'} onRecheck={recheckAccess} />
                 {errors.recheck && (
-                    <p role="alert" className="m-0 text-xs text-(--error-foreground)">
+                    <BoardNote tone="error" role="alert">
                         {errors.recheck}
-                    </p>
+                    </BoardNote>
                 )}
-            </section>
-        </div>
+            </FormSection>
+        </SettingsGroups>
     );
 }

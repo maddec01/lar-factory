@@ -2,28 +2,31 @@
 
 import { ITEM_KINDS } from '@lar-factory/shared';
 import {
+    BoardNote,
     Button,
     buttonKind,
-    FormFieldset,
+    DraftFields,
     FormResult,
     FormSelect,
+    Input,
     MarkdownEditor,
     Modal,
+    PanelField,
 } from '@lar-works/design-system';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import { useAddItemStore } from './AddItemStore';
 import type { DraftValues } from './AddItemStore';
-import { CreateIssueBox, IssueFields, PanelSection, ticketOptions } from './IssueFields';
-import { HINT, RepoSelect } from './RepoSelect';
+import { CreateIssueBox, IssueFields, ticketOptions } from './IssueFields';
+import { RepoSelect } from './RepoSelect';
 import { KIND_BADGES } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 
 const KIND_CHOICES = ITEM_KINDS.map((value) => {
     const { name, icon: Icon, hue } = KIND_BADGES[value]!;
 
-    return { value, name, icon: <Icon style={{ color: `oklch(0.62 0.15 ${hue})` }} /> };
+    return { value, name, icon: <Icon />, hue };
 });
 
 /** The form's values, the editor's `description` and the Create issue `createChoice`, for the store to keep. */
@@ -105,26 +108,22 @@ export function AddItemForm() {
                 keepForm();
             }}
         >
-            {/* Narrower than 40rem, the side panel stacks under the editor, which grows with its text, and the two scroll as one;
-          each row sizes to its content, so a long text pushes the panel down rather than running under it. */}
-            <div className="@container flex min-h-0 flex-1 flex-col">
-                <FormFieldset
-                    id="item-fields"
-                    presentation="group"
-                    disabled={locked}
-                    className="border-base-300 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_16rem] border-t @max-[40rem]:auto-rows-max @max-[40rem]:grid-cols-[minmax(0,1fr)] @max-[40rem]:content-start @max-[40rem]:overflow-y-auto"
-                >
-                    <div className="flex min-h-0 flex-col gap-3 overflow-y-auto px-5 pt-4 pb-5 sm:px-6 @max-[40rem]:min-h-80 @max-[40rem]:overflow-visible">
-                        <input
+            <DraftFields
+                id="item-fields"
+                disabled={locked}
+                detailsLabel="Details"
+                main={
+                    <>
+                        <Input
                             id="item-title"
                             name="title"
+                            presentation="title"
                             required
                             maxLength={256}
                             autoComplete="off"
                             defaultValue={kept?.title}
                             aria-label="Title"
                             placeholder="Title"
-                            className="text-base-content w-full shrink-0 border-0 bg-transparent p-0 text-xl font-semibold tracking-tight outline-none placeholder:font-medium placeholder:text-(--muted-foreground)"
                         />
                         <MarkdownEditor
                             label="Description"
@@ -134,17 +133,16 @@ export function AddItemForm() {
                             disabled={locked}
                             fill="wide"
                         />
-                        <p className={`${HINT} shrink-0`}>Formats as you type · saved as Markdown</p>
+                        <BoardNote>Formats as you type · saved as Markdown</BoardNote>
                         <FormResult id="item-result" text={message} />
-                    </div>
-                    <aside
-                        aria-label="Details"
-                        className="border-base-300 bg-base-50/60 grid content-start gap-5 overflow-y-auto border-l px-4 py-4 @max-[40rem]:overflow-visible @max-[40rem]:border-t @max-[40rem]:border-l-0"
-                    >
-                        <PanelSection heading="Project" htmlFor="item-repo">
+                    </>
+                }
+                details={
+                    <>
+                        <PanelField heading="Project" htmlFor="item-repo">
                             <RepoSelect id="item-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
-                        </PanelSection>
-                        <PanelSection heading="Kind" htmlFor="item-kind">
+                        </PanelField>
+                        <PanelField heading="Kind" htmlFor="item-kind">
                             <FormSelect
                                 ref={kindSelect}
                                 id="item-kind"
@@ -154,7 +152,7 @@ export function AddItemForm() {
                                 onChange={setKind}
                                 choices={KIND_CHOICES}
                             />
-                        </PanelSection>
+                        </PanelField>
                         {selected && (
                             <IssueFields
                                 key={selected.repo}
@@ -164,9 +162,9 @@ export function AddItemForm() {
                                 choice={createChoice}
                             />
                         )}
-                    </aside>
-                </FormFieldset>
-            </div>
+                    </>
+                }
+            />
             <Modal.Footer
                 leading={
                     selected && (

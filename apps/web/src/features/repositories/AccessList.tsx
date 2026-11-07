@@ -6,7 +6,7 @@ import {
     type RepositoryOperation,
     type RepositorySetup,
 } from '@lar-factory/shared';
-import { Button, buttonKind, HelpTip, InsetPanel } from '@lar-works/design-system';
+import { Button, ButtonRow, buttonKind, InlineButton, InsetPanel, ReasonNote, Stack } from '@lar-works/design-system';
 
 import { FieldRow } from '@/shared/settings/FieldRow';
 import { ToolState } from '@/shared/settings/SettingControls';
@@ -50,7 +50,7 @@ export function AccessList({
     onRecheck?: (() => void) | undefined;
 }) {
     return (
-        <div data-access data-access-list className="grid min-w-0 gap-3">
+        <Stack space="group" data-access data-access-list>
             <InsetPanel presentation="settings">
                 {rows.map((row) => (
                     <div key={row.name} data-operation={row.operation}>
@@ -78,13 +78,13 @@ export function AccessList({
                 ))}
             </InsetPanel>
             {onRecheck && (
-                <span>
+                <ButtonRow>
                     <Button {...buttonKind('other')} loading={checking} onClick={onRecheck}>
                         Recheck access
                     </Button>
-                </span>
+                </ButtonRow>
             )}
-        </div>
+        </Stack>
     );
 }
 
@@ -109,19 +109,17 @@ export function AccessReason({
     const short = explanation.split('. ')[0]!.replace(/\.$/, '');
 
     return (
-        <span className="inline-flex min-w-0 flex-wrap items-center gap-1 text-xs text-(--muted-foreground)">
-            <span>{short}.</span>
-            <HelpTip label="access">{explanation}</HelpTip>
-            {onRecheck && (
-                <button
-                    type="button"
-                    className="cursor-pointer bg-transparent p-0 text-(--foreground) underline"
-                    disabled={checking}
-                    onClick={onRecheck}
-                >
-                    {checking ? 'Checking…' : 'Recheck'}
-                </button>
-            )}
-        </span>
+        <ReasonNote
+            reason={`${short}.`}
+            explanation={explanation}
+            helpLabel="access"
+            action={
+                onRecheck && (
+                    <InlineButton disabled={checking} onClick={onRecheck}>
+                        {checking ? 'Checking…' : 'Recheck'}
+                    </InlineButton>
+                )
+            }
+        />
     );
 }

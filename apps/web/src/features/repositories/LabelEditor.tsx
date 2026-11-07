@@ -1,14 +1,35 @@
 // The editor a label row opens: its name, colour and description, saving only what changed.
 
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
-import { Alert, Button, buttonKind, Input, InsetPanel } from '@lar-works/design-system';
+import {
+    Alert,
+    BoardNote,
+    Button,
+    ButtonRow,
+    buttonKind,
+    ColorSwatches,
+    Input,
+    InsetPanel,
+    TrackerLabelEditor,
+} from '@lar-works/design-system';
 import { useState, type FormEvent } from 'react';
 
 import { useEditStore, type LabelChange } from './EditStore';
 import { OTHER_MAPPINGS, ProblemText, capitalized } from './LabelParts';
 import { FieldRow } from '@/shared/settings/FieldRow';
 
-const SWATCHES = ['D73A4A', 'E99695', 'FBCA04', '0E8A16', 'C2E0C6', 'BFDADC', '1D76DB', '5319E7', 'D4C5F9', 'EDEDED'];
+const SWATCHES = [
+    'D73A4A',
+    'E99695',
+    'FBCA04',
+    '0E8A16',
+    'C2E0C6',
+    'BFDADC',
+    '1D76DB',
+    '5319E7',
+    'D4C5F9',
+    'EDEDED',
+].map((hex) => ({ value: hex, color: `#${hex}`, label: `Colour #${hex}` }));
 
 /** The change to `label` an editor's fields make: only what differs, so a tracker hears nothing it needn't. */
 function changeFrom(
@@ -62,7 +83,7 @@ export function LabelEditor({
     };
 
     return (
-        <form className="bg-base-200/40 grid gap-3 border-t p-3" onSubmit={(event) => void save(event)}>
+        <TrackerLabelEditor onSubmit={(event) => void save(event)}>
             {capabilities.changeScope === 'project' && (
                 <Alert tone="warning" title="Renaming affects the whole project">
                     {capabilities.heading} belong to the project, not to this repository. Everything with this{' '}
@@ -79,32 +100,23 @@ export function LabelEditor({
                     />
                 </FieldRow>
                 <ProblemText>{problem}</ProblemText>
-                {mappings && update.name !== undefined && (
-                    <p className="text-base-700 m-0 text-xs">This also updates {mappings}.</p>
-                )}
+                {mappings && update.name !== undefined && <BoardNote>This also updates {mappings}.</BoardNote>}
                 {capabilities.color && (
                     <FieldRow label="Colour">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                            {SWATCHES.map((hex) => (
-                                <button
-                                    key={hex}
-                                    type="button"
-                                    aria-label={`Colour #${hex}`}
-                                    aria-pressed={hex.toLowerCase() === draft.color.toLowerCase()}
-                                    disabled={running !== null}
-                                    className={`size-5 rounded-full border ${hex.toLowerCase() === draft.color.toLowerCase() ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--card)' : ''}`}
-                                    style={{ background: `#${hex}` }}
-                                    onClick={() => setDraft({ ...draft, color: hex })}
-                                />
-                            ))}
+                        <ColorSwatches
+                            swatches={SWATCHES}
+                            value={draft.color}
+                            disabled={running !== null}
+                            onPick={(color) => setDraft({ ...draft, color })}
+                        >
                             <Input
                                 aria-label="Hex colour"
-                                className="w-24"
+                                presentation="short"
                                 value={draft.color}
                                 disabled={running !== null}
                                 onChange={(e) => setDraft({ ...draft, color: e.target.value })}
                             />
-                        </span>
+                        </ColorSwatches>
                         <ProblemText>{badColor}</ProblemText>
                     </FieldRow>
                 )}
@@ -121,7 +133,7 @@ export function LabelEditor({
                 )}
             </InsetPanel>
             <ProblemText>{failure}</ProblemText>
-            <span className="flex gap-2">
+            <ButtonRow>
                 <Button {...buttonKind('other')} type="button" disabled={running !== null} onClick={onDone}>
                     Cancel
                 </Button>
@@ -133,7 +145,7 @@ export function LabelEditor({
                 >
                     Save
                 </Button>
-            </span>
-        </form>
+            </ButtonRow>
+        </TrackerLabelEditor>
     );
 }

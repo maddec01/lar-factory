@@ -96,6 +96,7 @@ function Refs({ text, find }: { text: string; find: FindRef }) {
     return text.split(/((?:[\w.-]+\/[\w.-]+)?#\d+)/).map((bit, n) => {
         const ref = /^(?:([\w.-]+\/[\w.-]+))?#(\d+)$/.exec(bit);
         const item = ref ? find(ref[1], Number(ref[2])) : undefined;
+
         return item ? (
             <button
                 key={n}
@@ -122,14 +123,17 @@ const waitsOn = (part: Part) =>
 function ThreadLine({ part }: { part: Part }) {
     const thread = shownThread(part, useShownStatus(part.item).working);
     const running = useStatusActivity();
+
     if (!thread) {
         const { work, dependencies } = blockerGroups(part.item, openWaits(part));
         const waits = [
             ...(work ? [work.names] : []),
             ...(dependencies ? [`you to mark ${dependencies.names} met`] : []),
         ];
+
         return waits.length ? <span>Waiting on {waits.join(' and ')}</span> : null;
     }
+
     return (
         <span className="flex min-w-0 items-center gap-1.5" title={thread.title}>
             <StatusGlyph
@@ -154,6 +158,7 @@ interface Stored<T> {
     read: (stored: string | null) => T;
     write: (value: T) => string;
 }
+
 const OPEN: Stored<boolean> = { name: 'open', read: (s) => s === '1', write: (on) => (on ? '1' : '0') };
 /** Work map or parts list; a dossier starts on its Work map. */
 const VIEW: Stored<View> = { name: 'view', read: (s) => (s === 'list' ? 'list' : 'map'), write: (v) => v };
@@ -161,6 +166,7 @@ const VIEW: Stored<View> = { name: 'view', read: (s) => (s === 'list' ? 'list' :
 function useStored<T>({ name, read, write }: Stored<T>, parent: Item): [T, (v: T) => void] {
     const key = `lar-board:dossier-${name}:${parent.id}`;
     const [value, setValue] = useState(() => read(localStorage.getItem(key)));
+
     return [
         value,
         (v) => {
@@ -184,6 +190,7 @@ function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void })
             <span className="sr-only">{label}</span>
         </button>
     );
+
     return (
         <div className="inline-flex rounded-lg bg-(--muted) p-0.5">
             {one('map', <MapIcon className="size-3.5" />, 'Work map')}
@@ -195,7 +202,9 @@ function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void })
 /** Where the concept's planning lives, as a quiet label; hovering or focusing it reads the whole note. */
 function LocalPlanning({ item }: { item: Item }) {
     if (!item.sync || item.sync.state === 'saved') return null;
+
     const note = ['Planning is saved on this Mac.', item.sync.message].filter(Boolean).join(' ');
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -479,13 +488,16 @@ function Attention({
             )),
         },
     ].filter((r) => r.entries.length && (!only || only.includes(r.key)));
+
     if (!rows.length && only) return null;
+
     if (!rows.length)
         return (
             <p className="m-0 text-[13px] text-(--muted-foreground)" data-attention-none>
                 Nothing holds this up.
             </p>
         );
+
     return (
         // The labels' column is 7.5rem, or as wide as the longest label so none wraps ("To verify or merge" needs more).
         <dl className="m-0 grid grid-cols-[minmax(7.5rem,max-content)_minmax(0,1fr)] gap-x-4 gap-y-2" data-attention>
@@ -507,15 +519,22 @@ function Action({ part, data }: { part: Part; data: BoardData }) {
     const { status } = part.item;
     const { working } = useShownStatus(part.item);
     const done = isDone(part.item);
+
     if (!done && working)
         return <OpenThread item={part.item} data={data} threadId={currentBuildThread(part.item)?.id} />;
+
     if (!done && YOURS.includes(status)) return <OnYourDesk />;
+
     if (!done && (status === 'Ready' || status === 'Queued'))
         return <PartStart part={part} data={data} label="Start" />;
+
     const waiting = !done && openWaits(part).length > 0;
+
     if (!done && !waiting && canRetryBuild(part.item)) return <StartBuild item={part.item} data={data} />;
+
     const thread =
         threadsOf(part.item).length > 0 || (!done && !waiting && ['Shaping', 'In progress', 'Review'].includes(status));
+
     return (
         <>
             {waiting && (
@@ -543,6 +562,7 @@ function PartRow({ part, data, home }: { part: Part; data: BoardData; home: stri
     const word = (activity && ACTIVITY_WORD[activity]) ?? shown.word;
     const slices = item.slices.length;
     const hasThreadLine = !!activity || !!shownThread(part, shown.working) || waits.length > 0;
+
     return (
         <li data-part={item.id} className={`@container rounded-md px-3 py-2 hover:bg-(--accent) ${picked(isPicked)}`}>
             <div className="flex items-start gap-x-3">
@@ -622,6 +642,7 @@ function PartsList({ parts, data, home }: { parts: Part[]; data: BoardData; home
     const [showDone, setShowDone] = useState(false);
     const shown = parts.filter((p) => showDone || !isDone(p.item));
     const done = parts.filter((p) => isDone(p.item)).length;
+
     return (
         <div className="grid gap-1">
             <ol className="m-0 grid list-none gap-x-4 gap-y-1 p-0 @4xl:grid-cols-2" data-parts-list>
@@ -662,6 +683,7 @@ interface Moving {
 
 function moving(parent: Item, parts: Part[], unavailable: boolean): Moving {
     const ahead = parts.filter((p) => !isDone(p.item));
+
     return {
         parts,
         done: Math.max(parent.subIssues.completed, parts.length - ahead.length),
@@ -702,6 +724,7 @@ function PartsBar({ m }: { m: Moving }) {
     const unread = m.count - m.parts.length;
     const unavailable = useActivityUnavailable();
     const disconnected = useBoardStore((state) => !!state.clientError);
+
     return (
         <ol
             className="m-0 flex min-w-0 list-none gap-[2px] overflow-hidden p-0"
@@ -711,6 +734,7 @@ function PartsBar({ m }: { m: Moving }) {
             {order.map((p) => {
                 const { word, glyph } = shownStatus(p.item, unavailable);
                 const pulse = glyph === 'In progress' && !itemActivityStill(p.item, Date.now(), disconnected);
+
                 return (
                     <li
                         key={p.item.id}
@@ -740,11 +764,17 @@ function PartsBar({ m }: { m: Moving }) {
 /** The one thing to say next: what waits on you (a part in Needs you first), else what can start, else what's moving. */
 function nextOf(m: Moving, parent: Item): { tone: 'you' | 'start' | 'moving' | 'none'; part?: Part; text: string } {
     if (needsAnswer(parent)) return { tone: 'you', text: itemName(parent) };
+
     const yours = m.needsYou[0] ?? m.yours[0];
+
     if (yours) return { tone: 'you', part: yours, text: `${itemName(yours.item)}` };
+
     if (m.ready[0]) return { tone: 'start', part: m.ready[0], text: `${itemName(m.ready[0].item)}` };
+
     if (m.active[0]) return { tone: 'moving', part: m.active[0], text: `${itemName(m.active[0].item)}` };
+
     if (m.count > m.parts.length) return { tone: 'none', text: 'Some parts are outside the board' };
+
     return { tone: 'none', text: noDelivery(parent) ? 'No delivery planned' : 'Nothing waits on you' };
 }
 
@@ -756,8 +786,10 @@ const META = 'min-w-0 lg:min-w-10 shrink-[1000] truncate';
  *  threads, nothing), so the threads' wording never contradicts the "need you" chip, which counts parts. */
 function threadCounts(threads: ReturnType<typeof threadsOf>): string {
     if (!threads.length) return '';
+
     const running = threads.filter(threadAtWork).length;
     const waiting = threads.filter((t) => t.state === 'needs you').length;
+
     return [
         plural(threads.length, 'T3 thread'),
         running && `${running} running`,
@@ -786,6 +818,7 @@ const noDelivery = (parent: Item) =>
 function chipsOf(parent: Item, m: Moving): Chip[] {
     const count = (n: number, word: string, tone: Chip['tone'], icon: ReactNode): Chip[] =>
         n ? [{ words: `${n} ${word}`, tone, icon }] : [];
+
     return [
         ...count(m.needsYou.length, 'need you', 'warning', <StatusGlyph status="Needs you" className="size-3" />),
         ...count(m.decisions.length, m.decisions.length === 1 ? 'decision' : 'decisions', 'accent', <MessagesSquare />),
@@ -799,7 +832,9 @@ function chipsOf(parent: Item, m: Moving): Chip[] {
 /** The first chip whole, at its full width, and how many more the row's tooltip names. An empty dossier takes no room. */
 function Chips({ chips }: { chips: Chip[] }) {
     const [first, ...rest] = chips;
+
     if (!first) return null;
+
     return (
         <span onClick={stop} className="flex shrink-0 items-center gap-1" data-chips>
             <Badge
@@ -836,6 +871,7 @@ function Next({ n, badged }: { n: ReturnType<typeof nextOf>; badged: boolean }) 
               : 'Needs you';
     const word = { you: yours, start: 'Next', moving: 'Moving', none: '' }[n.tone];
     const unseen = n.tone === 'start' || (badged && word === 'Needs you');
+
     return (
         <span className="flex min-w-0 items-center gap-2">
             {/* Start sits in the action slot labelled "Start", and a "need you" badge says Needs you, so those words are screen-reader text and leave their room to the title. */}
@@ -883,6 +919,7 @@ function DossierLine({
     const chips = chipsOf(parent, m);
     const n = nextOf(m, parent);
     const repos = otherRepos(parent, m, data);
+
     return (
         <div
             onClick={onClick}
@@ -969,6 +1006,7 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
     const missing = Math.max(parent.subIssues.total, parts.length) - parts.length;
     // The line's own label says the planning is local; a spec waiting to save still speaks up here.
     const { sync: _, ...unsynced } = parent;
+
     return (
         <div className="grid gap-3 border-t border-(--border) p-3" data-dossier-body>
             {noDelivery(parent) && (
@@ -1005,7 +1043,9 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
     // Letting go of a drag that selected text in the line leaves it as it was; a selection elsewhere on the page still toggles it.
     const toggle = (e: MouseEvent<HTMLDivElement>) => {
         const selection = window.getSelection();
+
         if (selection && !selection.isCollapsed && e.currentTarget.contains(selection.anchorNode)) return;
+
         setOn(!on);
     };
     const lead = (
@@ -1023,6 +1063,7 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
             <ChevronRight className={`size-4 ${on ? 'rotate-90' : ''}`} />
         </button>
     );
+
     return (
         <article className={`@container ${ROW_RULE}`} data-dossier={parent.id} aria-label={itemName(parent)}>
             <DossierLine
@@ -1043,7 +1084,9 @@ function DossierRow({ parent, parts, data }: { parent: Item; parts: Part[]; data
 /** The dossiers the filters leave; a dossier follows its parent's row. With none, the dock takes no height. */
 export function Dossiers({ dossiers }: { dossiers: DossierItems[] }) {
     const data = useBoardStore((state) => state.data);
+
     if (!dossiers.length) return null;
+
     return (
         <Pane id="dock" title="Concepts and linked work" count={dossiers.length}>
             <div data-dossiers>

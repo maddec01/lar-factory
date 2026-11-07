@@ -15,12 +15,14 @@ export class ElectronUpdaterError extends Data.TaggedError('ElectronUpdaterError
 }> {
     override get message(): string {
         const reason = this.cause instanceof Error ? this.cause.message : String(this.cause);
+
         return `Could not ${this.operation} the update: ${reason.split('\n', 1)[0]}`;
     }
 
     /** electron-updater's error code, such as `ERR_UPDATER_CHANNEL_FILE_NOT_FOUND`, if it gave one. */
     get code(): string | null {
         const code = (this.cause as { code?: unknown } | null)?.code;
+
         return typeof code === 'string' ? code : null;
     }
 }
@@ -60,6 +62,7 @@ export const make = async (): Promise<ElectronUpdater> => {
         removeListener: (eventName: string, listener: (arg: unknown) => void) => void;
     };
     const set = (apply: () => void) => Effect.sync(apply);
+
     return {
         setAutoDownload: (value) => set(() => (autoUpdater.autoDownload = value)),
         setAutoInstallOnAppQuit: (value) => set(() => (autoUpdater.autoInstallOnAppQuit = value)),

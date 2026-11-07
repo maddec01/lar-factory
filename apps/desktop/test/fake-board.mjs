@@ -9,15 +9,19 @@
 import { createServer } from 'node:http';
 
 if (process.env.ELECTRON_RUN_AS_NODE !== '1') process.exit(2);
+
 const mode = process.env.FAKE_BOARD ?? 'ready';
+
 if (mode === 'crash') process.exit(3);
 
 const busy = Number(process.env.FAKE_BOARD_BUSY ?? '0');
 let hits = 0;
 let answer = null;
+
 process.on('message', (message) => {
     if (message?.type === 'skills-checked') answer = message;
 });
+
 const server = createServer((req, res) => {
     if (req.url === '/healthz') {
         hits += 1;
@@ -30,9 +34,13 @@ const server = createServer((req, res) => {
         res.writeHead(404).end();
     }
 });
+
 server.listen(0, '127.0.0.1', () => {
     if (mode !== 'ready') return;
+
     process.send({ type: 'listening', port: server.address().port });
+
     const drift = process.env.FAKE_BOARD_DRIFT;
+
     if (process.env.FAKE_BOARD_CHECK === '1') process.send({ type: 'check-skills', id: 7, ...(drift && { drift }) });
 });

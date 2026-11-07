@@ -47,6 +47,7 @@ import { TargetReaders } from './target-readers.tsx';
 
 function DialogPreference({ preference, label }: { preference: keyof typeof DIALOG_PREFERENCES; label: string }) {
     const [on, setOn] = useState(() => dialogPreference(preference));
+
     return (
         <Switch
             label={label}
@@ -162,7 +163,9 @@ const ONLY_APP_UPDATES = 'Only the board app updates itself.';
  */
 function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
     if (!check) return { text: 'Not checked', tone: 'muted' };
+
     const older = (version: string) => `${version}, older than ${GH_FLOOR}`;
+
     switch (check.result) {
         case 'ok':
             return { text: `${login ? 'Signed in' : check.version || 'OK'}`, tone: 'success' };
@@ -201,7 +204,9 @@ function azSkipped(data: SettingsData): string {
 /** `name`'s state in `data`, Checking while its check runs with no result yet. */
 function stateOf(data: SettingsData, name: CheckedTool, login = false): ComponentProps<typeof ToolState> {
     const check = data.tools?.[name];
+
     if (!check && data.toolProgress?.checking.includes(name)) return { text: 'Checking', tone: 'muted' };
+
     return toolState(check, login);
 }
 
@@ -212,6 +217,7 @@ function refreshEvery(seconds: number): Control {
         seconds < 60 || !Number.isInteger(minutes)
             ? `${seconds} seconds`
             : `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+
     return custom(() => <span className="text-xs text-(--muted-foreground)">{value}</span>);
 }
 
@@ -254,6 +260,7 @@ function repositoryGroup(data: SettingsData): Group {
             </Button>
         )),
     }));
+
     return {
         title: 'Projects',
         description: 'Settings stay on this machine. Projects need no factory files.',
@@ -269,6 +276,7 @@ function repositoryGroup(data: SettingsData): Group {
 /** Why a target can't be unticked, or nothing. */
 function lockedReason({ locked, instances }: TargetSnapshot): string | undefined {
     if (!locked) return undefined;
+
     return instances.length > 0
         ? "T3 Code's provider instances read it, so it stays ticked."
         : "Claude's skill links point here, so it stays ticked.";
@@ -280,19 +288,23 @@ function lockedReason({ locked, instances }: TargetSnapshot): string | undefined
  */
 function targetNote(target: TargetSnapshot): string | undefined {
     if (!target.homeMissing) return lockedReason(target);
+
     const home = target.path.replace(/\/skills$/, '');
     const why = target.instances.length > 0 ? "T3 Code's provider instances read it; " : '';
+
     return `Not installed until ${home} exists. ${why}Lar Factory installs here once it exists.`;
 }
 
 function targetGroup({ app, targets }: PagesInput): Group {
     const description = 'The app installs its skills into each ticked folder: copies, or links in a Claude home.';
+
     if (!app)
         return {
             title: 'Skill folders',
             rows: [],
             note: <p className="m-0 text-xs text-(--muted-foreground)">{ONLY_APP_TARGETS}</p>,
         };
+
     return {
         title: 'Skill folders',
         help: description,
@@ -315,6 +327,7 @@ function targetGroup({ app, targets }: PagesInput): Group {
 /** A skill's install state, with what it means as its tooltip; nothing before an install records it. */
 function InstallState({ status }: { status: BundledSkill['status'] }) {
     if (!status) return null;
+
     const [text, tone, title]: [string, ComponentProps<typeof ToolState>['tone'], string] =
         status.state === 'matching'
             ? ['Installed', 'success', 'Matches this version of Lar Factory.']
@@ -325,6 +338,7 @@ function InstallState({ status }: { status: BundledSkill['status'] }) {
                     'Lar Factory put back its copy, which had changed.',
                 ]
               : ['Blocked', 'error', `${capitalise(blockedBy(status.paths).join(''))}. ${moveAway(status.paths)}`];
+
     return (
         <span title={title}>
             <ToolState text={text} tone={tone} />
@@ -338,22 +352,28 @@ function InstallState({ status }: { status: BundledSkill['status'] }) {
  */
 function moveAway(paths: readonly BlockingPath[]): string {
     const move = `Move ${paths.length === 1 ? 'that path' : 'each path'} away`;
+
     if (paths.some((blocking) => blocking.place === 'agents')) return `${move} to install this skill.`;
+
     const profiles = new Set(paths.flatMap((blocking) => (blocking.place === 'profile' ? [blocking.profile] : [])));
+
     return paths.every((blocking) => blocking.place === 'profile')
         ? `${move}, or untick the ${profiles.size === 1 ? 'profile' : 'profiles'}.`
         : `${move}.`;
 }
+
 const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** What blocks a skill, where it leaves the skill missing and what to do, as a line under its credit; nothing for a skill nothing blocks. */
 function BlockedReason({ status }: { status: BundledSkill['status'] }) {
     if (status?.state !== 'blocked') return null;
+
     const [opening, ...rest] = blockedBy(status.paths, (path) => (
         <code key={path} className="break-all">
             {path}
         </code>
     ));
+
     return (
         <span className="block text-(--destructive-foreground)">
             {capitalise(opening)}
@@ -424,6 +444,7 @@ function bundledGroup({ data, version }: PagesInput): Group {
                   control: custom(() => null),
               },
           ];
+
     return { title: 'Bundled skills', help: 'The skills and checklists the app installs, and who wrote them.', rows };
 }
 
@@ -433,7 +454,9 @@ function updateRows({ app, version }: PagesInput): Row[] {
         title: 'Update channel',
         description: 'Nightly offers each Nightly Release; Latest only Stable Releases.',
     };
+
     if (!app) return [{ id: 'updates-app-only', title: ONLY_APP_UPDATES, noteOnly: true, control: custom(() => null) }];
+
     return [
         { ...channel, control: custom(() => <ChannelChoice />) },
         {
@@ -448,6 +471,7 @@ function updateRows({ app, version }: PagesInput): Row[] {
 /** This Mac's retention setting, then each piece of work in Archive with what it offers; none in sample mode. */
 function archiveGroups(data: SettingsData, archive: PagesInput['archive']): Group[] {
     if (!data.retention) return [{ title: 'Archive', description: 'Sample mode keeps no work records.', rows: [] }];
+
     const retention = data.retention;
     const work: Row[] = (archive.items ?? []).map((item) => ({
         id: `archived-${item.id}`,
@@ -464,6 +488,7 @@ function archiveGroups(data: SettingsData, archive: PagesInput['archive']): Grou
         ),
         control: custom(() => <ArchiveActions item={item} />),
     }));
+
     return [
         {
             title: 'Retention',
@@ -494,6 +519,7 @@ function archiveGroups(data: SettingsData, archive: PagesInput['archive']): Grou
 
 export function pages(input: PagesInput): Page[] {
     const { data } = input;
+
     return [
         {
             id: 'general',
@@ -681,9 +707,13 @@ export function pages(input: PagesInput): Page[] {
 /** What the command does, or why its check failed and how to fix it. */
 function toolDescription(does: string, check: ToolCheck | undefined): ReactNode {
     if (!check || check.result === 'ok') return does;
+
     if (check.result === 'not-running') return 'Open T3 Code.';
+
     const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';
+
     if (!('fix' in check)) return `${where}Install T3 Code.`;
+
     return (
         <>
             {where}Fix: <code className="whitespace-nowrap">{check.fix}</code>

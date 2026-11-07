@@ -33,6 +33,7 @@ export function ModelEntries({
     const checked = storedChoice(selected);
     const entry = (label: string, choice?: ModelChoice, unavailable?: string, detail?: string) => {
         const why = held ?? unavailable ?? (!choice ? defaultHeld : undefined);
+
         return (
             <DropdownMenu.RadioItem
                 key={storedChoice(choice)}
@@ -52,6 +53,7 @@ export function ModelEntries({
             </DropdownMenu.RadioItem>
         );
     };
+
     return (
         <DropdownMenu.RadioGroup value={checked} aria-labelledby={`${headings}-with`}>
             <DropdownMenu.Label id={`${headings}-with`}>{heading}</DropdownMenu.Label>

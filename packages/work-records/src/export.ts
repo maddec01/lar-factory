@@ -23,6 +23,7 @@ const NO_HARD_LINKS = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV', 'ENOSY
 /** A file name part from the body's first heading: lowercase letters and digits joined by hyphens, never a path. */
 function slug(markdown: string): string {
     const heading = /^#{1,6}[ \t]+(.+?)[ \t#]*$/m.exec(markdown)?.[1] ?? '';
+
     return heading
         .normalize('NFKD')
         .toLowerCase()
@@ -40,6 +41,7 @@ function dependencyMarkdown(dependency: Dependency): string {
     const met = dependency.met
         ? `Marked met by ${dependency.met.by} at ${dependency.met.at}.${dependency.needsReview ? ' An observation changed since; review it.' : ''}`
         : 'Not met.';
+
     return (
         [
             `# ${dependency.owner}: ${dependency.need.split('\n')[0]}`,
@@ -70,45 +72,60 @@ export function exportMarkdown(records: WorkRecords, workId: string, destination
         workId,
         markdown: records.body(workId, body),
     }));
+
     for (const dependency of records.dependencies(workId))
         bodies.push({ body: 'dependency', workId: dependency.dependencyId, markdown: dependencyMarkdown(dependency) });
+
     if (record.kind === 'concept') {
         for (const child of records.children(workId)) {
             if (child.kind !== 'decision') continue;
+
             for (const body of ['decision', 'answer'] as const)
                 bodies.push({ body, workId: child.workId, markdown: records.body(child.workId, body) });
         }
     }
+
     const files = bodies.filter((entry): entry is typeof entry & { markdown: string } => entry.markdown !== null);
+
     if (!files.length)
         throw new WorkRecordError(
             'not-found',
             `The work record ${workId} has nothing to export: no brief, decision, map or Dependency.`,
         );
+
     if (typeof destination !== 'string' || !isAbsolute(destination))
         throw new WorkRecordError('invalid', `The export folder "${String(destination)}" isn't an absolute path.`);
+
     if (!statSync(destination, { throwIfNoEntry: false })?.isDirectory())
         throw new WorkRecordError('invalid', `The export folder ${destination} isn't a folder.`);
 
     const names = new Set<string>();
     const planned = files.map(({ body, workId: owner, markdown }) => {
         let name = `${body}-${slug(markdown) || owner}.md`;
+
         if (names.has(name)) name = `${name.slice(0, -3)}-${owner}.md`;
+
         names.add(name);
+
         return { path: join(destination, name), temporary: join(destination, `.${name}.${process.pid}.tmp`), markdown };
     });
     const failed = (reason: string) =>
         new WorkRecordError('export-failed', `Can't export the work record ${workId} to ${destination}: ${reason}.`);
     const taken = planned.find((file) => lstatSync(file.path, { throwIfNoEntry: false }));
+
     if (taken) throw failed(`${taken.path} already exists`);
+
     // A hard link fails when its name exists, so a file made after the check above is never replaced either. Where the
     // filesystem has no hard links, an exclusive copy fails the same way.
     const written: string[] = [];
     const linked: string[] = [];
+
     try {
         for (const file of planned) {
             const fd = openSync(file.temporary, 'wx');
+
             written.push(file.temporary);
+
             try {
                 writeFileSync(fd, file.markdown);
             } finally {
@@ -120,8 +137,10 @@ export function exportMarkdown(records: WorkRecords, workId: string, destination
                 linkSync(file.temporary, file.path);
             } catch (error) {
                 if (!NO_HARD_LINKS.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
+
                 copyFileSync(file.temporary, file.path, constants.COPYFILE_EXCL);
             }
+
             linked.push(file.path);
         }
     } catch (error) {
@@ -130,5 +149,6 @@ export function exportMarkdown(records: WorkRecords, workId: string, destination
     } finally {
         for (const path of written) rmSync(path, { force: true });
     }
+
     return planned.map((file) => file.path);
 }

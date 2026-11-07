@@ -29,9 +29,12 @@ const isCount = (value: unknown): value is number => Number.isSafeInteger(value)
 
 function readCodexTokenUsage(value: unknown): CodexTokenUsage | null {
     if (!isObject(value) || Array.isArray(value)) return null;
+
     const input = value.input_tokens;
     const output = value.output_tokens;
+
     if (typeof input !== 'number' || typeof output !== 'number') return null;
+
     const usage: Record<keyof CodexTokenUsage, unknown> = {
         input_tokens: input,
         cached_input_tokens: value.cached_input_tokens === undefined ? 0 : value.cached_input_tokens,
@@ -40,8 +43,11 @@ function readCodexTokenUsage(value: unknown): CodexTokenUsage | null {
         reasoning_output_tokens: value.reasoning_output_tokens === undefined ? 0 : value.reasoning_output_tokens,
         total_tokens: value.total_tokens === undefined ? input + output : value.total_tokens,
     };
+
     if (!CODEX_USAGE_FIELDS.every((key) => isCount(usage[key]))) return null;
+
     const valid = usage as CodexTokenUsage;
+
     return valid.cached_input_tokens + valid.cache_write_input_tokens <= valid.input_tokens &&
         valid.reasoning_output_tokens <= valid.output_tokens &&
         valid.total_tokens >= valid.input_tokens + valid.output_tokens
@@ -102,8 +108,10 @@ const FORK_COPY_MAX_GAP_MS = 1000;
 
 function isForkedSessionMeta(payload: Record<string, unknown>): boolean {
     if (typeof payload.forked_from_id === 'string') return true;
+
     const subagent = isObject(payload.source) ? payload.source.subagent : undefined;
     const spawn = isObject(subagent) ? subagent.thread_spawn : undefined;
+
     return isObject(spawn) && typeof spawn.parent_thread_id === 'string';
 }
 
@@ -113,8 +121,11 @@ function isForkedSessionMeta(payload: Record<string, unknown>): boolean {
  */
 export function codexServiceTier(serviceTier: unknown): UsageSpeed | undefined {
     if (serviceTier === 'priority' || serviceTier === 'fast') return 'fast';
+
     if (serviceTier === 'ultrafast') return 'ultrafast';
+
     if (serviceTier === undefined || serviceTier === 'default' || serviceTier === 'standard') return 'standard';
+
     return undefined;
 }
 
@@ -126,52 +137,69 @@ export function codexServiceTier(serviceTier: unknown): UsageSpeed | undefined {
  */
 export function parseCodexLine(line: string, state: CodexScanState): UsageRecord | null {
     let record: unknown;
+
     try {
         record = JSON.parse(line);
     } catch {
         return null;
     }
+
     if (!isObject(record)) return null;
+
     const payload = record.payload;
+
     if (!isObject(payload)) return null;
 
     if (record.type === 'session_meta') {
         // Only the first meta is this file's own session; a fork repeats its ancestors' after it.
         if (state.sawSessionMeta) return null;
+
         state.sawSessionMeta = true;
+
         const id = payload.id ?? payload.session_id;
+
         if (typeof id === 'string') state.sessionId = id;
+
         if (typeof payload.model_provider === 'string') state.modelProvider = payload.model_provider;
+
         const metaTimestampMs = parseTimestampMs(record.timestamp);
+
         if (metaTimestampMs !== null && isForkedSessionMeta(payload)) {
             state.suppressingForkCopies = true;
             state.forkCopyAnchorMs = metaTimestampMs;
         }
+
         return null;
     }
 
     if (record.type === 'turn_context') {
         if (typeof payload.model === 'string') state.model = payload.model;
+
         state.turnId =
             typeof payload.turn_id === 'string' && typeof payload.model === 'string' && payload.model.length > 0
                 ? payload.turn_id
                 : '';
+
         return null;
     }
 
     if (payload.type === 'thread_settings_applied') {
         state.sawThreadSettings = true;
+
         // Codex omits the tier when none was requested; any tier it doesn't name bills as standard.
         if (isObject(payload.thread_settings))
             state.speed = codexServiceTier(payload.thread_settings.service_tier) ?? 'standard';
+
         return null;
     }
 
     if (payload.type !== 'token_count' || !isObject(payload.info)) return null;
+
     const info = payload.info;
 
     // Codex may re-emit these counters once the model or timestamp is known.
     const timestampMs = parseTimestampMs(record.timestamp);
+
     if (timestampMs === null || state.model.length === 0) return null;
 
     const last = readCodexTokenUsage(info.last_token_usage);
@@ -181,30 +209,39 @@ export function parseCodexLine(line: string, state: CodexScanState): UsageRecord
     if (state.suppressingForkCopies) {
         if (timestampMs - state.forkCopyAnchorMs < FORK_COPY_MAX_GAP_MS) {
             state.forkCopyAnchorMs = timestampMs;
+
             // Copied history is billed in the parent, but sets the child's baseline.
             const signature = last === null ? null : JSON.stringify(last);
+
             if (cumulative !== null) state.lastCumulativeUsage = cumulative;
             else if (!hasCumulative && last !== null && signature !== state.lastUsageSignature) {
                 state.lastCumulativeUsage = advanceCodexUsage(state.lastCumulativeUsage, last);
             }
+
             state.lastUsageSignature = signature;
+
             return null;
         }
+
         state.suppressingForkCopies = false;
         state.lastUsageSignature = null;
     }
 
     const previous = state.lastCumulativeUsage;
+
     // A valid snapshot is the next baseline even when its request is malformed.
     if (cumulative !== null) state.lastCumulativeUsage = cumulative;
+
     if (last === null || (hasCumulative && cumulative === null)) {
         state.malformedRecords += 1;
+
         return null;
     }
 
     // Zero-component counters report context size, not a request.
     if (last.input_tokens + last.output_tokens === 0) {
         state.lastUsageSignature = null;
+
         return null;
     }
 
@@ -212,10 +249,12 @@ export function parseCodexLine(line: string, state: CodexScanState): UsageRecord
 
     if (last.total_tokens !== last.input_tokens + last.output_tokens) {
         state.malformedRecords += 1;
+
         return null;
     }
 
     const signature = JSON.stringify(last);
+
     if (cumulative !== null) {
         // A session resumed in a new Codex process restarts its cumulative counters at this request.
         if (
@@ -223,18 +262,24 @@ export function parseCodexLine(line: string, state: CodexScanState): UsageRecord
             !CODEX_USAGE_FIELDS.every((key) => cumulative[key] - (previous?.[key] ?? 0) === last[key])
         ) {
             state.malformedRecords += 1;
+
             return null;
         }
     } else {
         if (signature === state.lastUsageSignature) return null;
+
         // Advance the expected totals so a later cumulative re-emission is stale.
         const advanced = advanceCodexUsage(previous, last);
+
         if (advanced === null) {
             state.malformedRecords += 1;
+
             return null;
         }
+
         state.lastCumulativeUsage = advanced;
     }
+
     state.lastUsageSignature = signature;
 
     const totals: UsageTokenTotals = {
@@ -262,6 +307,7 @@ export function parseCodexLine(line: string, state: CodexScanState): UsageRecord
             : {}),
         dedupeKey: null,
     };
+
     return usage;
 }
 
@@ -274,5 +320,6 @@ export type LineParser = (line: string) => UsageRecord | null;
 /** Reads a Codex rollout's lines top to bottom, with one scan state. */
 export function codexLineParser(): LineParser {
     const state = initialCodexScanState();
+
     return (line) => (CODEX_MARKERS.test(line) ? parseCodexLine(line, state) : null);
 }

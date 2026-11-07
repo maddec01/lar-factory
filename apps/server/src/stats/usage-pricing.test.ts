@@ -50,6 +50,7 @@ test('custom token rates go ahead of public and provider-reported costs', () => 
             cacheWriteCostPerMillionTokens: 3,
         },
     });
+
     for (const reported of [null, 99]) {
         assert.deepEqual(priceUsage(table, record('example-model', reported), overrides), {
             costUsd: 13.5,
@@ -62,6 +63,7 @@ test('an unknown model is priced by its override, with omitted cache rates at th
     const overrides = createOverrideRateTable({
         'example-model': { inputCostPerMillionTokens: 2, outputCostPerMillionTokens: 8 },
     });
+
     assert.deepEqual(priceUsage(parseRateTable({}), record('example-model'), overrides), {
         costUsd: 14,
         costSource: 'modelPriced',
@@ -73,6 +75,7 @@ test('explicit zero rates hold, and an override matches only the exact trimmed m
     const overrides = createOverrideRateTable({
         ' vendor/example-model[1m] ': { inputCostPerMillionTokens: 0, outputCostPerMillionTokens: 0 },
     });
+
     assert.deepEqual(priceUsage(table, record(' vendor/example-model[1m] ', 99), overrides), {
         costUsd: 0,
         costSource: 'modelPriced',
@@ -101,6 +104,7 @@ test("fast requests cost the model's published fast multiple, and overrides have
     });
     const cost = (model: string, speed: UsageSpeed, custom?: typeof overrides) =>
         priceUsage(table, record(model, null, speed), custom).costUsd;
+
     close(cost('claude-opus-5-5', 'fast'), 2 * cost('claude-opus-5-5', 'standard'));
     assert.equal(cost('claude-fable-5-1', 'fast'), cost('claude-fable-5-1', 'standard'));
     assert.equal(cost('claude-opus-5-5', 'fast', overrides), cost('claude-opus-5-5', 'standard', overrides));
@@ -114,6 +118,7 @@ test('a fast request with a cache-write rate costs the fast multiple; a reported
             provider_specific_entry: { fast: 2 },
         },
     });
+
     close(priceUsage(table, record('claude-opus-5-5', null, 'fast')).costUsd, 58.8);
     assert.deepEqual(priceUsage(table, record('claude-opus-5-5', 29.4, 'fast')), {
         costUsd: 29.4,
@@ -139,6 +144,7 @@ test('Codex priority and ultrafast requests cost their published tier rates', ()
     });
     const cost = (model: string, speed: UsageSpeed) => priceUsage(table, record(model, null, speed)).costUsd;
     const standard = cost('gpt-6-astra', 'standard');
+
     close(cost('gpt-6-astra', 'fast'), 2 * standard);
     close(cost('gpt-6-astra', 'ultrafast'), 6 * standard);
     assert.equal(cost('gpt-6-sol', 'ultrafast'), cost('gpt-6-sol', 'standard'));
@@ -147,11 +153,13 @@ test('Codex priority and ultrafast requests cost their published tier rates', ()
 test('the canonical rate stays apart from a qualified one in either order', () => {
     const canonical = ['claude-fable-5', rate(1e-5, 1e-6)] as const;
     const deepInfra = ['deepinfra/anthropic/claude-fable-5', rate(1e-5)] as const;
+
     for (const entries of [
         [canonical, deepInfra],
         [deepInfra, canonical],
     ]) {
         const table = parseRateTable(Object.fromEntries(entries));
+
         assert.equal(lookupRate(table, 'claude-fable-5')?.cacheReadCostPerToken, 1e-6);
         assert.equal(
             lookupRate(table, 'deepinfra/anthropic/claude-fable-5')?.cacheReadCostPerToken,
@@ -164,6 +172,7 @@ test('the canonical rate stays apart from a qualified one in either order', () =
 
 test("a bracketed context-tier variant is priced at the base model's rate; names are matched in lower case", () => {
     const table = parseRateTable({ 'Claude-Fable-5-1': rate(1e-5, 2.5e-7) });
+
     assert.deepEqual(lookupRate(table, 'claude-fable-5-1[1m]'), lookupRate(table, 'claude-fable-5-1'));
     assert.notEqual(lookupRate(table, 'CLAUDE-FABLE-5-1'), null);
     assert.equal(lookupRate(table, 'anthropic/Claude-Fable-5-1[1m]'), null);
@@ -171,8 +180,11 @@ test("a bracketed context-tier variant is priced at the base model's rate; names
 
 test('a bare name stands for its qualified entries only when they share one rate', () => {
     const same = parseRateTable({ 'provider-a/example-model': rate(1), 'provider-b/example-model': rate(1) });
+
     assert.deepEqual(lookupRate(same, 'example-model'), lookupRate(same, 'provider-a/example-model'));
+
     const ambiguous = parseRateTable({ 'provider-a/example-model': rate(1), 'provider-b/example-model': rate(3) });
+
     assert.equal(lookupRate(ambiguous, 'provider-b/example-model')?.inputCostPerToken, 3);
     assert.equal(lookupRate(ambiguous, 'example-model'), null);
 });
@@ -184,6 +196,7 @@ test('half-priced entries, bare family names and synthetic records are unpriced'
         'anthropic/sonnet': rate(1),
         '<synthetic>': rate(1),
     });
+
     for (const model of ['half-model', 'opus', 'anthropic/sonnet', 'sonnet', '<synthetic>'])
         assert.equal(lookupRate(table, model), null, model);
 });
@@ -236,6 +249,7 @@ test("an item's API cost sums its records, after aliases, with overrides for the
         ],
         pricing,
     );
+
     close(cost ?? NaN, 0.01 + 0.01 + 3 + 0.5);
 });
 
@@ -245,6 +259,7 @@ test('an item where nothing could be priced has no API cost', () => {
         overrides: new Map(),
         aliases: new Map(),
     };
+
     assert.equal(apiCost([usage('mystery-model', 1000), usage('opus', 1000)], pricing), null);
     assert.equal(apiCost([], pricing), null);
     assert.equal(

@@ -14,6 +14,7 @@ describe('recovery inspection', () => {
                 branch: 'build/exact',
                 git: async (_tool, args) => {
                     expect(args.slice(0, 2)).toEqual(['-C', '/project']);
+
                     return {
                         code: args.includes('show-ref') && !present ? 1 : 0,
                         stdout: 'worktree /tree\nbranch refs/heads/build/exact\n\n',
@@ -23,6 +24,7 @@ describe('recovery inspection', () => {
                 },
                 provider: { prState: async () => 'CLOSED', openPrByHead: async () => 'https://github.com/a/b/pull/1' },
             });
+
             expect(result).toEqual({ branch: 'build/exact', branchExists: present, worktreePath: '/tree', pr: 'open' });
         });
     it('keeps failed observations unknown', async () => {
@@ -40,6 +42,7 @@ describe('recovery inspection', () => {
                 openPrByHead: async () => null,
             },
         });
+
         expect(result.pr).toBe('unknown');
         expect(result.warning).toContain('second PR');
         expect(result.warning).toContain('remote branch');

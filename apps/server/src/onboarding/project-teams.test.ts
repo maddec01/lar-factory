@@ -17,6 +17,7 @@ test('team choices read every project team without guessing from the project nam
                 '--output',
                 'json',
             ]);
+
             return JSON.stringify([{ name: 'App' }, { name: 'Controls' }, { name: 'DepotAndTrading' }]);
         }),
         { teams: ['App', 'Controls', 'DepotAndTrading'] },
@@ -27,6 +28,7 @@ test('team discovery refuses invalid repositories and reports read failures', as
     const never = async () => {
         throw new Error('should not run');
     };
+
     for (const repo of ['../x', 'owner/repo'])
         assert.equal(((await readProjectTeams({ repo }, never)) as { status: number }).status, 400);
     assert.deepEqual(

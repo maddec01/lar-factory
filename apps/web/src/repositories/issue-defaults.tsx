@@ -9,6 +9,7 @@ const LABELS = {
     createIssuesFromRetro: 'Create issues from retro captures',
     writeRefinedSpec: 'Write the refined spec to the issue',
 } as const;
+
 export type IssueSetting = keyof typeof LABELS;
 
 /** Both setup screens show effective values while keeping saved preferences intact. */
@@ -28,10 +29,12 @@ export function IssueDefaults({
     onChange: (key: IssueSetting, value: boolean) => void;
 }) {
     const effective = effectiveIssueSettings(setup);
+
     return (
         <div className={FIELD_GROUP}>
             {(Object.keys(LABELS) as IssueSetting[]).map((key) => {
                 const reason = key === 'writeRefinedSpec' ? effective.specReason : effective.createReason;
+
                 return (
                     <FieldRow
                         key={key}

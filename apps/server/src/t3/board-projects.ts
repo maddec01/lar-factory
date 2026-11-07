@@ -24,6 +24,7 @@ export interface BoardSessions {
  */
 export function boardProjects(baseUrl: string, version: string, sessions?: BoardSessions): ProjectProtocol {
     const url = new URL(baseUrl);
+
     if (
         url.protocol !== 'http:' ||
         !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ||
@@ -31,6 +32,7 @@ export function boardProjects(baseUrl: string, version: string, sessions?: Board
         url.password
     )
         throw new Error('Expected local T3 server');
+
     return new ProjectProtocol(
         sessions?.vault ?? keychainSessionVault(),
         sessions?.authority ?? boardSessionAuthority(),
@@ -51,5 +53,6 @@ export function subscribeBoardProjects(
     onChange: (read: ProjectRead) => void,
 ): () => void {
     const protocol = boardProjects(baseUrl, version);
+
     return subscribeProjects(new URL(baseUrl), version, protocol, onChange);
 }

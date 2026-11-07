@@ -16,14 +16,17 @@ export function resolveUpdateButtonAction(state: UpdateState): UpdateButtonActio
     ) {
         return 'install';
     }
+
     if (state.status === 'available') {
         return 'download';
     }
+
     if (state.status === 'error') {
         if (state.errorContext === 'download' && state.availableVersion) {
             return 'download';
         }
     }
+
     return 'none';
 }
 
@@ -33,16 +36,22 @@ export type UpdatePill = 'none' | 'available' | 'downloading' | 'ready';
 
 export function resolveUpdatePill(state: UpdateState | null): UpdatePill {
     if (!state) return 'none';
+
     if (state.status === 'downloading') return 'downloading';
+
     const action = resolveUpdateButtonAction(state);
+
     if (action === 'install' || (state.status === 'checking' && state.downloadedVersion)) return 'ready';
+
     return action === 'download' ? 'available' : 'none';
 }
 
 /** A download's whole percentage, 0 before the app reports one. */
 export function downloadPercent(state: Pick<UpdateState, 'downloadPercent'>): number {
     const percent = state.downloadPercent;
+
     if (percent === null || !Number.isFinite(percent)) return 0;
+
     return Math.floor(Math.min(100, Math.max(0, percent)));
 }
 
@@ -51,8 +60,10 @@ export function updateStatusText(state: UpdateState): string {
     // A failed download or install keeps its update available or downloaded, with the error.
     if ((state.errorContext === 'download' || state.errorContext === 'install') && state.message !== null) {
         const verb = state.errorContext === 'install' ? 'install' : 'download';
+
         return `Couldn't ${verb} ${state.downloadedVersion ?? state.availableVersion}: ${state.message}`;
     }
+
     switch (state.status) {
         case 'disabled':
         case 'error':
@@ -77,18 +88,23 @@ export function getUpdateInstallConfirmationMessage(
     state: Pick<UpdateState, 'availableVersion' | 'downloadedVersion'>,
 ): string {
     const version = state.downloadedVersion ?? state.availableVersion;
+
     return `The board app will restart to install${version ? ` ${version}` : ' the update'}.`;
 }
 
 export function getUpdateActionError(result: UpdateActionResult): string | null {
     if (!result.accepted || result.completed) return null;
+
     if (typeof result.state.message !== 'string') return null;
+
     const message = result.state.message.trim();
+
     return message.length > 0 ? message : null;
 }
 
 export function canCheckForUpdate(state: UpdateState | null): boolean {
     if (!state || !state.enabled) return false;
+
     return state.status !== 'checking' && state.status !== 'downloading' && state.status !== 'disabled';
 }
 
@@ -96,5 +112,6 @@ export function getUpdateDisabledReason(
     state: Pick<UpdateState, 'enabled' | 'status' | 'message'> | null,
 ): string | null {
     if (!state || (state.enabled && state.status !== 'disabled')) return null;
+
     return state.message?.trim() || 'Automatic updates are not available in this build.';
 }

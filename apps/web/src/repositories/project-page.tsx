@@ -56,16 +56,19 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
     const drafts = shownDrafts(setup, allDrafts[repo] ?? {});
     const errors = fieldErrors[repo] ?? {};
     const latest = useRef(setup);
+
     latest.current = setup;
     useEffect(
         () => () => {
             // Unmounting on Close or navigation counts as leaving every text field.
             const store = useEditStore.getState();
+
             for (const key of ['role', 'itemSource', 'skills', 'domainDocs'] as DraftSetting[])
                 void store.save(repo, key, latest.current);
         },
         [repo],
     );
+
     const recheckAccess = () => {
         void recheck(repo);
     };
@@ -93,6 +96,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                 Reset
             </Button>
         );
+
     return (
         <div data-project-page={repo} className="grid min-w-0 gap-7">
             <section className="grid min-w-0 gap-3">

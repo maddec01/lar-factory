@@ -12,13 +12,17 @@ let fullscreenSnapshot: boolean | null = null;
 
 function subscribeToFullscreen(onChange: () => void): () => void {
     const bridge = inMacApp() ? boardApp() : undefined;
+
     if (!bridge) return () => {};
+
     const unsubscribe = bridge.onWindowFullscreenStateChange((fullscreen) => {
         fullscreenSnapshot = fullscreen;
         onChange();
     });
+
     // The window may have changed state between the first render and this subscription.
     fullscreenSnapshot = bridge.getWindowFullscreenState();
+
     return () => {
         unsubscribe();
         fullscreenSnapshot = null;
@@ -27,6 +31,7 @@ function subscribeToFullscreen(onChange: () => void): () => void {
 
 function readFullscreen(): boolean {
     fullscreenSnapshot ??= inMacApp() ? (boardApp()?.getWindowFullscreenState() ?? false) : false;
+
     return fullscreenSnapshot;
 }
 
@@ -40,6 +45,7 @@ export const useWindowControlsInset = () => (useLightsHidden() ? '' : 'pl-[74px]
 /** In a browser, the traffic lights' grey stand-ins; in the Mac app, nothing, since macOS draws them. */
 export function TrafficLights() {
     if (inMacApp()) return null;
+
     return (
         <div className="browser-window-controls pointer-events-none fixed top-0 left-0 z-50 flex h-13 items-center">
             <span className="traffic-lights absolute left-4 flex gap-2" aria-hidden="true">

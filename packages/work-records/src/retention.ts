@@ -23,12 +23,14 @@ const wholeDays = (days: unknown): days is number => Number.isSafeInteger(days) 
 
 function checkRetention(value: unknown, source: string): Retention {
     const { hideAfterDays, deleteAfterDays } = (value ?? {}) as Partial<Retention>;
+
     if (!wholeDays(hideAfterDays) || !(deleteAfterDays === null || wholeDays(deleteAfterDays))) {
         throw new WorkRecordError(
             'invalid',
             `The retention setting in ${source} needs hideAfterDays and deleteAfterDays as whole numbers of days from 0, deleteAfterDays null to keep records.`,
         );
     }
+
     return { hideAfterDays, deleteAfterDays };
 }
 
@@ -36,16 +38,20 @@ function checkRetention(value: unknown, source: string): Retention {
 export function readRetention(dir = boardDataDir()): Retention {
     const path = retentionPath(dir);
     let text: string;
+
     try {
         text = readFileSync(path, 'utf8');
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ...DEFAULT_RETENTION };
+
         throw new WorkRecordError('invalid', `Can't read the retention setting ${path}: ${(error as Error).message}.`);
     }
+
     try {
         return checkRetention(JSON.parse(text), path);
     } catch (error) {
         if (error instanceof WorkRecordError) throw error;
+
         throw new WorkRecordError('invalid', `The retention setting ${path} isn't JSON: ${(error as Error).message}.`);
     }
 }
@@ -54,6 +60,7 @@ export function readRetention(dir = boardDataDir()): Retention {
 export function writeRetention(retention: Retention, dir = boardDataDir()): Retention {
     const checked = checkRetention(retention, 'the change');
     const path = retentionPath(dir);
+
     try {
         mkdirSync(dir, { recursive: true });
         writeFileSync(`${path}.${process.pid}.tmp`, `${JSON.stringify(checked, null, 2)}\n`);
@@ -64,5 +71,6 @@ export function writeRetention(retention: Retention, dir = boardDataDir()): Rete
             `Can't save the retention setting ${path}: ${(error as Error).message}.`,
         );
     }
+
     return checked;
 }

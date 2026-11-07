@@ -26,6 +26,7 @@ const editorOf = (el: Element): LexicalEditor => (el as Element & { __lexicalEdi
 /** Types `text` at the selection, or at the end when there is none; "\n" presses Enter. */
 export async function typeInto(el: Element, text: string): Promise<void> {
     const editor = editorOf(el);
+
     for (const char of text) {
         await act(async () => {
             if (char === '\n') editor.dispatchCommand(INSERT_PARAGRAPH_COMMAND, undefined);
@@ -33,7 +34,9 @@ export async function typeInto(el: Element, text: string): Promise<void> {
                 editor.update(
                     () => {
                         let selection = $getSelection();
+
                         if (!$isRangeSelection(selection)) selection = $getRoot().selectEnd();
+
                         selection.insertText(char);
                     },
                     { discrete: true },
@@ -48,8 +51,11 @@ export const selectAll = (el: HTMLElement) =>
         editorOf(el).update(
             () => {
                 const [first, last] = [$getRoot().getFirstDescendant(), $getRoot().getLastDescendant()];
+
                 if (!$isTextNode(first) || !$isTextNode(last)) throw new Error('No text to select.');
+
                 const selection = $createRangeSelection();
+
                 selection.anchor.set(first.getKey(), 0, 'text');
                 selection.focus.set(last.getKey(), last.getTextContentSize(), 'text');
                 // A selection the browser reports takes its format from the text it starts in.
@@ -75,6 +81,7 @@ export const selectEnd = (el: HTMLElement) =>
 export async function pastePlain(el: Element, text: string): Promise<void> {
     // jsdom has no ClipboardEvent or DataTransfer, so the event carries a stand-in holding only the text.
     const event = new Event('paste', { bubbles: true, cancelable: true });
+
     Object.defineProperty(event, 'clipboardData', {
         value: { types: ['text/plain'], getData: (type: string) => (type === 'text/plain' ? text : '') },
     });

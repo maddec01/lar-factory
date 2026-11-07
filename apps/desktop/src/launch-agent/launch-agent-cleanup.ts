@@ -35,6 +35,7 @@ const bootout = (input: LaunchInput) =>
             }),
         );
         const exitCode = yield* child.exitCode;
+
         if (exitCode !== 0) yield* Effect.logWarning(`launchctl bootout ${LABEL} exited with code ${exitCode}`);
     }).pipe(
         Effect.scoped,
@@ -44,7 +45,9 @@ const bootout = (input: LaunchInput) =>
 /** In a packaged app, stops and deletes the old agent if it's there. Never fails. */
 export const onLaunch = Effect.fn('LaunchAgentCleanup.onLaunch')(function* (input: LaunchInput) {
     const plist = plistPath(input.home);
+
     if (!input.isPackaged || !NodeFS.existsSync(plist)) return;
+
     yield* bootout(input);
     yield* Effect.try(() => NodeFS.rmSync(plist, { force: true })).pipe(
         Effect.andThen(Effect.logInfo(`removed the old launch agent ${LABEL}`)),

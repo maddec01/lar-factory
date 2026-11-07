@@ -31,6 +31,7 @@ it('limits ownership to the saved build and its slices and protects live and def
                         : 'main\nsaved\nslice/12345678-live\nslice/87654321-other\nsaved-extra\n',
         }),
     });
+
     expect(plan.localBranches).toEqual(['saved']);
     expect(plan.worktreePaths).toEqual(['/old']);
     expect(plan.dirtyFiles).toEqual(['/old: ?? untracked.txt']);
@@ -51,7 +52,9 @@ const planFrom = (refs: { upstream?: string; remoteDefault?: string }, logged: s
         provider: { branchExists: async () => false, openPrByHead: async () => null },
         git: async (_tool, args) => {
             const at = args.indexOf('log');
+
             if (at >= 0) logged.push(args[at + 2]!);
+
             return {
                 code: 0,
                 stderr: '',
@@ -69,12 +72,14 @@ const planFrom = (refs: { upstream?: string; remoteDefault?: string }, logged: s
 
 it("compares a branch with no upstream against the remote's default branch, not the local one", async () => {
     const logged: string[] = [];
+
     await planFrom({ remoteDefault: 'refs/remotes/origin/main\n' }, logged);
     expect(logged).toEqual(['refs/remotes/origin/main..refs/heads/saved']);
 });
 
 it('compares against the upstream when the branch has one, and the local default branch when origin has no copy', async () => {
     const logged: string[] = [];
+
     await planFrom({ upstream: 'origin/saved\n', remoteDefault: 'refs/remotes/origin/main\n' }, logged);
     await planFrom({}, logged);
     expect(logged).toEqual(['origin/saved..refs/heads/saved', 'main..refs/heads/saved']);
@@ -98,6 +103,7 @@ it('warns and leaves choices available when the remote cannot be observed', asyn
         },
         git: async () => ({ code: 0, stdout: '', stderr: '', detail: '' }),
     });
+
     expect(plan.remoteAvailable).toBe(true);
     expect(plan.warning).toContain('second PR');
     expect(plan.warning).toContain('close an open PR');
@@ -126,6 +132,7 @@ for (const branch of ['main', 'live'])
                       : 'main\nlive\n',
             }),
         });
+
         expect(plan.localBranches).toEqual([]);
         expect(plan.remoteAvailable).toBe(false);
     });
@@ -141,6 +148,7 @@ it('rejects changed losses before running any deletion', async () => {
         localAvailable: true,
         remoteAvailable: false,
     };
+
     await expect(
         executeCleanup({
             plan: { ...plan, dirtyFiles: ['new loss'] },
@@ -168,6 +176,7 @@ it('requires explicit confirmation before discarding local losses', async () => 
         localAvailable: true,
         remoteAvailable: false,
     };
+
     await expect(
         executeCleanup({
             plan,
@@ -192,9 +201,12 @@ it('deletes an owned branch in a disposable repository and preserves main', asyn
     const checkout = await mkdtemp(join(tmpdir(), 'cleanup-'));
     const git = async (args: string[]) => {
         const result = await runTool('git', ['-C', checkout, ...args], { timeout: 10000 });
+
         expect(result.code, result.stderr).toBe(0);
+
         return result.stdout;
     };
+
     try {
         await git(['init', '-b', 'main']);
         await git([
@@ -208,6 +220,7 @@ it('deletes an owned branch in a disposable repository and preserves main', asyn
             'initial',
         ]);
         await git(['branch', 'owned']);
+
         const plan = await inspectCleanup({
             repository: 'a/b',
             checkout,
@@ -220,6 +233,7 @@ it('deletes an owned branch in a disposable repository and preserves main', asyn
             writable: true,
             provider: { branchExists: async () => false, openPrByHead: async () => null },
         });
+
         expect(
             await executeCleanup({
                 plan,
@@ -244,9 +258,12 @@ it('resolves only a branch that is gone everywhere, and still reports each held 
     const { runTool } = await import('../tools/run-tool.ts');
     const root = await realpath(await mkdtemp(join(tmpdir(), 'cleanup-gone-')));
     const checkout = join(root, 'project');
+
     await mkdir(checkout);
+
     const git = async (args: string[]) => {
         const result = await runTool('git', ['-C', checkout, ...args], { timeout: 10000 });
+
         expect(result.code, result.stderr).toBe(0);
     };
     const remainingOf = async (
@@ -269,6 +286,7 @@ it('resolves only a branch that is gone everywhere, and still reports each held 
             writable: true,
             provider,
         });
+
         return executeCleanup({
             plan,
             expectedPlan: plan,
@@ -280,6 +298,7 @@ it('resolves only a branch that is gone everywhere, and still reports each held 
         });
     };
     const unpushed = { branchExists: async () => false, openPrByHead: async () => null };
+
     try {
         await git(['init', '-b', 'main']);
         await git([
@@ -292,7 +311,9 @@ it('resolves only a branch that is gone everywhere, and still reports each held 
             '-m',
             'initial',
         ]);
+
         const live = join(root, 'live');
+
         await git(['worktree', 'add', '-b', 'held', live]);
         expect(await remainingOf('deleted', unpushed)).toEqual({ errors: [], remainingBranches: [] });
         expect((await remainingOf('held', unpushed, [live])).remainingBranches).toEqual(['held']);
@@ -340,6 +361,7 @@ it('never counts the default branch as gone, even when neither the checkout nor 
         provider: { branchExists: async () => false, openPrByHead: async () => null },
         git: async () => ({ code: 0, stdout: '', stderr: '', detail: '' }),
     });
+
     expect(
         (
             await executeCleanup({
@@ -376,6 +398,7 @@ it('keeps a branch remaining when deleting it fails', async () => {
         confirmedLoss: false,
         git: async () => ({ code: 1, stdout: '', stderr: 'refused', detail: '' }),
     });
+
     expect(result).toEqual({ errors: ['Could not delete branch owned'], remainingBranches: ['owned'] });
 });
 
@@ -384,8 +407,10 @@ it('refuses unsafe root and symlink worktrees before invoking Git', async () => 
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
     const root = await mkdtemp(join(tmpdir(), 'cleanup-path-'));
+
     try {
         const alias = join(root, 'alias');
+
         await symlink(root, alias);
         for (const path of ['/', root, alias]) {
             const plan = {
@@ -398,6 +423,7 @@ it('refuses unsafe root and symlink worktrees before invoking Git', async () => 
                 localAvailable: true,
                 remoteAvailable: false,
             };
+
             await expect(
                 executeCleanup({
                     checkout: root,
@@ -448,6 +474,7 @@ it('passes the inspected head through the provider and retains failed remote del
             },
         },
     });
+
     expect(calls).toEqual([['a/b', 'owned', 'a'.repeat(40)]]);
     expect(result.errors).toEqual(['Could not delete remote branch owned']);
     expect(result.remainingBranches).toContain('owned');
@@ -460,11 +487,15 @@ it('removes only a verified sibling worktree of the same repository', async () =
     const { runTool } = await import('../tools/run-tool.ts');
     const root = await mkdtemp(join(tmpdir(), 'cleanup-worktree-'));
     const checkout = join(root, 'project');
+
     await mkdir(checkout);
+
     const git = async (args: string[]) => {
         const result = await runTool('git', ['-C', checkout, ...args], { timeout: 10000 });
+
         expect(result.code, result.stderr).toBe(0);
     };
+
     try {
         await git(['init', '-b', 'main']);
         await git([
@@ -478,6 +509,7 @@ it('removes only a verified sibling worktree of the same repository', async () =
             'initial',
         ]);
         await git(['worktree', 'add', '-b', 'owned', join(root, 'work')]);
+
         const plan = await inspectCleanup({
             repository: 'a/b',
             checkout,
@@ -489,6 +521,7 @@ it('removes only a verified sibling worktree of the same repository', async () =
             writable: true,
             provider: { branchExists: async () => false, openPrByHead: async () => null },
         });
+
         expect(plan.worktreePaths).toHaveLength(1);
         expect(
             await executeCleanup({
@@ -526,6 +559,7 @@ it('inspects branches a few at a time, in plan order, reading the branch and wor
                 most = Math.max(most, ++inFlight);
                 await new Promise((resolve) => setTimeout(resolve, (branches.length - branches.indexOf(branch)) * 2));
                 inFlight--;
+
                 return false;
             },
             openPrByHead: async () => null,
@@ -534,6 +568,7 @@ it('inspects branches a few at a time, in plan order, reading the branch and wor
             calls.push(
                 args.includes('worktree') ? 'worktree' : args.includes('--format=%(refname:short)') ? 'refs' : 'other',
             );
+
             return {
                 code: 0,
                 stderr: '',
@@ -542,6 +577,7 @@ it('inspects branches a few at a time, in plan order, reading the branch and wor
             };
         },
     });
+
     expect(plans.map((plan) => plan.branch)).toEqual(branches);
     expect(plans.map((plan) => plan.localBranches)).toEqual(branches.map((branch) => [branch]));
     expect(calls.filter((call) => call === 'refs')).toHaveLength(1);

@@ -9,6 +9,7 @@ const inTurns = (name: string, seen: string[]) => async () => {
         seen.push(`${name} ${turn}`);
         await nextTurn();
     }
+
     return name;
 };
 
@@ -16,6 +17,7 @@ test('work asked for while other work runs waits for it, so their turns never mi
     const seen: string[] = [];
     const run = oneAtATime();
     const answers = await Promise.all([run(inTurns('a', seen)), run(inTurns('b', seen))]);
+
     expect(seen).toEqual(['a 1', 'a 2', 'a 3', 'b 1', 'b 2', 'b 3']);
     expect(answers).toEqual(['a', 'b']);
 });
@@ -28,6 +30,7 @@ test('failed work still lets the next run, and its caller sees the failure', asy
         throw Error('read failed');
     });
     const next = run(inTurns('b', seen));
+
     await expect(failed).rejects.toThrow('read failed');
     expect(await next).toBe('b');
 });

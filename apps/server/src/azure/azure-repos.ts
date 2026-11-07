@@ -10,13 +10,16 @@ import { prStateOf, type AzurePr } from './azure-prs.ts';
 /** The az flags that name the repository's organization, with its project and repository names as az takes them. */
 function names(repo: string) {
     const [organization, project, repository] = repo.split('/') as [string, string, string];
+
     return { org: orgFlags(organization), project: decodePart(project), repository: decodePart(repository) };
 }
 
 /** A PR's id and organization, from its URL https://dev.azure.com/<org>/<project>/_git/<repository>/pullrequest/<id>. */
 function prOf(url: string): { id: string; repo: string } {
     const match = /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)$/.exec(url);
+
     if (!match) throw new Error(`${url} isn't an Azure Repos PR URL.`);
+
     return { id: match[4]!, repo: `${match[1]}/${match[2]}/${match[3]}` };
 }
 
@@ -27,6 +30,7 @@ async function json<T>(run: Az, args: string[], repo: string): Promise<T> {
 /** The args of `az devops invoke` on a git resource of the repository, routed to its project, repository and then `route`. */
 function invokeArgs(repo: string, resource: string, route: string[], more: string[]): string[] {
     const { project, repository } = names(repo);
+
     return [
         'devops',
         'invoke',
@@ -59,6 +63,7 @@ function post<T>(run: Az, repo: string, resource: string, route: string[], body:
 /** `az repos <args>` on the repository. */
 function repos<T>(run: Az, repo: string, args: string[]): Promise<T> {
     const { project, repository } = names(repo);
+
     return json<T>(run, ['repos', ...args, '--repository', repository, '--project', project], repo);
 }
 
@@ -70,6 +75,7 @@ async function branchHead(repo: string, branch: string, run: Az = az): Promise<s
         '--filter',
         `heads/${branch}`,
     ]);
+
     return refs.find((r) => r.name === `refs/heads/${branch}`)?.objectId ?? null;
 }
 
@@ -80,7 +86,9 @@ async function defaultBranchHead(repo: string, run: Az = az): Promise<{ branch: 
         '',
     );
     const sha = await branchHead(repo, branch, run);
+
     if (!sha) throw new Error(`${repo} has no ${branch} branch to start from.`);
+
     return { branch, sha };
 }
 
@@ -93,7 +101,9 @@ async function commitTree(repo: string, commit: string, run: Az = az): Promise<C
         treeEntries: { relativePath: string; mode: string; gitObjectType: string; objectId: string }[];
         continuation_token?: string | null;
     }>(run, repo, 'trees', [`sha1=${treeId}`], ['--query-parameters', 'recursive=true']);
+
     if (continuation_token) throw new Error('Azure DevOps listed only part of its files, since it has too many.');
+
     return {
         sha: objectId,
         files: new Map(
@@ -116,8 +126,10 @@ export async function canPush(repo: string, run: Az = az): Promise<boolean> {
         `https://dev.azure.com/${organization}/_apis/permissions/${GIT_REPOSITORIES}/${GENERIC_CONTRIBUTE}?tokens=${encodeURIComponent(`repoV2/${project.id}/${id}`)}&api-version=${API_VERSION}`,
         run,
     );
+
     if (value?.length !== 1 || typeof value[0] !== 'boolean')
         throw new Error('Azure DevOps returned no push permission decision');
+
     return value[0];
 }
 
@@ -129,12 +141,14 @@ async function branchExists(repo: string, branch: string, run: Az = az): Promise
 /** A PR's URL, from its repository and id. */
 export const prUrl = (repo: string, id: number) => {
     const [organization, project, repository] = repo.split('/');
+
     return `https://dev.azure.com/${organization}/${project}/_git/${repository}/pullrequest/${id}`;
 };
 
 /** Replaces a PR's description, by its URL. */
 async function editPrBody(url: string, body: string, run: Az = az): Promise<void> {
     const { id, repo } = prOf(url);
+
     await json(run, ['repos', 'pr', 'update', '--id', id, `--description=${body}`], repo);
 }
 
@@ -149,12 +163,14 @@ async function prState(url: string, run: Az = az): Promise<'OPEN' | 'MERGED' | '
             throw refusalOf(err);
         }),
     );
+
     return state === 'merged' ? 'MERGED' : state === 'closed' ? 'CLOSED' : 'OPEN';
 }
 
 /** Abandons a PR, by its URL, after a comment that says why. */
 async function closePr(url: string, comment: string, run: Az = az): Promise<void> {
     const { id, repo } = prOf(url);
+
     // az repos pr has no comment command; a thread of one comment, closed, is a plain comment.
     await post(run, repo, 'pullRequestThreads', [`pullRequestId=${id}`], {
         comments: [{ content: comment, commentType: 1 }],
@@ -166,6 +182,7 @@ async function closePr(url: string, comment: string, run: Az = az): Promise<void
 /** Reactivates a PR, by its URL, that was abandoned. */
 async function reopenPr(url: string, run: Az = az): Promise<void> {
     const { id, repo } = prOf(url);
+
     await json(run, ['repos', 'pr', 'update', '--id', id, '--status', 'active'], repo);
 }
 
@@ -193,20 +210,27 @@ async function openPrByHead(repo: string, branch: string, run: Az = az): Promise
         branch,
     ]);
     const pr = prs.find((pr) => pr.sourceRefName === `refs/heads/${branch}`);
+
     return pr ? prUrl(repo, pr.pullRequestId) : null;
 }
 
 /** Caller verifies ownership, default branch, live work, open PRs and write access before deletion. */
 async function deleteRemoteBranch(repo: string, branch: string, expectedHead?: string, run: Az = az): Promise<void> {
     const guardArgs = ['repos', 'ref', 'delete'];
+
     assertAzureCommandAllowed(guardArgs);
+
     const sha = await branchHead(repo, branch, run);
+
     if (!sha) {
         if (expectedHead !== undefined) throw new Error('Azure branch changed. Inspect and confirm again.');
+
         return;
     }
+
     if (expectedHead !== undefined && sha !== expectedHead)
         throw new Error('Azure branch changed. Inspect and confirm again.');
+
     const result = await repos<{ success: boolean; updateStatus?: string }>(run, repo, [
         ...guardArgs.slice(1),
         '--name',
@@ -214,6 +238,7 @@ async function deleteRemoteBranch(repo: string, branch: string, expectedHead?: s
         '--object-id',
         sha,
     ]);
+
     if (result.success !== true)
         throw new Error(`Azure branch deletion failed: ${result.updateStatus ?? 'unknown status'}`);
 }

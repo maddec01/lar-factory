@@ -23,6 +23,7 @@ export function StageLayout({ items, desk }: { items: Item[]; desk: ReactNode })
     const shows = rowFilter(filters, data.repos);
     const showsRow = ({ item }: { item: Item }) => shows(item);
     const { queue, shaping, ready, build, dock } = stageRows(items, data, unavailable);
+
     return (
         <>
             {desk}

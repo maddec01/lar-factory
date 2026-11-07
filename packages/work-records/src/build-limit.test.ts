@@ -10,15 +10,19 @@ import { writeHeavyCommandLimit } from './heavy-command-limit.ts';
 const dirs: string[] = [];
 const tempDir = () => {
     const dir = mkdtempSync(join(tmpdir(), 'build-limit-'));
+
     dirs.push(dir);
+
     return dir;
 };
+
 afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
 it('is Automatic while no file is saved, and saves in its own file beside the heavy command limit', () => {
     const dir = tempDir();
+
     expect(buildLimitSetting.read(dir)).toEqual({ limit: 'automatic' });
     writeHeavyCommandLimit(1, dir);
     expect(buildLimitSetting.write(3, dir)).toBe(3);
@@ -37,8 +41,11 @@ it('refuses an invalid limit, naming the build limit', () => {
 
 it("counts a file it can't use as Automatic and says why", () => {
     const dir = tempDir();
+
     writeFileSync(join(dir, 'build-limit.json'), '{');
+
     const read = buildLimitSetting.read(dir);
+
     expect(read.limit).toBe('automatic');
     expect(read.problem).toMatch(/^The build limit setting .*build-limit\.json isn't JSON/);
 });

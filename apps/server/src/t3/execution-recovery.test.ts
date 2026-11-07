@@ -17,6 +17,7 @@ it('retains thread facts across stale snapshots and accepts equal-sequence fragm
         messages: [],
         updatedAt: '2026-10-31T00:00:00Z',
     };
+
     expect(recovery.accept({ kind: 'snapshot', snapshotSequence: 4, projection }, 0)).toBe(true);
     expect(recovery.accept({ kind: 'snapshot', snapshotSequence: 3, projection }, 1)).toBe(false);
     expect(recovery.observation()?.observedAt).toBe('1970-01-01T00:00:00.000Z');

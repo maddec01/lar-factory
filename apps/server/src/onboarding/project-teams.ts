@@ -11,7 +11,9 @@ export async function readProjectTeams(
 ): Promise<{ teams: string[] } | { status: number; error: string }> {
     if (!isRepo(input.repo) || !onAzure(input.repo))
         return { status: 400, error: 'Choose an Azure DevOps repository to load its teams.' };
+
     const [organization, project] = input.repo.split('/').map(decodePart);
+
     try {
         const teams = JSON.parse(
             await run([
@@ -26,6 +28,7 @@ export async function readProjectTeams(
                 'json',
             ]),
         ) as { name: string }[];
+
         return { teams: teams.map((team) => team.name).sort((a, b) => a.localeCompare(b)) };
     } catch (err) {
         return { status: 502, error: `Can't load teams. ${message(err)}` };

@@ -7,6 +7,7 @@ import { useClock } from './second-clock.ts';
 let root: Root;
 let host: HTMLDivElement;
 const read = vi.fn((now: number) => Math.floor(now / 1_000));
+
 function Clock() {
     return createElement('span', null, useClock(read));
 }
@@ -27,7 +28,9 @@ afterEach(async () => {
 test('subscribers share one clock, do no clock work while hidden, and catch up when shown', async () => {
     await act(async () => root.render(createElement('div', null, createElement(Clock), createElement(Clock))));
     expect(vi.getTimerCount()).toBe(1);
+
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+
     await act(async () => document.dispatchEvent(new Event('visibilitychange')));
     expect(vi.getTimerCount()).toBe(0);
     read.mockClear();
@@ -44,6 +47,7 @@ test('subscribers share one clock, do no clock work while hidden, and catch up w
 
 test('a clock mounted while hidden waits until the window is shown', async () => {
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+
     await act(async () => root.render(createElement(Clock)));
     expect(vi.getTimerCount()).toBe(0);
     await act(async () => vi.advanceTimersByTime(7_000));

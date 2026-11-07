@@ -15,11 +15,13 @@ test('the data folder the app names wins over the environment home folder', () =
         HOME: '/Users/agent-home',
         [DATA_DIR_ENV]: '/Users/app-user/Library/Application Support/Lar Factory',
     };
+
     assert.equal(boardDataDir(undefined, env), '/Users/app-user/Library/Application Support/Lar Factory');
 });
 
 test('a home folder passed in wins over the data folder the app names', () => {
     const env = { [DATA_DIR_ENV]: '/Users/app-user/Library/Application Support/Lar Factory' };
+
     assert.equal(boardDataDir('/Users/someone', env), '/Users/someone/Library/Application Support/Lar Factory');
 });
 

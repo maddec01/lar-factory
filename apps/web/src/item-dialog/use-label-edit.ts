@@ -22,11 +22,13 @@ export function useLabelEdit(item: Pick<Item, 'id' | 'labels'>) {
     const read = useCallback(async () => {
         setChoices(null);
         setError(null);
+
         try {
             const response = await fetch(`/api/item-labels?itemId=${encodeURIComponent(itemId)}`, {
                 cache: 'no-store',
             });
             const body = (await response.json()) as { labels?: TrackerLabel[]; error?: string };
+
             if (body.labels)
                 setChoices(
                     body.labels.map(({ color, ...label }) => ({ ...label, ...(color && { color: `#${color}` }) })),
@@ -38,18 +40,23 @@ export function useLabelEdit(item: Pick<Item, 'id' | 'labels'>) {
     }, [itemId]);
     const toggle = async (label: string) => {
         if (writing.current) return;
+
         writing.current = true;
         setSaving(true);
         setError(null);
+
         const result = await postAction('/api/item-labels', {
             itemId,
             label,
             action: item.labels.some((name) => sameLabel(name, label)) ? 'remove' : 'add',
         });
+
         if (result.error) setError(result.error);
         else receive(result);
+
         writing.current = false;
         setSaving(false);
     };
+
     return { choices, error, saving, read, toggle };
 }

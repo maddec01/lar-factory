@@ -11,9 +11,12 @@ const CLI = join(import.meta.dirname, 'cli.ts');
 const dirs: string[] = [];
 const tempDir = () => {
     const dir = mkdtempSync(join(tmpdir(), 'lar-work-'));
+
     dirs.push(dir);
+
     return dir;
 };
+
 afterEach(() => {
     vi.unstubAllEnvs();
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -22,6 +25,7 @@ afterEach(() => {
 /** Runs lar-work from an empty folder, with HOME pointed at another, as a thread would with the board closed. */
 async function larWork(dataDir: string, ...args: string[]) {
     const cwd = tempDir();
+
     try {
         const { stdout, stderr } = await promisify(execFile)(
             process.execPath,
@@ -33,9 +37,11 @@ async function larWork(dataDir: string, ...args: string[]) {
                 timeout: 10_000,
             },
         );
+
         return { code: 0, stdout, stderr, record: /^[[{]/.test(stdout) ? JSON.parse(stdout) : null };
     } catch (error) {
         const { code, stdout, stderr } = error as { code: number; stdout: string; stderr: string };
+
         return { code, stdout, stderr, record: null };
     }
 }
@@ -46,8 +52,11 @@ describe('lar-work', { timeout: 30_000 }, () => {
     function fakeIssue(dir: string, issue: { labels: { name: string }[]; type: { name: string } | null }) {
         const log = join(dir, 'gh.log');
         const state = join(dir, 'issue.json');
+
         writeFileSync(state, JSON.stringify({ number: 12, ...issue }));
+
         const fake = join(dir, 'gh');
+
         writeFileSync(
             fake,
             `#!/usr/bin/env node
@@ -63,6 +72,7 @@ process.stdout.write('{}');
         );
         chmodSync(fake, 0o755);
         vi.stubEnv('GH_PATH', fake);
+
         return () => {
             try {
                 return readFileSync(log, 'utf8').trim().split('\n');
@@ -71,6 +81,7 @@ process.stdout.write('{}');
             }
         };
     }
+
     const mapped = (data: string) =>
         writeFileSync(
             join(data, 'repository-settings.json'),
@@ -99,8 +110,11 @@ process.stdout.write('{}');
         async (structureSync) => {
             const data = tempDir();
             const log = join(data, 'provider.log');
+
             writeFileSync(log, '');
+
             const fake = join(data, 'provider.cjs');
+
             writeFileSync(
                 fake,
                 `#!/usr/bin/env node
@@ -111,7 +125,9 @@ throw Error('Local exploration must not call a tracker');
             );
             vi.stubEnv('GH_PATH', fake);
             vi.stubEnv('AZ_PATH', fake);
+
             const repositories = ['team/server', 'org/Project/client'];
+
             writeFileSync(
                 join(data, 'repository-settings.json'),
                 JSON.stringify({
@@ -129,7 +145,9 @@ throw Error('Local exploration must not call a tracker');
                     })),
                 }),
             );
+
             const records = await openWorkRecords(join(data, 'work-records.db'));
+
             try {
                 for (const repository of repositories) {
                     const root = records.create({
@@ -138,9 +156,13 @@ throw Error('Local exploration must not call a tracker');
                         kind: 'concept',
                         ticket: `${repository}#42`,
                     });
+
                     records.trackerReserveCreation(root.workId);
+
                     const map = join(data, 'map.md');
+
                     writeFileSync(map, '# Map\nInvestigate another repository.');
+
                     const edited = await larWork(
                         data,
                         'set-body',
@@ -152,7 +174,9 @@ throw Error('Local exploration must not call a tracker');
                         '--file',
                         map,
                     );
+
                     expect(edited.code, edited.stderr).toBe(0);
+
                     const child = await larWork(
                         data,
                         'create',
@@ -163,7 +187,9 @@ throw Error('Local exploration must not call a tracker');
                         '--kind',
                         'build',
                     );
+
                     expect(child.code, child.stderr).toBe(0);
+
                     const linked = await larWork(
                         data,
                         'set-parent',
@@ -173,7 +199,9 @@ throw Error('Local exploration must not call a tracker');
                         '--parent',
                         root.workId,
                     );
+
                     expect(linked.code, linked.stderr).toBe(0);
+
                     const retried = await larWork(
                         data,
                         'sync-structure',
@@ -181,6 +209,7 @@ throw Error('Local exploration must not call a tracker');
                         '--confirmed-missing-issue',
                         root.workId,
                     );
+
                     expect(retried.code).toBe(2);
                     expect(retried.stderr).toContain('suspended');
                     expect(records.trackerReserveCreation(root.workId)).toBe(false);
@@ -197,10 +226,13 @@ throw Error('Local exploration must not call a tracker');
         const data = tempDir();
         const records = await openWorkRecords(join(data, 'work-records.db'));
         const root = records.create({ repository: 'example/product', title: 'Retained concept', kind: 'concept' });
+
         records.setBody(root.workId, root.revision, 'map', 'Local map content');
         records.trackerReserveCreation(root.workId);
+
         const before = records.trackerPending();
         const result = await larWork(data, 'sync-structure', root.workId, '--confirmed-missing-issue', root.workId);
+
         expect(result.code).toBe(2);
         expect(result.stderr).toContain('suspended');
         expect(records.trackerPending()).toEqual(before);
@@ -228,6 +260,7 @@ throw Error('Local exploration must not call a tracker');
                 'example/product#12',
             )
         ).record.record;
+
         mapped(data);
 
         const local = await larWork(
@@ -239,6 +272,7 @@ throw Error('Local exploration must not call a tracker');
             '--kind',
             'improvement',
         );
+
         expect(local.code).toBe(0);
         expect(local.record).toMatchObject({ kind: 'improvement', agreedTicketKind: null });
         expect(writes()).toEqual([]);
@@ -252,6 +286,7 @@ throw Error('Local exploration must not call a tracker');
             '--kind',
             'feature',
         );
+
         expect(swapped.stderr).toBe('');
         expect(swapped.record.record).toMatchObject({ kind: 'feature', agreedTicketKind: 'feature' });
         expect(swapped.record.line).toBe(
@@ -267,7 +302,9 @@ throw Error('Local exploration must not call a tracker');
     it('change-kind on a failed write keeps the kind and says what changed', async () => {
         const data = join(tempDir(), 'Lar Factory');
         const dir = tempDir();
+
         fakeIssue(dir, { labels: [{ name: 'bug' }], type: null });
+
         const made = (
             await larWork(
                 data,
@@ -282,9 +319,11 @@ throw Error('Local exploration must not call a tracker');
                 'example/product#12',
             )
         ).record.record;
+
         mapped(data);
         // A log path that is a folder fails the first write the fake gh appends.
         mkdirSync(join(dir, 'gh.log'));
+
         const failed = await larWork(
             data,
             'change-kind',
@@ -294,9 +333,12 @@ throw Error('Local exploration must not call a tracker');
             '--kind',
             'feature',
         );
+
         expect(failed.code).toBe(1);
         expect(failed.stderr).toMatch(/^lar-work: Could not finish changing #12 to Feature\./);
+
         const read = await larWork(data, 'read', made.workId);
+
         expect(read.record.kind).toBe('bug');
     });
 
@@ -315,7 +357,9 @@ throw Error('Local exploration must not call a tracker');
             '--ticket-kind',
             'feature',
         );
+
         expect(answered.record.kindAnswer).toEqual({ answer: 'keep', itemKind: 'bug', ticketKind: 'feature' });
+
         const none = await larWork(
             data,
             'record-kind-answer',
@@ -327,7 +371,9 @@ throw Error('Local exploration must not call a tracker');
             '--ticket-kind',
             'none',
         );
+
         expect(none.record.kindAnswer).toEqual({ answer: 'update', itemKind: 'bug', ticketKind: null });
+
         const bad = await larWork(
             data,
             'record-kind-answer',
@@ -339,6 +385,7 @@ throw Error('Local exploration must not call a tracker');
             '--ticket-kind',
             'none',
         );
+
         expect(bad.code).toBe(1);
     });
 
@@ -359,9 +406,12 @@ throw Error('Local exploration must not call a tracker');
                     'example/product#12',
                 )
             ).record.record;
+
             mapped(data);
+
             return made;
         }
+
         const check = async (data: string, workId: string) =>
             (await larWork(data, 'kind-disagreement', workId)).record.disagreement;
 
@@ -369,6 +419,7 @@ throw Error('Local exploration must not call a tracker');
             const data = join(tempDir(), 'Lar Factory');
             const writes = fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: { name: 'Feature' } });
             const made = await imported(data, 'feature');
+
             expect(await check(data, made.workId)).toBeNull();
 
             await larWork(data, 'update', made.workId, '--revision', String(made.revision), '--kind', 'bug');
@@ -385,8 +436,11 @@ throw Error('Local exploration must not call a tracker');
 
         it('a kept answer is reported as kept, which is what clears the board', async () => {
             const data = join(tempDir(), 'Lar Factory');
+
             fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: null });
+
             const made = await imported(data, 'bug');
+
             await larWork(
                 data,
                 'record-kind-answer',
@@ -404,8 +458,11 @@ throw Error('Local exploration must not call a tracker');
         it('a yes through change-kind leaves nothing to report', async () => {
             const data = join(tempDir(), 'Lar Factory');
             const dir = tempDir();
+
             fakeIssue(dir, { labels: [{ name: 'type: feature' }], type: null });
+
             const made = await imported(data, 'bug');
+
             await larWork(data, 'change-kind', made.workId, '--revision', String(made.revision), '--kind', 'bug');
             writeFileSync(
                 join(dir, 'issue.json'),
@@ -416,8 +473,11 @@ throw Error('Local exploration must not call a tracker');
 
         it("a ticket with no kind counts only when the item's kind has something mapped to add", async () => {
             const data = join(tempDir(), 'Lar Factory');
+
             fakeIssue(tempDir(), { labels: [{ name: 'docs' }], type: null });
+
             const made = await imported(data, 'bug');
+
             expect(await check(data, made.workId)).toMatchObject({ ticketKind: null, swap: { add: ['type: bug'] } });
 
             await larWork(data, 'update', made.workId, '--revision', String(made.revision), '--kind', 'improvement');
@@ -426,8 +486,11 @@ throw Error('Local exploration must not call a tracker');
 
         it("says why this login can't make the swap", async () => {
             const data = join(tempDir(), 'Lar Factory');
+
             fakeIssue(tempDir(), { labels: [{ name: 'type: feature' }], type: null });
+
             const made = await imported(data, 'bug');
+
             writeFileSync(
                 join(data, 'repository-settings.json'),
                 readFileSync(join(data, 'repository-settings.json'), 'utf8').replace(
@@ -442,11 +505,15 @@ throw Error('Local exploration must not call a tracker');
 
         it('local work and a repository with no setup have nothing to report, as on the board', async () => {
             const data = join(tempDir(), 'Lar Factory');
+
             fakeIssue(tempDir(), { labels: [{ name: 'feature' }], type: null });
+
             const local = (
                 await larWork(data, 'create', '--title', 'T', '--repository', 'example/product', '--kind', 'bug')
             ).record;
+
             expect(await check(data, local.workId)).toBeNull();
+
             const unlisted = (
                 await larWork(
                     data,
@@ -461,12 +528,15 @@ throw Error('Local exploration must not call a tracker');
                     'example/other#12',
                 )
             ).record.record;
+
             expect(await check(data, unlisted.workId)).toBeNull();
         });
 
         it('a failed ticket read fails with the reason', async () => {
             const data = join(tempDir(), 'Lar Factory');
+
             fakeIssue(tempDir(), { labels: [], type: null });
+
             const other = (
                 await larWork(
                     data,
@@ -481,9 +551,12 @@ throw Error('Local exploration must not call a tracker');
                     'example/product#12',
                 )
             ).record.record;
+
             mapped(data);
             vi.stubEnv('GH_PATH', join(tempDir(), 'no-such-gh'));
+
             const failed = await larWork(data, 'kind-disagreement', other.workId);
+
             expect(failed.code).toBe(1);
             expect(failed.stderr).toMatch(/^lar-work: Could not read #12\./);
         });
@@ -501,10 +574,13 @@ throw Error('Local exploration must not call a tracker');
             '--kind',
             'feature',
         );
+
         expect(created).toMatchObject({ code: 0, record: { repository: 'maddec01/lar', status: 'List', revision: 1 } });
+
         const { workId } = created.record;
 
         const updated = await larWork(data, 'update', workId, '--revision', '1', '--status', 'Queued');
+
         expect(updated.record).toMatchObject({ workId, status: 'Queued', queueOrder: 1, revision: 2 });
         expect((await larWork(data, 'read', workId)).record).toEqual(updated.record);
         expect((await larWork(data, 'list', '--status', 'Queued')).record).toEqual([updated.record]);
@@ -537,6 +613,7 @@ throw Error('Local exploration must not call a tracker');
             '--ticket',
             'maddec01/lar#5',
         );
+
         expect(first.record.created).toBe(true);
         expect(again.record).toEqual({ record: first.record.record, created: false });
 
@@ -544,6 +621,7 @@ throw Error('Local exploration must not call a tracker');
             await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'concept')
         ).record;
         const linked = await larWork(data, 'attach-ticket', workId, '--revision', '1', '--ticket', 'maddec01/lar#6');
+
         expect(linked.record).toMatchObject({ workId, ticket: 'maddec01/lar#6' });
         expect((await larWork(data, 'set-aside', workId, '--revision', '2')).record).toMatchObject({ setAside: true });
         expect((await larWork(data, 'restore', workId, '--revision', '3')).record).toMatchObject({ setAside: false });
@@ -552,7 +630,9 @@ throw Error('Local exploration must not call a tracker');
     it('captures a title and initial context and prints the context as markdown', async () => {
         const data = tempDir();
         const context = join(tempDir(), 'context.md');
+
         writeFileSync(context, 'The board is too bright.\n');
+
         const { record } = await larWork(
             data,
             'create',
@@ -565,6 +645,7 @@ throw Error('Local exploration must not call a tracker');
             '--file',
             context,
         );
+
         expect(record).toMatchObject({ title: 'Add dark mode' });
         expect(await larWork(data, 'context', record.workId)).toMatchObject({
             code: 0,
@@ -581,8 +662,11 @@ throw Error('Local exploration must not call a tracker');
         const { workId } = (
             await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug')
         ).record;
+
         await larWork(data, 'update', workId, '--revision', '1', '--status', 'Shaping');
+
         const stale = await larWork(data, 'update', workId, '--revision', '1', '--status', 'Ready');
+
         expect(stale).toMatchObject({
             code: 1,
             stdout: '',
@@ -626,6 +710,7 @@ throw Error('Local exploration must not call a tracker');
             await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')
         ).record;
         const brief = join(tempDir(), 'brief.md');
+
         writeFileSync(brief, '## What\n\nAdd it.\n');
         expect(
             (await larWork(data, 'set-body', workId, '--revision', '1', '--body', 'brief', '--file', brief)).record,
@@ -649,7 +734,9 @@ throw Error('Local exploration must not call a tracker');
             (await larWork(data, 'set-pr', workId, '--revision', '4', '--pr', 'maddec01/lar#9')).record,
         ).toMatchObject({ pullRequest: 'maddec01/lar#9' });
         expect((await larWork(data, 'pr-history', workId)).record).toMatchObject([{ pullRequest: 'maddec01/lar#8' }]);
+
         const round = join(tempDir(), 'round.json');
+
         writeFileSync(
             round,
             JSON.stringify({
@@ -698,6 +785,7 @@ throw Error('Local exploration must not call a tracker');
         ).record;
         const { intent } = (await larWork(data, 'record-intent', workId, '--revision', '1', '--purpose', 'shape'))
             .record;
+
         expect((await larWork(data, 'intents', '--unresolved')).record).toEqual([intent]);
 
         const resolved = await larWork(
@@ -711,6 +799,7 @@ throw Error('Local exploration must not call a tracker');
             '--thread',
             'thread-1',
         );
+
         expect(resolved.record).toMatchObject({
             record: { revision: 3 },
             intent: { outcome: 'started', threadId: 'thread-1' },
@@ -742,6 +831,7 @@ throw Error('Local exploration must not call a tracker');
         const { workId } = (
             await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')
         ).record;
+
         expect(
             (
                 await larWork(
@@ -786,6 +876,7 @@ throw Error('Local exploration must not call a tracker');
             (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', kind)).record
                 .workId;
         const [concept, slice, build] = [await create('concept'), await create('slice'), await create('build')];
+
         await larWork(data, 'add-blocker', build, '--revision', '1', '--blocker', slice);
         expect((await larWork(data, 'waiting-on', build)).record).toEqual([
             { workId: slice, reasons: ["It isn't finished."] },
@@ -839,6 +930,7 @@ throw Error('Local exploration must not call a tracker');
                 'maddec01/lar#4',
             )
         ).record;
+
         expect(
             (
                 await larWork(
@@ -882,12 +974,15 @@ throw Error('Local exploration must not call a tracker');
 
     it("saves this machine's retention setting and hides and deletes set-aside records with it", async () => {
         const data = tempDir();
+
         expect((await larWork(data, 'retention')).record).toEqual({ hideAfterDays: 7, deleteAfterDays: null });
+
         const { workId } = (
             await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'feature')
         ).record;
         const kept = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug'))
             .record;
+
         await larWork(data, 'set-aside', workId, '--revision', '1');
         expect((await larWork(data, 'hidden')).record).toEqual([]);
 
@@ -919,9 +1014,12 @@ throw Error('Local exploration must not call a tracker');
             await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'build')
         ).record;
         const brief = join(tempDir(), 'brief.md');
+
         writeFileSync(brief, '# Add it\n');
         await larWork(data, 'set-body', workId, '--revision', '1', '--body', 'brief', '--file', brief);
+
         const to = tempDir();
+
         expect((await larWork(data, 'export', workId, '--to', to)).record).toEqual([join(to, 'brief-add-it.md')]);
         expect(readdirSync(to)).toEqual(['brief-add-it.md']);
         expect(await larWork(data, 'export', workId, '--to', join(to, 'missing'))).toMatchObject({
@@ -936,6 +1034,7 @@ throw Error('Local exploration must not call a tracker');
             (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', kind)).record;
         const [build, replacement] = [await create('build'), await create('build')];
         const file = join(tempDir(), 'dependency.json');
+
         writeFileSync(
             file,
             JSON.stringify({
@@ -945,7 +1044,9 @@ throw Error('Local exploration must not call a tracker');
                 handover: 'Please add it.',
             }),
         );
+
         const { dependencyId } = (await larWork(data, 'add-dependency', build.workId, '--file', file)).record;
+
         expect(
             (await larWork(data, 'add-dependency-block', dependencyId, '--revision', '1', '--build', build.workId))
                 .record,
@@ -997,6 +1098,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('reports usage mistakes before opening the database', async () => {
         const data = join(tempDir(), 'unused');
+
         expect(await larWork(data, 'frobnicate')).toMatchObject({
             code: 2,
             stderr: expect.stringContaining('Unknown command "frobnicate"'),
@@ -1010,6 +1112,7 @@ throw Error('Local exploration must not call a tracker');
 
     it('explains identifiers, reads, changes, structure and errors in its help', async () => {
         const help = await larWork(tempDir(), '--help');
+
         expect(help.code).toBe(0);
         for (const heading of [
             'Identifiers',
@@ -1034,8 +1137,11 @@ it('keeps the brief gate local and refuses removed refinement publication comman
     const records = await openWorkRecords(join(data, 'work-records.db'));
     const made = records.create({ title: 'Search', repository: 'team/app', kind: 'build' });
     const work = records.setBody(made.workId, made.revision, 'brief', 'Find saved searches.');
+
     records.close();
+
     const gate = await larWork(data, 'gate', work.workId);
+
     expect(gate.record).toMatchObject({ current: false, briefDigest: expect.any(String) });
     expect(
         await larWork(
@@ -1067,6 +1173,7 @@ it(
         const data = tempDir();
         const fake = join(data, 'fake-gh');
         const sent = join(data, 'sent.json');
+
         writeFileSync(
             fake,
             `#!${process.execPath}
@@ -1097,8 +1204,11 @@ if (method === 'POST') {
                 ],
             }),
         );
+
         const context = join(data, 'description.md');
+
         writeFileSync(context, 'Selected improvement.');
+
         const args = [
             'create',
             '--request-id',
@@ -1114,8 +1224,10 @@ if (method === 'POST') {
         ];
         const first = await larWork(data, ...args);
         const again = await larWork(data, ...args);
+
         expect(first).toMatchObject({ code: 0, record: { ticket: null, status: 'List' } });
         expect(again.record.workId).toBe(first.record.workId);
+
         const converted = await larWork(
             data,
             'create-ticket',
@@ -1126,6 +1238,7 @@ if (method === 'POST') {
             '22222222-2222-4222-8222-222222222222',
             '--retro',
         );
+
         expect(converted).toMatchObject({
             code: 0,
             record: { workId: first.record.workId, ticket: 'example/product#17' },
@@ -1134,6 +1247,7 @@ if (method === 'POST') {
             title: 'Improve export',
             body: 'Selected improvement.\n\n<!-- lar-factory:create {"identity":"22222222-2222-4222-8222-222222222222"} -->',
         });
+
         const repeated = await larWork(
             data,
             'create-ticket',
@@ -1144,6 +1258,7 @@ if (method === 'POST') {
             '22222222-2222-4222-8222-222222222222',
             '--retro',
         );
+
         expect(repeated.record.workId).toBe(first.record.workId);
         expect((await larWork(data, 'list')).record).toHaveLength(1);
     },
@@ -1182,6 +1297,7 @@ it(
             '11111111-1111-4111-8111-111111111111',
             '--retro',
         ];
+
         settings(false);
         expect(await larWork(data, ...args)).toMatchObject({ code: 0, record: { ticket: null } });
         settings(true);
@@ -1203,8 +1319,11 @@ it('gate reports held-edit status without exposing untrusted tracker text to the
         kind: 'feature',
         ticket: 'example/widget#7',
     });
+
     record = records.setBody(record.workId, record.revision, 'brief', 'Trusted brief.');
+
     const state = records.specState(record.workId);
+
     records.saveSpecState(record.workId, state.generation, {
         ...state,
         active: true,
@@ -1212,7 +1331,9 @@ it('gate reports held-edit status without exposing untrusted tracker text to the
         warning: 'A GitHub edit waits for approval.',
     });
     records.close();
+
     const reply = await larWork(data, 'gate', record.workId);
+
     expect(reply.code).toBe(0);
     expect(reply.record.specSync.awaitingApproval).toBe(true);
     expect(reply.stdout).not.toContain('HOSTILE TRACKER INSTRUCTIONS');
@@ -1223,6 +1344,7 @@ it('resets a build through the CLI with revision checks', async () => {
     const data = join(tempDir(), 'Lar Factory');
     const made = await larWork(data, 'create', '--title', 'Build', '--repository', 'a/b', '--kind', 'build');
     const id = made.record.workId;
+
     expect(await larWork(data, 'set-build-branch', id, '--revision', '1', '--branch', 'feat/work')).toMatchObject({
         code: 0,
         record: { buildBranch: 'feat/work' },
@@ -1239,9 +1361,12 @@ it('manages validation lists and failure descriptions without revisions', async 
     const records = await openWorkRecords(join(data, 'work-records.db'));
     const build = records.create({ title: 'Build', repository: 'owner/repo', kind: 'build' });
     const run = records.startCheck(build.workId, { role: 'builder', command: ['test'], folder: '.', tree: null });
+
     records.finishCheck(run.checkId, { tree: null, exitStatus: 1, interrupted: false, log: null });
     records.close();
+
     const file = join(data, 'input.json');
+
     writeFileSync(file, JSON.stringify([{ command: ['test'], folder: '.' }]));
     expect((await larWork(data, 'set-check-list', build.workId, '--file', file)).code).toBe(0);
     writeFileSync(file, JSON.stringify({ tests: ['saves data'], diagnosis: 'Missing fixture' }));

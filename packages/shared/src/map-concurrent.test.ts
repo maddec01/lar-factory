@@ -10,10 +10,12 @@ test('bounded reads keep input order even when later requests finish first', asy
         async (value) => {
             started.push(value);
             await new Promise<void>((resolve) => release.set(value, resolve));
+
             return `result ${value}`;
         },
         2,
     );
+
     expect(started).toEqual([0, 1]);
     release.get(1)!();
     await Promise.resolve();

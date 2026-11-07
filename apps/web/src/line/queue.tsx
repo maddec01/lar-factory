@@ -11,6 +11,7 @@ import type { StageRow as Row } from './stage-rows.ts';
 export function Queue({ rows, shows }: { rows: Row[]; shows: (row: Row) => boolean }) {
     const data = useBoardStore((state) => state.data);
     const shown = rows.map((row, n) => ({ row, n })).filter(({ row }) => shows(row));
+
     return (
         <Pane id="queue" title="Queue" status="Queued" count={shown.length} className="queue">
             {shown.length ? (

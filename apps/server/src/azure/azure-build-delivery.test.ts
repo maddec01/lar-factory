@@ -39,6 +39,7 @@ test('an Azure build creates a PR against the actual base, records it locally, a
     const fake = fakeAzRepos({ defaultBranch: 'develop', branches: { [BRANCH]: 'build-head' } });
     const { branch: base } = await AZURE_REPOS.defaultBranchHead(REPO, fake.run);
     const created = JSON.parse(await fake.run(createArgs(base))) as FakePr;
+
     expect(created).toMatchObject({
         pullRequestId: 100,
         sourceRefName: `refs/heads/${BRANCH}`,
@@ -50,11 +51,14 @@ test('an Azure build creates a PR against the actual base, records it locally, a
 
     const dir = mkdtempSync(join(tmpdir(), 'azure-build-delivery-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
+
     t.onTestFinished(() => {
         records.close();
         rmSync(dir, { recursive: true, force: true });
     });
+
     let record = records.create({ title: 'Playback', repository: REPO, kind: 'build', status: 'Review' });
+
     record = records.setPullRequest(record.workId, record.revision, `${REPO}#${created.pullRequestId}`);
     expect(prUrl(REPO, created.pullRequestId)).toBe(
         'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api/pullrequest/100',
@@ -81,7 +85,9 @@ test('a lost PR-creation response is recovered by its source branch before recor
         await fake.run(createArgs('release'));
         throw Error('Connection lost after creation');
     };
+
     await expect(create()).rejects.toThrow('Connection lost');
+
     const found = JSON.parse(
         await fake.run([
             'repos',
@@ -97,6 +103,7 @@ test('a lost PR-creation response is recovered by its source branch before recor
             'https://dev.azure.com/contoso',
         ]),
     ) as FakePr[];
+
     expect(found).toHaveLength(1);
     expect(await observePr(REPO, found[0]!.pullRequestId, fake.run)).toBe('open');
     expect(fake.calls.filter((args) => args.slice(0, 3).join(' ') === 'repos pr create')).toHaveLength(1);

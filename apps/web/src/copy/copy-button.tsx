@@ -12,6 +12,7 @@ async function writeClipboard(text: string): Promise<void> {
     } catch {
         // Fallback for previews without clipboard permission.
         const area = document.createElement('textarea');
+
         area.value = text;
         area.setAttribute('readonly', '');
         area.style.position = 'fixed';
@@ -26,16 +27,21 @@ async function writeClipboard(text: string): Promise<void> {
 export function CopyButton({ text, label }: { text: string; label: string }) {
     const [copied, setCopied] = useState(0);
     const announce = useCopyStore((state) => state.announce);
+
     useEffect(() => {
         if (!copied) return;
+
         const timer = setTimeout(() => setCopied(0), 1500);
+
         return () => clearTimeout(timer);
     }, [copied]);
+
     const copy = async () => {
         await writeClipboard(text);
         setCopied(Date.now());
         announce();
     };
+
     return (
         <Button {...kind('other')} aria-label={label} onClick={() => void copy()}>
             {copied ? 'Copied' : 'Copy'}
@@ -45,6 +51,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
 
 export function CopyStatus() {
     const announcement = useCopyStore((state) => state.announcement);
+
     return (
         <div id="copy-status" className="sr-only" role="status" aria-live="polite">
             {announcement}

@@ -23,6 +23,7 @@ function childOpeningSize(): boolean {
 }
 
 export const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+
 const SHORTCUT = MAC ? '⌘⇧E' : 'Ctrl+Shift+E';
 
 /** The expanded dialog's size, inline so it wins over the Modal Copy's own size classes. */
@@ -38,8 +39,10 @@ export const EXPANDED: CSSProperties = {
 /** Whether the dialog is expanded, and a toggle; the shortcut toggles it too, unless `paused` while a prompt sits on top. */
 export function useExpand(paused = false, initial = childOpeningSize()): readonly [boolean, () => void] {
     const [expanded, setExpanded] = useState(initial);
+
     useEffect(() => {
         if (paused) return;
+
         const onKey = (event: KeyboardEvent) => {
             if (
                 event.key.toLowerCase() !== 'e' ||
@@ -48,13 +51,17 @@ export function useExpand(paused = false, initial = childOpeningSize()): readonl
                 !(MAC ? event.metaKey : event.ctrlKey)
             )
                 return;
+
             event.preventDefault();
             setExpanded((on) => !on);
         };
+
         // Captured, so a field that handles its own keys, such as the description editor, still lets it through.
         addEventListener('keydown', onKey, true);
+
         return () => removeEventListener('keydown', onKey, true);
     }, [paused]);
+
     return [expanded, () => setExpanded((on) => !on)] as const;
 }
 
@@ -63,6 +70,7 @@ export function ExpandButton({ expanded, toggle }: { expanded: boolean; toggle: 
     // Hover only: a dialog that opens with no field focuses this button, and a tooltip opened by that focus would take
     // the dialog's first Escape. aria-keyshortcuts still tells assistive tech the shortcut.
     const [hint, setHint] = useState(false);
+
     return (
         <Tooltip
             open={hint}

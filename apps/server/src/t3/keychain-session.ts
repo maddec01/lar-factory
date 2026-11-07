@@ -35,6 +35,7 @@ function keychain(operation: 'read' | 'write', input = ''): Promise<string> {
             child.kill();
             reject(new Error('Keychain unavailable'));
         }, 30_000);
+
         child.stdout.setEncoding('utf8').on('data', (data) => {
             output += data;
         });
@@ -44,6 +45,7 @@ function keychain(operation: 'read' | 'write', input = ''): Promise<string> {
         });
         child.on('close', (code) => {
             clearTimeout(timer);
+
             if (code === 0) resolve(output);
             else reject(new Error('Keychain unavailable'));
         });
@@ -57,9 +59,12 @@ export function keychainSessionVault(): SessionVault {
     return {
         async read() {
             const raw = await keychain('read');
+
             if (!raw) return undefined;
+
             try {
                 const value: unknown = JSON.parse(raw);
+
                 if (
                     typeof value !== 'object' ||
                     value === null ||
@@ -71,6 +76,7 @@ export function keychainSessionVault(): SessionVault {
                     typeof value.expiresAt !== 'string'
                 )
                     throw Error();
+
                 return value as BoardSession;
             } catch {
                 throw new Error('Invalid board credential');

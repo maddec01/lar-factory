@@ -12,7 +12,9 @@ function tick() {
 function followVisibility() {
     clearInterval(timer);
     timer = undefined;
+
     if (document.hidden) return;
+
     tick();
     timer = setInterval(tick, 1_000);
 }
@@ -20,13 +22,17 @@ function followVisibility() {
 /** One timer for the board, running while anything follows it and the window is visible. */
 function onSecond(listener: () => void) {
     listeners.add(listener);
+
     if (listeners.size === 1) {
         document.addEventListener('visibilitychange', followVisibility);
         followVisibility();
     }
+
     return () => {
         listeners.delete(listener);
+
         if (listeners.size) return;
+
         clearInterval(timer);
         timer = undefined;
         document.removeEventListener('visibilitychange', followVisibility);

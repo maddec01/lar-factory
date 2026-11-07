@@ -43,7 +43,9 @@ const SORTS = {
         compare: (a: Item, b: Item) => (a.sourceOrder ?? Infinity) - (b.sourceOrder ?? Infinity),
     },
 } as const;
+
 type Sort = keyof typeof SORTS;
+
 const isSort = (value: string): value is Sort => value in SORTS;
 
 /** A group in the left pane; one with no `count`, as a repository still reading, shows none. */
@@ -71,6 +73,7 @@ function GroupItem({
 
 function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; showRepo: boolean; onOpen: () => void }) {
     const repos = useBoardStore((state) => state.data.repos);
+
     return (
         <button
             type="button"
@@ -131,10 +134,14 @@ function SortMenu({ sort, onSort }: { sort: Sort; onSort: (sort: Sort) => void }
 function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElement | null>) {
     const itemOpen = useItemDialogStore((state) => state.itemId !== null);
     const wasOpen = useRef(false);
+
     useEffect(() => {
         const closed = wasOpen.current && !itemOpen;
+
         wasOpen.current = itemOpen;
+
         if (!closed) return;
+
         // The design system's Modal returns focus on the next task when the element that had it is still on the page.
         const timer = setTimeout(() => {
             if (
@@ -143,6 +150,7 @@ function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElem
             )
                 searchField.current?.focus({ preventScroll: true });
         });
+
         return () => clearTimeout(timer);
     }, [itemOpen, searchField]);
 }
@@ -160,7 +168,9 @@ function ListModal({ onClose }: { onClose: () => void }) {
     const [pick, setPick] = useState<string | null>(scope);
     const [sort, setSort] = useState<Sort | null>(null);
     const searchField = useRef<HTMLInputElement>(null);
+
     useFocusSearchWhenOpenerGoes(searchField);
+
     const [filters, setFilters] = useItemFilters();
     const q = query.trim().toLowerCase();
     const shows = rowFilter(filters, data.repos);
@@ -189,6 +199,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
             onPick={() => setPick(repo)}
         />
     );
+
     return (
         <Modal onClose={onClose}>
             <Modal.Content
@@ -299,6 +310,7 @@ export function ListButton() {
     const reading = useBoardStore((state) => readingScope(state.data));
     const open = useListStore((state) => state.open);
     const setOpen = useListStore((state) => state.setOpen);
+
     return (
         <>
             <Button

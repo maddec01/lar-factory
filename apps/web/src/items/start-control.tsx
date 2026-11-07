@@ -45,6 +45,7 @@ function startedThread(item: Item, data: BoardData, kind: StartKind) {
 function useShownStart(item: Item, data: BoardData, kind: StartKind) {
     const local = useStart(item.id, kind);
     const server = startProgressOf(data, item.id, PURPOSE[kind]);
+
     return {
         pending: local?.phase === 'pending' || server?.phase === 'starting',
         uncertain: server?.phase === 'may-have-started',
@@ -55,6 +56,7 @@ function useShownStart(item: Item, data: BoardData, kind: StartKind) {
 /** Whether Start is in flight, uncertain or done, which takes Move to List and Abandon away. */
 export function useStartHolds(item: Item, data: BoardData): boolean {
     const { pending, uncertain } = useShownStart(item, data, 'refine');
+
     return Boolean(startedThread(item, data, 'refine')) || uncertain || pending;
 }
 
@@ -71,6 +73,7 @@ export function StartEntries({
     onPick: (choice: ModelChoice | undefined) => void;
 }) {
     const lastChoice = useStartStore((state) => state.lastChoice);
+
     return (
         <ModelEntries
             groups={data.modelChoices}
@@ -119,6 +122,7 @@ export function StartControl({
             ? threads.find((t) => t.id !== data.startedBuilds?.[item.id]?.threadId)
             : undefined;
     const stopped = observed?.state === 'stopped';
+
     if (thread && observed?.state === 'done') {
         return (
             <span className="start-group">
@@ -131,6 +135,7 @@ export function StartControl({
             </span>
         );
     }
+
     // The toast announces a start; the tag only keeps Start from running twice.
     if (thread && !stopped && !pending)
         return (
@@ -146,6 +151,7 @@ export function StartControl({
                 </Badge>
             </span>
         );
+
     if (uncertain) {
         // Once its message is closed, a tag still says why Start is gone.
         return (
@@ -164,6 +170,7 @@ export function StartControl({
             </span>
         );
     }
+
     const retry = kind === 'build' && canRetryBuild(item);
     const verb = pending ? 'Starting…' : error || retry ? 'Retry start' : stopped && !resume ? 'Start again' : label;
     // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
@@ -175,6 +182,7 @@ export function StartControl({
         flushSync(() => setOpen(false));
         void startItem(item.id, choice, kind);
     };
+
     return (
         <span className="start-group">
             {retry
@@ -214,10 +222,13 @@ export function StartControl({
 /** Clears a failed start on every page, or a failure only this page holds. */
 async function dismissFailure(item: Item, kind: StartKind): Promise<void> {
     useStartStore.getState().set(item.id, undefined, kind);
+
     const session = useBoardStore.getState().data.capture?.session;
     const result = await postAction('/api/dismiss-start-error', { session, itemId: item.id, purpose: PURPOSE[kind] });
+
     flushSync(() => {
         receive(result);
+
         if (result.error) notify({ verb: 'Failed', item, startError: true, message: result.error });
     });
 }
@@ -237,7 +248,9 @@ export function StartMessage({ item, kind = 'refine' }: { item: Item; kind?: Sta
             : local?.phase === 'error'
               ? local.message
               : undefined;
+
     if (!message) return null;
+
     const id = CSS.escape(item.id);
     const close = () =>
         closeKeepingFocus(
@@ -248,6 +261,7 @@ export function StartMessage({ item, kind = 'refine' }: { item: Item; kind?: Sta
             },
             [`[data-back-to-list="${id}"]`, `[data-start="${id}"]`, `[data-start-result="${id}"]`],
         );
+
     return (
         <p className="start" ref={el} {...(uncertain && { tabIndex: -1, 'data-start-result': item.id })}>
             <span className="action-error">

@@ -162,6 +162,7 @@ function LimitBars({ used, limit }: { used: number; limit: number }) {
             style={{ background: on ? STATUS_COLOR['In progress'] : 'var(--border)' }}
         />
     );
+
     return (
         <span className="inline-flex items-center gap-[3px]">
             {Array.from({ length: limit }, (_, n) => bar(n, n < used))}
@@ -180,6 +181,7 @@ const Dash = () => <span className="font-normal text-(--muted-foreground)">–</
 function spendFace(figure: string, known: boolean, unavailable: boolean, loading: boolean) {
     const partial = known && (unavailable || loading);
     const why = unavailable ? 'Some usage is unavailable.' : 'Some usage is still loading.';
+
     return {
         partial,
         notice: partial
@@ -262,6 +264,7 @@ export function Counters() {
                     <div className="grid gap-1">
                         {[...new Set(s.needsYou.map((i) => i.status))].map((status) => {
                             const items = s.needsYou.filter((i) => i.status === status);
+
                             return (
                                 <section key={status}>
                                     <h3 className="m-0 flex h-7 items-center gap-1 px-2 text-xs font-medium text-(--muted-foreground)">

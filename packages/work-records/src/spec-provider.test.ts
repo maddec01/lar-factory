@@ -6,17 +6,24 @@ import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { structureProvider } from './tracker-sync.ts';
 
 const dirs: string[] = [];
+
 afterEach(() => {
     vi.unstubAllEnvs();
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
 function fake(command: 'gh' | 'az', initial: object) {
     const dir = mkdtempSync(join(tmpdir(), 'spec-provider-'));
+
     dirs.push(dir);
+
     const state = join(dir, 'state.json');
+
     writeFileSync(state, JSON.stringify(initial));
+
     const file = join(dir, command);
     const calls = join(dir, 'calls.jsonl');
+
     writeFileSync(calls, '');
     writeFileSync(
         file,
@@ -44,6 +51,7 @@ writeFileSync(path,JSON.stringify(state));process.stdout.write(JSON.stringify(re
     );
     chmodSync(file, 0o755);
     vi.stubEnv(command === 'gh' ? 'GH_PATH' : 'AZ_PATH', file);
+
     return {
         calls: () =>
             readFileSync(calls, 'utf8')
@@ -67,6 +75,7 @@ test('GitHub reads body and title editor permissions, and a Spec write patches t
     });
     const provider = structureProvider();
     const ticket = await provider.readSpec!('example/widget', 7);
+
     expect(ticket).toMatchObject({ body: 'Authored.', editorWrite: true, titleEditorWrite: true });
     await provider.replaceSpec!(ticket, 'Gated Spec.');
     expect(f.read().body).toBe('Gated Spec.');
@@ -81,6 +90,7 @@ test('GitHub rereads just before PATCH and refuses a concurrent title or body ch
     const f = fake('gh', { number: 7, body: 'Authored.', title: 'Work', updated_at: '1', permission: 'write' });
     const provider = structureProvider();
     const ticket = await provider.readSpec!('example/widget', 7);
+
     f.change({ ...f.read(), body: 'Concurrent edit.' });
     await expect(provider.replaceSpec!(ticket, 'Gated Spec.')).rejects.toThrow('changed before');
     expect(f.read().body).toBe('Concurrent edit.');
@@ -97,15 +107,20 @@ test('Azure Bug Spec writes test the revision and patch Repro Steps while leavin
             'Microsoft.VSTS.TCM.ReproSteps': '<p>Reproduce.</p>',
         },
     });
+
     vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '0');
+
     const provider = structureProvider();
     const ticket = await provider.readSpec!('example/Project/widget', 7);
+
     expect(ticket).toMatchObject({
         body: '<p>Reproduce.</p>',
         bodyField: 'Microsoft.VSTS.TCM.ReproSteps',
         version: '12',
     });
+
     const written = await provider.replaceSpec!(ticket, '<h2>Spec</h2>');
+
     expect(written).toMatchObject({ body: '<h2>Spec</h2>', version: '13' });
     expect(f.read().patch).toEqual([
         { op: 'test', path: '/rev', value: 12 },
@@ -126,6 +141,7 @@ test('unchanged GitHub bytes skip provenance reads and one editor needs one perm
     });
     const provider = structureProvider();
     const first = await provider.readSpec!('example/widget', 7);
+
     await provider.readSpec!('example/widget', 7, first);
     expect(f.calls().filter((args) => args[1] === 'graphql')).toHaveLength(1);
     expect(f.calls().filter((args) => args[1]?.includes('/collaborators/'))).toHaveLength(1);
@@ -151,7 +167,9 @@ test.each([{ historyBody: 'Racing body.' }, { historyTitle: 'Racing title' }])(
             permission: 'write',
             ...history,
         });
+
         const read = await structureProvider().readSpec!('example/widget', 7, { body: 'Old bytes.', title: 'Work' });
+
         expect(read.editorWrite).toBeUndefined();
         expect(read.titleEditorWrite).toBeUndefined();
     },

@@ -25,11 +25,14 @@ const success = (revision: string) =>
 test('open reads fresh evidence; changed revisions, races, failed refresh and disconnect withdraw readiness', async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     useBoardStore.setState({ data: { fetchedAt: 'first' } as never, clientError: null });
+
     const pending: ((response: Response) => void)[] = [];
+
     vi.stubGlobal(
         'fetch',
         vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve))),
     );
+
     const host = document.createElement('div');
     const root = createRoot(host);
     const click = async (label: string) =>
@@ -38,6 +41,7 @@ test('open reads fresh evidence; changed revisions, races, failed refresh and di
                 .find((b) => b.textContent === label)!
                 .click();
         });
+
     await act(async () => root.render(createElement(PrReadiness, { item, pr })));
     await click('Readiness details');
     expect(pending).toHaveLength(1);
@@ -78,11 +82,14 @@ test.each([
         'fetch',
         vi.fn(async () => new Response(JSON.stringify({ evidence }))),
     );
+
     const host = document.createElement('div');
     const root = createRoot(host);
+
     await act(async () => root.render(createElement(PrReadiness, { item, pr })));
     await act(async () => host.querySelector('button')!.click());
     expect(host.textContent).not.toContain('Ready to merge based on this observation.');
+
     if (evidence.available) {
         expect(host.textContent).toContain('Required policy required: running. Check the policy in Azure.');
         expect(host.textContent).toContain(
@@ -90,6 +97,7 @@ test.each([
         );
         expect(host.textContent).toContain('2026-10-31T00:00:00Z');
     } else expect(host.textContent).toContain('Azure policies unavailable');
+
     await act(async () => root.unmount());
     vi.unstubAllGlobals();
 });
@@ -97,11 +105,15 @@ test.each([
 test('unrelated board refreshes neither restart an evidence read nor withdraw its result', async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     useBoardStore.setState({ data: { fetchedAt: 'first' } as never, clientError: null });
+
     const pending: ((response: Response) => void)[] = [];
     const fetch = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)));
+
     vi.stubGlobal('fetch', fetch);
+
     const host = document.createElement('div');
     const root = createRoot(host);
+
     await act(async () => root.render(createElement(PrReadiness, { item, pr })));
     await act(async () => host.querySelector('button')!.click());
     for (const fetchedAt of ['second', 'third', 'fourth']) {

@@ -21,12 +21,14 @@ import { type Run, pickedProject, runSteps, stepReady, useWizardStore } from './
  */
 function closedFocus(opener: HTMLElement | null): HTMLElement | null {
     if (opener?.isConnected) return opener;
+
     return document.querySelector<HTMLElement>('.title-bar h1');
 }
 
 /** Back, then Next, or on the last step Finish; once Finish saved, Go to the board. */
 function Nav({ run }: { run: Run }) {
     const { projects, detection, finish, next, back, save, close } = useWizardStore();
+
     if (finish.state === 'done')
         return (
             <Button
@@ -40,10 +42,12 @@ function Nav({ run }: { run: Run }) {
                 Go to the board
             </Button>
         );
+
     const steps = runSteps(run, detection);
     const at = steps.indexOf(run.step);
     const savingLabels = Object.values(run.choices.newLabels ?? {}).some((names) => names?.some((name) => name.trim()));
     const ready = stepReady(run, projects, detection);
+
     return (
         <>
             {at > 0 && (
@@ -73,10 +77,12 @@ function Nav({ run }: { run: Run }) {
 /** The step's heading in the design system's Modal's header, which takes focus without being a Tab stop. */
 function stepHeading(dialog: HTMLElement | null): HTMLElement | null {
     const heading = dialog?.querySelector<HTMLElement>('[data-slot="modal-header"] h2') ?? null;
+
     if (heading) {
         heading.tabIndex = -1;
         heading.classList.add('outline-none');
     }
+
     return heading;
 }
 
@@ -87,21 +93,28 @@ function WizardModal({ run }: { run: Run }) {
     const shown = useRef<string | null>(null);
     const finished = finish.state === 'done';
     const place = finished ? 'done' : run.step;
+
     useEffect(() => {
         const moved = place !== shown.current;
+
         shown.current = place;
+
         // Opening, a new step, or a button such as Retry that went away with this render, puts focus on the step's heading, not the page.
         if (moved) {
             const body = dialog.current?.querySelector<HTMLElement>('[data-slot="modal-body"]');
+
             if (body) body.scrollTop = 0;
         }
+
         if (moved || document.activeElement === document.body) stepHeading(dialog.current)?.focus();
     });
+
     const steps = runSteps(run, detection);
     const at = steps.indexOf(run.step);
     const doneCount = finished ? steps.length : at;
     const done = finished ? 'Ready' : `Step ${at + 1} of ${steps.length}`;
     const picked = pickedProject(run, projects);
+
     return (
         <Modal onClose={close}>
             {/* The progress and Project line describe their own content. */}
@@ -141,15 +154,21 @@ export function WizardDialog() {
     const opener = useWizardStore((state) => state.opener);
     const open = run !== null;
     const wasOpen = useRef(false);
+
     useEffect(() => {
         const closed = wasOpen.current && !open;
+
         wasOpen.current = open;
+
         if (!closed) return;
+
         // The design system's Modal returns focus on the next task when the element that had it is still on the page.
         const timer = setTimeout(() => {
             if (document.activeElement === document.body) closedFocus(opener)?.focus();
         });
+
         return () => clearTimeout(timer);
     }, [open, opener]);
+
     return run && <WizardModal run={run} />;
 }

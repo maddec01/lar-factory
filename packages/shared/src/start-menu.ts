@@ -43,6 +43,7 @@ export function storedChoice(choice: ModelChoice | undefined): string {
 export function readChoice(raw: string | null): ModelChoice | undefined {
     try {
         const value = JSON.parse(raw ?? 'null') as Partial<ModelChoice> | null;
+
         return typeof value?.instanceId === 'string' && typeof value.model === 'string'
             ? { instanceId: value.instanceId, model: value.model }
             : undefined;

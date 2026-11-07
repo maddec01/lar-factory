@@ -29,6 +29,7 @@ export async function repositoryProject(
     if (!repos.some((r) => r.repo.toLowerCase() === repo.toLowerCase())) {
         return { error: `${repo} isn't onboarded. Add it in Settings > Projects.` };
     }
+
     return (await projectFinder(env))(repo);
 }
 
@@ -42,6 +43,7 @@ export async function repositoryProjectReads(
 ): Promise<{ repositoryProjects: Record<string, string | null>; t3Defaults: Record<string, ModelSelection> }> {
     const find = await projectFinder(env);
     const found = repos.map(({ repo }) => [repo, find(repo)] as const);
+
     return {
         repositoryProjects: Object.fromEntries(found.map(([repo, project]) => [repo, project.error ?? null])),
         t3Defaults: Object.fromEntries(
@@ -50,6 +52,7 @@ export async function repositoryProjectReads(
                     project.error === undefined
                         ? projectDefaults(project.projectId, t3SettingsPath(env), statsDbPath(env))?.selection
                         : null;
+
                 return selection ? [[repo, selection]] : [];
             }),
         ),
@@ -62,18 +65,22 @@ export async function anyOnAzureDevOps(
     env: NodeJS.ProcessEnv = process.env,
 ): Promise<boolean> {
     let found;
+
     try {
         found = await checkouts(env);
     } catch {
         return false;
     }
+
     const listed = new Set(repos.map(({ repo }) => repo.toLowerCase()));
+
     return found.some(({ origin }) => origin !== null && listed.has(azureRepo(origin)?.toLowerCase() ?? ''));
 }
 
 /** Whether an origin URL is on Azure DevOps: dev.azure.com, its ssh host, or an older *.visualstudio.com organization. */
 export function onAzureDevOps(url: string): boolean {
     const host = originHost(url);
+
     return host === 'dev.azure.com' || host.endsWith('.dev.azure.com') || host.endsWith('.visualstudio.com');
 }
 
@@ -92,7 +99,9 @@ export interface Checkout {
 /** T3's live projects with each one's `origin` URL, null for a worktree or a checkout without one; throws when T3's projects can't be read. */
 export async function checkouts(env: NodeJS.ProcessEnv): Promise<Checkout[]> {
     const read = await repositoryProjects(env);
+
     if (read.availability !== 'available' || !read.observation) throw new Error('T3 project discovery unavailable');
+
     return observedCheckouts(read.observation);
 }
 
@@ -101,6 +110,7 @@ export async function observedCheckouts(observation: ProjectObservation): Promis
     const projects = observation.projects.map((p) => ({ id: p.id, title: p.title, folder: p.workspaceRoot }));
     const origins: (string | null)[] = [];
     let next = 0;
+
     // Starting a git per project at once blocked the board's thread for every start together, and each start took longer beside the others.
     await Promise.all(
         Array.from({ length: Math.min(ORIGINS_AT_ONCE, projects.length) }, async () => {
@@ -108,6 +118,7 @@ export async function observedCheckouts(observation: ProjectObservation): Promis
                 origins[at] = mainCheckout(projects[at]!.folder) ? await originUrl(projects[at]!.folder) : null;
         }),
     );
+
     return projects.map((p, i) => ({ ...p, origin: origins[i] ?? null }));
 }
 
@@ -120,19 +131,25 @@ export function checkoutsOf(projects: readonly Checkout[], repo: string): Checko
 async function projectFinder(env: NodeJS.ProcessEnv): Promise<(repo: string) => RepositoryProject> {
     const home = env.HOME ?? '';
     let projects: Checkout[];
+
     try {
         projects = await checkouts(env);
     } catch {
         return () => ({ error: "Can't read T3 Code's projects; reconnect T3 Code before starting" });
     }
+
     return (repo) => {
         const matches = checkoutsOf(projects, repo);
+
         if (matches.length === 1) return { projectId: matches[0]!.id };
+
         if (!matches.length) return { error: `No T3 project is a checkout of ${repo}; add the checkout in T3 Code` };
+
         const folders = matches
             .map((p) => tilde(p.folder, home))
             .sort()
             .join(', ');
+
         return { error: `Several T3 projects are checkouts of ${repo}: ${folders}; remove all but one in T3 Code` };
     };
 }
@@ -146,8 +163,10 @@ function mainCheckout(folder: string): boolean {
  *  Only a small regular file is read, as a FIFO or a link to a device would block the server. */
 export function linkedWorktree(folder: string): boolean {
     const dotGit = join(folder, '.git');
+
     try {
         const stat = statSync(dotGit);
+
         return (
             stat.isFile() &&
             stat.size <= MAX_DOT_GIT_BYTES &&
@@ -161,6 +180,7 @@ export function linkedWorktree(folder: string): boolean {
 /** The checkout's `origin` URL, or null when it has none. */
 async function originUrl(folder: string): Promise<string | null> {
     const { code, stdout } = await runTool('git', ['-C', folder, 'remote', 'get-url', 'origin'], { timeout: 10_000 });
+
     return code === 0 ? stdout.trim() : null;
 }
 
@@ -177,16 +197,20 @@ export function githubRepo(url: string | null): string | null {
  */
 export function azureRepo(url: string): string | null {
     if (!onAzureDevOps(url)) return null;
+
     const host = originHost(url);
     const path = url.replace(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?[^/:]+[:/]/i, '').replace(/(?:\.git)?\/?$/, '');
     const ssh = path.match(/^v3\/([^/]+)\/([^/]+)\/([^/]+)$/);
     const https = path.match(/^(?:([^/]+)\/)?(?:([^/]+)\/)?_git\/([^/]+)$/);
     let parts: (string | undefined)[] | undefined;
+
     if (ssh) parts = ssh.slice(1);
     else if (https && host.endsWith('.visualstudio.com')) {
         const project = https[2] ?? (https[1]?.toLowerCase() === 'defaultcollection' ? undefined : https[1]);
+
         parts = [host.split('.')[0], project ?? https[3], https[3]];
     } else if (https?.[1]) parts = [https[1], https[2] ?? https[3], https[3]];
+
     return parts?.every(Boolean) ? parts.join('/') : null;
 }
 

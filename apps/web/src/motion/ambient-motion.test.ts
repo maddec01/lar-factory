@@ -31,7 +31,9 @@ afterEach(() => {
 
 function indicator() {
     const element = document.createElement('span');
+
     cleanups.push(ambientMotion(element)!);
+
     return element;
 }
 
@@ -41,6 +43,7 @@ const state = (element: Element) => element.getAttribute('data-ambient-motion');
 
 test('an indicator runs only after entering its viewport, and pauses when scrolled out', () => {
     const element = indicator();
+
     expect(state(element)).toBe('paused');
     intersect(element, true);
     expect(state(element)).toBe('running');
@@ -51,9 +54,12 @@ test('an indicator runs only after entering its viewport, and pauses when scroll
 test('hiding the window pauses all indicators; showing it resumes only those in view', () => {
     const visible = indicator();
     const outside = indicator();
+
     intersect(visible, true);
     intersect(outside, false);
+
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+
     document.dispatchEvent(new Event('visibilitychange'));
     expect([state(visible), state(outside)]).toEqual(['paused', 'paused']);
     // A resize/intersection notification while hidden must not restart the compositor.
@@ -68,6 +74,7 @@ test('detaching and reattaching refs leaves no old observer, listener or paused 
     const remove = vi.spyOn(document, 'removeEventListener');
     const element = indicator();
     const other = indicator();
+
     cleanups.shift()!();
     expect(state(element)).toBeNull();
     expect(unobserve).toHaveBeenCalledWith(element);
@@ -85,8 +92,10 @@ test('detaching and reattaching refs leaves no old observer, listener or paused 
 
 test('without intersection support, indicators still pause and resume with window visibility', () => {
     vi.stubGlobal('IntersectionObserver', undefined);
+
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
     const element = indicator();
+
     expect(state(element)).toBe('paused');
     hidden.mockReturnValue(false);
     document.dispatchEvent(new Event('visibilitychange'));

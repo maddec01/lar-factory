@@ -95,6 +95,7 @@ const body = (id = C200) => dossier(id).querySelector<HTMLElement>('[data-dossie
 /** The page with dossier `id` expanded, which the browser may remember from before a reload. */
 const mountOpen = async (data: BoardData = sample, id = C200) => {
     await mountPage(data);
+
     if (!body(id)) await press(opener(id));
 };
 /** Dossier `id` expanded too. */
@@ -120,6 +121,7 @@ test('a Queued concept stays out of the dock until it starts', async () => {
         statuses: ['Queued' as const],
         threads: [],
     };
+
     await mountPage({ ...sample, items: [...sample.items, concept] });
     expect([$('[data-dossier="I_queued"]'), $('.queue li[data-item="I_queued"]') !== null]).toEqual([null, true]);
 });
@@ -162,7 +164,9 @@ test('a dock row is one line, and its chevron expands the Work map under it, wit
 
 test('the chevron is a real button that says whether the row is expanded, and focus stays on it as the row collapses', async () => {
     await mountPage();
+
     const chevron = opener();
+
     expect([chevron.tagName, chevron.getAttribute('aria-expanded'), chevron.getAttribute('aria-label')]).toEqual([
         'BUTTON',
         'false',
@@ -242,10 +246,13 @@ test('a filter hides an expanded dossier with its row, and it is still expanded 
 
 test('the expanded line holds the local planning note, with its detail on focus and hover, and a compact view toggle in place of a body row', async () => {
     const data = withItem(C200, { sync: { state: 'pending', message: 'Waiting for GitHub.' } });
+
     await mountPage(data);
     expect(header().querySelector('[data-structure-sync]'), 'collapsed, the row stays as it is').toBeNull();
     await press(opener());
+
     const note = header().querySelector<HTMLElement>('[data-structure-sync]')!;
+
     expect([text(note), note.tabIndex, note.getAttribute('aria-label')]).toEqual([
         'On this Mac',
         0,
@@ -253,7 +260,9 @@ test('the expanded line holds the local planning note, with its detail on focus 
     ]);
     expect(body()!.querySelector('[data-structure-sync]'), 'no row of its own').toBeNull();
     expect(text(body()), 'nor its sentence').not.toContain('Planning is saved');
+
     const tools = header().querySelector<HTMLElement>('[data-dossier-tools]')!;
+
     expect([...tools.querySelectorAll('button')].map((b) => [text(b), b.title])).toEqual([
         ['Work map', 'Work map'],
         ['Parts list', 'Parts list'],
@@ -275,6 +284,7 @@ const clickWith = (el: Element, detail: number) =>
 /** Selects the text of `el`. */
 const select = (el: Element) => {
     const range = document.createRange();
+
     range.selectNodeContents(el);
     window.getSelection()!.removeAllRanges();
     window.getSelection()!.addRange(range);
@@ -284,7 +294,9 @@ test("a dossier's Start and view controls sit in its one action slot, and a clic
     await mountPage(writable(withItem('I_sample13', { blockers: [] }, calm({}))));
     expect(next().querySelector('[data-start]'), 'its next step keeps its room').toBeNull();
     await press(opener());
+
     const slot = col('side');
+
     expect(startIn(slot)).not.toBeNull();
     expect(slot.querySelector('[data-dossier-tools]')).not.toBeNull();
     expect(line().querySelector('[data-dossier-tools]'), 'none beside the title').toBeNull();
@@ -350,6 +362,7 @@ test('a refined concept leaves Shaping and stays in the dock, where its row says
 test("a refined concept's next step says no delivery is planned, once nothing else has a claim on it", async () => {
     const quiet = (data: BoardData): BoardData => ({ ...data, items: data.items.filter((i) => i.parentId !== C200) });
     const partless = { ...refined, subIssues: { completed: 0, total: 0 } };
+
     await mountPage(quiet(calm(partless)));
     expect(text(next())).toBe('No delivery planned');
     expect(chips(), 'the badge keeps its own word').toEqual(['Refined']);
@@ -374,6 +387,7 @@ test('a refined concept with active builds says Refined alone, and an unrefined 
 
 test('the row shows one chip by priority: what asks for action over Refined, Refined over fog, and the rest count in its tooltip', async () => {
     const words = (id = C200) => header(id).getAttribute('title');
+
     await mountPage(withItem(C200, refined));
     expect(chips(), 'a part in Needs you over open decisions and Refined').toEqual(['1 need you']);
     expect(header().querySelector('[data-refined]')).toBeNull();
@@ -382,7 +396,9 @@ test('the row shows one chip by priority: what asks for action over Refined, Ref
         '2 decisions, Refined, no delivery planned, 2 fog',
     );
     expect(words()).toContain('1 need you · 2 decisions · Refined · no delivery planned · 2 fog');
+
     const title = next().querySelector('[title]')!;
+
     expect(
         [title.getAttribute('title'), title.className.split(' ').includes('truncate')],
         'the next step cuts off, with its full text in its tooltip',
@@ -413,9 +429,12 @@ test('a settled decision counts as done in its part bar, whatever its Status say
         { ...sample.items.find((i) => i.id === 'I_sample10')!, ...settledDecision },
         { ...sample.items.find((i) => i.id === 'I_sample12')!, ...pending },
     ];
+
     await mountPage({ ...sample, items: [{ ...c200, subIssues: { total: 2, completed: 0 } }, ...parts] });
     expect(text(col('count'))).toBe('1/2 parts');
+
     const bar = [...col('bar').querySelectorAll<HTMLElement>('[data-part-bar] li')];
+
     expect(bar.map((li) => [li.title, li.style.background === 'var(--st-done)'])).toEqual([
         [expect.stringContaining('Complete'), true],
         [expect.stringContaining('Shaping'), false],
@@ -424,7 +443,9 @@ test('a settled decision counts as done in its part bar, whatever its Status say
 
 test('the line holds the kind, the title and chips that hide at zero, with its T3 threads in its tooltip', async () => {
     await mountPage();
+
     const title = header().querySelector('[data-title]')!;
+
     expect(text(header().querySelector('[data-kind]'))).toBe('Concept');
     expect(text(line())).toContain('#200 lar cloud: website sign-in and relay');
     expect(text(title)).toBe('#200 lar cloud: website sign-in and relay');
@@ -447,14 +468,20 @@ test('the line holds the kind, the title and chips that hide at zero, with its T
 
 test('a dossier keeps its title on one line: nothing wraps, the title and Azure fields give up their room to an ellipsis, and the first chip keeps its full width', async () => {
     await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
+
     const classes = (el: Element) => el.className.split(' ');
+
     expect(classes(line())).not.toContain('flex-wrap');
     expect(classes(header().querySelector('[data-title]')!)).toContain('truncate');
+
     const azure = header().querySelector('[data-azure]')!;
+
     expect(classes(azure.parentElement!)).toEqual(expect.arrayContaining(['shrink-[1000]', 'truncate']));
     expect(azure.getAttribute('title')).toBe('Feature · Active · Ana');
+
     // The next step's title truncates before the first chip gives up any width.
     const box = classes(header().querySelector('[data-chips]')!);
+
     expect(box).toContain('shrink-0');
     expect(box).not.toContain('overflow-hidden');
     expect(classes(next())).toContain('min-w-0');
@@ -463,6 +490,7 @@ test('a dossier keeps its title on one line: nothing wraps, the title and Azure 
 
 test('the blocked chip counts the blocked slices of unfinished parts', async () => {
     const s13 = sample.items.find((i) => i.id === 'I_sample13')!;
+
     await mountPage(
         withItem('I_sample13', {
             slices: s13.slices.map((x, n) => (n < 2 ? { ...x, progress: 'blocked' as const } : x)),
@@ -520,7 +548,9 @@ test('the line has no stage track and no repository dots; the agent figures sit 
     expect(
         header().querySelector('[class*="rounded-full"]:not([data-part-bar] li):not([data-chip]):not([data-chip] *)'),
     ).toBeNull();
+
     const figures = col('figures').firstElementChild!;
+
     expect(
         [figures.children.length, text(figures), figures.children[0]!.className.split(' ')],
         "#200's parts' figures, one truncating line",
@@ -531,6 +561,7 @@ test('the line has no stage track and no repository dots; the agent figures sit 
 
 test('a concept keeps the provider counts when Reset hides an unfinished part', async () => {
     const data = withItem(C180, { subIssues: { total: 2, completed: 1 } });
+
     await mountOpen(
         {
             ...data,
@@ -550,15 +581,19 @@ test('an open dossier has no About section; what keeps the work moving is in lab
     await mountOpen();
     expect(dossier().querySelector('[data-about]')).toBeNull();
     expect(text(dossier())).not.toContain('Destination');
+
     const rows = () => [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')];
+
     expect(rows().map((r) => [r.dataset.attentionRow, text(r.firstElementChild)])).toEqual([
         ['you', 'Needs you 1'],
         ['decisions', 'Open decisions 2'],
         ['waiting', 'Waiting 1'],
         ['fog', 'Fog 2'],
     ]);
+
     const entries = (key: string) =>
         [...dossier().querySelector(`[data-attention-row="${key}"] dd`)!.children].map(text);
+
     expect(entries('decisions')).toEqual([
         '#202 Sign-in screenPrototype · Needs you',
         '#201 Relay: broker only or full TURN?Grill · Shaping',
@@ -598,10 +633,13 @@ test('a part at Verify or Ready to merge counts as moving while its build thread
         },
     } as ItemThread;
     const clear = withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, fresh()));
+
     await mountOpen(withItem('I_sample13', { status: 'Ready to merge', blockers: [], threads: [build] }, clear));
     expect(dossier().querySelector('[data-attention-row="verify"]')).toBeNull();
     expect(text(next())).toBe('Moving#140 Owner accounts');
+
     const part = text(step('I_sample13'));
+
     expect([
         part.includes('Working'),
         part.includes('Ready to merge'),
@@ -658,10 +696,13 @@ test('a decision part and a work map node name the running build thread and say 
     } as ItemThread;
     const shape = { ...build, id: 'shape', title: 'Shape', purpose: 'shape', hasRunningChildren: undefined };
     const data = withItem('I_sample10', { status: 'Verify', threads: [shape, build] }, fresh());
+
     await mountOpen(data);
     expect(text(dossier().querySelector('[data-attention-row="decisions"]'))).toContain('· Working');
     await press(button(dossier(), 'Work map'));
+
     const node = text(dossier().querySelector('[data-map-part="I_sample10"]'));
+
     expect([node.includes('Working · child work running'), node.includes('Verify')]).toEqual([true, false]);
 });
 
@@ -673,9 +714,11 @@ test('parts in Verify or Ready to merge get their own row after Needs you, which
             withItem('I_sample13', { status: 'Ready to merge', blockers: [] }),
         ),
     );
+
     const rows = [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')].map((r) =>
         text(r.firstElementChild),
     );
+
     expect(rows.slice(0, 2)).toEqual(['Needs you 1', 'To verify or merge 2']);
     expect(chips()).toContain('1 need you');
     expect(text(next()), "what's next names the part in Needs you first").toBe('Needs you#202 Sign-in screen');
@@ -713,7 +756,9 @@ test('parts in Verify or Ready to merge get their own row after Needs you, which
             withItem('I_sample13', { status: 'Ready to merge', blockers: [] }),
         ),
     );
+
     const verify = dossier().querySelector('[data-attention-row="verify"]')!;
+
     expect(
         [
             verify.firstElementChild!.className.split(' '),
@@ -734,12 +779,15 @@ test('parts in Verify or Ready to merge get their own row after Needs you, which
 
 test('blocked slices name the part they belong to and what they wait on', async () => {
     const s13 = sample.items.find((i) => i.id === 'I_sample13')!;
+
     await mountOpen(
         withItem('I_sample13', {
             slices: s13.slices.map((x, n) => (n === 0 ? { ...x, progress: 'blocked' as const } : x)),
         }),
     );
+
     const blocked = dossier().querySelector('[data-attention-row="blocked"]')!;
+
     expect([text(blocked.firstElementChild), [...blocked.lastElementChild!.children].map(text)]).toEqual([
         'Blocked slices 1',
         [`#${s13.slices[0]!.number} ${s13.slices[0]!.title}slice of #140 · waits on a re-slice`],
@@ -751,7 +799,9 @@ test('blocked slices name the part they belong to and what they wait on', async 
 test('a part with nothing to wait on is ready to start, with its Start', async () => {
     holdPosts(unblocked());
     await mountOpen(unblocked());
+
     const ready = dossier().querySelector('[data-attention-row="ready"]')!;
+
     expect([text(ready.firstElementChild), text(ready.querySelector('dd > div > span'))]).toEqual([
         'Ready to start 1',
         '#140 Owner accounts',
@@ -770,8 +820,11 @@ test('a part with nothing to wait on is ready to start, with its Start', async (
 
 test('the Ready to start row and the header agree on what can start: a Queued decision can, a part with a live thread cannot', async () => {
     const data = withItem('I_sample12', { status: 'Shaping', threads: [thread('shaping', 'running')] }, withDecision());
+
     await mountOpen(data);
+
     const ready = () => dossier().querySelector('[data-attention-row="ready"]');
+
     expect([text(ready()!.firstElementChild), text(startIn(col('side')))]).toEqual(['Ready to start 1', 'Start ▾']);
     await receive(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
     expect([ready(), startIn(col('side'))], 'a live thread').toEqual([null, null]);
@@ -811,7 +864,9 @@ test('the parts list holds the open parts in dependency order, two columns where
     await mountOpen();
     expect(listed()).toEqual(['I_sample12', 'I_sample10', 'I_sample13']);
     expect(dossier().querySelector('[data-parts-list]')!.className.split(' ')).toContain('@4xl:grid-cols-2');
+
     const fold = button(dossier(), 'Show 1 done');
+
     await press(fold);
     expect([text(fold), fold.getAttribute('aria-expanded'), listed().length]).toEqual(['Hide 1 done', 'true', 4]);
     await openInstead(C180);
@@ -841,6 +896,7 @@ test('each part shows what it asks next, then its stage track, status, figures a
             ],
         }),
     );
+
     const lines = (id: string) =>
         [
             step(id).querySelector('[data-row-open] > :first-child'),
@@ -848,6 +904,7 @@ test('each part shows what it asks next, then its stage track, status, figures a
             step(id).querySelector('.row-second'),
             step(id).querySelector('[data-part-action]'),
         ].map(text);
+
     expect(lines('I_sample10')).toEqual([
         '#201 Relay: broker only or full TURN?',
         'GrillQuiet',
@@ -896,7 +953,9 @@ test('a part waiting on another, with no Start of its own, says what it waits on
         [...step('I_sample10').children[1]!.querySelectorAll('button, svg')],
         'plain text: no chip, no status icon',
     ).toEqual([]);
+
     const side = dossier().querySelector('[data-attention-row="waiting"] dd > div > span:last-child')!;
+
     expect([text(side), side.children.length], 'the Waiting row says it the same way').toEqual(['waits on #202', 0]);
 });
 
@@ -918,6 +977,7 @@ test('a part held by a Dependency says what it is waiting on', async () => {
         needsReview: false,
         observation: null,
     };
+
     await mountOpen(
         withItem('I_sample13', {
             threads: [],
@@ -934,7 +994,9 @@ test('a part held by a Dependency says what it is waiting on', async () => {
 
 test('a Ready part with completed prerequisites offers Start without blocking wording', async () => {
     await mountOpen(unblocked());
+
     const part = step('I_sample13');
+
     expect(text(startIn(part))).toBe('Start ▾');
     expect(text(part)).not.toContain('waits on');
 });
@@ -942,7 +1004,9 @@ test('a Ready part with completed prerequisites offers Start without blocking wo
 test('a blocked build shows only Start after, a Start, in place of Start build', async () => {
     await mountOpen();
     expect(startIn(step('I_sample13'))).toBeNull();
+
     const after = step('I_sample13').querySelector<HTMLElement>('[data-start-after]')!;
+
     expect([text(after), after.dataset.kind]).toEqual(['Start after #202 ▾', 'start']);
     expect(text(next()), 'the header offers no start while a part waits on you').toBe('Needs you#202 Sign-in screen');
 });
@@ -988,10 +1052,13 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
         { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
         { number: 140, repo: 'maddec01/lar-server', state: 'open' },
     ]);
+
     holdPosts(data);
     await mountOpen(data);
     expect(startIn(step('I_d204'))).toBeNull();
+
     const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
+
     expect([text(after), after.title]).toEqual([
         'Start after #140 ▾',
         'Pick a model to start it once #201, #140 complete',
@@ -1035,6 +1102,7 @@ test("in the map, a part waiting on another repository's issue names it without 
 
 test("Open thread takes Start's place while a part has a live thread", async () => {
     const data = withDecision();
+
     await mountOpen(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
     expect(startIn(step('I_d204'))).toBeNull();
     expect(step('I_d204').querySelector('[data-open-thread]')!.getAttribute('href')).toBe(
@@ -1050,7 +1118,9 @@ test('a map with no End-to-end check draws no check and no placeholder for one',
             disconnect() {}
         },
     );
+
     const { check: _, ...map } = c200.map!;
+
     await mountOpen(withItem(C200, { map }));
     await press(button(dossier(), 'Work map'));
     expect(dossier().querySelector('[data-map-check]')).toBeNull();
@@ -1088,12 +1158,16 @@ test('the Map view draws Decisions and Builds lanes, its current parts in order,
         },
     );
     await mountOpen();
+
     const toggle = button(dossier(), 'Work map');
+
     await press(toggle);
     expect([toggle.getAttribute('aria-pressed'), button(dossier(), 'Parts list').getAttribute('aria-pressed')]).toEqual(
         ['true', 'false'],
     );
+
     const map = dossier().querySelector('[data-work-map]')!;
+
     expect(dossier().querySelector('[data-parts-list]'), "the map takes the parts list's place").toBeNull();
     expect([...map.querySelectorAll('.sticky')].map(text), "the concept's own repository goes unnamed").toEqual([
         'Decisions',
@@ -1111,7 +1185,9 @@ test('the Map view draws Decisions and Builds lanes, its current parts in order,
     expect(text(map.querySelector('[data-map-check]'))).toBe(
         'end-to-end checkSign in on the website, then stream from a phone off Wi-Fi3 steps · after #140',
     );
+
     const node = (id: string) => map.querySelector(`[data-map-part="${id}"]`)!;
+
     expect(startIn(node('I_sample13')), 'a blocked part offers Start after alone').toBeNull();
     expect(text(node('I_sample13').querySelector('[data-start-after]')), 'the state line names what it waits on').toBe(
         'Start after ▾',
@@ -1138,6 +1214,7 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
             repository: { nameWithOwner: 'maddec01/lar-factory' },
         },
     });
+
     await mountOpen(
         {
             ...sample,
@@ -1159,7 +1236,9 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
 
 test("the dossiers take the main area's scope", async () => {
     await mountPage();
+
     const { useScopeStore } = await import('../board/scope-store.ts');
+
     await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
     expect(
         $$('[data-dossier]').map((d) => d.getAttribute('data-dossier')),
@@ -1186,6 +1265,7 @@ test('the parts list keeps cross-repository dependency order even when builds re
         title: 'Finish in the server',
         blockers: [{ repo: second.repo!, number: second.number!, state: 'open' }],
     };
+
     await mountOpen(
         {
             ...sample,
@@ -1204,6 +1284,7 @@ test('the parts list keeps a build before a research decision blocked by that bu
         ...decision([{ repo: build.repo!, number: build.number!, state: 'open' }]),
         labels: ['decision-research'],
     };
+
     await mountOpen({ ...sample, items: [c200, research, build] });
     expect(
         [...dossier().querySelectorAll('[data-parts-list] [data-part]')].map((p) => p.getAttribute('data-part')),
@@ -1212,12 +1293,17 @@ test('the parts list keeps a build before a research decision blocked by that bu
 
 test("a concept map's Dependencies show as a Dependencies row, after what waits and before the fog", async () => {
     const dependencies = ['A resume endpoint, from team/relay, blocks #140'];
+
     await mountOpen(withItem(C200, { map: { ...c200.map!, dependencies } }));
+
     const rows = [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')].map(
         (r) => r.dataset.attentionRow,
     );
+
     expect(rows).toEqual(['you', 'decisions', 'waiting', 'dependencies', 'fog']);
+
     const row = dossier().querySelector('[data-attention-row="dependencies"]')!;
+
     expect([text(row.firstElementChild), [...row.querySelector('dd')!.children].map(text)]).toEqual([
         'Dependencies 1',
         dependencies,
@@ -1232,6 +1318,7 @@ test('a concept with no map has no fog row', async () => {
     const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], {
         body: 'A concept written as ordinary prose.',
     });
+
     await mountOpen({ ...sample, items: normalizeItems([concept]) }, 'I_700');
     expect([
         dossier('I_700').querySelector('[data-attention]'),
@@ -1247,6 +1334,7 @@ test('unlabelled local decision parts show the decision lane and completed answe
             disconnect() {}
         },
     );
+
     const complete: Item = {
         ...sample.items.find((item) => item.id === 'I_sample10')!,
         recorded: true,
@@ -1266,15 +1354,20 @@ test('unlabelled local decision parts show the decision lane and completed answe
         threads: undefined,
     };
     const parent: Item = { ...c200, subIssues: { total: 2, completed: 1 } };
+
     await mountOpen({ ...sample, items: [parent, complete, pending] });
     expect(text(col('count'))).toBe('1/2 parts');
     await press(button(dossier(), 'Work map'));
+
     const map = dossier().querySelector('[data-work-map]')!;
+
     expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisions']);
     expect(map.querySelector(`[data-map-part="${complete.id}"]`), 'folded into history').toBeNull();
     await press(map.querySelector('[data-map-history]')!);
+
     const doneNode = map.querySelector(`[data-history-part="${complete.id}"]`)!;
     const pendingNode = map.querySelector(`[data-map-part="${pending.id}"]`)!;
+
     expect(text(doneNode)).toContain('No method');
     expect(text(doneNode)).not.toContain('Shaping');
     expect(text(doneNode)).not.toContain('build');
@@ -1361,6 +1454,7 @@ const mapOpen = async (data: BoardData) => {
     );
     localStorage.setItem(VIEW_KEY + C200, 'map');
     await mountOpen(data);
+
     return dossier().querySelector<HTMLElement>('[data-work-map]')!;
 };
 const fiveSettled = (['grill', 'prototype', 'research', 'task', 'grill'] as const).map((method, n) =>
@@ -1382,13 +1476,18 @@ test('5 settled decisions fold into one group, and a running build leads a map s
         ],
     });
     const map = await mapOpen(conceptOf([...fiveSettled, running]));
+
     expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part'))).toEqual([
         'W_build',
     ]);
+
     const canvas = map.querySelector<HTMLElement>('[data-map-canvas]')!;
     const y = (el: HTMLElement) => parseInt(el.style.top, 10);
+
     expect(parseInt(canvas.style.height, 10), 'one lane and the group').toBeLessThanOrEqual(200);
+
     const group = map.querySelector<HTMLElement>('[data-map-history]')!;
+
     expect(y(group), 'the group sits below current work').toBeGreaterThan(
         y(map.querySelector<HTMLElement>('[data-map-part="W_build"]')!.parentElement!),
     );
@@ -1401,9 +1500,12 @@ test('expanding the history group lists each settled part with its method; colla
         conceptOf([...fiveSettled, settledPart('W_merged', 'task', { kind: 'build', decisionMethod: undefined })]),
     );
     const group = map.querySelector<HTMLElement>('[data-map-history]')!;
+
     expect(text(group)).toBe('5 settled decisions · 1 finished buildShow');
     await press(group);
+
     const rows = [...map.querySelectorAll<HTMLElement>('[data-history-part]')];
+
     expect(rows.map(text)).toEqual([
         'ResearchPart W_s2',
         'GrillPart W_s0',
@@ -1432,11 +1534,14 @@ test('a part waiting on a settled decision in the group keeps its edge, from the
         blockers: [{ number: 0, repo: c200.repo!, state: 'open', workId: 'W_next' }],
     });
     const map = await mapOpen(conceptOf([...fiveSettled, held, later], { map: { ...c200.map!, check: undefined } }));
+
     expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
         'history W_next',
         'W_next W_later',
     ]);
+
     const label = () => map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
+
     expect([text(label()), label().tagName, label().getAttribute('aria-label')]).toEqual([
         '2 completed prerequisites',
         'BUTTON',
@@ -1453,7 +1558,9 @@ test('a part waiting on a settled decision in the group keeps its edge, from the
         [...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge')),
         'a board push moves it into the group',
     ).toEqual(['history W_later']);
+
     const single = map.querySelector('[data-edge-label="history W_later"]')!;
+
     expect([text(single), single.getAttribute('aria-label')]).toEqual([
         '1 completed prerequisite',
         '1 completed prerequisite: Part W_next',
@@ -1473,10 +1580,13 @@ test('a part a finished part waited on keeps its edge into the group', async () 
             { map: { ...c200.map!, check: undefined } },
         ),
     );
+
     expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
         'W_open history',
     ]);
+
     const label = map.querySelector('[data-edge-label="W_open history"]')!;
+
     expect([text(label), label.getAttribute('aria-label')]).toEqual([
         'before 1 completed part',
         'before 1 completed part: Part W_done',
@@ -1506,6 +1616,7 @@ test('an edge label counts each finished blocker once, names them on focus, and 
         }),
     );
     const label = map.querySelector<HTMLElement>('[data-edge-label="history W_next"]')!;
+
     expect(text(label), 'the same part listed twice counts once').toBe('2 completed prerequisites');
     expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge')).sort()).toEqual([
         'W_open W_next',
@@ -1547,6 +1658,7 @@ test('a node holds one waiting reason, on a state line that shares no width with
     );
     const node = (id: string) => map.querySelector<HTMLElement>(`[data-map-part="${id}"]`)!;
     const facts = (id: string) => node(id).querySelector<HTMLElement>('[data-map-facts]')!;
+
     expect(text(facts('W_both')), 'both blockers, once, and nothing competing with them').toBe(
         'Ready · Waiting on #201, #140',
     );
@@ -1574,6 +1686,7 @@ test('a build whose planner ended while its child and background work run reads 
     const build = workPart('W_build', { status: 'In progress', buildPhase: 'plan', threads: [newest, planner] });
     const map = await mapOpen(conceptOf([build]));
     const node = map.querySelector('[data-map-part="W_build"]')!;
+
     expect(text(node.querySelector('[data-map-facts]'))).toBe('Planning · child work running');
     expect(node.querySelector('[data-open-thread]')!.getAttribute('href')).toBe(
         't3code://threads/sample-environment/plan',
@@ -1601,6 +1714,7 @@ test('a finished part with work still running stays with current work', async ()
             }),
         ]),
     );
+
     expect(map.querySelector('[data-map-history]')).toBeNull();
     expect(text(map.querySelector('[data-map-part="W_d"] [data-map-facts]'))).toContain('Complete · Working');
 });
@@ -1613,6 +1727,7 @@ test('a status never repeats as its activity, and a part with no thread says not
             workPart('W_none', { status: 'Shaping' }),
         ]),
     );
+
     expect(text(map.querySelector('[data-map-part="W_q"] [data-map-facts]'))).toBe('Needs you');
     expect(text(map.querySelector('[data-map-part="W_none"] [data-map-facts]'))).toBe('Shaping');
     await receive(conceptOf([workPart('W_q', { status: 'In progress', threads: [{ ...asks, state: 'running' }] })]));
@@ -1645,6 +1760,7 @@ test('a held Dependency shows met or not met under the map, naming what it holds
             { number: 0, repo: 'server team', state: 'closed', title: met.need, dependency: met },
         ],
     });
+
     await mapOpen(
         conceptOf([build], {
             map: {
@@ -1656,7 +1772,9 @@ test('a held Dependency shows met or not met under the map, naming what it holds
             },
         }),
     );
+
     const row = dossier().querySelector('[data-attention-row="dependencies"]')!;
+
     expect([...row.querySelector('dd')!.children].map(text)).toEqual([
         'server team: An export endpointnot met · holds #77',
         'server team: A relaymet · holds #77',
@@ -1666,17 +1784,21 @@ test('a held Dependency shows met or not met under the map, naming what it holds
         [...row.querySelectorAll('[data-dependency-state]')].map((el) => el.getAttribute('data-dependency-state')),
     ).toEqual(['unmet', 'met']);
     expect(dossier().querySelector('[data-attention-row="fog"]'), 'the fog keeps its place too').not.toBeNull();
+
     const order = [...dossier().querySelectorAll('[data-work-map], [data-attention-row]')].map(
         (el) => el.getAttribute('data-attention-row') ?? 'map',
     );
+
     expect(order).toEqual(['map', 'dependencies', 'fog']);
 });
 
 test('the map view leaves out what its nodes already say, keeping a concept question above the map', async () => {
     await mapOpen(withItem(C200, { status: 'In progress', threads: [thread('own-question', 'needs you')] }));
+
     const order = [...dossier().querySelectorAll('[data-work-map], [data-attention-row]')].map(
         (el) => el.getAttribute('data-attention-row') ?? 'map',
     );
+
     expect(order).toEqual(['you', 'map', 'fog']);
     expect(dossier().querySelector('[data-attention-none]')).toBeNull();
 });
@@ -1696,6 +1818,7 @@ test('only a part in another repository names it, by project icon and name, once
     );
     const repoName = (el: Element | null) => text(el!.querySelector('[data-part-repo] > .truncate'));
     const lanes = [...map.querySelectorAll('.sticky')];
+
     expect([text(lanes[0]), text(lanes[1]), repoName(lanes[2]!)]).toEqual(['Decisions', 'Builds', 'lar-apple']);
     expect(lanes[2]!.querySelector('[data-part-repo]')!.children.length, 'the icon and the name').toBe(2);
     expect(map.querySelector('[data-map-part="W_home"] [data-part-repo]'), 'home goes unnamed').toBeNull();
@@ -1720,8 +1843,11 @@ test('method and kind share one label on nodes, history rows and the parts list'
             settledPart('W_t', 'task'),
         ]),
     );
+
     await press(map.querySelector('[data-map-history]')!);
+
     const label = (el: string) => text(map.querySelector(`${el} [data-part-kind]`));
+
     expect([
         label('[data-map-part="W_b"]'),
         label('[data-map-part="W_g"]'),
@@ -1735,6 +1861,7 @@ test('method and kind share one label on nodes, history rows and the parts list'
 test('a blocked slice shows on its part in the map', async () => {
     const build = workPart('W_b', { status: 'In progress', slices: [{ ...base.slices[0]!, progress: 'blocked' }] });
     const map = await mapOpen(conceptOf([build]));
+
     expect(text(map.querySelector('[data-map-part="W_b"] [data-map-facts]'))).toContain('1 slice blocked');
 });
 
@@ -1764,7 +1891,9 @@ test('a settled decision with a thread offers Open thread and names its method, 
     expect(text(step('I_sample10').querySelector('[data-part-meta]'))).toContain('Research');
     await press(button(dossier(), 'Work map'));
     await press(dossier().querySelector('[data-map-history]')!);
+
     const card = dossier().querySelector('[data-history-part="I_sample10"]')!;
+
     expect(openThreadIn(card)!.getAttribute('href')).toBe('t3code://threads/sample-environment/own');
     expect(text(card)).toContain('Research');
     expect(text(card)).not.toContain('decision');
@@ -1785,7 +1914,9 @@ test('a settled decision with no thread shows no thread control, and no valid me
     expect(text(step('I_sample10').querySelector('[data-part-meta]'))).toContain('No method');
     await press(button(dossier(), 'Work map'));
     await press(dossier().querySelector('[data-map-history]')!);
+
     const card = dossier().querySelector('[data-history-part="I_sample10"]')!;
+
     expect(openThreadIn(card)).toBeNull();
     expect(text(card)).toContain('No method');
     expect(text(dossier().querySelector('[data-work-map]')), 'absence says nothing').not.toContain('no thread');
@@ -1809,7 +1940,9 @@ test('a part that waits on another keeps saying so beside Open thread', async ()
     expect(text(step('I_sample10'))).toContain('waits on #203');
     expect(openThreadIn(step('I_sample10'))).not.toBeNull();
     await press(button(dossier(), 'Work map'));
+
     const card = dossier().querySelector('[data-map-part="I_sample10"]')!;
+
     expect(text(card)).toContain('Waiting on #203');
     expect(openThreadIn(card)!.getAttribute('aria-label')).toBe('Open thread');
 });
@@ -1830,6 +1963,7 @@ test('a row showing its Start or desk marker offers no Open thread', async () =>
 
 test('a part row keeps last-known figures, explains them, and hides all zeros', async () => {
     const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
+
     await mountOpen({
         ...withItem(
             'I_sample10',
@@ -1839,7 +1973,9 @@ test('a part row keeps last-known figures, explains them, and hides all zeros', 
         usageRead: { readable: false },
     });
     await press(button(dossier(), 'Parts list'));
+
     const figures = step('I_sample10').querySelector<HTMLElement>('.row-second [title^="Agent time"]')!;
+
     expect(figures.title).toContain("Last known figures: T3 Code's usage can't be read now.");
     expect(text(figures)).toContain('$2.00');
     expect(step('I_sample12').querySelector('.row-second [title^="Agent time"]')).toBeNull();
@@ -1847,6 +1983,7 @@ test('a part row keeps last-known figures, explains them, and hides all zeros', 
 
 test('a failed family marks its own known figures last known while the board reads usage', async () => {
     const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
+
     await mountOpen({
         ...withItem(
             'I_sample10',
@@ -1856,7 +1993,9 @@ test('a failed family marks its own known figures last known while the board rea
         usageRead: { readable: true, readAt: '2026-11-03T10:00:00.000Z' },
     });
     await press(button(dossier(), 'Parts list'));
+
     const figures = (id: string) => step(id).querySelector<HTMLElement>('.row-second [title^="Agent time"]')!;
+
     expect(figures('I_sample10').title).toContain("Last known figures: T3 Code's usage can't be read now.");
     expect(figures('I_sample12').title).not.toContain('Last known');
 });
@@ -1865,6 +2004,7 @@ const dossierTotal = () => dossier().querySelector<HTMLElement>('[data-col="figu
 
 test('a Dossier total marks a sum with a failed part partial with a + after its cost, and says why', async () => {
     const usage = { agentMs: 60_000, tokens: 1000, costUsd: 2 };
+
     await mountPage(
         withItem(
             'I_sample10',
@@ -1885,7 +2025,9 @@ test('a Dossier total marks a sum with a failed part partial with a + after its 
 
 test('a Dossier total with a loading part and no figures for it gives no sum and shows the loader', async () => {
     await mountPage(withItem('I_sample10', { stats: undefined, usageState: 'loading', threads: [partThread] }));
+
     const total = dossier().querySelector('[data-col="figures"]')!;
+
     expect(text(total)).toBe('Loading usage');
     expect(total.querySelector('[data-loader]')).not.toBeNull();
 });
@@ -1915,15 +2057,20 @@ test.each(['Verify', 'Ready to merge'] as const)(
             activity: { available: true, readAt: new Date(NOW).toISOString(), toolRunning: true, agents: [] },
         };
         const data = withItem('I_sample13', { status, blockers: [], slices: [], threads: [build] }, fresh());
+
         await mountOpen(data);
+
         const icon = status === 'Verify' ? 'lucide-circle-dot' : 'lucide-git-merge';
         const glyphs = () => step('I_sample13').querySelectorAll(`svg.${icon}.status-pulse`);
+
         expect(glyphs(), 'the name and Track agree').toHaveLength(2);
         expect(text(step('I_sample13'))).toContain('Working');
+
         const bar = () =>
             [...dossier().querySelectorAll('[data-part-bar] li')].find((li) =>
                 li.getAttribute('title')?.startsWith('#140'),
             ) as HTMLElement;
+
         expect(bar().classList.contains('status-pulse')).toBe(true);
         expect(bar().style.background).toBe('var(--st-now)');
         await receive(
@@ -1984,9 +2131,12 @@ test.each([
 
 test('work map nodes keep resumed Verify icons and the Builds lane keeps Hammer', async () => {
     const build: ItemThread = { ...thread('build', 'done'), purpose: 'build', hasRunningChildren: true };
+
     await mountOpen(withItem('I_sample13', { status: 'Verify', slices: [], blockers: [], threads: [build] }, fresh()));
     await press(button(dossier(), 'Work map'));
+
     const node = () => dossier().querySelector('[data-map-part="I_sample13"]')!;
+
     expect(node().querySelector('svg.lucide-circle-dot.status-pulse')).not.toBeNull();
     expect(text(node())).toContain('Working');
     expect(dossier().querySelector('[data-work-map] .lucide-hammer')).not.toBeNull();

@@ -64,32 +64,41 @@ const AGENTS_DRIVERS = new Set(['codex', 'cursor', 'grok', 'opencode', 'fx', 'mu
  */
 export function installTargets(driver: string, home: string, settings: InstanceSettings = {}): InstallTarget[] {
     const userHome = environmentHome(settings.environment) ?? home;
+
     if (driver === 'claudeAgent') {
         const homePath =
             isRecord(settings.config) && typeof settings.config.homePath === 'string'
                 ? settings.config.homePath.trim()
                 : '';
+
         return [
             { kind: 'claude', path: join(homePath ? expandHome(homePath, home) : join(userHome, '.claude'), 'skills') },
         ];
     }
+
     if (driver === 'antigravity')
         return ANTIGRAVITY.map((folder) => ({ kind: 'antigravity', path: join(userHome, folder) }));
+
     if (AGENTS_DRIVERS.has(driver)) return [{ kind: 'agents', path: join(userHome, AGENTS) }];
+
     return [];
 }
 
 /** The absolute `HOME` in an instance's environment list; T3 blanks a sensitive value. */
 function environmentHome(environment: unknown): string | undefined {
     if (!Array.isArray(environment)) return undefined;
+
     const entry: unknown = environment.find((variable: unknown) => isRecord(variable) && variable.name === 'HOME');
     const value = isRecord(entry) && typeof entry.value === 'string' ? entry.value.trim() : '';
+
     return isAbsolute(value) ? value : undefined;
 }
 
 function expandHome(path: string, home: string): string {
     if (path === '~') return home;
+
     if (path.startsWith('~/')) return join(home, path.slice(2));
+
     return resolve(home, path);
 }
 
@@ -115,8 +124,10 @@ export async function discoverProviderInstances(options: DiscoverOptions): Promi
             reject(new Unavailable('timed-out'));
         }, options.timeoutMs ?? 5_000);
     });
+
     try {
         const config = await Promise.race([askT3(options, controller.signal), deadline]);
+
         return { available: true, instances: providerInstances(config, options.home) };
     } catch (error) {
         return { available: false, reason: error instanceof Unavailable ? error.reason : 'failed' };
@@ -129,9 +140,12 @@ export async function discoverProviderInstances(options: DiscoverOptions): Promi
 /** T3's `server.getConfig` answer. */
 async function askT3({ runtimePath, runT3 }: DiscoverOptions, signal: AbortSignal): Promise<unknown> {
     const origin = runtimeOrigin(runtimePath);
+
     if (!origin) throw new Unavailable('not-running');
+
     // The session's token goes only to a server on this machine, whatever the runtime file names.
     if (!LOOPBACK.has(origin.hostname)) throw new Unavailable('failed');
+
     const session = issued(
         await runT3(
             [
@@ -149,8 +163,10 @@ async function askT3({ runtimePath, runT3 }: DiscoverOptions, signal: AbortSigna
             signal,
         ),
     );
+
     try {
         const ticket = await websocketTicket(origin, session.token, signal);
+
         return await getConfig(origin, ticket, signal);
     } finally {
         // The session expires within a minute anyway.
@@ -164,6 +180,7 @@ const LOOPBACK = new Set(['127.0.0.1', '[::1]', 'localhost']);
 function runtimeOrigin(path: string): URL | undefined {
     try {
         const runtime: unknown = JSON.parse(readFileSync(path, 'utf8'));
+
         return isRecord(runtime) && typeof runtime.origin === 'string' ? new URL(runtime.origin) : undefined;
     } catch {
         return undefined;
@@ -173,6 +190,7 @@ function runtimeOrigin(path: string): URL | undefined {
 function issued({ code, stdout }: { code: number | null; stdout: string }): { sessionId: string; token: string } {
     try {
         const session: unknown = JSON.parse(stdout);
+
         if (
             code === 0 &&
             isRecord(session) &&
@@ -184,11 +202,13 @@ function issued({ code, stdout }: { code: number | null; stdout: string }): { se
     } catch {
         /* Not the CLI's JSON answer. */
     }
+
     throw new Unavailable('unauthenticated');
 }
 
 async function websocketTicket(origin: URL, token: string, signal: AbortSignal): Promise<string> {
     let response: Response;
+
     try {
         // A redirect fails rather than carry the token on to wherever it points.
         response = await fetch(new URL('/api/auth/websocket-ticket/rpc', origin), {
@@ -200,19 +220,26 @@ async function websocketTicket(origin: URL, token: string, signal: AbortSignal):
     } catch {
         throw new Unavailable(signal.aborted ? 'timed-out' : 'not-running');
     }
+
     if (response.status === 401 || response.status === 403) throw new Unavailable('unauthenticated');
+
     const answer: unknown = response.ok ? await response.json() : undefined;
+
     if (!isRecord(answer) || typeof answer.ticket !== 'string') throw new Unavailable('failed');
+
     return answer.ticket;
 }
 
 /** Sends one `server.getConfig` request over T3's `/ws` and resolves with its success value. */
 function getConfig(origin: URL, ticket: string, signal: AbortSignal): Promise<unknown> {
     const url = new URL('/ws', origin);
+
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     url.searchParams.set('orchestrationProtocol', '2');
     url.searchParams.set('wsTicket', ticket);
+
     const socket = new WebSocket(url);
+
     return new Promise((resolve, reject) => {
         signal.addEventListener('abort', () => {
             socket.close();
@@ -225,19 +252,27 @@ function getConfig(origin: URL, ticket: string, signal: AbortSignal): Promise<un
         );
         socket.addEventListener('message', (event) => {
             let message: unknown;
+
             try {
                 message = typeof event.data === 'string' ? JSON.parse(event.data) : undefined;
             } catch {
                 // A throw here would escape the promise into the main process.
                 socket.close();
                 reject(new Unavailable('failed'));
+
                 return;
             }
+
             if (!isRecord(message)) return;
+
             if (message._tag === 'Ping') socket.send(JSON.stringify({ _tag: 'Pong' }));
+
             if (message._tag !== 'Exit' || message.requestId !== '1') return;
+
             socket.close();
+
             const exit = message.exit;
+
             if (isRecord(exit) && exit._tag === 'Success') resolve(exit.value);
             else reject(new Unavailable('failed'));
         });
@@ -249,15 +284,19 @@ function getConfig(origin: URL, ticket: string, signal: AbortSignal): Promise<un
 /** Each listed provider and its targets, from its settings entry when T3 has one. */
 function providerInstances(config: unknown, home: string): ProviderInstance[] {
     if (!isRecord(config) || !Array.isArray(config.providers)) throw new Unavailable('failed');
+
     const settings =
         isRecord(config.settings) && isRecord(config.settings.providerInstances)
             ? config.settings.providerInstances
             : {};
+
     return config.providers.flatMap((provider: unknown): ProviderInstance[] => {
         if (!isRecord(provider) || typeof provider.instanceId !== 'string' || typeof provider.driver !== 'string')
             return [];
+
         const { instanceId: id, driver } = provider;
         const entry = Object.hasOwn(settings, id) ? settings[id] : undefined;
+
         return [
             {
                 id,

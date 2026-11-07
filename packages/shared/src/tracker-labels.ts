@@ -34,6 +34,7 @@ const DEFAULT_COLOR = 'ededed';
 /** `name` as one part of a URL's path. Encoding leaves a dot alone, and a part of only dots would climb out of the label's route. */
 function labelPathPart(name: string): string {
     if (/^\.+$/.test(name)) throw new Error(`The factory can't address a label named ${name}.`);
+
     return encodeURIComponent(name);
 }
 
@@ -43,10 +44,12 @@ function githubLabels(repo: string, gh: LabelCommands['gh']): TrackerLabels {
             ['api', '--method', method, path, ...(body === undefined ? [] : ['--input', '-'])],
             body === undefined ? undefined : JSON.stringify(body),
         );
+
         return answer.trim() ? (JSON.parse(answer) as unknown) : undefined;
     };
     const labelOf = (raw: unknown): TrackerLabel => {
         if (!isRecord(raw) || typeof raw.name !== 'string') throw new Error('GitHub returned an unreadable label.');
+
         return {
             name: raw.name,
             ...(typeof raw.color === 'string' && { color: raw.color }),
@@ -54,12 +57,15 @@ function githubLabels(repo: string, gh: LabelCommands['gh']): TrackerLabels {
         };
     };
     const labels = `repos/${repo}/labels`;
+
     return {
         list: async () => {
             const pages = JSON.parse(
                 await gh(['api', '--method', 'GET', `${labels}?per_page=100`, '--paginate', '--slurp']),
             ) as unknown;
+
             if (!Array.isArray(pages)) throw new Error('GitHub returned an unreadable list of labels.');
+
             return pages.flat().map(labelOf);
         },
         create: async ({ color = DEFAULT_COLOR, ...label }) => labelOf(await api('POST', labels, { ...label, color })),
@@ -85,12 +91,14 @@ function githubLabels(repo: string, gh: LabelCommands['gh']): TrackerLabels {
 
 function githubKinds(repo: string, gh: LabelCommands['gh']): TicketKinds {
     const issue = (ticket: number) => `repos/${repo}/issues/${ticket}`;
+
     return {
         read: async (ticket) => {
             const raw = JSON.parse(await gh(['api', '--method', 'GET', issue(ticket)])) as {
                 labels?: { name: string }[];
                 type?: { name: string } | null;
             };
+
             return { labels: (raw.labels ?? []).map(({ name }) => name), type: raw.type?.name ?? null };
         },
         setType: async (ticket, type) => {
@@ -132,6 +140,7 @@ function azureProject(repo: string) {
         '--output',
         'json',
     ];
+
     return { organization, project, invoke };
 }
 
@@ -144,6 +153,7 @@ function azureLabels(repo: string, az: LabelCommands['az']): TrackerLabels {
      */
     const changeTags = async (ticket: number, change: (tags: string[]) => string[]) => {
         assertAzureWriteAllowed();
+
         const {
             value: [item],
         } = await withFile(
@@ -153,8 +163,10 @@ function azureLabels(repo: string, az: LabelCommands['az']): TrackerLabels {
                     value: { rev: number; fields: Record<string, unknown> }[];
                 },
         );
+
         if (!item)
             throw new Error(`Work item ${ticket} does not exist in ${project}, or you have no right to read it.`);
+
         const tagsField = item.fields['System.Tags'];
         const tags =
             typeof tagsField === 'string'
@@ -164,7 +176,9 @@ function azureLabels(repo: string, az: LabelCommands['az']): TrackerLabels {
                       .filter(Boolean)
                 : [];
         const changed = change(tags);
+
         if (changed.length === tags.length) return;
+
         await withFile(
             [
                 { op: 'test', path: '/rev', value: item.rev },
@@ -181,6 +195,7 @@ function azureLabels(repo: string, az: LabelCommands['az']): TrackerLabels {
     return {
         list: async () => {
             const { value } = JSON.parse(await az(invoke('tags', 'GET'))) as { value: { name: string }[] };
+
             return value.map(({ name }) => ({ name }));
         },
         create: async () => {
@@ -189,11 +204,15 @@ function azureLabels(repo: string, az: LabelCommands['az']): TrackerLabels {
         },
         update: async (name, { name: newName, ...rest }) => {
             assertAzureWriteAllowed();
+
             if (Object.keys(rest).length) throw new Error('Azure DevOps tags have no colour or description.');
+
             if (newName === undefined) return { name };
+
             const answer = await withFile({ name: newName }, (file) =>
                 az(invoke('tags', 'PATCH', [`tagIdOrName=${labelPathPart(name)}`], file)),
             );
+
             return { name: (JSON.parse(answer) as { name: string }).name };
         },
         delete: async (name) => {
@@ -236,10 +255,13 @@ function moveMainText(item: AzureText, fromType: string, toType: string): { op: 
     const text = (name: string) => (typeof item.fields[name] === 'string' ? item.fields[name] : '');
     const moved = stripTrackerStructure(text(from));
     const own = stripTrackerStructure(text(to));
+
     if (from === to || !hasContent(moved) || own.includes(moved)) return [];
+
     const markdown = [from, to].some((name) => item.multilineFieldsFormat?.[name] === 'Markdown');
     const merged = hasContent(own) ? `${moved}${markdown ? '\n\n---\n\n' : '<hr>'}${own}` : moved;
     const structure = readTrackerStructure(text(to));
+
     return [
         { op: 'add', path: `/fields/${to}`, value: structure ? writeTrackerStructure(merged, structure) : merged },
         ...(markdown ? [{ op: 'add' as const, path: `/multilineFieldsFormat/${to}`, value: 'Markdown' }] : []),
@@ -259,14 +281,18 @@ function azureKinds(repo: string, az: LabelCommands['az']): TicketKinds {
                     value: (AzureText & { rev: number })[];
                 },
         );
+
         if (!item)
             throw new Error(`Work item ${ticket} does not exist in ${project}, or you have no right to read it.`);
+
         return item;
     };
+
     return {
         read: async (ticket) => {
             const { fields } = await workItem(ticket, ['System.Tags', 'System.WorkItemType']);
             const tags = fields['System.Tags'];
+
             return {
                 labels:
                     typeof tags === 'string'
@@ -281,19 +307,23 @@ function azureKinds(repo: string, az: LabelCommands['az']): TicketKinds {
         /** One patch, so the type and its text change together, and fails if someone changed the work item since its read. */
         setType: async (ticket, type) => {
             assertAzureWriteAllowed();
+
             const item = await workItem(ticket, ['System.WorkItemType', DESCRIPTION, REPRO_STEPS]);
             const ops = [
                 { op: 'test', path: '/rev', value: item.rev },
                 { op: 'add', path: '/fields/System.WorkItemType', value: type },
                 ...moveMainText(item, String(item.fields['System.WorkItemType']), type),
             ];
+
             await withFile(ops, (file) => az(workItemPatch(organization, project, ticket, file, MARKDOWN_API_VERSION)));
         },
         boardTypes: async (team) => {
             if (!team) return [];
+
             const { requirementBacklog } = JSON.parse(
                 await az(invoke('backlogconfiguration', 'GET', [`team=${team}`], undefined, { area: 'work' })),
             ) as { requirementBacklog: { workItemTypes: { name: string }[] } };
+
             return requirementBacklog.workItemTypes.map(({ name }) => name);
         },
     };

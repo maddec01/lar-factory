@@ -37,6 +37,7 @@ const own = (...items: ActivityItemRow[]) =>
     threadActivity({ items, runLive: true, agents: [], commandRunning: false, readAt: AT });
 const action = (over: Partial<ActivityItemRow>) => {
     const read = own(item(over));
+
     return read.available ? read.action : 'unavailable';
 };
 
@@ -75,6 +76,7 @@ test('a tool reads as its title with a path shortened, or its name without its s
 test('Thinking and Writing are actions only while their text streams, and finished text moves the time on', () => {
     const later = '2026-11-04T12:03:00.000Z';
     const tool = item({ input: 'pnpm test' });
+
     expect(
         own(item({ type: 'reasoning', status: 'running', streaming: 1, completedAt: null, updatedAt: later }), tool),
     ).toMatchObject({ action: 'Thinking', actionAt: later, toolRunning: false });
@@ -92,7 +94,9 @@ test('Thinking and Writing are actions only while their text streams, and finish
 
 test('a stale running item does not count once its run ended, and a new run has no action until it takes one', () => {
     const stale = item({ status: 'running', input: 'pnpm test', runLive: 0, completedAt: null });
+
     expect(own(stale)).toEqual({ available: true, readAt: AT, toolRunning: false, agents: [] });
+
     const after = threadActivity({
         items: [stale, item({ type: 'reasoning', status: 'running', streaming: 1, runLive: 0, completedAt: null })],
         runLive: false,
@@ -100,6 +104,7 @@ test('a stale running item does not count once its run ended, and a new run has 
         commandRunning: false,
         readAt: AT,
     });
+
     expect(after, 'a thread whose agents or background work go on shows its last action, as finished').toMatchObject({
         action: 'pnpm test',
         toolRunning: false,
@@ -108,6 +113,7 @@ test('a stale running item does not count once its run ended, and a new run has 
 
 test('a running tool counts for the thread or an agent, however old, but waiting on an agent does not', () => {
     const running = { status: 'running', completedAt: null };
+
     expect(own(item({ ...running, input: 'sleep 9' }))).toMatchObject({ toolRunning: true });
     expect(own(item({ ...running, type: 'dynamic_tool', toolName: 'mcp__t3-code__delegate_task' }))).toMatchObject({
         toolRunning: false,
@@ -139,8 +145,10 @@ test('an agent shows "Subagent" with no title, the last segment of a path, and n
             readAt: AT,
             agents: [{ row: agent(row), items: [] }],
         });
+
         return read.available ? read.agents : [];
     };
+
     expect(agents({})).toEqual([{ title: 'Review', model: 'gpt-6', actionAt: AT }]);
     expect(agents({ title: null, model: null })).toEqual([{ title: 'Subagent', actionAt: AT }]);
     expect(agents({ startedAt: null }), 'an agent with no time still counts').toEqual([
@@ -169,11 +177,14 @@ CREATE TABLE orchestration_v2_projection_turn_items (turn_item_id TEXT PRIMARY K
 function activityDb(t: TestContext): string {
     const path = join(tempDir(t, 'lar-activity-'), 'statev2.sqlite');
     const db = new DatabaseSync(path);
+
     db.exec(SCHEMA);
+
     const run = db.prepare('INSERT INTO orchestration_v2_projection_runs VALUES (?, ?, 1, ?)');
     const sub = db.prepare('INSERT INTO orchestration_v2_projection_subagents VALUES (?, ?, ?, ?, ?, ?, ?)');
     const turn = db.prepare('INSERT INTO orchestration_v2_projection_turn_items VALUES (?, ?, ?, ?, ?, ?, ?)');
     const payload = (over: object) => JSON.stringify({ startedAt: AT, updatedAt: AT, ...over });
+
     run.run('build-run', 'build', 'completed');
     run.run('impl-run', 'impl', 'running');
     // A child task working after the run that started it ended, with a native subagent of its own and one that finished.
@@ -203,6 +214,7 @@ function activityDb(t: TestContext): string {
         payload({ title: 'Read /a/b.ts', toolName: 'Read', completedAt: AT }),
     );
     db.close();
+
     return path;
 }
 
@@ -218,6 +230,7 @@ test('a pass reads the agents under a build, its child tasks and their native su
         () => new DatabaseSync(path, { readOnly: true }),
         () => activityFamilies(shells),
     );
+
     t.onTestFinished(() => reads.close());
     expect(reads.read(atWork).activity).toEqual({
         available: true,
@@ -237,20 +250,28 @@ test('each pass stamps a read with its own time, and a pass that repeats a threa
     t.onTestFinished(() => {
         vi.useRealTimers();
     });
+
     const path = activityDb(t);
     const pass = () => {
         const reads = activityReads(
             () => new DatabaseSync(path, { readOnly: true }),
             () => activityFamilies(shells),
         );
+
         t.onTestFinished(() => reads.close());
+
         return reads;
     };
     const stamp = (read: ItemThread) => (read.activity?.available ? read.activity.readAt : undefined);
+
     vi.setSystemTime(AT);
+
     const first = pass();
+
     expect(stamp(first.read(atWork))).toBe(AT);
+
     const later = '2026-11-04T12:00:02.000Z';
+
     vi.setSystemTime(later);
     expect(stamp(first.read(atWork))).toBe(AT);
     expect(stamp(pass().read(atWork))).toBe(later);
@@ -265,9 +286,12 @@ test('comparing items without read times sees a change of action, and no change 
             },
         ] as unknown as Item[];
     const compared = (items: Item[]) => JSON.stringify(withoutReadTimes(items));
+
     expect(compared(at('Read a.ts', AT))).toBe(compared(at('Read a.ts', '2026-11-04T12:00:02.000Z')));
     expect(compared(at('Read a.ts', AT))).not.toBe(compared(at('Read b.ts', AT)));
+
     const unavailable = [{ id: 'i', threads: [{ ...atWork, activity: { available: false } }] }] as unknown as Item[];
+
     expect(withoutReadTimes(unavailable)[0]).toBe(unavailable[0]);
     expect(holdsActivityRead(at('Read a.ts', AT))).toBe(true);
     expect(holdsActivityRead(unavailable)).toBe(false);
@@ -278,20 +302,27 @@ test('a pass opens the database once, reads each thread at work once, and reads 
     const open = vi.fn(() => new DatabaseSync(path, { readOnly: true }));
     const families = vi.fn(() => activityFamilies(shells));
     const reads = activityReads(open, families);
+
     t.onTestFinished(() => reads.close());
     expect(reads.read({ ...atWork, id: 'idle', hasRunningChildren: undefined })).not.toHaveProperty('activity');
     expect(open).not.toHaveBeenCalled();
+
     const db = new DatabaseSync(path, { readOnly: true });
     const prepare = vi.spyOn(db, 'prepare');
+
     open.mockReturnValue(db);
+
     const first = reads.read(atWork);
     const queries = prepare.mock.calls.length;
+
     expect(queries).toBeGreaterThan(0);
     expect(reads.read(atWork).activity).toBe(first.activity);
     reads.read({ ...atWork, id: 'impl', state: 'running' });
     expect(open).toHaveBeenCalledTimes(1);
     expect(families).toHaveBeenCalledTimes(1);
+
     const afterImpl = prepare.mock.calls.length;
+
     expect(afterImpl, 'thread parameters reuse the prepared statements, never their result rows').toBe(queries);
     reads.read({ ...atWork, id: 'impl', state: 'running' });
     expect(prepare.mock.calls.length).toBe(afterImpl);
@@ -301,29 +332,38 @@ test('a reused activity connection reads new actions and finished agents on the 
     const path = activityDb(t);
     const database = createActivityDatabase(path);
     const writer = new DatabaseSync(path);
+
     writer.exec('PRAGMA journal_mode=WAL');
     t.onTestFinished(() => {
         database.close();
         writer.close();
     });
+
     const pass = () => activityReads(database.open, () => activityFamilies(shells), database.release);
     const first = pass();
+
     expect(first.read(atWork).activity).toMatchObject({ agents: [{ action: 'pnpm test' }, { action: 'Read b.ts' }] });
     first.close();
     writer
         .prepare('UPDATE orchestration_v2_projection_turn_items SET payload_json = ? WHERE turn_item_id = ?')
         .run(JSON.stringify({ input: 'pnpm run typecheck', startedAt: AT, updatedAt: AT }), 'i1');
     writer.exec("UPDATE orchestration_v2_projection_subagents SET status = 'completed' WHERE subagent_id = 's2'");
+
     const next = pass();
+
     expect(next.read(atWork).activity).toMatchObject({ agents: [{ action: 'pnpm run typecheck' }] });
     next.close();
     // A schema failure is unavailable immediately, then a new connection can recover on the next pass.
     writer.exec('ALTER TABLE orchestration_v2_projection_turn_items RENAME TO hidden_items');
+
     const failed = pass();
+
     expect(failed.read(atWork).activity).toEqual({ available: false });
     failed.close();
     writer.exec('ALTER TABLE hidden_items RENAME TO orchestration_v2_projection_turn_items');
+
     const recovered = pass();
+
     expect(recovered.read(atWork).activity).toMatchObject({
         available: true,
         agents: [{ action: 'pnpm run typecheck' }],
@@ -335,19 +375,26 @@ test("a thread at work that is also another thread's agent is read once in a pas
     const db = new DatabaseSync(activityDb(t), { readOnly: true });
     const prepare = db.prepare.bind(db);
     const statements: { sql: string; all: { mock: { calls: unknown[][] } } }[] = [];
+
     vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
         const statement = prepare(sql);
+
         statements.push({ sql, all: vi.spyOn(statement, 'all') });
+
         return statement;
     });
+
     const pass = activityReads(
         () => db,
         () => activityFamilies(shells),
     );
+
     t.onTestFinished(() => pass.close());
     pass.read(atWork);
     pass.read({ ...atWork, id: 'impl', state: 'running' });
+
     const reads = statements.flatMap(({ sql, all }) => all.mock.calls.map(([id]) => `${String(id)} ${sql}`));
+
     expect(reads.some((read) => read.startsWith('impl '))).toBe(true);
     expect(new Set(reads).size).toBe(reads.length);
 });
@@ -361,11 +408,16 @@ test('a read that fails, or a T3 that cannot be read, says unavailable, and no r
         },
         () => activityFamilies(shells),
     );
+
     expect(failed.read(atWork).activity).toEqual({ available: false });
+
     const outage = activityReads(good, () => undefined);
+
     expect(outage.read(atWork).activity).toEqual({ available: false });
+
     const open = vi.fn(good);
     const retained = activityReads(open, () => activityFamilies(shells));
+
     t.onTestFinished(() => retained.close());
     expect(retained.read({ ...atWork, observedAt: AT }).activity).toEqual({ available: false });
     expect(open).not.toHaveBeenCalled();
@@ -379,6 +431,7 @@ test("a thread's own family leaves out its parent, so a sibling never reads as i
         lineage: { parentThreadId: 'parent', rootThreadId: 'parent' },
     });
     const lookup = activityFamilies([{ id: 'parent', status: 'running', updatedAt: AT }, running('a'), running('b')]);
+
     expect([...lookup('a').threads]).toEqual(['a']);
     expect([...lookup('parent').threads]).toEqual(['parent', 'a', 'b']);
 });
@@ -395,6 +448,7 @@ test('a thread with a family above a finished middle thread still finds its gran
         },
     ]);
     const family = lookup('root');
+
     expect([...family.threads]).toEqual(['root', 'grandchild', 'gone']);
     expect(family.commandRunning).toBe(true);
     expect(lookup('unrelated')).toMatchObject({ commandRunning: false });

@@ -11,9 +11,12 @@ const GB = 2 ** 30;
 const dirs: string[] = [];
 const tempDir = () => {
     const dir = mkdtempSync(join(tmpdir(), 'heavy-command-limit-'));
+
     dirs.push(dir);
+
     return dir;
 };
+
 afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
@@ -41,6 +44,7 @@ describe('heavy command limit setting', () => {
 
     it.each<HeavyCommandLimit>(['automatic', 1, 3])('saves %s in the data folder and reads it back', (limit) => {
         const dir = join(tempDir(), 'Lar Factory');
+
         expect(writeHeavyCommandLimit(limit, dir)).toBe(limit);
         expect(readHeavyCommandLimit(dir)).toEqual({ limit });
         expect(readdirSync(dir)).toEqual(['heavy-command-limit.json']);
@@ -48,6 +52,7 @@ describe('heavy command limit setting', () => {
 
     it('refuses an invalid limit and leaves the saved one as it was', () => {
         const dir = tempDir();
+
         writeHeavyCommandLimit(2, dir);
         for (const limit of [0, -1, 1.5, '2', 'auto', null, Infinity]) {
             expect(() => writeHeavyCommandLimit(limit as HeavyCommandLimit, dir), String(limit)).toThrow(
@@ -64,8 +69,11 @@ describe('heavy command limit setting', () => {
         ['{ "limit": "4" }', 'needs a limit'],
     ])('counts %s as Automatic and says why, and a save replaces it', (text, why) => {
         const dir = tempDir();
+
         writeFileSync(join(dir, 'heavy-command-limit.json'), text);
+
         const read = readHeavyCommandLimit(dir);
+
         expect(read.limit).toBe('automatic');
         expect(read.problem).toContain(why);
         writeHeavyCommandLimit(4, dir);
@@ -74,8 +82,11 @@ describe('heavy command limit setting', () => {
 
     it("counts a file it can't read as Automatic and says why", () => {
         const dir = tempDir();
+
         mkdirSync(join(dir, 'heavy-command-limit.json'));
+
         const read = readHeavyCommandLimit(dir);
+
         expect(read.limit).toBe('automatic');
         expect(read.problem).toContain("Can't read the heavy command limit setting");
     });

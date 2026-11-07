@@ -8,9 +8,11 @@ import { expect, test, vi } from 'vite-plus/test';
 
 test("The design system's Modal opens a titled dialog with its close button and content", async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
     const onClose = vi.fn();
     const host = document.body.appendChild(document.createElement('div'));
     const root = createRoot(host);
+
     await act(async () =>
         root.render(
             createElement(Modal, {
@@ -24,6 +26,7 @@ test("The design system's Modal opens a titled dialog with its close button and 
     );
 
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+
     expect(dialog.getAttribute('data-slot')).toBe('modal-content');
     expect(dialog.querySelector('h2')?.textContent).toBe('Edit settings');
     expect(
@@ -49,9 +52,12 @@ test('a FormSelect gives its form an empty value for None, the picked value afte
             disconnect() {}
         },
     );
+
     const heard: (string | null)[] = [];
+
     function Owner() {
         const [value, setValue] = useState('');
+
         return createElement(
             'form',
             {
@@ -69,11 +75,15 @@ test('a FormSelect gives its form an empty value for None, the picked value afte
             }),
         );
     }
+
     const host = document.body.appendChild(document.createElement('div'));
     const root = createRoot(host);
+
     await act(async () => root.render(createElement(Owner)));
+
     const form = host.querySelector('form')!;
     const trigger = form.querySelector<HTMLElement>('#who')!;
+
     expect(new FormData(form).get('who')).toBe('');
     expect(trigger.textContent).toBe('None');
 

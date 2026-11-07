@@ -27,6 +27,7 @@ test('a discovered concept stays in List until it has been added locally', () =>
     } as Item;
     const data = { items: [concept], repos: [], firstRead: { settled: true } } as unknown as BoardData;
     const fresh = boardSections(data, Date.now());
+
     assert.equal(fresh.list[0]?.id, concept.id);
     assert.deepEqual([fresh.concepts.length, fresh.shaping.length], [0, 0]);
     data.items = [{ ...concept, recorded: true }];
@@ -87,6 +88,7 @@ for (const status of ['Verify', 'Ready to merge'] as const) {
 
     test(`${status} stays on the desk while thread activity is unavailable`, () => {
         const running = delivered(status, { currentRunning: true });
+
         assert.equal(onDesk(running, undefined, 'HTTP 502'), true, 'a client error');
         assert.equal(onDesk(running, { error: 'HTTP 502' }), true, 'a failed read');
         assert.equal(onDesk(running, { fetchedAt: '2026-11-02T11:00:00Z' }), true, 'old data');
@@ -184,6 +186,7 @@ test('Reopen PR and a replacement build name the destination, and a closed ticke
 
 test('a choice names the other note only when the notice has one, and then says the notice stays for it', () => {
     const noted = waiting([{ type: 'ticket-closed' }]);
+
     noted.needsYou!.hasOtherNote = true;
     for (const action of ['keep-working', 'reopen-pr', 'replace-pr', 'back-to-queue', 'back-to-list'] as const) {
         assert.ok(needsYouPrompt(noted, action).detail.endsWith(STAYS), action);
@@ -204,11 +207,14 @@ test('a choice that starts nothing says so beside a no-thread cause', () => {
 
 test('Start again says what it starts, and that the notice goes only once a thread does', () => {
     const after = 'Once T3 shows the thread, the notice goes away. If the start fails, the notice stays.';
+
     assert.deepEqual(needsYouPrompt(waiting([{ type: 'no-thread' }]), 'start-again'), {
         question: 'Start #7 Keep history again?',
         detail: `This starts a new shaping thread in T3. The item stays at Review. Its ticket doesn't change. Its PR, branch and worktree don't change. ${after}`,
     });
+
     const build = waiting([{ type: 'no-thread' }]);
+
     build.needsYou!.startAgainPurpose = 'build';
     assert.equal(
         needsYouPrompt(build, 'start-again').detail,
@@ -242,6 +248,7 @@ test('a current shaping question enters the desk and leaves when answered', () =
         threads: [{ id: 'question', state: 'needs you' }],
     } as Item;
     const data = { items: [item], repos: [], firstRead: { settled: true } } as unknown as BoardData;
+
     assert.deepEqual(boardSections(data, Date.now()).needsYou, [item]);
     item.threads = [{ id: 'question', state: 'running' }] as Item['threads'];
     assert.deepEqual(boardSections(data, Date.now()).needsYou, []);
@@ -272,12 +279,15 @@ for (const kind of ['issue', 'concept'] as const) {
                 kind === 'concept'
                     ? !['List', 'Queued', 'Done'].includes(status)
                     : ['Shaping', 'Needs you', 'Verify', 'Ready to merge'].includes(status);
+
             assert.equal(boardSections(data, Date.now()).needsYou.length, Number(expected));
             item.threads = 'unavailable';
+
             const ordinary =
                 kind === 'concept'
                     ? status === 'Needs you'
                     : ['Needs you', 'Verify', 'Ready to merge'].includes(status);
+
             assert.equal(boardSections(data, Date.now()).needsYou.length, Number(ordinary));
             item.threads = [{ id: 'q', state: 'needs you', observedAt: '2026-11-02' }] as Item['threads'];
             assert.equal(boardSections(data, Date.now()).needsYou.length, Number(ordinary));
@@ -290,6 +300,7 @@ test('Abandon from a notice names Archive and leaves the ticket as it is, and of
         waiting([{ type: 'pr-closed' }], {
             needsYou: { reason: 'Why.', offers: ['set-aside'], causes: [{ type: 'pr-closed' }], ticketOpen },
         });
+
     assert.equal(
         abandonPrompt(notice(false)).detail,
         'This moves the item off the desk into Settings › Archive. Its ticket stays as it is. Any PR it has stays as it is.',
@@ -322,6 +333,7 @@ test('Abandon from a notice names Archive and leaves the ticket as it is, and of
 
 test('a closed PR is one a cause names or the ticket links', () => {
     const pr = (state: 'open' | 'closed') => [{ number: 1, url: 'u', state }] as Item['linkedPrs'];
+
     assert.equal(hasClosedPr(waiting([{ type: 'pr-closed' }])), true);
     assert.equal(hasClosedPr(waiting([{ type: 'ticket-closed' }], { linkedPrs: pr('closed') })), true);
     assert.equal(hasClosedPr(waiting([{ type: 'ticket-closed' }], { linkedPrs: pr('open') })), false);
@@ -421,6 +433,7 @@ describe('placementOf', () => {
 
         test('leaves out a concept with Refinement complete, even with a question or a start', () => {
             const refined = { refinement: { complete: true, reasons: [] } };
+
             assert.deepEqual(sections(concept(refined)), ['dock']);
             assert.deepEqual(sections(concept({ ...refined, status: 'Needs you' })), ['desk', 'dock']);
             assert.deepEqual(sections(concept({ ...refined, status: 'Queued' }), { starts: { shape: starting } }), [
@@ -483,10 +496,13 @@ describe('placementOf', () => {
         test('holds concepts once started and items with sub-issues', () => {
             const child = part();
             const parent = work({ id: 'concept', status: 'In progress' });
+
             assert.ok(sections(concept()).includes('dock'));
             assert.ok(!sections(concept({ status: 'Queued' })).includes('dock'));
             assert.deepEqual(sections(parent, { all: [parent, child] }), ['build', 'dock']);
+
             const queued = concept({ status: 'Queued' });
+
             assert.deepEqual(
                 sections(queued, { all: [queued, child] }),
                 ['queue', 'dock'],
@@ -498,6 +514,7 @@ describe('placementOf', () => {
             for (const status of ['List', 'Done'] as const) {
                 const parent = concept({ status });
                 const child = part({ status: 'Shaping' });
+
                 assert.deepEqual(sections(parent, { all: [parent, child] }), []);
                 assert.deepEqual(
                     place(child, { all: [parent, child] }),
@@ -516,6 +533,7 @@ describe('placementOf', () => {
         const parent = concept();
         const inDossier = (change: Partial<Item>, facts?: Partial<PlacementFacts>) => {
             const child = part(change);
+
             return place(child, { all: [parent, child], ...facts });
         };
 
@@ -570,6 +588,7 @@ test('the desk leaves out Ready and a merged build counts under shipped', () => 
     const closedAt = new Date(AT - 1000).toISOString();
     const ready = delivered('Ready', { state: 'done' });
     const merged = delivered('Done', { state: 'done' }, { closedAt });
+
     assert.deepEqual(boardSections(boardWith(ready), AT).needsYou, []);
     assert.deepEqual(
         boardSections(boardWith(merged), AT).done.map((item) => item.id),
@@ -580,8 +599,11 @@ test('the desk leaves out Ready and a merged build counts under shipped', () => 
 test('shaping follows the placement rule: a pending start joins it, and a part still in its dossier leaves it', () => {
     const ids = (sections: { shaping: Item[] }) => sections.shaping.map((item) => item.id);
     const shaping = delivered('Shaping', { state: 'done' }, { threads: [] });
+
     assert.deepEqual(ids(boardSections(boardWith(shaping), AT)), [shaping.id]);
+
     const waiting = { ...shaping, status: 'Needs you' as const };
+
     assert.deepEqual(
         ids(boardSections(boardWith(waiting), AT)),
         [waiting.id],
@@ -592,15 +614,23 @@ test('shaping follows the placement rule: a pending start joins it, and a part s
         [waiting.id],
         'and is on the desk too',
     );
+
     const queued = { ...shaping, status: 'Queued' as const };
+
     assert.deepEqual(ids(boardSections(boardWith(queued), AT)), []);
+
     const starting = {
         startProgress: { [queued.id]: { shape: { phase: 'starting' } } },
     } as unknown as Partial<BoardData>;
+
     assert.deepEqual(ids(boardSections(boardWith(queued, starting), AT)), [queued.id]);
+
     const failed = { startProgress: { [queued.id]: { shape: { phase: 'failed' } } } } as unknown as Partial<BoardData>;
+
     assert.deepEqual(ids(boardSections(boardWith(queued, failed), AT)), [], 'a failed start waits in the Queue again');
+
     const parent = delivered('In progress', { state: 'done' }, { id: 'parent' });
     const part = { ...shaping, parentId: 'parent' };
+
     assert.deepEqual(ids(boardSections(boardWith(part, { items: [parent, part] }), AT)), []);
 });

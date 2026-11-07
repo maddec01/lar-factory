@@ -9,7 +9,9 @@ import { join } from 'node:path';
  * `<pid>.json`, `{ "port": n }`, per live board. */
 export function recordBoard(port: number, dir = join(boardDataDir(), 'boards')): () => void {
     const file = join(dir, `${process.pid}.json`);
+
     mkdirSync(dir, { recursive: true });
     writeFileSync(file, JSON.stringify({ port }));
+
     return () => rmSync(file, { force: true });
 }

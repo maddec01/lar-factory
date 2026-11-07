@@ -39,6 +39,7 @@ export function detectReads(run: Az = az): DetectReads {
             const { commitTree, defaultBranchHead } = prHost(repo);
             const tool = onAzure(repo) ? run : undefined;
             const head = await defaultBranchHead(repo, tool);
+
             return { tree: await commitTree(repo, head.sha, tool) };
         },
         github: (repo) => repositoryAccess(repo),
@@ -46,7 +47,9 @@ export function detectReads(run: Az = az): DetectReads {
         azureAccess: (repo) => readAzureAccess(repo, run),
         teams: async (repo) => {
             const read = await readProjectTeams({ repo }, run);
+
             if ('error' in read) throw new Error(read.error.replace(/^Can't load teams\. /, ''));
+
             return read.teams;
         },
     };
@@ -60,33 +63,43 @@ const originRepo = (origin: string | null): string | null =>
 async function detectCheckout(key: string, projectId: string, reads: DetectReads): Promise<Detected<string>> {
     const repo = shownRepo(key);
     let projects;
+
     try {
         projects = await reads.checkouts();
     } catch (err) {
         return { refused: `Can't read T3 Code's projects: ${message(err)}. Open T3 Code, then retry.` };
     }
+
     const picked = projects.find((p) => p.id === projectId);
+
     if (!picked) return { refused: 'This project is no longer in T3 Code. Go back and choose another.' };
+
     if (!picked.origin)
         return {
             refused: `${picked.folder} is not a repository folder with a remote. Choose the main repository folder for ${repo}.`,
         };
+
     const origin = originRepo(picked.origin);
+
     if (!origin || !sameRepo(origin, key)) {
         return {
             refused: `${picked.folder} connects to ${origin ? shownRepo(origin) : picked.origin} instead of ${repo}. Go back and choose the main repository folder for ${repo}.`,
         };
     }
+
     const others = projects.filter((p) => p.id !== projectId && sameRepo(originRepo(p.origin) ?? '', key));
+
     if (others.length) {
         const folders = [picked, ...others]
             .map((p) => p.folder)
             .sort()
             .join(', ');
+
         return {
             refused: `More than one T3 project points to ${repo}. The folders are ${folders}. Keep one project in T3 Code, then retry.`,
         };
     }
+
     return { found: picked.folder };
 }
 
@@ -98,17 +111,23 @@ async function githubAccess(
     reads: DetectReads,
 ): Promise<{ itemSources: Detected<RepositoryItemSource[]>; access: Access }> {
     let found;
+
     try {
         found = await reads.github(repo);
     } catch (err) {
         return { itemSources: { refused: `Can't read ${repo} with gh: ${message(err)}` }, access: {} };
     }
+
     const { push, triage, issues, tokenWrites } = found;
     const access: Access = {};
+
     // GitHub grants applying labels at triage and managing them at write.
     if (!push) for (const operation of ['push-branch', 'manage-labels'] as const) access[operation] = 'refused';
+
     if (!triage) access['tag-ticket'] = 'refused';
+
     if (tokenWrites === false) for (const operation of REPOSITORY_OPERATIONS) access[operation] = 'refused';
+
     if (tokenWrites === true) {
         if (push)
             for (const operation of [
@@ -120,10 +139,13 @@ async function githubAccess(
                 'relate-ticket',
             ] as const)
                 access[operation] = 'allowed';
+
         if (triage) access['tag-ticket'] = 'allowed';
+
         if (issues)
             for (const operation of ['publish-ticket', 'comment-ticket'] as const) access[operation] = 'allowed';
     }
+
     if (!issues)
         for (const operation of [
             'publish-ticket',
@@ -135,6 +157,7 @@ async function githubAccess(
             'relate-ticket',
         ] as const)
             access[operation] = 'refused';
+
     return {
         itemSources: issues ? { found: [{ kind: 'issues' }] } : { refused: `${repo} has issues turned off.` },
         access,
@@ -161,6 +184,7 @@ async function azureAccess(
                   () => ({}),
               ),
     ]);
+
     return { itemSources: teams, access };
 }
 
@@ -175,6 +199,7 @@ type TreeFacts = Pick<SetupDetection, 'domainDocs' | 'projectSkills'>;
 function domainDocsOf(files: readonly string[]): DomainDocLocation {
     const glossary = ['GLOSSARY.md', 'CONTEXT.md'].find((path) => files.includes(path));
     const adrs = files.some((path) => path.startsWith('docs/adr/'));
+
     return glossary || adrs
         ? { kind: 'repository', glossary: glossary ?? 'GLOSSARY.md', adrs: 'docs/adr' }
         : { kind: 'off' };
@@ -183,15 +208,19 @@ function domainDocsOf(files: readonly string[]): DomainDocLocation {
 /** The facts the default branch's tree holds, each Refused with the same problem when gh or az can't read it. */
 async function treeFacts(repo: string, reads: DetectReads): Promise<TreeFacts> {
     let tree;
+
     try {
         ({ tree } = await reads.tree(repo));
     } catch (err) {
         const refused = {
             refused: `Can't read ${shownRepo(repo)} with ${onAzure(repo) ? 'az' : 'gh'}: ${message(err)}`,
         };
+
         return { domainDocs: refused, projectSkills: refused };
     }
+
     const files = [...tree.files.keys()];
+
     return {
         domainDocs: { found: domainDocsOf(files) },
         projectSkills: { found: [...new Set(projectSkills(files).map((skill) => skill.name))].sort() },
@@ -204,14 +233,17 @@ export async function detectSetup(
     reads: DetectReads = detectReads(),
 ): Promise<{ detection: SetupDetection } | { status: number; error: string }> {
     const { repo, projectId } = input;
+
     if (!isRepo(repo) || typeof projectId !== 'string')
         return { status: 400, error: 'Choose a Project and its T3 project before detecting its setup.' };
+
     const azure = onAzure(repo);
     const [checkout, { itemSources, access }, facts] = await Promise.all([
         detectCheckout(repo, projectId, reads),
         (azure ? azureAccess : githubAccess)(repo, reads),
         treeFacts(repo, reads),
     ]);
+
     return {
         detection: {
             repo,

@@ -20,6 +20,7 @@ import {
 import { openWorkRecords, type WorkRecords } from './work-records.ts';
 
 const handles: { records: WorkRecords; dir: string }[] = [];
+
 afterEach(() => {
     vi.unstubAllEnvs();
     for (const { records, dir } of handles.splice(0)) {
@@ -27,12 +28,16 @@ afterEach(() => {
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
 async function cache() {
     const dir = mkdtempSync(join(tmpdir(), 'structure-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
+
     handles.push({ records, dir });
+
     return records;
 }
+
 const settings = (repo: string, structureSync = true): RepositorySetup =>
     ({
         repo,
@@ -45,6 +50,7 @@ const settings = (repo: string, structureSync = true): RepositorySetup =>
         },
         vocabulary: {},
     }) as unknown as RepositorySetup;
+
 function fakeProvider() {
     const issues = new Map<string, StructureTicket>();
     const comments = new Map<string, string>();
@@ -58,7 +64,9 @@ function fakeProvider() {
     };
     const read = async (repository: string, number: number) => {
         const ticket = issues.get(key(repository, number));
+
         if (!ticket) throw Error('No issue.');
+
         return { ...ticket };
     };
     const provider: StructureProvider = {
@@ -70,23 +78,32 @@ function fakeProvider() {
         create: async (repo, title, body) => {
             writes.push(`create ${repo} ${title}`);
             put(repo, ++counter, body);
+
             return read(repo, counter);
         },
         comment: async (ticket, body) => {
             writes.push('comment');
+
             if (failComment && --failComment === 0) throw Error('Comment unavailable.');
+
             const id = String(++commentCount);
+
             comments.set(id, body);
+
             return id;
         },
         readComment: async (_ticket, id) => {
             const body = comments.get(id);
+
             if (!body) throw Error('No comment.');
+
             return body;
         },
         replace: async (ticket, body) => {
             const current = await read(ticket.repository, ticket.number);
+
             if (current.version !== ticket.version) throw Error('Issue changed.');
+
             writes.push(`replace ${key(ticket.repository, ticket.number)}`);
             issues.set(key(ticket.repository, ticket.number), {
                 ...ticket,
@@ -95,7 +112,9 @@ function fakeProvider() {
             });
         },
     };
+
     put('team/relay', 6, 'Relay author text.');
+
     return {
         provider,
         issues,
@@ -107,8 +126,10 @@ function fakeProvider() {
         },
     };
 }
+
 const MAP =
     '## Destination\nWatch anywhere.\n\n## Decisions so far\n- Use a shared contract.\n\n## Fog\n- none\n\n## Domain docs\n- PRIVATE DOMAIN DRAFT\n\n## Map\n```mermaid\nflowchart LR\n A[Server] --> B[Apple]\n```\n';
+
 async function concept(records: WorkRecords) {
     let root = records.create({
         repository: 'team/server',
@@ -116,17 +137,25 @@ async function concept(records: WorkRecords) {
         kind: 'concept',
         ticket: 'team/server#42',
     });
+
     root = records.setBody(root.workId, root.revision, 'map', MAP);
+
     let decision = records.create({ repository: 'team/server', title: 'Choose contract', kind: 'decision' });
+
     decision = records.setParent(decision.workId, decision.revision, root.workId);
     decision = records.setBody(decision.workId, decision.revision, 'decision', 'PRIVATE DECISION');
     decision = records.setBody(decision.workId, decision.revision, 'answer', 'PRIVATE ANSWER');
+
     let build = records.create({ repository: 'team/apple', title: 'Play media', kind: 'build' });
+
     build = records.setParent(build.workId, build.revision, root.workId);
     build = records.setBody(build.workId, build.revision, 'brief', 'PRIVATE BRIEF');
     build = records.update(build.workId, build.revision, { status: 'Queued' });
+
     let slice = records.create({ repository: 'team/apple', title: 'PRIVATE SLICE', kind: 'slice' });
+
     slice = records.setParent(slice.workId, slice.revision, build.workId);
+
     const dependency = records.addDependency(root.workId, {
         need: 'Relay contract',
         owner: 'team/relay',
@@ -134,7 +163,9 @@ async function concept(records: WorkRecords) {
         contract: 'Stream URL',
         evidence: 'Version 1',
     });
+
     records.addDependencyBlock(dependency.dependencyId, dependency.revision, build.workId);
+
     return { root, build, decision, slice };
 }
 
@@ -143,6 +174,7 @@ test('GitHub structural commits append comments, preserve interleaved author edi
     const dir = handles.at(-1)!.dir;
     const state = join(dir, 'github.json');
     const fake = join(dir, 'gh.mjs');
+
     writeFileSync(
         state,
         JSON.stringify({ body: 'Author original.', labels: [], comments: [], writes: [], next: 100, interleave: true }),
@@ -172,6 +204,7 @@ if(method!=='GET')save();
         { mode: 0o755 },
     );
     vi.stubEnv('GH_PATH', fake);
+
     const provider = structureProvider();
     const ticket = await provider.read('team/server', 1);
     const { writeTrackerStructure } = await import('@lar-factory/shared');
@@ -181,8 +214,11 @@ if(method!=='GET')save();
         identity: '11111111-1111-4111-8111-111111111111',
         repository: 'team/server',
     };
+
     await provider.replace(ticket, writeTrackerStructure(ticket.body, base));
+
     let fixture = JSON.parse(readFileSync(state, 'utf8'));
+
     expect(fixture.body).toBe('Author edited between the structure read and append.');
     expect(fixture.writes.some((write: { method: string }) => write.method === 'PATCH')).toBe(false);
     // More than a page of ordinary discussion must not hide the latest saved structural projection.
@@ -190,8 +226,11 @@ if(method!=='GET')save();
         ...Array.from({ length: 120 }, (_, index) => ({ id: String(500 + index), body: `Ordinary comment ${index}` })),
     );
     writeFileSync(state, JSON.stringify(fixture));
+
     const found = await provider.read('team/server', 1);
+
     expect(readTrackerStructure(found.body)).toMatchObject(base);
+
     const manifest = {
         root: 'https://github.com/team/server/issues/1',
         repository: 'team/server',
@@ -200,6 +239,7 @@ if(method!=='GET')save();
         previous: null,
         chunks: [{ id: '4', digest: 'd'.repeat(64) }],
     };
+
     fixture = JSON.parse(readFileSync(state, 'utf8'));
     fixture.comments.push({ id: '800', body: writeTrackerStructure('', { ...base, snapshot: manifest }).trim() });
     fixture.comments.push({
@@ -218,19 +258,24 @@ test('Azure dependency PR references retain their repository URL and round trip 
         title: 'Playback',
         ticket: 'org/Project/server#1',
     });
+
     records.addDependency(root.workId, {
         need: 'Relay endpoint',
         owner: 'org/Project/relay',
         ticket: 'org/Project/relay#6',
         pullRequests: ['org/Project/relay#7'],
     });
+
     const snapshot = records.trackerSnapshot(root.workId);
+
     expect(snapshot.dependencies[0]?.ticket).toBe('https://dev.azure.com/org/Project/_workitems/edit/6');
     expect(snapshot.dependencies[0]?.pullRequests).toEqual([
         'https://dev.azure.com/org/Project/_git/relay/pullrequest/7',
     ]);
+
     const fresh = await cache();
     const restored = fresh.trackerRestore(snapshot, 'a'.repeat(64));
+
     expect(fresh.dependencies(restored)[0]?.pullRequests).toEqual(['org/Project/relay#7']);
 });
 
@@ -257,6 +302,7 @@ test('untrusted snapshot shape and repository mismatches fail before any context
         ],
         dependencies: [],
     };
+
     for (const payload of [
         { ...valid, nodes: [null] },
         { ...valid, nodes: [{ ...valid.nodes[0], ticket: 'unrelated/secret#1' }] },
@@ -291,6 +337,7 @@ test('untrusted snapshot shape and repository mismatches fail before any context
             readComment: async () => `<!-- lar-factory:chunk ${generation} 0\n${encoded}\n-->`,
         } as unknown as StructureProvider;
         const fresh = await cache();
+
         await expect(
             readStructureSnapshot(ticket, metadata, provider, [settings('team/server')]).then((saved) => {
                 return Promise.all(saved.snapshot.nodes.map((node) => provider.read(node.repository, 1))).then(() =>
@@ -312,6 +359,7 @@ test('a stale failure checkpoint cannot overwrite a later structural outbox entr
         ticket: 'team/server#42',
     });
     const digest = trackerDigest(records.trackerSnapshot(root.workId));
+
     records.setBody(root.workId, root.revision, 'map', '## Destination\nLater map');
     records.trackerFailed(root.workId, 'An obsolete request failed.', true, digest);
     expect(records.trackerState(root.workId)).toEqual({ state: 'pending' });
@@ -331,15 +379,20 @@ test('one refresh reads the tracker graph once, and each record keeps the state 
         title: 'Failed',
         ticket: 'team/server#60',
     });
+
     records.trackerFailed(failed.workId, 'The tracker refused.', true);
+
     const { openDatabase } = await import('./database.ts');
     const database = await openDatabase(join(dir, 'work-records.db'));
     const graphReads = vi.fn();
     const prepare = database.db.prepare.bind(database.db);
+
     database.db.prepare = ((sql: string) => {
         if (sql.includes("FROM work_records WHERE kind <> 'slice'")) graphReads();
+
         return prepare(sql);
     }) as typeof database.db.prepare;
+
     const stateOf = trackerCache(database).trackerStates();
     const expected: [string, unknown][] = [
         [root.workId, { state: 'pending' }],
@@ -348,6 +401,7 @@ test('one refresh reads the tracker graph once, and each record keeps the state 
         ...lone.map(({ workId }): [string, unknown] => [workId, undefined]),
         [failed.workId, { state: 'conflict', message: 'The tracker refused.' }],
     ];
+
     for (const [workId, state] of expected) {
         expect(stateOf(workId)).toEqual(state);
         expect(records.trackerState(workId)).toEqual(state);
@@ -358,8 +412,10 @@ test('one refresh reads the tracker graph once, and each record keeps the state 
 
 test('the existing create transport sends GitHub options and Azure Bug HTML with tags, identity, iteration and default area', async () => {
     await cache();
+
     const dir = handles.at(-1)!.dir;
     const cli = join(dir, 'provider.mjs');
+
     writeFileSync(
         cli,
         `#!/usr/bin/env node
@@ -391,7 +447,9 @@ if(args[0]==='api') {
     vi.stubEnv('GH_PATH', cli);
     vi.stubEnv('AZ_PATH', cli);
     vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '');
+
     const provider = structureProvider();
+
     expect(
         (
             await provider.create('example/source', 'Failure', '## Steps', 'Bug', undefined, {
@@ -401,6 +459,7 @@ if(args[0]==='api') {
             })
         ).number,
     ).toBe(8);
+
     const bug = await provider.create(
         'example/Project/source',
         'Failure',
@@ -409,6 +468,7 @@ if(args[0]==='api') {
         'Project\\Team',
         { labels: ['backend', 'triage'], assignee: 'writer@example.test', iteration: 'Project\\Sprint' },
     );
+
     expect(bug.body).toContain('<h2>Steps</h2>');
     expect(bug.number).toBe(9);
 });
@@ -416,10 +476,13 @@ if(args[0]==='api') {
 test('suspension retains pending work and uncertain creation across explicit retries and setting variants', async () => {
     const records = await cache();
     const { root, decision } = await concept(records);
+
     records.trackerReserveCreation(decision.workId);
+
     const before = records.trackerPending();
     const checkpoint = records.trackerCheckpoint(root.workId);
     const fake = fakeProvider();
+
     for (const structureSync of [undefined, false, true]) {
         await syncStructures(records, {
             provider: fake.provider,
@@ -438,24 +501,30 @@ test('legacy upgrade preserves every stored row and repeats without changing pen
     const records = await cache();
     const { root, decision } = await concept(records);
     const finished = records.create({ repository: 'team/apple', title: 'Completed earlier build', kind: 'build' });
+
     records.setBody(finished.workId, finished.revision, 'brief', 'Retained finished history');
     records.recordFinished(finished.workId, records.read(finished.workId).revision);
     records.trackerReserveCreation(decision.workId);
     records.trackerFailed(root.workId, 'Retained conflict', true, 'local-digest');
+
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('./migrations.ts');
     const { openDatabase } = await import('./database.ts');
     const path = records.trackerDatabasePath();
     const raw = new DatabaseSync(path);
+
     raw.exec(`PRAGMA user_version = ${MIGRATIONS.length - 1}`);
+
     const rows = () =>
         raw
             .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             .all()
             .map(({ name }) => [name, raw.prepare(`SELECT * FROM "${String(name).replaceAll('"', '""')}"`).all()]);
     const before = JSON.stringify(rows());
+
     for (let attempt = 0; attempt < 2; attempt++) {
         const upgraded = await openDatabase(path);
+
         expect(JSON.stringify(rows())).toBe(before);
         upgraded.close();
     }
@@ -477,8 +546,10 @@ test('legacy snapshot chunks still recover without structural publication', asyn
     const digest = (text: string) => createHash('sha256').update(text).digest('hex');
     const data = gzipSync(payload).toString('base64');
     const fake = fakeProvider();
+
     fake.put('team/server', 42);
     fake.comments.set('123', `<!-- lar-factory:chunk 11111111-1111-1111-1111-111111111111 0\n${data}\n-->`);
+
     const ticket = await fake.provider.read('team/server', 42);
     const metadata: TrackerStructure = {
         version: 1,
@@ -493,8 +564,11 @@ test('legacy snapshot chunks still recover without structural publication', asyn
             chunks: [{ id: '123', digest: digest(data) }],
         },
     };
+
     ticket.body = writeTrackerStructure('', metadata);
+
     const recovered = await readStructureSnapshot(ticket, metadata, fake.provider, [settings('team/server')]);
+
     expect(recovered.snapshot).toEqual(snapshot);
     expect(fake.writes).toEqual([]);
 });

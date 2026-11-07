@@ -34,6 +34,7 @@ export class ReadProblem extends Error {
     readonly fix?: string;
     constructor(message: string, fix?: string) {
         super(message);
+
         if (fix !== undefined) this.fix = fix;
     }
 }

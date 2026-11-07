@@ -23,40 +23,52 @@ export function CreateTicket({ item }: { item: Item }) {
         azureReadOnly: repo?.setup?.azureReadOnly,
     });
     const locked = !!attempt && attempt.phase !== 'failed';
+
     useEffect(() => {
         if (!open) return;
+
         section.current?.focus();
+
         let current = true;
+
         setPreview(null);
         setError('');
         void fetch(`/api/ticket-preview?itemId=${encodeURIComponent(item.id)}`)
             .then(async (response) => {
                 const result = (await response.json()) as { preview?: TicketPreview; error?: string };
+
                 if (!response.ok || !result.preview)
                     throw Error(result.error ?? 'Could not read the outgoing issue text.');
+
                 if (current) setPreview(result.preview);
             })
             .catch(() => {
                 if (current)
                     setError('Could not read the outgoing issue text. Close and reopen Create issue to retry.');
             });
+
         return () => {
             current = false;
             trigger.current?.focus();
         };
     }, [open, item.id]);
+
     if (item.number || !repo || data.capture?.enabled === false) return null;
+
     if (!open)
         return (
             <Button ref={trigger} {...kind('other')} data-create-ticket={item.id} onClick={() => setOpen(true)}>
                 Create issue
             </Button>
         );
+
     const outgoing = locked ? attempt.preview : preview;
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
         if (outgoing) void submit(item.id, outgoing, ticketOptions(event.currentTarget));
     };
+
     return (
         <section
             ref={section}

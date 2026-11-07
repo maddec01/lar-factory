@@ -8,12 +8,15 @@ export function coalesced(work: () => void, gapMs: number): () => void {
         work();
         gap = setTimeout(() => {
             gap = undefined;
+
             if (!again) return;
+
             again = false;
             run();
         }, gapMs);
         gap.unref();
     };
+
     return () => {
         if (gap) again = true;
         else run();

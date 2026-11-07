@@ -47,7 +47,9 @@ async function buildBoard(
         undefined,
         skillCheck,
     );
+
     await until(board, (d) => d.items.length === items.length);
+
     return { board, home: startable.HOME! };
 }
 
@@ -77,17 +79,23 @@ test("Start build moves its concept's work record to In progress, writes nothing
         boardIssue(40, 'Ready', undefined, ['concept']),
     ]);
     const response = await startBuild(board, board.id(12));
+
     assert.equal(response.status, 200);
+
     const answer = await response.json();
+
     assert.equal(answer.thread.threadId, 'thread-1');
     assert.equal(answer.board.startedBuilds[board.id(12)].threadId, 'thread-1');
     assert.equal(answer.board.items.find((i: { id: string }) => i.id === board.id(40)).status, 'In progress');
+
     const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
     try {
         assert.equal(records.read(board.id(40)).status, 'In progress');
     } finally {
         records.close();
     }
+
     assert.deepEqual(await writes(board), []);
     assert.deepEqual(await board.t3Calls(), [
         [
@@ -107,8 +115,11 @@ test("Start build moves its concept's work record to In progress, writes nothing
 test('a fetch that fails refuses Start build, starts no thread and lets a retry start it', async (t) => {
     const { board, home } = await buildBoard(t, [readyIssue(12, ['build'])]);
     const origin = join(home, 'origin.git');
+
     renameSync(origin, `${origin}.away`);
+
     const refused = await startBuild(board, board.id(12));
+
     assert.equal(refused.status, 409);
     assert.equal(
         (await refused.json()).error,
@@ -128,6 +139,7 @@ test('Start build asks the board app to check the skills before it starts the th
         { BOARD_SKILL_CHECK: '1' },
         () => null,
     );
+
     assert.equal((await startBuild(board, board.id(12))).status, 200);
     assert.equal(board.skillChecks(), 1);
     assert.deepEqual(
@@ -146,6 +158,7 @@ test('a refused skill check refuses Start build with its reason, writes nothing 
         () => refusal,
     );
     const refused = await startBuild(board, board.id(12));
+
     assert.equal(refused.status, 409);
     assert.equal((await refused.json()).error, refusal);
     assert.deepEqual([...(await writes(board)), ...(await board.t3Calls())], []);
@@ -163,14 +176,18 @@ test('Drift asks for a choice before Start build writes anything, then starts on
         { BOARD_SKILL_CHECK: '1' },
         (drift) => {
             choices.push(drift);
+
             return drift
                 ? null
                 : { refusal: 'Some skills changed: lar-build. Replace them or start anyway.', drift: ['lar-build'] };
         },
     );
     const asked = await startBuild(board, board.id(12));
+
     assert.equal(asked.status, 409);
+
     const answer = await asked.json();
+
     assert.deepEqual(
         [answer.error, answer.drift, answer.thread],
         ['Some skills changed: lar-build. Replace them or start anyway.', ['lar-build'], null],
@@ -187,12 +204,14 @@ test('Drift asks for a choice before Start build writes anything, then starts on
 test("Start build refuses a Drift choice it doesn't know without checking the skills", async (t) => {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { BOARD_SKILL_CHECK: '1' }, () => null);
     const refused = await startBuild(board, board.id(12), undefined, board.url, 'overwrite');
+
     assert.equal(refused.status, 422);
     assert.equal(board.skillChecks(), 0);
 });
 
 test('without a bundle Start build asks for no skill check', async (t) => {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, {}, () => 'refused');
+
     assert.equal((await startBuild(board, board.id(12))).status, 200);
     assert.equal(board.skillChecks(), 0);
 });
@@ -204,6 +223,7 @@ test('the build message names lar-build under LAR_FACTORY_INSTALL_ROOT when it i
         {},
         { LAR_FACTORY_INSTALL_ROOT: '/tmp/lar-root' },
     );
+
     assert.equal((await startBuild(board, board.id(12))).status, 200);
     assert.deepEqual(
         (await board.t3Calls()).map((args) => args[3]),
@@ -217,6 +237,7 @@ test('Start build runs the thread on the picked model choice', async (t) => {
         instanceId: 'claudeAgent_personal',
         model: 'claude-opus-5-5',
     });
+
     assert.equal(response.status, 200);
     assert.deepEqual(await board.t3Calls(), [
         [
@@ -242,6 +263,7 @@ test('Start build leaves a labelled build, a parent build and a parent already I
         boardIssue(41, 'In progress', undefined, ['concept']),
         readyIssue(14, ['improvement', 'build']),
     ]);
+
     for (const id of [board.id(12), board.id(13), board.id(14)])
         assert.equal((await startBuild(board, id)).status, 200);
     assert.deepEqual(await writes(board), []);
@@ -259,6 +281,7 @@ test('a refused repository project writes nothing to GitHub and runs no t3', asy
         }),
     ]);
     const response = await startBuild(board, board.id(30, 'maddec01/lar-server'));
+
     assert.equal(response.status, 409);
     assert.equal(
         (await response.json()).error,
@@ -272,6 +295,7 @@ test('Start build is refused while a blocker is incomplete, naming it, and runs 
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])]);
     const blockers = await recordBlockers(board, board.id(12), ['Decision 5']);
     const refused = await startBuild(board, board.id(12));
+
     assert.equal(refused.status, 409);
     assert.equal(
         (await refused.json()).error,
@@ -295,17 +319,21 @@ const child = (status?: string) => ({ id: 'child', rootThreadId: SHAPING, turns:
 /** A board with Ready #12 and its shaping thread recorded, T3 showing `threads` and `requests`, if any; waits for the first read. */
 async function shapingBoard(t: TestContext, threads?: object[], requests: object[] = []) {
     const env = startableEnv(t);
+
     if (threads) {
         writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify(threads));
         writeFileSync(env.T3_STATE_DB + '.requests.json', JSON.stringify(requests));
     }
+
     const { board } = await buildBoard(
         t,
         [readyIssue(12, ['build'])],
         { threads: { 'maddec01/lar-factory#12': [SHAPING] } },
         env,
     );
+
     await until(board, (d) => d.items[0]!.threads !== undefined);
+
     return board;
 }
 
@@ -328,14 +356,18 @@ for (const [name, threads, requests] of [
             }
         })();
         const refused = await startBuild(board, board.id(12));
+
         assert.equal(refused.status, 409);
         assert.equal((await refused.json()).error, LIVE_SHAPING);
+
         const again = await openWorkRecords(workRecordsPath(board.dataDir));
+
         try {
             assert.deepEqual(again.read(board.id(12)), before);
         } finally {
             again.close();
         }
+
         assert.deepEqual(await board.t3Calls(), []);
     });
 }
@@ -348,6 +380,7 @@ for (const [name, threads] of [
 ] as [string, object[] | undefined][]) {
     test(`Start build runs while the shaping thread is ${name}`, async (t) => {
         const board = await shapingBoard(t, threads);
+
         assert.equal((await startBuild(board, board.id(12))).status, 200);
     });
 }
@@ -365,8 +398,10 @@ test('once Delete records a shaping thread as deleted, a fresh stats read replac
         ],
     });
     const env = startableEnv(t);
+
     writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify([minutes(SHAPING, 60)]));
     writeFileSync(env.T3_STATE_DB + '.requests.json', '[]');
+
     const { board } = await buildBoard(
         t,
         [readyIssue(12, ['build'])],
@@ -375,15 +410,19 @@ test('once Delete records a shaping thread as deleted, a fresh stats read replac
     );
     const agentMs = (data: BoardData) => {
         const { stats } = data.items[0]!;
+
         return typeof stats === 'object' ? stats.agentMs : undefined;
     };
+
     await until(board, (d) => agentMs(d) === 60 * 60_000);
     writeShapingThreadCleanup('delete', board.dataDir);
     assert.equal((await startBuild(board, board.id(12))).status, 200);
     await until(board, (d) => agentMs(d) === 60 * 60_000);
     writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify([minutes('thread-1', 10)]));
+
     const data = await until(board, (d) => agentMs(d) === 10 * 60_000);
     const [item] = data.items;
+
     assert.deepEqual(
         (item!.threads as { id: string }[]).map((thread) => thread.id),
         ['thread-1'],
@@ -391,7 +430,9 @@ test('once Delete records a shaping thread as deleted, a fresh stats read replac
     );
     assert.equal(item!.needsYou, undefined, 'no Start again notice');
     assert.deepEqual(data.startCheckFailures ?? {}, {});
+
     const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
     try {
         assert.ok(records.threads(board.id(12)).find((thread) => thread.threadId === SHAPING)?.deletedAt);
         assert.deepEqual(records.pendingShapingThreadCleanups(), []);
@@ -401,18 +442,24 @@ test('once Delete records a shaping thread as deleted, a fresh stats read replac
 });
 
 const cleanupProblem = (data: BoardData) => data.items[0]?.shapingCleanupProblem;
+
 /** Starts #12's build and returns its status then, which a cleanup problem never changes. */
 async function startedStatus(board: Board): Promise<string> {
     const response = await startBuild(board, board.id(12));
+
     assert.equal(response.status, 200);
+
     return ((await response.json()) as { board: BoardData }).board.items[0]!.status;
 }
 
 test('a corrupt cleanup setting at Start build starts the build and shows a problem until a sweep applies the fixed setting', async (t) => {
     const board = await shapingBoard(t, [idleShaping]);
+
     writeFileSync(join(board.dataDir, 'shaping-thread-cleanup.json'), '{');
+
     const status = await startedStatus(board);
     const shown = await until(board, (d) => cleanupProblem(d) !== undefined);
+
     assert.equal(
         cleanupProblem(shown),
         "The board couldn't clean up the shaping threads. It can't read the shaping thread cleanup setting. It keeps trying.",
@@ -421,7 +468,9 @@ test('a corrupt cleanup setting at Start build starts the build and shows a prob
     assert.equal(shown.items[0]!.needsYou, undefined);
     writeShapingThreadCleanup('keep', board.dataDir);
     await until(board, (d) => cleanupProblem(d) === undefined);
+
     const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
     try {
         assert.deepEqual(records.pendingShapingThreadCleanups(), []);
     } finally {
@@ -439,6 +488,7 @@ test('a saved cleanup failure leaves the build running, shows a problem and clea
         item,
         (shown) => shown.shapingCleanupProblem !== undefined,
     );
+
     assert.equal(
         cleanupProblem(data),
         "The board couldn't clean up the shaping threads. T3 refused it. It keeps trying.",
@@ -455,9 +505,12 @@ test('a saved cleanup failure leaves the build running, shows a problem and clea
 
 test('a running thread with another purpose is not refused as a shaping thread', async (t) => {
     const env = startableEnv(t);
+
     writeFileSync(env.T3_STATE_DB + '.execution.json', JSON.stringify([{ id: 'earlier-build', turns: [turn()] }]));
     writeFileSync(env.T3_STATE_DB + '.requests.json', '[]');
+
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, env);
+
     await changeRecords(
         board,
         (records) => {
@@ -472,6 +525,7 @@ test('a running thread with another purpose is not refused as a shaping thread',
 test("a started build shows in the board data's started builds, apart from the item's refining thread", async (t) => {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])]);
     const answer = await (await startBuild(board, board.id(12))).json();
+
     assert.equal(answer.board.startedBuilds[board.id(12)].threadId, 'thread-1');
     assert.equal(answer.board.started?.[board.id(12)], undefined);
 });
@@ -479,6 +533,7 @@ test("a started build shows in the board data's started builds, apart from the i
 test('a double press, a retry or another page starts no second build thread', async (t) => {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { t3: { delay: 100 } });
     const responses = await Promise.all([startBuild(board, board.id(12)), startBuild(board, board.id(12))]);
+
     assert.deepEqual(
         responses.map((r) => r.status),
         [200, 200],
@@ -490,6 +545,7 @@ test('a double press, a retry or another page starts no second build thread', as
 for (const fail of ['killed', 'garbage']) {
     test(`an unconfirmed build start (${fail}) is never retried as a new thread`, async (t) => {
         const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { t3: { fail } });
+
         assert.equal((await (await startBuild(board, board.id(12))).json()).uncertain, true);
         assert.equal((await (await startBuild(board, board.id(12))).json()).uncertain, true);
         assert.equal((await board.t3Calls()).filter((args) => args[0] === 'thread' && args[1] === 'start').length, 1);
@@ -498,16 +554,21 @@ for (const fail of ['killed', 'garbage']) {
 
 test('Start build only runs for Ready issues from this board page and session', async (t) => {
     const { board } = await buildBoard(t, [boardIssue(12, 'Queued')]);
+
     assert.match(
         (await (await startBuild(board, board.id(12))).json()).error,
         /^Only Ready items can start a build; this one is in Queued\.$/,
     );
     assert.equal((await startBuild(board, 'I_missing')).status, 404);
+
     const restarted = await board.post({ session: 'old', itemId: board.id(12) }, board.url, '/api/start-build');
+
     assert.equal(restarted.status, 409);
     assert.match((await restarted.json()).error, /Press Start build again/);
     assert.equal((await startBuild(board, board.id(12), undefined, 'https://evil.example')).status, 403);
+
     const sample = await startBoard(t, {}, true);
+
     assert.equal((await startBuild(sample, 'I_sample05')).status, 403);
     assert.deepEqual([...(await writes(board)), ...(await board.t3Calls()), ...(await sample.t3Calls())], []);
 });
@@ -515,6 +576,7 @@ test('Start build only runs for Ready issues from this board page and session', 
 test('the board data says, per repository, whether Start build finds its repository project', async (t) => {
     const { board } = await buildBoard(t, [boardIssue(12, 'Ready')]);
     const data = (await until(board, (d) => !!d.repositoryProjects)) as BoardData;
+
     assert.deepEqual(data.repositoryProjects, {
         'maddec01/lar-server': 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code',
         'maddec01/lar-apple': 'No T3 project is a checkout of maddec01/lar-apple; add the checkout in T3 Code',
@@ -524,6 +586,7 @@ test('the board data says, per repository, whether Start build finds its reposit
 
 test('recovery endpoints validate item and options before starting a thread', async (t) => {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])]);
+
     assert.equal((await board.postSession({}, '/api/inspect-recovery')).status, 400);
     assert.equal(
         (await board.postSession({ itemId: board.id(12), options: { branchChoice: 'erase' } }, '/api/start-again'))

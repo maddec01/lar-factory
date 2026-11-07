@@ -19,6 +19,7 @@ test("with web and api reading one sprint, an untagged item is for both, and a r
         { id: 3, type: 'User Story', state: 'New', tags: 'repo-Web Api' },
     ];
     const read = await azureBoard([WEB, API], TEAM, fakeAz({ items }).run).read();
+
     assert.deepEqual(placed(read.items), [
         [1, WEB, [WEB, API]],
         [2, WEB, null],
@@ -30,6 +31,7 @@ test("with web and api reading one sprint, an untagged item is for both, and a r
 test('a repo- tag matches its repository whatever its case', async () => {
     const items: WorkItem[] = [{ id: 1, type: 'User Story', state: 'New', tags: 'REPO-WEB API' }];
     const read = await azureBoard([WEB, API], TEAM, fakeAz({ items }).run).read();
+
     assert.deepEqual(placed(read.items), [[1, API, null]]);
 });
 
@@ -41,6 +43,7 @@ test("an item tagged for a repository that isn't onboarded, or with two repo- ta
         { id: 3, type: 'User Story', state: 'New', tags: 'repo-web' },
     ];
     const read = await azureBoard([WEB, API], TEAM, fakeAz({ items }).run).read();
+
     assert.deepEqual(placed(read.items), [[3, WEB, null]]);
 });
 
@@ -53,6 +56,7 @@ test('Tasks contribute to parent counts without becoming board items', async () 
         { id: 21, type: 'Task', state: 'New', parent: 2 },
     ];
     const read = await azureBoard([WEB, API], TEAM, fakeAz({ items }).run).read();
+
     assert.deepEqual(placed(read.items), [
         [1, WEB, null],
         [2, WEB, [WEB, API]],
@@ -72,6 +76,7 @@ test('one repository reading the sprint still leaves an untagged item untagged, 
         TEAM,
         fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }] }).run,
     ).read();
+
     assert.deepEqual(placed(read.items), [[1, WEB, [WEB]]]);
 });
 
@@ -85,6 +90,7 @@ test('a ticket search lists the open backlog items for the repository whose titl
     ];
     const source = azureBoard([WEB, API], TEAM, fakeAz({ items }).run);
     const url = (id: number) => `https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/${id}`;
+
     assert.deepEqual(await source.searchTickets(API, 'EXPORT report'), [
         { number: 1, title: 'Export the report', url: url(1) },
         { number: 2, title: 'Report export for api', url: url(2) },
@@ -108,6 +114,7 @@ test("a ticket read gives an open work item's description and kind, and nothing 
         { id: 3, type: 'User Story', state: 'New', title: 'Theirs', tags: 'repo-web' },
     ];
     const source = azureBoard([WEB, API], TEAM, fakeAz({ items }).run);
+
     assert.deepEqual(await source.readTicket(API, 1), {
         number: 1,
         title: 'Export',
@@ -127,6 +134,7 @@ test('a ticket observation reads a work item open or not, with its assignee, and
         { id: 3, type: 'User Story', state: 'Removed', title: 'Abandoned', tags: 'repo-web' },
     ];
     const source = azureBoard([WEB, API], TEAM, fakeAz({ items }).run);
+
     assert.deepEqual(await source.observeTicket(API, 1), {
         abandonmentComplete: false,
         state: 'open',
@@ -161,9 +169,12 @@ test("a source reads the team's backlog levels and each type's states once per S
                 : undefined,
     });
     const source = clocked(az, clock);
+
     await assert.rejects(source.read());
     failing = false;
+
     const reads = (resource: string) => az.calls.filter((c) => c[c.indexOf('--resource') + 1] === resource).length;
+
     await source.read();
     clock.now = SETTINGS_TTL - 1;
     await source.read();
@@ -188,12 +199,15 @@ test(`a read runs at most ${PR_READS} az repos pr show calls at once`, async () 
     let most = 0;
     const run = async (args: string[]) => {
         if (args.slice(0, 3).join(' ') !== 'repos pr show') return az.run(args);
+
         most = Math.max(most, ++running);
         await new Promise((resolve) => setTimeout(resolve, 1));
         running--;
+
         return az.run(args);
     };
     const [item] = (await azureBoard([WEB], TEAM, run).read()).items;
+
     assert.equal(item!.linkedPrs.length, 10);
     assert.equal(most, PR_READS);
 });
@@ -204,6 +218,7 @@ test("an item whose type has no Removed state, such as Basic's Issue, carries wh
         { id: 11, type: 'Task', state: 'New', parent: 1 },
     ];
     const [issue] = (await azureBoard([WEB], TEAM, fakeAz({ items, requirement: 'Issue' }).run).read()).items;
+
     assert.equal(
         issue!.abandonRefusal,
         "Issue has no Removed state in Fabrikam Fiber, so the board can't abandon it. Close or delete it in Azure DevOps.",
@@ -219,8 +234,11 @@ test('an item read alone keeps sprint child counts without relisting the sprint'
     const az = fakeAz({ items });
     const sprint = azureBoard([WEB, API], TEAM, az.run);
     const read = await sprint.read();
+
     az.calls.length = 0;
+
     const some = await sprint.readSome!([read.items.find((i) => i.number === 1)!]);
+
     assert.deepEqual(placed(some), [[1, WEB, null]]);
     assert.deepEqual(some[0]!.subIssues, { total: 1, completed: 0 });
     assert.equal(
@@ -236,6 +254,7 @@ test('native Azure type, state and assignee survive independently of factory sta
         requirement: 'Product Backlog Item',
     });
     const [item] = (await azureBoard([WEB], TEAM, az.run).read()).items;
+
     assert.equal(item!.status, 'List');
     assert.deepEqual(item!.azure, { type: 'Product Backlog Item', state: 'Committed', assignee: 'Ana Silva' });
 });
@@ -260,5 +279,6 @@ test('sprint counts stay scoped when a listing also contains children from the b
         az.run,
     );
     const [item] = (await source.read()).items;
+
     assert.deepEqual(item!.subIssues, { total: 1, completed: 0 });
 });

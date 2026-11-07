@@ -9,15 +9,19 @@ async function start(found: SetupDetection = detection()) {
         '/api/onboarding/detect': { detection: found, error: null },
         '/api/onboarding/setup': { error: null },
     });
+
     const { useWizardStore, stepReady } = await import('./wizard-store.ts');
+
     await settle(() => useWizardStore.getState().start());
     useWizardStore.getState().pick('lar-web');
     await settle(() => useWizardStore.getState().next());
     await settle(() => useWizardStore.getState().next());
+
     return {
         wizard: useWizardStore,
         ready: () => {
             const { run, projects, detection: read } = useWizardStore.getState();
+
             return stepReady(run!, projects, read);
         },
     };
@@ -30,6 +34,7 @@ test("each project that can't be picked gets its own reason", async () => {
     const run = { step: 'project', projectId: null, repo: null, provider: null, savedAs: null, choices: {} } as const;
     const repo = 'maddec01/lar-web';
     const onBoard = project('lar-web', { onBoard: true });
+
     expect(unpickable(project('lar-web'), run, empty)).toBeNull();
     expect(unpickable(project('app', { ...noRepo, blocked: 'linked-worktree' }), run, empty)).toBe(
         'This folder is a git worktree. Add its main checkout instead.',
@@ -48,11 +53,14 @@ test("each project that can't be picked gets its own reason", async () => {
 
 test('adding a folder T3 lists as a worktree shows the same reason and picks nothing', async () => {
     const added = project('app', { ...noRepo, blocked: 'linked-worktree' });
+
     serve(sample, [], { error: null }, 200, {
         '/api/onboarding/projects': (body) =>
             'folder' in body ? { projects: [added], projectId: 'app' } : { projects: [] },
     });
+
     const { useWizardStore } = await import('./wizard-store.ts');
+
     await settle(() => useWizardStore.getState().start());
     useWizardStore.getState().chooseNew();
     useWizardStore.getState().setFolder('~/app');
@@ -65,6 +73,7 @@ test('adding a folder T3 lists as a worktree shows the same reason and picks not
 
 test('onboarding chooses a source without importing individual tickets or changing repository files', async () => {
     const { wizard, ready } = await start();
+
     expect(wizard.getState().run?.step).toBe('work');
     expect(ready()).toBe(true);
     await settle(() => wizard.getState().save());
@@ -77,14 +86,19 @@ test('onboarding chooses a source without importing individual tickets or changi
         structureSync: true,
         domainDocs: { kind: 'off' },
     });
+
     const routes = fetchMock.mock.calls.map(([url]) => url);
+
     expect(routes.some((url) => /onboarding\/(?:import|pr(?:\/|$))|config/.test(url))).toBe(false);
 });
 
 test('legacy enabled sync does not require structural access for setup', async () => {
     const found = detection();
+
     found.access['comment-ticket'] = 'unverified';
+
     const { wizard, ready } = await start(found);
+
     expect(ready()).toBe(true);
     await settle(() => wizard.getState().save());
     expect(posted('/api/onboarding/setup')).toHaveLength(1);
@@ -92,6 +106,7 @@ test('legacy enabled sync does not require structural access for setup', async (
 
 test('an Azure source needs a readable team, not individual item picks', async () => {
     const { wizard, ready } = await start(detection({ provider: 'Azure DevOps', itemSources: { found: [] } }));
+
     expect(ready()).toBe(false);
     wizard.getState().choose({ itemSource: { kind: 'azure-board', team: 'Example App' }, structureSync: false });
     expect(ready()).toBe(true);
@@ -99,12 +114,14 @@ test('an Azure source needs a readable team, not individual item picks', async (
 
 test('a refused checkout cannot finish even with sync off', async () => {
     const { wizard, ready } = await start(detection({ checkout: { refused: 'Use the main checkout.' } }));
+
     wizard.getState().choose({ structureSync: false });
     expect(ready()).toBe(false);
 });
 
 test('closing preserves choices for an explicit resume', async () => {
     const { wizard } = await start();
+
     wizard.getState().choose({ structureSync: false, role: 'API server' });
     await settle(() => wizard.getState().close());
     expect(posted('/api/onboarding/repositories')[0]).toMatchObject({
@@ -117,13 +134,16 @@ test('closing preserves choices for an explicit resume', async () => {
 test('a project changed while detection runs cannot receive its stale response', async () => {
     const { wizard } = await start();
     let answer!: (response: Response) => void;
+
     fetchMock.mockImplementation(
         () =>
             new Promise<Response>((resolve) => {
                 answer = resolve;
             }),
     );
+
     const pending = wizard.getState().detect();
+
     wizard.getState().chooseNew();
     await settle(() => answer(new Response(JSON.stringify({ detection: detection() }))));
     await pending;
@@ -141,11 +161,14 @@ test.each(['project', 'work', 'access'] as const)(
                 { repo, progress: { step, done: ['project', 'work'], answers: { projectId: 'lar-web', choices } } },
             ],
         };
+
         serve(data, [project('lar-web', { onBoard: true })], {}, 200, {
             '/api/onboarding/detect': { detection: detection() },
         });
+
         const { useBoardStore } = await import('../board/board-store.ts');
         const { useWizardStore } = await import('./wizard-store.ts');
+
         useBoardStore.setState({ data });
         await settle(() => useWizardStore.getState().resume(repo));
         expect(useWizardStore.getState().run).toMatchObject({ step, choices });
@@ -162,6 +185,7 @@ test.each(['project', 'work', 'access'] as const)(
 
 test('Access runs second and lets a saved inaccessible mapping reach Work for removal', async () => {
     const { wizard, ready } = await start();
+
     wizard.getState().back();
     expect(wizard.getState().run?.step).toBe('access');
     wizard.getState().choose({ vocabulary: { bug: { type: 'Bug', labels: [] } } });

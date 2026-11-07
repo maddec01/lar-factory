@@ -23,6 +23,7 @@ import { TicketPicker } from './ticket-picker.tsx';
 const HINT = 'm-0 text-xs leading-snug text-(--muted-foreground)';
 const KIND_CHOICES = ITEM_KINDS.map((value) => {
     const { name, icon: Icon, hue } = KIND_BADGES[value]!;
+
     return { value, name, icon: <Icon style={{ color: `oklch(0.62 0.15 ${hue})` }} /> };
 });
 
@@ -32,6 +33,7 @@ function valuesOf(form: HTMLFormElement, description: string, createChoice: bool
     const value = (name: string) => String(values.get(name) ?? '');
     const createIssue = values.has('createIssue');
     const options = createIssue ? ticketOptions(form) : undefined;
+
     return {
         repo: value('repo'),
         kind: value('kind'),
@@ -47,6 +49,7 @@ function valuesOf(form: HTMLFormElement, description: string, createChoice: bool
 function RepoSelect({ id, repo, onRepo }: { id: string; repo: string; onRepo: (repo: string) => void }) {
     const data = useBoardStore((state) => state.data);
     const hint = noneOnboarded(data);
+
     return (
         <>
             <FormSelect
@@ -86,10 +89,12 @@ function AddItemForm() {
     const { phase } = submission;
     const locked = phase !== 'editing';
     const keepForm = () => keep(valuesOf(form.current!, description.current, createChoice));
+
     // The checkbox's input event comes before this render, so the choice is kept once it has rendered.
     useEffect(() => {
         if (createChoice !== null) keepForm();
     }, [createChoice]);
+
     // An edit in the editor counts as one in the form.
     const onDescription = (markdown: string) => {
         description.current = markdown;
@@ -99,7 +104,9 @@ function AddItemForm() {
 
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
         const form = event.currentTarget;
+
         void submit(valuesOf(form, description.current, createChoice)).then(() => {
             if (
                 useAddItemStore.getState().submission.phase === 'editing' &&
@@ -110,6 +117,7 @@ function AddItemForm() {
                 kindSelect.current?.focus();
         });
     };
+
     return (
         <Modal.Form
             ref={form}
@@ -228,6 +236,7 @@ function PickTicketPane() {
     // Opened before the repositories arrived, repo matches none: the first is then selected.
     const selected = data.repos.find((r) => r.repo === repo) ?? data.repos[0];
     const disabled = data.capture?.enabled === false || !selected;
+
     return (
         <>
             <div
@@ -270,6 +279,7 @@ function PaneSwitch() {
             {label}
         </button>
     );
+
     return (
         <div role="group" aria-label="Add" className="bg-base-200 flex gap-0.5 rounded-lg p-0.5">
             {choice('new', 'New work')}
@@ -284,6 +294,7 @@ function useDescription(): string {
     const { pane, values } = useAddItemStore();
     const selected = repos.find((r) => r.repo === values?.repo) ?? repos[0];
     const where = selected ? ` in ${repoName(selected.repo, repos)}` : '';
+
     return pane === 'pick' ? `Find an open ticket${where}.` : `Record work${where} and add it to List.`;
 }
 
@@ -295,6 +306,7 @@ function AddItemDialog() {
     const { draft, pane, setOpen } = useAddItemStore();
     const [expanded, toggleExpanded] = useExpand();
     const description = useDescription();
+
     return (
         <Modal onClose={() => setOpen(false)}>
             {/* ninna-ui's Modal drops the description from aria-describedby, so a hidden copy of it describes the dialog. */}
@@ -324,6 +336,7 @@ function AddItemDialog() {
 
 export function AddItem() {
     const { open, setOpen } = useAddItemStore();
+
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'n') {
@@ -331,9 +344,12 @@ export function AddItem() {
                 useAddItemStore.getState().setOpen(true);
             }
         };
+
         addEventListener('keydown', onKey);
+
         return () => removeEventListener('keydown', onKey);
     }, []);
+
     return (
         <>
             <Button

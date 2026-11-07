@@ -34,21 +34,26 @@ export function useVocabularyDiscovery(repo: string, onboarding = false) {
     const discovery = read?.repo === repo ? read.discovery : null;
     const [error, setError] = useState<string | null>(null);
     const [attempt, retry] = useState(0);
+
     useEffect(() => {
         let current = true;
+
         setError(null);
         void postAction<{ discovery: VocabularyDiscovery }>(
             onboarding ? '/api/onboarding/vocabulary' : '/api/repositories/settings',
             onboarding ? { repo } : { repo, change: 'discover-vocabulary' },
         ).then((result) => {
             if (!current) return;
+
             if (result.error || !result.discovery) setError(result.error ?? 'The board sent no vocabulary.');
             else setRead({ repo, discovery: result.discovery });
         });
+
         return () => {
             current = false;
         };
     }, [repo, onboarding, attempt, labelChanges]);
+
     return { discovery, error, retry: () => retry((n) => n + 1) };
 }
 
@@ -74,6 +79,7 @@ export function VocabularyRead({ repo, error, retry }: { repo: string; error: st
 
 function vocabularyAccess(setup: VocabularyAccess) {
     const options = setup.azureReadOnly === undefined ? {} : { azureReadOnly: setup.azureReadOnly };
+
     return {
         labels: writeAccessProblem(setup.repo, 'tag-ticket', setup.access, options),
         newLabels: newLabelProblem(setup.repo, setup.access, options),
@@ -115,6 +121,7 @@ export function VocabularyFields({
     const [active, setActive] = useState(0);
     const changed = useRef(false);
     const latest = useRef({ value, newLabels, onCommit });
+
     latest.current = { value, newLabels, onCommit };
     useEffect(
         () => () => {
@@ -122,6 +129,7 @@ export function VocabularyFields({
         },
         [],
     );
+
     const access = vocabularyAccess(setup);
     const labelsProblem = unavailable(discovery.labels) ?? access.labels;
     const noTypes = discovery.types.state === 'available' && !discovery.types.choices.length;
@@ -147,6 +155,7 @@ export function VocabularyFields({
     const createProblem = labelsProblem ?? access.newLabels ?? typedLabelsProblem(setup.repo, [typed]);
     const update = (term: VocabularyTerm, fresh = newLabels, commit = !open) => {
         onChange(term, fresh);
+
         if (commit) {
             changed.current = false;
             onCommit?.(term, fresh);
@@ -168,10 +177,12 @@ export function VocabularyFields({
     };
     const close = (next: boolean) => {
         setOpen(next);
+
         if (!next && changed.current) {
             changed.current = false;
             onCommit?.(value, newLabels);
         }
+
         if (next) {
             setQuery('');
             setActive(0);
@@ -182,13 +193,16 @@ export function VocabularyFields({
         if (label && (!labelsProblem || chosen.includes(label))) toggle(label);
     };
     const at = Math.min(active, Math.max(0, matches.length - 1));
+
     useEffect(() => {
         if (open) document.getElementById(`label-${name}-${at}`)?.scrollIntoView({ block: 'nearest' });
     }, [open, name, at, query]);
+
     const gone = (label: string) =>
         discovery.labels.state === 'available' &&
         !discovery.labels.choices.includes(label) &&
         !newLabels.includes(label);
+
     return (
         <div data-vocabulary={name} className="grid min-w-0 gap-2 px-3 py-3">
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_8.5rem] items-center gap-x-3 gap-y-2 sm:grid-cols-[5.5rem_8.5rem_minmax(0,1fr)]">
@@ -282,10 +296,15 @@ export function VocabularyFields({
                                     onKeyDown={(event) => {
                                         if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter'].includes(event.key))
                                             event.preventDefault();
+
                                         if (event.key === 'ArrowDown') setActive(Math.min(at + 1, matches.length - 1));
+
                                         if (event.key === 'ArrowUp') setActive(Math.max(at - 1, 0));
+
                                         if (event.key === 'Home') setActive(0);
+
                                         if (event.key === 'End') setActive(matches.length - 1);
+
                                         if (event.key === 'Enter') choose(matches[at]);
                                     }}
                                 />
@@ -329,7 +348,9 @@ export function VocabularyFields({
                                         disabled={!!createProblem || disabled}
                                         onClick={() => {
                                             if (createProblem) return;
+
                                             update(value, [...newLabels, typed], !!onCommit);
+
                                             if (!onCommit) setQuery('');
                                         }}
                                     >
@@ -401,13 +422,16 @@ export function VocabularyFields({
 function VocabularySettings({ setup }: { setup: RepositorySetup }) {
     const { discovery, error, retry } = useVocabularyDiscovery(setup.repo);
     const { vocabulary, vocabularyDrafts, vocabularyErrors, draftVocabulary, recheck } = useEditStore();
+
     if (!discovery) return <VocabularyRead repo={setup.repo} error={error} retry={retry} />;
+
     return (
         <div className="grid min-w-0 gap-2">
             {error && <VocabularyRead repo={setup.repo} error={error} retry={retry} />}
             <div className={FIELD_GROUP}>
                 {(Object.keys(KIND_NAMES) as VocabularyKind[]).map((key) => {
                     const draft = vocabularyDrafts[setup.repo]?.[key];
+
                     return (
                         <VocabularyFields
                             key={key}

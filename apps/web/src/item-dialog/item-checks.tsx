@@ -6,20 +6,26 @@ export function ItemChecksSection({ itemId }: { itemId: string }) {
     const requested = useRef(false);
     const [record, setRecord] = useState<ItemChecks | null>(null);
     const [error, setError] = useState<string | null>(null);
+
     async function read() {
         if (requested.current) return;
+
         requested.current = true;
+
         try {
             const response = await fetch(`/api/item-checks?itemId=${encodeURIComponent(itemId)}`, {
                 cache: 'no-store',
             });
             const body = (await response.json()) as { checks?: ItemChecks; error?: string };
+
             if (!response.ok || !body.checks) throw new Error(body.error ?? 'The board did not return checks.');
+
             setRecord(body.checks);
         } catch (error) {
             setError(error instanceof Error ? error.message : 'Could not read checks.');
         }
     }
+
     return (
         <details
             data-checks

@@ -63,9 +63,12 @@ export function serverRuntimePath(env: NodeJS.ProcessEnv = process.env): string 
  */
 export function t3Running(path: string): boolean {
     const pid = readJsonRecord(path)?.pid;
+
     if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return false;
+
     try {
         loopTrace.span('t3 liveness', () => process.kill(pid, 0));
+
         return true;
     } catch (err) {
         // Signal 0 only asks whether the process exists; EPERM means it does, under another user.
@@ -76,7 +79,9 @@ export function t3Running(path: string): boolean {
 /** `~` and `~/…` under `home`, as T3's expandHomePath reads a configured path. */
 export function expandHome(path: string, home: string): string {
     if (path === '~') return home;
+
     if (path.startsWith('~/')) return join(home, path.slice(2));
+
     return isAbsolute(path) ? path : resolve(home, path);
 }
 
@@ -105,6 +110,7 @@ export interface T3Settings {
 /** T3's settings at `path`, with `~` standing for `home`; as if empty when they can't be read. */
 export function readT3Settings(path: string, home: string): T3Settings {
     const settings = readJsonRecord(path);
+
     return {
         instanceHomes: instanceHomes(settings?.providerInstances, home),
         priceOverrides: priceOverrides(settings?.usagePriceOverrides),
@@ -128,15 +134,21 @@ function instanceHomes(instances: unknown, home: string): Map<string, InstanceHo
             { driver: driver as TranscriptDriver, home: join(home, dir) },
         ]),
     );
+
     if (!isRecord(instances)) return homes;
+
     for (const [id, instance] of Object.entries(
         instances as Record<string, { driver?: unknown; config?: { homePath?: unknown } } | null>,
     )) {
         const driver = instance?.driver;
+
         if (!isTranscriptDriver(driver)) continue;
+
         const configured = typeof instance?.config?.homePath === 'string' ? instance.config.homePath.trim() : '';
+
         homes.set(id, { driver, home: configured ? expandHome(configured, home) : join(home, DRIVER_HOMES[driver]) });
     }
+
     return homes;
 }
 
@@ -145,6 +157,7 @@ const isPrice = (value: unknown): value is number => typeof value === 'number' &
 /** The settings' `usagePriceOverrides`, keeping each entry T3's settings schema accepts. */
 function priceOverrides(value: unknown): Record<string, PriceOverride> {
     if (!isRecord(value)) return {};
+
     return Object.fromEntries(
         Object.entries(value).flatMap(([model, price]): [string, PriceOverride][] => {
             if (
@@ -154,8 +167,11 @@ function priceOverrides(value: unknown): Record<string, PriceOverride> {
                 !isPrice(price.outputCostPerMillionTokens)
             )
                 return [];
+
             const { cacheReadCostPerMillionTokens: read, cacheWriteCostPerMillionTokens: write } = price;
+
             if ((read !== undefined && !isPrice(read)) || (write !== undefined && !isPrice(write))) return [];
+
             return [
                 [
                     model.trim(),
@@ -174,6 +190,7 @@ function priceOverrides(value: unknown): Record<string, PriceOverride> {
 /** The settings' `usageModelAliases`, trimmed, keeping the non-empty ones. */
 function modelAliases(value: unknown): Record<string, string> {
     if (!isRecord(value)) return {};
+
     return Object.fromEntries(
         Object.entries(value).flatMap(([model, target]): [string, string][] =>
             typeof target === 'string' && model.trim() && target.trim() ? [[model.trim(), target.trim()]] : [],

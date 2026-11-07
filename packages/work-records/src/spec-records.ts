@@ -42,6 +42,7 @@ export interface SpecRecords {
     /** Compare-and-swap the checkpoint, optionally importing/approving exact text in the same transaction. */
     saveSpecState(workId: string, generation: number, state: SpecState, change?: SpecChange): boolean;
 }
+
 const empty = (ticket: string | null): SpecState => ({
     generation: 0,
     ticket,
@@ -52,13 +53,16 @@ const empty = (ticket: string | null): SpecState => ({
     error: null,
     warning: null,
 });
+
 function load(database: Database, workId: string, ticket: string | null): SpecState {
     const row = database.db.prepare('SELECT generation, state FROM ticket_specs WHERE work_id = ?').get(workId);
     const state = row
         ? { ...(JSON.parse(String(row.state)) as SpecState), generation: Number(row.generation) }
         : empty(ticket);
+
     return state.ticket === ticket ? state : { ...empty(ticket), generation: state.generation };
 }
+
 function save(database: Database, workId: string, state: SpecState) {
     database.db
         .prepare(
@@ -66,18 +70,23 @@ function save(database: Database, workId: string, state: SpecState) {
         )
         .run(workId, state.generation + 1, JSON.stringify({ ...state, changedAt: new Date().toISOString() }));
 }
+
 /** Called only inside recordGate's transaction. Settings and verified access are checked by the drain. */
 export function queueTicketSpec(database: Database, workId: string, ticket: string, text: string) {
     if (database.db.prepare('SELECT 1 FROM dependencies WHERE lower(ticket) = lower(?)').get(ticket)) return;
+
     const state = load(database, workId, ticket);
+
     save(database, workId, { ...state, pending: text, error: null, retryAfter: 0 });
 }
 export function specRecords(database: Database, read: (workId: string) => WorkRecord): SpecRecords {
     const { db } = database;
+
     return {
         specEligible: (workId) =>
             database.read(() => {
                 const record = read(workId);
+
                 return (
                     Boolean(record.ticket) &&
                     !['concept', 'decision', 'slice'].includes(record.kind) &&
@@ -96,13 +105,18 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
             database.write(() => {
                 const record = read(workId);
                 const before = load(database, workId, record.ticket);
+
                 if (before.generation !== generation || state.ticket !== record.ticket) return false;
+
                 if (['concept', 'decision', 'slice'].includes(record.kind))
                     throw new WorkRecordError('invalid', 'This record cannot hold a ticket Spec.');
+
                 save(database, workId, state);
+
                 if (change) {
                     const digest = createHash('sha256').update(JSON.stringify(change.text)).digest('hex');
                     const approved = change.source === 'user';
+
                     db.prepare(`INSERT INTO bodies (work_id, body, markdown, written, has_content, has_passing_gate)
           VALUES (?, 'brief', ?, (SELECT coalesce(max(written), 0) + 1 FROM bodies), ?, ? OR EXISTS (SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ? AND source IN ('gate', 'user') AND invalidated = 0))
           ON CONFLICT DO UPDATE SET markdown = excluded.markdown, written = excluded.written, has_content = excluded.has_content, has_passing_gate = excluded.has_passing_gate`).run(
@@ -113,7 +127,9 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
                         workId,
                         digest,
                     );
+
                     const at = new Date().toISOString();
+
                     db.prepare(
                         'INSERT INTO brief_gates (gate_id, work_id, source_revision, brief_digest, approved_by, evidence, recorded_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                     ).run(
@@ -130,6 +146,7 @@ export function specRecords(database: Database, read: (workId: string) => WorkRe
                         'UPDATE work_records SET title = ?, revision = revision + 1, updated_at = ? WHERE work_id = ?',
                     ).run(change.title ?? record.title, at, workId);
                 }
+
                 return true;
             }),
     };

@@ -8,6 +8,7 @@ import { fresh, sample, settle } from '../../test/support.ts';
 
 // The glyphs read the board store, which starts from the page that support.ts serves.
 let StatusGlyph: typeof import('./status-glyph.tsx').StatusGlyph;
+
 beforeAll(async () => {
     ({ StatusGlyph } = await import('./status-glyph.tsx'));
 });
@@ -15,8 +16,11 @@ beforeAll(async () => {
 test('status icons stay still without running activity, and Ready has its own arrow', () => {
     for (const status of STATUSES) {
         const html = renderToStaticMarkup(createElement(StatusGlyph, { status }));
+
         expect(html).not.toMatch(/status-pulse|status-spin/);
+
         if (status === 'In progress') expect(html).toContain('lucide-circle');
+
         if (status === 'Ready') expect(html).toContain('lucide-circle-arrow-right');
     }
 });
@@ -29,12 +33,14 @@ test.each([
     ['Ready to merge', 'lucide-git-merge', 'status-pulse'],
 ] as const)('%s animates its own icon while running', (status, icon, motion) => {
     const html = renderToStaticMarkup(createElement(StatusGlyph, { status, running: true }));
+
     expect(html).toContain(icon);
     expect(html).toContain(motion);
 });
 
 test('In progress spins a box around its icon, so the compositor runs it at any device scale', () => {
     const html = renderToStaticMarkup(createElement(StatusGlyph, { status: 'In progress', running: true }));
+
     expect(html).toMatch(/^<span class="[^"]*status-spin[^"]*"><svg /);
 });
 
@@ -60,16 +66,22 @@ async function runningGlyph() {
         threads: [{ purpose: 'build', state: 'working', currentRunning: true }],
     } as unknown as Item;
     const data = { ...fresh(), items: [item], refreshSeconds: 60 };
+
     await settle(() => useBoardStore.getState().receive(data, 'action'));
+
     const onRender = vi.fn();
+
     document.body.replaceChildren();
+
     const host = document.body.appendChild(document.createElement('div'));
+
     await settle(() =>
         createRoot(host).render(
             createElement(Profiler, { id: 'glyph', onRender }, createElement(ItemStatusGlyph, { item })),
         ),
     );
     onRender.mockClear();
+
     return {
         data,
         host,
@@ -82,6 +94,7 @@ async function runningGlyph() {
 
 test('a clock tick that changes nothing a glyph shows renders no glyph', async () => {
     const { host, onRender, tick } = await runningGlyph();
+
     expect(host.querySelector('.status-spin')).not.toBeNull();
     vi.advanceTimersByTime(15_000);
     await tick();
@@ -90,6 +103,7 @@ test('a clock tick that changes nothing a glyph shows renders no glyph', async (
 
 test('a glyph stops animating on the tick that makes its activity unavailable', async () => {
     const { host, tick } = await runningGlyph();
+
     vi.advanceTimersByTime(180_001);
     await tick();
     expect(host.querySelector('.status-spin')).toBeNull();
@@ -100,6 +114,7 @@ test('a push whose starts say the same renders no glyph, and a start beginning s
     const itemId = data.items[0]!.id;
     const startProgress = (phase: 'failed' | 'starting') =>
         ({ [itemId]: { build: { phase, message: 'Refused' } } }) as BoardData['startProgress'];
+
     await receive({ ...data, startProgress: startProgress('failed') });
     onRender.mockClear();
     await receive({ ...data, startProgress: startProgress('failed') });

@@ -43,6 +43,7 @@ test('choices within a filter match any, and the two filters must both match', (
     const concept = item('c', { kind: 'concept', labels: ['area: web'] });
     const shows = (kinds: Parameters<typeof rowFilter>[0]['kinds'], labels: string[]) =>
         [bug, feature, concept].filter(rowFilter({ kinds, labels }, [])).map((i) => i.id);
+
     expect(shows([], [])).toEqual(['b', 'f', 'c']);
     expect(shows(['bug', 'feature'], [])).toEqual(['b', 'f']);
     expect(shows([], ['area: web', 'area: api'])).toEqual(['b', 'f', 'c']);
@@ -53,6 +54,7 @@ test('No kind finds builds, decisions and tickets with no recognised kind, and n
     const rows = (['bug', 'feature', 'improvement', 'concept', 'decision', 'build', 'issue'] as const).map((kind) =>
         item(kind, { kind }),
     );
+
     expect(rows.filter(rowFilter({ kinds: ['no-kind'], labels: [] }, [])).map((i) => i.id)).toEqual([
         'decision',
         'build',
@@ -62,6 +64,7 @@ test('No kind finds builds, decisions and tickets with no recognised kind, and n
 
 test('local work appears under kind filters and drops out once a label filter is active', () => {
     const local = item('local', { kind: 'feature', number: 0, labels: [] });
+
     expect(rowFilter({ kinds: ['feature'], labels: [] }, [])(local)).toBe(true);
     expect(rowFilter({ kinds: ['feature'], labels: ['area: web'] }, [])(local)).toBe(false);
 });
@@ -75,6 +78,7 @@ test('the Labels filter offers each name once without case, across repositories,
         }),
         item('b', { repo: 'maddec01/lar-apple', labels: ['area: web', 'docs'] }),
     ];
+
     expect(labelChoices(rows, [])).toEqual([
         { name: 'Area: Web', color: '#BFDADC' },
         { name: 'docs', color: undefined },
@@ -86,6 +90,7 @@ test("the Labels filter leaves out Azure's repo- tags and offers a GitHub repo- 
         item('a', { repo: 'contoso/Fabrikam%20Fiber/lar-api', labels: ['repo-lar-api', 'docs'] }),
         item('b', { repo: 'maddec01/lar-apple', labels: ['repo-web'] }),
     ];
+
     expect(labelChoices(rows, []).map(({ name }) => name)).toEqual(['docs', 'repo-web']);
     expect(rowFilter({ kinds: [], labels: ['repo-lar-api'] }, [])(rows[0]!)).toBe(false);
 });
@@ -96,6 +101,7 @@ test("a label mapped to the item's kind is neither offered nor matched on that r
     } as NonNullable<BoardData['repos'][number]['setup']>;
     const repos = [{ ...sample.repos[0]!, repo: base.repo, setup }];
     const mapped = item('a', { kind: 'bug', labels: ['oops'] });
+
     expect(labelChoices([mapped], repos)).toEqual([]);
     expect(rowFilter({ kinds: [], labels: ['oops'] }, repos)(mapped)).toBe(false);
     expect(rowFilter({ kinds: [], labels: ['oops'] }, repos)({ ...mapped, kind: 'feature' })).toBe(true);
@@ -124,7 +130,9 @@ test('the board keeps Queue numbers while a filter hides the first row, whose it
 test('a start error on a hidden row stays out of view, and shows on the row once the filter clears', async () => {
     seed(BOARD_KEY, ['bug']);
     await mountPage(withItems([item('Q1', { number: 1, title: 'First', kind: 'feature' })]));
+
     const { useStartStore } = await import('../items/start-store.ts');
+
     await settle(() => useStartStore.getState().set('Q1', { phase: 'error', message: 'T3 is down' }));
     expect(text($('.queue'))).not.toContain('T3 is down');
     await search();
@@ -181,6 +189,7 @@ test('the filters apply to every pane, their counts follow, and each says when n
 
 test('removing a chip or clearing moves focus to the Kind menu, which always stays', async () => {
     const kindMenu = () => bar().querySelector<HTMLElement>('[data-filter="kind"]');
+
     seed(LIST_KEY, ['bug'], ['gone']);
     await mountPage(withItems([]));
     await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
@@ -200,6 +209,7 @@ test('a broken save reads as no filters', async () => {
 
 test('List and the board keep separate filters, and filters write nothing to the tracker', async () => {
     const listed = (id: string, kind: Item['kind']) => item(id, { kind, status: 'List' });
+
     seed(BOARD_KEY, ['bug']);
     seed(LIST_KEY, ['feature']);
     await mountPage(
@@ -207,7 +217,9 @@ test('List and the board keep separate filters, and filters write nothing to the
     );
     expect(queueRows()).toEqual([]);
     await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
+
     const rows = () => $$<HTMLButtonElement>('[data-list-modal] button[data-item]').map((b) => b.dataset.item);
+
     expect(rows()).toEqual(['L1']);
     expect(chips()).toEqual(['Remove Feature']);
     await clear();
@@ -218,6 +230,7 @@ test('List and the board keep separate filters, and filters write nothing to the
 
 test("the List counts follow the filters, and its Labels filter holds the chosen repository's names", async () => {
     const other = sample.repos[1]!.repo;
+
     await mountPage(
         withItems([
             item('L1', { status: 'List', kind: 'bug', labels: ['docs'] }),
@@ -228,10 +241,12 @@ test("the List counts follow the filters, and its Labels filter holds the chosen
     await open('labels');
     expect(choices(), 'All Projects lists the union, without case').toEqual(['docs', 'infra']);
     await choose('docs');
+
     const rows = () =>
         $$<HTMLButtonElement>('[data-list-modal] button[data-item]')
             .map((b) => b.dataset.item)
             .sort();
+
     expect(rows(), 'matched without case across repositories').toEqual(['L1', 'L2']);
     await removeChip('docs');
     await settle(() =>

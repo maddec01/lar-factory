@@ -10,8 +10,10 @@ test('a JSON file reads as its object, and as null when missing, garbled or not 
     const dir = tempDir(t, 'lar-json-');
     const file = (name: string, text: string) => {
         writeFileSync(join(dir, name), text);
+
         return join(dir, name);
     };
+
     assert.deepEqual(readJsonRecord(file('object.json', '{"a":1}')), { a: 1 });
     assert.equal(readJsonRecord(join(dir, 'missing.json')), null);
     assert.equal(readJsonRecord(file('garbled.json', '{')), null);

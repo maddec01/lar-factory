@@ -44,20 +44,25 @@ const merged = (source: ItemSource) =>
 function fakeSource(title: string, items: Item[], writes: string[]): ItemSource {
     const write = (what: string) => async () => {
         writes.push(`${title} ${what}`);
+
         return null;
     };
+
     return {
         read: async () => ({ title, items }),
         searchTickets: async (repo, query) => {
             writes.push(`${title} search ${repo} ${query}`);
+
             return [];
         },
         readTicket: async (repo, number) => {
             writes.push(`${title} read ${repo}#${number}`);
+
             return null;
         },
         observeTicket: async (repo, number) => {
             writes.push(`${title} observe ${repo}#${number}`);
+
             return { state: 'open' };
         },
         abandon: async (i) => write(`abandon ${i.id}`)(),
@@ -72,6 +77,7 @@ test("a ticket search, read and observation go to the repository's own source, a
             ['maddec01/lar-apple', fakeSource('apple', [], writes)],
         ]),
     );
+
     await source.searchTickets('maddec01/lar-apple', 'seek');
     await source.readTicket('Maddec01/Lar-Server', 7);
     await source.observeTicket('maddec01/lar-apple', 8);
@@ -93,6 +99,7 @@ test('a merged source lists every item it read, with or without a status', async
             ['maddec01/lar-apple', issues],
         ]),
     ).read();
+
     assert.deepEqual(
         read.items.map((i) => i.id),
         ['I_1', 'I_2'],
@@ -101,6 +108,7 @@ test('a merged source lists every item it read, with or without a status', async
 
 test('with no source a read lists nothing and an abandon is refused', async () => {
     const sources = mergeSources(new Map());
+
     assert.deepEqual(await sources.read(), { title: '', items: [] });
     assert.equal(await sources.abandon(item('I_1', 'maddec01/lar-server')), "That item's Project isn't onboarded.");
 });
@@ -114,9 +122,11 @@ test('each read loads the configs first and builds the sources again only when t
         async () => ({ configs, problems: [] }),
         (read) => {
             built.push(read.map((c) => `${c.repo} ${c.labels.join(',')}`));
+
             return merged(fakeSource(read.map((c) => c.repo).join(',') || 'none', [], []));
         },
     );
+
     assert.deepEqual(sources.repos(), []);
     assert.equal((await sources.read()).title, 'maddec01/lar-apple');
     await sources.read();
@@ -135,10 +145,12 @@ test("a read whose configs can't be loaded fails, and abandons keep going to the
     const sources = onboardedSources(
         async () => {
             if (fail) throw new Error("repository-settings.json isn't valid JSON.");
+
             return { configs: [config('maddec01/lar-apple')], problems: [] };
         },
         () => merged(fakeSource('apple', [], writes)),
     );
+
     await sources.read();
     fail = true;
     await assert.rejects(sources.read(), /valid JSON/);
@@ -160,6 +172,7 @@ test("a read leaves out the items of a repository whose config couldn't be read,
         }),
         () => merged(fakeSource('lar', listed, [])),
     );
+
     assert.deepEqual(
         (await sources.read()).items.map((i) => i.id),
         ['I_1'],
@@ -189,6 +202,7 @@ test("repositories reading one team's sprint share one read, and an untagged ite
         az.run,
     );
     const read = await sources.read();
+
     // The docs team's sprint is the same fake sprint, read apart; its copy of an item the web sprint listed shows once.
     assert.deepEqual(
         read.items.map((i) => [i.number, i.repo, i.untaggedFor ?? null]),
@@ -213,6 +227,7 @@ test('a problem with a source that repositories share shows under each of them',
             ['contoso/p/api', sprint],
         ]),
     ).read();
+
     assert.deepEqual(read.problems, [
         { repo: 'contoso/p/web', problem: 'az is logged out.', fix: 'az login' },
         { repo: 'contoso/p/api', problem: 'az is logged out.', fix: 'az login' },
@@ -225,12 +240,14 @@ function slowSource(name: string, items: Item[] = []): { source: ItemSource; fin
     const done = new Promise<void>((resolve) => {
         finish = resolve;
     });
+
     return {
         source: {
             ...fakeSource(name, [], []),
             name,
             read: async () => {
                 await done;
+
                 return { title: name, items };
             },
         },
@@ -252,6 +269,7 @@ test('a read marks each source as started at once and as finished when its own r
             ['maddec01/lar-apple', fast.source],
         ]),
     ).read(progress);
+
     assert.deepEqual(events, ['+lar-server', '+lar-apple']);
     fast.finish();
     await new Promise((resolve) => setImmediate(resolve));
@@ -279,6 +297,7 @@ test('a source without a name is named by its repositories, and a failed read st
             ['contoso/p%20q/api', failing],
         ]),
     );
+
     await assert.rejects(sources.read(progress), /boom/);
     assert.deepEqual(events, ['+web, api', '-web, api']);
 });
@@ -294,6 +313,7 @@ test("each source's read lands while another still reads, with the items read so
             ['maddec01/lar-apple', fast.source],
         ]),
     ).read(progress);
+
     fast.finish();
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(
@@ -301,7 +321,9 @@ test("each source's read lands while another still reads, with the items read so
         [[['I_2'], ['maddec01/lar-server']]],
     );
     slow.finish();
+
     const read = await reading;
+
     assert.equal(landed.length, 1, 'the last read to land is the read itself');
     assert.deepEqual(
         read.items.map((i) => i.id),
@@ -342,6 +364,7 @@ test("a source whose first read failed, or that its tool blocks, isn't waiting, 
         blocked: (kind: string) => kind === 'azure-board',
     };
     const reading = sources.read(progress, held);
+
     await new Promise((resolve) => setImmediate(resolve));
     slow.finish();
     await new Promise((resolve) => setImmediate(resolve));
@@ -353,7 +376,9 @@ test("a source whose first read failed, or that its tool blocks, isn't waiting, 
         'neither the failed nor the blocked source waits',
     );
     assert.equal(blocked.reads, 0);
+
     const checking = await sources.read(undefined, { ...pace(1_000), waits: (kind: string) => kind === 'azure-board' });
+
     assert.deepEqual(checking.waiting, ['maddec01/lar-server'], "a source waiting for its tool's check is waiting");
 });
 
@@ -369,10 +394,12 @@ test('the onboarded sources pass on what has landed, leaving out the repositorie
             ...merged(fakeSource('lar', [], [])),
             read: async (progress) => {
                 progress?.landed?.({ title: 'lar', items: listed, waiting: ['maddec01/lar-factory'] });
+
                 return { title: 'lar', items: listed };
             },
         }),
     );
+
     await sources.read({ started: () => {}, finished: () => {}, landed: (read) => landed.push(read) });
     assert.deepEqual(
         landed.map((read) => [read.items.map((i) => i.id), read.waiting]),
@@ -386,6 +413,7 @@ test('the onboarded sources pass the progress to the sources they build', async 
         async () => ({ configs: [config('maddec01/lar-apple')], problems: [] }),
         () => merged({ ...fakeSource('lar', [], []), name: 'lar' }),
     );
+
     await sources.read({ started: (name) => events.push(`+${name}`), finished: (name) => events.push(`-${name}`) });
     assert.deepEqual(events, ['+lar', '-lar']);
 });
@@ -398,9 +426,11 @@ function countedSource(name: string, items: () => Item[]): ItemSource & { reads:
         reads: 0,
         read: async () => {
             source.reads++;
+
             return { title: name, items: items() };
         },
     };
+
     return source;
 }
 
@@ -419,9 +449,12 @@ test('a paced read reads a source with active work every 15 seconds and an idle 
             ['maddec01/lar-server', idle],
         ]),
     );
+
     await sources.read(undefined, pace(0));
     assert.equal(sources.due(pace(14_999)), false);
+
     const read = await sources.read(undefined, pace(15_000));
+
     assert.deepEqual(
         read.items.map((i) => i.id),
         ['I_1', 'I_2'],
@@ -459,6 +492,7 @@ test("invalidating an item reads only the source that lists it, at once, and an 
             ['maddec01/lar-server', server],
         ]),
     );
+
     await sources.read(undefined, pace(0));
     sources.invalidate('https://github.com/maddec01/lar-apple/issues/9');
     assert.equal(sources.due(pace(1_999)), false, 'two reads of one source are at least 2 seconds apart');
@@ -476,7 +510,9 @@ test('a source whose read failed is read again, while one that read keeps its re
         ...countedSource('flaky', () => []),
         read: async () => {
             flaky.reads++;
+
             if (fail) throw new Error('boom');
+
             return { title: 'flaky', items: [item('I_2', 'maddec01/lar-server')] };
         },
     };
@@ -486,10 +522,13 @@ test('a source whose read failed is read again, while one that read keeps its re
             ['maddec01/lar-server', flaky],
         ]),
     );
+
     await assert.rejects(sources.read(undefined, pace(0)), /boom/);
     fail = false;
     assert.equal(sources.due(pace(14_999)), false, 'a source that never read retries at the active pace');
+
     const read = await sources.read(undefined, pace(15_000));
+
     assert.deepEqual(
         read.items.map((i) => i.id),
         ['I_1', 'I_2'],
@@ -502,10 +541,12 @@ test('a paced read loads the configs again only every 5 minutes, or after reload
     const sources = onboardedSources(
         async () => {
             loads++;
+
             return { configs: [config('maddec01/lar-apple')], problems: [] };
         },
         () => merged(fakeSource('lar', [], [])),
     );
+
     await sources.read(undefined, pace(0));
     await sources.read(undefined, pace(299_999));
     assert.equal(loads, 1);
@@ -533,14 +574,18 @@ test('a source that reads items alone reads only its active and asked-for items 
         {
             readSome: async (items: Item[]) => {
                 some.push(items.map((i) => i.id));
+
                 return listed.filter((i) => items.some((asked) => asked.id === i.id));
             },
         },
     );
     const sources = mergeSources(new Map([['maddec01/lar-server', project]]));
+
     await sources.read(undefined, pace(0));
     listed = [{ ...listed[0]!, status: 'Review', statuses: ['Review'] }, listed[1]!];
+
     const read = await sources.read(undefined, pace(15_000));
+
     assert.deepEqual([project.reads, some], [1, [['I_1']]]);
     assert.deepEqual(
         read.items.map((i) => `${i.id}:${i.status}`),
@@ -551,7 +596,9 @@ test('a source that reads items alone reads only its active and asked-for items 
     assert.equal(sources.readAfresh(read.items[1]!), false);
     sources.invalidate(listed[1]!.url!);
     sources.invalidate('https://github.com/maddec01/lar-apple/issues/3');
+
     const asked = await sources.read(undefined, pace(17_000));
+
     assert.deepEqual(some.at(-1), ['I_2', 'I_3'], 'the asked-for items read at once, alone');
     assert.deepEqual(
         asked.items.map((i) => i.id),
@@ -572,6 +619,7 @@ test('a read of a few items that fails reads the whole source instead', async ()
         },
     );
     const sources = mergeSources(new Map([['maddec01/lar-server', project]]));
+
     await sources.read(undefined, pace(0));
     await sources.read(undefined, pace(15_000));
     assert.equal(project.reads, 2);
@@ -592,15 +640,18 @@ test('a change check every 5 seconds reads the items changed elsewhere alone, an
         {
             readSome: async (items: Item[]) => {
                 some.push(items.map((i) => i.id));
+
                 return items;
             },
             changes: async (since: number) => {
                 checks.push(since);
+
                 return changes;
             },
         },
     );
     const sources = mergeSources(new Map([['maddec01/lar-server', project]]));
+
     await sources.read(undefined, pace(0));
     await sources.probe(pace(4_999));
     assert.deepEqual(checks, [], 'no check before 5 seconds');
@@ -630,11 +681,13 @@ test('a source whose change check sees every edit reads only the items no check 
             seesEdits: true,
             readSome: async (items: Item[]) => {
                 some.push(items.map((i) => i.id));
+
                 return items;
             },
         },
     );
     const sources = mergeSources(new Map([['maddec01/lar-apple', issues]]));
+
     await sources.read(undefined, pace(0));
     await sources.read(undefined, pace(15_000));
     assert.deepEqual(some, [['I_2']]);
@@ -649,18 +702,24 @@ test('a read that fails after a change check asks again for what it read, at the
             seesEdits: true,
             readSome: async (items: Item[]) => {
                 some.push(items.map((i) => i.id));
+
                 if (fail) throw new Error('timeout');
+
                 return items;
             },
             changes: async () => ['https://github.com/Maddec01/Lar-Apple/issues/1'],
         },
     );
     const read = issues.read;
+
     issues.read = async () => {
         if (fail) throw new Error('timeout');
+
         return read();
     };
+
     const sources = mergeSources(new Map([['maddec01/lar-apple', issues]]));
+
     await sources.read(undefined, pace(0));
     fail = true;
     await sources.probe(pace(5_000));
@@ -685,6 +744,7 @@ test('a change check that fails waits a minute before it checks again', async ()
         },
     );
     const sources = mergeSources(new Map([['maddec01/lar-apple', issues]]));
+
     await sources.read(undefined, pace(0));
     await sources.probe(pace(5_000));
     await sources.probe(pace(6_000));
@@ -703,8 +763,11 @@ test('an item read alone keeps the map its whole read gave it, as a dossier read
         },
     );
     const sources = merged(project);
+
     await sources.read(undefined, pace(0));
+
     const read = await sources.read(undefined, pace(15_000));
+
     assert.equal(read.items[0]!.map, map);
 });
 
@@ -717,6 +780,7 @@ test('a read request naming an item no source lists reads only the source of the
             ['maddec01/lar-server', server],
         ]),
     );
+
     await sources.read(undefined, pace(0));
     sources.invalidate('https://github.com/maddec01/Lar-Apple/issues/12');
     await sources.read(undefined, pace(2_000));
@@ -739,8 +803,11 @@ test('a read of a few items keeps everything it brings, as a parent read with a 
         },
     );
     const sources = merged(team);
+
     await sources.read(undefined, pace(0));
+
     const read = await sources.read(undefined, pace(15_000));
+
     assert.deepEqual(
         read.items.map((i) => `${i.id}:${i.status}`),
         ['I_1:In progress', 'I_2:Review', 'I_3:List'],
@@ -754,6 +821,7 @@ test('a source whose kind waits reads nothing and checks for no changes, and rea
         {
             changes: async (since: number) => {
                 checks.push(since);
+
                 return [];
             },
         },
@@ -771,12 +839,15 @@ test('a source whose kind waits reads nothing and checks for no changes, and rea
     );
     let waiting = new Set<string>(['azure-board']);
     const paced = (now: number) => ({ ...pace(now), waits: (kind: string) => waiting.has(kind) });
+
     assert.deepEqual(
         (await sources.read(undefined, { ...paced(0), waits: () => true })).waiting,
         ['maddec01/lar-apple', 'maddec01/lar-server'],
         'a read with every source waiting reads nothing, and every repository waits',
     );
+
     const read = await sources.read(undefined, paced(0));
+
     assert.deepEqual(
         read.items.map((i) => i.id),
         ['I_1'],
@@ -812,6 +883,7 @@ test('repositories reading one Azure board share its backlog and sprint and rout
         },
     }));
     const read = await configuredSources(configs, az.run).read();
+
     assert.deepEqual(
         read.items.map((i) => [i.number, i.repo, i.untaggedFor ?? null]),
         [

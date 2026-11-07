@@ -47,6 +47,7 @@ test('the board page opens on the loading screen, over the board, with the mark 
 test('a new step rolls the old line out while the new one rolls in, and only the line animates', async () => {
     await mountPage(unsettled());
     expect($('.loading-roll-in'), 'the first line arrives with the page, so it does not roll').toBeNull();
+
     const mark = $('.loading-mark');
 
     await push(unsettled(firstRead('finishing')));
@@ -147,6 +148,7 @@ test('a restarted server keeps the last complete board visible until fresh data 
     await mountPage(fresh());
     await advance(DRAW_MS);
     await advance(EXIT_MS);
+
     const { useBoardStore } = await import('../board/board-store.ts');
     const before = useBoardStore.getState().data.items;
 
@@ -165,8 +167,11 @@ test('a restarted server keeps the last complete board visible until fresh data 
         capture: { enabled: true, session: 'new-server-session' },
         localProblem: 'A new server warning',
     };
+
     await push(partial);
+
     const current = useBoardStore.getState().data;
+
     expect(current.capture?.session).toBe('new-server-session');
     expect(current.localProblem).toBe('A new server warning');
     expect(current.repos).toEqual(partial.repos);
@@ -175,6 +180,7 @@ test('a restarted server keeps the last complete board visible until fresh data 
     expect(screen()).toBeNull();
 
     const oneItem = { ...fresh(), items: sample.items.slice(0, 1) };
+
     await push(oneItem);
     expect(screen()).toBeNull();
     expect(useBoardStore.getState().data.items).toEqual(oneItem.items);
@@ -182,12 +188,16 @@ test('a restarted server keeps the last complete board visible until fresh data 
 
 test('restart snapshots honor completed-source removals while retaining unread source rows', async () => {
     await mountPage(fresh());
+
     const { useBoardStore } = await import('../board/board-store.ts');
     const server = sample.items.filter((item) => item.repo === 'maddec01/lar-server');
     const apple = sample.items.filter((item) => item.repo === 'maddec01/lar-apple');
     const read = { ...firstRead('items', ['lar-apple']), waiting: ['maddec01/lar-apple'] };
+
     await push({ ...unsettled(read), items: server.slice(1) });
+
     const items = useBoardStore.getState().data.items;
+
     expect(
         items.some((item) => item.id === server[0]!.id),
         'removed from the completed source',
@@ -202,11 +212,13 @@ test('Queue and Abandon responses stay authoritative during a restarted read', a
     await mountPage(fresh());
     await advance(DRAW_MS);
     await advance(EXIT_MS);
+
     const { useBoardStore } = await import('../board/board-store.ts');
     const { receive } = await import('../items/card-actions.ts');
     const issue = sample.items.find((item) => item.status === 'List')!;
     const queued = { ...issue, id: 'new-work-record', status: 'Queued' as const };
     const read = { ...firstRead('items', ['lar-apple']), waiting: sample.repos.map((repo) => repo.repo) };
+
     await push({ ...unsettled(read), items: [queued] });
     expect(
         useBoardStore.getState().data.items.filter((item) => item.repo === issue.repo && item.number === issue.number),
@@ -292,6 +304,7 @@ test('installation readiness waits until the loading screen has finished leaving
             blocked: [],
         }),
     });
+
     await mountPage(fresh(), '', '?loading=drawn');
     expect(bridge.boardReady).not.toHaveBeenCalled();
     await advance(EXIT_MS - 1);
@@ -317,6 +330,7 @@ test('a development app without installation enabled never sends installation re
             blocked: [],
         }),
     });
+
     await mountPage(fresh(), '', '?loading=drawn');
     await advance(EXIT_MS);
     expect(bridge.boardReady).not.toHaveBeenCalled();
@@ -324,12 +338,16 @@ test('a development app without installation enabled never sends installation re
 
 test('restart keeps rows before readiness and through failed settlement, then accepts successful empty sources', async () => {
     await mountPage(fresh());
+
     const { useBoardStore } = await import('../board/board-store.ts');
     const before = useBoardStore.getState().data.items;
+
     await push({ ...unsettled({ ...firstRead('items'), waiting: [] }), items: [], repos: [] });
     expect(useBoardStore.getState().data.items).toEqual(before);
     expect(useBoardStore.getState().data.repos).toEqual(sample.repos);
+
     const failed = sample.repos.map((repo) => ({ repo: repo.repo, problem: 'Source unavailable' }));
+
     await push({ ...fresh(), items: [], itemSourceProblems: failed });
     expect(useBoardStore.getState().data.items).toEqual(before);
     await push({ ...fresh(), items: [], itemSourceProblems: failed.slice(1) });

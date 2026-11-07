@@ -23,12 +23,16 @@ export function parentSkillCheck(
     parent: ParentChannel = process,
 ): ((drift?: DriftChoice) => Promise<SkillCheckOutcome>) | undefined {
     if (env[SKILL_CHECK_ENV] !== '1' || !parent.send) return undefined;
+
     const send = parent.send.bind(parent);
     const waiting = new Map<number, (outcome: SkillCheckOutcome) => void>();
     let next = 0;
+
     parent.on('message', (message: unknown) => {
         if (!isSkillCheckAnswer(message)) return;
+
         const { refusal, drift } = message;
+
         waiting.get(message.id)?.({ refusal, ...(drift && { drift }) });
         waiting.delete(message.id);
     });
@@ -36,10 +40,13 @@ export function parentSkillCheck(
         for (const answer of waiting.values()) answer(NO_ANSWER);
         waiting.clear();
     });
+
     return (drift) =>
         new Promise((resolve) => {
             if (!parent.connected) return resolve(NO_ANSWER);
+
             const id = next++;
+
             waiting.set(id, resolve);
             send({ type: 'check-skills', id, ...(drift && { drift }) });
         });

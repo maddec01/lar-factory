@@ -15,11 +15,13 @@ const IOS = 'maddec01/lar-ios';
 /** A data folder whose list names `repos`, each on the board. */
 function dataDir(repos: string[] = [WEB, API, IOS]): string {
     const dir = mkdtempSync(join(tmpdir(), 'lar repository list test '));
+
     onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
     writeFileSync(
         join(dir, 'repository-settings.json'),
         JSON.stringify({ repositories: repos.map((repo) => ({ repo })) }),
     );
+
     return dir;
 }
 
@@ -28,6 +30,7 @@ const saved = (dir: string) =>
 
 test('a Connection reads the same from either repository', () => {
     const dir = dataDir();
+
     saveConnections(WEB, [API], dir);
     assert.deepEqual(readConnections(WEB, dir), [API]);
     assert.deepEqual(readConnections(API, dir), [WEB]);
@@ -36,6 +39,7 @@ test('a Connection reads the same from either repository', () => {
 
 test('saving a pair from each side, or again, keeps it once', () => {
     const dir = dataDir();
+
     saveConnections(WEB, [API], dir);
     saveConnections(API, [WEB], dir);
     saveConnections('MADDEC01/LAR-WEB', [API, API], dir);
@@ -44,6 +48,7 @@ test('saving a pair from each side, or again, keeps it once', () => {
 
 test("saving a repository's Connections replaces its pairs, so an unticked one goes", () => {
     const dir = dataDir();
+
     saveConnections(WEB, [API, IOS], dir);
     saveConnections(API, [IOS], dir);
     saveConnections(WEB, [IOS], dir);
@@ -53,6 +58,7 @@ test("saving a repository's Connections replaces its pairs, so an unticked one g
 
 test('only another repository on the board can be connected', () => {
     const dir = dataDir([WEB, API]);
+
     saveOnboarding({ repo: IOS, progress: { step: 'role', done: [], answers: { projectId: 'p' } } }, null, dir);
     saveConnections(WEB, [WEB, IOS, 'maddec01/lar-cli', API], dir);
     assert.deepEqual(readConnections(WEB, dir), [API]);
@@ -60,6 +66,7 @@ test('only another repository on the board can be connected', () => {
 
 test('a pair naming a repository removed from the file by hand reads as gone', () => {
     const dir = dataDir([WEB, API]);
+
     writeFileSync(
         join(dir, 'repository-settings.json'),
         JSON.stringify({

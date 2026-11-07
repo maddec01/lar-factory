@@ -67,11 +67,13 @@ test("a row hides managed labels and keeps every other label in the ticket's ord
         'decision-grill',
         'Area: Server',
     ];
+
     assert.deepEqual(shownLabels({ kind: 'improvement', labels }), ['needs-triage', 'area: web', 'Area: Server']);
 });
 
 test('a label mapped to a kind hides on rows of that kind only, without case', () => {
     const vocabulary = mapped('bug', 'type: defect');
+
     assert.deepEqual(shownLabels({ kind: 'bug', labels: ['Type: Defect', 'web'] }, vocabulary), ['web']);
     assert.deepEqual(shownLabels({ kind: 'feature', labels: ['Type: Defect', 'web'] }, vocabulary), [
         'Type: Defect',
@@ -86,6 +88,7 @@ test('a concept hides labels mapped to either concept term, and a build its own'
         'concept-kind': { type: null, labels: ['idea'] },
         build: { type: null, labels: ['delivery'] },
     });
+
     assert.deepEqual(shownLabels({ kind: 'concept', labels: ['epic', 'idea', 'delivery'] }, vocabulary), ['delivery']);
     assert.deepEqual(shownLabels({ kind: 'build', labels: ['epic', 'idea', 'delivery'] }, vocabulary), [
         'epic',
@@ -96,6 +99,7 @@ test('a concept hides labels mapped to either concept term, and a build its own'
 test('a row reads the first 100 labels a ticket has, before hiding any', () => {
     const labels = ['bug', ...Array.from({ length: 120 }, (_, n) => `area ${n}`)];
     const shown = shownLabels({ kind: 'bug', labels });
+
     assert.equal(shown.length, 99);
     assert.equal(shown.at(-1), 'area 98');
 });
@@ -108,6 +112,7 @@ const MEANINGS = [
 
 for (const [kind, names] of MEANINGS) {
     const others: string[] = MEANINGS.flatMap(([other, otherNames]) => (other === kind ? [] : [...otherNames]));
+
     for (const [how, vocabulary] of [
         ['with no mapping', undefined],
         ['with a mapping', effectiveVocabulary({ [kind]: { type: null, labels: [`type: ${kind}`] } }).vocabulary],
@@ -115,6 +120,7 @@ for (const [kind, names] of MEANINGS) {
         test(`changing to ${kind} ${how} keeps the names meaning ${kind}, in any case, and removes the other kinds' names`, () => {
             const labels = [...names, ...names.map((name) => name.toUpperCase()), ...others, 'docs'];
             const { remove } = kindLabelSwap(labels, kind, vocabulary);
+
             assert.deepEqual(remove, others);
             assert.equal(trackerKind(labels.filter((label) => !remove.includes(label))), kind);
         });

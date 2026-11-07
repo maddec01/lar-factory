@@ -26,6 +26,7 @@ async function board(id: number, fail?: (args: string[]) => Error | undefined) {
     const { items } = await source.read();
     // The read shows only the requirement level's type, so another type's item stands in as the first item renumbered.
     const item = items.find((i) => i.number === id) ?? { ...items[0]!, number: id, statuses: [] as Status[] };
+
     return { az, source, item };
 }
 
@@ -33,9 +34,12 @@ const stateTo = (state: string) => ({ op: 'replace', path: '/fields/System.State
 
 test('Abandon moves the work item to its Removed-category state, and names a type with none', async () => {
     const story = await board(4);
+
     assert.equal(await story.source.abandon(story.item), null);
     assert.deepEqual(story.az.patches, [{ id: 4, ops: [{ op: 'test', path: '/rev', value: 1 }, stateTo('Removed')] }]);
+
     const issue = await board(5);
+
     assert.equal(
         await issue.source.abandon(issue.item),
         'Could not abandon work item 5. Issue in Fabrikam Fiber has no Removed-category state. Close or delete it in Azure DevOps.',
@@ -46,9 +50,12 @@ test('Abandon moves the work item to its Removed-category state, and names a typ
 test('Abandon reads the work item with one batch read and PATCHes it through az rest at 7.1, testing its rev', async () => {
     const { az, source, item } = await board(4);
     const before = az.calls.length;
+
     assert.equal(await source.abandon(item), null);
+
     const read = az.calls[before];
     const patch = az.calls.at(-1);
+
     assert.equal(read![read!.indexOf('--resource') + 1], 'workitemsbatch');
     assert.deepEqual(patch!.slice(0, 3), ['rest', '--method', 'patch']);
     assert.equal(
@@ -64,15 +71,18 @@ test('a logged-out az shows its fix, and any other az error shows as it is', asy
             ? new Error('Please run az login to set up an account.')
             : undefined,
     );
+
     assert.equal(
         await loggedOut.source.abandon(loggedOut.item),
         'Could not abandon work item 4. az is logged out. Run az login, then try again.',
     );
+
     const changed = await board(4, (args) =>
         args[0] === 'rest' && args.includes('patch')
             ? new Error('az devops invoke failed: TF26071: changed since you opened it')
             : undefined,
     );
+
     assert.equal(
         await changed.source.abandon(changed.item),
         'Could not abandon work item 4. az devops invoke failed: TF26071: changed since you opened it',
@@ -92,6 +102,7 @@ const workItem = (number: number) =>
 
 test('a saved description replaces the field the details read, as markdown, at 7.2-preview.3 and testing the rev read', async () => {
     const az = fakeAz({ items: ITEMS });
+
     assert.equal(
         await saveAzureDescription(
             workItem(4),
@@ -100,7 +111,9 @@ test('a saved description replaces the field the details read, as markdown, at 7
         ),
         null,
     );
+
     const patch = az.calls.at(-1)!;
+
     assert.equal(
         patch[patch.indexOf('--url') + 1],
         'https://dev.azure.com/contoso/Fabrikam%20Fiber/_apis/wit/workitems/4?api-version=7.2-preview.3',
@@ -121,6 +134,7 @@ test('a Bug whose description came from Repro Steps saves to Repro Steps', async
     const az = fakeAz({
         items: [{ id: 9, type: 'Bug', state: 'New', description: '', reproSteps: '<p>Open it.</p>' }],
     });
+
     assert.equal(
         await saveAzureDescription(
             workItem(9),
@@ -137,6 +151,7 @@ test('a Bug whose description came from Repro Steps saves to Repro Steps', async
 
 test('a work item changed since its details were read is a conflict, and writes nothing', async () => {
     const az = fakeAz({ items: [{ ...ITEMS[3]!, rev: 3 }] });
+
     assert.deepEqual(
         await saveAzureDescription(workItem(4), { body: 'New.', bodyField: 'System.Description', revision: 2 }, az.run),
         {
@@ -156,6 +171,7 @@ test('no right to edit the work item, a logged-out az and any other az error eac
             { body: 'New.', bodyField: 'System.Description', revision: 1 },
             failing(message).run,
         );
+
     assert.deepEqual(
         await save(
             'ERROR: TF237111: The current user does not have permissions to save work items under the specified area path.',
@@ -177,6 +193,7 @@ test('no right to edit the work item, a logged-out az and any other az error eac
 
 test('an item that is not an Azure DevOps work item is refused', async () => {
     const az = fakeAz({ items: ITEMS });
+
     assert.deepEqual(
         await saveAzureDescription(
             { ...workItem(4), repo: 'maddec01/lar' },

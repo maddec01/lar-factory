@@ -46,8 +46,10 @@ export function ticketKindOf(
 ): SwapKind | null {
     const names = [...labels, ...(type ? [type] : [])].map((name) => name.toLowerCase());
     const carries = (wanted: readonly string[]) => wanted.some((name) => names.includes(name));
+
     if (isSwapKind(itemKind) && (carries(mappedNames(itemKind, vocabulary)) || carries(kindNames(itemKind))))
         return itemKind;
+
     return (
         SWAP_KINDS.find((kind) => carries(mappedNames(kind, vocabulary))) ??
         SWAP_KINDS.find((kind) => carries(kindNames(kind))) ??
@@ -62,6 +64,7 @@ export function kindTicketSwap(
     vocabulary?: EffectiveVocabulary,
 ): KindTicketSwap {
     const to = vocabulary?.[kind].type ?? null;
+
     return {
         ...kindLabelSwap(ticket.labels, kind, vocabulary),
         type: to !== null && !(ticket.type !== null && sameLabel(ticket.type, to)) ? { from: ticket.type, to } : null,
@@ -76,6 +79,7 @@ export function kindSwapAccessProblem(
     safety: { azureReadOnly?: boolean | undefined } = {},
 ): string | null {
     const options = safety.azureReadOnly === undefined ? {} : { azureReadOnly: safety.azureReadOnly };
+
     return (
         (swap.add.length || swap.remove.length ? writeAccessProblem(repo, 'tag-ticket', access, options) : null) ??
         (swap.type ? writeAccessProblem(repo, 'type-ticket', access, options) : null)
@@ -96,11 +100,17 @@ export function kindDisagreement(
     vocabulary?: EffectiveVocabulary,
 ): KindDisagreement | null {
     const { kind, agreedTicketKind, kindAnswer } = record;
+
     if (!isSwapKind(kind)) return null;
+
     const ticketKind = ticketKindOf(kind, ticket, vocabulary);
+
     if (ticketKind === kind || (ticketKind === null && mappedNames(kind, vocabulary).length === 0)) return null;
+
     const answered = kindAnswer?.itemKind === kind && kindAnswer.ticketKind === ticketKind ? kindAnswer.answer : null;
+
     if (answered === 'update') return null;
+
     return {
         ticketKind,
         changed:

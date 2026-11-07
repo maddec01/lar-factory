@@ -4,8 +4,10 @@ import { readAzureReadiness } from './azure-readiness.ts';
 
 const read = (policy = 'approved', vote = 10, state = 'succeeded', race = false) => {
     let heads = 0;
+
     return readAzureReadiness('org', 'project', 'repo', 1, async (args) => {
         const resource = args[args.indexOf('--resource') + 1];
+
         return JSON.stringify(
             resource === 'pullRequests'
                 ? {
@@ -29,6 +31,7 @@ const read = (policy = 'approved', vote = 10, state = 'succeeded', race = false)
         );
     });
 };
+
 test('binds successful evidence to a revision', async () =>
     expect(await read()).toMatchObject({ available: true, sourceRevision: 'old', blockers: [] }));
 test.each(['queued', 'running', 'rejected', 'broken', 'unknown'])('blocks required policy %s', async (state) =>
@@ -45,6 +48,7 @@ test('blocks pending statuses and retains iteration', async () =>
 test('an unset native status blocks readiness while preserving the other evidence', async () => {
     const result = await readAzureReadiness('o', 'p', 'r', 1, async (args) => {
         const resource = args[args.indexOf('--resource') + 1];
+
         return JSON.stringify(
             resource === 'pullRequests'
                 ? { lastMergeSourceCommit: { commitId: 'h' }, repository: { project: { id: 'p' } } }
@@ -59,6 +63,7 @@ test('an unset native status blocks readiness while preserving the other evidenc
                   },
         );
     });
+
     expect(result).toMatchObject({
         available: true,
         sourceRevision: 'h',
@@ -88,11 +93,13 @@ test('accepts empty successful lists', async () => {
                 : { value: [] },
         ),
     );
+
     expect(result).toMatchObject({ available: true, blockers: [], policies: [], statuses: [], reviewers: [] });
 });
 test('retains optional failures without treating them as required', async () => {
     const result = await readAzureReadiness('o', 'p', 'r', 1, async (args) => {
         const resource = args[args.indexOf('--resource') + 1];
+
         return JSON.stringify(
             resource === 'pullRequests'
                 ? { lastMergeSourceCommit: { commitId: 'h' }, repository: { project: { id: 'p' } } }
@@ -110,5 +117,6 @@ test('retains optional failures without treating them as required', async () => 
                   },
         );
     });
+
     expect(result).toMatchObject({ available: true, blockers: [], policies: [{ status: 'rejected' }] });
 });

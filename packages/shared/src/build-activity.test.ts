@@ -17,6 +17,7 @@ it('requires current build execution and rejects waiting, cached and stale evide
         buildPhase: 'implement',
         threads: [{ purpose: 'build', state: 'running', currentRunning: true }],
     } as unknown as Item;
+
     expect(buildActivity(item)).toEqual({ label: 'Implementing', running: true });
     expect(buildActivity(item, true).running).toBe(false);
     expect(buildActivity({ ...item, threads: 'unavailable' })).toEqual({
@@ -40,6 +41,7 @@ it('requires current build execution and rejects waiting, cached and stale evide
 it('shows a relaunch after stopped or finished build threads, also while activity is stale', () => {
     for (const state of ['stopped', 'finished']) {
         const relaunching = { status: 'In progress', threads: [{ purpose: 'build', state }] } as Item;
+
         expect(buildActivity(relaunching, true, { phase: 'starting' })).toEqual({ label: 'Starting', running: false });
         expect(buildActivity(relaunching, false, { phase: 'may-have-started', message: 'Check T3.' })).toEqual({
             label: 'May have started',
@@ -55,6 +57,7 @@ it('does not call finished slices Implementing while the builder moves to its ne
         slices: [{ progress: 'done' }],
         threads: [{ purpose: 'build', state: 'running', currentRunning: true }],
     } as unknown as Item;
+
     expect(buildActivity(item)).toEqual({ label: 'Finishing build', running: true });
     expect(buildActivity({ ...item, buildPhase: 'full-checks' })).toEqual({ label: 'Checks', running: true });
     expect(buildActivity({ ...item, slices: [...item.slices, { progress: 'active' }] } as Item).label).toBe(
@@ -72,15 +75,20 @@ it('active delegated work counts as working after the parent run ended', () => {
         slices: [{ progress: 'active' }],
         threads: [{ purpose: 'build', state: 'done' }],
     } as unknown as Item;
+
     expect(delegatedWorkRunning(finished)).toBe(true);
     expect(buildActivity(finished)).toEqual({ label: 'Implementing', running: true });
     expect(buildActivity(finished, true).running, 'stale activity stays unavailable').toBe(false);
     expect(workingAgain({ ...finished, status: 'Verify' })).toBe(true);
+
     const ended = { ...finished, slices: [{ progress: 'done' }] } as unknown as Item;
+
     expect(delegatedWorkRunning(ended)).toBe(false);
     expect(buildActivity(ended).running).toBe(false);
+
     const childOf = (thread: object) =>
         ({ ...ended, threads: [{ purpose: 'build', state: 'done', ...thread }] }) as unknown as Item;
+
     expect(delegatedWorkRunning(childOf({ hasRunningChildren: true }))).toBe(true);
     expect(
         delegatedWorkRunning(childOf({ hasRunningChildren: true, observedAt: 'cached' })),
@@ -90,11 +98,13 @@ it('active delegated work counts as working after the parent run ended', () => {
         workingAgain({ ...childOf({ hasLiveChildren: true }), status: 'Verify' }),
         'a child waiting on you stays on the desk',
     ).toBe(false);
+
     const shaping = {
         ...ended,
         status: 'Ready',
         threads: [{ purpose: 'shape', state: 'done', hasRunningChildren: true, hasLiveChildren: true }],
     } as unknown as Item;
+
     expect(buildActivity(shaping).running, 'a shaping child is no build evidence').toBe(false);
     expect(workingAgain({ ...shaping, status: 'Ready to merge' })).toBe(false);
     expect(
@@ -109,6 +119,7 @@ it('active delegated work counts as working after the parent run ended', () => {
 
 it('a failed start leaves the row as it was', () => {
     const item = { status: 'Ready', threads: [] } as unknown as Item;
+
     expect(buildActivity(item, false, { phase: 'failed', message: 'No' })).toEqual(buildActivity(item));
 });
 
@@ -118,6 +129,7 @@ it('offers a retry only for a stopped build thread with no recorded phase', () =
         buildPhase: null,
         threads: [{ purpose: 'build', state: 'stopped' }],
     } as unknown as Item;
+
     expect(canRetryBuild(stopped)).toBe(true);
     expect(canRetryBuild({ ...stopped, buildPhase: 'plan' })).toBe(false);
     expect(canRetryBuild({ ...stopped, status: 'Review' })).toBe(false);
@@ -153,6 +165,7 @@ for (const status of ['Verify', 'Ready to merge'] as const) {
 
     it(`says ${status} when the thread is idle, asks a question, is held or can't be read`, () => {
         const recorded = { label: status, running: false };
+
         expect(buildActivity({ ...running, threads: [{ purpose: 'build', state: 'done' }] } as Item)).toEqual(recorded);
         expect(buildActivity({ ...running, threads: [{ purpose: 'build', state: 'needs you' }] } as Item)).toEqual(
             recorded,
@@ -194,6 +207,7 @@ it('counts builds against the build limit while they start, build or work again,
         failed: { build: { phase: 'failed', message: 'Refused.' } },
         shaping: { shape: { phase: 'starting' } },
     };
+
     expect(buildsAtWork({ items, startProgress }).map((i) => i.id)).toEqual([
         'starting',
         'may',

@@ -51,6 +51,7 @@ function OptionField({
     value?: string;
 }) {
     const [value, setValue] = useState(() => (choices.some((choice) => choice.value === start) ? start : ''));
+
     return (
         choices.length > 0 && (
             <PanelSection heading={label} htmlFor={`item-${name}`}>
@@ -70,33 +71,41 @@ function OptionField({
 export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kind: string; kept?: TicketOptions }) {
     const [read, setRead] = useState<TicketCreationOptions | null>(null);
     const [error, setError] = useState('');
+
     useEffect(() => {
         let current = true;
+
         void fetch(`/api/ticket-options?repo=${encodeURIComponent(repo.repo)}`)
             .then(async (response) => {
                 const result = (await response.json()) as { options?: TicketCreationOptions; error?: string };
+
                 if (!response.ok || !result.options) throw Error(result.error ?? 'Could not read issue options.');
+
                 if (current) setRead(result.options);
             })
             .catch(() => {
                 if (current) setError('Could not read issue options. You can still submit the title and description.');
             });
+
         return () => {
             current = false;
         };
     }, [repo.repo]);
+
     if (error)
         return (
             <p role="status" className={HINT}>
                 {error}
             </p>
         );
+
     if (!read)
         return (
             <p role="status" className={HINT}>
                 Reading issue options… You can submit while they load.
             </p>
         );
+
     const setup = repo.setup;
     const access = setup?.access ?? {};
     const safety = { azureReadOnly: setup?.azureReadOnly };
@@ -106,6 +115,7 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
     const labelsShown =
         !writeAccessProblem(repo.repo, 'tag-ticket', access, safety) &&
         (read.labels.length > 0 || !writeAccessProblem(repo.repo, 'manage-labels', access, safety));
+
     return (
         <div className="grid gap-3">
             {read.problems.length > 0 && (
@@ -146,6 +156,7 @@ function createIssueState(repo: RepoConfig, choice: boolean | null): { checked: 
     const effective = repo.setup ? effectiveIssueSettings(repo.setup) : null;
     const reason =
         effective?.createReason ?? (effective ? null : 'Issue access is not checked yet. Recheck access in Settings.');
+
     return { checked: !reason && (choice ?? effective?.createIssuesFromAddItem ?? false), reason };
 }
 
@@ -164,6 +175,7 @@ export function CreateIssueBox({
     const running = useEditStore((state) => state.running);
     const error = useEditStore((state) => state.errors[repo.repo]);
     const { checked, reason } = createIssueState(repo, choice);
+
     return (
         <div className="grid gap-1">
             <Checkbox
@@ -210,6 +222,7 @@ export function IssueFields({
     choice: boolean | null;
 }) {
     const { checked, reason } = createIssueState(repo, choice);
+
     return (
         <div className="border-base-300 grid gap-3 border-t pt-4">
             {checked ? (
@@ -230,6 +243,7 @@ export function IssueFields({
 /** Both forms submit exactly the optional fields currently visible. */
 export function ticketOptions(form: HTMLFormElement): TicketOptions {
     const values = new FormData(form);
+
     return {
         ...(form.querySelector('#item-labels') ? { labels: values.getAll('labels').map(String) } : {}),
         ...(values.has('newLabels') ? { newLabels: values.getAll('newLabels').map(String) } : {}),

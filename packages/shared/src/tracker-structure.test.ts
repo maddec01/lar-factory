@@ -10,15 +10,19 @@ test('managed structure round trips Markdown and HTML without changing original 
             map: '## Map\n```mermaid\nflowchart LR\nA --> B\n```\n<!-- hello -->',
         };
         const body = writeTrackerStructure(original, structure);
+
         expect(body.startsWith(original)).toBe(true);
         expect(readTrackerStructure(body)).toEqual(structure);
+
         const replaced = writeTrackerStructure(body, { ...structure, map: 'A changed map' });
+
         expect(replaced.startsWith(original)).toBe(true);
         expect(replaced.match(/lar-factory:structure/g)).toHaveLength(1);
     }
 });
 test('duplicate, malformed, excessive and newer structure blocks refuse reads and writes', () => {
     const good = writeTrackerStructure('', { version: 1, kind: 'concept' });
+
     for (const bad of [
         good + good,
         '<!-- lar-factory:structure\n{bad}\n-->',

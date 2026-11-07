@@ -98,6 +98,7 @@ export const installOverviewTargets = (snapshot: InstallSnapshot): TargetSnapsho
 /** Every current target succeeded, with no running operation, global error or Clash. */
 export const installOverviewSucceeded = (snapshot: InstallSnapshot): boolean => {
     const targets = installOverviewTargets(snapshot);
+
     return (
         !snapshot.running &&
         !snapshot.error &&

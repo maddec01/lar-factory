@@ -12,11 +12,13 @@ test('an already-applied structural schema without creation reservations upgrade
     const path = join(dir, 'work-records.db');
     const root = '11111111-1111-4111-8111-111111111111';
     const build = '22222222-2222-4222-8222-222222222222';
+
     try {
         const earlier = await openDatabase(path, { migrations: MIGRATIONS.slice(0, 10) });
         const insert = earlier.db.prepare(
             `INSERT INTO work_records(work_id,repository,kind,status,revision,created_at,updated_at,title,initial_context) VALUES (?,'team/server',?,?,1,'2026-10-31','2026-10-31',?,'Original context')`,
         );
+
         insert.run(root, 'concept', 'Shaping', 'Existing concept');
         insert.run(build, 'build', 'Queued', 'Existing build');
         earlier.db
@@ -31,7 +33,9 @@ test('an already-applied structural schema without creation reservations upgrade
             .run(build, 'brief', 'PRIVATE LOCAL BRIEF');
         earlier.db.exec('DROP TABLE tracker_creations');
         earlier.close();
+
         const upgraded = await openWorkRecords(path);
+
         try {
             expect(upgraded.read(root).status).toBe('Shaping');
             expect(upgraded.body(root, 'map')).toContain('Preserve the map.');

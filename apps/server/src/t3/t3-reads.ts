@@ -78,41 +78,55 @@ export async function readT3Stats(
     { now, threadIds, items = [], trace = createReadTrace() }: StatsReadOptions,
 ): Promise<StatsRead> {
     if (!existsSync(sources.db)) return nothingRead(failedRead);
+
     // The inputs take a turn of their own, apart from the thread reads that started this read.
     await trace.pause();
+
     try {
         loopTrace.span('t3 db check', () => readT3Db(sources.db, () => {}));
         trace.step('inputs');
+
         const inputs = await protocolStatsInputs(threadIds, trace.pause);
+
         if (!inputs) return nothingRead(loadingRead);
+
         let stats: ItemStatsReader;
+
         try {
             stats = await itemStats(sources, inputs.rows, now, { sessions: inputs.sessions, items, trace });
         } catch {
             return nothingRead(failedRead);
         }
+
         const states = new Map<string, NonNullable<Item['usageState']>>();
         const usage: T3Reads['usage'] = (ids) => {
             const key = threadsKey(ids);
             let state = states.get(key);
+
             if (!state) {
                 const reads = inputs.familyReads(ids);
+
                 state = reads.includes('failed') ? 'failed' : reads.includes('never') ? 'loading' : 'current';
                 states.set(key, state);
             }
+
             return state;
         };
         let counted = 0;
+
         for (const ids of items) {
             usage(ids);
+
             if (++counted * ITEM_WORK >= AGGREGATION_WORK_PER_CHUNK) {
                 counted = 0;
                 await trace.pause();
             }
         }
+
         return {
             stats: (ids) => {
                 const state = usage(ids);
+
                 return state === 'failed' ? 'unavailable' : state === 'loading' ? undefined : (stats(ids) ?? undefined);
             },
             usage,

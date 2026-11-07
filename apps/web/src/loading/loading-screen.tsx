@@ -33,18 +33,26 @@ type Phase = 'showing' | 'leaving' | 'gone';
 function useScreen(settled: boolean): { phase: Phase; drawn: boolean } {
     const [drawn, setDrawn] = useState(() => drawnByDesktop() || reducedMotion());
     const [phase, setPhase] = useState<Phase>('showing');
+
     useEffect(() => {
         if (drawn) return;
+
         const timer = setTimeout(() => setDrawn(true), DRAW_MS);
+
         return () => clearTimeout(timer);
     }, [drawn]);
     useEffect(() => {
         if (!settled) return setPhase('showing');
+
         if (!drawn) return;
+
         setPhase('leaving');
+
         const timer = setTimeout(() => setPhase('gone'), EXIT_MS);
+
         return () => clearTimeout(timer);
     }, [settled, drawn]);
+
     return { phase, drawn };
 }
 
@@ -65,12 +73,14 @@ interface Lines {
  */
 function useLines(text: string): Lines {
     const [lines, setLines] = useState<Lines>({ current: { id: 0, text }, rolled: false });
+
     // A change of text shows in the same render, so the old line never paints beside the new one.
     if (lines.current.text !== text) {
         if (lines.leaving) {
             setLines({ ...lines, current: { id: lines.current.id, text } });
         } else {
             const roll = !reducedMotion();
+
             setLines({
                 current: { id: lines.current.id + 1, text },
                 ...(roll && { leaving: lines.current }),
@@ -78,12 +88,17 @@ function useLines(text: string): Lines {
             });
         }
     }
+
     const leaving = lines.leaving;
+
     useEffect(() => {
         if (!leaving) return;
+
         const timer = setTimeout(() => setLines((now) => ({ ...now, leaving: undefined })), ROLL_MS);
+
         return () => clearTimeout(timer);
     }, [leaving]);
+
     return lines;
 }
 
@@ -111,8 +126,11 @@ function Mark() {
 function useInertBoard(covered: boolean) {
     useLayoutEffect(() => {
         const board = document.getElementById('app');
+
         if (!covered || !board) return;
+
         board.setAttribute('inert', '');
+
         return () => board.removeAttribute('inert');
     }, [covered]);
 }
@@ -122,9 +140,12 @@ export function LoadingScreen() {
     const loaded = useBoardStore((state) => state.loaded);
     const { phase, drawn } = useScreen(loaded);
     const { current, leaving, rolled } = useLines(stepText(read));
+
     useInertBoard(phase !== 'gone');
+
     const installs = useInstallStore((state) => state.snapshot?.installs);
     const follow = useInstallStore((state) => state.follow);
+
     useEffect(follow, [follow]);
     useEffect(() => {
         if (phase === 'gone' && installs)
@@ -132,7 +153,9 @@ export function LoadingScreen() {
                 ?.boardReady()
                 .catch(() => {});
     }, [phase, installs]);
+
     if (phase === 'gone') return null;
+
     // In the body, beside the board's root, so the board can be inert without the screen.
     return createPortal(
         <div className={`loading-screen ${drawn ? 'is-drawn' : ''} ${phase === 'leaving' ? 'is-leaving' : ''}`}>

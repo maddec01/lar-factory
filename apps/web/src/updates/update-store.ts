@@ -47,22 +47,27 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
     pending: false,
     follow: () => {
         const bridge = boardApp();
+
         if (!bridge) return () => {};
+
         let pushed = false;
         const stop = bridge.onUpdateState((state) => {
             pushed = true;
             set({ state, ...(endsInstall(state) && { installing: false }) });
         });
+
         // A push that lands before the read answers is newer, so the read doesn't overwrite it.
         void bridge.getUpdateState().then(
             (state) => pushed || set({ state }),
             () => {},
         );
+
         return stop;
     },
     check: async () => {
         try {
             const result = await boardApp()!.checkForUpdate();
+
             if (!result.checked) {
                 toastUpdateError(
                     'Could not check for updates',
@@ -76,9 +81,13 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
     download: async () => {
         try {
             const result = await boardApp()!.downloadUpdate();
+
             if (!result.accepted) showUpdateNotDownloadedToast();
+
             if (result.completed) showUpdateDownloadedToast();
+
             const actionError = getUpdateActionError(result);
+
             if (actionError) toastUpdateError('Could not download update', actionError);
         } catch (error) {
             toastUpdateError('Could not start update download', errorMessage(error, 'An unexpected error occurred.'));
@@ -86,26 +95,36 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
     },
     install: async () => {
         const { state, installing } = get();
+
         if (installing || !state) return;
+
         try {
             if (!(await boardApp()!.confirmRestart(getUpdateInstallConfirmationMessage(state)))) return;
         } catch (error) {
             toastUpdateError('Could not confirm update', errorMessage(error, 'Update confirmation failed.'));
+
             return;
         }
+
         set({ installing: true });
+
         try {
             // A successful install quits the app, so the answer only comes when it didn't take or failed.
             const result = await boardApp()!.installUpdate();
+
             if (!result.accepted) {
                 set({ installing: false });
                 // Deliberately the downloaded toast, as T3's installLocalUpdate shows showDesktopUpdateDownloadedToast for a
                 // refused install (SidebarUpdatePill.tsx at 9a391eb): the update is still there to install.
                 showUpdateDownloadedToast();
+
                 return;
             }
+
             if (endsInstall(result.state)) set({ installing: false });
+
             const actionError = getUpdateActionError(result);
+
             if (actionError) toastUpdateError('Could not install update', actionError);
         } catch (error) {
             set({ installing: false });
@@ -115,8 +134,11 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
     run: async () => {
         const { state, pending, installing } = get();
         const action = state ? resolveUpdateButtonAction(state) : 'none';
+
         if (pending || installing || action === 'none') return;
+
         set({ pending: true });
+
         try {
             await (action === 'download' ? get().download() : get().install());
         } finally {

@@ -6,14 +6,19 @@ import type { ConceptMap, EndToEndCheck } from './model.ts';
 function sections(body: string): Map<string, string[]> {
     const found = new Map<string, string[]>();
     let lines: string[] | null = null;
+
     for (const line of body.split(/\r?\n/)) {
         const heading = /^##\s+(.+?)\s*$/.exec(line);
+
         if (heading) {
             const name = heading[1]!.toLowerCase();
+
             lines = found.has(name) ? null : [];
+
             if (lines) found.set(name, lines);
         } else lines?.push(line);
     }
+
     return found;
 }
 
@@ -29,8 +34,11 @@ const STEP = /^\d+[.)]\s+(.+)$/;
 
 function paragraph(lines: string[] = []): string {
     const start = lines.findIndex((l) => l.trim());
+
     if (start < 0) return '';
+
     const end = lines.findIndex((l, i) => i > start && !l.trim());
+
     return lines
         .slice(start, end < 0 ? undefined : end)
         .map((l) => l.trim())
@@ -41,15 +49,19 @@ function paragraph(lines: string[] = []): string {
 function endToEndCheck(lines: string[]): EndToEndCheck {
     const trimmed = lines.map((l) => l.trim());
     const first = trimmed.find((l) => l) ?? '';
+
     return { title: STEP.test(first) ? '' : first, steps: matches(trimmed, STEP) };
 }
 
 /** The lines outside fenced code blocks, so a Mermaid flowchart's lines are left out. */
 function unfenced(lines: string[] = []): string[] {
     let fenced = false;
+
     return lines.filter((line) => {
         if (!/^\s*```/.test(line)) return !fenced;
+
         fenced = !fenced;
+
         return false;
     });
 }
@@ -66,8 +78,12 @@ export function parseConceptMap(body: string): ConceptMap {
         fog: bullets(found.get('fog')),
     };
     const check = found.get('end-to-end check');
+
     if (check) map.check = endToEndCheck(check);
+
     const dependencies = bullets(unfenced(found.get('map')));
+
     if (dependencies.length) map.dependencies = dependencies;
+
     return map;
 }

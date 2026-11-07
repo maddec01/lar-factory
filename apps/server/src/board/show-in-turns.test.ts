@@ -14,8 +14,10 @@ function heldTurn() {
         new Promise<void>((resolve) => {
             pass = resolve;
         });
+
     return { turn, pass: () => pass() };
 }
+
 const settle = () =>
     new Promise<void>((resolve) => {
         setImmediate(resolve);
@@ -34,6 +36,7 @@ test('the read and the threads take separate turns, and the board shows the whol
         (items) => board.applyRead(items, board.revision(), (read) => read.map((i) => (enriched.push(i.id), i))),
         turn,
     );
+
     await settle();
     // Between the turns, the board still shows the last read whole, and no thread was read.
     expect(board.snapshot().items.map((i) => i.status)).toEqual(['Ready', 'Ready']);
@@ -56,6 +59,7 @@ test('a read that reaches the board between the turns is read again in the showi
         show,
         turn,
     );
+
     await settle();
     // A command moves the work and shows the records at once, while the older read waits for its turn.
     records = [item('a', 'In progress')];
@@ -69,6 +73,7 @@ test('with nothing to read again, the newer read stays and the older one is drop
     const board = createBoardState({ items: [item('a', 'Ready')] } as unknown as BoardData);
     const show = (items: Item[]) => board.applyRead(items, board.revision(), (read) => read);
     const applied: string[] = [];
+
     await showInTurns(
         board,
         async () => [item('a', 'Ready')],

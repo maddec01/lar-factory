@@ -8,12 +8,15 @@ import { readOnboardedConfigs, readRepositorySetups, changeRepositorySettings } 
 
 async function folder(t: TestContext) {
     const dir = await mkdtemp(join(tmpdir(), 'local-settings-'));
+
     t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
     return dir;
 }
 
 test('board reads only local overrides and makes no provider calls', async (t) => {
     const dir = await folder(t);
+
     await writeFile(
         join(dir, 'repository-settings.json'),
         JSON.stringify({
@@ -33,6 +36,7 @@ test('board reads only local overrides and makes no provider calls', async (t) =
             ],
         }),
     );
+
     let calls = 0;
     const result = await readOnboardedConfigs(
         [{ repo: 'team/app' }],
@@ -42,6 +46,7 @@ test('board reads only local overrides and makes no provider calls', async (t) =
         },
         dir,
     );
+
     expect(calls).toBe(0);
     expect(result.problems).toEqual([]);
     expect(result.setups[0]).toMatchObject({ role: 'Application', labels: [], skills: ['test'], structureSync: true });
@@ -51,6 +56,7 @@ test('board reads only local overrides and makes no provider calls', async (t) =
 
 test('local settings validate values and reset to factory defaults', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('team/app', null, dir);
     expect(
         await changeRepositorySettings({ repo: 'team/app', change: 'override', key: 'role', value: 'App' }, dir),
@@ -69,6 +75,7 @@ test('local settings validate values and reset to factory defaults', async (t) =
 
 test('Settings persists issue preferences independently and rejects invalid values', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('team/app', null, dir);
     for (const key of ['createIssuesFromAddItem', 'createIssuesFromRetro', 'writeRefinedSpec'] as const) {
         expect(readRepositorySetups(dir)[0]?.[key]).toBe(true);
@@ -90,9 +97,12 @@ test('Settings persists issue preferences independently and rejects invalid valu
 
 test('Azure read-only is exposed for this session without changing saved choices or GitHub', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('organization/project/repository', null, dir);
     saveOnboarded('team/app', null, dir);
+
     const before = await readFile(join(dir, 'repository-settings.json'), 'utf8');
+
     vi.stubEnv('LAR_FACTORY_AZURE_READ_ONLY', '1');
     t.onTestFinished(() => {
         vi.unstubAllEnvs();
@@ -106,6 +116,7 @@ test('Azure read-only is exposed for this session without changing saved choices
 
 test('legacy private domain docs read as off and save as on or off', async (t) => {
     const dir = await folder(t);
+
     await writeFile(
         join(dir, 'repository-settings.json'),
         JSON.stringify({
@@ -122,6 +133,7 @@ test('legacy private domain docs read as off and save as on or off', async (t) =
 
 test('changing docs applies directly and leaves no acceptance gate', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('team/app', null, dir);
     await changeRepositorySettings(
         {
@@ -140,9 +152,12 @@ test('changing docs applies directly and leaves no acceptance gate', async (t) =
 
 test('stale publication settings requests preserve the complete settings file', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('team/app', null, dir);
+
     const path = join(dir, 'repository-settings.json');
     const before = await readFile(path, 'utf8');
+
     for (const value of [false, true]) {
         expect(
             await changeRepositorySettings({ repo: 'team/app', change: 'structure-sync', value }, dir),
@@ -153,6 +168,7 @@ test('stale publication settings requests preserve the complete settings file', 
 
 test('vocabulary rejects malformed mappings before provider reads', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('team/app', null, dir);
     for (const value of [null, {}, { type: null, labels: [''] }, { type: null, labels: [], extra: true }]) {
         expect(
@@ -164,7 +180,9 @@ test('vocabulary rejects malformed mappings before provider reads', async (t) =>
 
 test('vocabulary discovery reads existing terms and saving requires field access', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('team/app', null, dir);
+
     const reads = {
         github: async (path: string) =>
             path === 'repos/team/app' ? { owner: { type: 'Organization' } } : [[{ name: 'bug' }]],
@@ -173,6 +191,7 @@ test('vocabulary discovery reads existing terms and saving requires field access
         },
     };
     const before = await readFile(join(dir, 'repository-settings.json'), 'utf8');
+
     expect(
         await changeRepositorySettings({ repo: 'team/app', change: 'discover-vocabulary' }, dir, reads),
     ).toMatchObject({ discovery: { labels: { state: 'available', choices: ['bug'] } } });
@@ -195,9 +214,13 @@ test('vocabulary discovery reads existing terms and saving requires field access
 
 test('Settings refuses a typed managed name with the reason, even when the tracker has that label', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('team/app', null, dir);
+
     const { replaceAccess } = await import('@lar-factory/shared/repository-settings');
+
     replaceAccess('team/app', { 'tag-ticket': 'allowed', 'manage-labels': 'allowed' }, dir);
+
     const reads = {
         github: async (path: string) =>
             path.includes('/labels') ? [{ name: 'linked-work' }] : { owner: { type: 'User' } },
@@ -217,9 +240,11 @@ test('Settings refuses a typed managed name with the reason, even when the track
             reads,
             async (_repo, label) => {
                 created.push(label);
+
                 return label;
             },
         );
+
     expect(await save(' Linked-Work ')).toEqual({
         status: 400,
         error: "Linked-Work is reserved for the factory's saved links.",
@@ -231,9 +256,13 @@ test('Settings refuses a typed managed name with the reason, even when the track
 
 test('Settings persists created labels only after provider success', async (t) => {
     const dir = await folder(t);
+
     saveOnboarded('team/app', null, dir);
+
     const { replaceAccess } = await import('@lar-factory/shared/repository-settings');
+
     replaceAccess('team/app', { 'tag-ticket': 'allowed', 'manage-labels': 'allowed' }, dir);
+
     const reads = {
         github: async (path: string) => (path.includes('/labels') ? [] : { owner: { type: 'User' } }),
         azure: async () => ({ value: [] }),
@@ -245,6 +274,7 @@ test('Settings persists created labels only after provider success', async (t) =
         value: { type: null, labels: [] },
         newLabels: ['triage'],
     };
+
     expect(
         await changeRepositorySettings(request, dir, reads, async () => {
             throw new Error('Label creation denied');

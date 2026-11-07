@@ -87,12 +87,14 @@ function stubBridge(setResult: InstallOperationResult = { snapshot: listed }) {
         getInstallState: () => (mounted ? reads() : ((mounted = true), Promise.resolve(listed))),
         onInstallState: vi.fn((listener: (snapshot: InstallSnapshot) => void) => {
             push = listener;
+
             return () => {
                 push = () => {};
             };
         }),
         setTargetTick: vi.fn(async (_path: string, _ticked: boolean) => setResult),
     });
+
     return { ...bridge, getInstallState: reads, push: (snapshot: InstallSnapshot) => settle(() => push(snapshot)) };
 }
 
@@ -194,7 +196,9 @@ test('a search that matches nothing says so in the section list and keeps the op
 
 test('Close returns to the board as it was, and Settings opens again on the same section', async () => {
     await mountPage();
+
     const { useScopeStore } = await import('../board/scope-store.ts');
+
     await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
     await settle(() => settingsButton()!.click());
     await settle(() => section('Diagnostics').click());
@@ -209,7 +213,9 @@ test('Close returns to the board as it was, and Settings opens again on the same
 
 test('the modal takes clicks over the title bar in the board app, rather than dragging the window', async () => {
     await open('General');
+
     const { noDrag } = addStylesheet();
+
     expect(noDrag(modal()!)).toBe(true);
     expect(noDrag($('[data-slot="modal-overlay"]')!)).toBe(true);
 });
@@ -250,6 +256,7 @@ test('Projects only shows each repository with its provider and item source', as
         },
         { repo: 'contoso/Fabrikam/lar-web', role: 'Web', items: 'azure-board' as const, team: 'Web Team', labels: [] },
     ];
+
     await open('Projects', { ...sample, repos });
     expect(groups()).toEqual([['Projects', repos.map((r) => `repo-${r.repo}`)]]);
     expect(row('gh')).toBeNull();
@@ -273,9 +280,12 @@ test('onboarded and onboarding repository rows show the project icon or toned in
             },
         ],
     };
+
     serve(data, [project('lar-web', { onBoard: true })]);
     await open('Projects', data);
+
     const icon = (id: string) => row(id).querySelector('.settings-row-title [data-project-icon]');
+
     expect(text(icon(`repo-${sample.repos[0]!.repo}`))).toBe('🚀');
     expect(text(icon(`repo-${sample.repos[1]!.repo}`))).toBe('L');
     expect(text(icon('repo-maddec01/lar-web'))).toBe('L');
@@ -285,13 +295,16 @@ test('onboarded and onboarding repository rows show the project icon or toned in
 
 test('a Project with a setup offers its page, an unread one has none, and Add Project opens onboarding over Settings', async () => {
     const board = { ...sample, repos: [{ ...sample.repos[0]!, setup: {} as RepositorySetup }, sample.repos[1]!] };
+
     serve(board, [project('lar-web')]);
     await open('Projects', board);
     expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
         ['Open Project', false],
         ['Add Project', false],
     ]);
+
     const add = $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === 'Add Project')!;
+
     // A click focuses the button it presses.
     add.focus();
     await settle(() => add.click());
@@ -327,6 +340,7 @@ test('a repository still onboarding is listed with its provider and its step, an
             },
         ],
     };
+
     serve(data, [project('lar-web', { onBoard: true })]);
     await open('Projects', data);
     expect(groups()[0]).toEqual([
@@ -392,6 +406,7 @@ test('Integrations shows provider logins and the fix for missing access tools', 
 
 test('Integrations keeps both providers available while Diagnostics omits unused tools', async () => {
     const { gh: _, ...withoutGh } = toolChecks({ az: { result: 'ok', version: '2.67.0' } });
+
     await open('Integrations', { ...sample, tools: withoutGh, toolProgress: { checking: [], skipped: ['gh'] } });
     expect(groups()[0]).toEqual(['Issue trackers', ['gh', 'az']]);
     expect(text(row('gh').querySelector('.tool-state'))).toBe('● Not checked');
@@ -407,6 +422,7 @@ test('Settings shows gh and az Checking while their checks run, though other che
         tools: landed,
         toolProgress: { checking: ['gh', 't3', 'jq', 'curl', 'az'] as CheckedTool[], skipped: [] },
     };
+
     await open('Integrations', data);
     expect(groups()[0]).toEqual(['Issue trackers', ['gh', 'az']]);
     expect(['gh', 'az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● Checking', '● Checking']);
@@ -539,12 +555,16 @@ test('Skills credits each bundled skill and checklist, with a link to its source
         ],
     });
     expect($$('.settings-group h3').map(text)).toContain('Bundled skills');
+
     const rows = ['bundled-lar-work', 'bundled-references/security-checklist.md'].map(row);
+
     expect(rows.map((r) => [text(r.querySelector('.font-medium')), text(r.querySelector('.text-xs'))])).toEqual([
         ['lar-work', 'Lar · MIT'],
         ['references/security-checklist.md', 'Addy Osmani · MIT'],
     ]);
+
     const link = rows[1]!.querySelector('a')!;
+
     expect([text(link).trim(), link.getAttribute('aria-label'), link.getAttribute('href'), link.target]).toEqual([
         'Source',
         'references/security-checklist.md source',
@@ -571,6 +591,7 @@ const restoredAt = '2026-10-26T09:30:00.000Z';
 const states = (...names: string[]) =>
     names.map((name) => {
         const state = row(`bundled-${name}`).querySelector('.tool-state');
+
         return state && [text(state), state.closest('[title]')?.getAttribute('title') ?? null];
     });
 
@@ -606,6 +627,7 @@ test("a blocked skill's row says which paths block it, where each leaves it miss
         { place: 'profile', profile: '.claude', path: '/home/.claude/skills/grill' },
         { place: 'antigravity', path: '/home/.gemini/config/skills/grill' },
     ];
+
     await open('Skills', {
         ...sample,
         bundledSkills: [
@@ -628,6 +650,7 @@ test('a skill only Antigravity or a profile blocks says to move the path away, o
         name,
         status: { state: 'blocked' as const, paths },
     });
+
     await open('Skills', {
         ...sample,
         bundledSkills: [
@@ -670,6 +693,7 @@ test("in the board app, a Lar skill's last update is the app's version", async (
 
 test('a Date or restore from another year shows its year', async () => {
     const lastYear = new Date().getUTCFullYear() - 1;
+
     await open('Skills', {
         ...sample,
         bundledSkills: [
@@ -693,7 +717,9 @@ test('Skills has no Skill sync group', async () => {
 
 test("Skills says so in one row when it couldn't read the bundled skills", async () => {
     await open('Skills', { ...sample, bundledSkills: [] });
+
     const group = $$('.settings-group').find((g) => text(g.querySelector('h3')) === 'Bundled skills')!;
+
     expect(
         [...group.querySelectorAll<HTMLElement>('.settings-row')].map((r) => [
             r.dataset.row,
@@ -709,6 +735,7 @@ const profileTicks = () => ['~/.claude/skills', '~/.claude-work/skills'].map((pa
 
 test('Skills lists every Install target with its tick, and a locked one says why it stays ticked', async () => {
     const bridge = stubBridge();
+
     await open();
     expect(bridge.getInstallState).toHaveBeenCalledOnce();
     expect(switches().map((s) => [s.getAttribute('aria-label'), ticked(s), s.disabled])).toEqual([
@@ -722,6 +749,7 @@ test('Skills lists every Install target with its tick, and a locked one says why
 
 test("a target T3 Code's instances read stays ticked and says so", async () => {
     const bridge = stubBridge();
+
     bridge.getInstallState.mockResolvedValueOnce({
         ...listed,
         targets: [targetAt('~/.claude/skills', true, { locked: true, instances: ['claude'] })],
@@ -733,6 +761,7 @@ test("a target T3 Code's instances read stays ticked and says so", async () => {
 
 test("a T3 target whose Claude home doesn't exist says it isn't installed", async () => {
     const bridge = stubBridge();
+
     bridge.getInstallState.mockResolvedValueOnce({
         ...listed,
         targets: [targetAt('~/.claude-work/skills', false, { locked: true, instances: ['work'], homeMissing: true })],
@@ -747,9 +776,12 @@ test("a T3 target whose Claude home doesn't exist says it isn't installed", asyn
 test('a long target path wraps beside its switch, which keeps its size', async () => {
     const long = `~/${'very-long-folder-name/'.repeat(12)}skills`;
     const bridge = stubBridge();
+
     bridge.getInstallState.mockResolvedValueOnce({ ...listed, targets: [targetAt(long, true)] });
     await open();
+
     const title = row(`target-${long}`).querySelector('.settings-row-title')!;
+
     expect(title.classList.contains('truncate')).toBe(false);
     expect([...title.classList]).toEqual(expect.arrayContaining(['min-w-0', 'wrap-anywhere']));
     expect(switchOf(long).closest('.settings-row-control')!.classList.contains('max-w-full')).toBe(true);
@@ -757,6 +789,7 @@ test('a long target path wraps beside its switch, which keeps its size', async (
 
 test('ticking a target installs it and shows the new ticks', async () => {
     const bridge = stubBridge({ snapshot: bothTicked });
+
     await open();
     await settle(() => switchOf('~/.claude-work/skills').click());
     expect(bridge.setTargetTick).toHaveBeenCalledWith('~/.claude-work/skills', true);
@@ -767,6 +800,7 @@ test('ticking a target installs it and shows the new ticks', async () => {
 
 test('Settings follows each new install state while open', async () => {
     const bridge = stubBridge();
+
     await open();
     await bridge.push(bothTicked);
     expect(profileTicks()).toEqual([true, true]);
@@ -780,6 +814,7 @@ test('Settings follows each new install state while open', async () => {
 test('focus stays on a switch while its change runs and after', async () => {
     const bridge = stubBridge();
     let finish!: (result: InstallOperationResult) => void;
+
     bridge.setTargetTick.mockImplementationOnce(
         () =>
             new Promise((resolve) => {
@@ -787,7 +822,9 @@ test('focus stays on a switch while its change runs and after', async () => {
             }),
     );
     await open();
+
     const box = switchOf('~/.claude-work/skills');
+
     box.focus();
     await settle(() => box.click());
     // A browser blurs a control that turns disabled; jsdom doesn't, so check it stays enabled too.
@@ -804,6 +841,7 @@ test('focus stays on a switch while its change runs and after', async () => {
 
 test('unticking a Claude target removes its links', async () => {
     const bridge = stubBridge({ snapshot: snapshotOf(false, false), removed: { links: ['tdd'], checklists: true } });
+
     await open();
     await settle(() => switchOf('~/.claude/skills').click());
     expect(bridge.setTargetTick).toHaveBeenCalledWith('~/.claude/skills', false);
@@ -813,6 +851,7 @@ test('unticking a Claude target removes its links', async () => {
 
 test('unticking says only what it removed', async () => {
     const bridge = stubBridge({ snapshot: snapshotOf(false, true), removed: { links: ['tdd'], checklists: false } });
+
     bridge.getInstallState.mockResolvedValueOnce(bothTicked);
     await open();
     await settle(() => switchOf('~/.claude/skills').click());
@@ -836,6 +875,7 @@ test('unticking a copy target says its copies stay', async () => {
         release: '0.2.0',
         skills: [{ name: 'lar-build', state: 'installed' }],
     });
+
     bridge.getInstallState.mockResolvedValueOnce({ ...listed, targets: [extra] });
     bridge.setTargetTick.mockResolvedValueOnce({
         snapshot: { ...listed, targets: [{ ...extra, active: false }] },
@@ -879,6 +919,7 @@ test("a target's result shows under the targets only", async () => {
 
 test('a bridge that throws shows the error', async () => {
     const bridge = stubBridge();
+
     bridge.getInstallState.mockRejectedValueOnce(new Error('home is gone'));
     await open();
     expect($('.settings-row[data-row="target-~/.claude/skills"]')).toBeNull();
@@ -887,6 +928,7 @@ test('a bridge that throws shows the error', async () => {
 
 test("a state that couldn't read the targets shows its error", async () => {
     const bridge = stubBridge();
+
     bridge.getInstallState.mockResolvedValueOnce({
         ...listed,
         targets: [],
@@ -899,6 +941,7 @@ test("a state that couldn't read the targets shows its error", async () => {
 test('Skills says Loading until the state arrives, also when opened again', async () => {
     const bridge = stubBridge();
     let finish!: (snapshot: InstallSnapshot) => void;
+
     bridge.getInstallState.mockImplementationOnce(
         () =>
             new Promise((resolve) => {
@@ -928,6 +971,7 @@ test('Skills says Loading until the state arrives, also when opened again', asyn
 
 test('before the first install the switches show disabled with the reason, and turn on once it finishes', async () => {
     const bridge = stubBridge();
+
     bridge.getInstallState.mockResolvedValueOnce({ ...listed, installed: false });
     await open();
     expect(text(body())).toContain("Lar Factory hasn't installed its skills yet");
@@ -945,6 +989,7 @@ test('before the first install the switches show disabled with the reason, and t
 
 test('a run that installs nothing says how to start one that does, with the switches disabled', async () => {
     const bridge = stubBridge();
+
     bridge.getInstallState.mockResolvedValueOnce({ ...listed, installs: false });
     await open();
     expect(text(body())).toContain('Start it with --install-skills');
@@ -975,6 +1020,7 @@ describe('updates', () => {
             getUpdateState: vi.fn(async () => start),
             onUpdateState: vi.fn((listener: (state: UpdateState) => void) => {
                 push = listener;
+
                 return () => {};
             }),
             setUpdateChannel: vi.fn(async (channel: UpdateChannel) => ({ ...start, channel })),
@@ -983,6 +1029,7 @@ describe('updates', () => {
             installUpdate: vi.fn(async () => ({ accepted: true, completed: false, state: start })),
             confirmRestart: answerRestart(true),
         });
+
         return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
     }
 
@@ -1008,6 +1055,7 @@ describe('updates', () => {
 
     test('choosing a channel switches the app to it and shows what its check found', async () => {
         const { bridge, push } = stubChannel();
+
         await open('Updates');
         await pick('latest');
         expect(bridge.setUpdateChannel).toHaveBeenCalledWith('latest');
@@ -1026,6 +1074,7 @@ describe('updates', () => {
 
     test('Check now asks the app to check', async () => {
         const { bridge } = stubChannel();
+
         await open('Updates');
         expect(checkNow().disabled).toBe(false);
         await settle(() => checkNow().click());
@@ -1035,6 +1084,7 @@ describe('updates', () => {
     test('a second choice waits until the first switch ends', async () => {
         const { bridge } = stubChannel();
         let finish!: (state: UpdateState) => void;
+
         bridge.setUpdateChannel.mockImplementationOnce(
             () =>
                 new Promise((resolve) => {
@@ -1066,6 +1116,7 @@ describe('updates', () => {
             downloadedVersion: null,
             downloadPercent: 40,
         });
+
         bridge.installUpdate = vi.fn(() => new Promise<never>(() => {}));
         bridge.confirmRestart = answerRestart(true);
         await open('Updates');
@@ -1082,6 +1133,7 @@ describe('updates', () => {
 
     test('a refused switch keeps the old channel and says why', async () => {
         const { bridge } = stubChannel();
+
         bridge.setUpdateChannel.mockRejectedValueOnce(
             new Error('Cannot change the update channel to latest while an update download is in progress.'),
         );
@@ -1102,6 +1154,7 @@ describe('updates', () => {
 
         test('an available update says so, and Download downloads it', async () => {
             const { bridge } = stubChannel(available);
+
             await open('Updates');
             expect([status(), text(pill())]).toEqual([`${next} is available.`, 'Update available']);
             expect($('.settings-body .check-now')).toBeNull();
@@ -1123,6 +1176,7 @@ describe('updates', () => {
                 downloadedVersion: next,
                 downloadPercent: 100,
             });
+
             await open('Updates');
             expect([status(), text(pill())]).toEqual([`${next} is ready to install.`, 'Restart to update']);
             expect(text(action())).toBe('Restart to update');
@@ -1138,6 +1192,7 @@ describe('updates', () => {
                 downloadedVersion: next,
                 downloadPercent: 100,
             });
+
             bridge.installUpdate.mockImplementation(() => new Promise<never>(() => {}));
             await open('Updates');
             await settle(() => action()!.click());
@@ -1154,6 +1209,7 @@ describe('updates', () => {
             canRetry: true,
         };
         const { push } = stubChannel({ ...available, errorContext: 'download', message: 'net::ERR_TIMED_OUT' });
+
         await open('Updates');
         expect(status()).toBe("Couldn't download 0.2.0-nightly.20261024.42: net::ERR_TIMED_OUT");
         await push({
@@ -1196,6 +1252,7 @@ test('Diagnostics names the address serving this board', async () => {
 test('dialog preferences default off and persist when Settings reopens', async () => {
     localStorage.removeItem('lar-board:match-list-size');
     localStorage.removeItem('lar-board:open-list-expanded');
+
     try {
         await open('General');
         expect(switches().map(ticked)).toEqual([false, false]);
@@ -1214,7 +1271,9 @@ test('dialog preferences default off and persist when Settings reopens', async (
 
 test('Skills shows live work and recovery without counting blocked skills as installed', async () => {
     const bridge = stubBridge();
+
     await open();
+
     const work = targetAt('~/.agents/skills', true, {
         kind: 'agents',
         release: '0.1.0',
@@ -1226,10 +1285,13 @@ test('Skills shows live work and recovery without counting blocked skills as ins
             { name: 'lar-shape', state: 'installing' },
         ],
     });
+
     await bridge.push({ ...listed, running: 'launch', targets: [work] });
     expect(text(row('target-~/.agents/skills'))).toContain('Release 0.1.0');
     expect(text(row('target-~/.agents/skills'))).toContain('lar-shape: Installing');
+
     const progress = row('target-~/.agents/skills').querySelector('progress')!;
+
     expect([progress.value, progress.max]).toEqual([1, 2]);
     await bridge.push({
         ...listed,
@@ -1258,6 +1320,7 @@ test('Skills shows live work and recovery without counting blocked skills as ins
 test('a push before the initial Settings read wins and uses the shared subscription', async () => {
     const bridge = stubBridge();
     let finish!: (snapshot: InstallSnapshot) => void;
+
     bridge.getInstallState.mockImplementationOnce(
         () =>
             new Promise((resolve) => {
@@ -1279,6 +1342,7 @@ test('a push before the initial Settings read wins and uses the shared subscript
 test('a delayed read failure cannot discard a newer pushed snapshot', async () => {
     const bridge = stubBridge();
     let fail!: (cause: Error) => void;
+
     bridge.getInstallState.mockImplementationOnce(
         () =>
             new Promise((_resolve, reject) => {
@@ -1294,6 +1358,7 @@ test('a delayed read failure cannot discard a newer pushed snapshot', async () =
 
 test('Skills groups shared readers and custom homes with disabled badges and locked ticks', async () => {
     const bridge = stubBridge();
+
     bridge.getInstallState.mockResolvedValueOnce({
         ...listed,
         discovery: 'available',
@@ -1314,10 +1379,14 @@ test('Skills groups shared readers and custom homes with disabled badges and loc
         ],
     });
     await open();
+
     const shared = row('target-~/.agents/skills');
+
     expect($$('.settings-row[data-row="target-~/.agents/skills"]')).toHaveLength(1);
     expect(text(shared)).toContain('Codex personal');
+
     const disabled = shared.querySelector('[data-reader="cursor"]')!;
+
     expect(disabled.getAttribute('aria-label')).toContain('Disabled in T3 Code');
     expect(disabled.className).toContain('text-(--muted-foreground)');
     expect(switchOf('~/.agents/skills').disabled).toBe(true);
@@ -1330,6 +1399,7 @@ test('Skills groups shared readers and custom homes with disabled badges and loc
 
 test('Skills explains discovery waiting, unavailable and completed without provider targets', async () => {
     const bridge = stubBridge();
+
     bridge.getInstallState.mockResolvedValueOnce({ ...listed, discovery: 'waiting' });
     await open();
     expect(text(body())).toContain('Waiting for T3 Code to list its provider instances');
@@ -1357,8 +1427,11 @@ test('a failed first install can retry globally in Settings after dismissal with
             error: 'Still no permission',
         })),
     });
+
     await open();
+
     const retry = () => $<HTMLButtonElement>('.settings-body [data-retry-install]')!;
+
     expect(retry()).not.toBeNull();
     expect(retry().getAttribute('aria-label')).toContain('all active targets');
     await settle(() => retry().click());
@@ -1392,6 +1465,7 @@ test('dismissed Drift stays in Settings with failed Replace and later recovery',
         getInstallState: vi.fn(async () => drifted),
         onInstallState: (listener: (next: InstallSnapshot) => void) => {
             pushInstall = listener;
+
             return () => {};
         },
         replaceDrift: vi.fn(async (): Promise<InstallOperationResult> => ({
@@ -1399,19 +1473,25 @@ test('dismissed Drift stays in Settings with failed Replace and later recovery',
             error: 'EACCES: ~/.agents/skills/lar-build',
         })),
     });
+
     await open();
+
     const warning = () => $('[data-warning="drift"]')?.closest('[data-slot="toast"]');
+
     expect(warning()).toBeUndefined();
     await settle(() => pushInstall({ ...drifted }));
     await settle(() => section('General').click());
     await settle(() => section('Skills').click());
     expect(warning()).toBeUndefined();
     expect(text(row('target-~/.agents/skills'))).toContain('lar-build: Changed');
+
     const replace = () => row('target-~/.agents/skills').querySelector<HTMLButtonElement>('[data-replace-drift]')!;
+
     await settle(() => replace().click());
     expect(text(row('target-~/.agents/skills'))).toContain('EACCES');
     expect(replace().disabled).toBe(false);
     expect(warning()).toBeUndefined();
+
     const recovered = {
         ...drifted,
         drift: [],
@@ -1424,6 +1504,7 @@ test('dismissed Drift stays in Settings with failed Replace and later recovery',
             },
         ],
     };
+
     bridge.replaceDrift.mockResolvedValueOnce({ snapshot: recovered });
     await settle(() => replace().click());
     expect(text(row('target-~/.agents/skills'))).toContain('Restored skills: lar-build');
@@ -1454,8 +1535,11 @@ test('Settings retains Clash paths and Retry after the overview closes', async (
         getInstallState: vi.fn(async () => clashed),
         retryInstall: vi.fn(async () => ({ snapshot: listed })),
     });
+
     await open();
+
     const target = row('target-~/.claude/skills');
+
     expect(text(target)).toContain('lar-build: Existing skill');
     expect(text(target)).toContain('Existing skill at ~/.claude/skills/lar-build');
     expect(text(target)).toContain('does not own this path. Rename or remove it, then Retry.');
@@ -1483,7 +1567,9 @@ test('a dependent Claude target directs Clash recovery to the source path only',
         })),
     });
     await open();
+
     const target = row('target-~/.claude/skills');
+
     expect(text(target)).toContain('lar-build: Blocked by an existing skill');
     expect(text(target)).toContain('Existing skill at ~/.agents/skills/lar-build');
     expect(text(target)).not.toContain('Existing skill at ~/.claude/skills/lar-build');
@@ -1512,11 +1598,14 @@ test('manual ticks wait while a global recovery is pending and become usable aft
         ),
         setTargetTick: vi.fn(),
     });
+
     await open();
     await settle(() =>
         row('target-~/.agents/skills').querySelector<HTMLButtonElement>('[data-replace-drift]')!.click(),
     );
+
     const control = switchOf('~/.claude-work/skills');
+
     expect(control.getAttribute('aria-disabled')).toBe('true');
     await settle(() => control.click());
     expect(bridge.setTargetTick).not.toHaveBeenCalled();
@@ -1542,16 +1631,22 @@ async function renderCounted(label: string, data: BoardData = sample) {
     const { useBoardStore } = await import('../board/board-store.ts');
     const { useSettingsStore } = await import('./settings-store.ts');
     const { SettingsDialog } = await import('./settings.tsx');
+
     useBoardStore.setState({ data });
     useSettingsStore.setState({ open: true, section: label });
+
     const onRender = vi.fn();
+
     document.body.replaceChildren();
+
     const host = document.body.appendChild(document.createElement('div'));
+
     await settle(() =>
         createRoot(host).render(createElement(Profiler, { id: 'settings', onRender }, createElement(SettingsDialog))),
     );
     await settle(() => vi.advanceTimersByTime(50));
     onRender.mockClear();
+
     return {
         onRender,
         push: (data: BoardData) =>
@@ -1561,12 +1656,14 @@ async function renderCounted(label: string, data: BoardData = sample) {
 
 test('a push that changes only what Settings does not show renders nothing in it', async () => {
     const { onRender, push } = await renderCounted('general');
+
     await push({ ...sample, items: sample.items.slice(1), fetchedAt: LATER_READ });
     expect(onRender).not.toHaveBeenCalled();
 });
 
 test('a push that changes what Settings shows updates it', async () => {
     const { onRender, push } = await renderCounted('general');
+
     await push({ ...sample, refreshSeconds: 90 });
     expect(onRender).toHaveBeenCalled();
     expect(text(row('refresh'))).toContain('90 seconds');
@@ -1575,6 +1672,7 @@ test('a push that changes what Settings shows updates it', async () => {
 test('a push with the same repositories renders nothing in the Projects section, whatever icons they have', async () => {
     const data: BoardData = { ...sample, projectIcons: { [sample.repos[0]!.repo]: { kind: 'emoji', emoji: '🚀' } } };
     const { onRender, push } = await renderCounted('projects', data);
+
     expect($$('.settings-body [data-project-icon]').map(text).slice(0, 2)).toEqual(['🚀', 'L']);
     await push({ ...data, items: sample.items.slice(1), fetchedAt: LATER_READ });
     expect(onRender).not.toHaveBeenCalled();
@@ -1585,6 +1683,7 @@ test('a push that changes an icon or the order of the repositories updates their
     const { push } = await renderCounted('projects', data);
     const square = (repo: string) => row(`repo-${repo}`).querySelector('[data-project-icon]');
     const [first, second] = sample.repos;
+
     await push({ ...data, projectIcons: { [first!.repo]: { kind: 'emoji', emoji: '🛠' } } });
     expect(text(square(first!.repo))).toBe('🛠');
     expect(square(second!.repo)!.classList.contains('repo-tone-1')).toBe(true);
@@ -1594,6 +1693,7 @@ test('a push that changes an icon or the order of the repositories updates their
 
 test('Diagnostics says the board server has read only once a read has landed', async () => {
     const { push } = await renderCounted('diagnostics');
+
     await push({ ...sample, fetchedAt: null });
     expect(text(row('d-server'))).toContain('last read never');
     await push({ ...sample, fetchedAt: LATER_READ });

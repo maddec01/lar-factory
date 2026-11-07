@@ -22,32 +22,39 @@ const makeFakeServer = (options?: { readonly failStarts?: number }) =>
         const start = Effect.gen(function* () {
             if (failures > 0) {
                 failures -= 1;
+
                 return yield* new BoardServerError({ message: 'fake start failed' });
             }
+
             const exit = yield* Deferred.make<string>();
             const child = {
                 port: 5000 + children.length,
                 crash: Deferred.succeed(exit, 'on SIGKILL').pipe(Effect.asVoid),
                 stopped: false,
             };
+
             children.push(child);
             yield* Effect.addFinalizer(() =>
                 Effect.sync(() => {
                     child.stopped = true;
                 }),
             );
+
             const board: RunningBoard = {
                 pid: child.port,
                 url: new URL(`http://127.0.0.1:${child.port}/`),
                 exited: Deferred.await(exit),
             };
+
             return board;
         });
+
         return { children, start };
     });
 
 const readyUrls = () => {
     const urls: Array<string> = [];
+
     return {
         urls,
         onReady: (url: URL) =>
@@ -64,6 +71,7 @@ describe('supervise', () => {
         Effect.gen(function* () {
             const server = yield* makeFakeServer();
             const ready = readyUrls();
+
             yield* BoardSupervisor.supervise(server.start, ready, delays).pipe(Effect.forkScoped);
             yield* Effect.yieldNow;
             assert.deepStrictEqual(ready.urls, ['http://127.0.0.1:5000/']);
@@ -82,6 +90,7 @@ describe('supervise', () => {
         Effect.gen(function* () {
             const server = yield* makeFakeServer({ failStarts: 5 });
             const ready = readyUrls();
+
             yield* BoardSupervisor.supervise(server.start, ready, delays).pipe(Effect.forkScoped);
             // Failed starts at 0, then after 0.5, 1, 2, 4 and 4 seconds; the sixth start succeeds.
             for (const ms of [500, 1000, 2000, 4000]) {
@@ -107,6 +116,7 @@ describe('supervise', () => {
                         reasons.push(reason);
                     }),
             };
+
             yield* BoardSupervisor.supervise(server.start, events, delays).pipe(Effect.forkScoped);
             yield* Effect.yieldNow;
             assert.deepStrictEqual(reasons, ['fake start failed']);
@@ -121,6 +131,7 @@ describe('supervise', () => {
         Effect.gen(function* () {
             const server = yield* makeFakeServer({ failStarts: 2 });
             const ready = readyUrls();
+
             yield* BoardSupervisor.supervise(server.start, ready, delays).pipe(Effect.forkScoped);
             yield* TestClock.adjust(Duration.millis(500 + 1000));
             assert.strictEqual(server.children.length, 1);
@@ -137,6 +148,7 @@ describe('supervise', () => {
             const ready = readyUrls();
             const scope = yield* Scope.make();
             const fiber = yield* BoardSupervisor.supervise(server.start, ready, delays).pipe(Effect.forkIn(scope));
+
             yield* Effect.yieldNow;
             yield* server.children[0]!.crash;
             yield* Effect.yieldNow;
@@ -152,6 +164,7 @@ describe('supervise', () => {
         Effect.gen(function* () {
             const server = yield* makeFakeServer();
             const scope = yield* Scope.make();
+
             yield* BoardSupervisor.supervise(server.start, readyUrls(), delays).pipe(Effect.forkIn(scope));
             yield* Effect.yieldNow;
             assert.isFalse(server.children[0]!.stopped);
@@ -167,6 +180,7 @@ describe('makeControl', () => {
             const server = yield* makeFakeServer();
             const ready = readyUrls();
             const control = yield* BoardSupervisor.makeControl(BoardSupervisor.supervise(server.start, ready, delays));
+
             yield* control.start;
             yield* control.start;
             yield* Effect.yieldNow;
@@ -206,18 +220,24 @@ describe('supervise with a real server', () => {
                     }),
                 ),
             );
+
             yield* BoardSupervisor.supervise(
                 start,
                 { onReady: (url) => Queue.offer(pages, url).pipe(Effect.asVoid) },
                 delays,
             ).pipe(Effect.forkScoped);
             yield* Queue.take(pages);
+
             const firstPid = pid;
+
             process.kill(firstPid, 'SIGKILL');
 
             const page = yield* Queue.take(pages);
+
             assert.notStrictEqual(pid, firstPid);
+
             const health = yield* Effect.promise(() => fetch(new URL('/healthz', page)).then((res) => res.status));
+
             assert.strictEqual(health, 200);
         }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
     );

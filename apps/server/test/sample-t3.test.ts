@@ -24,7 +24,9 @@ const ICON = { kind: 'emoji', emoji: '🧪' };
 
 function tempHome(t: TestContext): string {
     const home = mkdtempSync(join(tmpdir(), 'lar-sample-t3-'));
+
     t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+
     return home;
 }
 
@@ -34,7 +36,9 @@ async function sampleT3(t: TestContext, home: string, env: Record<string, string
         'lar-server': 'git@github.com:maddec01/lar-server.git',
         'lar-web': 'git@github.com:maddec01/lar-web.git',
     });
+
     if (!existsSync(join(home, 'Library'))) writeRepositoryList(home, ['maddec01/lar-web']);
+
     const db = projectsDb(
         t,
         ['lar-server', 'lar-web'].map((id) => ({ id, root: `${home}/Developer/lar/${id}` })),
@@ -46,6 +50,7 @@ async function sampleT3(t: TestContext, home: string, env: Record<string, string
         FAKE_T3_ICON: JSON.stringify(ICON),
         ...env,
     });
+
     return { ...board, db, data: () => board.board() as Promise<BoardData> };
 }
 
@@ -56,6 +61,7 @@ async function until(check: () => Promise<boolean>): Promise<void> {
 /** A folder holding a `t3` that runs `script`, to put first on PATH. */
 function fakeT3Bin(home: string, script: string): string {
     const bin = mkdtempSync(join(home, 'bin-'));
+
     writeFileSync(
         join(bin, 't3'),
         `#!/bin/sh
@@ -63,14 +69,18 @@ ${script}
 `,
     );
     chmodSync(join(bin, 't3'), 0o755);
+
     return bin;
 }
 
 test("the project step lists T3's projects, counting sample repositories as on the board and leaving the real settings unread", async (t) => {
     const board = await sampleT3(t, tempHome(t));
     const response = await fetch(`${board.url}/api/onboarding/projects`);
+
     assert.equal(response.status, 200);
+
     const { projects } = (await response.json()) as { projects: { name: string; onBoard: boolean; icon: unknown }[] };
+
     assert.deepEqual(
         projects.map((p) => [p.name, p.onBoard, p.icon]),
         [
@@ -82,17 +92,21 @@ test("the project step lists T3's projects, counting sample repositories as on t
 
 test("a sample repository with one T3 project shows its icon, and the sample file's chosen icons are ignored", async (t) => {
     const board = await sampleT3(t, tempHome(t));
+
     await until(async () => Object.keys((await board.data()).projectIcons ?? {}).length > 0);
     assert.deepEqual((await board.data()).projectIcons, { 'maddec01/lar-server': ICON });
 });
 
 test('it shows T3 as unavailable when T3 stops and reads again when T3 returns', async (t) => {
     const board = await sampleT3(t, tempHome(t));
+
     await until(async () => (await board.data()).t3Availability?.availability === 'available');
 
     renameSync(board.db, `${board.db}.away`);
     await until(async () => (await board.data()).t3Availability?.availability === 'unavailable');
+
     const refused = await fetch(`${board.url}/api/onboarding/projects`);
+
     assert.deepEqual(
         [refused.status, await refused.json()],
         [502, { error: "Can't read T3 Code's projects; reconnect T3 Code before onboarding" }],
@@ -112,6 +126,7 @@ test('it starts on sample data with T3 unavailable', async (t) => {
         BOARD_SAMPLE_T3: '1',
     });
     const data = () => board.board() as Promise<BoardData>;
+
     await until(async () => (await data()).t3Availability?.availability === 'unavailable');
     assert.ok((await data()).items.length > 0);
     assert.deepEqual((await data()).projectIcons, {});
@@ -127,8 +142,10 @@ test("every write gets sample mode's refusal", async (t) => {
         ['/api/recheck', {}, 'Sample mode looks no tools up.'],
         ['/api/items', { title: 'x' }, 'Adding items is disabled in sample mode.'],
     ];
+
     for (const [path, body, error] of refusals) {
         const response = await board.postSession(body, path);
+
         assert.deepEqual([path, response.status, await response.json()], [path, 403, { error }]);
     }
     assert.deepEqual(await board.t3Calls(), []);
@@ -139,6 +156,7 @@ function filesUnder(dir: string): Record<string, string> {
     return Object.fromEntries(
         readdirSync(dir, { recursive: true, encoding: 'utf8' }).flatMap((name) => {
             const stat = statSync(join(dir, name));
+
             return stat.isFile() ? [[name, `${stat.size}:${stat.mtimeMs}`]] : [];
         }),
     );
@@ -148,17 +166,22 @@ test('over its ticks it reads T3 and nothing else, and changes no file in the ap
     const home = tempHome(t);
     const az = join(home, 'fake-az');
     const azLog = join(home, 'az-calls');
+
     writeFileSync(az, `#!/bin/sh\necho "$*" >> '${azLog}'\n`);
     chmodSync(az, 0o755);
     writeRepositoryList(home, ['maddec01/lar-web']);
+
     const dataDir = join(home, 'Library/Application Support/Lar Factory');
     const before = filesUnder(dataDir);
     const reads = join(home, 't3-reads');
 
     const board = await sampleT3(t, home, { AZ_PATH: az, FAKE_T3_READS: reads });
     const readCount = () => readFileSync(reads, 'utf8').split('\n').length;
+
     await until(async () => readCount() > 1);
+
     const startupReads = readCount();
+
     // Two local ticks, and enough of the second-long read tick.
     await new Promise((resolve) => setTimeout(resolve, 4_500));
 
@@ -173,6 +196,7 @@ test('plain sample mode still asks T3 for nothing', async (t) => {
     const home = tempHome(t);
     const reads = join(home, 't3-reads');
     const board = await startBoard(t, { recorded: false }, true, false, { HOME: home, FAKE_T3_READS: reads });
+
     await new Promise((resolve) => setTimeout(resolve, 2_500));
     assert.equal(existsSync(reads), false);
     assert.equal(((await board.board()) as BoardData).t3Availability, undefined);
@@ -184,6 +208,7 @@ test('a normal stop revokes its session before exiting', async (t) => {
     const log = join(home, 'revoked');
     const bin = fakeT3Bin(home, `sleep 0.4; echo "$*" >> '${log}'`);
     const board = await sampleT3(t, home, { PATH: `${bin}:${process.env.PATH}` });
+
     await board.stop();
     assert.equal(readFileSync(log, 'utf8').trim(), 'auth session revoke fake-session');
 });
@@ -193,6 +218,7 @@ test('a revocation that hangs leaves the existing shutdown limit in force', asyn
     const bin = fakeT3Bin(home, 'sleep 20');
     const board = await sampleT3(t, home, { PATH: `${bin}:${process.env.PATH}` });
     const stopping = Date.now();
+
     await board.stop();
     assert.ok(Date.now() - stopping < 5_000);
 });

@@ -67,6 +67,7 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
     expect(row('I_sample05').querySelector('.rounded-full[class*="repo-tone"]'), 'no tone dot').toBeNull();
 
     const { useScopeStore } = await import('../board/scope-store.ts');
+
     await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
     expect(
         rows().map((r) => r.dataset.item),
@@ -85,12 +86,17 @@ test("an unanswered kind disagreement shows a muted marker naming the ticket's k
         ...sample,
         items: sample.items.map((i) => (i.id === sample05.id ? { ...i, kindDisagreement } : i)),
     });
+
     await mountPage(withKinds(disagreement));
+
     const marker = () => row('I_sample05').querySelector<HTMLElement>('[data-kind-marker]');
+
     expect(text(marker())).toBe('Bug');
     expect(marker()!.title).toBe('The ticket says Bug. Open to choose.');
     expect(marker()!.querySelector('svg')).not.toBeNull();
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     await settle(() => useBoardStore.setState({ data: withKinds({ ...disagreement, ticketKind: null }) }));
     expect(text(marker())).toBe('No kind');
     expect(marker()!.title).toBe('The ticket has no kind. Open to choose.');
@@ -100,6 +106,7 @@ test("an unanswered kind disagreement shows a muted marker naming the ticket's k
 
 test('local work shows the laptop source icon', async () => {
     const local = { ...sample05, id: 'local', number: 0, url: null, labels: [] };
+
     await mountPage({ ...sample, items: [...sample.items, local] });
     expect(row('local').querySelector('[aria-label="Saved only on this machine."]')).not.toBeNull();
 });
@@ -111,8 +118,10 @@ test("a dossier's parts are left out and show in the dossier; a Queued parent st
         items: [...sample.items, decision('I_d200', 200), decision('I_d129', 129), decision('I_d999', 999)],
     });
     expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample05', 'I_sample06', 'I_sample21', 'I_d999']);
+
     const openDossier = (id: string) =>
         settle(() => $<HTMLButtonElement>(`[data-dossier="${id}"] [data-dossier-open]`)!.click());
+
     await openDossier('I_sample05');
     expect($('[data-dossier="I_sample05"] [data-part="I_d129"]'), "#129's sub-issue, in its dossier").not.toBeNull();
     await openDossier('I_sample09');
@@ -147,9 +156,12 @@ test('a Queued item blocked by an open issue shows only Start after', async () =
                 : i,
         ),
     };
+
     await mountPage(blocked);
     expect(row('I_sample05').querySelector('[data-start]'), 'no disabled Start beside it').toBeNull();
+
     const after = row('I_sample05').querySelector<HTMLElement>('[data-start-after]')!;
+
     expect([text(after), after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual([
         'Start after ▾',
         'start',
@@ -160,6 +172,7 @@ test('a Queued item blocked by an open issue shows only Start after', async () =
 
 test("a Queued item whose repository has no T3 project has its Shape issue disabled with the project's hint", async () => {
     const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
+
     await mountPage({ ...withChoices, repositoryProjects: { 'maddec01/lar-server': hint } });
     expect([text(start()), start().disabled, start().title]).toEqual(['Shape', true, hint]);
     expect(row('I_sample05').querySelector('[data-start-after]'), 'nothing blocks it, so no Start after').toBeNull();
@@ -184,6 +197,7 @@ test('when no queued item can start, the Queue header shows no button and no row
                 : i,
         ),
     };
+
     await mountPage(held);
     expect(queue().querySelector('header button')).toBeNull();
     expect(text(queue()), 'no row waits for a slot').not.toContain('next when a build slot frees');
@@ -242,8 +256,11 @@ test("Shape issue opens its menu without opening the dialog, and starts its row'
 
     const title = `#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`;
     const thread = { threadId: 'thread-1', title };
+
     await answer({ thread, error: null, board: { ...withChoices, started: { I_sample06: thread } } });
+
     const tag = row('I_sample06').querySelector('[data-start-result]')!;
+
     expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread thread-1']);
     expect(row('I_sample06').querySelector('[data-start]')).toBeNull();
     expect(text(toast())).toBe('Refining started for #20. Open thread');
@@ -262,9 +279,12 @@ test('while an item has a running or needs-you thread, its row has Open thread i
               ? { ...i, threads: threads('needs you') }
               : i,
     ) as Item[];
+
     await mountPage({ ...sample, items, t3EnvironmentId: 'env-1' });
     expect(row('I_sample05').querySelector('[data-start]')).toBeNull();
+
     const open = row('I_sample05').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+
     expect([open.getAttribute('aria-label'), open.getAttribute('href')]).toEqual([
         'Open thread',
         expect.stringContaining('t1'),
@@ -300,12 +320,16 @@ test('a Start that may have run hides Shape issue; closing its message leaves a 
             startProgress: { I_sample05: { shape: { phase: 'may-have-started', message: 'Check T3.' } } },
         },
     });
+
     const moved = () => $<HTMLLIElement>('[data-stage="shaping"] li[data-item="I_sample05"]')!;
+
     expect(
         [$('.queue li[data-item="I_sample05"]'), moved().querySelector('[data-start]')],
         'a start in flight moves the row to Shaping',
     ).toEqual([null, null]);
+
     const message = moved().querySelector<HTMLElement>('p.start[data-start-result]')!;
+
     expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
     await settle(() => message.querySelector<HTMLButtonElement>('button.dismiss')!.click());
     expect(text(moved().querySelector('.started-tag.unsure'))).toBe('May have started');
@@ -339,7 +363,9 @@ test('Move to List from the dialog takes the item off the Queue', async () => {
 
 test('Abandon from the dialog takes the item off the Queue; a failed one is a toast', async () => {
     holdPosts();
+
     const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' } as BoardData['capture'] };
+
     await mountPage(data);
     await settle(() => row('I_sample06').querySelector<HTMLButtonElement>('[data-row-open]')!.click());
     await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="I_sample06"]')!);

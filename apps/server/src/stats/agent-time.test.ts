@@ -48,6 +48,7 @@ test("an item's time comes from plain rows: its root's turns less waits, and a c
         }),
         Date.parse(at(60)),
     );
+
     // The root works 0-2 and 4-10; the child 5-20, of which 10-20 is outside the root's work.
     assert.deepEqual(time(['root']), { agentMs: 18 * MIN, wallMs: 18 * MIN, threads: ['root', 'child'] });
     assert.equal(time(['gone']), null, 'a recorded thread T3 no longer has counts nothing');
@@ -83,6 +84,7 @@ test("an item's threads are its record's thread IDs and their children, whatever
         }),
         Date.parse(at(60)),
     );
+
     assert.deepEqual(time(['a', 'b']), { agentMs: 15 * MIN, wallMs: 15 * MIN, threads: ['a', 'b', 'b-child'] });
     assert.deepEqual(time(['a', 'a'])?.threads, ['a'], 'a thread recorded twice counts once');
 });
@@ -147,6 +149,7 @@ test("a shaping thread's figures take in its subagents, its delegated tasks and 
         }),
         Date.parse(at(60)),
     );
+
     // The record holds only the shape thread; its family comes through the lineage root.
     assert.deepEqual(time(['shape']), {
         agentMs: 27 * MIN,
@@ -162,6 +165,7 @@ test("an open turn on an active provider thread runs up to now; on an idle one i
         { id: 't', thread: 'root', providerThread: 'p', status: 'running', startedAt: at(0), completedAt: null },
     ];
     const lastMessages = [{ thread: 'root', at: at(12) }];
+
     assert.equal(
         agentTime(rows({ threads, turns, lastMessages, active: new Set(['p']) }), now)(['root'])?.agentMs,
         30 * MIN,

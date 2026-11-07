@@ -43,6 +43,7 @@ function draftsOf(setup: RepositorySetup): Drafts {
         setup.domainDocs.kind === 'repository'
             ? setup.domainDocs
             : { kind: 'off', glossary: 'GLOSSARY.md', adrs: 'docs/adr' };
+
     return {
         role: setup.role,
         team: setup.itemSource?.kind === 'azure-board' ? setup.itemSource.team : '',
@@ -76,6 +77,7 @@ function valueOf(key: DraftSetting, drafts: Drafts): SharedRepositorySettings[Sh
             return list(drafts.skills);
         case 'domainDocs':
             if (drafts.domainDocs === 'off') return { kind: 'off' };
+
             return drafts.glossary.trim() && drafts.adrs.trim()
                 ? { kind: 'repository', glossary: drafts.glossary.trim(), adrs: drafts.adrs.trim() }
                 : null;
@@ -123,10 +125,13 @@ export const useEditStore = create<EditState>()((set, get) => {
     const revisions: Record<string, Partial<Record<keyof Drafts, number>>> = {};
     const fieldError = (repo: string, field: keyof Drafts | Running, error: string | null) => {
         const errors = { ...get().fieldErrors[repo] };
+
         if (error) errors[field] = error;
         else delete errors[field];
+
         set({ fieldErrors: { ...get().fieldErrors, [repo]: errors } });
     };
+
     function call(
         repo: string,
         running: Running,
@@ -139,24 +144,33 @@ export const useEditStore = create<EditState>()((set, get) => {
         );
         const id = JSON.stringify([repo, change, versions]);
         const waiting = queues.get(repo);
+
         if (waiting?.id === id) return waiting.task;
+
         const task = (waiting?.task ?? Promise.resolve())
             .then(async () => {
                 set({ running });
                 fieldError(repo, running, null);
+
                 const result = await postAction(endpoint, { repo, ...change });
+
                 receive(result);
+
                 if (result.error) fieldError(repo, running, result.error);
                 else if (snapshot) {
                     const typed = { ...get().drafts[repo] };
+
                     for (const field of Object.keys(snapshot) as (keyof Drafts)[]) {
                         if (revisions[repo]?.[field] === versions[field]) delete typed[field];
                     }
                     set({ drafts: { ...get().drafts, [repo]: typed } });
                 }
+
                 const errors = { ...get().errors };
+
                 if (result.error) errors[repo] = result.error;
                 else delete errors[repo];
+
                 set({
                     running: null,
                     errors,
@@ -166,14 +180,18 @@ export const useEditStore = create<EditState>()((set, get) => {
                             ? 1
                             : 0),
                 });
+
                 return result.error;
             })
             .finally(() => {
                 if (queues.get(repo)?.task === task) queues.delete(repo);
             });
+
         queues.set(repo, { id, task });
+
         return task;
     }
+
     return {
         issueDrafts: {},
         vocabularyDrafts: {},
@@ -197,20 +215,28 @@ export const useEditStore = create<EditState>()((set, get) => {
         },
         save: async (repo, key, setup) => {
             const typed = get().drafts[repo] ?? {};
+
             if (!FIELDS[key].some((field) => field in typed)) return;
+
             const drafts = shownDrafts(setup, typed);
             const value = valueOf(key, drafts);
+
             if (value === null) {
                 if (key === 'itemSource') fieldError(repo, 'team', 'Enter a Team.');
+
                 if (key === 'domainDocs') {
                     if (!drafts.glossary.trim()) fieldError(repo, 'glossary', 'Enter a glossary path.');
+
                     if (!drafts.adrs.trim()) fieldError(repo, 'adrs', 'Enter an ADR folder.');
                 }
+
                 return;
             }
+
             const snapshot = Object.fromEntries(
                 FIELDS[key].filter((field) => field in typed).map((field) => [field, typed[field]]),
             );
+
             await call(repo, key, { change: 'override', key, value }, snapshot);
         },
         reset: async (repo, key) => {
@@ -218,6 +244,7 @@ export const useEditStore = create<EditState>()((set, get) => {
             const snapshot = Object.fromEntries(
                 FIELDS[key].filter((field) => field in typed).map((field) => [field, typed[field]]),
             );
+
             await call(repo, key, { change: 'override', key }, snapshot);
         },
         recheck: async (repo) => {
@@ -231,26 +258,34 @@ export const useEditStore = create<EditState>()((set, get) => {
                 value,
                 ...(newLabels.length && { newLabels }),
             });
+
             set({
                 vocabularyErrors: {
                     ...get().vocabularyErrors,
                     [repo]: { ...get().vocabularyErrors[repo], [key]: error ?? undefined },
                 },
             });
+
             if (!error && get().vocabularyDrafts[repo]?.[key] === snapshot) {
                 const drafts = { ...get().vocabularyDrafts[repo] };
+
                 delete drafts[key];
                 set({ vocabularyDrafts: { ...get().vocabularyDrafts, [repo]: drafts } });
             }
+
             return !error;
         },
         issueDefault: async (repo, key, on) => {
             const version = (choiceVersions[repo]?.[key] ?? 0) + 1;
+
             choiceVersions[repo] = { ...choiceVersions[repo], [key]: version };
             set({ issueDrafts: { ...get().issueDrafts, [repo]: { ...get().issueDrafts[repo], [key]: on } } });
+
             const error = await call(repo, key, { change: 'override', key, value: on });
+
             if (!error && choiceVersions[repo]?.[key] === version) {
                 const draft = { ...get().issueDrafts[repo] };
+
                 delete draft[key];
                 set({ issueDrafts: { ...get().issueDrafts, [repo]: draft } });
             }

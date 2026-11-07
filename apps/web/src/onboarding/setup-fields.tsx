@@ -9,6 +9,7 @@ import { useId, type ReactNode } from 'react';
  */
 export function Choice({ value, children }: { value: string; children: ReactNode }) {
     const id = useId();
+
     return (
         <div
             data-choice={value}

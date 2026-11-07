@@ -31,6 +31,7 @@ function Content() {
     const loaded = useBoardStore((state) => state.loaded);
     const scope = useShownScope();
     const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
+
     return (
         // Everything under the title bar scrolls as one page, and nothing in it shrinks to fit.
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pt-3 pb-4 *:shrink-0">
@@ -51,6 +52,7 @@ export function App() {
     // T3 Code not running is a warning; only a missing t3 replaces the main area.
     const missing = t3?.result === 'missing' ? t3 : undefined;
     const empty = useBoardStore((state) => noneOnboarded(state.data));
+
     return (
         // The design system's Tooltip needs a provider above it.
         <TooltipProvider>

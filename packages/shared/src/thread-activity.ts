@@ -55,6 +55,7 @@ export const ACTIVITY_STALE_MS = 30_000;
 /** Whether T3's answer for a thread is lost: its read failed or has gone old. */
 export function activityLost(activity: ThreadActivity | undefined, now: number): boolean {
     if (!activity) return false;
+
     return !activity.available || now - Date.parse(activity.readAt) > ACTIVITY_STALE_MS;
 }
 
@@ -65,27 +66,37 @@ const ageOf = (at: string, now: number): number => Math.max(0, now - Date.parse(
 /** What a row shows for `thread` at `now`; undefined for a thread that finished with nothing at work. */
 export function threadActivityLine(thread: ItemThread, now: number): ThreadActivityLine | undefined {
     const { activity } = thread;
+
     if (thread.observedAt || activity?.available === false || activityLost(activity, now)) return UNAVAILABLE;
+
     const agents = activity?.agents ?? [];
+
     if (thread.state === 'needs you' || thread.childNeedsYou)
         return { state: 'waiting', action: 'Waiting on you', ageMs: ageOf(thread.updated, now), agents: agents.length };
+
     if (thread.state === 'stopped' && !agents.length)
         return { state: 'stopped', action: 'Stopped', ageMs: ageOf(thread.updated, now), agents: 0 };
+
     if (!activity)
         return thread.state === 'running' || thread.queued || thread.hasLiveChildren || thread.hasRunningChildren
             ? UNAVAILABLE
             : undefined;
+
     if (thread.queued && !agents.length)
         return { state: 'working', action: 'Queued', ageMs: ageOf(thread.updated, now), agents: 0 };
+
     const newest = [
         { action: activity.action, actionAt: activity.actionAt ?? thread.updated },
         ...agents.flatMap(({ action, actionAt }) => (actionAt ? [{ action, actionAt }] : [])),
     ].reduce((best, next) => (Date.parse(next.actionAt) > Date.parse(best.actionAt) ? next : best));
     const ageMs = ageOf(newest.actionAt, now);
+
     if (ageMs >= QUIET_MS && !activity.toolRunning)
         return { state: 'quiet', action: `No action for ${Math.floor(ageMs / 60_000)}m`, ageMs, agents: agents.length };
+
     // A thread that has just started may be newer than an agent's last action, and has no words of its own.
     const action = newest.action ?? activity.action ?? agents.find((agent) => agent.action)?.action ?? 'Starting';
+
     return { state: 'working', action, ageMs, agents: agents.length };
 }
 
@@ -95,17 +106,23 @@ const UNDER_WAY: readonly Item['status'][] = ['Shaping', 'In progress', 'Review'
 /** The thread a row follows: the newest at work, else the newest if it stopped work still under way. Threads come newest first. */
 export function itemActivityThread(item: Item): ItemThread | undefined {
     if (item.paused || item.archived || !Array.isArray(item.threads)) return undefined;
+
     const threads = item.threads.filter((thread) => !thread.archived);
     const atWork = threads.find((thread) => isLiveThread(thread) || thread.hasRunningChildren);
+
     return atWork ?? (threads[0]?.state === 'stopped' && UNDER_WAY.includes(item.status) ? threads[0] : undefined);
 }
 
 /** What `item`'s row shows at `now`; undefined when it shows no line. `unreadable` is a page that lost the server, whose threads may be out of date. */
 export function itemActivityLine(item: Item, now: number, unreadable = false): ThreadActivityLine | undefined {
     if (item.paused || item.archived) return undefined;
+
     if (item.threads === 'unavailable') return UNDER_WAY.includes(item.status) ? UNAVAILABLE : undefined;
+
     const thread = itemActivityThread(item);
+
     if (!thread) return undefined;
+
     return unreadable ? UNAVAILABLE : threadActivityLine(thread, now);
 }
 
@@ -116,20 +133,26 @@ export function itemActivityAgents(
     unreadable = false,
 ): ThreadAgent[] | 'unavailable' | undefined {
     const state = itemActivityLine(item, now, unreadable)?.state;
+
     if (state === 'unavailable') return 'unavailable';
+
     const activity = itemActivityThread(item)?.activity;
+
     if (!state || state === 'stopped' || !activity?.available) return undefined;
+
     const { action, actionAt, agents } = activity;
     const listed = [
         ...(action ? [{ title: 'Lead thread', action, ...(actionAt ? { actionAt } : {}) }] : []),
         ...agents,
     ];
+
     return listed.length ? listed : undefined;
 }
 
 /** Whether `item`'s row stops animating at `now`: its thread waits, stopped or can't be read. */
 export function itemActivityStill(item: Item, now: number, unreadable = false): boolean {
     const state = itemActivityLine(item, now, unreadable)?.state;
+
     return state === 'waiting' || state === 'stopped' || state === 'unavailable';
 }
 
@@ -139,6 +162,7 @@ const SAMPLE_NOW = Date.parse('2026-10-21T10:00:00Z');
 /** The sample board with its activity times moved so its ages count from `now`. Its reads stay stamped far ahead, since the sample board reads nothing and they never go old. */
 export function sampleActivityFrom(data: BoardData, now: number): BoardData {
     const moved = (at: string) => new Date(Date.parse(at) + now - SAMPLE_NOW).toISOString();
+
     return {
         ...data,
         items: data.items.map((item) =>
@@ -148,7 +172,9 @@ export function sampleActivityFrom(data: BoardData, now: number): BoardData {
                       ...item,
                       threads: item.threads.map((thread) => {
                           const { activity } = thread;
+
                           if (!activity?.available) return thread;
+
                           return {
                               ...thread,
                               updated: moved(thread.updated),

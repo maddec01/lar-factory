@@ -18,6 +18,7 @@ const issueEdits = async (board: Board) =>
 /** The Status the board's work-record database holds for `workId`, read as a thread would. */
 async function recordedStatus(board: Board, workId: string): Promise<Status> {
     const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
     try {
         return records.read(workId).status;
     } finally {
@@ -27,9 +28,12 @@ async function recordedStatus(board: Board, workId: string): Promise<Status> {
 
 test('Queue moves the work record to Queued, shows it at once and writes nothing to GitHub', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
+
     await until(board, (d) => d.items.length === 1);
+
     const id = board.id(12);
     const response = await queue(board, id);
+
     assert.equal(response.status, 200);
     assert.equal(statusOf((await response.json()).board, id), 'Queued');
     assert.equal(statusOf(await board.board(), id), 'Queued');
@@ -39,21 +43,30 @@ test('Queue moves the work record to Queued, shows it at once and writes nothing
 
 test("refreshes keep the record's Queued though GitHub's labels still say List", async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, true);
+
     await until(board, (d) => d.items.length === 1);
+
     const id = board.id(12);
+
     assert.equal((await queue(board, id)).status, 200);
+
     const reads = async () =>
         (await board.calls()).filter((args) => args[1] === 'graphql' && args.some((a) => a.includes('states: [OPEN]')))
             .length;
     const target = (await reads()) + 4;
+
     while ((await reads()) < target) await new Promise((r) => setTimeout(r, 20));
+
     assert.equal(statusOf(await board.board(), id), 'Queued');
 });
 
 test("a ticket edit never changes the record's Status", async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, true);
+
     await until(board, (d) => d.items.length === 1);
+
     const id = board.id(12);
+
     await board.update({ items: [boardIssue(12, 'Ready', 'maddec01/lar-factory', ['bug'])] });
     await until(board, (d) => d.items.some((i) => i.labels.includes('bug')));
     assert.equal(statusOf(await board.board(), id), 'List');
@@ -61,6 +74,7 @@ test("a ticket edit never changes the record's Status", async (t) => {
 
 test('Queue only moves List items and is a no-op for an item already Queued', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'Queued'), boardIssue(13, 'Ready')] });
+
     await until(board, (d) => d.items.length === 2);
     assert.equal((await queue(board, board.id(12))).status, 200);
     assert.equal((await queue(board, board.id(13))).status, 409);
@@ -71,18 +85,25 @@ test('Queue only moves List items and is a no-op for an item already Queued', as
 
 test('a move on a record a thread changed since the board read it is refused, and the board shows the record as it is', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
+
     // Let startup's provider observation publish its revision before deliberately making the board stale.
     await until(board, (d) => d.firstRead.settled && d.items.length === 1 && d.items[0]!.revision > 1);
+
     const id = board.id(12);
     const records = await openWorkRecords(workRecordsPath(board.dataDir));
+
     try {
         records.update(id, records.read(id).revision, { kind: 'bug' });
     } finally {
         records.close();
     }
+
     const response = await queue(board, id);
+
     assert.equal(response.status, 409);
+
     const body = (await response.json()) as { error: string; board: BoardData };
+
     assert.match(body.error, /read it again/);
     assert.equal(body.board.items.find((i) => i.id === id)?.kind, 'bug');
     assert.equal(await recordedStatus(board, id), 'List');
@@ -90,15 +111,20 @@ test('a move on a record a thread changed since the board read it is refused, an
 
 test('Queue and Back to List reject requests from other pages and sample mode', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
+
     await until(board, (d) => d.items.length === 1);
     for (const origin of ['https://evil.example', 'null', '']) {
         assert.equal((await queue(board, board.id(12), origin)).status, 403);
         assert.equal((await backToList(board, board.id(12), origin)).status, 403);
     }
     assert.equal(await recordedStatus(board, board.id(12)), 'List');
+
     const sample = await startBoard(t, {}, true);
+
     assert.equal((await queue(sample, 'I_sample01')).status, 403);
+
     const response = await backToList(sample, 'I_sample01');
+
     assert.equal(response.status, 403);
     assert.equal((await response.json()).error, 'Moving items back to List is disabled in sample mode.');
     assert.equal((await sample.calls()).length, 0);
@@ -106,14 +132,19 @@ test('Queue and Back to List reject requests from other pages and sample mode', 
 
 test('Back to List moves the work record to List and writes nothing to GitHub', async (t) => {
     const board = await startBoard(t, { items: [boardIssue(12, 'Queued'), boardIssue(13, 'Ready')] });
+
     await until(board, (d) => d.items.length === 2);
+
     const id = board.id(12);
     const response = await backToList(board, id);
+
     assert.equal(response.status, 200);
     assert.equal(statusOf((await response.json()).board, id), 'List');
     assert.equal(await recordedStatus(board, id), 'List');
     assert.equal((await backToList(board, id)).status, 200, 'an item already in List is a no-op');
+
     const refused = await backToList(board, board.id(13));
+
     assert.equal(refused.status, 409);
     assert.equal((await refused.json()).error, 'Only Queued items can be moved back to List; this one is in Ready.');
     assert.deepEqual(await issueEdits(board), []);
@@ -130,15 +161,21 @@ test('Back to List is refused while a Start is in flight, uncertain or done for 
         false,
         startableEnv(t),
     );
+
     await until(board, (d) => d.items.length === 1);
+
     const id = board.id(12);
     const starting = startItem(board, id);
+
     await new Promise((r) => setTimeout(r, 100));
+
     const inFlight = await backToList(board, id);
+
     assert.equal(inFlight.status, 409);
     assert.equal((await inFlight.json()).error, refused);
     assert.equal((await starting).status, 200);
     assert.equal((await backToList(board, id)).status, 409, 'done');
+
     const unsure = await startBoard(
         t,
         { items: [boardIssue(12, 'Queued')], t3: { fail: 'killed' } },
@@ -146,6 +183,7 @@ test('Back to List is refused while a Start is in flight, uncertain or done for 
         false,
         startableEnv(t),
     );
+
     await until(unsure, (d) => d.items.length === 1);
     assert.equal((await startItem(unsure, unsure.id(12))).status, 502);
     assert.equal((await backToList(unsure, unsure.id(12))).status, 409, 'uncertain');

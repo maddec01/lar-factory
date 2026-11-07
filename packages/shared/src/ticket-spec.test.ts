@@ -11,6 +11,7 @@ test('the whole Spec precedes a collapsed Original with stable delimiters', () =
 
 test('Azure conversion preserves the Spec delimiters and collapsed Original while escaping authored HTML', () => {
     const html = trackerMarkdownHtml(formatTicketSpec('## What\nBuild it.', 'Original.\n\n<script>alert(1)</script>'));
+
     expect(html).toContain('<!-- lar-factory:spec -->');
     expect(html).toContain('<details>\n<summary>Original</summary>');
     expect(html).toContain('<h2>What</h2>');
@@ -24,6 +25,7 @@ test('the formatter preserves the exact brief bytes for its gate copy', () => {
 
 test('reading a marked ticket restores only Original and preserves exact Spec bytes', async () => {
     const { readTicketSpec } = await import('./ticket-spec.ts');
+
     expect(readTicketSpec(formatTicketSpec('Whole brief.  \n', 'Authored request.'))).toMatchObject({
         marked: true,
         spec: 'Whole brief.  \n',
@@ -36,6 +38,7 @@ test('Azure Spec formatting uses a visible Original fallback that survives strip
     const { readTicketSpec } = await import('./ticket-spec.ts');
     const html = formatTicketSpec('## What\nBuild it.', '**Authored** request.', { format: 'html' });
     const sanitized = html.replace(/<!--[\s\S]*?-->/g, '');
+
     expect(sanitized).toContain('<h2>Original (Lar Factory)</h2>');
     expect(readTicketSpec(sanitized)).toMatchObject({
         marked: true,

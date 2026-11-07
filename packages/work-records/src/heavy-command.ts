@@ -56,17 +56,21 @@ async function readSlots(
     const live = [];
     const unreadable = new Set<string>();
     const names = await readdir(slots);
+
     // Judged by the PID in the name alone, so a check stays cheap with many waiters. A reused PID keeps the file until
     // that process exits.
     for (const name of names) {
         const pid = ownerFileName.exec(name)?.[1];
+
         if (!pid) continue;
+
         try {
             process.kill(Number(pid), 0);
             continue;
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== 'ESRCH') continue;
         }
+
         try {
             await unlink(join(slots, name));
         } catch {
@@ -75,21 +79,27 @@ async function readSlots(
     }
     for (const name of names.filter((name) => slotName.test(name))) {
         let owner: SlotOwner | null;
+
         try {
             owner = await ownerAt<SlotOwner>(join(slots, name));
+
             if (owner && !validSlotOwner(owner))
                 throw Error(`The lock ${join(slots, name)} has invalid ownership data.`);
         } catch (error) {
             unreadable.add(name);
+
             if (!warned.has(name))
                 process.stderr.write(
                     `lar-work: ignoring unreadable heavy command slot ${name}: ${(error as Error).message}\n`,
                 );
+
             warned.add(name);
             continue;
         }
+
         if (owner && (await ownsProcess(owner))) live.push({ name, owner });
     }
+
     return { live, unreadable };
 }
 
@@ -105,7 +115,9 @@ export async function waitForHeavySlot(
 ): Promise<HeavySlot | null> {
     const dir = resolve(dataDir);
     const unheld: HeavySlot = { env: process.env, async release() {} };
+
     if (process.env[HOLDER_ENV] === dir) return unheld;
+
     const slots = join(dir, 'heavy-slots');
     const base = join(slots, 'slot');
     const owner: SlotOwner = { pid: process.pid, token: randomUUID(), folder: process.cwd(), command };
@@ -119,46 +131,58 @@ export async function waitForHeavySlot(
             }
     };
     let stop = false;
+
     void cancelled.then(() => {
         stop = true;
     });
+
     const began = Date.now();
     let reported = -Infinity;
     let problem: string | undefined;
     const warned = new Set<string>();
+
     try {
         owner.identity = await processIdentity(process.pid);
         await mkdir(slots, { recursive: true });
         candidate = await writeOwnerFile(base, owner);
         for (;;) {
             const setting = readHeavyCommandLimit(dir);
+
             if (setting.problem && setting.problem !== problem)
                 process.stderr.write(`lar-work: ${setting.problem} Using Automatic.\n`);
+
             problem = setting.problem;
+
             const limit =
                 setting.limit === 'automatic'
                     ? automaticHeavyCommandLimit(availableParallelism(), totalmem())
                     : setting.limit;
             const { live, unreadable } = await readSlots(slots, warned);
             let holders = live;
+
             for (let i = 0; i < limit + unreadable.size && holders.length < limit; i++) {
                 const name = `slot-${i}`;
                 const target = join(slots, name);
+
                 if (
                     unreadable.has(name) ||
                     holders.some((holder) => holder.name === name) ||
                     !(await claimPath(base, owner, target))
                 )
                     continue;
+
                 // A waiter that claimed a slot below a lowered limit while older holders still run gives it back.
                 holders = (await readSlots(slots, warned)).live;
+
                 if (holders.length > limit) {
                     await releasePath(target, owner);
                     break;
                 }
+
                 process.stderr.write(
                     `lar-work: started after waiting ${Math.round((Date.now() - began) / 1000)}s for a heavy command slot.\n`,
                 );
+
                 return {
                     env: { ...process.env, [HOLDER_ENV]: dir },
                     async release() {
@@ -169,21 +193,27 @@ export async function waitForHeavySlot(
                                 `lar-work: can't free heavy command slot ${target}: ${(error as Error).message}\n`,
                             );
                         }
+
                         await discard();
                     },
                 };
             }
+
             if (stop) {
                 await discard();
+
                 return null;
             }
+
             if (Date.now() - reported >= REPORT_EVERY_MS) {
                 reported = Date.now();
                 process.stderr.write(
                     `lar-work: waiting for a heavy command slot; ${holders.length} of ${limit} in use:\n${holders.map((holder) => describe(holder.owner)).join('\n')}\n`,
                 );
             }
+
             let timer: NodeJS.Timeout | undefined;
+
             await Promise.race([
                 new Promise((done) => {
                     timer = setTimeout(done, checkEvery());
@@ -191,8 +221,10 @@ export async function waitForHeavySlot(
                 cancelled,
             ]);
             clearTimeout(timer);
+
             if (stop) {
                 await discard();
+
                 return null;
             }
         }
@@ -201,6 +233,7 @@ export async function waitForHeavySlot(
         process.stderr.write(
             `lar-work: can't use the heavy command slots in ${slots}: ${(error as Error).message}. Running without a slot.\n`,
         );
+
         return unheld;
     }
 }
@@ -210,21 +243,29 @@ export async function heavyCommand(args: string[]): Promise<number> {
     const separator = args.indexOf('--');
     const command = separator < 0 ? [] : args.slice(separator + 1);
     let dataDir: string;
+
     try {
         const { values } = parseArgs({
             args: args.slice(1, separator < 0 ? undefined : separator),
             options: { 'data-dir': { type: 'string' } },
         });
+
         if (!command.length) throw Error('heavy needs a command after --.');
+
         dataDir = values['data-dir'] ?? boardDataDir();
     } catch (error) {
         process.stderr.write(`lar-work: ${(error as Error).message}\nRun lar-work --help for usage.\n`);
+
         return 2;
     }
+
     const termination = trapTermination();
+
     try {
         const slot = await waitForHeavySlot(dataDir, command, termination.signalled);
+
         if (!slot) return signalStatus(termination.signal!);
+
         try {
             return (await termination.run(command, { stdio: ['ignore', 'inherit', 'inherit'], env: slot.env })).code;
         } finally {

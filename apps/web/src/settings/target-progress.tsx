@@ -12,8 +12,11 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
     const { replacing, retrying, error, retryError, replace, retry } = useDriftStore();
     const snapshot = useInstallStore((state) => state.snapshot);
     const pending = useSettingsStore((state) => state.pending);
+
     if (!snapshot?.installs || (!failed && !drift)) return null;
+
     const busy = !!snapshot.running || pending !== null || replacing || retrying;
+
     return (
         <div className="grid gap-2 text-xs">
             <p className="m-0 text-(--muted-foreground)">Retry and Replace apply to all active targets.</p>
@@ -103,6 +106,7 @@ export function TargetProgress({ target, showProgress = true }: { target: Target
                 : target.active && target.skills.length > 0 && successful === target.skills.length
                   ? 'Installed'
                   : 'Not installed';
+
     return (
         <div className="grid gap-2 text-xs [overflow-wrap:anywhere]">
             <p className="m-0" role={showProgress ? 'status' : undefined}>

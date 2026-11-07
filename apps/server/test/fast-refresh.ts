@@ -4,6 +4,7 @@ import { setInterval as realSetInterval } from 'node:timers';
 
 // Every source reads on each refresh tick, active or not.
 if (!process.env.FAST_LOCAL_REFRESH_ONLY) process.env.BOARD_READ_MS ||= process.env.FAST_REFRESH_MS || '100';
+
 process.env.BOARD_CATCH_UP_MS ||= process.env.FAST_REFRESH_MS || '100';
 
 /** The refresh tick's own interval in server.ts, which FAST_REFRESH_TICKS marks. */
@@ -14,6 +15,7 @@ const ticks = process.env.FAST_REFRESH_TICKS === '1' ? `${process.env.FAKE_GH_ST
 
 globalThis.setInterval = ((callback: (...args: unknown[]) => void, delay?: number, ...args: unknown[]) => {
     if (process.env.FAST_LOCAL_REFRESH_ONLY && delay !== 2_000) return realSetInterval(callback, delay, ...args);
+
     const run =
         ticks && delay === REFRESH_TICK_MS
             ? (...given: unknown[]) => {
@@ -21,5 +23,6 @@ globalThis.setInterval = ((callback: (...args: unknown[]) => void, delay?: numbe
                   callback(...given);
               }
             : callback;
+
     return realSetInterval(run, Math.min(delay ?? 0, Number(process.env.FAST_REFRESH_MS) || 100), ...args);
 }) as typeof globalThis.setInterval;

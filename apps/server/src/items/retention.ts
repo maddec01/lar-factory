@@ -56,29 +56,36 @@ export function createRetention({
 
     function deleteNow(retention: Retention): void {
         if (!records || retention.deleteAfterDays === null) return;
+
         const { deleted, kept } = records.deleteExpired(retention, now());
+
         if (deleted.length || kept.length) lastDelete = { at: now().toISOString(), deleted, kept };
     }
 
     return {
         hidden() {
             const retention = read();
+
             return records && !('problem' in retention)
                 ? new Set(records.hidden(retention, now()).map((r) => r.workId))
                 : new Set();
         },
         state() {
             const retention = read();
+
             if ('problem' in retention) return { hideAfterDays: 0, deleteAfterDays: null, problem: retention.problem };
+
             return { ...retention, ...(lastDelete && { lastDelete }) };
         },
         save({ hideAfterDays, deleteAfterDays, confirmed }) {
             if (!records) return { status: 409, body: { error: 'The board has no work records to keep or delete.' } };
+
             const current = read();
             const next = { hideAfterDays, deleteAfterDays } as Retention;
             const newDelete =
                 next.deleteAfterDays !== null &&
                 ('problem' in current || current.deleteAfterDays !== next.deleteAfterDays);
+
             try {
                 if (newDelete && confirmed !== true) {
                     // Validates the days the way the setting does, without saving it.
@@ -86,23 +93,30 @@ export function createRetention({
                         { hideAfterDays: next.deleteAfterDays as number, deleteAfterDays: null },
                         now(),
                     );
+
                     return {
                         status: 200,
                         body: { error: null, saved: false, due: due.map(({ workId, title }) => ({ workId, title })) },
                     };
                 }
+
                 writeRetention(next, dir);
                 deleteNow(next);
             } catch (err) {
                 if (!(err instanceof WorkRecordError)) throw err;
+
                 return { status: err.code === 'invalid' ? 400 : 500, body: { error: err.message } };
             }
+
             changed();
+
             return { status: 200, body: { error: null, saved: true } };
         },
         deleteDue() {
             const retention = read();
+
             if ('problem' in retention) return;
+
             try {
                 deleteNow(retention);
             } catch (err) {

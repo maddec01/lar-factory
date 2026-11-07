@@ -8,6 +8,7 @@ import { statsDbPath } from '../src/t3/t3-settings.ts';
 
 export async function repositoryProjects(env: NodeJS.ProcessEnv = process.env): Promise<ProjectRead> {
     if (env.FAKE_T3_READS) appendFileSync(env.FAKE_T3_READS, 'read\n');
+
     try {
         return {
             availability: 'available',

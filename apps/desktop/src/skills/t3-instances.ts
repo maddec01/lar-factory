@@ -18,6 +18,7 @@ export const runT3 =
         new Promise((resolve) => {
             ChildProcess.execFile('t3', args, { env, signal, encoding: 'utf8' }, (error, stdout) => {
                 const code = error ? (typeof error.code === 'number' ? error.code : null) : 0;
+
                 resolve({ code, stdout });
             });
         });

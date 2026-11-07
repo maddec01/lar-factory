@@ -27,9 +27,13 @@ export async function inspectWorkRecovery(input: RecoveryInput): Promise<{
     const exists = await git('git', ['-C', input.checkout, 'show-ref', '--verify', '--quiet', ref], {
         timeout: 10_000,
     });
+
     if (exists.code !== 0 && exists.code !== 1) throw new Error('Cannot inspect the local branch');
+
     const trees = await git('git', ['-C', input.checkout, 'worktree', 'list', '--porcelain'], { timeout: 10_000 });
+
     if (trees.code !== 0) throw new Error('Cannot inspect local worktrees');
+
     const worktreePath =
         trees.stdout
             .split('\n\n')
@@ -39,13 +43,16 @@ export async function inspectWorkRecovery(input: RecoveryInput): Promise<{
             ?.slice(9) ?? null;
     const provider = input.provider ?? prHost(input.repository);
     let pr: 'open' | 'none' | 'unknown' = 'none';
+
     try {
         const recorded = input.recordedPr ? await provider.prState(input.recordedPr) : null;
         const found = await provider.openPrByHead(input.repository, branch);
+
         if (recorded === 'OPEN' || found) pr = 'open';
     } catch {
         pr = 'unknown';
     }
+
     return {
         branch,
         branchExists: exists.code === 0,

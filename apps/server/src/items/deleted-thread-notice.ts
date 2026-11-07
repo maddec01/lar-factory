@@ -13,18 +13,26 @@ export function deletedThreadNotice(
         item.threads.some((t) => t.state === 'running' || t.state === 'needs you' || t.hasLiveChildren)
     )
         return item.needsYou;
+
     const latest = (recorded ?? records.threads(item.id))
         .filter((t) => t.purpose === 'shape' || t.purpose === 'build')
         .at(-1);
+
     if (!latest?.deletedAt) return item.needsYou;
+
     const record = records.read(item.id);
+
     if (record.kind === 'slice' || !['Shaping', 'Needs you', 'In progress', 'Review'].includes(record.status))
         return item.needsYou;
+
     const causes = item.needsYou?.causes ?? [];
+
     if (causes.some((c) => c.type === 'pr-closed')) return item.needsYou;
+
     const observations = records.observations(item.id);
     const pr = observations.find((o) => o.of === 'pr')?.state;
     const ticketClosed = causes.some((c) => c.type === 'ticket-closed');
+
     return {
         reason: ['The latest work thread was deleted.', ...(item.needsYou ? [item.needsYou.reason] : [])].join(' '),
         deletedThread: true,

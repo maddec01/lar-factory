@@ -65,9 +65,12 @@ async function plannedSwap(
     boardTypes: TicketKinds['boardTypes'],
 ): Promise<{ swap: KindTicketSwap; note: string }> {
     const swap = kindTicketSwap(ticket, kind, setup?.vocabulary);
+
     if (!swap.type) return { swap, note: '' };
+
     const { to } = swap.type;
     const shown = await boardTypes(setup?.itemSource?.kind === 'azure-board' ? setup.itemSource.team : undefined);
+
     return shown && !shown.some((type) => sameLabel(type, to))
         ? {
               swap: { ...swap, type: null },
@@ -90,13 +93,18 @@ export async function checkKind(
     { setup, kinds }: Pick<KindChangeDeps, 'setup' | 'kinds'>,
 ): Promise<KindCheck | null> {
     if (!record.ticket || !setup?.vocabulary) return null;
+
     const number = ticketNumber(record.ticket);
     const { read, boardTypes } = kinds ?? ticketKinds(record.repository);
+
     try {
         const ticket = await read(number);
         const disagreement = kindDisagreement(record, ticket, setup.vocabulary);
+
         if (!disagreement) return null;
+
         const { swap, note } = await plannedSwap(ticket, record.kind as SwapKind, setup, boardTypes);
+
         return { ...disagreement, swap, note, accessProblem: swapProblem(record.repository, swap, setup) };
     } catch (error) {
         throw new WorkRecordError('invalid', `Could not read #${number}. ${(error as Error).message}`);
@@ -111,14 +119,18 @@ export async function changeKind(
     { setup, ...tracker }: KindChangeDeps,
 ): Promise<KindChangeResult> {
     if (!SWAP_KINDS.includes(kind)) throw new WorkRecordError('invalid', 'Choose Bug, Feature or Improvement.');
+
     const record = records.read(workId);
+
     if (!kindCanChange(record.kind as Kind))
         throw new WorkRecordError('invalid', `A ${record.kind} has no kind to change.`);
+
     if (record.revision !== revision)
         throw new WorkRecordError(
             'stale-revision',
             `The work record ${workId} is at revision ${record.revision}, not ${revision}; read it again and retry.`,
         );
+
     const name = KIND_NAMES[kind];
     // A read or observation can bump the record while the tracker answers, so the writes below take its revision then.
     const itemOnly = (why: string): KindChangeResult => ({
@@ -128,6 +140,7 @@ export async function changeKind(
         labelChanges: [],
         ticketType: null,
     });
+
     if (!record.ticket) return itemOnly('Local work has no ticket to change.');
 
     const repo = record.repository;
@@ -138,10 +151,12 @@ export async function changeKind(
     const done: string[] = [];
     const labelChanges: LabelChange[] = [];
     const line = (note = '') => `${done.length ? `#${number}: ${done.join('; ')}.` : ''}${note}`;
+
     try {
         const ticket = await read(number);
         const { swap, note } = await plannedSwap(ticket, kind, setup, boardTypes);
         const problem = swapProblem(repo, swap, setup);
+
         if (problem) return itemOnly(`Its ticket stays as it is: ${problem}`);
 
         for (const label of swap.add) {
@@ -154,10 +169,12 @@ export async function changeKind(
             done.push(`removed ${noun} ${label}`);
             labelChanges.push({ label, action: 'remove' });
         }
+
         if (swap.type) {
             await setType(number, swap.type.to);
             done.push(`type ${ticket.type ?? 'none'} to ${swap.type.to}`);
         }
+
         const swapped = records.update(workId, records.read(workId).revision, { kind, agreedTicketKind: kind });
         // A type this change leaves alone can still read as another kind. The user chose this update, so that doesn't ask again.
         const left = kindDisagreement(
@@ -168,6 +185,7 @@ export async function changeKind(
             },
             setup?.vocabulary,
         );
+
         return {
             record: left
                 ? records.recordKindAnswer(workId, swapped.revision, { answer: 'update', ticketKind: left.ticketKind })

@@ -110,13 +110,17 @@ function SettingsModal() {
     const { section, project, setSection, setOpen } = useSettingsStore();
     // The title bar's Update pill follows the updater too, but it isn't there above the missing-t3 notice.
     const follow = useUpdateStore((state) => state.follow);
+
     useEffect(follow, [follow]);
+
     const archived = useArchiveStore((state) => state.items);
     const archiveProblem = useArchiveStore((state) => state.problem);
+
     // Archive stays off the board data, so it's read each time its section opens.
     useEffect(() => {
         if (section === 'archive') void useArchiveStore.getState().load();
     }, [section]);
+
     const all = pages({
         data,
         app: !!boardApp(),
@@ -127,6 +131,7 @@ function SettingsModal() {
     const byId = new Map(all.map((p) => [p.id, p]));
     const [query, setQuery] = useState('');
     const search = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             const typing =
@@ -137,13 +142,18 @@ function SettingsModal() {
                 event.target instanceof Node &&
                 event.target !== document.body &&
                 !search.current?.closest('[role="dialog"]')?.contains(event.target);
+
             if (event.key !== '/' || typing || over || event.metaKey || event.ctrlKey || event.altKey) return;
+
             event.preventDefault();
             search.current?.focus();
         };
+
         addEventListener('keydown', onKey);
+
         return () => removeEventListener('keydown', onKey);
     }, []);
+
     const q = query.trim().toLowerCase();
     const matches = (p: Page) =>
         !q ||
@@ -167,6 +177,7 @@ function SettingsModal() {
     const page = matches(open) ? open : (nav.flatMap((group) => group.pages)[0] ?? open);
     const setup = page.id === 'projects' && project ? data.repos.find((r) => r.repo === project)?.setup : undefined;
     const title = setup ? shownRepo(setup.repo) : page.label;
+
     return (
         <Modal onClose={() => setOpen(false)}>
             <Modal.Content
@@ -238,5 +249,6 @@ function SettingsModal() {
 /** Settings while it's open. Onboarding and confirmation dialogs stack over it. */
 export function SettingsDialog() {
     const open = useSettingsStore((state) => state.open);
+
     return open ? <SettingsModal /> : null;
 }

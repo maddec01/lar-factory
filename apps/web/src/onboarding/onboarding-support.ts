@@ -36,15 +36,18 @@ export function serve(
 ): void {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
         const route = routes[url];
+
         if (route) {
             const answer =
                 typeof route === 'function'
                     ? route(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>)
                     : route;
+
             return answer instanceof Response
                 ? answer
                 : new Response(JSON.stringify(answer), { status: 'error' in answer && answer.error ? 502 : 200 });
         }
+
         return url === '/api/onboarding/projects'
             ? new Response(JSON.stringify(Array.isArray(projects) ? { projects } : projects), {
                   status: Array.isArray(projects) ? 200 : 502,
@@ -96,7 +99,10 @@ export async function openOnboarding(
 ): Promise<void> {
     serve(data, projects, { error: null }, 200, routes);
     await mountPage(data);
+
     if (!data.repos.length) return settle(() => $<HTMLButtonElement>('[data-onboard]')!.click());
+
     const { useWizardStore } = await import('./wizard-store.ts');
+
     await settle(() => useWizardStore.getState().start());
 }

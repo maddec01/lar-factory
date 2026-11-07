@@ -70,13 +70,17 @@ const latestThread = (item: Item) => (Array.isArray(item.threads) ? item.threads
 /** The one thing the item's status asks of you. A Start leaves the latest thread to the Open thread beside it. */
 function statusAction(item: Item, data: BoardData, working: boolean): StatusAction {
     const linkedBeside = latestThread(item);
+
     if (working) return { opens: currentBuildThread(item)?.id };
+
     if (needsAnswer(item)) return { opens: openQuestionThread(item)?.id, label: 'Answer in T3' };
+
     switch (item.status) {
         case 'List':
             return { control: <QueueButton item={item} data={data} /> };
         case 'Queued':
             if (hasLiveThread(item)) return LATEST_THREAD;
+
             return {
                 control: <StartOrAfter item={item} data={data} label="Shape issue" linkedBeside={linkedBeside} />,
             };
@@ -117,6 +121,7 @@ function StatusActions({ item, data }: { item: Item; data: BoardData }) {
         item.threads === 'unavailable'
             ? !opensThread
             : latest !== undefined && !(opensThread && (action.opens ?? latest) === latest);
+
     return (
         <>
             {beside && <OpenThread item={item} data={data} />}
@@ -132,8 +137,11 @@ function StatusActions({ item, data }: { item: Item; data: BoardData }) {
 /** Move to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. */
 function MoveActions({ item, data }: { item: Item; data: BoardData }) {
     const startHolds = useStartHolds(item, data);
+
     if (item.status === 'List') return <AbandonButton item={item} data={data} />;
+
     if (item.status !== 'Queued' || startHolds || hasLiveThread(item)) return null;
+
     return (
         <>
             <BackToListButton item={item} data={data} />
@@ -198,6 +206,7 @@ function ItemDialogContent({ item, data, now, read, edit, refresh, expanded, tog
         : aside
           ? '@min-[45rem]:grid-rows-[auto_1fr]'
           : '';
+
     return (
         <Modal.Content
             title={`${itemName(item)}`}
@@ -417,6 +426,7 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
     /** The part to open once unsaved edits are discarded, rather than closing. */
     const [nextPart, setNextPart] = useState<string | null>(null);
     const [expanded, toggleExpanded] = useExpand(asking);
+
     useEffect(() => {
         useItemDialogStore.setState({
             dismiss: () => {
@@ -426,18 +436,22 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
                 }
             },
         });
+
         return () => {
             useItemDialogStore.setState({ dismiss: null });
         };
     }, [edit.saving, edit.dirty, close]);
+
     const openPart = (itemId: string) => {
         if (edit.saving) return;
+
         if (!edit.dirty) useItemDialogStore.getState().open(itemId);
         else {
             setNextPart(itemId);
             setAsking(true);
         }
     };
+
     return (
         <>
             <Modal onClose={() => (edit.dirty ? setAsking(true) : close())} loading={edit.saving}>
@@ -461,6 +475,7 @@ function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; no
                     }}
                     discard={() => {
                         setAsking(false);
+
                         if (nextPart) useItemDialogStore.getState().open(nextPart);
                         else close();
                     }}
@@ -474,10 +489,13 @@ export function ItemDialog() {
     const { data, now } = useBoardStore();
     const { itemId, session, close } = useItemDialogStore();
     const item = data.items.find((i) => i.id === itemId);
+
     // An item that left the board closes the dialog for good, so a later read that brings it back doesn't reopen it.
     useEffect(() => {
         if (itemId && !item) close();
     }, [itemId, item, close]);
+
     if (!item) return null;
+
     return <ItemModal key={session} item={item} data={data} now={now} close={close} />;
 }

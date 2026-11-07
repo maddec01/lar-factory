@@ -57,18 +57,22 @@ interface RawComments {
 const nameOf = (identity: unknown): string | null => {
     const raw = identity as RawIdentity;
     const name = typeof raw === 'string' ? raw : raw?.displayName;
+
     return name || null;
 };
 
 /** The format a field says it has, else HTML when the text opens with a tag, else markdown. */
 function formatOf(said: string | undefined, text: string): TextFormat {
     if (said?.toLowerCase() === 'html') return 'html';
+
     if (said?.toLowerCase() === 'markdown') return 'markdown';
+
     return /^\s*<[a-z!/]/i.test(text) ? 'html' : 'markdown';
 }
 
 const comment = (raw: RawComment): ItemComment => {
     const body = raw.text ?? '';
+
     return {
         id: String(raw.id),
         author: nameOf(raw.createdBy) ?? 'unknown',
@@ -85,6 +89,7 @@ type Call = <R>(resource: string, route: string[], version: string, more?: strin
 async function inArea<T>(item: Item, run: Az, use: (call: Call, repo: string) => Promise<T>): Promise<T | Refused> {
     if (!item.repo || !onAzure(item.repo) || item.number === null)
         return { status: 404, error: 'That item is not an Azure DevOps work item.' };
+
     const [organization, project] = item.repo.split('/') as [string, string];
     const call = async <R>(resource: string, route: string[], version: string, more: string[] = []): Promise<R> => {
         try {
@@ -109,11 +114,13 @@ async function inArea<T>(item: Item, run: Az, use: (call: Call, repo: string) =>
             throw problemOf(err);
         }
     };
+
     try {
         return await use(call, item.repo);
     } catch (err) {
         if (err instanceof ReadProblem)
             return { status: 502, error: `${err.message}${err.fix ? ` Run ${err.fix}.` : ''}` };
+
         return { status: 502, error: err instanceof Error ? err.message : String(err) };
     }
 }
@@ -148,7 +155,9 @@ async function relationsOf(
     const relatedIds = linked(workItem, 'System.LinkTypes.Related');
     const blockerIds = linked(workItem, 'System.LinkTypes.Dependency-Reverse');
     const ids = [...new Set([...childIds, ...relatedIds, ...blockerIds])];
+
     if (!ids.length) return { subTickets: [] };
+
     const [organization, project] = repo.split('/') as [string, string];
     const batches = Array.from({ length: Math.ceil(ids.length / 200) }, (_, i) => ids.slice(i * 200, (i + 1) * 200));
     const reads = await Promise.all(
@@ -182,6 +191,7 @@ async function relationsOf(
     const refs = new Map(
         children.map((raw): [number, IssueRef] => {
             const kind = category.get(field(raw, 'System.WorkItemType'))?.get(field(raw, 'System.State'));
+
             return [
                 raw.id,
                 {
@@ -203,6 +213,7 @@ async function relationsOf(
             )
             .map((raw) => raw.id),
     );
+
     return {
         subTickets: references(childIds.filter((id) => !removed.has(id))),
         ...(relatedIds.length > 0 && { related: references(relatedIds) }),
@@ -221,7 +232,9 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
     inArea(item, run, async (call, repo) => {
         // Both read at once, but a work item the batch leaves out answers 404 before the comments read fails for it.
         const comments = readComments(call, item);
+
         comments.catch(() => {});
+
         const {
             value: [workItem],
         } = await withFile({ ids: [item.number], $expand: 'Relations', errorPolicy: 'Omit' }, (file) =>
@@ -232,8 +245,10 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
                 ['--http-method', 'POST', '--in-file', file],
             ),
         );
+
         if (!workItem)
             return { status: 404, error: `Work item ${item.number} does not exist, or you have no right to read it.` };
+
         const read = await comments;
         const text = (name: string) => (typeof workItem.fields[name] === 'string' ? workItem.fields[name] : undefined);
         const hasContent = (value: string) =>
@@ -254,28 +269,36 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
         ] as const;
         const sections = descriptionFields.flatMap(([name, title]) => {
             const body = text(name) ?? '';
+
             return name !== bodyField && hasContent(body)
                 ? [{ title, body, format: formatOf(workItem.multilineFieldsFormat?.[name], body) }]
                 : [];
         });
         const discussion = await discussionPage(call, item, read);
+
         if ('error' in discussion) return discussion;
+
         let relationsError: string | undefined;
         const relations = await relationsOf(call, repo, workItem).catch((err: unknown) => {
             relationsError = err instanceof Error ? err.message : String(err);
+
             return { subTickets: [] };
         });
         const attachments = (workItem.relations ?? []).flatMap((r) => {
             if (r.rel !== 'AttachedFile' || !URL.canParse(r.url)) return [];
+
             const url = new URL(r.url);
+
             if (
                 url.protocol !== 'https:' ||
                 !(url.hostname === 'dev.azure.com' || url.hostname.endsWith('.visualstudio.com'))
             )
                 return [];
+
             return [{ name: r.attributes?.name || 'Attachment', url: r.url }];
         });
         const assignee = nameOf(workItem.fields['System.AssignedTo']);
+
         return {
             body: stripTrackerStructure(body),
             format: formatOf(workItem.multilineFieldsFormat?.[bodyField], body),
@@ -299,5 +322,6 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
 export const readAzureOlderComments = (item: Item, before: string, run: Az = az): Promise<ItemCommentsPage | Refused> =>
     inArea(item, run, async (call) => {
         const read = await readComments(call, item, before);
+
         return discussionPage(call, item, read);
     });

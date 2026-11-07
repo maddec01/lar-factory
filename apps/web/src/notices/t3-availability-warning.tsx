@@ -17,15 +17,21 @@ export function T3AvailabilityWarning() {
     const source = useBoardStore((state) => state.data.t3Availability);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
     if (!source || source.availability === 'available') return null;
+
     const renew = async () => {
         if (pending) return;
+
         setPending(true);
+
         const result = await postAction('/api/t3/reauthorize', {});
+
         setError(result.error);
         setPending(false);
         receive(result);
     };
+
     return (
         <Warning dismissKey={`t3-source:${source.availability}`} title={titles[source.availability]}>
             {source.observedAt ? (

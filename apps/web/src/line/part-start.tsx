@@ -30,10 +30,14 @@ export function PartStart({
     namesBlocker?: boolean;
 }) {
     const { item } = part;
+
     if (item.status === 'Ready')
         return <StartBuild item={item} data={data} label={label} namesBlocker={namesBlocker} />;
+
     if (item.status !== 'Queued') return null;
+
     // A thread already at work on the item would get a second one.
     if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
+
     return <StartOrAfter item={item} data={data} label={label} namesBlocker={namesBlocker} />;
 }

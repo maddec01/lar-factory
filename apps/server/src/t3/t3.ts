@@ -35,40 +35,57 @@ export async function startThread(
 ): Promise<StartResult> {
     const existing = worktree && 'type' in worktree ? worktree : undefined;
     const created = worktree && !('type' in worktree) ? worktree : undefined;
+
     if (existing && !choice)
         return { thread: null, error: 'Choose a model before continuing in an existing worktree.' };
+
     if (choice) {
         const found = defaults(project);
+
         if (!found) return { thread: null, error: "Can't read T3 Code's settings. Check T3 Code, then start again." };
+
         const selection = launchSelection(choice, found.selection);
+
         // A resumed build's message matches its earlier thread, so a lost answer stays uncertain rather than finding that one.
         if (existing) {
             const result = await launch(project, message, selection, existing, 'approval-required');
+
             return result.uncertain ? UNCERTAIN : result;
         }
+
         const workspace: LaunchWorkspace = created
             ? { type: 'worktree', baseRef: created.base, branch: created.branch }
             : { type: 'root' };
         const result = await launch(project, message, selection, workspace, found.runtimeMode);
+
         return result.uncertain ? recoverStart(project, message, run) : result;
     }
+
     const where = created ? ['--worktree', created.base, '--branch', created.branch] : [];
     const missing = `${missingTool('t3')}. Install the T3 Code CLI or set T3_PATH.`;
     let result: RunResult;
+
     try {
         result = await run(['thread', 'start', project, message, ...where, '--json'], 60_000);
     } catch {
         return recoverStart(project, message, run);
     }
+
     const { code, stdout } = result;
+
     if (code === 'ENOENT') return { thread: null, error: missing };
+
     // A failed command can have created a thread before losing its answer.
     if (code !== 0) return recoverStart(project, message, run);
+
     try {
         const launched = JSON.parse(stdout) as { threadId?: unknown; title?: unknown };
+
         if (typeof launched.threadId !== 'string' || !launched.threadId) throw new Error('No thread id.');
+
         // T3 titles a thread from the first line of its first message.
         const title = typeof launched.title === 'string' ? launched.title : (message.split('\n')[0] ?? message);
+
         return { thread: { threadId: launched.threadId, title }, error: null };
     } catch {
         return recoverStart(project, message, run);
@@ -78,12 +95,14 @@ export async function startThread(
 /** List/show can recover a late launch; absence or ambiguity never permits a retry. */
 async function recoverStart(project: string, message: string, run: T3Run): Promise<StartResult> {
     const found = await findStartedThread(project, [message], [], run);
+
     return typeof found === 'object' ? { thread: found, error: null } : UNCERTAIN;
 }
 
 /** Whether T3 could have titled a thread `title` from `message`: from its first line, which T3 cuts short with an ellipsis when long. */
 export function titledFrom(title: unknown, message: string): boolean {
     const line = message.split('\n')[0]!;
+
     return title === line || (typeof title === 'string' && title.endsWith('…') && line.startsWith(title.slice(0, -1)));
 }
 
@@ -99,17 +118,27 @@ export async function findStartedThread(
 ): Promise<StartedThread | 'absent' | 'unknown'> {
     try {
         const listed = await run(['thread', 'list', '--project', project, '--json'], 10_000);
+
         if (listed.code !== 0) return 'unknown';
+
         const threads: unknown = JSON.parse(listed.stdout);
+
         if (!Array.isArray(threads)) return 'unknown';
+
         const matches = new Map<string, StartedThread>();
+
         for (const thread of threads) {
             if (!isRecord(thread) || typeof thread.threadId !== 'string') return 'unknown';
+
             if (!messages.some((message) => titledFrom(thread.title, message)) || known.includes(thread.threadId))
                 continue;
+
             const shown = await run(['thread', 'show', thread.threadId, '--json', '--messages', '2147483647'], 10_000);
+
             if (shown.code !== 0) return 'unknown';
+
             const answer: unknown = JSON.parse(shown.stdout);
+
             if (
                 !isRecord(answer) ||
                 !isRecord(answer.thread) ||
@@ -117,10 +146,13 @@ export async function findStartedThread(
                 !Array.isArray(answer.messages)
             )
                 return 'unknown';
+
             const first = answer.messages.find((entry) => isRecord(entry) && entry.role === 'user');
+
             if (isRecord(first) && messages.some((message) => first.text === message))
                 matches.set(thread.threadId, { threadId: thread.threadId, title: String(thread.title) });
         }
+
         return matches.size === 1 ? [...matches.values()][0]! : matches.size ? 'unknown' : 'absent';
     } catch {
         return 'unknown';
@@ -132,7 +164,9 @@ export type T3Run = (args: string[], timeout: number) => Promise<RunResult>;
 
 const runT3: T3Run = (args, timeout) => {
     const command = toolCommand('t3');
+
     if (!command) return Promise.resolve({ code: 'ENOENT', stdout: '', stderr: '', detail: '' });
+
     return runTool(command.file, args, { env: command.env, timeout });
 };
 
@@ -140,15 +174,21 @@ const runT3: T3Run = (args, timeout) => {
 export async function addProject(folder: string): Promise<string | null> {
     const command = toolCommand('t3');
     const missing = `${missingTool('t3')}. Install the T3 Code CLI or set T3_PATH.`;
+
     if (!command) return missing;
+
     const { code, detail } = await runTool(command.file, ['project', 'add', folder], {
         env: command.env,
         timeout: 60_000,
     });
+
     if (code === 'ENOENT') return missing;
+
     if (code === 0) return null;
+
     // A signal, such as our timeout, leaves it unknown whether T3 added the folder.
     if (code === null) return "t3 didn't answer in time. Check T3 Code's projects before adding the folder again.";
+
     return `t3 could not add the project: ${detail}`;
 }
 
@@ -156,18 +196,22 @@ export async function addProject(folder: string): Promise<string | null> {
 export async function lookupThread(id: string, run: T3Run = runT3): Promise<'live' | 'deleted' | 'unknown'> {
     try {
         const result = await run(['thread', 'show', id, '--json', '--messages', '0'], 10_000);
+
         if (
             result.code === 1 &&
             result.stdout === '' &&
             result.stderr.trim() === `Thread ${id} is no longer available.`
         )
             return 'deleted';
+
         if (result.code === 0) {
             const answer: unknown = JSON.parse(result.stdout);
+
             if (isRecord(answer) && isRecord(answer.thread) && answer.thread.threadId === id) return 'live';
         }
     } catch {
         /* A failed lookup leaves the Start protected. */
     }
+
     return 'unknown';
 }

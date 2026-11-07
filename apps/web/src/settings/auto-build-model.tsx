@@ -17,8 +17,10 @@ import { ModelEntries, opensOnChecked } from '../items/model-entries.tsx';
 
 function modelLabel(groups: ModelGroup[], selected: ModelChoice | undefined): string {
     if (!selected) return 'T3 Project default';
+
     const group = groups.find((g) => g.instanceId === selected.instanceId);
     const model = group?.models.find((m) => m.slug === selected.model);
+
     return model ? `${group!.name} ${model.label}` : `${selected.instanceId} ${selected.model} (not offered)`;
 }
 
@@ -27,6 +29,7 @@ type AutoBuildData = Pick<BoardData, 'repos' | 'autoBuild' | 'modelChoices' | 't
 /** Each repository's default model, once the board has read the setting and T3's defaults, which it never does in sample mode. */
 function RepositoryDefaults({ data }: { data: AutoBuildData }) {
     if (!data.autoBuild || data.autoBuild.model || !data.t3Defaults || !data.repos.length) return null;
+
     return (
         <ul className="m-0 grid list-none gap-1 p-0 text-xs" aria-label="Default model by Project">
             {data.repos.map(({ repo }) => (
@@ -53,13 +56,16 @@ export function AutoBuildModelSetting({ data }: { data: AutoBuildData }) {
             setSaving(true);
             setError(null);
         });
+
         const result = await postAction('/api/auto-build', { model: model ?? null });
+
         flushSync(() => {
             receive(result);
             setSaving(false);
             setError(result.error);
         });
     };
+
     return (
         <div className="grid gap-3" data-auto-build-model>
             <div className="grid max-w-80 gap-2">

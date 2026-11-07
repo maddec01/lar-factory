@@ -12,7 +12,9 @@ import { openWorkRecords, workRecordsPath, type WorkRecords } from './work-recor
 
 const checkoutEnv = (): NodeJS.ProcessEnv => {
     const env = { ...process.env };
+
     for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR']) delete env[key];
+
     return env;
 };
 const git = (args: string[], env = checkoutEnv()) =>
@@ -30,14 +32,21 @@ function checkoutFolder(): string {
 /** The checkout's tree as it stands, including unstaged and untracked files, without changing its index. */
 function snapshot(): string | null {
     let temp: string | undefined;
+
     try {
         const root = git(['rev-parse', '--show-toplevel']);
         const index = git(['rev-parse', '--path-format=absolute', '--git-path', 'index']);
+
         temp = mkdtempSync(join(tmpdir(), 'lar-check-index-'));
+
         const target = join(temp, 'index');
+
         if (existsSync(index)) copyFileSync(index, target);
+
         const env = { ...checkoutEnv(), GIT_INDEX_FILE: target };
+
         git(['-C', root, 'add', '-A'], env);
+
         return git(['write-tree'], env);
     } catch {
         return null;
@@ -50,6 +59,7 @@ export async function checkCommand(args: string[]): Promise<number> {
     const reuse = args[0] === 'reuse-check';
     const separator = args.indexOf('--');
     let parsed;
+
     try {
         parsed = parseArgs({
             args: args.slice(1, separator < 0 ? undefined : separator),
@@ -62,6 +72,7 @@ export async function checkCommand(args: string[]): Promise<number> {
                 'data-dir': { type: 'string' },
             },
         });
+
         if (
             parsed.positionals.length !== 1 ||
             !parsed.values.role?.trim() ||
@@ -71,30 +82,39 @@ export async function checkCommand(args: string[]): Promise<number> {
             throw new Error('Expected work ID, role and command, or check ID and reuse reason.');
     } catch (error) {
         process.stderr.write(`lar-work: ${String(error)}\n`);
+
         return 2;
     }
+
     const {
         values,
         positionals: [workId],
     } = parsed;
     const path = workRecordsPath(values['data-dir']);
+
     if (reuse) {
         let records: WorkRecords | undefined;
+
         try {
             const tree = snapshot();
+
             if (!tree) throw new Error('Current tree unavailable.');
+
             records = await openWorkRecords(path);
             process.stdout.write(
                 `${JSON.stringify(records.reuseCheck(workId!, values.check!, { role: values.role!, reason: values.reason!, tree }))}\n`,
             );
+
             return 0;
         } catch (error) {
             process.stderr.write(`lar-work: ${String(error)}\n`);
+
             return 1;
         } finally {
             records?.close();
         }
     }
+
     const command = args.slice(separator + 1);
     const termination = trapTermination();
     let records: WorkRecords | undefined;
@@ -108,6 +128,7 @@ export async function checkCommand(args: string[]): Promise<number> {
                 warn(error);
             }
     };
+
     try {
         try {
             records = await openWorkRecords(path);
@@ -122,15 +143,20 @@ export async function checkCommand(args: string[]): Promise<number> {
         } catch (error) {
             warn(error);
         }
+
         const slot = await waitForHeavySlot(dirname(path), command, termination.signalled);
+
         if (!slot) {
             record((records, run) =>
                 records.finishCheck(run.checkId, { tree: null, exitStatus: null, interrupted: true, log: null }),
             );
+
             return signalStatus(termination.signal!);
         }
+
         try {
             record((records, run) => records.beginCheck(run.checkId, { tree: snapshot() }));
+
             const capacity = 10 * 1024 * 1024;
             const tail = Buffer.allocUnsafe(capacity);
             let cursor = 0;
@@ -140,8 +166,10 @@ export async function checkCommand(args: string[]): Promise<number> {
                     input.pause();
                     output.once('drain', () => input.resume());
                 }
+
                 const bytes = chunk.length > capacity ? chunk.subarray(-capacity) : chunk;
                 const first = Math.min(bytes.length, capacity - cursor);
+
                 bytes.copy(tail, cursor, 0, first);
                 bytes.copy(tail, 0, first);
                 cursor = (cursor + bytes.length) % capacity;
@@ -156,10 +184,13 @@ export async function checkCommand(args: string[]): Promise<number> {
                 },
             });
             const end = snapshot();
+
             record((records, run) => {
                 let log: string | null = `check-logs/${run.workId}/${run.checkId}.log`;
+
                 try {
                     const file = join(dirname(path), log);
+
                     mkdirSync(dirname(file), { recursive: true });
                     writeFileSync(
                         file,
@@ -170,6 +201,7 @@ export async function checkCommand(args: string[]): Promise<number> {
                 } catch {
                     log = null;
                 }
+
                 records.finishCheck(run.checkId, {
                     tree: end,
                     exitStatus: outcome.code,
@@ -177,12 +209,14 @@ export async function checkCommand(args: string[]): Promise<number> {
                     log,
                 });
             });
+
             return outcome.code;
         } finally {
             await slot.release();
         }
     } finally {
         termination.dispose();
+
         try {
             records?.close();
         } catch (error) {

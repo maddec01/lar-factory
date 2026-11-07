@@ -32,24 +32,33 @@ export function createAutoBuildSetting({ dir, offerModelChoices, changed = () =>
                     body: { error: 'Send the Auto-build switch as true or false, or its model choice.' },
                 };
             }
+
             const saved = readAutoBuild(dir);
             // A file the board can't use reads as off on T3 Project default, and this save replaces it.
             let next: AutoBuild = { on: saved.on, ...(saved.model && { model: saved.model }) };
+
             if (on !== undefined) next = { ...next, on: on as boolean };
+
             if (model === null) next = { on: next.on };
             else if (model !== undefined) {
                 const choice = findModelChoice(offerModelChoices(), model);
+
                 if (!choice)
                     return { status: 422, body: { error: "That model choice isn't offered. Pick another one." } };
+
                 next = { on: next.on, model: choice };
             }
+
             try {
                 writeAutoBuild(next, dir);
             } catch (err) {
                 if (!(err instanceof WorkRecordError)) throw err;
+
                 return { status: err.code === 'invalid' ? 400 : 500, body: { error: err.message } };
             }
+
             changed();
+
             return { status: 200, body: { error: null } };
         },
     };

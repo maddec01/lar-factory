@@ -50,9 +50,12 @@ const counted = (last: unknown, total?: unknown, extra = {}) =>
 
 test('a Codex record takes its model from the preceding turn context, and input includes the cached part', () => {
     const state = initialCodexScanState();
+
     parseCodexLine(sessionMeta, state);
     parseCodexLine(turnContext, state);
+
     const record = parseCodexLine(tokenCount(19239, 11008, 299, 116), state);
+
     assert.deepEqual(record, {
         provider: 'codex',
         timestampMs: Date.parse('2026-08-01T05:17:49.919Z'),
@@ -74,6 +77,7 @@ test('a Codex record takes its model from the preceding turn context, and input 
 
 test('a repeated Codex token_count is skipped, so deltas are not counted twice', () => {
     const state = initialCodexScanState();
+
     parseCodexLine(turnContext, state);
     assert.notEqual(parseCodexLine(tokenCount(100, 0, 10, 0), state), null);
     assert.equal(parseCodexLine(tokenCount(100, 0, 10, 0), state), null);
@@ -81,12 +85,14 @@ test('a repeated Codex token_count is skipped, so deltas are not counted twice',
 
 test('Codex counters before a model or a valid timestamp are dropped, not consumed', () => {
     const state = initialCodexScanState();
+
     assert.equal(parseCodexLine(tokenCount(100, 0, 10, 0), state), null);
     parseCodexLine(turnContext, state);
     assert.notEqual(parseCodexLine(tokenCount(100, 0, 10, 0), state), null);
 
     const cumulativeState = initialCodexScanState();
     const line = counted(counters(100, 20), counters(100, 20));
+
     assert.equal(parseCodexLine(line, cumulativeState), null);
     parseCodexLine(turnContext, cumulativeState);
     assert.equal(parseCodexLine(line.replace('2026-08-01T05:17:49.919Z', 'invalid'), cumulativeState), null);
@@ -96,8 +102,11 @@ test('Codex counters before a model or a valid timestamp are dropped, not consum
 
 test('stale Codex requests are ignored, equal requests count when totals advance, and the tier follows thread settings', () => {
     const state = initialCodexScanState();
+
     parseCodexLine(turnContext, state);
+
     const request = counters(100, 20);
+
     assert.equal(parseCodexLine(counted(request, request), state)?.totals.outputTokens, 20);
     assert.equal(parseCodexLine(counted(counters(20, 5), request), state), null);
     assert.equal(
@@ -117,7 +126,9 @@ test('stale Codex requests are ignored, equal requests count when totals advance
             }),
             state,
         );
+
         const record = parseCodexLine(counted(request, counters(100 * (index + 3), 20 * (index + 3))), state);
+
         assert.equal(record?.model, 'gpt-6-astra');
         assert.equal(record?.speed, tier === 'priority' ? 'fast' : 'ultrafast');
         assert.equal(record?.totals.uncachedInputTokens, 100);
@@ -129,8 +140,11 @@ test('stale Codex requests are ignored, equal requests count when totals advance
 for (const initialCumulative of [false, true]) {
     test(`legacy Codex requests are not billed again, nor the next cumulative delta dropped (initial cumulative=${initialCumulative})`, () => {
         const state = initialCodexScanState();
+
         parseCodexLine(turnContext, state);
+
         const first = counters(100, 20);
+
         assert.equal(
             parseCodexLine(counted(first, initialCumulative ? first : undefined), state)?.totals.outputTokens,
             20,
@@ -151,8 +165,10 @@ test('every cumulative Codex component is checked, and an inconsistent pair stil
         reasoning_output_tokens: 5,
     };
     const fields = Object.keys(request) as (keyof typeof request)[];
+
     for (const field of fields) {
         const state = initialCodexScanState();
+
         parseCodexLine(turnContext, state);
         assert.deepEqual(parseCodexLine(counted(request, request), state)?.totals, {
             uncachedInputTokens: 60,
@@ -161,10 +177,14 @@ test('every cumulative Codex component is checked, and an inconsistent pair stil
             outputTokens: 20,
             reasoningTokens: 5,
         });
+
         const total = { ...request };
+
         for (const key of fields) total[key] *= 2;
         total[field] += 1;
+
         if (field === 'input_tokens' || field === 'output_tokens') total.total_tokens += 1;
+
         assert.equal(parseCodexLine(counted(request, total), state), null, field);
         assert.equal(state.malformedRecords, 1, field);
         for (const key of fields) total[key] += request[key];
@@ -176,8 +196,11 @@ test('every cumulative Codex component is checked, and an inconsistent pair stil
 for (const malformed of ['request', 'cumulative']) {
     test(`malformed Codex ${malformed} counters are skipped, and the next request counts`, () => {
         const state = initialCodexScanState();
+
         parseCodexLine(turnContext, state);
+
         const request = counters(100, 20);
+
         parseCodexLine(counted(request, request), state);
         assert.equal(
             parseCodexLine(
@@ -201,9 +224,12 @@ for (const malformed of ['request', 'cumulative']) {
 
 test('a Codex context-window estimate or compaction marker is not billed, and the next request counts', () => {
     const state = initialCodexScanState();
+
     parseCodexLine(turnContext, state);
     parseCodexLine(counted(counters(100, 20), counters(100, 20)), state);
+
     const estimate = { ...counters(0, 0), total_tokens: 1000 };
+
     assert.equal(
         parseCodexLine(counted({ ...estimate, total_tokens: 880 }, estimate, { model_context_window: 1000 }), state),
         null,
@@ -213,9 +239,11 @@ test('a Codex context-window estimate or compaction marker is not billed, and th
             .outputTokens,
         2,
     );
+
     const marker = counted({ ...counters(0, 0), total_tokens: 26387 }, counters(0, 0), {
         model_context_window: 475000,
     });
+
     assert.equal(parseCodexLine(marker, state), null);
     // After a compaction or a resume in a new process, the cumulative counters restart at the request.
     assert.equal(parseCodexLine(counted(counters(30, 5), counters(30, 5)), state)?.totals.outputTokens, 5);
@@ -228,16 +256,22 @@ test("a Codex OpenAI session's turn keeps its tier unresolved until thread setti
         JSON.stringify({ type: 'session_meta', payload: { id, model_provider } });
     const context = (turn_id?: string, model?: string) =>
         JSON.stringify({ type: 'turn_context', payload: { turn_id, model } });
+
     for (const provider of ['openai', 'custom', undefined]) {
         const state = initialCodexScanState();
+
         parseCodexLine(meta('own-session', provider), state);
         parseCodexLine(meta('ancestor', provider === 'openai' ? 'custom' : 'openai'), state);
         parseCodexLine(context('first-turn', 'gpt-6-astra'), state);
+
         const first = parseCodexLine(tokenCount(100, 0, 1, 0), state);
+
         assert.equal(first?.sessionId, 'own-session');
         assert.equal(first?.unresolvedServiceTierTurnId, provider === 'openai' ? 'first-turn' : undefined);
     }
+
     const state = initialCodexScanState();
+
     parseCodexLine(meta('own-session', 'openai'), state);
     parseCodexLine(
         JSON.stringify({
@@ -247,7 +281,9 @@ test("a Codex OpenAI session's turn keeps its tier unresolved until thread setti
         state,
     );
     parseCodexLine(context('native-turn', 'gpt-6-astra'), state);
+
     const record = parseCodexLine(tokenCount(100, 0, 2, 0), state);
+
     assert.equal(record?.speed, 'fast');
     assert.equal(record && 'unresolvedServiceTierTurnId' in record, false);
 });
@@ -272,6 +308,7 @@ const stamped = (timestamp: string, line: string) => JSON.stringify({ ...JSON.pa
 test('a forked Codex rollout drops its re-stamped copied burst and keeps its own first event', () => {
     const state = initialCodexScanState();
     const forkInstant = '2026-08-01T05:00:00.000Z';
+
     parseCodexLine(forkMeta({ id: 'child', timestamp: forkInstant, forkedFromId: 'parent' }), state);
     parseCodexLine(forkMeta({ id: 'parent', timestamp: forkInstant }), state);
     parseCodexLine(stamped(forkInstant, turnContext), state);
@@ -283,10 +320,12 @@ test('a forked Codex rollout drops its re-stamped copied burst and keeps its own
         parseCodexLine(stamped('2026-08-01T05:00:00.002Z', counted(counters(200, 20), counters(300, 30))), state),
         null,
     );
+
     const real = parseCodexLine(
         stamped('2026-08-01T05:00:06.000Z', counted(counters(200, 20), counters(500, 50))),
         state,
     );
+
     assert.equal(real?.sessionId, 'child');
     assert.equal(real?.totals.outputTokens, 20);
     assert.notEqual(
@@ -296,6 +335,7 @@ test('a forked Codex rollout drops its re-stamped copied burst and keeps its own
     assert.equal(state.malformedRecords, 0);
 
     const spawned = initialCodexScanState();
+
     parseCodexLine(forkMeta({ id: 'child', timestamp: forkInstant, spawnParentId: 'parent' }), spawned);
     parseCodexLine(stamped(forkInstant, turnContext), spawned);
     assert.equal(
@@ -305,6 +345,7 @@ test('a forked Codex rollout drops its re-stamped copied burst and keeps its own
     );
 
     const root = initialCodexScanState();
+
     parseCodexLine(forkMeta({ id: 'root', timestamp: '2026-08-01T05:00:00.000Z' }), root);
     parseCodexLine(stamped('2026-08-01T05:00:00.100Z', turnContext), root);
     assert.notEqual(

@@ -18,6 +18,7 @@ const ALL = 'Search';
 const deskCards = () => $$('.desk-card').length;
 const receive = async (data: BoardData) => {
     const { useBoardStore } = await import('./board-store.ts');
+
     await settle(() => useBoardStore.getState().receive(data));
 };
 const store = async () => (await import('./scope-store.ts')).useScopeStore.getState();
@@ -56,8 +57,10 @@ test('a board with storage that throws keeps working for this page', async () =>
     // Only these keys: other stores read their own storage unguarded.
     for (const method of ['getItem', 'setItem', 'removeItem'] as const) {
         const real = Storage.prototype[method] as (this: Storage, ...args: unknown[]) => never;
+
         vi.spyOn(Storage.prototype, method).mockImplementation(function (this: Storage, ...args: unknown[]) {
             if (args[0] === SCOPE_KEY || args[0] === FILTERS_KEY) throw new Error('blocked');
+
             return real.apply(this, args);
         });
     }
@@ -104,7 +107,9 @@ test('the saved repository shows again when it returns to the board', async () =
 
 test('a repository the board search offers only for its List items stays shown', async () => {
     localStorage.setItem(SCOPE_KEY, GONE);
+
     const listed = sample.items.find((item) => item.status === 'List')!;
+
     await mountPage({ ...sample, items: [...sample.items, { ...listed, id: 'gone-item', repo: GONE }] });
     expect(scopeLabel()).toBe(scoped('lar-gone'));
 });
@@ -121,7 +126,9 @@ test('the List modal starts on the shown Scope, and Scope board writes the saved
     localStorage.setItem(SCOPE_KEY, GONE);
     await mountPage();
     await settle(() => $<HTMLButtonElement>('.title-bar button.list-button')!.click());
+
     const nav = () => $$<HTMLButtonElement>('[data-list-modal] nav[aria-label="Projects"] button');
+
     expect(
         nav()
             .filter((b) => b.getAttribute('aria-current') === 'page')

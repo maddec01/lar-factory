@@ -2,6 +2,7 @@
 // it left. Keyed by item id.
 
 import { create } from 'zustand';
+
 export interface ItemAction {
     phase: 'pending' | 'error';
     kind: 'queue' | 'back-to-list' | 'abandon' | 'needs-you' | 'dependency-met';
@@ -11,6 +12,7 @@ export interface ItemAction {
 /** `record` with `key` set to `value`, or without `key` when `value` is `undefined`. */
 export function setKey<T>(record: Record<string, T>, key: string, value: T | undefined): Record<string, T> {
     const { [key]: _, ...rest } = record;
+
     return value ? { ...rest, [key]: value } : rest;
 }
 

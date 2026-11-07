@@ -12,6 +12,7 @@ import { Choice } from './controls.tsx';
 
 function wholeFromOne(text: string): number | null {
     const n = Number(text);
+
     return text.trim() !== '' && Number.isSafeInteger(n) && n >= 1 ? n : null;
 }
 
@@ -49,11 +50,14 @@ export function LimitSetting({
     const save = async (limit: HeavyCommandLimit) => {
         setSaving(true);
         setError(null);
+
         const result = await postAction(`/api/${name}`, { limit });
+
         flushSync(() => {
             receive(result);
             setSaving(false);
             setError(result.error);
+
             if (!result.error) {
                 setMode(null);
                 setTyped(null);
@@ -63,6 +67,7 @@ export function LimitSetting({
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+
         if (number !== null && !held) void save(number);
     };
 
@@ -70,6 +75,7 @@ export function LimitSetting({
         { value: 'automatic', label: state ? `Automatic (${state.automatic})` : 'Automatic' },
         { value: 'number', label: 'Number' },
     ];
+
     return (
         <div className="grid gap-2" data-limit={name}>
             <Choice
@@ -79,9 +85,11 @@ export function LimitSetting({
                 busy={saving}
                 onChange={(next) => {
                     setError(null);
+
                     if (next === 'automatic') void save('automatic');
                     else {
                         setMode('number');
+
                         if (typeof saved !== 'number' && state) setTyped(String(state.automatic));
                     }
                 }}

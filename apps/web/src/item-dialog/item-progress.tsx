@@ -37,6 +37,7 @@ function SliceChip({ slice }: { slice: Slice }) {
 /** A concept's parts done out of its parts, as the records count them, including any retention took off the board. */
 function PartsProgress({ item }: { item: Item }) {
     const { completed, total } = item.subIssues;
+
     return (
         <div className="grid gap-1" data-parts-progress>
             <p className="m-0 text-xs text-(--muted-foreground)">
@@ -60,7 +61,9 @@ export function ItemProgress({ item }: { item: Item }) {
     const done = item.slices.filter((s) => s.progress === 'done').length;
     const concept = item.kind === 'concept';
     const parts = concept && item.subIssues.total > 0;
+
     if (at < 0 && !item.slices.length && !parts) return null;
+
     return (
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-progress>
             {parts && <PartsProgress item={item} />}
@@ -69,6 +72,7 @@ export function ItemProgress({ item }: { item: Item }) {
                     {WORKFLOW_STEPS.map((s, i) => {
                         const name = i === at ? shown.word : s;
                         const label = `Step ${i + 1} of ${WORKFLOW_STEPS.length}: ${name}`;
+
                         if (i !== at) {
                             return (
                                 <li
@@ -85,6 +89,7 @@ export function ItemProgress({ item }: { item: Item }) {
                                 />
                             );
                         }
+
                         return (
                             <li
                                 key={s}

@@ -56,6 +56,7 @@ export const useBoardStore = create<BoardState>()((set) => ({
                 const key = (item: BoardData['items'][number]) =>
                     item.number ? refKey(item.repo, item.number).toLowerCase() : item.id;
                 const items = new Map(cached.map((item) => [key(item), item]));
+
                 for (const item of data.items) items.set(key(item), item);
                 data = {
                     ...data,
@@ -63,7 +64,9 @@ export const useBoardStore = create<BoardState>()((set) => ({
                     repos: data.repos.length || (!beforeSources && !cached.length) ? data.repos : state.data.repos,
                 };
             }
+
             data = shareBoardData(state.data, data);
+
             return {
                 data,
                 loaded: state.loaded || Boolean(data.firstRead.ready) || data.firstRead.settled,

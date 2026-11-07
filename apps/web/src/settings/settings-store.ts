@@ -54,11 +54,16 @@ function untickText(
     removed: InstallOperationResult['removed'],
 ): string {
     if (target?.kind !== 'claude') return `Lar Factory no longer installs into ${where}, and left its copies there.`;
+
     const links = (removed?.links.length ?? 0) > 0;
     const checklists = removed?.checklists ?? false;
+
     if (links && checklists) return `Removed the skill links and checklists from ${where}.`;
+
     if (links) return `Removed the skill links from ${where}.`;
+
     if (checklists) return `Removed the checklists from ${where}.`;
+
     return `Lar Factory had no skill links or checklists in ${where} to remove.`;
 }
 
@@ -83,17 +88,22 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     result: { text: '' },
     setOpen: (open) => {
         const call = ++opening;
+
         unfollow();
         unfollow = () => {};
         set({ open, targets: null, result: { text: '' } });
+
         const app = boardApp();
+
         if (!open || !app) return;
+
         const latest = () => call === opening;
         const store = useInstallStore.getState();
         const unsubscribe = useInstallStore.subscribe(
             ({ snapshot }) => snapshot && latest() && set(fromSnapshot(snapshot)),
         );
         const stop = store.follow();
+
         unfollow = () => {
             unsubscribe();
             stop();
@@ -101,6 +111,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
         void store.read().then(
             (snapshot) => {
                 if (!latest()) return;
+
                 set(fromSnapshot(snapshot));
             },
             (error) =>
@@ -118,11 +129,16 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     setSection: (section) => set({ section: section === 'repos' ? 'projects' : section, project: null }),
     setTick: async (path, ticked) => {
         if (get().pending || !get().installed || !get().installs) return;
+
         set({ pending: path, result: { text: '' } });
+
         const target = get().targets?.find((candidate) => candidate.path === path);
+
         try {
             const { snapshot, conflicts = [], removed, error } = await boardApp()!.setTargetTick(path, ticked);
+
             useInstallStore.getState().accept(snapshot);
+
             if (error) set({ result: { text: `Couldn't change ${path}: ${error}`, tone: 'error', from: 'targets' } });
             else if (conflicts.length)
                 set({
@@ -149,7 +165,9 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     },
     setChannel: async (channel) => {
         if (get().switchingTo) return;
+
         set({ switchingTo: channel, result: { text: '' } });
+
         try {
             useUpdateStore.setState({ state: await boardApp()!.setUpdateChannel(channel) });
         } catch (error) {

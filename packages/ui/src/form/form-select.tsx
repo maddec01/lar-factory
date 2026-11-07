@@ -37,6 +37,7 @@ export const FormSelect = forwardRef<HTMLButtonElement, FormSelectProps>(
             flushSync(() => onChange(item === NONE ? '' : item));
             field.current?.dispatchEvent(new Event('input', { bubbles: true }));
         };
+
         return (
             <>
                 {name && <input ref={field} type="hidden" name={name} value={value} />}

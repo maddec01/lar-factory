@@ -20,17 +20,23 @@ import {
 /** A temp folder with `bin` holding runnable files of the given names, and a login shell whose PATH starts with `bin`. */
 async function machine(t: TestContext, names: string[]) {
     const dir = await mkdtemp(join(tmpdir(), 'lar-tools-test-'));
+
     t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
     const bin = join(dir, 'bin');
+
     await mkdir(bin);
     for (const name of names) {
         await writeFile(join(bin, name), '#!/bin/sh\n');
         await chmod(join(bin, name), 0o755);
     }
+
     const shell = join(dir, 'login-shell');
+
     // Called as `<shell> -ilc <script>`; a login shell sets its own PATH before the script runs.
     await writeFile(shell, `#!/bin/sh\nPATH=${bin}:/usr/bin:/bin; export PATH; exec /bin/sh -c "$2"\n`);
     await chmod(shell, 0o755);
+
     return { dir, bin, shell };
 }
 
@@ -38,8 +44,11 @@ test('finds the tools on the login shell PATH when started with a bare PATH', as
     const { bin, shell } = await machine(t, ['t3', 'gh', 'az']);
     const env = { PATH: '/usr/bin:/bin', SHELL: shell };
     const loginPath = await readLoginPath(env);
+
     assert.equal(loginPath?.split(':')[0], bin);
+
     const tools = findTools(env, loginPath);
+
     assert.deepEqual(tools.t3, { path: join(bin, 't3') });
     assert.deepEqual(tools.gh, { path: join(bin, 'gh') });
     assert.deepEqual(tools.az, { path: join(bin, 'az') });
@@ -48,11 +57,13 @@ test('finds the tools on the login shell PATH when started with a bare PATH', as
 
 test('an empty override counts as unset', async (t) => {
     const { bin } = await machine(t, ['gh']);
+
     assert.deepEqual(findTools({ PATH: bin, GH_PATH: '' }, null).gh, { path: join(bin, 'gh') });
 });
 
 test('an override with a slash that is not runnable leaves the tool missing, with no fallback', async (t) => {
     const { dir, bin } = await machine(t, ['t3', 'not-runnable']);
+
     await chmod(join(bin, 'not-runnable'), 0o644);
     for (const override of [join(dir, 'nowhere/t3'), join(bin, 'not-runnable'), bin]) {
         assert.deepEqual(findTools({ PATH: bin, T3_PATH: override }, null).t3, {
@@ -64,6 +75,7 @@ test('an override with a slash that is not runnable leaves the tool missing, wit
 
 test('an override with a slash that is runnable is used as given', async (t) => {
     const { bin } = await machine(t, ['my-t3']);
+
     assert.deepEqual(findTools({ PATH: '/usr/bin', T3_PATH: join(bin, 'my-t3') }, null).t3, {
         path: join(bin, 'my-t3'),
     });
@@ -71,6 +83,7 @@ test('an override with a slash that is runnable is used as given', async (t) => 
 
 test('a bare-name override is looked up on the PATH', async (t) => {
     const { bin } = await machine(t, ['t3', 'other-t3']);
+
     assert.deepEqual(findTools({ PATH: bin, T3_PATH: 'other-t3' }, null).t3, { path: join(bin, 'other-t3') });
     assert.deepEqual(findTools({ PATH: bin, T3_PATH: 'absent-t3' }, null).t3, {
         path: null,
@@ -82,6 +95,7 @@ test('a missing az is reported as missing and the other tools are still found', 
     const { bin } = await machine(t, ['t3', 'gh']);
     // No Homebrew folders, which may hold a real az.
     const tools = findTools({ PATH: bin }, null, []);
+
     assert.deepEqual(tools.az, { path: null });
     assert.deepEqual(tools.t3, { path: join(bin, 't3') });
     assert.deepEqual(tools.gh, { path: join(bin, 'gh') });
@@ -89,17 +103,21 @@ test('a missing az is reported as missing and the other tools are still found', 
 
 test('git, jq and curl are looked up like gh, each with its own override', async (t) => {
     assert.deepEqual(TOOL_NAMES, ['t3', 'gh', 'az', 'git', 'jq', 'curl']);
+
     const { dir, bin } = await machine(t, ['git', 'jq', 'curl', 'my-jq']);
     const found = findTools({ PATH: bin }, null, []);
+
     assert.deepEqual(
         [found.git, found.jq, found.curl],
         [{ path: join(bin, 'git') }, { path: join(bin, 'jq') }, { path: join(bin, 'curl') }],
     );
+
     const overridden = findTools(
         { PATH: bin, GIT_PATH: join(dir, 'nowhere/git'), JQ_PATH: 'my-jq', CURL_PATH: 'absent-curl' },
         null,
         [],
     );
+
     assert.deepEqual(overridden.git, { path: null, override: `GIT_PATH=${join(dir, 'nowhere/git')}` });
     assert.deepEqual(overridden.jq, { path: join(bin, 'my-jq') });
     assert.deepEqual(overridden.curl, { path: null, override: 'CURL_PATH=absent-curl' });
@@ -123,6 +141,7 @@ test('the checks report each command: its version, missing with the override and
         await writeFile(join(bin, name), `#!/bin/sh\n${body}\n`);
         await chmod(join(bin, name), 0o755);
     };
+
     await script('t3', 'echo t3 v0.1.3-nightly.1');
     await script(
         'gh',
@@ -133,7 +152,9 @@ test('the checks report each command: its version, missing with the override and
     await script('curl', 'exit 2');
     await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, JQ_PATH: join(dir, 'nowhere/jq') });
     await writeFile(join(dir, 'server-runtime.json'), JSON.stringify({ version: 1, pid: process.pid, port: 3773 }));
+
     const { tools, ghError } = await checkTools({ gh: true, az: false }, join(dir, 'server-runtime.json'));
+
     assert.deepEqual(tools, {
         t3: { result: 'ok', version: '0.1.3-nightly.1' },
         gh: { result: 'logged-out', version: '2.96.1', fix: 'gh auth login' },
@@ -150,11 +171,14 @@ test('each check is heard as it lands, so a slow one holds up no other', async (
         await writeFile(join(bin, name), `#!/bin/sh\n${body}\n`);
         await chmod(join(bin, name), 0o755);
     };
+
     await script('t3', 'echo t3 v0.1.3-nightly.1');
     await script('gh', 'echo "gh version 2.96.1 (2026-08-01)"');
     await script('git', 'sleep 1; echo git version 2.56.0');
     await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
+
     const heard: string[] = [];
+
     await checkTools({ gh: true, az: false }, join(dir, 'no-runtime.json'), (check) =>
         heard.push(...Object.keys(check)),
     );
@@ -164,6 +188,7 @@ test('each check is heard as it lands, so a slow one holds up no other', async (
 
 test("t3 is not running without T3's runtime file, and missing outranks it", async (t) => {
     const { dir, bin, shell } = await machine(t, []);
+
     await writeFile(join(bin, 't3'), '#!/bin/sh\necho t3 v0.1.3-nightly.1\n');
     await chmod(join(bin, 't3'), 0o755);
     await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
@@ -191,6 +216,7 @@ const authStatus = (scopes: string | null) =>
 /** Probes a gh that prints `version` for `--version` and `status` for `auth status`. */
 async function probeWith(t: TestContext, version: string, status: string) {
     const { dir, bin, shell } = await machine(t, []);
+
     await writeFile(join(dir, 'version'), `${version}\n`);
     await writeFile(join(dir, 'status'), `${status}\n`);
     await writeFile(
@@ -199,6 +225,7 @@ async function probeWith(t: TestContext, version: string, status: string) {
     );
     await chmod(join(bin, 'gh'), 0o755);
     await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
+
     return (await probeGh()).check;
 }
 
@@ -222,6 +249,7 @@ test('a gh older than 2.94.0 is outdated, with brew upgrade gh as its fix', asyn
 
 test('a missing or logged-out gh still blocks reading', async (t) => {
     const { shell } = await machine(t, []);
+
     await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, GH_PATH: '/nowhere/gh' });
     assert.deepEqual((await probeGh()).check, {
         result: 'missing',
@@ -238,6 +266,7 @@ const AZ_VERSION = `echo '{"azure-cli": "2.67.0", "azure-cli-core": "2.67.0", "e
  */
 async function probeAzWith(t: TestContext, account: number, extension: number, version = AZ_VERSION) {
     const { bin, shell } = await machine(t, []);
+
     await writeFile(
         join(bin, 'az'),
         `#!/bin/sh
@@ -249,6 +278,7 @@ exit 9
     );
     await chmod(join(bin, 'az'), 0o755);
     await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
+
     return probeAz();
 }
 
@@ -276,6 +306,7 @@ test('an az that fails to print its version still has its sign-in and extension 
 
 test('a missing az has brew install azure-cli as its fix', async (t) => {
     const { shell } = await machine(t, []);
+
     await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, AZ_PATH: '/nowhere/az' });
     assert.deepEqual(await probeAz(), {
         result: 'missing',
@@ -286,10 +317,15 @@ test('a missing az has brew install azure-cli as its fix', async (t) => {
 
 test('the checks probe gh and az only when asked to', async (t) => {
     const { shell } = await machine(t, []);
+
     await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, GH_PATH: '/nowhere/gh', AZ_PATH: '/nowhere/az' });
+
     const neither = (await checkTools({ gh: false, az: false })).tools;
+
     assert.deepEqual(['gh' in neither, 'az' in neither], [false, false]);
+
     const both = (await checkTools({ gh: true, az: true })).tools;
+
     assert.deepEqual([both.gh?.result, both.az?.result], ['missing', 'missing']);
 });
 
@@ -301,9 +337,12 @@ test('the login shell PATH goes before the inherited one, then the Homebrew fold
 test('a login shell that fails falls back to launchctl', async (t) => {
     const { dir } = await machine(t, []);
     const shell = join(dir, 'broken-shell');
+
     await writeFile(shell, '#!/bin/sh\nexit 1\n');
     await chmod(shell, 0o755);
+
     const launchctl = join(dir, 'launchctl');
+
     await writeFile(launchctl, '#!/bin/sh\n[ "$1 $2" = "getenv PATH" ] && echo /from/launchd:/usr/bin\n');
     await chmod(launchctl, 0o755);
     assert.equal(await readLoginPath({ PATH: '/usr/bin:/bin', SHELL: shell }, launchctl), '/from/launchd:/usr/bin');

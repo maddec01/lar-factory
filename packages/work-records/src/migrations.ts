@@ -204,15 +204,18 @@ export const MIGRATIONS: readonly Migration[] = [
         db.exec(
             'ALTER TABLE bodies ADD COLUMN has_content INTEGER NOT NULL DEFAULT 0; ALTER TABLE bodies ADD COLUMN has_passing_gate INTEGER NOT NULL DEFAULT 0',
         );
+
         const update = db.prepare(`UPDATE bodies SET has_content = ?, has_passing_gate = EXISTS (
       SELECT 1 FROM brief_gates WHERE work_id = ? AND brief_digest = ?
     ) WHERE work_id = ? AND body = ?`);
+
         for (const row of db.prepare('SELECT work_id, body, markdown FROM bodies').all()) {
             const markdown = String(row.markdown);
             const digest =
                 row.body === 'brief' && markdown.trim()
                     ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex')
                     : '';
+
             update.run(
                 Number(Boolean(markdown.trim())),
                 String(row.work_id),
@@ -292,7 +295,9 @@ export const MIGRATIONS: readonly Migration[] = [
         ]) {
             for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
                 if (table === 'work_records' && action === 'DELETE') continue;
+
                 const row = action === 'DELETE' ? 'OLD' : 'NEW';
+
                 db.exec(`CREATE TRIGGER tracker_${table}_${action.toLowerCase()} AFTER ${action} ON ${table} BEGIN
           UPDATE tracker_sequence SET value = value + 1;
           INSERT INTO tracker_outbox (work_id, sequence) VALUES (${row}.work_id, (SELECT value FROM tracker_sequence))
@@ -302,6 +307,7 @@ export const MIGRATIONS: readonly Migration[] = [
         }
         for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
             const row = action === 'DELETE' ? 'OLD' : 'NEW';
+
             db.exec(`CREATE TRIGGER tracker_dependency_blocks_${action.toLowerCase()} AFTER ${action} ON dependency_blocks BEGIN
         UPDATE tracker_sequence SET value = value + 1;
         INSERT INTO tracker_outbox (work_id, sequence) SELECT work_id, (SELECT value FROM tracker_sequence)
@@ -321,6 +327,7 @@ export const MIGRATIONS: readonly Migration[] = [
                     : action === 'DELETE'
                       ? 'lower(OLD.ticket)'
                       : 'lower(OLD.ticket),lower(NEW.ticket)';
+
             db.exec(`CREATE TRIGGER tracker_dependency_members_${action.toLowerCase()} AFTER ${action} ON dependencies BEGIN
         UPDATE tracker_sequence SET value=value+1;
         INSERT INTO tracker_outbox(work_id,sequence)
@@ -357,7 +364,9 @@ export const MIGRATIONS: readonly Migration[] = [
         ]) {
             for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
                 if (table === 'work_records' && action === 'DELETE') continue;
+
                 const row = action === 'DELETE' ? 'OLD' : 'NEW';
+
                 db.exec(`CREATE TRIGGER tracker_${table}_${action.toLowerCase()} AFTER ${action} ON ${table} BEGIN
           UPDATE tracker_sequence SET value=value+1;
           INSERT INTO tracker_outbox(work_id,sequence) VALUES (${row}.work_id,(SELECT value FROM tracker_sequence))
@@ -367,17 +376,20 @@ export const MIGRATIONS: readonly Migration[] = [
         }
         for (const action of ['INSERT', 'UPDATE', 'DELETE']) {
             const row = action === 'DELETE' ? 'OLD' : 'NEW';
+
             db.exec(`CREATE TRIGGER tracker_dependency_blocks_${action.toLowerCase()} AFTER ${action} ON dependency_blocks BEGIN
         UPDATE tracker_sequence SET value=value+1;
         INSERT INTO tracker_outbox(work_id,sequence) SELECT work_id,(SELECT value FROM tracker_sequence) FROM dependencies WHERE dependency_id=${row}.dependency_id
         ON CONFLICT(work_id) DO UPDATE SET sequence=excluded.sequence;
       END;`);
+
             const tickets =
                 action === 'INSERT'
                     ? 'lower(NEW.ticket)'
                     : action === 'DELETE'
                       ? 'lower(OLD.ticket)'
                       : 'lower(OLD.ticket),lower(NEW.ticket)';
+
             db.exec(`CREATE TRIGGER tracker_dependency_members_${action.toLowerCase()} AFTER ${action} ON dependencies BEGIN
         UPDATE tracker_sequence SET value=value+1;
         INSERT INTO tracker_outbox(work_id,sequence) SELECT work_id,(SELECT value FROM tracker_sequence) FROM work_records WHERE lower(ticket) IN (${tickets})

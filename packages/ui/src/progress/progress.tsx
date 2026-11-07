@@ -16,6 +16,7 @@ export function Progress({
     caption?: React.ReactNode;
 }) {
     const share = max > 0 ? Math.min(Math.max(value / max, 0), 1) : 0;
+
     return (
         <div className={`flex items-center gap-2 ${className}`} data-slot="progress">
             <div

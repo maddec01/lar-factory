@@ -29,8 +29,10 @@ const message = (board: Board) => shapePrompt(board, '#12 Issue 12', board.id(12
 /** A temporary home with git checkouts of the given origins under ~/Developer/lar. */
 function home(t: TestContext, origins: Record<string, string | null>): string {
     const dir = mkdtempSync(join(tmpdir(), 'lar-start-home-'));
+
     t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
     checkouts(dir, origins);
+
     return dir;
 }
 
@@ -45,7 +47,9 @@ async function boardIn(
 ) {
     const dir = home(t, origins);
     const board = await startBoard(t, { items, ...options }, false, false, { HOME: dir, T3_STATE_DB: db(dir), ...env });
+
     await until(board, (d) => d.items.length === items.length);
+
     return { board, home: dir };
 }
 
@@ -71,6 +75,7 @@ const start = (board: Board, itemId: string, origin = board.url, model?: unknown
 test("Start begins one lar-shape thread in the card's repository project and leaves the Status alone", async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(30, 'Queued', 'maddec01/lar-server')]);
     const response = await start(board, board.id(12));
+
     assert.equal(response.status, 200);
     assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: 'Shaping #12 Issue 12' });
     assert.equal((await start(board, board.id(30, 'maddec01/lar-server'))).status, 200);
@@ -93,6 +98,7 @@ test('Start runs the thread on the picked model choice, still in the repository 
         instanceId: 'claudeAgent_personal',
         model: 'claude-opus-5-5',
     });
+
     assert.equal(response.status, 200);
     assert.deepEqual(await board.t3Calls(), [
         [
@@ -109,6 +115,7 @@ test('Start runs the thread on the picked model choice, still in the repository 
 test('the board data offers the model choices', async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
     const groups = ((await board.board()) as BoardData).modelChoices;
+
     assert.deepEqual(
         groups?.map((g) => g.name),
         ['Personal', 'VI', 'Codex'],
@@ -127,6 +134,7 @@ for (const [name, model] of [
     test(`Start refuses ${name} as the model choice and runs no t3`, async (t) => {
         const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
         const response = await start(board, board.id(12), board.url, model);
+
         assert.equal(response.status, 422);
         assert.match((await response.json()).error, /isn't offered/);
         assert.deepEqual(await board.t3Calls(), []);
@@ -136,11 +144,13 @@ for (const [name, model] of [
 test('Start finds the repository project by origin, whatever its folder is called or wherever it lives', async (t) => {
     const { board } = await boardIn(t, [boardIssue(12, 'Queued')], {}, (dir) => {
         checkouts(dir, { 'factory-clone': 'https://github.com/maddec01/lar-factory' }, 'code');
+
         return projectsDb(t, [
             { id: 'project-lar', root: `${dir}/Developer/lar` },
             { id: 'project-clone', root: '~/code/factory-clone' },
         ]);
     });
+
     assert.equal((await start(board, board.id(12))).status, 200);
     assert.equal((await board.t3Calls())[0]?.[2], 'project-clone');
 });
@@ -150,8 +160,10 @@ const NO_PROJECT = 'No T3 project is a checkout of maddec01/lar-factory; add the
 /** A folder whose `.git` is a file, as in a git worktree of the lar-factory checkout. */
 function worktree(dir: string): string {
     const folder = join(dir, 'worktrees/lar-factory-1');
+
     mkdirSync(folder, { recursive: true });
     writeFileSync(join(folder, '.git'), `gitdir: ${dir}/Developer/lar/lar-factory/.git\n`);
+
     return folder;
 }
 
@@ -190,6 +202,7 @@ const refusals: {
         name: 'two checkouts of the repository',
         projects: (dir) => {
             checkouts(dir, { 'factory-clone': 'git@github.com:maddec01/lar-factory.git' }, 'code');
+
             return [...PROJECTS(dir), { id: 'project-clone', root: `${dir}/code/factory-clone` }];
         },
         error: () =>
@@ -212,8 +225,11 @@ for (const refusal of refusals) {
             refusal.db ?? ((dir) => projectsDb(t, (refusal.projects ?? PROJECTS)(dir))),
         );
         const response = await start(board, board.id(12));
+
         assert.equal(response.status, 409, 'a refusal is not a t3 failure');
+
         const answer = await response.json();
+
         assert.equal(answer.error, refusal.error(dir));
         assert.equal(answer.uncertain, undefined, 'a refused Start can be pressed again');
         assert.deepEqual(await board.t3Calls(), []);
@@ -224,12 +240,16 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
     let db = '';
     const { board } = await boardIn(t, [boardIssue(12, 'Queued')], ORIGINS, (dir) => {
         db = join(dir, 'changed.sqlite');
+
         const changed = new DatabaseSync(db);
+
         changed.exec('CREATE TABLE projection_projects (id TEXT)');
         changed.close();
+
         return db;
     });
     const response = await start(board, board.id(12));
+
     assert.equal(response.status, 409);
     assert.equal((await response.json()).error, "Can't read T3 Code's projects; reconnect T3 Code before starting");
     assert.deepEqual(await board.t3Calls(), []);
@@ -241,9 +261,12 @@ test('Start refuses an unreadable list of onboarded repositories, naming the fil
         HOME: dir,
         T3_STATE_DB: projectsDb(t, PROJECTS(dir)),
     });
+
     await until(board, (d) => d.items.length === 1);
     writeFileSync(join(dir, 'Library/Application Support/Lar Factory/repository-settings.json'), '{ broken');
+
     const response = await start(board, board.id(12));
+
     assert.equal(response.status, 409);
     assert.match((await response.json()).error, /repository-settings\.json isn't valid JSON/);
     assert.deepEqual(await board.t3Calls(), []);
@@ -252,18 +275,22 @@ test('Start refuses an unreadable list of onboarded repositories, naming the fil
 test('a thread T3 returns untitled takes the first line of the work message as its title', async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { untitled: true } });
     const response = await start(board, board.id(12));
+
     assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: 'Shaping #12 Issue 12' });
 });
 
 test('a double press, a retry or another page starts no second thread for the item', async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(13, 'Queued')], { t3: { delay: 100 } });
     const responses = await Promise.all([start(board, board.id(12)), start(board, board.id(12))]);
+
     assert.deepEqual(
         responses.map((r) => r.status),
         [200, 200],
     );
     assert.equal((await start(board, board.id(12))).status, 200);
+
     const thread = { threadId: 'thread-1', title: 'Shaping #12 Issue 12' };
+
     assert.deepEqual(
         ((await board.board()) as BoardData).started,
         { [board.id(12)]: thread },
@@ -276,6 +303,7 @@ test('a double press, a retry or another page starts no second thread for the it
 test('an uncertain T3 error prevents another launch', async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'down' } });
     const failed = await start(board, board.id(12));
+
     assert.equal(failed.status, 502);
     assert.match((await failed.json()).error, /could not be confirmed/);
     await board.update({ items: [boardIssue(12, 'Queued')] });
@@ -286,6 +314,7 @@ for (const fail of ['killed', 'garbage']) {
     test(`an unconfirmed start (${fail}) is never retried as a new thread`, async (t) => {
         const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail } });
         const first = await start(board, board.id(12));
+
         assert.equal(first.status, 502);
         assert.equal((await first.json()).uncertain, true);
         await board.update({ items: [boardIssue(12, 'Queued')] });
@@ -297,6 +326,7 @@ for (const fail of ['killed', 'garbage']) {
 test('a missing t3 says how to point the board at it', async (t) => {
     const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, { T3_PATH: '/nonexistent/t3' });
     const response = await start(board, board.id(12));
+
     assert.equal(response.status, 502);
     assert.match((await response.json()).error, /T3_PATH/);
 });
@@ -305,6 +335,7 @@ test('Start only runs for Queued issues from this board page and session', async
     const board = await startBoard(t, {
         items: [boardIssue(12, 'List'), boardIssue(13, 'Ready'), boardIssue(14, 'Queued')],
     });
+
     await until(board, (d) => d.items.length === 3);
     assert.equal((await start(board, board.id(12))).status, 409);
     assert.equal((await start(board, board.id(13))).status, 409);
@@ -314,16 +345,22 @@ test('Start only runs for Queued issues from this board page and session', async
             .status,
         400,
     );
+
     const restarted = await board.post({ session: 'old', itemId: board.id(14) }, board.url, '/api/start');
+
     assert.equal(restarted.status, 409);
+
     const answer = await restarted.json();
+
     assert.ok(
         !answer.uncertain && answer.board.capture.session,
         'a stale page gets the new session and can press Start again',
     );
     for (const origin of ['https://evil.example', 'null', ''])
         assert.equal((await start(board, board.id(14), origin)).status, 403);
+
     const sample = await startBoard(t, {}, true);
+
     assert.equal((await start(sample, 'I_sample05')).status, 403);
     assert.equal(
         (await sample.postSession({ itemId: 'I_sample05', purpose: 'shape' }, '/api/dismiss-start-error')).status,
@@ -338,8 +375,11 @@ test('Start only runs for Queued issues from this board page and session', async
 
 test('Start is refused while a blocker is incomplete, naming each one', async (t) => {
     const board = await factoryBoard(t, [rawIssue('I_12', 12, 'Queued', ['decision-grill'])]);
+
     await recordBlockers(board, board.id(12), ['Decision 5', 'Decision 6']);
+
     const refused = await start(board, board.id(12));
+
     assert.equal(refused.status, 409);
     assert.equal(
         (await refused.json()).error,
@@ -352,10 +392,14 @@ for (const recover of ['late', 'deleted']) {
     test(`an uncertain launch with ${recover} CLI evidence preserves duplicate protection`, async (t) => {
         const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'garbage', recover } });
         const response = await start(board, board.id(12));
+
         assert.equal(response.status, recover === 'late' ? 200 : 502);
+
         const answer = await response.json();
+
         if (recover === 'late') assert.equal(answer.thread.threadId, 'thread-1');
         else assert.equal(answer.uncertain, true);
+
         await start(board, board.id(12));
         assert.equal((await board.t3Calls()).filter((args) => args[1] === 'start').length, 1);
         assert.ok((await board.t3Calls()).some((args) => args[1] === 'show'));

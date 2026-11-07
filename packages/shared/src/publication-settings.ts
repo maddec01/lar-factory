@@ -49,11 +49,13 @@ export async function readAzureVocabulary(
         '--output',
         'json',
     ];
+
     return run ? JSON.parse(await run(args)) : jsonCommand('az', args);
 }
 
 function failure(err: unknown): VocabularyCapability {
     const reason = err instanceof Error ? err.message : String(err);
+
     // 404 may conceal a private resource. Never call it unsupported without explicit evidence.
     return {
         state: /(?:HTTP\s*|status(?: code)?[=: ]+)(?:410|501)\b|not implemented|unsupported (?:capability|api|api version)/i.test(
@@ -77,13 +79,16 @@ async function choices(
             : isRecord(raw)
               ? raw.value
               : undefined;
+
         if (
             !Array.isArray(list) ||
             list.some((item) => !isRecord(item) || typeof item.name !== 'string' || !item.name.trim())
         ) {
             throw new Error('The provider returned an unreadable list of terms.');
         }
+
         keep?.(list as Record<string, unknown>[]);
+
         return {
             state: 'available',
             choices: [...new Set(list.filter((item) => item.isDisabled !== true).map((item) => item.name as string))],
@@ -98,24 +103,30 @@ export async function discoverVocabulary(
     reads: VocabularyReads = vocabularyReads,
 ): Promise<VocabularyDiscovery> {
     if (!isRepo(repo)) throw new Error('Name a GitHub or Azure DevOps repository.');
+
     if (onAzure(repo)) {
         const [types, labels] = await Promise.all([
             choices(() => reads.azure(repo, 'workitemtypes')),
             choices(() => reads.azure(repo, 'tags')),
         ]);
+
         return { provider: 'azure', types, labels };
     }
+
     const types = async (): Promise<VocabularyCapability> => {
         try {
             const raw = await reads.github(`repos/${repo}`);
             const metadata = Array.isArray(raw) ? raw[0] : raw;
+
             if (!isRecord(metadata) || !isRecord(metadata.owner) || typeof metadata.owner.type !== 'string')
                 throw new Error('Could not detect the repository owner.');
+
             if (metadata.owner.type === 'User')
                 return {
                     state: 'unsupported',
                     reason: 'GitHub issue types are available only in organization repositories.',
                 };
+
             return choices(() => reads.github(`repos/${repo}/issue-types`));
         } catch (err) {
             return failure(err);
@@ -131,6 +142,7 @@ export async function discoverVocabulary(
             },
         ),
     ]);
+
     return {
         provider: 'github',
         types: foundTypes,
@@ -152,9 +164,12 @@ export async function readPublicationSettings(
     options: { dir?: string; reads?: VocabularyReads } = {},
 ): Promise<PublicationSettings> {
     const listed = readRepositorySetups(options.dir).find((s) => sameRepo(s.repo, repo));
+
     if (!listed) throw new Error(`${repo} is not on this Mac's list.`);
+
     const reads = options.reads ?? vocabularyReads;
     const setup = readRepositorySetups(options.dir).find((s) => sameRepo(s.repo, repo))!;
+
     return {
         setup,
         discovery: await discoverVocabulary(setup.repo, reads),
@@ -179,11 +194,17 @@ export async function saveVocabularyLabels(
 ): Promise<string[]> {
     if (!Array.isArray(names) || names.some((name) => typeof name !== 'string' || !name.trim() || name.length > 100))
         throw new Error('Enter nonempty new label names of at most 100 characters.');
+
     if (!names.length) return [];
+
     const refused = typedLabelsProblem(repo, names as string[]);
+
     if (refused) throw new Error(refused);
+
     if (discovery.labels.state !== 'available') throw new Error('Recheck label access before creating labels.');
+
     const choices = [...discovery.labels.choices];
+
     if (
         (names as string[]).some(
             (name) => !choices.some((choice) => choice.toLowerCase() === name.trim().toLowerCase()),
@@ -191,16 +212,21 @@ export async function saveVocabularyLabels(
     ) {
         const { newLabelProblem } = await import('./write-access.ts');
         const problem = newLabelProblem(repo, access);
+
         if (problem) throw new Error(problem);
     }
+
     const resolved: string[] = [];
+
     for (const raw of names as string[]) {
         const name = raw.trim();
         const existing = choices.find((choice) => choice.toLowerCase() === name.toLowerCase());
         const saved = existing ?? (await create(repo, name));
+
         choices.push(saved);
         resolved.push(saved);
     }
+
     return [...new Set(resolved)];
 }
 
@@ -215,6 +241,7 @@ const ticketOptionReads: TicketOptionReads = {
     ...vocabularyReads,
     azureOptions: (repo, team, field) => {
         const [organization, project] = repo.split('/');
+
         return jsonCommand(
             'az',
             field === 'assignees'
@@ -267,16 +294,20 @@ export async function discoverTicketOptions(
         try {
             const raw = await read();
             const rows = Array.isArray(raw) ? raw.flat() : isRecord(raw) && Array.isArray(raw.value) ? raw.value : null;
+
             if (!rows || !rows.every(isRecord)) throw Error('The provider returned unreadable issue options.');
+
             return rows.map(parse);
         } catch (err) {
             problems.push(err instanceof Error ? err.message : String(err));
+
             return [];
         }
     };
     const text = (value: unknown) => {
         if (typeof value !== 'string' || !value.trim())
             throw Error('The provider returned an unreadable issue option.');
+
         return value;
     };
     const azure = onAzure(repo);
@@ -296,6 +327,7 @@ export async function discoverTicketOptions(
                   (row) => {
                       if (!Number.isSafeInteger(row.number) || Number(row.number) <= 0)
                           throw Error('The provider returned an unreadable milestone.');
+
                       return { value: String(row.number), name: text(row.title) };
                   },
               ),
@@ -306,6 +338,7 @@ export async function discoverTicketOptions(
               )
             : Promise.resolve([]),
     ]);
+
     return {
         provider: vocabulary.provider,
         labels: vocabulary.labels.state === 'available' ? vocabulary.labels.choices : [],

@@ -74,6 +74,7 @@ export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoCon
 /** A row's repository: its project icon and name. Where the ticket is saved is SourceIcon's to say, beside it. */
 export function RepoCell({ item }: { item: Item }) {
     const repos = useBoardStore((state) => state.data.repos);
+
     return (
         <span data-repo-cell className="flex min-w-0 items-center gap-1">
             <ProjectIcon repo={repoKey(item)} size="small" />
@@ -93,6 +94,7 @@ export function TitleLink({ item, className = 'title' }: { item: Item; className
             {item.title}
         </>
     );
+
     return item.url ? (
         <a className={className} href={item.url} target="_blank" rel="noopener">
             {text}
@@ -119,7 +121,9 @@ export function ItemTitle({ item }: { item: Item }) {
 /** Azure's type, state and assignee as one compact line beside factory status. */
 export function AzureFields({ azure }: { azure: AzureWorkItem | undefined }) {
     if (!azure) return null;
+
     const text = [azure.type, azure.state, azure.assignee].filter(Boolean).join(' · ');
+
     return (
         <span data-azure title={text} className="block min-w-0 truncate text-xs text-(--muted-foreground)">
             {text}
@@ -138,6 +142,7 @@ const SLICE_COLOR: Record<SliceProgress, string> = {
 /** A 6px segment for each recorded slice; waiting segments are faint. `still` stops an active one pulsing. */
 export function SliceBar({ item, still = false }: { item: Item; thick?: boolean; still?: boolean }) {
     if (!item.slices.length) return null;
+
     return (
         <ol className="m-0 flex list-none gap-[2px] p-0">
             {item.slices.map((s, i) => (
@@ -204,7 +209,9 @@ const CHECKS_COLOR = { failed: 'var(--error)', running: 'var(--warning)', passed
 /** A pull request's checks as a coloured dot and their state, with the passed count when `counts`; nothing when it has none. */
 function ChecksBadge({ checks, counts }: { checks: Checks | null; counts?: boolean }) {
     const state = checkState(checks);
+
     if (!checks || !state) return null;
+
     return (
         <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-(--muted-foreground)">
             <span className="size-2 rounded-full" style={{ background: CHECKS_COLOR[state] }} />
@@ -250,9 +257,12 @@ export function PrList({ item }: { item: Item }) {
 export function useLastKnown(item: Item): string | null {
     const read = useBoardStore((state) => state.data.usageRead);
     const unreadable = read?.readable === false;
+
     if (!unreadable && item.usageState !== 'failed') return null;
+
     const at =
         unreadable && read.readAt ? ` from ${day(read.readAt, undefined)}, ${clock(read.readAt, undefined)}` : '';
+
     return `Last known figures${at}: T3 Code's usage can't be read now.`;
 }
 
@@ -279,12 +289,18 @@ export function AgentWork({
     className?: string;
 }) {
     const lastKnown = useLastKnown(item);
+
     if (!s || s === 'unavailable' || !hasFigures(s)) return null;
+
     const old = !s.frozen ? lastKnown : null;
     const figures: [label: string, value: string, unit: string][] = [];
+
     if (s.costUsd !== undefined) figures.push(['Cost', formatUsd(s.costUsd), '']);
+
     figures.push(['Agent time', duration(s.agentMs), ''], ['Tokens', formatTokens(s.tokens), ' tokens']);
+
     if (s.wallMs) figures.push(['Wall time', duration(s.wallMs), ' wall']);
+
     return (
         <p
             data-agent-work
@@ -312,9 +328,12 @@ export const usageLoading = (
     { firstRead, items }: Pick<BoardData, 'firstRead' | 'items'>,
 ): boolean => {
     if (typeof stats === 'object' && stats.frozen) return false;
+
     if (usageState === 'loading') return true;
+
     if (typeof stats === 'object' && stats.provisional)
         return !firstRead.settled || items.some((other) => other.usageState === 'loading');
+
     return !usageState && stats === undefined && Array.isArray(threads) && threads.length > 0;
 };
 
@@ -328,11 +347,15 @@ export function AgentWorkNote({ item }: { item: Item }) {
     // Usage loads only for recorded threads, which T3 may not have answered for yet.
     const hasThread = item.usageState === 'loading' || (Array.isArray(item.threads) && item.threads.length > 0);
     const s = usageUnreadable(item) ? 'unavailable' : hasThread ? item.stats : undefined;
+
     // Known figures answer for an item still loading; none, or all zeros, say no more than having none.
     if (s && s !== 'unavailable' && (item.usageState !== 'loading' || hasFigures(s))) return null;
+
     // A settled decision may have no thread of its own, which is nothing to wait for.
     if (!s && !hasThread && item.kind === 'decision' && isDone(item)) return null;
+
     const none = item.kind === 'concept' ? 'No T3 thread of its own.' : 'No T3 thread has worked on this yet.';
+
     return (
         <p className="m-0 text-xs text-(--muted-foreground)">
             {s === 'unavailable' ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : none}
@@ -350,8 +373,11 @@ export const KIND_BADGES: Partial<Record<Kind, { name: string; icon: LucideIcon;
 /** A kind in its colour with its icon, then `children`; builds, decisions and tickets with no recognised kind have none. */
 export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode }) {
     const badge = KIND_BADGES[kind];
+
     if (!badge) return null;
+
     const { name, icon: Icon, hue } = badge;
+
     return (
         <Badge data-kind-badge hue={hue}>
             <Icon aria-hidden="true" />
@@ -364,9 +390,12 @@ export function KindBadge({ kind, children }: { kind: Kind; children?: ReactNode
 /** Beside a row's kind badge, in the row's muted text: what the ticket says instead, until someone answers. */
 export function KindMarker({ item }: { item: Pick<Item, 'kindDisagreement'> }) {
     const { kindDisagreement: disagreement } = item;
+
     if (!disagreement || disagreement.kept) return null;
+
     const said = disagreement.ticketKind ? KIND_BADGES[disagreement.ticketKind]!.name : 'No kind';
     const sentence = disagreement.ticketKind ? `The ticket says ${said}.` : 'The ticket has no kind.';
+
     return (
         <span
             data-kind-marker
@@ -409,8 +438,10 @@ export function LabelChips({ item }: { item: LabelledItem }) {
 export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean }) {
     const words: string[] = [];
     const method = decisionMethodName(item);
+
     if (method) words.push(method);
     else if (!onRow && !KIND_BADGES[item.kind]) words.push('Work');
+
     const parentKind = useBoardStore(
         (state) =>
             state.data.items.find((parent) =>
@@ -421,10 +452,14 @@ export function ItemKind({ item, onRow = false }: { item: Item; onRow?: boolean 
             )?.kind,
     );
     const parentIsConcept = item.tracker?.parent?.kind === 'concept' || parentKind === 'concept';
+
     if (parentIsConcept) words.push('Part of a concept');
     else if (item.parent) words.push('Part of another issue');
+
     if (item.tracker?.connections?.length || item.tracker?.dependencies?.length) words.push('Across Projects');
+
     const badge = KIND_BADGES[item.kind];
+
     return badge || words.length ? (
         <span data-item-kind className="inline-flex flex-wrap gap-1">
             <KindBadge kind={item.kind} />
@@ -478,6 +513,7 @@ export function useActivityFeedback(item: Item) {
     // An error from another read, such as GitHub's, leaves T3's activity readable, and the row's phase with it.
     const readable = !!lineState && lineState !== 'unavailable';
     const lost = useActivityLost(item);
+
     return buildActivity(
         item,
         (unavailable && !readable) || lost,
@@ -495,6 +531,7 @@ export function shownStatus(item: Item, unavailable: boolean): { working: boolea
 export const useShownStatus = (item: Item) => {
     const unavailable = useActivityUnavailable();
     const lost = useActivityLost(item);
+
     return shownStatus(item, unavailable || lost);
 };
 
@@ -511,6 +548,7 @@ export function ActivityFeedback({
                 {feedback.label}
             </span>
         );
+
     return (
         <div
             role="img"

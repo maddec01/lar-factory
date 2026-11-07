@@ -57,13 +57,18 @@ async function mounted(data: BoardData) {
             <P extends object>(Glyph: (props: P) => ReactNode) =>
             (props: P) => {
                 glyphRenders += 1;
+
                 return Glyph(props);
             };
+
         return { ...real, StatusGlyph: counted(real.StatusGlyph), ItemStatusGlyph: counted(real.ItemStatusGlyph) };
     });
     await mountPage(data);
+
     const { useBoardStore } = await import('./board/board-store.ts');
+
     glyphRenders = 0;
+
     return {
         tickAt: (ms: number) =>
             settle(() => {
@@ -76,6 +81,7 @@ async function mounted(data: BoardData) {
 test('a tick that changes nothing renders no glyph, and the ages on the desk and in the Queue still move', async () => {
     const { tickAt } = await mounted(boardOf([running('I_build', 'In progress'), queued, awaiting], 100_000));
     const deskAge = () => text($('.desk-card .desk-meta'));
+
     expect(text($('.queue-age'))).toBe('0s ago');
     expect(deskAge()).toContain('0s ago');
     expect($('.status-spin'), 'the running row spins').not.toBeNull();
@@ -103,6 +109,7 @@ test("the tick that makes the read stale stops the spinner, keeps T3's activity 
         boardOf([running('I_build', 'In progress', titles), running('I_verify', 'Verify')], 60),
     );
     const onDesk = () => $$('.desk-card').map((card) => card.getAttribute('data-item'));
+
     expect($('.status-spin')).not.toBeNull();
     expect(text($('[data-activity="working"] [data-action]'))).toBe('Run the tests');
     expect(onDesk()).toEqual([]);
@@ -118,6 +125,7 @@ test("the tick that makes the read stale stops the spinner, keeps T3's activity 
 
 test('a push that changes the data renders the glyphs and shows the change', async () => {
     const data = boardOf([running('I_build', 'In progress'), queued], 100_000);
+
     await mounted(data);
     expect($('[data-item="I_build"] .status-spin')).not.toBeNull();
     await push(moved('I_build', 'Review', data));

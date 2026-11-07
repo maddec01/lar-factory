@@ -11,6 +11,7 @@ const isThreadLink = (url: URL): boolean =>
 /** `target` as a URL the system opens, or undefined when it isn't an http(s) URL or a T3 Code thread link. */
 export const outsideUrl = (target: string): string | undefined => {
     const url = URL.parse(target);
+
     return url && (WEB.includes(url.protocol) || isThreadLink(url)) ? url.href : undefined;
 };
 

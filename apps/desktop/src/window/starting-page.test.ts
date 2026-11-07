@@ -8,6 +8,7 @@ const html = (url: string) => decodeURIComponent(url.slice(url.indexOf(',') + 1)
 describe('StartingPage', () => {
     it('opens on the loading screen: the Lar Factory lockup over the first step, titled Lar Factory', () => {
         const page = StartingPage.url();
+
         assert.match(page, /^data:text\/html;charset=utf-8,/);
         assert.include(html(page), '<title>Lar Factory</title>');
         assert.include(html(page), `>${StartingPage.STEPS.shell}<`);
@@ -18,6 +19,7 @@ describe('StartingPage', () => {
 
     it('takes its colours and spacing from the design system, in light and dark mode', () => {
         const page = html(StartingPage.url());
+
         assert.match(page, /--background:/);
         assert.match(page, /prefers-color-scheme:dark/);
         assert.match(page, /body\{[^}]*background:var\(--background\)/);
@@ -26,6 +28,7 @@ describe('StartingPage', () => {
 
     it('plays the draw and the roll unless the user prefers reduced motion', () => {
         const page = html(StartingPage.url());
+
         // The minifier writes 480ms as .48s.
         assert.match(
             page,
@@ -49,12 +52,14 @@ describe('StartingPage messages', () => {
     // Runs a message in a stand-in for the page and returns what it called.
     const run = (script: string) => {
         const calls: Array<[string, string]> = [];
+
         new Function('window', script)({
             larLoading: {
                 step: (text: string) => calls.push(['step', text]),
                 error: (text: string) => calls.push(['error', text]),
             },
         });
+
         return calls;
     };
 
@@ -64,6 +69,7 @@ describe('StartingPage messages', () => {
 
     it("sends why a start failed as the page's error line, whatever characters the reason holds", () => {
         const reason = `the board server exited with code 1 <before> "it" reported a port `;
+
         assert.deepEqual(run(StartingPage.errorScript(reason)), [
             ['error', `The board server didn't start: ${reason}. Trying again.`],
         ]);
@@ -101,25 +107,33 @@ describe('StartingPage script', () => {
 
     const open = (reduced = false) => {
         const nodes: Record<string, Node> = { slot: new Node(), step: new Node(), error: new Node() };
+
         nodes.error!.hidden = true;
+
         const first = new Node();
+
         first.textContent = StartingPage.STEPS.shell;
         nodes.slot!.append(first);
+
         const timers: Array<() => void> = [];
         const script = /<script>([\s\S]*)<\/script>/.exec(html(StartingPage.url()))![1]!;
         const window: Record<string, any> = {};
+
         new Function('window', 'document', 'matchMedia', 'setTimeout', script)(
             window,
             { getElementById: (id: string) => nodes[id], createElement: () => new Node() },
             () => ({ matches: reduced }),
             (run: () => void) => timers.push(run),
         );
+
         const slot = () => nodes.slot!.children.map((child) => child.textContent);
+
         return { page: window.larLoading, nodes, slot, timers };
     };
 
     it('rolls a new step in over the old one, which leaves when the roll ends', () => {
         const { page, slot, timers } = open();
+
         page.step(StartingPage.STEPS.server);
         assert.deepEqual(slot(), [StartingPage.STEPS.shell, StartingPage.STEPS.server]);
         timers.forEach((run) => run());
@@ -128,12 +142,14 @@ describe('StartingPage script', () => {
 
     it('swaps the line without rolling with reduced motion', () => {
         const { page, slot } = open(true);
+
         page.step(StartingPage.STEPS.server);
         assert.deepEqual(slot(), [StartingPage.STEPS.server]);
     });
 
     it('shows an error in place of the step line', () => {
         const { page, nodes } = open();
+
         page.error("The board server didn't start: x. Trying again.");
         assert.equal(nodes.error!.textContent, "The board server didn't start: x. Trying again.");
         assert.isFalse(nodes.error!.hidden);
@@ -142,6 +158,7 @@ describe('StartingPage script', () => {
 
     it("shows the step line again, and hides the error, when the retry's next step arrives", () => {
         const { page, nodes, slot } = open();
+
         page.error("The board server didn't start: x. Trying again.");
         page.step(StartingPage.STEPS.shell);
         assert.isFalse(nodes.step!.hidden, 'the same step as before the failure still shows the line');
@@ -184,6 +201,7 @@ describe('StartingPage.boardUrl', () => {
     it('keeps a URL the launch secret still goes to', () => {
         const secret = 's3cret';
         const href = StartingPage.boardUrl(new URL('http://127.0.0.1:4317/'));
+
         assert.equal(LaunchSecret.forFrame(href, 'http://127.0.0.1:4317', secret), secret);
     });
 });

@@ -28,6 +28,7 @@ export function matchingGroups(groups: readonly SearchGroup[], query: string): S
     const words = wordsOf(query);
     const matches = ({ name, hint = '' }: SearchOption) =>
         words.every((word) => `${name} ${hint}`.toLowerCase().includes(word));
+
     return groups
         .map(({ label, options }) => ({ label, options: options.filter(matches) }))
         .filter(({ options }) => options.length);

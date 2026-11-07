@@ -67,24 +67,29 @@ export function createCapture({
     /** The record as the board shows it now. */
     const shown = (workId: string, extra: object = {}) => {
         reread();
+
         return withBoard(200, { item: board.find(workId) ?? null, error: null, ...extra });
     };
 
     return {
         async capture(input) {
             if (!records) return reply(409, { error: NO_RECORDS });
+
             const result = await captureWork(input, { records, repos, provider, discoverOptions });
+
             return result.body.record ? shown(result.body.record.workId) : result;
         },
 
         async createTicket(itemId, input) {
             if (!records) return reply(409, { error: NO_RECORDS });
+
             try {
                 const result = await createRecordTicket(
                     itemId,
                     { ...input, retro: false },
                     { records, repos, provider, discoverOptions },
                 );
+
                 return result.body.record ? shown(result.body.record.workId) : result;
             } catch (err) {
                 return failed(err);
@@ -93,6 +98,7 @@ export function createCapture({
 
         async ticketPreview(itemId) {
             if (!records) return reply(409, { error: NO_RECORDS });
+
             try {
                 return reply(200, { preview: recordTicketPreview(records, itemId, repos()), error: null });
             } catch (err) {
@@ -102,7 +108,9 @@ export function createCapture({
 
         async options(value) {
             const repo = repoOf(value);
+
             if (!repo) return reply(422, { error: 'Choose a configured Project.' });
+
             try {
                 return reply(200, { options: await discoverOptions(repo), error: null });
             } catch {
@@ -114,48 +122,67 @@ export function createCapture({
 
         async searchTickets(input) {
             const repo = repoOf(input.repo);
+
             if (!repo) return reply(422, { error: 'Choose a configured Project.' });
+
             if (typeof input.query !== 'string' || input.query.length > 256)
                 return reply(422, { error: 'Search with text of at most 256 characters.' });
+
             let found: TicketMatch[];
+
             try {
                 found = await items.searchTickets(repo.repo, input.query);
             } catch (err) {
                 return reply(502, { error: `Could not search ${repo.repo}'s tickets. ${(err as Error).message}` });
             }
+
             const held = records ? holders(repo.repo) : new Map<string, WorkRecord>();
             const tickets = found.map((t) => {
                 const holder = held.get(`${repo.repo}#${t.number}`.toLowerCase());
+
                 return holder ? { ...t, workId: holder.workId } : t;
             });
+
             return reply(200, { tickets, error: null });
         },
 
         async pick(input) {
             const repo = repoOf(input.repo);
+
             if (!repo) return reply(422, { error: 'Choose a configured Project.' });
+
             if (!isTicketNumber(input.number))
                 return reply(422, { error: 'Pick one of the tickets the search found.' });
+
             if (!records) return reply(409, { error: NO_RECORDS });
+
             const ticket = `${repo.repo}#${input.number}`;
+
             try {
                 const held = holders(repo.repo).get(ticket.toLowerCase());
+
                 if (held) {
                     if (held.setAside) records.restore(held.workId, held.revision);
+
                     return shown(held.workId, { created: false });
                 }
             } catch (err) {
                 return failed(err);
             }
+
             let read;
+
             try {
                 read = await items.readTicket(repo.repo, input.number);
             } catch (err) {
                 return withBoard(502, { error: `Could not read ${ticket}. ${(err as Error).message}` });
             }
+
             if (!read) return withBoard(404, { error: `${repo.repo} has no open ticket #${input.number}.` });
+
             try {
                 const { record, created } = await importPickedTicket(records, repo.repo, read);
+
                 return shown(record.workId, { created });
             } catch (err) {
                 return failed(err);
@@ -164,23 +191,33 @@ export function createCapture({
 
         async attachTicket(itemId, number) {
             const item = board.find(itemId);
+
             if (!item) return reply(404, { error: 'That item is no longer on the board.' });
+
             if (item.number) return withBoard(409, { error: `This item already has its ticket, #${item.number}.` });
+
             if (!isTicketNumber(number)) return reply(422, { error: 'Pick one of the tickets the search found.' });
+
             if (!records || !item.repo) return reply(409, { error: NO_RECORDS });
+
             const ticket = `${item.repo}#${number}`;
             let read;
+
             try {
                 read = await items.readTicket(item.repo, number);
             } catch (err) {
                 return withBoard(502, { error: `Could not read ${ticket}. ${(err as Error).message}` });
             }
+
             if (!read) return withBoard(404, { error: `${item.repo} has no open ticket #${number}.` });
+
             try {
                 records.attachTicket(item.id, item.revision, ticket);
+
                 return shown(item.id);
             } catch (err) {
                 reread();
+
                 return { ...failed(err), body: { error: (err as Error).message, board: board.snapshot() } };
             }
         },

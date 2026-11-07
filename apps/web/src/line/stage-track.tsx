@@ -13,12 +13,14 @@ const STAGES: { name: string; statuses: Status[] }[] = [
     { name: 'Review', statuses: ['Review'] },
     { name: 'Verify', statuses: ['Verify', 'Ready to merge'] },
 ];
+
 /** Done follows the active stages; List and Queued sit before them. */
 export const stageOf = (s: Status) =>
     s === 'Done' ? STAGES.length : STAGES.findIndex((st) => st.statuses.includes(s));
 export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
 /** A row's own buttons draw their focus ring inside the pane that clips them. */
 export const ROW_OPENS = 'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--primary)';
+
 const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
 /** The desk's statuses a row takes no action on. */
@@ -31,19 +33,26 @@ const THREAD_TEXT: Record<ThreadState, string> = {
     stopped: 'Run stopped',
     done: 'Run finished',
 };
+
 export function threadText(item: Item, working: boolean): string {
     const latest = Array.isArray(item.threads) ? item.threads[0] : undefined;
     // A build's own run can end while its slices or children work on, and a shaping run's children too; say both.
     const parent = (Array.isArray(item.threads) && currentBuildThread(item)) || latest;
+
     if (parent && !parent.observedAt && (parent.state === 'done' || parent.state === 'stopped')) {
         const ended = `parent ${THREAD_TEXT[parent.state].toLowerCase()}`;
+
         if (delegatedWorkRunning(item) || parent.hasRunningChildren)
             return working ? `${ended.charAt(0).toUpperCase()}${ended.slice(1)}` : `Working, ${ended}`;
+
         // A live child that isn't running hasn't finished either, though it isn't Working.
         if (parent.hasLiveChildren) return `${THREAD_TEXT[parent.state]}, child waiting`;
     }
+
     if (working) return THREAD_TEXT.running;
+
     if (item.threads === 'unavailable') return 'Thread unavailable';
+
     return latest ? `${THREAD_TEXT[latest.state]}${lastSeen(latest)}` : 'Not started';
 }
 
@@ -72,13 +81,16 @@ export function Track({
     running?: boolean;
 }) {
     const at = stageOf(status);
+
     if (status === 'Done')
         return (
             <span className="flex h-5 items-center" title="Complete">
                 <StatusGlyph status="Done" />
             </span>
         );
+
     if (at < 0) return null;
+
     return (
         <ol className="m-0 grid list-none grid-cols-5 gap-px p-0" title={`${label}${waiting ? ', waiting' : ''}`}>
             {STAGES.map((st, n) => (

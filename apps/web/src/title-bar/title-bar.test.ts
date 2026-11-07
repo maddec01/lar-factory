@@ -45,6 +45,7 @@ const isGreen = (el: Element) => el.classList.contains('bg-success');
 const tooltip = async () => {
     await settle(() => refreshed().focus());
     await settle(() => vi.advanceTimersByTime(1000));
+
     // Radix repeats the tooltip, hidden, as the trigger's description; this reads the one shown.
     return $$('[data-radix-popper-content-wrapper] [data-line]')
         .filter((line) => !line.closest('[role="tooltip"]'))
@@ -91,9 +92,11 @@ test('the title bar holds the brand, the status strip, the search field, then Li
         'update',
         'settings',
     ]);
+
     const header = titleBar().querySelector('header')!;
     const [, , middle, right] = [...header.children];
     const strip = middle!.querySelector('.status-strip')!;
+
     expect(
         [...strip.children].map((el) =>
             el.matches('.refreshed') ? 'refreshed' : el.matches('.counters') ? 'counters' : 'rule',
@@ -109,14 +112,18 @@ test('the title bar holds the brand, the status strip, the search field, then Li
 // wrapper takes the room up to 26rem at the far end of the title zone, beside the actions.
 test('the counters sit after the brand, and the field takes up to 26rem beside the actions', async () => {
     await mountPage();
+
     const strip = titleBar().querySelector('.status-strip')!;
+
     expect(
         strip.className.split(' ').filter((c) => /absolute|translate/.test(c)),
         'the strip is not centred',
     ).toEqual([]);
     expect(strip.previousElementSibling, 'the strip opens the title zone').toBeNull();
     expect(strip.parentElement!.className.split(' '), 'the title zone fills the room up to List').toContain('flex-1');
+
     const wrapper = field().parentElement!;
+
     expect(strip.nextElementSibling).toBe(wrapper);
     expect(wrapper.className.split(' ')).toEqual(
         expect.arrayContaining(['ml-auto', 'flex-1', 'min-w-0', 'max-w-[26rem]']),
@@ -135,14 +142,18 @@ test("Add item is the bar's Main action and every other control an App control; 
         })),
     });
     await mountPage();
+
     const kindOf = (selector: string) => titleBar().querySelector(selector)!.getAttribute('data-kind');
+
     expect(kindOf('.add-item')).toBe('main');
     for (const selector of ['.list-button', '.update-button', '.open-settings'])
         expect(kindOf(selector), selector).toBe('control');
     expect([...titleBar().querySelectorAll('.counters button')].map((b) => b.getAttribute('data-kind'))).toEqual(
         Array(5).fill('control'),
     );
+
     const settings = titleBar().querySelector('.open-settings')!;
+
     expect([settings.getAttribute('data-icon-only'), settings.getAttribute('aria-label'), text(settings)]).toEqual([
         'large',
         'Settings',
@@ -159,10 +170,14 @@ test("in a browser, where nothing updates, there's no update pill", async () => 
 
 test(`the brand reads "Lar Factory": the design system's BrandMark, then Factory on its baseline`, async () => {
     await mountPage();
+
     const brand = $('.title-bar .brand')!;
+
     expect(text(brand)).toBe('arFactory');
     expect(brand.className.split(' ')).toEqual(expect.arrayContaining(['inline-flex', 'items-baseline']));
+
     const [mark, factory] = [...brand.children];
+
     expect(mark!.className.split(' ')).toContain('lar-brand-mark');
     expect(mark!.querySelector('svg')).not.toBeNull();
     expect(text(factory)).toBe('Factory');
@@ -215,7 +230,9 @@ test("in a browser too, the missing-t3 notice's bar holds only the brand and Set
 
 test('Add item opens the Add item flow, and ⌘N does too', async () => {
     await mountPage();
+
     const add = titleBar().querySelector<HTMLButtonElement>('.add-item')!;
+
     expect([text(add), add.getAttribute('aria-keyshortcuts')]).toEqual(['Add item', 'Meta+N']);
     await settle(() => add.click());
     expect($('#add-item-dialog')!.hidden).toBe(false);
@@ -223,7 +240,9 @@ test('Add item opens the Add item flow, and ⌘N does too', async () => {
 
 test("in a browser, grey stand-ins hold the traffic lights' place, with the bar starting past them as in the Mac app", async () => {
     await mountPage();
+
     const lights = $$('.traffic-lights > span');
+
     expect(lights).toHaveLength(3);
     expect(
         lights.every((s) => s.className.split(' ').includes('bg-(--traffic-stand-in)') && !s.style.background),
@@ -241,6 +260,7 @@ test('in the Mac app, macOS draws the traffic lights and the bar starts past the
 
 test("in the Mac app's full screen, where macOS hides the traffic lights, the bar keeps only its own padding", async () => {
     const window = fullScreen(true);
+
     stubApp(window.bridge);
     await mountPage();
     expect(inset()).toBe(false);
@@ -341,6 +361,7 @@ test('while some repositories still read, it shows Loading Projects behind a gre
         ...fresh(),
         firstRead: { step: 'items' as const, running: [], waiting, settled: false },
     });
+
     await mountPage(reading(['maddec01/lar-server', 'maddec01/lar-apple']));
     expect(text(refreshed())).toBe('Loading Projects');
     expect([isAmber(dot()), isGreen(dot())]).toEqual([false, false]);
@@ -353,7 +374,9 @@ test('while some repositories still read, it shows Loading Projects behind a gre
 
 test('the tooltip gives the exact time and when reads happen', async () => {
     await mountPage(readAgo(11_000));
+
     const read = clock(new Date(NOW - 11_000).toISOString(), undefined);
+
     expect(read).toMatch(/^\d\d:\d\d$/);
     expect(await tooltip()).toEqual([
         `Updated 12s ago · ${read}`,
@@ -363,7 +386,9 @@ test('the tooltip gives the exact time and when reads happen', async () => {
 
 test('the Refreshed clock stops while the window is hidden and catches up immediately when shown', async () => {
     await mountPage(fresh());
+
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+
     await settle(() => document.dispatchEvent(new Event('visibilitychange')));
     await settle(() => vi.advanceTimersByTime(12_000));
     expect(text(refreshed())).toBe('0s ago');
@@ -376,7 +401,9 @@ test('the Refreshed clock stops while the window is hidden and catches up immedi
 
 test('the tooltip names a failed read by its first line', async () => {
     await mountPage();
+
     const read = clock(sample.fetchedAt!, undefined);
+
     expect(await tooltip()).toEqual([
         `Updated 20m ago · ${read}`,
         'Last read failed: gh api graphql failed: error connecting to api.github.com',
@@ -396,7 +423,9 @@ test('the dot pings once for each newer read, never on page load, in stale or wh
     await settle(() => vi.advanceTimersByTime(5_000));
     expect(ping()).toBeNull();
     await push(fresh());
+
     const first = ping();
+
     expect(first).not.toBeNull();
     expect(first!.className.split(' ')).toEqual(
         expect.arrayContaining(['motion-safe:animate-[refreshed-ping_1.2s_ease-out_forwards]']),
@@ -433,12 +462,16 @@ test('the bar folds by its own width instead of squeezing: the counters keep the
         })),
     });
     await mountPage();
+
     const classes = (el: Element | null) => el!.className.split(' ');
+
     expect(
         classes(titleBar().querySelector('header')),
         "the design system's TitleBar is the container the fold reads",
     ).toContain('@container');
+
     const counters = titleBar().querySelector('.counters')!;
+
     expect(classes(counters)).toContain('shrink-0');
     expect(classes(counters), 'a size container would have no width of its own').not.toContain('@container');
     expect(classes(counters.parentElement), 'its slot never shrinks below it').not.toContain('min-w-0');
@@ -447,6 +480,7 @@ test('the bar folds by its own width instead of squeezing: the counters keep the
         ['.add-item', 'Add item'],
     ] as const) {
         const span = [...titleBar().querySelectorAll(`${button} span`)].find((s) => text(s) === label);
+
         expect(classes(span ?? null), `${label}'s label stays for screen readers`).toContain('@max-[70rem]:sr-only');
     }
     expect(text(counters), 'the counters show no labels').not.toMatch(/need you|shaping|building|shipped|spend/);

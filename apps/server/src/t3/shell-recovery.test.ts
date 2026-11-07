@@ -6,6 +6,7 @@ describe('shell recovery', () => {
     it('rejects replay and stale snapshots while retaining projects', () => {
         const recovery = new ShellRecovery();
         const project = { id: 'one', title: 'One', workspaceRoot: '/one', faviconPath: null, projectIcon: null };
+
         expect(recovery.accept({ kind: 'snapshot', snapshot: { snapshotSequence: 3, projects: [project] } })).toBe(
             true,
         );
@@ -31,6 +32,7 @@ describe('shell recovery', () => {
 it('merges marked metadata updates without removing unrelated projects, including at a later sequence', () => {
     const recovery = new ShellRecovery();
     const project = (id: string) => ({ id, title: id, workspaceRoot: `/${id}`, faviconPath: null, projectIcon: null });
+
     recovery.accept({
         kind: 'snapshot',
         snapshot: { snapshotSequence: 3, projects: [project('factory'), project('other')] },
@@ -61,6 +63,7 @@ it('merges marked metadata updates without removing unrelated projects, includin
 it('rejects malformed metadata markers without changing the observation', () => {
     const recovery = new ShellRecovery();
     const first = { id: 'factory', title: 'Factory', workspaceRoot: '/factory', faviconPath: null, projectIcon: null };
+
     recovery.accept({ kind: 'snapshot', snapshot: { snapshotSequence: 3, projects: [first] } });
     expect(() =>
         recovery.accept({
@@ -76,11 +79,14 @@ describe('project icon fields', () => {
     const base = { id: 'one', title: 'One', workspaceRoot: '/one' };
     const first = (fields: object) => {
         const recovery = new ShellRecovery();
+
         recovery.accept({ kind: 'snapshot', snapshot: { snapshotSequence: 1, projects: [{ ...base, ...fields }] } });
+
         return recovery;
     };
     const icons = (recovery: ShellRecovery) => {
         const { faviconPath, projectIcon } = recovery.observation().projects[0]!;
+
         return { faviconPath, projectIcon };
     };
     const icon = { kind: 'emoji', emoji: '🚀' };
@@ -99,6 +105,7 @@ describe('project icon fields', () => {
 
     it('keeps a value a project.updated event or metadata snapshot omits, and an explicit null clears it', () => {
         const recovery = first({ faviconPath: 'logo.png', projectIcon: icon });
+
         recovery.accept({ kind: 'project.updated', sequence: 2, project: { ...base, title: 'Renamed' } });
         expect(icons(recovery)).toEqual({ faviconPath: 'logo.png', projectIcon: icon });
         recovery.accept({
@@ -119,6 +126,7 @@ describe('project icon fields', () => {
 
     it('forgets the old values when a full snapshot omits them', () => {
         const recovery = first({ faviconPath: 'logo.png', projectIcon: icon });
+
         recovery.accept({ kind: 'snapshot', snapshot: { snapshotSequence: 2, projects: [base] } });
         expect(icons(recovery)).toEqual({ faviconPath: null, projectIcon: null });
     });

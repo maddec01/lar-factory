@@ -51,7 +51,9 @@ interface Instance {
 export function loadModelChoices(settingsPath: string, manifestPath: string): ModelGroup[] {
     const settings = readJsonRecord(settingsPath);
     const manifest = readManifest(manifestPath);
+
     if (!settings || !manifest) return [];
+
     return instances(settings)
         .filter(enabled)
         .flatMap((instance) => {
@@ -59,6 +61,7 @@ export function loadModelChoices(settingsPath: string, manifestPath: string): Mo
                 ...currentModels(manifest, instance.driver),
                 ...customModels(instance.config),
             ]);
+
             return models.length ? [{ instanceId: instance.id, name: displayName(instance), models }] : [];
         });
 }
@@ -66,9 +69,13 @@ export function loadModelChoices(settingsPath: string, manifestPath: string): Mo
 /** The offered choice `input` names, or null when it names none (or anything else). */
 export function findModelChoice(groups: readonly ModelGroup[], input: unknown): ModelChoice | null {
     if (!isRecord(input) || Object.keys(input).length !== 2) return null;
+
     const { instanceId, model } = input;
+
     if (typeof instanceId !== 'string' || typeof model !== 'string') return null;
+
     const choice = { instanceId, model };
+
     return offers(groups, choice) ? choice : null;
 }
 
@@ -96,6 +103,7 @@ export function effectiveDefaults(
             | string
             | undefined) ?? DEFAULT_RUNTIME_MODE;
     let row: unknown;
+
     if (settings.projectSettingsFolded !== true && stored.defaultModelSelection === undefined) {
         try {
             row = projectRow();
@@ -103,14 +111,18 @@ export function effectiveDefaults(
             return { selection: null, runtimeMode };
         }
     }
+
     const override = stored.defaultModelSelection === undefined ? (row ?? undefined) : stored.defaultModelSelection;
+
     // T3 skips an override on an instance disabled here. A null override clears the default.
     if (override === null) return { selection: null, runtimeMode };
+
     const selection = parseSelection(override);
     const chosen =
         selection && instanceEnabled(settings, stored, selection.instanceId)
             ? selection
             : parseSelection(settings.defaultModelSelection);
+
     return { selection: chosen, runtimeMode };
 }
 
@@ -121,6 +133,7 @@ export function projectDefaults(
     dbPath = statsDbPath(),
 ): ProjectDefaults | null {
     const settings = readJsonRecord(settingsPath);
+
     return (
         settings &&
         effectiveDefaults(settings, projectId, () => readT3Db(dbPath, (db) => projectDefaultSelection(db, projectId)))
@@ -130,12 +143,14 @@ export function projectDefaults(
 /** What a launch sends for `choice`: the default's options when it names the default's instance and model, else none, as options belong to one model. */
 export function launchSelection(choice: ModelChoice, selection: ModelSelection | null): ModelSelection {
     const same = selection?.instanceId === choice.instanceId && selection.model === choice.model;
+
     return same && selection.options?.length ? { ...choice, options: selection.options } : choice;
 }
 
 /** Only the instance, model and option ids and values: the settings may hold secrets. */
 function parseSelection(value: unknown): ModelSelection | null {
     if (!isRecord(value) || typeof value.instanceId !== 'string' || typeof value.model !== 'string') return null;
+
     const options = (Array.isArray(value.options) ? value.options : []).flatMap((option): ModelSelectionOption[] =>
         isRecord(option) &&
         typeof option.id === 'string' &&
@@ -143,6 +158,7 @@ function parseSelection(value: unknown): ModelSelection | null {
             ? [{ id: option.id, value: option.value }]
             : [],
     );
+
     return { instanceId: value.instanceId, model: value.model, ...(options.length ? { options } : {}) };
 }
 
@@ -153,14 +169,18 @@ function instanceEnabled(
     instanceId: string,
 ): boolean {
     const here = isRecord(stored.providerInstances) ? stored.providerInstances[instanceId] : undefined;
+
     if (isRecord(here) && typeof here.enabled === 'boolean') return here.enabled;
+
     const listed = instances(settings).find((instance) => instance.id === instanceId);
+
     return listed ? enabled(listed) : false;
 }
 
 /** The manifest inside T3's cached model list, or null when it can't be read. */
 function readManifest(path: string): Record<string, unknown> | null {
     const manifest = readJsonRecord(path)?.manifest;
+
     return isRecord(manifest) ? manifest : null;
 }
 
@@ -175,13 +195,16 @@ function instances(settings: Record<string, unknown>): Instance[] {
         driver: id,
         enabled: true,
     }));
+
     return [...configured, ...builtIn];
 }
 
 function enabled(instance: Instance): boolean {
     const configEnabled =
         isRecord(instance.config) && typeof instance.config.enabled === 'boolean' ? instance.config.enabled : undefined;
+
     if (instance.enabled === false || configEnabled === false) return false;
+
     return typeof instance.enabled === 'boolean'
         ? instance.enabled
         : (configEnabled ?? !DISABLED_BY_DEFAULT.has(instance.driver));
@@ -198,8 +221,11 @@ const humanize = (slug: string) =>
 function displayName(instance: Instance): string {
     const named = typeof instance.displayName === 'string' ? instance.displayName.trim() : '';
     const driverName = DRIVER_NAMES[instance.driver] ?? humanize(instance.driver);
+
     if (named && named !== driverName) return named;
+
     if (instance.id !== instance.driver && humanize(instance.id)) return humanize(instance.id);
+
     return named || driverName;
 }
 
@@ -207,10 +233,12 @@ function currentModels(manifest: Record<string, unknown>, driver: string): Model
     const slugs = isRecord(manifest.currentModels) ? manifest.currentModels[driver] : undefined;
     const provider = isRecord(manifest.providers) ? manifest.providers[driver] : undefined;
     const known = isRecord(provider) && Array.isArray(provider.models) ? provider.models.filter(isRecord) : [];
+
     return (Array.isArray(slugs) ? slugs : [])
         .filter((slug): slug is string => typeof slug === 'string' && slug.trim() !== '')
         .map((slug) => {
             const name = known.find((m) => m.slug === slug)?.name;
+
             return { slug, label: typeof name === 'string' && name.trim() ? name : slug };
         });
 }
@@ -218,6 +246,7 @@ function currentModels(manifest: Record<string, unknown>, driver: string): Model
 /** The instance's custom models, by slug: T3 takes a slug or `{ slug, name }`. */
 function customModels(config: unknown): ModelOption[] {
     const entries = isRecord(config) && Array.isArray(config.customModels) ? config.customModels : [];
+
     return entries
         .map((entry) => (isRecord(entry) ? entry.slug : entry))
         .filter((slug): slug is string => typeof slug === 'string' && slug.trim() !== '')

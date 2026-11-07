@@ -77,10 +77,14 @@ CREATE TABLE orchestration_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, a
 /** Writes the database to a temporary folder removed after the test, and returns its path. */
 export function statsDb(t: TestContext, threads: FixtureThread[], requests: FixtureRequest[] = []): string {
     const path = join(tempDir(t, 'lar-stats-'), 'statev2.sqlite');
+
     writeFileSync(path + '.execution.json', JSON.stringify(threads));
     writeFileSync(path + '.requests.json', JSON.stringify(requests));
+
     const db = new DatabaseSync(path);
+
     db.exec(SCHEMA);
+
     const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?, ?)');
     const message = db.prepare('INSERT INTO orchestration_v2_projection_messages VALUES (?, ?, ?, ?, ?)');
     const turn = db.prepare(`INSERT INTO orchestration_v2_projection_provider_turns
@@ -92,6 +96,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
     const request = db.prepare('INSERT INTO orchestration_v2_projection_runtime_requests VALUES (?, ?, ?, ?, ?)');
     const provider = db.prepare('INSERT INTO orchestration_v2_projection_provider_threads VALUES (?, ?, ?, ?, ?)');
     const subagent = db.prepare('INSERT INTO orchestration_v2_projection_subagents VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+
     for (const th of threads) {
         const lineage = th.rootThreadId
             ? {
@@ -100,6 +105,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
                   rootThreadId: th.rootThreadId,
               }
             : { parentThreadId: null, relationshipToParent: null, rootThreadId: th.id };
+
         thread.run(
             th.id,
             th.title ?? th.id,
@@ -109,6 +115,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
         // Inserted latest first, so the reader has to order by time.
         [...(th.messages ?? [])].reverse().forEach((text, i, all) => {
             const at = new Date(Date.parse('2026-10-20T08:00:00Z') + (all.length - 1 - i) * 60_000).toISOString();
+
             message.run(`${th.id}:m${i}`, th.id, 'user', at, JSON.stringify({ role: 'user', text }));
         });
         message.run(
@@ -118,6 +125,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
             '2026-10-20T07:00:00.000Z',
             JSON.stringify({ role: 'assistant', text: 'Build x/y#1' }),
         );
+
         if (th.repliedAt)
             message.run(
                 `${th.id}:reply`,
@@ -126,6 +134,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
                 th.repliedAt,
                 JSON.stringify({ role: 'assistant', text: 'Done.' }),
             );
+
         // updated_at is bulk-updated by T3, so it is set to a time item stats must never use.
         [th.subagent ?? []]
             .flat()
@@ -148,6 +157,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
                 driver = 'claudeAgent',
                 createdAt = '2026-10-20T08:00:00.000Z',
             } = typeof entry === 'string' ? { session: entry } : entry;
+
             provider.run(
                 `${th.id}:${session}`,
                 th.id,
@@ -162,17 +172,22 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
                 }),
             );
         }
+
         // A provider thread is active while any of its turns is open and not abandoned.
         const providerThreads = new Map<string, boolean>();
+
         for (const tu of th.turns ?? []) {
             const completedAt = tu.completedAt ?? null;
             const providerThread = `${th.id}:${tu.providerThread ?? tu.id}`;
+
             providerThreads.set(
                 providerThread,
                 (providerThreads.get(providerThread) ?? false) || !(completedAt || tu.abandoned),
             );
+
             const codex = tu.codex;
             const attemptId = codex ? `${tu.id}:attempt` : null;
+
             // T3's own token counts, which item stats no longer read.
             turn.run(
                 tu.id,
@@ -193,8 +208,10 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
                     ...(codex ? { nativeTurnRef: { driver: 'codex', nativeId: codex.nativeTurn } } : {}),
                 }),
             );
+
             if (codex && attemptId) {
                 const run = `${tu.id}:run`;
+
                 attempt.run(attemptId, th.id, run, providerThread, JSON.stringify({ nativeThreadId: codex.session }));
                 // A later steer's selection, which doesn't change the tier the turn started with.
                 for (const modelSelection of [codex.selection, { instanceId: 'codex', model: 'steered' }]) {
@@ -217,6 +234,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
     }
     requests.forEach((r, i) => request.run(`request-${i}`, 'unused', r.turnId, r.createdAt, r.resolvedAt ?? null));
     db.close();
+
     return path;
 }
 
@@ -258,7 +276,9 @@ export interface FixtureTranscripts {
 /** A temporary folder removed after the test. */
 export function tempDir(t: TestContext, prefix: string): string {
     const dir = mkdtempSync(join(tmpdir(), prefix));
+
     t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+
     return dir;
 }
 
@@ -276,17 +296,22 @@ export function claudeHome(
     home = tempDir(t, 'lar-claude-home-'),
 ): string {
     const project = join(home, 'projects', '-Users-me--t3-worktrees-lar-factory-feat-60');
+
     mkdirSync(project, { recursive: true });
     for (const [session, { main, subagents }] of Object.entries(sessions)) {
         if (main) writeFileSync(join(project, `${session}.jsonl`), lines(main));
+
         if (!subagents) continue;
+
         const dir = join(project, session, 'subagents');
+
         mkdirSync(dir, { recursive: true });
         for (const [agent, records] of Object.entries(subagents)) {
             writeFileSync(join(dir, `agent-${agent}.meta.json`), JSON.stringify({ agentType: 'general-purpose' }));
             writeFileSync(join(dir, `agent-${agent}.jsonl`), lines(records));
         }
     }
+
     return home;
 }
 
@@ -301,16 +326,19 @@ export function codexHome(
     home = tempDir(t, 'lar-codex-home-'),
 ): string {
     const day = join(home, 'sessions', '2026', '10', '20');
+
     mkdirSync(day, { recursive: true });
     for (const [session, records] of Object.entries(sessions)) {
         writeFileSync(join(day, `rollout-2026-10-20T09-00-00-${session}.jsonl`), lines(records));
     }
+
     return home;
 }
 
 /** A Codex rollout's opening lines: its session meta, and a turn context naming `model`. */
 export function codexSession(id: string, model = 'gpt-5.6-sol', forkedFrom?: string): object[] {
     const timestamp = '2026-10-20T09:00:00.000Z';
+
     return [
         {
             type: 'session_meta',
@@ -337,6 +365,7 @@ export function codexTokens(
         reasoning_output_tokens: 0,
         total_tokens: i + o,
     });
+
     return {
         type: 'event_msg',
         timestamp: at,
@@ -363,20 +392,25 @@ export function t3Settings(
     const providerInstances = Object.fromEntries(
         Object.entries(homes).map(([id, entry]) => {
             const { driver, homePath } = typeof entry === 'string' ? { driver: 'claudeAgent', homePath: entry } : entry;
+
             return [id, { driver, displayName: id, enabled: true, config: { homePath } }];
         }),
     );
+
     writeFileSync(
         path,
         JSON.stringify({ providerInstances, usageModelAliases: null, usagePriceOverrides: null, ...usage }),
     );
+
     return path;
 }
 
 /** Writes T3's cached price table, `usage-model-rates.json`, around a LiteLLM document, and returns its path. */
 export function usageRates(t: TestContext, document: Record<string, object>): string {
     const path = join(tempDir(t, 'lar-t3-rates-'), 'usage-model-rates.json');
+
     writeFileSync(path, JSON.stringify({ fetchedAtMs: Date.parse('2026-10-20T00:00:00Z'), document }));
+
     return path;
 }
 
@@ -391,11 +425,15 @@ export interface FixtureProject {
 export function projectsDb(t: TestContext, projects: FixtureProject[]): string {
     const path = join(tempDir(t, 'lar-projects-'), 'statev2.sqlite');
     const db = new DatabaseSync(path);
+
     db.exec(`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, title TEXT NOT NULL,
     workspace_root TEXT NOT NULL, deleted_at TEXT)`);
+
     const project = db.prepare('INSERT INTO projection_projects VALUES (?, ?, ?, ?)');
+
     for (const p of projects) project.run(p.id, p.id, p.root, p.deletedAt ?? null);
     db.close();
+
     return path;
 }
 
@@ -413,10 +451,13 @@ export interface FixtureProjectThread {
 export function projectThreadsDb(t: TestContext, threads: FixtureProjectThread[]): string {
     const path = join(tempDir(t, 'lar-threads-'), 'statev2.sqlite');
     const db = new DatabaseSync(path);
+
     db.exec(`CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, project_id TEXT, title TEXT, created_at TEXT, deleted_at TEXT);
 CREATE TABLE orchestration_v2_projection_messages (message_id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, created_at TEXT, payload_json TEXT);`);
+
     const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?, ?, ?)');
     const message = db.prepare('INSERT INTO orchestration_v2_projection_messages VALUES (?, ?, ?, ?, ?)');
+
     for (const th of threads) {
         thread.run(th.id, th.project, th.title, th.createdAt, th.deletedAt ?? null);
         (th.messages ?? []).forEach((m, i) =>
@@ -430,5 +471,6 @@ CREATE TABLE orchestration_v2_projection_messages (message_id TEXT PRIMARY KEY, 
         );
     }
     db.close();
+
     return path;
 }

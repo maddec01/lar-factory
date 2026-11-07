@@ -57,9 +57,13 @@ const launcherScript = (input: InstallInput) =>
 /** What sits at `path`: nothing, the app's launcher with its text, or something else, which includes a symlink. */
 const existing = (path: string): { kind: 'none' } | { kind: 'ours'; text: string } | { kind: 'foreign' } => {
     const stat = NodeFS.lstatSync(path, { throwIfNoEntry: false });
+
     if (!stat) return { kind: 'none' };
+
     if (!stat.isFile()) return { kind: 'foreign' };
+
     const text = NodeFS.readFileSync(path, 'utf8');
+
     return text.split('\n')[1] === MARK ? { kind: 'ours', text } : { kind: 'foreign' };
 };
 
@@ -68,17 +72,23 @@ export const install = (input: InstallInput): InstallOutcome => {
     const path = launcherPath(input.home);
     const script = launcherScript(input);
     const found = existing(path);
+
     if (found.kind === 'foreign') return { kind: 'foreign', path };
+
     if (found.kind === 'ours' && found.text === script) return { kind: 'unchanged', path };
+
     NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
+
     // Written beside the launcher and renamed over it, so a thread never runs half a file.
     const temp = `${path}.${process.pid}.tmp`;
+
     try {
         NodeFS.writeFileSync(temp, script, { mode: 0o755 });
         NodeFS.renameSync(temp, path);
     } finally {
         NodeFS.rmSync(temp, { force: true });
     }
+
     return { kind: 'installed', path };
 };
 
@@ -87,6 +97,7 @@ export const onLaunch = Effect.fn('LarWorkLauncher.onLaunch')(function* (
     input: InstallInput & { readonly isPackaged: boolean; readonly installInDevelopment?: boolean },
 ) {
     if (!input.isPackaged && !input.installInDevelopment) return;
+
     yield* Effect.try(() => install(input)).pipe(
         Effect.flatMap((outcome) => {
             switch (outcome.kind) {

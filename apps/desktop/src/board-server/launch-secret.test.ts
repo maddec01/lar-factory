@@ -5,6 +5,7 @@ import * as LaunchSecret from './launch-secret.ts';
 describe('LaunchSecret', () => {
     it('makes a new secret each launch', () => {
         const first = LaunchSecret.make();
+
         assert.match(first, /^[\w-]{43}$/);
         assert.notStrictEqual(LaunchSecret.make(), first);
     });

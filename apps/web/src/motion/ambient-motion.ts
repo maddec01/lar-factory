@@ -15,25 +15,32 @@ function visibilityChanged(): void {
 
 export function ambientMotion(element: Element | null): (() => void) | undefined {
     if (!element) return;
+
     if (!indicators.size) document.addEventListener('visibilitychange', visibilityChanged);
+
     // Without IntersectionObserver, visibility changes still pause indicators in a hidden window.
     const visible = typeof IntersectionObserver === 'undefined';
+
     indicators.set(element, visible);
     update(element, visible);
+
     if (!visible) {
         observer ??= new IntersectionObserver((entries) => {
             for (const { target, isIntersecting } of entries) {
                 if (!indicators.has(target)) continue;
+
                 indicators.set(target, isIntersecting);
                 update(target, isIntersecting);
             }
         });
         observer.observe(element);
     }
+
     return () => {
         observer?.unobserve(element);
         indicators.delete(element);
         element.removeAttribute('data-ambient-motion');
+
         if (!indicators.size) {
             observer?.disconnect();
             observer = undefined;

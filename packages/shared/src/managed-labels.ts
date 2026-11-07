@@ -10,6 +10,7 @@ const MANAGED_PREFIXES = [DECISION_LABEL_PREFIX, STATUS_LABEL_PREFIX];
 
 export const isManagedLabel = (name: string): boolean => {
     const typed = name.trim().toLowerCase();
+
     return MANAGED_NAMES.includes(typed) || MANAGED_PREFIXES.some((prefix) => typed.startsWith(prefix));
 };
 
@@ -46,6 +47,7 @@ const SWAP_KIND_NAMES: readonly string[] = TRACKER_KIND_NAMES.filter(([kind]) =>
 /** Whether trackerKind reads `name` as a kind by itself, so a repository can map a kind to it. */
 export const isKindName = (name: string): boolean => {
     const typed = name.trim().toLowerCase();
+
     return TRACKER_KIND_NAMES.some(([, names]) => names.includes(typed));
 };
 
@@ -71,6 +73,7 @@ export function kindLabelSwap(
         ...kindLabels('concept', vocabulary),
     ]);
     const swapped = new Set([...SWAP_KIND_NAMES, ...SWAP_KINDS.flatMap((other) => kindLabels(other, vocabulary))]);
+
     return {
         add: (vocabulary?.[kind].labels ?? []).filter((label) => !labels.some((name) => sameLabel(name, label))),
         remove: labels.filter((label) => swapped.has(label.toLowerCase()) && !kept.has(label.toLowerCase())),
@@ -84,5 +87,6 @@ export function shownLabels(
     isManaged: (name: string) => boolean = isManagedLabel,
 ): string[] {
     const mapped = new Set(kindLabels(item.kind, vocabulary));
+
     return item.labels.slice(0, LABEL_LIMIT).filter((label) => !isManaged(label) && !mapped.has(label.toLowerCase()));
 }

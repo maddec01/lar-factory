@@ -102,6 +102,7 @@ export const boardApp = (): BoardAppBridge | undefined => window.boardApp;
 /** Headers for a JSON write: in the app they carry the secret the server checks. */
 export function writeHeaders(): Record<string, string> {
     const secret = boardApp()?.secret;
+
     return { 'Content-Type': 'application/json', ...(secret && { 'X-Board-Secret': secret }) };
 }
 

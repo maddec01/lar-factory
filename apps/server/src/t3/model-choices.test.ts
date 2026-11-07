@@ -34,8 +34,10 @@ function files(t: TestContext, settings: unknown, manifest: unknown = MANIFEST) 
     const dir = tempDir(t, 'lar-model-choices-');
     const write = (name: string, value: unknown) => {
         writeFileSync(join(dir, name), typeof value === 'string' ? value : JSON.stringify(value));
+
         return join(dir, name);
     };
+
     return { settings: write('settings.json', settings), manifest: write('model-manifest.json', manifest) };
 }
 
@@ -54,6 +56,7 @@ const CLAUDE_MODELS = [
 
 test("offers each enabled instance's current models in manifest order, named, else by slug", (t) => {
     const { settings, manifest } = files(t, { providerInstances: {} });
+
     assert.deepEqual(loadModelChoices(settings, manifest), [
         CODEX,
         { instanceId: 'claudeAgent', name: 'Claude', models: CLAUDE_MODELS },
@@ -72,6 +75,7 @@ test("enabled instances follow T3's rules; disabled ones aren't offered", (t) =>
             codex_work: { driver: 'codex', displayName: 'Codex' },
         },
     });
+
     assert.deepEqual(
         loadModelChoices(settings, manifest).map((g) => [g.instanceId, g.name]),
         [
@@ -95,6 +99,7 @@ test("an instance's custom models follow its current models, by slug", (t) => {
             claudeAgent: { driver: 'claudeAgent', enabled: false },
         },
     });
+
     assert.deepEqual(loadModelChoices(settings, manifest), [
         {
             ...CODEX,
@@ -109,6 +114,7 @@ test("an instance's custom models follow its current models, by slug", (t) => {
 
 test('an instance with no models is left out', (t) => {
     const { settings, manifest } = files(t, { providerInstances: { grok: { driver: 'grok', enabled: true } } });
+
     assert.deepEqual(
         loadModelChoices(settings, manifest).map((g) => g.instanceId),
         ['codex', 'claudeAgent'],
@@ -123,12 +129,14 @@ for (const [name, settingsValue, manifestValue] of [
 ] as const) {
     test(`${name} offer only T3 Project default`, (t) => {
         const { settings, manifest } = files(t, settingsValue, manifestValue);
+
         assert.deepEqual(loadModelChoices(settings, manifest), []);
     });
 }
 
 test('missing files offer only T3 Project default', (t) => {
     const dir = tempDir(t, 'lar-model-choices-');
+
     assert.deepEqual(loadModelChoices(join(dir, 'none.json'), join(dir, 'none.json')), []);
 });
 
@@ -144,11 +152,13 @@ test('no other settings value leaves the option list', (t) => {
         },
     });
     const offered = JSON.stringify(loadModelChoices(settings, manifest));
+
     assert.doesNotMatch(offered, /SECRET/);
 });
 
 test('a choice is offered only as an enabled instance and one of its models', () => {
     const groups = [CODEX];
+
     assert.deepEqual(findModelChoice(groups, { instanceId: 'codex', model: 'gpt-a' }), {
         instanceId: 'codex',
         model: 'gpt-a',
@@ -193,12 +203,14 @@ test('the T3 Project default follows the project override when settings are fold
         defaultModelSelection: GLOBAL,
         projectSettingsOverrides: { p: { defaultModelSelection: OVERRIDE } },
     };
+
     assert.deepEqual(effectiveDefaults(settings, 'p', noLegacy).selection, OVERRIDE);
     assert.deepEqual(effectiveDefaults(settings, 'other', noLegacy).selection, GLOBAL);
 });
 
 test('before folding, the project row applies under its stored override', () => {
     const base = { defaultModelSelection: GLOBAL, projectSettingsOverrides: {} };
+
     assert.deepEqual(effectiveDefaults(base, 'p', () => LEGACY).selection, LEGACY);
     assert.deepEqual(effectiveDefaults(base, 'p', () => null).selection, GLOBAL);
     assert.deepEqual(
@@ -215,6 +227,7 @@ test('an unread project row leaves the T3 Project default unknown, so no options
     const answer = effectiveDefaults({ defaultModelSelection: GLOBAL }, 'p', () => {
         throw Error('no database');
     });
+
     assert.equal(answer.selection, null);
 });
 
@@ -225,18 +238,23 @@ test('a project override on a disabled instance falls back to the global default
         providerInstances: { claudeAgent: { driver: 'claudeAgent', enabled: false } },
         projectSettingsOverrides: { p: { defaultModelSelection: OVERRIDE } },
     };
+
     assert.deepEqual(effectiveDefaults(off, 'p', noLegacy).selection, GLOBAL);
+
     const onHere = {
         ...off,
         projectSettingsOverrides: {
             p: { defaultModelSelection: OVERRIDE, providerInstances: { claudeAgent: { enabled: true } } },
         },
     };
+
     assert.deepEqual(effectiveDefaults(onHere, 'p', noLegacy).selection, OVERRIDE);
+
     const unlisted = {
         ...folded,
         projectSettingsOverrides: { p: { defaultModelSelection: { instanceId: 'gone', model: 'm' } } },
     };
+
     assert.deepEqual(effectiveDefaults(unlisted, 'p', noLegacy).selection, GLOBAL);
 });
 
@@ -249,11 +267,13 @@ test('only instance, model and option ids and values leave the settings', () => 
             options: [{ id: 'effort', value: 'medium', secret: 'y' }, { id: 'bad', value: {} }, 'junk'],
         },
     };
+
     assert.deepEqual(effectiveDefaults(settings, 'p', noLegacy).selection, OVERRIDE);
 });
 
 test("the runtime mode follows the project override, then the global setting, then T3's own default", () => {
     const folded = { projectSettingsFolded: true };
+
     assert.equal(effectiveDefaults(folded, 'p', noLegacy).runtimeMode, 'full-access');
     assert.equal(effectiveDefaults({ ...folded, defaultRuntimeMode: 'auto' }, 'p', noLegacy).runtimeMode, 'auto');
     assert.equal(
@@ -272,6 +292,7 @@ test("the runtime mode follows the project override, then the global setting, th
 
 test("a choice takes the default's options only for the same instance and model", () => {
     const choice = { instanceId: OVERRIDE.instanceId, model: OVERRIDE.model };
+
     assert.deepEqual(launchSelection(choice, OVERRIDE), OVERRIDE);
     assert.deepEqual(launchSelection(choice, { ...choice }), choice);
     assert.deepEqual(launchSelection(choice, GLOBAL), choice);

@@ -56,6 +56,7 @@ export function LabelPicker({
         create?.onCreate(typed);
         setQuery('');
     };
+
     return (
         <div className="grid w-72 gap-2" data-label-picker aria-busy={busy}>
             <Input
@@ -70,13 +71,16 @@ export function LabelPicker({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
                     if (e.key !== 'Enter') return;
+
                     e.preventDefault();
+
                     if (fresh && !refusal) add();
                 }}
             />
             <div className="grid max-h-56 gap-0.5 overflow-y-auto">
                 {hits.map(({ name, color, description }) => {
                     const fixed = locked.some((label) => sameLabel(label, name));
+
                     return (
                         <label
                             key={name}

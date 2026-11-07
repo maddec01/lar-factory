@@ -13,6 +13,7 @@ export const BUNDLE_URL = new URL('../../../../.assembled-skills/', import.meta.
 /** BOARD_BUNDLE_DIR when set (the board app's bundle), else the checkout's root. */
 export function bundleUrl(env: NodeJS.ProcessEnv = process.env): URL {
     const dir = env.BOARD_BUNDLE_DIR;
+
     return dir ? pathToFileURL(join(dir, '/')) : BUNDLE_URL;
 }
 
@@ -28,8 +29,11 @@ interface Upstream {
 function tableRows(markdown: string, header: string): string[][] {
     const lines = markdown.split('\n');
     const start = lines.findIndex((line) => line.startsWith(header));
+
     if (start < 0) return [];
+
     const end = lines.findIndex((line, index) => index > start && !line.startsWith('|'));
+
     return lines.slice(start + 2, end < 0 ? undefined : end).map((row) =>
         row
             .split('|')
@@ -52,15 +56,18 @@ function parseUpstream(markdown: string) {
     ];
     const authors = new Map<string, { author: string; licence: string }>();
     const line = /^Authors: (.*)$/m.exec(markdown)?.[1] ?? '';
+
     for (const [, source, author, licence] of line.matchAll(/(\S+\/\S+) by ([^(]+?) \(([^)]+)\)/g)) {
         authors.set(source!, { author: author!, licence: licence! });
     }
+
     return { included, authors };
 }
 
 /** The two installed skills, credited to Lar and the authors of the Copies and Ports they include. */
 export function readBundledSkills(bundle: string): BundledSkill[] {
     const { included, authors } = parseUpstream(readFileSync(join(bundle, 'UPSTREAM.md'), 'utf8'));
+
     return ['lar-shape', 'lar-build'].map((name) => ({
         name,
         author: LAR.author,
@@ -92,11 +99,13 @@ export function installHome(env: NodeJS.ProcessEnv = process.env, home = homedir
 /** `skills` with each skill's state from the install manifest in `home`; unchanged when there is none or it can't be read. */
 export function withInstallState(skills: BundledSkill[], home: string): BundledSkill[] {
     let status;
+
     try {
         status = readSkillStatus(home);
     } catch {
         return skills;
     }
+
     return skills.map((skill) => (status?.[skill.name] ? { ...skill, status: status[skill.name] } : skill));
 }
 

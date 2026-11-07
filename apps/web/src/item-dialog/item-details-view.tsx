@@ -126,6 +126,7 @@ function Comments({
 }) {
     const older = useOlderComments(itemId, entry);
     const comments = [...entry.details.comments, ...older.comments];
+
     return (
         <div className={`grid min-w-0 gap-2 ${className}`} data-comments>
             <Heading>
@@ -220,14 +221,19 @@ function SpecNotice({
     const act = async (action: 'retry' | 'accept' | 'reject') => {
         setBusy(true);
         setError(null);
+
         const result = await postAction('/api/item-spec', { itemId, generation: spec.generation, action });
+
         if (result.error) setError(result.error);
         else {
             detailsCache.drop(itemId);
+
             if (!(await refresh())) setError('Could not reload the Spec. Reopen the item to read it.');
         }
+
         setBusy(false);
     };
+
     return (
         <div className="grid gap-2 text-sm" data-spec-sync>
             {(spec.error || spec.warning || spec.pending) && (
@@ -299,16 +305,19 @@ export function ItemDescription({
                 <Loading />
             </div>
         );
+
     if (read.state === 'failed')
         return (
             <p className={`m-0 text-sm text-(--error-foreground) ${className}`} role="alert">
                 Could not load the details: {read.error}
             </p>
         );
+
     const { sections } = read.details;
     // A save the details could not be read back after stands for the description until they are.
     const [body, format]: [string, TextFormat] =
         edit.saved === null ? [read.details.body, read.details.format] : [edit.saved, 'markdown'];
+
     return (
         <div
             className={`grid min-w-0 gap-2 ${fill ? 'min-h-0 grid-rows-[auto_minmax(0,1fr)]' : ''} ${className}`}
@@ -423,8 +432,11 @@ function FromDetails({
                 <Placeholder className="h-4 w-20" />
             </Fact>
         );
+
     if (read.state === 'failed') return null;
+
     const shown = show(read.details);
+
     return shown ? <Fact label={label}>{shown}</Fact> : null;
 }
 
@@ -440,15 +452,19 @@ function ItemLabels({ item }: { item: Item }) {
     const edit = useLabelEdit(item);
     const [open, setOpen] = useState(false);
     const { heading, noun } = trackerCapabilities(item.repo);
+
     if (!item.number) return null;
+
     const linked = item.labels.some((l) => l.toLowerCase() === STRUCTURE_LABEL);
     const problem = writeAccessProblem(item.repo, 'tag-ticket', setup?.access ?? {}, {
         azureReadOnly: setup?.azureReadOnly,
     });
     const openChange = (next: boolean) => {
         setOpen(next);
+
         if (next) void edit.read();
     };
+
     return (
         <Fact label={heading}>
             <span className="flex flex-wrap items-center gap-1">
@@ -518,6 +534,7 @@ function ItemLabels({ item }: { item: Item }) {
 
 const KIND_CHOICES = SWAP_KINDS.map((value) => {
     const { name, icon: Icon } = KIND_BADGES[value]!;
+
     return { value, name, icon: <Icon aria-hidden="true" /> };
 });
 
@@ -534,6 +551,7 @@ function ItemKindControl({ item }: { item: Item }) {
     );
     const control = useRef<HTMLButtonElement>(null);
     const wasSaving = useRef(false);
+
     useEffect(() => {
         if (
             wasSaving.current &&
@@ -541,10 +559,14 @@ function ItemKindControl({ item }: { item: Item }) {
             (document.activeElement === document.body || document.activeElement?.matches(OPEN_ITEM_DIALOG))
         )
             control.current?.focus();
+
         wasSaving.current = saving;
     }, [saving]);
+
     const { start } = useKindChangeStore.getState();
+
     if (!kindCanChange(item.kind)) return null;
+
     return (
         <>
             <Fact label="Kind">
@@ -600,7 +622,9 @@ function swapLine(item: Item, { add, remove, type }: KindTicketSwap, note: strin
             : []),
         ...(type ? [`type ${type.from ?? 'none'} → ${type.to}`] : []),
     ];
+
     if (parts.length) return `Update changes #${item.number}: ${parts.join(', ')}.${note}`;
+
     return note
         ? `Update writes nothing to #${item.number}.${note}`
         : `Update writes nothing to #${item.number}, as ${kindName(item.kind as SwapKind)} has no mapped ${noun} or type.`;
@@ -628,21 +652,28 @@ function KindNotice({ item, read, refresh }: { item: Item; read: ItemDetailsRead
         read.state === 'loaded' &&
         !plan &&
         readFor !== kinds;
+
     useEffect(() => {
         if (!planStale) return;
+
         let current = true;
+
         detailsCache.drop(item.id);
         void refresh().then(() => {
             if (current) setReadFor(kinds);
         });
+
         return () => {
             current = false;
         };
     }, [planStale, kinds, item.id, refresh]);
+
     if (!disagreement) return null;
+
     const { ticketKind, changed, kept } = disagreement;
     const { swap, note } = plan ?? { swap: disagreement.swap, note: '' };
     const { start, answer } = useKindChangeStore.getState();
+
     if (kept && !reopened) {
         return (
             <p data-kind-kept className={`${NOTICE_HINT} w-full`}>
@@ -657,6 +688,7 @@ function KindNotice({ item, read, refresh }: { item: Item; read: ItemDetailsRead
             </p>
         );
     }
+
     const mine = kindName(item.kind as SwapKind);
     const said = ticketKind && kindName(ticketKind);
     const keep = () => {
@@ -670,6 +702,7 @@ function KindNotice({ item, read, refresh }: { item: Item; read: ItemDetailsRead
     const problem = ticketMoved
         ? null
         : kindSwapAccessProblem(item.repo, swap, setup?.access ?? {}, { azureReadOnly: setup?.azureReadOnly });
+
     return (
         <div data-kind-notice className="grid w-full gap-2 rounded-lg border border-(--border) p-3">
             <p className="m-0 text-sm">
@@ -732,6 +765,7 @@ export function ItemMeta({
     now: number;
 }) {
     const azure = Boolean(item.repo && onAzure(item.repo));
+
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2" data-meta>
             {item.azure && (
@@ -829,16 +863,19 @@ function RelationSection({ title, children }: { title: string; children: ReactNo
 /** Children, named attachments, blockers and Related work; a failed relation read leaves the description intact. */
 export function ItemRelations({ item, read }: { item: Item; read: ItemDetailsRead }) {
     if (read.state === 'failed') return null;
+
     if (read.state === 'loading')
         return (
             <RelationSection title="Sub-tickets">
                 <Placeholder className="h-4 w-24" />
             </RelationSection>
         );
+
     const { subTickets, attachments, blockers, related, relationsError } = read.details;
     const sprint = item.currentSprint;
     const current = sprint ? subTickets.filter((s) => sprint.childNumbers.includes(s.number)) : subTickets;
     const other = sprint ? subTickets.filter((s) => !sprint.childNumbers.includes(s.number)) : [];
+
     return (
         <>
             {relationsError && (

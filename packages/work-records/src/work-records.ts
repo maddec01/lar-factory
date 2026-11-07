@@ -76,6 +76,7 @@ export type BuildPhase = (typeof BUILD_PHASES)[number];
  * record's brief. */
 export const BODIES = ['brief', 'decision', 'map', 'answer', 'domain-drafts'] as const;
 export type Body = (typeof BODIES)[number];
+
 /** Each body as a sentence names it. */
 const BODY_NAMES: Record<Body, string> = {
     brief: 'a brief',
@@ -587,8 +588,10 @@ const retiredAt = (row: Row): string | null =>
 /** The finished and set-aside rows that left active work at least `days` days before `now`. */
 function dueRows(rows: readonly Row[], days: number, now: Date): Row[] {
     const cutoff = new Date(now.getTime() - days * 86_400_000).toISOString();
+
     return rows.filter((row) => {
         const at = retiredAt(row);
+
         return at !== null && at <= cutoff;
     });
 }
@@ -598,6 +601,7 @@ const invalid = (message: string) => new WorkRecordError('invalid', message);
 function checkRepository(repository: unknown): string {
     if (typeof repository !== 'string' || !/^[^\s/]+(\/[^\s/]+)+$/.test(repository))
         throw invalid(`The repository "${String(repository)}" isn't a repository name like owner/name.`);
+
     return repository;
 }
 
@@ -605,6 +609,7 @@ function checkRepository(repository: unknown): string {
 function checkOneOf<T extends string>(values: readonly T[], value: unknown, what: string): T {
     if (!values.includes(value as T))
         throw invalid(`The ${what} "${String(value)}" isn't one of ${values.join(', ')}.`);
+
     return value as T;
 }
 
@@ -616,6 +621,7 @@ function checkReference(reference: unknown, what: 'ticket' | 'PR'): string {
     if (typeof reference !== 'string' || !/^[^\s/#]+(\/[^\s/#]+)+#[1-9]\d*$/.test(reference)) {
         throw invalid(`The ${what} "${String(reference)}" isn't a ${what} reference like owner/name#12.`);
     }
+
     return reference;
 }
 
@@ -624,6 +630,7 @@ const checkTicket = (ticket: unknown): string => checkReference(ticket, 'ticket'
 /** Throws unless a record of `kind` holds `body`. */
 function checkHolds(kind: WorkKind, body: Body): void {
     const holder = BODY_HOLDERS[body];
+
     if (holder ? kind !== holder : kind === 'concept' || kind === 'decision') {
         throw invalid(
             holder
@@ -642,45 +649,55 @@ function checkBuilt(kind: WorkKind): void {
 function checkTitle(title: unknown): string {
     if (typeof title !== 'string' || !title.trim() || /[\r\n]/.test(title))
         throw invalid(`The title "${String(title)}" is empty, isn't text or has more than one line.`);
+
     return title;
 }
 
 function checkText(text: unknown, what: string): string {
     if (typeof text !== 'string') throw invalid(`The ${what} isn't text.`);
+
     return text;
 }
 
 function checkFilled(text: unknown, what: string): string {
     if (typeof text !== 'string' || !text.trim()) throw invalid(`The ${what} is empty or isn't text.`);
+
     return text;
 }
 
 function checkSkills(skills: unknown): string[] {
     if (!Array.isArray(skills)) throw invalid("The skills aren't a list.");
+
     for (const [index, skill] of skills.entries()) {
         if (typeof skill !== 'string' || !/^\S+$/.test(skill))
             throw invalid(`The skill "${String(skill)}" is empty or has spaces.`);
+
         if (skills.indexOf(skill) !== index) throw invalid(`The skills list ${skill} twice.`);
     }
+
     return skills as string[];
 }
 
 function checkThreadId(threadId: unknown): string {
     if (typeof threadId !== 'string' || !/^\S+$/.test(threadId))
         throw invalid(`The thread ID "${String(threadId)}" is empty or has spaces.`);
+
     return threadId;
 }
 
 function checkPurpose(purpose: unknown): string {
     if (typeof purpose !== 'string' || !/^[a-z][a-z0-9-]*$/.test(purpose))
         throw invalid(`The purpose "${String(purpose)}" isn't a lowercase word like build.`);
+
     return purpose;
 }
 
 /** A finding's disposition and the reason a rejection needs. */
 function checkDisposition(disposition: unknown, reason: unknown): [FindingDisposition, string | null] {
     const checked = checkOneOf(FINDING_DISPOSITIONS, disposition, 'disposition');
+
     if (checked !== 'rejected') return [checked, null];
+
     return [checked, checkFilled(reason, 'reason for rejecting a finding')];
 }
 
@@ -688,6 +705,7 @@ function checkDisposition(disposition: unknown, reason: unknown): [FindingDispos
 function checkOwns(parent: Row, child: { work_id: string; kind: WorkKind }): void {
     const owns: readonly WorkKind[] =
         parent.kind === 'concept' ? ['decision', 'build'] : UNBUILT_KINDS.includes(parent.kind) ? [] : ['slice'];
+
     if (!owns.includes(child.kind)) {
         throw invalid(
             `A ${parent.kind} owns ${owns.length ? `only ${owns.join(' and ')} records` : 'no records'}, so ${parent.work_id} can't own the ${child.kind} ${child.work_id}.`,
@@ -698,6 +716,7 @@ function checkOwns(parent: Row, child: { work_id: string; kind: WorkKind }): voi
 function checkRevision(revision: unknown): number {
     if (!Number.isSafeInteger(revision) || (revision as number) < 1)
         throw invalid(`The revision "${String(revision)}" isn't a whole number from 1.`);
+
     return revision as number;
 }
 
@@ -753,6 +772,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             body === 'brief' && markdown.trim()
                 ? createHash('sha256').update(JSON.stringify(markdown)).digest('hex')
                 : '';
+
         writeBodyRow.run(workId, body, markdown, Number(Boolean(markdown.trim())), workId, digest);
     };
     const bodyWrittenRow = db.prepare('SELECT written FROM bodies WHERE work_id = ? AND body = ?');
@@ -771,8 +791,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     /** The ticket or PR a read of `of` observes on `row`; throws when the record has none. */
     const subject = (row: Row, of: Observed): string => {
         const reference = of === 'ticket' ? row.ticket : row.pull_request;
+
         if (!reference)
             throw invalid(`The work record ${row.work_id} has no ${of === 'ticket' ? 'ticket' : 'PR'} to observe.`);
+
         return reference;
     };
     const replacePullRequest = db.prepare(
@@ -792,7 +814,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
     const find = (workId: string): Row => {
         const row = select.get(workId) as Row | undefined;
+
         if (!row) throw new WorkRecordError('not-found', `No work record has the work ID "${workId}".`);
+
         return row;
     };
     const queueOrder = (repository: string, status: Status, current: number | null = null): number | null =>
@@ -809,7 +833,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         const used = conditions.filter(([, value]) => value !== undefined);
         const sql = `${query}${used.length ? ` WHERE ${used.map(([test]) => test).join(' AND ')}` : ''} ${order}`;
         let statement = filteredQueries.get(sql);
+
         if (!statement) filteredQueries.set(sql, (statement = db.prepare(sql)));
+
         return statement.all(...used.flatMap(([, value]) => (typeof value === 'string' ? [value] : [])));
     };
 
@@ -823,10 +849,13 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         const ticket = record.ticket === undefined ? null : checkTicket(record.ticket);
         const title = checkTitle(record.title);
         const context = record.context === undefined ? '' : checkText(record.context, 'initial context');
+
         if (ticket && byTicket.get(ticket))
             throw new WorkRecordError('ticket-taken', `Another work record already holds the ticket ${ticket}.`);
+
         const now = new Date().toISOString();
         const workId = randomUUID();
+
         insertRow.run(
             workId,
             title,
@@ -839,29 +868,34 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             now,
             now,
         );
+
         return fromRow(find(workId));
     };
 
     const importTicket = (record: NewWorkRecord & { ticket: string }) => {
         const ticket = checkTicket(record.ticket);
         const existing = byTicket.get(ticket) as Row | undefined;
+
         if (!existing) {
             const parsed = readTicketSpec(
                 stripTrackerStructure(record.context ?? '')
                     .replace(/<!-- lar-factory:create [^\n]*? -->/g, '')
                     .trimEnd(),
             );
+
             return {
                 record: insert(parsed.marked ? { ...record, context: parsed.original ?? '' } : record),
                 created: true,
             };
         }
+
         if (existing.repository !== record.repository) {
             throw new WorkRecordError(
                 'ticket-taken',
                 `The ticket ${ticket} already belongs to the work record ${existing.work_id} in ${existing.repository}.`,
             );
         }
+
         return { record: fromRow(existing), created: false };
     };
 
@@ -879,21 +913,26 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         database.write(() => {
             const expected = checkRevision(revision);
             const row = find(workId);
+
             if (row.revision !== expected) {
                 throw new WorkRecordError(
                     'stale-revision',
                     `The work record ${workId} is at revision ${row.revision}, not ${expected}; read it again and retry.`,
                 );
             }
+
             const touched: string[] = [];
             const patch = apply(row, touched);
+
             if (patch === null) return fromRow(row);
+
             const next = {
                 ...row,
                 ...patch,
                 revision: row.revision + 1,
                 updated_at: patch.updated_at ?? new Date().toISOString(),
             };
+
             updateRow.run(
                 next.kind,
                 next.status,
@@ -916,6 +955,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 expected,
             );
             for (const id of touched) bump.run(next.updated_at, id);
+
             return fromRow(find(workId));
         });
 
@@ -942,8 +982,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         fromIntentRow(database.read(() => selectIntent.get(intentId)) as unknown as IntentRow);
     const insertThread = (workId: string, threadId: string, purpose: string) => {
         const holder = threadHolder.get(threadId);
+
         if (holder)
             throw invalid(`The thread ${threadId} is already recorded on the work record ${String(holder.work_id)}.`);
+
         addThreadRow.run(threadId, workId, purpose, new Date().toISOString());
     };
 
@@ -956,6 +998,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     /** Keep needs no command, so its row starts cleaned and a later build under another setting leaves the thread alone. */
     const addCleanupRows = (workId: string, choice: SavedShapingThreadCleanup) => {
         const cleanedAt = choice === 'keep' ? new Date().toISOString() : null;
+
         for (const { thread_id: threadId } of unhandledShapingThreads.all(workId)) {
             addCleanupRow.run(
                 String(threadId),
@@ -973,6 +1016,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     const checkDays = (days: unknown, what: string): number => {
         if (!Number.isSafeInteger(days) || (days as number) < 0)
             throw invalid(`The ${what} "${String(days)}" isn't a whole number of days from 0.`);
+
         return days as number;
     };
 
@@ -980,37 +1024,50 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     /** Each reason the work in `row` isn't complete; none once it is. */
     const incomplete = (row: Row): string[] => {
         if (row.kind === 'slice') return row.finished_at ? [] : ["It isn't finished."];
+
         if (row.kind === 'decision') {
             const [answer, drafts] = [bodyWritten(row.work_id, 'answer'), bodyWritten(row.work_id, 'domain-drafts')];
             const reasons = [];
+
             if (answer === undefined) reasons.push("Its confirmed answer isn't recorded.");
+
             if (drafts === undefined) reasons.push("Its domain drafts aren't recorded.");
+
             if (reasons.length || !row.parent_id) return reasons;
+
             const map = bodyWritten(row.parent_id, 'map');
+
             return map !== undefined && map > Math.max(answer!, drafts!)
                 ? []
                 : [`Its concept ${row.parent_id}'s map isn't updated since its answer and domain drafts.`];
         }
+
         if (row.kind === 'concept') {
             const reasons = row.fog_gone_at ? [] : ["Its Fog isn't gone."];
             const children = childRows.all(row.work_id) as unknown as Row[];
+
             if (!row.finished_at && !children.some((child) => child.kind === 'build' && !child.set_aside_at))
                 reasons.push('No delivery planned.');
+
             for (const child of children) {
                 if (child.set_aside_at || !incomplete(child).length) continue;
+
                 reasons.push(
                     child.kind === 'decision'
                         ? `Its decision ${child.work_id} isn't settled.`
                         : `Its ${child.kind} ${child.work_id} isn't Done.`,
                 );
             }
+
             return reasons;
         }
+
         const reasons = !row.pull_request
             ? ['It has no recorded PR.']
             : prState.get(row.work_id)?.state === 'merged'
               ? []
               : [`Its PR ${row.pull_request} isn't observed merged.`];
+
         return [
             ...reasons,
             ...unmet(row.work_id).map(
@@ -1022,15 +1079,18 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
     const related = (query: StatementSync, workId: string): WorkRecord[] =>
         database.read(() => {
             find(workId);
+
             return (query.all(workId) as unknown as Row[]).map(fromRow);
         });
 
     function clearChecks(workId: string) {
         db.prepare('DELETE FROM check_runs WHERE work_id=?').run(workId);
         db.prepare('DELETE FROM check_lists WHERE work_id=?').run(workId);
+
         const logs = join(dataDir, 'check-logs');
         // Never traverse a redirected log root during recursive cleanup.
         const root = lstatSync(logs, { throwIfNoEntry: false });
+
         if (root?.isDirectory() && !root.isSymbolicLink()) {
             rmSync(join(logs, workId), { recursive: true, force: true });
         }
@@ -1038,10 +1098,14 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
 
     function resetOwnedBuild(workId: string, row: Row, touched: string[]) {
         if (row.kind !== 'build') throw invalid('Only builds own slices.');
+
         const slices = childRows.all(workId) as unknown as Row[];
+
         if (slices.some((slice) => slice.kind !== 'slice'))
             throw invalid('The build owns a record that is not a slice.');
+
         const owned = new Set(slices.map((slice) => slice.work_id));
+
         for (const slice of slices) {
             for (const blocker of blockerRows.all(slice.work_id) as unknown as Row[]) {
                 if (!owned.has(blocker.work_id) && blocker.work_id !== workId) touched.push(blocker.work_id);
@@ -1071,8 +1135,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             db.prepare('DELETE FROM work_records WHERE work_id = ?').run(slice.work_id);
         }
         clearChecks(workId);
+
         return { build_phase: null };
     }
+
     return {
         ...validationRecords(database, (id) => fromRow(find(id))),
         ...trackerCache(database),
@@ -1082,6 +1148,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         captureSubmission: (requestId) =>
             database.read(() => {
                 const row = db.prepare('SELECT * FROM capture_submissions WHERE request_id=?').get(requestId);
+
                 return row
                     ? {
                           draft: String(row.draft),
@@ -1097,6 +1164,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         claimCapture: (requestId, draft, targetWorkId) =>
             database.write(() => {
                 if (!/^[a-f0-9-]{36}$/.test(requestId)) throw invalid('The submission needs a valid request ID.');
+
                 const pending = targetWorkId
                     ? db
                           .prepare(
@@ -1104,10 +1172,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                           )
                           .get(targetWorkId)
                     : null;
+
                 if (pending && pending.request_id !== requestId)
                     throw invalid(
                         'This item already has a ticket creation submission. Recover that submission before creating another issue.',
                     );
+
                 const fresh = Boolean(
                     db
                         .prepare(
@@ -1116,11 +1186,14 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         .run(requestId, draft, targetWorkId ?? null).changes,
                 );
                 const row = db.prepare('SELECT * FROM capture_submissions WHERE request_id=?').get(requestId)!;
+
                 if (row.draft === '') throw invalid('This submission expired. It cannot create another item or issue.');
+
                 if (row.draft !== draft)
                     throw invalid(
                         'This submission already belongs to another item. Finish it before starting a new one.',
                     );
+
                 return {
                     fresh,
                     submission: {
@@ -1150,22 +1223,33 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         completeCapture: (requestId, record, target) =>
             database.write(() => {
                 const row = db.prepare('SELECT * FROM capture_submissions WHERE request_id=?').get(requestId);
+
                 if (!row) throw invalid('This submission has no durable request.');
+
                 if (row.draft === '') throw invalid('This submission expired. It cannot create another item or issue.');
+
                 if (row.work_id) return { record: fromRow(find(String(row.work_id))), created: false };
+
                 if (row.ticket && row.ticket !== record.ticket)
                     throw invalid('The submission already holds another ticket.');
+
                 if (target) {
                     const current = find(target.workId);
+
                     if (row.target_work_id !== target.workId || !record.ticket)
                         throw invalid('This submission belongs to another item.');
+
                     if (current.revision !== checkRevision(target.revision))
                         throw invalid('The local item changed while creating its ticket.');
+
                     if (current.ticket && current.ticket !== record.ticket)
                         throw invalid('This item already holds another ticket.');
+
                     const holder = byTicket.get(checkTicket(record.ticket)) as Row | undefined;
+
                     if (holder && holder.work_id !== target.workId)
                         throw invalid('Another item already holds this ticket.');
+
                     db.prepare('UPDATE work_records SET ticket=?,revision=revision+1,updated_at=? WHERE work_id=?').run(
                         record.ticket,
                         new Date().toISOString(),
@@ -1176,16 +1260,20 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         record.ticket,
                         requestId,
                     );
+
                     return { record: fromRow(find(target.workId)), created: false };
                 }
+
                 const imported = record.ticket
                     ? importTicket({ ...record, ticket: record.ticket })
                     : { record: insert(record), created: true };
+
                 db.prepare('UPDATE capture_submissions SET work_id=?,ticket=? WHERE request_id=?').run(
                     imported.record.workId,
                     imported.record.ticket,
                     requestId,
                 );
+
                 return imported;
             }),
         create: (record) => database.write(() => insert(record)),
@@ -1208,6 +1296,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             const nextStatus = status === undefined ? undefined : checkStatus(status);
             const nextKind = kind === undefined ? undefined : checkKind(kind);
             const agreed = agreedTicketKind === undefined ? undefined : checkKind(agreedTicketKind);
+
             return change(workId, revision, (row) => {
                 // A Status the record already has writes nothing, so an agent's later call is harmless.
                 if (
@@ -1216,21 +1305,31 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     (agreed ?? row.agreed_ticket_kind) === row.agreed_ticket_kind
                 )
                     return null;
+
                 if (nextKind && nextKind !== row.kind) {
                     const child = { work_id: row.work_id, kind: nextKind };
+
                     if (row.parent_id) checkOwns(find(row.parent_id), child);
+
                     for (const owned of childRows.all(workId) as unknown as Row[])
                         checkOwns({ ...row, kind: nextKind }, owned);
+
                     // The new kind must hold what the record already holds.
                     if (row.build_phase || row.pull_request || row.skills || hasRounds.get(workId))
                         checkBuilt(nextKind);
+
                     for (const { body } of bodyNames.all(workId)) checkHolds(nextKind, body as Body);
+
                     if (row.fog_gone_at && nextKind !== 'concept')
                         throw invalid(`The concept ${workId} has its Fog recorded gone, so it stays a concept.`);
+
                     const held = kindConflict(workId);
+
                     if (held) throw invalid(held);
                 }
+
                 const moved = nextStatus ?? row.status;
+
                 return {
                     status: moved,
                     kind: nextKind ?? row.kind,
@@ -1244,6 +1343,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             const checked = checkOneOf(['keep', 'update'], answer, 'answer');
             const covered =
                 ticketKind === null ? null : checkOneOf(['bug', 'feature', 'improvement'], ticketKind, 'ticket kind');
+
             return change(workId, revision, (row) => ({
                 kind_answer: JSON.stringify({
                     answer: checked,
@@ -1254,18 +1354,23 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         },
         attachTicket: (workId, revision, ticket) => {
             const reference = checkTicket(ticket);
+
             return change(workId, revision, (row) => {
                 if (row.ticket === reference) return null;
+
                 if (row.ticket)
                     throw invalid(
                         `The work record ${workId} already has the ticket ${row.ticket}; it can't take ${reference}.`,
                     );
+
                 const holder = byTicket.get(reference) as Row | undefined;
+
                 if (holder)
                     throw new WorkRecordError(
                         'ticket-taken',
                         `The work record ${holder.work_id} already holds the ticket ${reference}.`,
                     );
+
                 return { ticket: reference };
             });
         },
@@ -1273,15 +1378,18 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         setAside: (workId, revision) =>
             change(workId, revision, (row) => {
                 if (row.set_aside_at) throw invalid(`The work record ${workId} is already set aside.`);
+
                 return { set_aside_at: new Date().toISOString() };
             }),
         restore: (workId, revision) =>
             change(workId, revision, (row) => {
                 if (!row.set_aside_at) throw invalid(`The work record ${workId} isn't set aside.`);
+
                 return { set_aside_at: null };
             }),
         setNeedsYou: (workId, revision, reason) => {
             const why = checkFilled(reason, 'Needs you reason');
+
             return change(workId, revision, (row) => (row.needs_you === why ? null : { needs_you: why }));
         },
         clearNeedsYou: (workId, revision) =>
@@ -1289,6 +1397,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         setNeedsYouCauses: (workId, revision, causes, { clearReason = false, status } = {}) => {
             const saved = causes.length ? JSON.stringify(causes) : null;
             const moved = status === undefined ? undefined : checkStatus(status);
+
             return change(workId, revision, (row) =>
                 row.needs_you_causes === saved &&
                 (!clearReason || row.needs_you === null) &&
@@ -1307,44 +1416,62 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         },
         snapshotSkills: (workId, revision, skills) => {
             const snapshot = JSON.stringify(checkSkills(skills));
+
             return change(workId, revision, (row) => {
                 checkBuilt(row.kind);
+
                 if (row.skills !== null)
                     throw invalid(`The build ${workId} already snapshotted its skills when it started.`);
+
                 return { skills: snapshot };
             });
         },
         setParent: (workId, revision, parentId) =>
             change(workId, revision, (row, touched) => {
                 const parent = find(parentId);
+
                 if (row.parent_id)
                     throw invalid(`The work record ${workId} already has the parent ${row.parent_id}; clear it first.`);
+
                 checkOwns(parent, row);
+
                 const conflict = treeConflict(workId, parentId);
+
                 if (conflict) throw invalid(conflict);
+
                 touched.push(parentId);
+
                 return { parent_id: parentId };
             }),
         clearParent: (workId, revision) =>
             change(workId, revision, (row, touched) => {
                 if (!row.parent_id) throw invalid(`The work record ${workId} has no parent.`);
+
                 const conflict = treeConflict(workId, null);
+
                 if (conflict) throw invalid(conflict);
+
                 touched.push(row.parent_id);
+
                 return { parent_id: null };
             }),
         addBlocker: (workId, revision, blockerId) =>
             change(workId, revision, (row, touched) => {
                 find(blockerId);
+
                 if (blockerId === workId) throw invalid(`The work record ${workId} can't block itself.`);
+
                 if (hasBlocker.get(workId, blockerId))
                     throw invalid(`The work record ${workId} is already blocked by ${blockerId}.`);
+
                 if (waitsOn.get(blockerId, workId))
                     throw invalid(
                         `The work record ${blockerId} already waits on ${workId}, so blocking ${workId} by it would make a cycle.`,
                     );
+
                 insertBlocker.run(workId, blockerId);
                 touched.push(blockerId);
+
                 return {};
             }),
         removeBlocker: (workId, revision, blockerId) =>
@@ -1352,64 +1479,89 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 if (!deleteBlocker.run(workId, blockerId).changes) {
                     throw invalid(`The work record ${workId} isn't blocked by ${blockerId}.`);
                 }
+
                 touched.push(blockerId);
+
                 return {};
             }),
         setBody: (workId, revision, body, markdown) => {
             const name = checkOneOf(BODIES, body, 'body');
             const text = checkText(markdown, name);
+
             return change(workId, revision, (row) => {
                 checkHolds(row.kind, name);
                 writeBody(workId, name, text);
+
                 return {};
             });
         },
         restoreImported: (workId, revision, imported) => {
             const body = checkOneOf(BODIES, imported.body, 'body');
             const markdown = checkText(imported.markdown, body);
+
             return change(workId, revision, (row, touched) => {
                 checkHolds(row.kind, body);
+
                 if (bodyText.get(workId, body)) return null;
+
                 let parentId = row.parent_id;
+
                 if (imported.parentId && !parentId) {
                     const parent = find(imported.parentId);
+
                     checkOwns(parent, row);
                     parentId = parent.work_id;
                     touched.push(parentId);
                 }
+
                 for (const blockerId of new Set(imported.blockerIds ?? [])) {
                     find(blockerId);
+
                     if (blockerId === workId) throw invalid(`The work record ${workId} can't block itself.`);
+
                     if (hasBlocker.get(workId, blockerId)) continue;
+
                     if (waitsOn.get(blockerId, workId))
                         throw invalid(
                             `The work record ${blockerId} already waits on ${workId}, so blocking ${workId} by it would make a cycle.`,
                         );
+
                     insertBlocker.run(workId, blockerId);
+
                     if (!touched.includes(blockerId)) touched.push(blockerId);
                 }
                 writeBody(workId, body, markdown);
+
                 return { parent_id: parentId };
             });
         },
         body: (workId, body) =>
             database.read(() => {
                 const name = checkOneOf(BODIES, body, 'body');
+
                 find(workId);
+
                 const row = bodyText.get(workId, name);
+
                 return row ? String(row.markdown) : null;
             }),
         setBuildPhase: (workId, revision, phase) => {
             const checked = checkOneOf(BUILD_PHASES, phase, 'build phase');
+
             return change(workId, revision, (row) => (checkBuilt(row.kind), { build_phase: checked }));
         },
         setPullRequest: (workId, revision, pullRequest) => {
             const reference = checkReference(pullRequest, 'PR');
+
             return change(workId, revision, (row) => {
                 checkBuilt(row.kind);
+
                 if (row.pull_request === reference) return null;
+
                 if (row.pull_request) replacePullRequest.run(workId, row.pull_request, new Date().toISOString());
+
                 deleteObservation.run(workId, 'pr');
+
                 return { pull_request: reference };
             });
         },
@@ -1420,15 +1572,20 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     ? checkOneOf(TICKET_STATES, observation.state, 'ticket state')
                     : checkOneOf(PULL_REQUEST_STATES, observation.state, 'PR state');
             const { assignee } = observation as { assignee?: unknown };
+
             if (of === 'pr' && assignee !== undefined) throw invalid('A PR observation has no assignee.');
+
             const who = assignee === undefined ? null : checkFilled(assignee, 'assignee');
+
             return change(workId, revision, (row) => {
                 const now = new Date().toISOString();
                 const reference = subject(row, of);
                 const previous = observationRows.all(workId).find((entry) => entry.observed === of);
                 const unchanged =
                     previous?.subject === reference && previous.state === state && previous.assignee === who;
+
                 writeObservation.run(workId, of, reference, state, who, now);
+
                 // Refresh observation freshness without making unchanged work look newly edited on every poll.
                 return state === 'merged' && !row.finished_at
                     ? { finished_at: now }
@@ -1440,15 +1597,19 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         recordReadFailure: (workId, revision, of, failure) => {
             const observed = checkOneOf(OBSERVED, of, 'observed thing');
             const reason = checkFilled(failure, 'read failure');
+
             return change(workId, revision, (row) => {
                 const reference = subject(row, observed);
+
                 writeReadFailure.run(workId, observed, reference, new Date().toISOString(), reason);
+
                 return { updated_at: row.updated_at };
             });
         },
         observations: (workId) =>
             database.read(() => {
                 find(workId);
+
                 return observationRows.all(workId).map((row): Observation => ({
                     of: row.observed as Observed,
                     subject: String(row.subject),
@@ -1462,6 +1623,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         replacedPullRequests: (workId) =>
             database.read(() => {
                 find(workId);
+
                 return replacedRows
                     .all(workId)
                     .map((row) => ({ pullRequest: String(row.pull_request), replacedAt: String(row.replaced_at) }));
@@ -1469,17 +1631,26 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         recordReviewRound: (workId, revision, round) =>
             change(workId, revision, (row) => {
                 checkBuilt(row.kind);
+
                 if (typeof round?.base !== 'string' || !/^[0-9a-f]{7,64}$/.test(round.base))
                     throw invalid(`The round's base "${String(round?.base)}" isn't a commit sha.`);
+
                 if (!Array.isArray(round.reviewers as unknown) || !round.reviewers.length)
                     throw invalid('The round has no reviewers.');
+
                 const number = Number(nextRound.get(workId)!.next);
+
                 insertRound.run(workId, number, round.base, new Date().toISOString());
+
                 const seen = new Set<ReviewAxis>();
+
                 for (const reviewer of round.reviewers) {
                     const axis = checkOneOf(REVIEW_AXES, reviewer?.axis, 'axis');
+
                     if (seen.has(axis)) throw invalid(`The round lists the ${axis} reviewer twice.`);
+
                     seen.add(axis);
+
                     const verdict = checkOneOf(REVIEW_VERDICTS, reviewer.verdict, 'verdict');
                     const notChecked =
                         verdict === 'skipped'
@@ -1487,35 +1658,44 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                             : reviewer.notChecked === undefined
                               ? null
                               : checkFilled(reviewer.notChecked, `${axis} reviewer's note on what it couldn't check`);
+
                     if (!Array.isArray(reviewer.findings as unknown))
                         throw invalid(`The ${axis} reviewer's findings aren't a list.`);
+
                     if (verdict === 'skipped' && reviewer.findings.length)
                         throw invalid(`The skipped ${axis} reviewer can't have findings.`);
+
                     insertAxis.run(workId, number, axis, verdict, notChecked);
                     reviewer.findings.forEach((finding, index) => {
                         const severity = checkOneOf(FINDING_SEVERITIES, finding?.severity, 'severity');
                         const summary = checkFilled(finding.summary, `${axis} finding`);
                         const [disposition, reason] = checkDisposition(finding.disposition, finding.reason);
+
                         insertFinding.run(workId, number, axis, index + 1, severity, summary, disposition, reason);
                     });
                 }
+
                 return {};
             }),
         setFindingDisposition: (workId, revision, { round, axis, finding }, disposition, reason) => {
             const [checked, why] = checkDisposition(disposition, reason);
+
             return change(workId, revision, () => {
                 const updated = disposeFinding.run(checked, why, workId, round, axis, finding);
+
                 if (!updated.changes)
                     throw new WorkRecordError(
                         'not-found',
                         `The work record ${workId} has no finding ${finding} from the ${axis} reviewer in round ${round}.`,
                     );
+
                 return {};
             });
         },
         reviewRounds: (workId) =>
             database.read(() => {
                 find(workId);
+
                 return roundRows.all(workId).map((round): ReviewRound => ({
                     round: Number(round.round),
                     base: String(round.base),
@@ -1542,7 +1722,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         'UPDATE threads SET deleted_at = coalesce(deleted_at, ?) WHERE work_id = ? AND thread_id = ?',
                     )
                     .run(new Date().toISOString(), workId, checkThreadId(threadId));
+
                 if (!result.changes) throw invalid('The thread does not belong to this record.');
+
                 return {};
             }),
         setBuildBranch: (workId, revision, branch) =>
@@ -1551,23 +1733,28 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     checkFilled(branch, 'build branch'),
                     workId,
                 );
+
                 return {};
             }),
         invalidateGate: (workId, revision) =>
             change(workId, revision, () => {
                 db.prepare('UPDATE brief_gates SET invalidated = 1 WHERE work_id = ?').run(workId);
                 db.prepare("UPDATE bodies SET has_passing_gate = 0 WHERE work_id = ? AND body = 'brief'").run(workId);
+
                 return {};
             }),
         cleanupOwnership: (workId) =>
             database.read(() => {
                 find(workId);
+
                 const row = db.prepare('SELECT cleanup_ownership FROM work_records WHERE work_id = ?').get(workId);
+
                 return JSON.parse(String(row?.cleanup_ownership ?? '[]'));
             }),
         resolveCleanup: (workId, revision, resolvedBranches) =>
             change(workId, revision, (row) => {
                 if (row.kind !== 'build') throw invalid('Only builds own cleanup.');
+
                 const stored = db.prepare('SELECT cleanup_ownership FROM work_records WHERE work_id = ?').get(workId);
                 const snapshots = JSON.parse(String(stored?.cleanup_ownership ?? '[]')) as {
                     branch: string;
@@ -1575,8 +1762,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     sliceBranches: string[];
                 }[];
                 const owned = new Set(snapshots.flatMap((snapshot) => [snapshot.branch, ...snapshot.sliceBranches]));
+
                 if (resolvedBranches.some((branch) => !owned.has(branch)))
                     throw invalid('Cleanup branch is not owned by this build.');
+
                 const resolved = new Set(resolvedBranches);
                 const remaining = snapshots
                     .map((snapshot) => ({
@@ -1585,22 +1774,27 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         sliceBranches: snapshot.sliceBranches.filter((branch) => !resolved.has(branch)),
                     }))
                     .filter((snapshot) => snapshot.branch || snapshot.sliceBranches.length);
+
                 db.prepare('UPDATE work_records SET cleanup_ownership = ? WHERE work_id = ?').run(
                     JSON.stringify(remaining),
                     workId,
                 );
+
                 return {};
             }),
         captureCleanup: (workId, revision, branch, sliceBranches) =>
             change(workId, revision, (row) => {
                 if (row.kind !== 'build') throw invalid('Only builds own cleanup.');
+
                 const previous = db.prepare('SELECT cleanup_ownership FROM work_records WHERE work_id = ?').get(workId);
                 const snapshots = JSON.parse(String(previous?.cleanup_ownership ?? '[]'));
                 const sliceIds = (childRows.all(workId) as unknown as Row[])
                     .filter((slice) => slice.kind === 'slice')
                     .map((slice) => slice.work_id);
+
                 if (sliceBranches.some((name) => !sliceIds.some((id) => name.startsWith(`slice/${id.slice(0, 8)}-`))))
                     throw invalid('Cleanup branch is not owned by this build.');
+
                 snapshots.push({
                     sliceBranches,
                     branch: row.build_branch || checkFilled(branch, 'build branch'),
@@ -1610,6 +1804,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     JSON.stringify(snapshots),
                     workId,
                 );
+
                 return {};
             }),
         resetBuild: (workId, revision) =>
@@ -1617,22 +1812,27 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         addThread: (workId, revision, threadId, purpose) => {
             const id = checkThreadId(threadId);
             const checked = checkPurpose(purpose);
+
             return change(workId, revision, () => (insertThread(workId, id, checked), {}));
         },
         threads: (workId) =>
             database.read(() => {
                 find(workId);
+
                 return threadRows.all(workId).map(fromThreadRow);
             }),
         threadsByWork: () =>
             database.read(() => {
                 const byWork = new Map<string, RecordedThread[]>();
+
                 for (const row of allThreadRows.all()) {
                     const workId = String(row.work_id);
                     const threads = byWork.get(workId);
+
                     if (threads) threads.push(fromThreadRow(row));
                     else byWork.set(workId, [fromThreadRow(row)]);
                 }
+
                 return byWork;
             }),
         recordLaunchIntent: (workId, revision, purpose, recovery, shapingThreadCleanup) => {
@@ -1640,6 +1840,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
             const intentId = randomUUID();
             const record = change(workId, revision, () => {
                 insertIntent.run(intentId, workId, checked, new Date().toISOString(), shapingThreadCleanup ?? null);
+
                 if (recovery)
                     db.prepare('UPDATE launch_intents SET recovery = ? WHERE intent_id = ?').run(
                         JSON.stringify({
@@ -1649,8 +1850,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         }),
                         intentId,
                     );
+
                 return {};
             });
+
             return { record, intent: intent(intentId) };
         },
         launchIntents: (filter) =>
@@ -1676,15 +1879,21 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 threadId === null ? checkFilled((outcome as { failure: unknown }).failure, 'launch failure') : null;
             const record = change(workId, revision, (work, touched) => {
                 const row = selectIntent.get(intentId) as IntentRow | undefined;
+
                 if (row?.work_id !== workId)
                     throw new WorkRecordError(
                         'not-found',
                         `The work record ${workId} has no launch intent "${intentId}".`,
                     );
+
                 if (row.resolved_at) throw invalid(`The launch intent ${intentId} is already resolved.`);
+
                 if (threadId) insertThread(workId, threadId, row.purpose);
+
                 if (threadId && row.shaping_thread_cleanup) addCleanupRows(workId, row.shaping_thread_cleanup);
+
                 resolveIntent.run(threadId, failure, new Date().toISOString(), intentId);
+
                 // The board owns the launch's move, so it doesn't wait for the agent's setup.
                 const launched: Partial<Row> =
                     threadId && row.purpose === 'shape' && work.status === 'Queued'
@@ -1695,13 +1904,17 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 const staged = db
                     .prepare('SELECT recovery FROM launch_intents WHERE intent_id = ?')
                     .get(intentId)?.recovery;
+
                 if (threadId && staged) {
                     const recovery = JSON.parse(String(staged)) as { branch: string; reset: boolean };
+
                     if (recovery.reset) resetOwnedBuild(workId, work, touched);
+
                     db.prepare('UPDATE work_records SET build_branch = ? WHERE work_id = ?').run(
                         recovery.branch,
                         workId,
                     );
+
                     return {
                         ...launched,
                         ...(recovery.reset ? { build_phase: null } : {}),
@@ -1709,8 +1922,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         needs_you_causes: null,
                     };
                 }
+
                 return launched;
             });
+
             return { record, intent: intent(intentId) };
         },
         pendingShapingThreadCleanups: () =>
@@ -1736,6 +1951,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         markShapingThreadDeleted: (threadId) =>
             database.write(() => {
                 const now = new Date().toISOString();
+
                 db.prepare('UPDATE shaping_thread_cleanups SET cleaned_at = ?, failure = NULL WHERE thread_id = ?').run(
                     now,
                     threadId,
@@ -1766,15 +1982,19 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         recordFinished: (workId, revision) =>
             change(workId, revision, (row) => {
                 if (row.finished_at) throw invalid(`The work record ${workId} is already finished.`);
+
                 return { finished_at: new Date().toISOString() };
             }),
         hidden: (retention, now = new Date()) => {
             const days = checkDays(retention?.hideAfterDays, 'days before hiding');
+
             return database.read(() => dueRows(retiredRows.all() as unknown as Row[], days, now).map(fromRow));
         },
         deleteExpired: (retention, now = new Date()) => {
             if (retention?.deleteAfterDays === null) return { deleted: [], kept: [] };
+
             const days = checkDays(retention?.deleteAfterDays, 'days before deleting');
+
             return database.write(() => {
                 const due = new Map(
                     dueRows(retiredRows.all() as unknown as Row[], days, now).map((row) => [row.work_id, row]),
@@ -1795,8 +2015,10 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                                 (JSON.parse(String(row.attempt)) as { status: string }).status,
                             ]),
                     );
+
                     return operations.some((operation) => attempts.get(operation.operationId) !== 'successful');
                 };
+
                 // A due record that a kept record needs is kept too, which can keep its own parent or blockers in turn.
                 for (let changed = true; changed;) {
                     changed = false;
@@ -1810,6 +2032,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                                 String(plan.work_id),
                                 ...publicationSources.all(String(plan.plan_id)).map((source) => String(source.work_id)),
                             ];
+
                             return (
                                 members.includes(workId) &&
                                 (members.some((id) => !due.has(id)) ||
@@ -1818,7 +2041,9 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                             );
                         });
                         const dependency = retentionReason(workId, (id) => due.has(id));
+
                         if (!child && !waiting && !journal && !dependency) continue;
+
                         due.delete(workId);
                         kept.push({
                             workId,
@@ -1833,14 +2058,19 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                         changed = true;
                     }
                 }
+
                 const deleted = [...due.keys()];
                 const touched = new Set<string>();
+
                 for (const workId of deleted) {
                     const { parent_id: parent } = due.get(workId)!;
+
                     if (parent && !due.has(parent)) touched.add(parent);
+
                     for (const blocker of blockerRows.all(workId) as unknown as Row[])
                         if (!due.has(blocker.work_id)) touched.add(blocker.work_id);
                 }
+
                 // Children go before their parents, so clear the parents among the deleted records first.
                 const deleteOwned = [
                     'review_findings',
@@ -1857,6 +2087,7 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                 const clearParent = db.prepare('UPDATE work_records SET parent_id = NULL WHERE work_id = ?');
                 const deleteBlockers = db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?');
                 const deleteRecord = db.prepare('DELETE FROM work_records WHERE work_id = ?');
+
                 for (const workId of deleted) clearParent.run(workId);
                 for (const workId of deleted)
                     db.prepare('DELETE FROM publication_attachments WHERE work_id = ?').run(workId);
@@ -1872,39 +2103,50 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
                     clearChecks(workId);
                     deleteRecord.run(workId);
                 }
+
                 const at = new Date().toISOString();
+
                 for (const workId of touched) bump.run(at, workId);
+
                 return { deleted, kept };
             });
         },
         refinement: (workId) =>
             database.read(() => {
                 const row = find(workId);
+
                 if (row.kind !== 'concept') throw invalid('Only a concept has refinement.');
+
                 const reasons = row.fog_gone_at ? [] : ["Its Fog isn't gone."];
+
                 if (
                     !db
                         .prepare("SELECT 1 FROM bodies WHERE work_id = ? AND body = 'map' AND has_content = 1")
                         .get(workId)
                 )
                     reasons.push('Its map is empty.');
+
                 for (const child of childRows.all(workId) as unknown as Row[]) {
                     if (child.kind === 'decision' && !child.set_aside_at && incomplete(child).length)
                         reasons.push(`Its decision ${child.work_id} isn't settled.`);
                 }
+
                 return { complete: !reasons.length, reasons };
             }),
         completion: (workId) =>
             database.read(() => {
                 const reasons = incomplete(find(workId));
+
                 return { complete: !reasons.length, reasons };
             }),
         waitingOn: (workId) =>
             database.read(() => {
                 find(workId);
+
                 const records = (blockerRows.all(workId) as unknown as Row[])
                     .map((blocker) => ({ workId: blocker.work_id, reasons: incomplete(blocker) }))
                     .filter((blocker) => blocker.reasons.length);
+
                 return [
                     ...records,
                     ...unmet(workId).map(({ dependencyId }) => ({ dependencyId, reasons: ["It isn't marked met."] })),
@@ -1913,9 +2155,12 @@ function workRecords(database: Database, dataDir: string): WorkRecords {
         setFogGone: (workId, revision, gone) => {
             if (typeof gone !== 'boolean')
                 throw invalid(`Whether the Fog is gone "${String(gone)}" isn't true or false.`);
+
             return change(workId, revision, (row) => {
                 if (row.kind !== 'concept') throw invalid(`Only a concept has Fog; this record is a ${row.kind}.`);
+
                 if ((row.fog_gone_at !== null) === gone) return null;
+
                 return { fog_gone_at: gone ? new Date().toISOString() : null };
             });
         },

@@ -55,12 +55,14 @@ export function mergePaths(
     fallbackDirs = FALLBACK_DIRS,
 ): string {
     const dirs = [loginPath, inherited].flatMap((path) => path?.split(':') ?? []);
+
     return [...new Set([...dirs, ...fallbackDirs].filter(Boolean))].join(':');
 }
 
 function runnable(file: string): boolean {
     try {
         accessSync(file, constants.X_OK);
+
         return statSync(file).isFile();
     } catch {
         return false;
@@ -70,8 +72,10 @@ function runnable(file: string): boolean {
 function onPath(name: string, searchPath: string): string | null {
     for (const dir of searchPath.split(':')) {
         const file = join(dir, name);
+
         if (runnable(file)) return file;
     }
+
     return null;
 }
 
@@ -83,10 +87,14 @@ export function findTools(env: NodeJS.ProcessEnv, loginPath: string | null, fall
     const searchPath = mergePaths(loginPath, env.PATH, fallbackDirs);
     const find = (name: ToolName): ToolLookup => {
         const value = env[OVERRIDES[name]];
+
         if (!value) return { path: onPath(name, searchPath) };
+
         const path = value.includes('/') ? (runnable(value) ? value : null) : onPath(value, searchPath);
+
         return path ? { path } : { path: null, override: `${OVERRIDES[name]}=${value}` };
     };
+
     return {
         ...(Object.fromEntries(TOOL_NAMES.map((name) => [name, find(name)])) as Record<ToolName, ToolLookup>),
         searchPath,
@@ -95,6 +103,7 @@ export function findTools(env: NodeJS.ProcessEnv, loginPath: string | null, fall
 
 async function output(file: string, args: string[], env: NodeJS.ProcessEnv, timeout: number): Promise<string | null> {
     const { code, stdout } = await runTool(file, args, { env, timeout });
+
     return code === 0 ? stdout : null;
 }
 
@@ -119,7 +128,9 @@ export async function readLoginPath(env: NodeJS.ProcessEnv, launchctl = '/bin/la
         5_000,
     );
     const match = printed?.match(new RegExp(`${START}\\n(.*)\\n${END}`));
+
     if (match?.[1]) return match[1];
+
     return (await output(launchctl, ['getenv', 'PATH'], env, 2_000))?.trim() || null;
 }
 
@@ -132,7 +143,9 @@ let loginPath: string | null = null;
  */
 export async function lookUpTools(env: NodeJS.ProcessEnv = process.env, rereadLoginPath = true): Promise<Tools> {
     if (rereadLoginPath || !current) loginPath = await readLoginPath(env);
+
     current = loopTrace.span('tool lookup', () => findTools(env, loginPath));
+
     return current;
 }
 
@@ -144,6 +157,7 @@ export function tools(): Tools | null {
 /** How to run a tool the last lookup found, or null when it's missing. */
 export function toolCommand(name: ToolName): { file: string; env: NodeJS.ProcessEnv } | null {
     const path = current?.[name].path;
+
     return path ? { file: path, env: { ...process.env, PATH: current!.searchPath } } : null;
 }
 
@@ -151,6 +165,7 @@ export function toolCommand(name: ToolName): { file: string; env: NodeJS.Process
 export function missingTool(name: ToolName): string {
     const lookup = current?.[name];
     const override = lookup && lookup.path === null ? lookup.override : undefined;
+
     return override ? `${name} was not found at ${override}` : `${name} was not found`;
 }
 
@@ -158,6 +173,7 @@ export function missingTool(name: ToolName): string {
 function missingCheck(name: ToolName): { result: 'missing'; override?: string } {
     const lookup = current?.[name];
     const override = lookup && lookup.path === null ? lookup.override : undefined;
+
     return { result: 'missing', ...(override && { override }) };
 }
 
@@ -169,17 +185,23 @@ function missingWithFix(name: Exclude<ToolName, 't3'>): { result: 'missing'; ove
 /** The first version number on the first line of a `--version` output, else that line; undefined when it's empty. */
 export function versionOf(stdout: string): string | undefined {
     const line = stdout.trim().split('\n')[0]!.trim();
+
     return line.match(/\d+\.\d+[\w.+-]*/)?.[0] ?? (line || undefined);
 }
 
 /** Runs `<tool> --version`: the tool passes when it runs, with the version if it printed one with status 0; else it's missing. */
 async function checkVersion<M>(name: ToolName, missing: () => M): Promise<{ result: 'ok'; version?: string } | M> {
     const command = toolCommand(name);
+
     if (!command) return missing();
+
     const { code, stdout } = await runTool(command.file, ['--version'], { env: command.env, timeout: 5_000 });
+
     // A string code is a spawn error: the binary went away or can't run since the lookup.
     if (typeof code === 'string') return missing();
+
     const version = code === 0 ? versionOf(stdout) : undefined;
+
     return { result: 'ok', ...(version && { version }) };
 }
 
@@ -202,9 +224,12 @@ function olderThanFloor(version: string | undefined): boolean {
         ?.match(/^(\d+)\.(\d+)\.(\d+)/)
         ?.slice(1)
         .map(Number);
+
     if (!parts) return false;
+
     const floor = GH_FLOOR.split('.').map(Number);
     const i = parts.findIndex((part, j) => part !== floor[j]);
+
     return i !== -1 && parts[i]! < floor[i]!;
 }
 
@@ -213,7 +238,9 @@ const GH_UPGRADE = 'brew upgrade gh';
 /** Whether a logged-in gh's version needs an upgrade. */
 function loggedInCheck(version: string | undefined): GhCheck {
     const outdated = olderThanFloor(version);
+
     if (outdated) return { result: 'outdated', version: version!, fix: GH_UPGRADE };
+
     return { result: 'ok', ...(version && { version }) };
 }
 
@@ -223,11 +250,14 @@ function loggedInCheck(version: string | undefined): GhCheck {
  */
 export async function probeGh(): Promise<GhProbe> {
     const command = toolCommand('gh');
+
     if (!command) return { check: missingWithFix('gh') };
+
     const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 5_000 });
     /** A failed run's probe: missing on a spawn error, which means gh went away or can't run since the lookup; else gh's error. */
     const failed = ({ code, detail }: RunResult, args: string[], version?: string): GhProbe => {
         if (typeof code === 'string') return { check: missingWithFix('gh') };
+
         // No code means a signal, which here is the timeout.
         return {
             check: { result: 'ok', ...(version && { version }) },
@@ -235,14 +265,19 @@ export async function probeGh(): Promise<GhProbe> {
         };
     };
     const versionRun = await run(['--version']);
+
     if (versionRun.code !== 0) return failed(versionRun, ['--version']);
+
     const version = versionOf(versionRun.stdout);
     const status = await run(['auth', 'status']);
+
     // Older gh prints the status to stderr.
     if (status.code === 0) return { check: loggedInCheck(version) };
+
     if (typeof status.code === 'number' && LOGGED_OUT.test(status.stderr || status.stdout)) {
         return { check: { result: 'logged-out', ...(version && { version }), fix: 'gh auth login' } };
     }
+
     return failed(status, ['auth', 'status'], version);
 }
 
@@ -250,6 +285,7 @@ export async function probeGh(): Promise<GhProbe> {
 function azVersionOf(stdout: string): string | undefined {
     try {
         const version: unknown = (JSON.parse(stdout) as Record<string, unknown> | null)?.['azure-cli'];
+
         return typeof version === 'string' ? version : undefined;
     } catch {
         return undefined;
@@ -263,26 +299,35 @@ function azVersionOf(stdout: string): string | undefined {
  */
 export async function probeAz(): Promise<AzCheck> {
     const command = toolCommand('az');
+
     if (!command) return missingWithFix('az');
+
     const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 10_000 });
     const versionRun = await run(['version']);
+
     // A string code is a spawn error: az went away or can't run since the lookup.
     if (typeof versionRun.code === 'string') return missingWithFix('az');
+
     const version = versionRun.code === 0 ? azVersionOf(versionRun.stdout) : undefined;
     const [account, extension] = await Promise.all([
         run(['account', 'show']),
         run(['extension', 'show', '--name', 'azure-devops']),
     ]);
+
     if (account.code !== 0) return { result: 'logged-out', ...(version && { version }), fix: 'az login' };
+
     if (extension.code !== 0)
         return { result: 'no-extension', ...(version && { version }), fix: 'az extension add --name azure-devops' };
+
     return { result: 'ok', ...(version && { version }) };
 }
 
 /** Checks t3 runs, then that T3 Code is running, as its runtime file at `runtime` says. */
 async function checkT3(runtime: string): Promise<T3Check> {
     const check = await checkVersion('t3', () => missingCheck('t3'));
+
     if (check.result !== 'ok' || t3Running(runtime)) return check;
+
     return { result: 'not-running', ...(check.version && { version: check.version }) };
 }
 
@@ -300,6 +345,7 @@ export async function checkTools(
     const heard = <T>(check: Promise<T>, of: (found: T) => Partial<ToolChecks>) =>
         check.then((found) => {
             landed(of(found));
+
             return found;
         });
     const [gh, az, t3, git, jq, curl] = await Promise.all([
@@ -311,5 +357,6 @@ export async function checkTools(
         heard(checkCommand('curl'), (curl) => ({ curl })),
     ]);
     const tools: ToolChecks = { t3, git, jq, curl, ...(gh && { gh: gh.check }), ...(az && { az }) };
+
     return { tools, ...(gh?.error && { ghError: gh.error }) };
 }

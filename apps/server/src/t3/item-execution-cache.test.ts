@@ -10,9 +10,11 @@ const fixture = vi.hoisted(() => ({
     runtimeReads: { count: 0 },
     running: vi.fn(() => true),
 }));
+
 vi.mock('../json-file.ts', () => ({
     readJsonRecord: () => {
         fixture.runtimeReads.count++;
+
         return { origin: 'http://localhost:3773', serverVersion: 'fixture', pid: 1 };
     },
 }));
@@ -26,11 +28,13 @@ vi.mock('./execution-protocol.ts', () => ({
         changed: typeof fixture.changed,
     ) => {
         fixture.changed = changed;
+
         return () => {};
     },
     readExecution: (_origin: unknown, _version: unknown, _protocol: unknown, id: string) => fixture.read(id),
     readArchivedShells: () => fixture.archived(),
 }));
+
 const archivedRead = (threads: object[]): ThreadFamilyRead => ({
     availability: 'available',
     observation: {
@@ -39,6 +43,7 @@ const archivedRead = (threads: object[]): ThreadFamilyRead => ({
         observedAt: '2026-10-31T12:00:00Z',
     },
 });
+
 beforeEach(() => {
     fixture.archived.mockResolvedValue(archivedRead([]));
 });
@@ -50,6 +55,7 @@ afterEach(() => {
 });
 it("reads T3's runtime file once per synchronous pass, however many items ask, and again on the next", async () => {
     const { protocolItemThreads } = await import('./item-execution.ts');
+
     await Promise.resolve();
     fixture.runtimeReads.count = 0;
     for (let i = 0; i < 100; i++) protocolItemThreads([`thread-${i}`]);
@@ -60,6 +66,7 @@ it("reads T3's runtime file once per synchronous pass, however many items ask, a
 });
 it("asks whether T3's process lives only while no subscription to it shows that it does", async () => {
     const { protocolItemThreads } = await import('./item-execution.ts');
+
     protocolItemThreads(['thread']);
     await Promise.resolve();
     fixture.changed!({
@@ -80,6 +87,7 @@ it("asks whether T3's process lives only while no subscription to it shows that 
 it('loads history once, refreshes changed threads and keeps timestamped last observations through an outage', async () => {
     const { protocolItemThreads, protocolThreadById } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
+
     fixture.read.mockImplementation(async (id) => ({
         availability: 'available',
         observation: {
@@ -91,6 +99,7 @@ it('loads history once, refreshes changed threads and keeps timestamped last obs
         },
     }));
     protocolItemThreads(['one', 'archive']);
+
     const shells = [
         { id: 'one', updatedAt: observedAt },
         { id: 'archive', updatedAt: observedAt },
@@ -100,6 +109,7 @@ it('loads history once, refreshes changed threads and keeps timestamped last obs
             availability: 'available',
             observation: { observedAt, snapshot: { threads: [threads[0]], archivedThreads: [threads[1]] } },
         });
+
     publish();
     await vi.waitFor(() => expect(protocolItemThreads(['one', 'archive'])).toHaveLength(2));
     publish();
@@ -128,6 +138,7 @@ it('resolves a started thread across message formats, and only when one thread m
     const current = 'Build #7 T\nBuild w1. Read /a/long/path/builder.md and follow it.';
     const earlier = 'Build w1. Read /a/long/path/builder.md and follow it.';
     const first: Record<string, string> = { 'in-current': current, 'in-earlier': earlier };
+
     fixture.read.mockImplementation(async (id) => ({
         availability: 'available',
         observation: {
@@ -136,7 +147,9 @@ it('resolves a started thread across message formats, and only when one thread m
         },
     }));
     protocolItemThreads([]);
+
     const shell = (id: string, title: string) => ({ id, projectId: 'p', title, updatedAt: observedAt });
+
     fixture.changed!({
         availability: 'available',
         observation: {
@@ -171,6 +184,7 @@ it('finds the one started thread whose first message is the start message, leavi
     const { protocolItemThreads, protocolStartedThread } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
     const message = 'Build w1. Read builder.md and follow it.';
+
     fixture.read.mockImplementation(async (id) => ({
         availability: 'available',
         observation: {
@@ -180,7 +194,9 @@ it('finds the one started thread whose first message is the start message, leavi
     }));
     protocolItemThreads([]);
     expect(() => protocolStartedThread('p', [message], [])).toThrow('unavailable');
+
     const shell = (id: string) => ({ id, projectId: 'p', title: message, updatedAt: observedAt });
+
     fixture.changed!({
         availability: 'available',
         observation: { observedAt, snapshot: { threads: [shell('old'), shell('new')], archivedThreads: [] } },
@@ -203,8 +219,10 @@ it('shows shell status changes immediately while history reads wait, without tre
     const delayed = new Promise<ExecutionRead>((resolve) => {
         release = resolve;
     });
+
     fixture.read.mockReturnValue(delayed);
     protocolItemThreads(['one']);
+
     const publish = (thread: Record<string, unknown>) =>
         fixture.changed!({
             availability: 'available',
@@ -214,6 +232,7 @@ it('shows shell status changes immediately while history reads wait, without tre
             },
         });
     const shell = { id: 'one', projectId: 'p', title: 'Shape issue', updatedAt: observedAt, status: 'running' };
+
     publish(shell);
     expect(protocolItemThreads(['one'])).toMatchObject([{ state: 'running' }]);
     expect(protocolThreadById('one').availability).toBe('unavailable');
@@ -234,6 +253,7 @@ it('shows shell status changes immediately while history reads wait, without tre
 it('reads stats only for the requested thread family even when unrelated history is still loading', async () => {
     const { protocolItemThreads, protocolThreadById, protocolStatsInputs } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
+
     fixture.read.mockImplementation(async (id) =>
         id === 'unrelated'
             ? new Promise<ExecutionRead>(() => {})
@@ -280,7 +300,9 @@ it('reads stats only for the requested thread family even when unrelated history
 
 it('does not acquire histories for shell-only consumers', async () => {
     const { protocolItemThreads } = await import('./item-execution.ts');
+
     protocolItemThreads(['one']);
+
     const read: ShellRead = {
         availability: 'available',
         observation: {
@@ -291,6 +313,7 @@ it('does not acquire histories for shell-only consumers', async () => {
             },
         },
     };
+
     fixture.changed!(read);
     fixture.changed!(read);
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -300,13 +323,16 @@ it('does not acquire histories for shell-only consumers', async () => {
 it('a failing thread is read again only on demand, and not before retryAt', async () => {
     const { protocolItemThreads, protocolThreadReads } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
+
     fixture.read.mockResolvedValue({ availability: 'unavailable' });
     protocolItemThreads([]);
     fixture.changed!({
         availability: 'available',
         observation: { observedAt, snapshot: { threads: [{ id: 'bad', updatedAt: observedAt }], archivedThreads: [] } },
     });
+
     const clock = vi.spyOn(Date, 'now');
+
     clock.mockReturnValue(1_000_000);
     protocolThreadReads(['bad'])!.demand();
     await vi.waitFor(() => expect(protocolThreadReads(['bad'])!.reads.get('bad')).toBe('failed'));
@@ -326,6 +352,7 @@ it('a failing thread is read again only on demand, and not before retryAt', asyn
 it('a thread on neither list reads as failed once the archived list fails, so no catch-up waits on it', async () => {
     const { protocolItemThreads, protocolThreadReads } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
+
     fixture.archived.mockResolvedValue({ availability: 'unavailable' });
     protocolItemThreads([]);
     expect(protocolThreadReads(['lost'])).toBeNull();
@@ -340,6 +367,7 @@ it('a thread on neither list reads as failed once the archived list fails, so no
 it('stats inputs answer for the reads as they stood, though a read lands after them', async () => {
     const { protocolItemThreads, protocolStatsInputs } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
+
     fixture.read.mockImplementation(async (id) => ({
         availability: 'available',
         observation: {
@@ -363,7 +391,9 @@ it('stats inputs answer for the reads as they stood, though a read lands after t
             snapshot: { threads: [{ id: 'late', updatedAt: observedAt }], archivedThreads: [] },
         },
     });
+
     const inputs = (await protocolStatsInputs(['late']))!;
+
     await vi.waitFor(async () =>
         expect((await protocolStatsInputs(['late']))!.familyReads(['late'])).toEqual(['current']),
     );
@@ -377,10 +407,12 @@ it('coalesces concurrent global demand, bounds reads and includes archived child
     const releases: (() => void)[] = [];
     let active = 0;
     let peak = 0;
+
     fixture.read.mockImplementation(
         (id) =>
             new Promise((resolve) => {
                 peak = Math.max(peak, ++active);
+
                 const projection = {
                     thread: { id },
                     messages: [],
@@ -390,6 +422,7 @@ it('coalesces concurrent global demand, bounds reads and includes archived child
                     runtimeRequests: [],
                     subagents: [],
                 };
+
                 releases.push(() => {
                     active--;
                     resolve({ availability: 'available', observation: { observedAt, projection } });
@@ -397,11 +430,13 @@ it('coalesces concurrent global demand, bounds reads and includes archived child
             }),
     );
     protocolItemThreads([]);
+
     const shells = Array.from({ length: 20 }, (_, i) => ({
         id: String(i),
         updatedAt: observedAt,
         ...(i ? { lineage: { rootThreadId: '0' } } : {}),
     }));
+
     fixture.changed!({
         availability: 'available',
         observation: { observedAt, snapshot: { threads: shells.slice(0, 10), archivedThreads: shells.slice(10) } },
@@ -422,22 +457,27 @@ it('rejects in-flight results across an outage and reacquires on reconnect', asy
     const { protocolItemThreads, protocolThreadById } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
     let release!: (read: ExecutionRead) => void;
+
     fixture.read.mockImplementationOnce(
         () =>
             new Promise((resolve) => {
                 release = resolve;
             }),
     );
+
     const result: ExecutionRead = {
         availability: 'available',
         observation: { observedAt, projection: { thread: { id: 'one' }, messages: [] } },
     };
+
     fixture.read.mockResolvedValue(result);
     protocolItemThreads([]);
+
     const shell: ShellRead = {
         availability: 'available',
         observation: { observedAt, snapshot: { threads: [{ id: 'one', updatedAt: observedAt }], archivedThreads: [] } },
     };
+
     fixture.changed!(shell);
     expect(protocolThreadById('one').availability).toBe('unavailable');
     fixture.changed!({ availability: 'unavailable' });
@@ -453,6 +493,7 @@ it('keeps failed detail reads unavailable and retries later demand without a req
     const { protocolItemThreads, protocolThreadById } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
     const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+
     try {
         fixture.read.mockRejectedValueOnce(Error('offline')).mockResolvedValue({
             availability: 'available',
@@ -490,6 +531,7 @@ it('reads a thread cleanup state from the current snapshot only', async () => {
             observation: { observedAt: updatedAt, snapshot: { threads, archivedThreads } },
         });
     const idle = { id: 'one', updatedAt, status: 'idle' };
+
     expect(threadCleanupState('one')).toBe('unavailable');
     show([idle]);
     expect(threadCleanupState('one')).toEqual({ archived: false, settled: false, live: false });
@@ -532,6 +574,7 @@ it('counts a thread idle for cleanup only under the statuses T3 lists as idle, i
             observation: { observedAt: updatedAt, snapshot: { threads, archivedThreads: [] } },
         });
     const one = (status?: string) => ({ id: 'one', updatedAt, status });
+
     threadCleanupState('one');
     for (const status of ['idle', 'completed', 'interrupted', 'failed', 'cancelled', 'rolled_back']) {
         show([one(status)]);
@@ -540,8 +583,10 @@ it('counts a thread idle for cleanup only under the statuses T3 lists as idle, i
     for (const status of ['blocked', 'a-status-from-a-later-t3', undefined]) {
         show([one(status)]);
         expect(threadCleanupState('one')).toMatchObject({ live: true });
+
         const child = { id: 'child', updatedAt, status: 'idle', lineage: { parentThreadId: 'one' } };
         const grandchild = { id: 'grandchild', updatedAt, status, lineage: { parentThreadId: 'child' } };
+
         show([one('idle'), child, grandchild]);
         expect(threadCleanupState('one')).toMatchObject({ live: true });
         show([one('idle'), { id: 'rooted', updatedAt, status, lineage: { rootThreadId: 'one' } }]);
@@ -566,6 +611,7 @@ it('counts work a finished status can hide as live for cleanup, itself and each 
         });
     const one = { id: 'one', updatedAt, status: 'completed' };
     const child = { id: 'child', updatedAt, status: 'completed', lineage: { parentThreadId: 'one' } };
+
     threadCleanupState('one');
     for (const work of [
         { activityRunStatus: 'running' },
@@ -593,6 +639,7 @@ it('counts work a finished status can hide as live for cleanup, itself and each 
 it('sends no cleanup command to a thread with an unknown status', async () => {
     const { threadCleanupState } = await import('./item-execution.ts');
     const { createShapingThreadSweep } = await import('../items/shaping-thread-cleanup.ts');
+
     threadCleanupState('one');
     fixture.changed!({
         availability: 'available',
@@ -604,12 +651,14 @@ it('sends no cleanup command to a thread with an unknown status', async () => {
             },
         },
     });
+
     const send = vi.fn();
     const records = {
         pendingShapingThreadCleanups: () => [
             { threadId: 'one', workId: 'work', action: 'delete', commandId: 'command', failure: null },
         ],
     } as unknown as WorkRecords;
+
     await createShapingThreadSweep({ records, stateOf: threadCleanupState, lookup: vi.fn(), send, deleted: vi.fn() })();
     expect(send).not.toHaveBeenCalled();
 });
@@ -630,7 +679,9 @@ const showActive = (threads: object[]) =>
 
 it('reads the archived list only for a thread the active shells lack, and at most once in 30 seconds', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') });
+
     const { protocolItemThreads } = await import('./item-execution.ts');
+
     protocolItemThreads([]);
     showActive([shell('active')]);
     expect(protocolItemThreads(['active'])).toMatchObject([{ id: 'active' }]);
@@ -649,6 +700,7 @@ it('reads the archived list only for a thread the active shells lack, and at mos
 
 it('sorts an archived thread after the unarchived ones, however recently T3 updated it', async () => {
     const { protocolItemThreads } = await import('./item-execution.ts');
+
     protocolItemThreads([]);
     showActive([shell('build')]);
     fixture.archived.mockResolvedValue(
@@ -664,7 +716,9 @@ it('sorts an archived thread after the unarchived ones, however recently T3 upda
 
 it('keeps an archived thread for display when a later read fails, and answers unavailable for cleanup', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') });
+
     const { protocolItemThreads, threadCleanupState } = await import('./item-execution.ts');
+
     protocolItemThreads([]);
     showActive([]);
     fixture.archived.mockResolvedValue(archivedRead([shell('put-away', { archivedAt: observedAt })]));
@@ -685,6 +739,7 @@ it('keeps an archived thread for display when a later read fails, and answers un
 
 it('treats an archived list with an invalid shell as a failed read', async () => {
     const { protocolItemThreads, threadCleanupState } = await import('./item-execution.ts');
+
     protocolItemThreads([]);
     showActive([shell('active')]);
     fixture.archived.mockResolvedValue(archivedRead([{ id: 'broken', updatedAt: 'never' }]));
@@ -697,11 +752,14 @@ it('treats an archived list with an invalid shell as a failed read', async () =>
 
 it('rereads the archived list after a thread leaves the active shells, and a read begun before that answers nothing for cleanup', async () => {
     const { protocolItemThreads, threadCleanupState } = await import('./item-execution.ts');
+
     protocolItemThreads([]);
     showActive([shell('one'), shell('other')]);
     threadCleanupState('never');
     await vi.waitFor(() => expect(threadCleanupState('never')).toBe('absent'));
+
     let answer!: (read: ThreadFamilyRead) => void;
+
     fixture.archived.mockClear();
     fixture.archived.mockReturnValueOnce(
         new Promise((resolve) => {
@@ -721,6 +779,7 @@ it('rereads the archived list after a thread leaves the active shells, and a rea
 
 it('answers from the active shell once a thread is unarchived, whatever the archived list last said', async () => {
     const { protocolItemThreads, threadCleanupState } = await import('./item-execution.ts');
+
     protocolItemThreads([]);
     showActive([]);
     fixture.archived.mockResolvedValue(archivedRead([shell('back', { archivedAt: observedAt })]));
@@ -733,9 +792,12 @@ it('answers from the active shell once a thread is unarchived, whatever the arch
 
 it('never finds a started thread in the archived list', async () => {
     const { protocolItemThreads, protocolStartedThread } = await import('./item-execution.ts');
+
     protocolItemThreads([]);
     showActive([]);
+
     const message = 'Build w1.';
+
     fixture.archived.mockResolvedValue(
         archivedRead([shell('old', { projectId: 'p', title: message, archivedAt: observedAt })]),
     );
@@ -756,6 +818,7 @@ const readOf = (id: string): ExecutionRead => {
         runtimeRequests: [],
         subagents: [],
     };
+
     return { availability: 'available', observation: { observedAt, projection } };
 };
 const countedThreads = (inputs: { rows: { threads: { id: unknown }[] } } | null) =>
@@ -763,6 +826,7 @@ const countedThreads = (inputs: { rows: { threads: { id: unknown }[] } } | null)
 
 it('answers per family: a failed read fails only the family holding that thread, and the other family still counts', async () => {
     const { protocolItemThreads, protocolStatsInputs } = await import('./item-execution.ts');
+
     fixture.read.mockImplementation(async (id) => (id === 'broken' ? { availability: 'unavailable' } : readOf(id)));
     protocolItemThreads([]);
     showActive([shell('own'), shell('broken'), shell('child', { lineage: { rootThreadId: 'broken' } })]);
@@ -771,7 +835,9 @@ it('answers per family: a failed read fails only the family holding that thread,
     await vi.waitFor(async () =>
         expect((await protocolStatsInputs())!.familyReads(['broken'])).toEqual(['failed', 'current']),
     );
+
     const inputs = (await protocolStatsInputs())!;
+
     expect(inputs.familyReads(['own'])).toEqual(['current']);
     expect(countedThreads(inputs).sort()).toEqual(['child', 'own']);
     expect(inputs.allObserved, 'a thread never read successfully is not observed').toBe(false);
@@ -779,6 +845,7 @@ it('answers per family: a failed read fails only the family holding that thread,
 
 it('counts a changed thread from its last read while the next is pending, and a deleted thread never', async () => {
     const { protocolItemThreads, protocolStatsInputs, protocolThreadById } = await import('./item-execution.ts');
+
     fixture.read.mockImplementation(async (id) => readOf(id));
     protocolItemThreads([]);
     showActive([shell('one')]);
@@ -788,13 +855,17 @@ it('counts a changed thread from its last read while the next is pending, and a 
     );
     fixture.read.mockReturnValue(new Promise<ExecutionRead>(() => {}));
     showActive([shell('one', { status: 'running' })]);
+
     const pending = (await protocolStatsInputs(['one']))!;
+
     expect(pending.familyReads(['one'])).toEqual(['pending']);
     expect(countedThreads(pending)).toEqual(['one']);
     expect(pending.allObserved).toBe(true);
     expect(protocolThreadById('one').availability, 'its other callers keep the strict check').toBe('unavailable');
     showActive([shell('one', { deletedAt: observedAt })]);
+
     const deleted = (await protocolStatsInputs(['one']))!;
+
     expect(deleted.familyReads(['one'])).toEqual(['gone']);
     expect(countedThreads(deleted)).toEqual([]);
 });
@@ -802,6 +873,7 @@ it('counts a changed thread from its last read while the next is pending, and a 
 it('keeps a thread whose re-read failed in the count for deduplication, and fails it until a read succeeds', async () => {
     const { protocolItemThreads, protocolStatsInputs } = await import('./item-execution.ts');
     const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+
     try {
         fixture.read.mockImplementation(async (id) => readOf(id));
         protocolItemThreads([]);
@@ -816,7 +888,9 @@ it('keeps a thread whose re-read failed in the count for deduplication, and fail
         await vi.waitFor(async () =>
             expect((await protocolStatsInputs(['one']))!.familyReads(['one'])).toEqual(['failed']),
         );
+
         const failed = (await protocolStatsInputs(['one']))!;
+
         expect(countedThreads(failed)).toEqual(['one']);
         expect(failed.allObserved).toBe(true);
         now.mockReturnValue(2001);
@@ -831,8 +905,10 @@ it('keeps a thread whose re-read failed in the count for deduplication, and fail
 
 it('holds an unlisted thread as never read until both lists are read, and an ageing or failing archived read does not bring that back', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') });
+
     const { protocolItemThreads, protocolStatsInputs } = await import('./item-execution.ts');
     let answer!: (read: ThreadFamilyRead) => void;
+
     fixture.archived.mockReturnValueOnce(
         new Promise((resolve) => {
             answer = resolve;
@@ -856,6 +932,7 @@ it('holds an unlisted thread as never read until both lists are read, and an age
 
 it('reads a thread found on the archived list like any other, keeping its family current', async () => {
     const { protocolItemThreads, protocolStatsInputs } = await import('./item-execution.ts');
+
     fixture.read.mockImplementation(async (id) => readOf(id));
     fixture.archived.mockResolvedValue(archivedRead([shell('put-away', { archivedAt: observedAt })]));
     protocolItemThreads([]);
@@ -868,6 +945,7 @@ it('reads a thread found on the archived list like any other, keeping its family
 
 it('reads as loading while T3 runs with its thread list unread, and throws once the list fails or T3 stops', async () => {
     const { protocolStatsInputs } = await import('./item-execution.ts');
+
     expect(await protocolStatsInputs(['one'])).toBeNull();
     fixture.changed!({ availability: 'unavailable' });
     await expect(protocolStatsInputs(['one'])).rejects.toThrow('unavailable');
@@ -876,6 +954,7 @@ it('reads as loading while T3 runs with its thread list unread, and throws once 
 it("keeps only what stats read from each thread's history, and still counts it", async () => {
     const { protocolItemThreads, protocolStatsInputs, protocolThreadById } = await import('./item-execution.ts');
     const observedAt = '2026-10-31T12:00:00Z';
+
     fixture.read.mockImplementation(async (id) => ({
         availability: 'available',
         observation: {
@@ -921,7 +1000,9 @@ it("keeps only what stats read from each thread's history, and still counts it",
         'subagents',
         'thread',
     ]);
+
     const { rows } = (await protocolStatsInputs(['own']))!;
+
     expect(rows.threads).toMatchObject([{ id: 'own', title: 'Own', text: 'Build it' }]);
     expect(rows.turns).toMatchObject([{ id: 'turn', thread: 'own', status: 'completed' }]);
     expect([...rows.active]).toEqual(['provider']);

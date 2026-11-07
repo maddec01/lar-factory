@@ -11,12 +11,15 @@ import * as LaunchAgentCleanup from './launch-agent-cleanup.ts';
 const makeHome = (withAgent: boolean) => {
     const home = tempDir('launch-agent-home-');
     const checkout = NodePath.join(home, 'Code/lar-factory');
+
     NodeFS.mkdirSync(checkout, { recursive: true });
     NodeFS.writeFileSync(NodePath.join(checkout, 'README.md'), '# Lar Factory\n');
+
     if (withAgent) {
         NodeFS.mkdirSync(NodePath.dirname(LaunchAgentCleanup.plistPath(home)), { recursive: true });
         NodeFS.writeFileSync(LaunchAgentCleanup.plistPath(home), `<plist><string>${checkout}</string></plist>\n`);
     }
+
     return { home, checkout };
 };
 
@@ -25,8 +28,11 @@ const makeLaunchctl = (exitCode: number) => {
     const dir = tempDir('fake-launchctl-');
     const log = NodePath.join(dir, 'calls.log');
     const launchctl = NodePath.join(dir, 'launchctl');
+
     NodeFS.writeFileSync(launchctl, `#!/bin/sh\necho "$@" >> "${log}"\nexit ${exitCode}\n`, { mode: 0o755 });
+
     const calls = () => (NodeFS.existsSync(log) ? NodeFS.readFileSync(log, 'utf8').trim().split('\n') : []);
+
     return { launchctl, calls };
 };
 
@@ -38,6 +44,7 @@ describe('onLaunch', () => {
         Effect.gen(function* () {
             const { home, checkout } = makeHome(true);
             const fake = makeLaunchctl(0);
+
             yield* run({ isPackaged: true, home, uid: 501, launchctl: fake.launchctl });
             assert.deepStrictEqual(fake.calls(), ['bootout gui/501/nl.mux.factory-board']);
             assert.isFalse(NodeFS.existsSync(LaunchAgentCleanup.plistPath(home)));
@@ -49,6 +56,7 @@ describe('onLaunch', () => {
         Effect.gen(function* () {
             const { home } = makeHome(false);
             const fake = makeLaunchctl(0);
+
             yield* run({ isPackaged: true, home, uid: 501, launchctl: fake.launchctl });
             assert.deepStrictEqual(fake.calls(), []);
         }),
@@ -58,6 +66,7 @@ describe('onLaunch', () => {
         Effect.gen(function* () {
             const { home, checkout } = makeHome(true);
             const fake = makeLaunchctl(3);
+
             yield* run({ isPackaged: true, home, uid: 501, launchctl: fake.launchctl });
             assert.lengthOf(fake.calls(), 1);
             assert.isFalse(NodeFS.existsSync(LaunchAgentCleanup.plistPath(home)));
@@ -68,6 +77,7 @@ describe('onLaunch', () => {
     it.effect("succeeds when launchctl can't run", () =>
         Effect.gen(function* () {
             const { home } = makeHome(true);
+
             yield* run({ isPackaged: true, home, uid: 501, launchctl: '/nonexistent/launchctl' });
             assert.isFalse(NodeFS.existsSync(LaunchAgentCleanup.plistPath(home)));
         }),
@@ -77,6 +87,7 @@ describe('onLaunch', () => {
         Effect.gen(function* () {
             const { home } = makeHome(true);
             const fake = makeLaunchctl(0);
+
             yield* run({ isPackaged: false, home, uid: 501, launchctl: fake.launchctl });
             assert.deepStrictEqual(fake.calls(), []);
             assert.isTrue(NodeFS.existsSync(LaunchAgentCleanup.plistPath(home)));

@@ -10,10 +10,13 @@ export async function listenOnFreePort(server: Server, host: string, ports: read
     for (const port of ports) {
         if (await listen(server, host, port)) {
             const address = server.address();
+
             if (!address || typeof address === 'string') throw new Error('Expected a listening TCP port');
+
             return address.port;
         }
     }
+
     return null;
 }
 
@@ -23,7 +26,9 @@ export type ParentMessage = { type: 'listening'; port: number };
 /** Tells the parent process, when there is one with an IPC channel, that the board listens on `port`. */
 export function reportListening(port: number): void {
     if (!process.send || !process.connected) return;
+
     const message: ParentMessage = { type: 'listening', port };
+
     process.send(message);
 }
 
@@ -31,6 +36,7 @@ function listen(server: Server, host: string, port: number): Promise<boolean> {
     return new Promise((resolve, reject) => {
         const failed = (error: NodeJS.ErrnoException) => {
             server.off('listening', listening);
+
             if (error.code === 'EADDRINUSE') resolve(false);
             else reject(error);
         };
@@ -38,6 +44,7 @@ function listen(server: Server, host: string, port: number): Promise<boolean> {
             server.off('error', failed);
             resolve(true);
         };
+
         server.once('error', failed);
         server.once('listening', listening);
         server.listen(port, host);

@@ -13,7 +13,9 @@ import {
 export const STEP_TITLES = { project: 'Project', access: 'Access', work: 'Work and docs' } as const;
 export type StepId = keyof typeof STEP_TITLES;
 export const isStep = (id: string): id is StepId => Object.hasOwn(STEP_TITLES, id);
+
 const found = <T>(fact: Detected<T>): T | null => ('found' in fact ? fact.found : null);
+
 export const stepsOf = (): StepId[] => ['project', 'access', 'work'];
 export interface Answers {
     itemSource: RepositoryItemSource | null;
@@ -44,6 +46,7 @@ export function sourceOptions(detection: SetupDetection): Option<RepositoryItemS
 }
 export const repositoryDocs = (detection: SetupDetection): DomainDocLocation => {
     const docs = found(detection.domainDocs);
+
     return docs?.kind === 'repository' ? docs : { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' };
 };
 export function skillOptions(detection: SetupDetection): Option<string>[] {
@@ -69,6 +72,7 @@ export function connectionsOf(
         .filter((o) => choices.connections?.some((r) => sameRepo(r, o.value)))
         .map((o) => o.value);
 }
+
 function defaultsOf(detection: SetupDetection): Answers {
     return {
         itemSource: sourceOptions(detection)[0]?.value ?? null,
@@ -81,8 +85,10 @@ function defaultsOf(detection: SetupDetection): Answers {
         structureSync: true,
     };
 }
+
 export function answersOf(detection: SetupDetection, choices: OnboardingChoices): Answers {
     const answers = { ...defaultsOf(detection), ...choices };
+
     return { ...answers, domainDocs: answers.domainDocs.kind === 'repository' ? answers.domainDocs : { kind: 'off' } };
 }
 export function answerProblem(step: StepId, answers: Answers): string | null {

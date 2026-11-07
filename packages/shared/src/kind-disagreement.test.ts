@@ -34,6 +34,7 @@ test("a ticket carrying the item's kind agrees, whichever other name trackerKind
 
 test('a label mapped to another kind beats a kind name, as the repository chose it', () => {
     const renamed = effectiveVocabulary({ improvement: { type: null, labels: ['bug'] } }).vocabulary;
+
     assert.equal(ticketKindOf('feature', ticket(['bug']), renamed), 'improvement');
 });
 
@@ -77,7 +78,9 @@ test("a ticket with no kind disagrees only when the item's kind has a mapped lab
         kept: false,
         swap: { add: ['type: bug'], remove: [], type: { from: 'Task', to: 'Bug' } },
     });
+
     const typeOnly = effectiveVocabulary({ bug: { type: 'Bug', labels: [] } }).vocabulary;
+
     assert.equal(kindDisagreement(record('bug'), ticket([], null), typeOnly)?.ticketKind, null);
 });
 
@@ -96,6 +99,7 @@ test('the swap names the labels and type an update changes', () => {
 
 test('a kept answer holds until either kind changes, then the question returns', () => {
     const kept = { answer: 'keep', itemKind: 'bug', ticketKind: 'feature' };
+
     assert.equal(kindDisagreement(record('bug', { kindAnswer: kept }), ticket(['feature']), NONE)?.kept, true);
     assert.equal(kindDisagreement(record('bug', { kindAnswer: kept }), ticket(['improvement']), NONE)?.kept, false);
     assert.equal(kindDisagreement(record('improvement', { kindAnswer: kept }), ticket(['feature']), NONE)?.kept, false);
@@ -103,12 +107,14 @@ test('a kept answer holds until either kind changes, then the question returns',
 
 test('a kept answer can cover a ticket with no kind', () => {
     const kept = { answer: 'keep', itemKind: 'bug', ticketKind: null };
+
     assert.equal(kindDisagreement(record('bug', { kindAnswer: kept }), ticket([]), MAPPED)?.kept, true);
     assert.equal(kindDisagreement(record('bug', { kindAnswer: kept }), ticket(['feature']), MAPPED)?.kept, false);
 });
 
 test('an update answer ends the question for the kinds it covers', () => {
     const updated = { answer: 'update', itemKind: 'improvement', ticketKind: 'bug' };
+
     assert.equal(kindDisagreement(record('improvement', { kindAnswer: updated }), ticket([], 'Bug'), NONE), null);
     assert.equal(
         kindDisagreement(record('improvement', { kindAnswer: updated }), ticket([], 'Feature'), NONE)?.kept,
@@ -118,6 +124,7 @@ test('an update answer ends the question for the kinds it covers', () => {
 
 test('a swap needs access only for what it writes', () => {
     const swap = { add: ['bug'], remove: [], type: null };
+
     assert.match(kindSwapAccessProblem('team/app', swap, { 'tag-ticket': 'refused' })!, /tag-ticket was refused/);
     assert.equal(kindSwapAccessProblem('team/app', swap, { 'tag-ticket': 'allowed' }), null);
     assert.equal(kindSwapAccessProblem('team/app', { add: [], remove: [], type: null }, {}), null);

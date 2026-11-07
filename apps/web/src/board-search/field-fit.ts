@@ -34,7 +34,9 @@ export function fitField({ field: room, bar }: FieldRoom, tokenWidths: readonly 
     const used = (count: number) =>
         CHROME + SEARCH_WORD + tokens(count) + (count < tokenWidths.length ? COUNT + GAP : 0);
     let shown = tokenWidths.length;
+
     while (shown > 0 && used(shown) > room) shown--;
+
     return {
         shown,
         keyHint: shown === tokenWidths.length && used(shown) + KEY_HINT + GAP <= room,

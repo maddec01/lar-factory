@@ -18,7 +18,9 @@ export function Warning({
     children: ReactNode;
 }) {
     const dismissed = useDismissed(dismissKey);
+
     if (dismissed) return null;
+
     return (
         <div data-slot="notice" className="relative border-t py-3 pr-8 text-xs first:border-t-0 first:py-1">
             <div data-warning={dismissKey}>

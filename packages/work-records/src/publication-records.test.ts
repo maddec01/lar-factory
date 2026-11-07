@@ -12,14 +12,20 @@ const opened: WorkRecords[] = [];
 const dirs: string[] = [];
 const open = async (path = join(tempDir(), 'work-records.db')) => {
     const records = await openWorkRecords(path);
+
     opened.push(records);
+
     return records;
 };
+
 function tempDir() {
     const dir = mkdtempSync(join(tmpdir(), 'publication-'));
+
     dirs.push(dir);
+
     return dir;
 }
+
 afterEach(() => {
     for (const records of opened.splice(0)) records.close();
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -28,14 +34,17 @@ afterEach(() => {
 it('ties gate evidence to the exact brief across execution metadata changes', async () => {
     const records = await open();
     let work = records.create({ title: 'Search', repository: 'team/app', kind: 'build', status: 'Ready' });
+
     expect(records.gate(work.workId)).toMatchObject({ current: false, briefDigest: null, evidence: [] });
     work = records.setBody(work.workId, work.revision, 'brief', 'Find a saved search.');
+
     const digest = records.gate(work.workId).briefDigest!;
     const evidence = records.recordGate(work.workId, work.revision, {
         briefDigest: digest,
         approvedBy: 'reviewer',
         evidence: 'Doubt review passed; assumptions confirmed.',
     });
+
     expect(evidence).toMatchObject({ briefDigest: digest, approvedBy: 'reviewer', sourceRevision: 2 });
     work = records.setBuildPhase(work.workId, work.revision, 'implement');
     expect(records.gate(work.workId).current).toBe(true);
@@ -56,33 +65,42 @@ it('ties gate evidence to the exact brief across execution metadata changes', as
 it('names the latest gate that passed the current brief and was not invalidated since', async () => {
     const records = await open();
     let work = records.create({ title: 'Search', repository: 'team/app', kind: 'build', status: 'Ready' });
+
     work = records.setBody(work.workId, work.revision, 'brief', 'Find a saved search.');
+
     const digest = records.gate(work.workId).briefDigest!;
+
     records.recordGate(work.workId, work.revision, { briefDigest: digest, approvedBy: 'reviewer', evidence: 'First.' });
+
     const second = records.recordGate(work.workId, records.read(work.workId).revision, {
         briefDigest: digest,
         approvedBy: 'reviewer',
         evidence: 'Second.',
     });
+
     expect(records.gate(work.workId)).toMatchObject({ current: true, passing: second });
     records.invalidateGate(work.workId, records.read(work.workId).revision);
     expect(records.gate(work.workId)).toMatchObject({ current: false, passing: null });
+
     const third = records.recordGate(work.workId, records.read(work.workId).revision, {
         briefDigest: digest,
         approvedBy: 'reviewer',
         evidence: 'Third.',
     });
+
     expect(records.gate(work.workId)).toMatchObject({ current: true, passing: third });
 });
 
 async function passingBuild(records: WorkRecords) {
     const made = records.create({ title: 'Search', repository: 'team/app', kind: 'build' });
     const work = records.setBody(made.workId, made.revision, 'brief', 'Find a saved search.');
+
     records.recordGate(work.workId, work.revision, {
         briefDigest: records.gate(work.workId).briefDigest!,
         approvedBy: 'reviewer',
         evidence: 'Passed.',
     });
+
     return work;
 }
 
@@ -114,6 +132,7 @@ function proposal(records: WorkRecords, workId: string): import('@lar-factory/sh
 
 function approve(records: WorkRecords, workId: string, input = proposal(records, workId)) {
     const plan = records.proposePublication(workId, records.read(workId).revision, input);
+
     return records.approvePublication(workId, plan.planId, plan.revision, plan.digest, 'pedro');
 }
 
@@ -139,10 +158,14 @@ it('persists approval, successful text, uncertainty and the next operation acros
             location: { kind: 'body', start: 0, end: 28 },
         },
     );
+
     expect(result.results.map((item) => item.status)).toEqual(['successful', 'pending']);
+
     const reopened = await open(path);
+
     expect(reopened.publication(work.workId, plan.planId)).toEqual(result);
     expect(reopened.pendingPublication(work.workId, plan.planId).next?.operationId).toBe('update-note');
+
     const linked = reopened.attachPublicationUrl(
         work.workId,
         work.revision,
@@ -150,11 +173,14 @@ it('persists approval, successful text, uncertainty and the next operation acros
         'team/app#12',
         'https://example.test/issues/12',
     );
+
     expect(linked).toMatchObject({ workId: work.workId, status: 'List', ticket: 'team/app#12' });
     expect(reopened.body(work.workId, 'brief')).toBe('Find a saved search.');
     expect(reopened.pendingPublication(work.workId, plan.planId).current).toBe(true);
+
     const second = reopened.claimPublication(work.workId, plan.planId, result.revision, plan.digest, content, 'cli');
     const afterCrash = await open(path);
+
     expect(afterCrash.pendingPublication(work.workId, plan.planId)).toMatchObject({
         next: null,
         uncertain: ['update-note'],
@@ -163,6 +189,7 @@ it('persists approval, successful text, uncertainty and the next operation acros
     expect(() =>
         afterCrash.claimPublication(work.workId, plan.planId, second.plan.revision, plan.digest, content, 'board'),
     ).toThrow(/No operation/);
+
     const resolved = afterCrash.resolvePublicationOutcome(
         work.workId,
         plan.planId,
@@ -175,6 +202,7 @@ it('persists approval, successful text, uncertainty and the next operation acros
             location: { kind: 'comment', commentId: 'comment-7' },
         },
     );
+
     expect(resolved.results.map((item) => item.status)).toEqual(['successful', 'successful']);
     expect(afterCrash.lastPublished(work.workId)).toMatchObject([
         { text: 'Find saved searches by name.', ticket: 'team/app#12', location: { kind: 'body', start: 0, end: 28 } },
@@ -193,6 +221,7 @@ it('requires settled concepts and current gates for active builds without waitin
     let concept = records.create({ title: 'Search', repository: 'team/app', kind: 'concept' });
     let decision = records.create({ title: 'Match', repository: 'team/app', kind: 'decision' });
     let build = await passingBuild(records);
+
     decision = records.setParent(decision.workId, decision.revision, concept.workId);
     build = records.setParent(build.workId, build.revision, concept.workId);
     expect(records.publicationReadiness(concept.workId)).toMatchObject({
@@ -228,11 +257,16 @@ it('rejects stale inputs, malformed operations and inconsistent outcomes without
     const records = await open();
     const work = await passingBuild(records);
     const input = proposal(records, work.workId);
+
     expect(() => records.proposePublication(work.workId, 1, input)).toThrow(/revision/);
+
     const staleChild = structuredClone(input);
+
     staleChild.sources[0]!.revision = 1;
     expect(() => records.proposePublication(work.workId, work.revision, staleChild)).toThrow(/revision/);
+
     const malformed = structuredClone(input);
+
     malformed.operations.push({
         kind: 'relationship',
         operationId: 'bad',
@@ -242,21 +276,30 @@ it('rejects stale inputs, malformed operations and inconsistent outcomes without
         relationship: 'child',
     });
     expect(() => records.proposePublication(work.workId, work.revision, malformed)).toThrow(/another ticket/);
+
     const missingResolution = structuredClone(input);
+
     missingResolution.tickets[0]!.typeResolution.candidates = [];
     expect(() => records.proposePublication(work.workId, work.revision, missingResolution)).toThrow(/type candidate/);
+
     const wrongRepository = structuredClone(input);
+
     wrongRepository.tickets[0]!.destination.repository = 'team/elsewhere';
     expect(() => records.proposePublication(work.workId, work.revision, wrongRepository)).toThrow(/own repository/);
+
     const privateText = structuredClone(input);
+
     privateText.tickets[0]!.body = `Work ${work.workId}`;
     expect(() => records.proposePublication(work.workId, work.revision, privateText)).toThrow(/private work IDs/);
     expect(records.publications(work.workId)).toEqual([]);
+
     const plan = records.proposePublication(work.workId, work.revision, input);
+
     expect(() => records.approvePublication(work.workId, plan.planId, plan.revision, 'wrong', 'pedro')).toThrow(
         /exact proposed content/,
     );
     expect(records.publication(work.workId, plan.planId)).toEqual(plan);
+
     const approved = records.approvePublication(work.workId, plan.planId, plan.revision, plan.digest, 'pedro');
     const content = { tickets: input.tickets, operations: input.operations };
     const claimed = records.claimPublication(
@@ -267,6 +310,7 @@ it('rejects stale inputs, malformed operations and inconsistent outcomes without
         content,
         'board',
     );
+
     expect(() =>
         records.recordPublicationOutcome(work.workId, plan.planId, claimed.plan.revision, 'create-build', 'wrong', {
             status: 'failed',
@@ -299,6 +343,7 @@ it('requires fresh approval for content changes and preserves success through fa
     const input = proposal(records, work.workId);
     const content = { tickets: input.tickets, operations: input.operations };
     let plan = approve(records, work.workId, input);
+
     for (const change of [
         (next: typeof content) => {
             next.tickets[0]!.destination.project = 'Another project';
@@ -311,13 +356,16 @@ it('requires fresh approval for content changes and preserves success through fa
         },
     ]) {
         const current = structuredClone(content);
+
         change(current);
         expect(records.pendingPublication(work.workId, plan.planId, current).current).toBe(false);
         expect(() =>
             records.claimPublication(work.workId, plan.planId, plan.revision, plan.digest, current, 'board'),
         ).toThrow(/changed/);
     }
+
     const first = records.claimPublication(work.workId, plan.planId, plan.revision, plan.digest, content, 'board');
+
     plan = records.recordPublicationOutcome(
         work.workId,
         plan.planId,
@@ -332,7 +380,9 @@ it('requires fresh approval for content changes and preserves success through fa
             location: { kind: 'body', start: 0, end: 28 },
         },
     );
+
     const second = records.claimPublication(work.workId, plan.planId, plan.revision, plan.digest, content, 'cli');
+
     plan = records.recordPublicationOutcome(
         work.workId,
         plan.planId,
@@ -346,7 +396,9 @@ it('requires fresh approval for content changes and preserves success through fa
         failed: ['update-note'],
         successful: ['create-build'],
     });
+
     const replacement = records.proposePublication(work.workId, work.revision, { ...input, replaces: plan.planId });
+
     expect(replacement).toMatchObject({
         approval: null,
         replaces: plan.planId,
@@ -366,6 +418,7 @@ it('requires fresh approval for content changes and preserves success through fa
             'cli',
         ),
     ).toThrow(/needs approval/);
+
     const approved = records.approvePublication(
         work.workId,
         replacement.planId,
@@ -373,6 +426,7 @@ it('requires fresh approval for content changes and preserves success through fa
         replacement.digest,
         'pedro',
     );
+
     work = records.setBody(work.workId, work.revision, 'brief', 'Find a different search.');
     expect(records.pendingPublication(work.workId, approved.planId).current).toBe(false);
     expect(() =>
@@ -385,15 +439,22 @@ it('keeps handovers public and attaches a manually posted URL without changing l
     const path = join(tempDir(), 'work-records.db');
     const records = await open(path);
     let work = await passingBuild(records);
+
     work = records.addThread(work.workId, work.revision, 'thread-1', 'build');
     work = records.setPullRequest(work.workId, work.revision, 'team/app#99');
+
     const input = proposal(records, work.workId);
+
     input.operations = [];
+
     const plan = records.proposePublication(work.workId, work.revision, input);
+
     expect(records.publicationHandover(work.workId, plan.planId)).toBe(
         '# Find saved searches\n\nFind saved searches by name.\n',
     );
+
     const other = records.create({ title: 'Existing', repository: 'team/app', kind: 'feature', ticket: 'team/app#12' });
+
     expect(() =>
         records.attachPublicationUrl(
             work.workId,
@@ -405,6 +466,7 @@ it('keeps handovers public and attaches a manually posted URL without changing l
     ).toThrow(/already belongs/);
     expect(records.read(work.workId)).toEqual(work);
     expect(records.read(other.workId).ticket).toBe('team/app#12');
+
     const attached = records.attachPublicationUrl(
         work.workId,
         work.revision,
@@ -412,6 +474,7 @@ it('keeps handovers public and attaches a manually posted URL without changing l
         'team/app#13',
         'https://example.test/issues/13',
     );
+
     expect(attached).toEqual({
         ...work,
         ticket: 'team/app#13',
@@ -421,7 +484,9 @@ it('keeps handovers public and attaches a manually posted URL without changing l
     expect(records.threads(work.workId)).toMatchObject([{ threadId: 'thread-1' }]);
     expect(records.body(work.workId, 'brief')).toBe('Find a saved search.');
     expect(records.gate(work.workId).current).toBe(true);
+
     const reopened = await open(path);
+
     expect(reopened.publicationAttachment(work.workId)).toMatchObject({
         planId: plan.planId,
         ticket: 'team/app#13',
@@ -433,6 +498,7 @@ it('returns only the latest exact text for a replaced body region', async () => 
     const records = await open();
     const work = await passingBuild(records);
     const input = proposal(records, work.workId);
+
     input.tickets[0]!.destination = {
         provider: 'azure',
         repository: 'team/app',
@@ -451,6 +517,7 @@ it('returns only the latest exact text for a replaced body region', async () => 
             expectedText: '',
         },
     ];
+
     const first = approve(records, work.workId, input);
     const claim = records.claimPublication(
         work.workId,
@@ -460,6 +527,7 @@ it('returns only the latest exact text for a replaced body region', async () => 
         { tickets: input.tickets, operations: input.operations },
         'board',
     );
+
     records.recordPublicationOutcome(work.workId, first.planId, claim.plan.revision, 'append', claim.claimToken, {
         status: 'successful',
         evidence: 'Preserved the original HTML and appended refinement.',
@@ -477,6 +545,7 @@ it('returns only the latest exact text for a replaced body region', async () => 
             expectedText: 'Refined search',
         },
     ];
+
     const second = approve(records, work.workId, input);
     const update = records.claimPublication(
         work.workId,
@@ -486,6 +555,7 @@ it('returns only the latest exact text for a replaced body region', async () => 
         { tickets: input.tickets, operations: input.operations },
         'board',
     );
+
     records.recordPublicationOutcome(work.workId, second.planId, update.plan.revision, 'replace', update.claimToken, {
         status: 'successful',
         evidence: 'Replaced only the approved region.',
@@ -506,6 +576,7 @@ it('returns only the latest exact text for a replaced body region', async () => 
             expectedText: 'Search by name',
         },
     ];
+
     const third = approve(records, work.workId, input);
     const shorter = records.claimPublication(
         work.workId,
@@ -515,6 +586,7 @@ it('returns only the latest exact text for a replaced body region', async () => 
         { tickets: input.tickets, operations: input.operations },
         'board',
     );
+
     records.recordPublicationOutcome(work.workId, third.planId, shorter.plan.revision, 'shorter', shorter.claimToken, {
         status: 'successful',
         evidence: 'Changed the approved section.',
@@ -555,16 +627,20 @@ it('allows one claim across processes and keeps a simulated provider write uncer
         plan.planId,
     ];
     const results = await Promise.all([execute(process.execPath, args), execute(process.execPath, args)]);
+
     expect(results.filter((item) => item.stdout.trim() === 'lost')).toHaveLength(1);
     expect(records.pendingPublication(work.workId, plan.planId)).toMatchObject({
         uncertain: ['create-build'],
         next: null,
     });
+
     let saved = records.publication(work.workId, plan.planId);
+
     saved = records.resolvePublicationOutcome(work.workId, plan.planId, saved.revision, 'create-build', 'pedro', {
         status: 'failed',
         evidence: 'Neither worker dispatched to the provider.',
     });
+
     const next = records.proposePublication(work.workId, work.revision, {
         ...proposal(records, work.workId),
         replaces: saved.planId,
@@ -580,6 +656,7 @@ it('allows one claim across processes and keeps a simulated provider write uncer
     writeFileSync(process.argv[5], 'https://example.test/issues/12');
     process.exit(17);
   `;
+
     await expect(
         execute(process.execPath, [
             '--disable-warning=ExperimentalWarning',
@@ -594,18 +671,23 @@ it('allows one claim across processes and keeps a simulated provider write uncer
         ]),
     ).rejects.toMatchObject({ code: 17 });
     expect(readFileSync(providerFixture, 'utf8')).toBe('https://example.test/issues/12');
+
     const reopened = await open(path);
+
     expect(reopened.pendingPublication(work.workId, approved.planId)).toMatchObject({
         uncertain: ['create-build'],
         next: null,
     });
+
     const uncertain = reopened.publication(work.workId, approved.planId);
+
     expect(() =>
         reopened.proposePublication(work.workId, work.revision, {
             ...proposal(reopened, work.workId),
             replaces: approved.planId,
         }),
     ).toThrow(/Resolve uncertain/);
+
     const resolved = reopened.resolvePublicationOutcome(
         work.workId,
         approved.planId,
@@ -620,6 +702,7 @@ it('allows one claim across processes and keeps a simulated provider write uncer
             location: { kind: 'body', start: 0, end: 28 },
         },
     );
+
     expect(reopened.pendingPublication(work.workId, resolved.planId).next?.operationId).toBe('update-note');
 });
 
@@ -628,15 +711,21 @@ it('retains recovery evidence and deletes terminal journals together with their 
     const records = await open(path);
     let work = await passingBuild(records);
     const input = proposal(records, work.workId);
+
     input.operations = input.operations.slice(0, 1);
+
     const plan = approve(records, work.workId, input);
+
     work = records.setAside(work.workId, work.revision);
+
     const retention = { hideAfterDays: 0, deleteAfterDays: 0 };
+
     expect(records.deleteExpired(retention)).toMatchObject({
         deleted: [],
         kept: [{ workId: work.workId, reason: expect.stringContaining('recovery evidence') }],
     });
     work = records.restore(work.workId, work.revision);
+
     const claim = records.claimPublication(
         work.workId,
         plan.planId,
@@ -645,6 +734,7 @@ it('retains recovery evidence and deletes terminal journals together with their 
         { tickets: input.tickets, operations: input.operations },
         'board',
     );
+
     records.setAside(work.workId, work.revision);
     expect(records.deleteExpired(retention).deleted).toEqual([]);
     records.recordPublicationOutcome(work.workId, plan.planId, claim.plan.revision, 'create-build', claim.claimToken, {
@@ -656,7 +746,9 @@ it('retains recovery evidence and deletes terminal journals together with their 
     });
     expect(records.deleteExpired(retention)).toEqual({ deleted: [work.workId], kept: [] });
     expect(records.list({})).toEqual([]);
+
     const reopened = await open(path);
+
     expect(reopened.list({})).toEqual([]);
 });
 
@@ -665,6 +757,7 @@ it('invalidates dispatch when a different ticket is attached outside the journal
     const work = await passingBuild(records);
     const input = proposal(records, work.workId);
     const plan = approve(records, work.workId, input);
+
     records.attachTicket(work.workId, work.revision, 'team/app#15');
     expect(records.pendingPublication(work.workId, plan.planId).current).toBe(false);
     expect(() =>
@@ -683,7 +776,9 @@ it('never recreates a completed ticket after multiple replacement plans', async 
     const records = await open();
     const work = await passingBuild(records);
     const input = proposal(records, work.workId);
+
     input.operations = input.operations.slice(0, 1);
+
     const first = approve(records, work.workId, input);
     const claim = records.claimPublication(
         work.workId,
@@ -693,6 +788,7 @@ it('never recreates a completed ticket after multiple replacement plans', async 
         { tickets: input.tickets, operations: input.operations },
         'board',
     );
+
     records.recordPublicationOutcome(work.workId, first.planId, claim.plan.revision, 'create-build', claim.claimToken, {
         status: 'successful',
         evidence: 'Created.',
@@ -700,12 +796,16 @@ it('never recreates a completed ticket after multiple replacement plans', async 
         url: 'https://example.test/issues/12',
         location: { kind: 'body', start: 0, end: 28 },
     });
+
     const secondInput = structuredClone(input);
+
     secondInput.replaces = first.planId;
     secondInput.tickets[0]!.destination.ticket = 'team/app#12';
     secondInput.tickets[0]!.destination.url = 'https://example.test/issues/12';
     secondInput.operations = [];
+
     const second = approve(records, work.workId, secondInput);
+
     expect(() => records.proposePublication(work.workId, work.revision, { ...input, replaces: second.planId })).toThrow(
         /completed|known/,
     );
@@ -716,12 +816,15 @@ it('journals ordered concept creation, native relationships, approved textual fa
     const records = await open();
     let concept = records.create({ title: 'Search', repository: 'team/app', kind: 'concept' });
     let build = await passingBuild(records);
+
     build = records.setParent(build.workId, build.revision, concept.workId);
     build = records.setPullRequest(build.workId, build.revision, 'team/app#99');
     concept = records.read(concept.workId);
     concept = records.setBody(concept.workId, concept.revision, 'map', 'Ship search by name.');
     concept = records.setFogGone(concept.workId, concept.revision, true);
+
     const input = proposal(records, concept.workId);
+
     input.tickets[0]!.vocabulary = {
         concept: { type: 'Epic', labels: ['Search'] },
         feature: { type: 'Feature', labels: ['Product'] },
@@ -740,11 +843,15 @@ it('journals ordered concept creation, native relationships, approved textual fa
             dependsOn: ['parent', 'build'],
         },
     ];
+
     const invalid = structuredClone(input);
+
     invalid.operations = [input.operations[1]!, input.operations[0]!];
     expect(() => records.proposePublication(concept.workId, concept.revision, invalid)).toThrow(/earlier operations/);
+
     let plan = approve(records, concept.workId, input);
     const content = { tickets: input.tickets, operations: input.operations };
+
     for (const [operationId, ticketNumber] of [
         ['parent', '12'],
         ['build', '13'],
@@ -757,6 +864,7 @@ it('journals ordered concept creation, native relationships, approved textual fa
             content,
             'board',
         );
+
         expect(claim.operation.operationId).toBe(operationId);
         plan = records.recordPublicationOutcome(
             concept.workId,
@@ -773,12 +881,16 @@ it('journals ordered concept creation, native relationships, approved textual fa
             },
         );
     }
+
     const link = records.claimPublication(concept.workId, plan.planId, plan.revision, plan.digest, content, 'board');
+
     plan = records.recordPublicationOutcome(concept.workId, plan.planId, link.plan.revision, 'child', link.claimToken, {
         status: 'failed',
         evidence: 'Native relationship refused.',
     });
+
     const fallback = structuredClone(input);
+
     fallback.replaces = plan.planId;
     fallback.tickets[0]!.destination = {
         provider: 'github',
@@ -829,6 +941,7 @@ it('journals ordered concept creation, native relationships, approved textual fa
             { tickets: fallback.tickets, operations: fallback.operations },
             'board',
         );
+
         expect(claim.operation.operationId).toBe(operationId);
         plan = records.recordPublicationOutcome(
             concept.workId,
@@ -868,8 +981,11 @@ it('journals ordered concept creation, native relationships, approved textual fa
 it('replaces a published comment at its approved location and rejects a changed delivery PR', async () => {
     const records = await open();
     let work = await passingBuild(records);
+
     work = records.setPullRequest(work.workId, work.revision, 'team/app#99');
+
     const input = proposal(records, work.workId);
+
     input.tickets[0]!.destination = {
         provider: 'github',
         repository: 'team/app',
@@ -895,6 +1011,7 @@ it('replaces a published comment at its approved location and rejects a changed 
             content: 'Closes team/app#12',
         },
     ];
+
     const plan = approve(records, work.workId, input);
     const claim = records.claimPublication(
         work.workId,
@@ -904,6 +1021,7 @@ it('replaces a published comment at its approved location and rejects a changed 
         { tickets: input.tickets, operations: input.operations },
         'board',
     );
+
     expect(() =>
         records.recordPublicationOutcome(
             work.workId,
@@ -918,6 +1036,7 @@ it('replaces a published comment at its approved location and rejects a changed 
             },
         ),
     ).toThrow(/approved comment location/);
+
     const updated = records.recordPublicationOutcome(
         work.workId,
         plan.planId,
@@ -930,6 +1049,7 @@ it('replaces a published comment at its approved location and rejects a changed 
             location: { kind: 'comment', commentId: 'refinement' },
         },
     );
+
     expect(records.lastPublished(work.workId)).toMatchObject([
         { text: 'Refined search', location: { kind: 'comment', commentId: 'refinement' } },
     ]);
@@ -954,14 +1074,19 @@ it('claims a shared build creation only once across a concept plan and a standal
     const records = await open();
     let concept = records.create({ title: 'Search', repository: 'team/app', kind: 'concept' });
     let build = await passingBuild(records);
+
     build = records.setParent(build.workId, build.revision, concept.workId);
     concept = records.read(concept.workId);
     concept = records.setBody(concept.workId, concept.revision, 'map', 'Search by name.');
     concept = records.setFogGone(concept.workId, concept.revision, true);
+
     const standaloneInput = proposal(records, build.workId);
+
     standaloneInput.operations = standaloneInput.operations.slice(0, 1);
+
     const standalone = approve(records, build.workId, standaloneInput);
     const conceptInput = proposal(records, concept.workId);
+
     conceptInput.tickets[0]!.destination = {
         provider: 'github',
         repository: 'team/app',
@@ -972,6 +1097,7 @@ it('claims a shared build creation only once across a concept plan and a standal
     conceptInput.operations = [
         { kind: 'create', operationId: 'shared-build', ticketWorkId: build.workId, dependsOn: [] },
     ];
+
     const parent = approve(records, concept.workId, conceptInput);
     const first = records.claimPublication(
         build.workId,
@@ -981,6 +1107,7 @@ it('claims a shared build creation only once across a concept plan and a standal
         { tickets: standaloneInput.tickets, operations: standaloneInput.operations },
         'cli',
     );
+
     expect(() =>
         records.claimPublication(
             concept.workId,
@@ -1013,10 +1140,13 @@ it('projects publication eligibility and existence without loading plans or sour
     const records = await open();
     const build = await passingBuild(records);
     const concept = records.create({ title: 'Search', repository: 'team/app', kind: 'concept' });
+
     records.setParent(build.workId, build.revision, concept.workId);
     records.setBody(concept.workId, records.read(concept.workId).revision, 'map', 'Destination.');
     records.setFogGone(concept.workId, records.read(concept.workId).revision, true);
+
     const projected = records.publicationSummaries();
+
     expect(projected.get(build.workId)).toEqual({ eligible: true, reasons: [] });
     expect(projected.get(concept.workId)).toEqual({ eligible: true, reasons: [] });
     records.setBody(build.workId, records.read(build.workId).revision, 'brief', 'Changed brief.');
@@ -1034,6 +1164,7 @@ it('keeps projection query cost constant as briefs and publication history grow'
     const path = join(tempDir(), 'records.db');
     const records = await open(path);
     const database = await openDatabase(path);
+
     try {
         const queries: string[] = [];
         const measured = publicationRecords(
@@ -1044,8 +1175,10 @@ it('keeps projection query cost constant as briefs and publication history grow'
                         if (key === 'prepare')
                             return (sql: string) => {
                                 queries.push(sql);
+
                                 return target.prepare(sql);
                             };
+
                         return Reflect.get(target, key);
                     },
                 }),
@@ -1054,9 +1187,12 @@ it('keeps projection query cost constant as briefs and publication history grow'
             () => {},
         );
         const build = await passingBuild(records);
+
         measured.publicationSummaries();
+
         const smallQueries = queries.splice(0).length;
         let previous: string | undefined;
+
         for (let i = 0; i < 20; i++) {
             const plan = records.proposePublication(build.workId, records.read(build.workId).revision, {
                 ...proposal(records, build.workId),
@@ -1068,13 +1204,17 @@ it('keeps projection query cost constant as briefs and publication history grow'
                     },
                 ],
             });
+
             previous = plan.planId;
         }
         for (let i = 0; i < 30; i++) {
             const work = records.create({ title: 'Another search', repository: 'team/app', kind: 'build' });
+
             records.setBody(work.workId, work.revision, 'brief', 'Private source text. '.repeat(10_000));
         }
+
         const summary = measured.publicationSummaries();
+
         expect(summary.get(build.workId)).toEqual({ eligible: true, reasons: [], recoverable: true });
         expect(summary.size).toBe(31);
         expect(queries.length).toBeLessThanOrEqual(3);
@@ -1093,6 +1233,7 @@ it('backfills lightweight eligibility from existing briefs and exact gate eviden
     // The schema before the backfill, the seventh step.
     const old = await openDatabase(path, { migrations: MIGRATIONS.slice(0, 6) });
     const briefDigest = createHash('sha256').update(JSON.stringify('Known brief.')).digest('hex');
+
     for (const [id, brief] of [
         ['passed', 'Known brief.'],
         ['changed', 'Changed brief.'],
@@ -1112,7 +1253,9 @@ it('backfills lightweight eligibility from existing briefs and exact gate eviden
             .run(id!, id!, briefDigest, 'person', 'Passed.', '');
     }
     old.close();
+
     const records = await open(path);
+
     expect(records.publicationSummaries().get('passed')).toEqual({ eligible: true, reasons: [] });
     expect(records.publicationSummaries().get('changed')).toEqual({
         eligible: false,

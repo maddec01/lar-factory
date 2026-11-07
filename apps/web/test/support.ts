@@ -30,6 +30,7 @@ export const recorded = (items: Item[]): Item[] =>
             items.find((p) => item.parent && p.number === item.parent.number && p.repo === item.parent.repo)?.id ??
             null,
     }));
+
 /** The details sample mode serves, by item id. */
 const sampleDetails = sampleDetailsJson as unknown as Record<string, ItemDetails>;
 /** The details of an item the sample holds none for. */
@@ -51,9 +52,11 @@ export const detailsRead = (url: string): string | null =>
 /** The board's answer to the read of `itemId`'s details: the sample's, or none. */
 export const detailsReply = (itemId: string): Response =>
     new Response(JSON.stringify({ details: sampleDetails[itemId] ?? noDetails }));
+
 /** The board's answer to a read the page makes without a test's say: the item's details, else the sample board. */
 const answerRead = (url: string): Response => {
     const itemId = detailsRead(url);
+
     return itemId ? detailsReply(itemId) : new Response(JSON.stringify(sample));
 };
 
@@ -118,6 +121,7 @@ const pageListeners: [
 beforeEach(() => {
     for (const target of new Set<EventTarget>([globalThis, window, document])) {
         const add = target.addEventListener.bind(target);
+
         vi.spyOn(target, 'addEventListener').mockImplementation((type, listener, options) => {
             pageListeners.push([target, type, listener, options]);
             add(type, listener, options);
@@ -160,7 +164,9 @@ afterEach(() => {
 /** Serves the page with `data` at `hash` and `search`, then runs its entry until the first paint. */
 export async function mountPage(data: BoardData = sample, hash = '', search = ''): Promise<void> {
     history.replaceState(null, '', `/${search}${hash}`);
+
     const html = pageWithData(template, data);
+
     document.documentElement.innerHTML = new DOMParser().parseFromString(html, 'text/html').documentElement.innerHTML;
     await act(async () => {
         await import('../src/main.tsx');
@@ -191,6 +197,7 @@ export async function openOptions(trigger: Element): Promise<string[]> {
         trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })),
     );
     await settle(() => vi.advanceTimersByTime(50));
+
     return $$('[role="option"]').map(textBesideIcon);
 }
 
@@ -214,7 +221,9 @@ export const text = (el: Element | null | undefined) => el?.textContent ?? '';
 /** An element's text without its project icon's initial or monogram, which screen readers skip. */
 export const textBesideIcon = (el: Element | null | undefined) => {
     const copy = el?.cloneNode(true) as Element | undefined;
+
     copy?.querySelectorAll('[data-project-icon]').forEach((icon) => icon.remove());
+
     return text(copy);
 };
 /** A warning's title and description. */
@@ -234,12 +243,16 @@ export const moved = (id: string, status: Status, data: BoardData = sample): Boa
 });
 
 let answerPost: ((body: object, status?: number) => Promise<void>) | undefined;
+
 /** Makes each POST wait until the test answers it, so the pending state can be seen; a board read gets `board`. */
 export function holdPosts(board: BoardData = sample): void {
     fetchMock.mockImplementation(async (url: string) => {
         if (url === '/api/board') return new Response(JSON.stringify(board));
+
         const itemId = detailsRead(url);
+
         if (itemId) return detailsReply(itemId);
+
         return new Promise<Response>((resolve) => {
             answerPost = (body, status = 200) => settle(() => resolve(new Response(JSON.stringify(body), { status })));
         });
@@ -253,6 +266,7 @@ export const posted = () =>
         .filter(([url]) => url !== '/api/board' && !detailsRead(url))
         .map((call) => {
             const [url, init] = call as unknown as [string, RequestInit | undefined];
+
             return [url, init?.body && JSON.parse(init.body as string)];
         });
 
@@ -296,7 +310,9 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
         confirmRestart: unused,
         ...parts,
     };
+
     vi.stubGlobal('boardApp', bridge);
+
     return bridge;
 }
 
@@ -307,6 +323,7 @@ export function fullScreen(on: boolean) {
         getWindowFullscreenState: () => on,
         onWindowFullscreenStateChange: (listener) => {
             listeners.add(listener);
+
             return () => listeners.delete(listener);
         },
     };
@@ -315,6 +332,7 @@ export function fullScreen(on: boolean) {
             on = next;
             listeners.forEach((listener) => listener(next));
         });
+
     return { bridge, set };
 }
 
@@ -331,12 +349,15 @@ const pageCss = () =>
 export function addStylesheet(): { noDrag: (el: Element) => boolean } {
     const css = pageCss();
     const style = document.createElement('style');
+
     style.textContent = css;
     document.head.append(style);
+
     const all = css + readFileSync(join(import.meta.dirname, '../../../packages/ui/src/styles.css'), 'utf8');
     const selectors = [...all.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) =>
         rule[1]!.replace(/\/\*[^]*?\*\//g, ''),
     );
+
     return {
         noDrag: (el) =>
             el.classList.contains('[-webkit-app-region:no-drag]') || selectors.some((selector) => el.matches(selector)),

@@ -95,11 +95,13 @@ const endMarker = (name: string) => `__T3CODE_ENV_${name}_END__`;
 /** A command for `<shell> -ilc` that prints each variable between its markers. */
 const buildEnvironmentCaptureCommand = (shell: string, names: ReadonlyArray<string>): string => {
     const isNushell = NodePath.basename(shell).toLowerCase().startsWith('nu');
+
     return names
         .map((name) => {
             if (!SHELL_ENV_NAME_PATTERN.test(name)) {
                 throw new Error(`Unsupported environment variable name: ${name}`);
             }
+
             if (isNushell) {
                 // Without a configured conversion, Nu expands home paths only in a list PATH.
                 const defaultValue =
@@ -114,8 +116,10 @@ const buildEnvironmentCaptureCommand = (shell: string, names: ReadonlyArray<stri
                     `$env.ENV_CONVERSIONS?.${name}?.to_string? != null { ` +
                     `$env.${name} | do $env.ENV_CONVERSIONS.${name}.to_string $env.${name} ` +
                     `} else { ${defaultValue} }`;
+
                 return [`print '${startMarker(name)}'`, `print (${value})`, `print '${endMarker(name)}'`].join('; ');
             }
+
             return [
                 `printf '%s\\n' '${startMarker(name)}'`,
                 `printenv ${name} || true`,
@@ -127,18 +131,25 @@ const buildEnvironmentCaptureCommand = (shell: string, names: ReadonlyArray<stri
 
 const extractEnvironment = (output: string, names: ReadonlyArray<string>): Record<string, string> => {
     const environment: Record<string, string> = {};
+
     for (const name of names) {
         const start = output.indexOf(startMarker(name));
+
         if (start === -1) continue;
+
         const valueStart = start + startMarker(name).length;
         const end = output.indexOf(endMarker(name), valueStart);
+
         if (end === -1) continue;
+
         const value = output
             .slice(valueStart, end)
             .replace(/^\r?\n/, '')
             .replace(/\r?\n$/, '');
+
         if (value.length > 0) environment[name] = value;
     }
+
     return environment;
 };
 
@@ -160,6 +171,7 @@ const runCommandOutput = (input: {
                 forceKillAfter: PROCESS_TERMINATE_GRACE,
             }),
         );
+
         return yield* Effect.all([Stream.mkString(Stream.decodeText(child.stdout)), child.exitCode], {
             concurrency: 2,
         });
@@ -206,13 +218,17 @@ export const childEnvironment = Effect.fn('ShellEnvironment.childEnvironment')(f
     userShell: string | undefined = readUserLoginShell(),
 ): Effect.fn.Return<Environment, never, ChildProcessSpawner.ChildProcessSpawner> {
     const shellEnvironment: Record<string, string> = {};
+
     for (const shell of listLoginShellCandidates(env.SHELL, userShell)) {
         Object.assign(shellEnvironment, yield* readLoginShellEnvironment(shell));
+
         if (shellEnvironment.PATH) break;
     }
+
     const loginPath = trimNonEmpty(shellEnvironment.PATH) ?? (yield* readLaunchctlPath);
 
     const result: Environment = { ...env, PATH: mergePaths([loginPath, env.PATH, ...HOMEBREW_DIRS]) };
+
     for (const name of SHELL_PREFERRED_ENV_NAMES) {
         if (shellEnvironment[name]) result[name] = shellEnvironment[name];
     }
@@ -225,13 +241,16 @@ export const childEnvironment = Effect.fn('ShellEnvironment.childEnvironment')(f
     if (LOCALE_ENV_NAMES.every((name) => !trimNonEmpty(result[name]))) {
         for (const name of LOCALE_ENV_NAMES) {
             const value = trimNonEmpty(shellEnvironment[name]);
+
             if (value) result[name] = value;
         }
+
         // A Finder launch inherits no locale, so children land in the C locale. Set only
         // LC_CTYPE to a UTF-8 locale every supported macOS has, keeping C collation.
         if (LOCALE_ENV_NAMES.every((name) => !trimNonEmpty(result[name]))) {
             result.LC_CTYPE = FALLBACK_LC_CTYPE;
         }
     }
+
     return result;
 });

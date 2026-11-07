@@ -7,12 +7,15 @@ import { $, fetchMock, mountPage, settle, stubApp } from '../test/support.ts';
 
 const secretOfLastPost = () => {
     const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
+
     return new Headers(init.headers).get('X-Board-Secret');
 };
 
 async function queueFirstItem(): Promise<void> {
     await mountPage();
+
     const { useItemDialogStore } = await import('./item-dialog/item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open('I_sample01'));
     await settle(() => $<HTMLButtonElement>('[data-item-dialog] [data-queue="I_sample01"]')!.click());
 }

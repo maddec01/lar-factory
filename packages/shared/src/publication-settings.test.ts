@@ -41,6 +41,7 @@ for (const repo of ['org/repo', 'org/project/repo']) {
                 throw new Error(`HTTP ${status}: ${status === 501 ? 'Not implemented' : 'Access denied'}`);
             };
             const result = await discoverVocabulary(repo, { github: fail, azure: fail });
+
             expect(result.types.state).toBe(state);
             expect(result.labels.state).toBe(state);
             expect(result.types).toHaveProperty('reason');
@@ -54,10 +55,13 @@ test('personal GitHub repositories have no issue types, without disguising a ref
         ...available,
         github: async (path) => {
             paths.push(path);
+
             if (path.includes('/labels')) throw new Error('HTTP 403: Labels denied');
+
             return { owner: { type: 'User' } };
         },
     });
+
     expect(result.types.state).toBe('unsupported');
     expect(result.labels).toEqual({ state: 'refused', reason: 'HTTP 403: Labels denied' });
     expect(paths.some((p) => p.endsWith('issue-types'))).toBe(false);
@@ -70,14 +74,21 @@ test('the command reads the board settings while it is closed and detects mappin
     const { writeListFile, setVocabularyOverride, setOverride } = await import('./repository-settings.ts');
     const { readPublicationSettings } = await import('./publication-settings.ts');
     const dir = await mkdtemp(join(tmpdir(), 'publication settings '));
+
     t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
     const repo = 'org/project/repo';
+
     writeListFile(dir, { repositories: [{ repo }] });
     setVocabularyOverride(repo, 'build', { type: 'User Story', labels: ['backend'] }, dir);
+
     const first = await readPublicationSettings(repo, { dir, reads: available });
+
     expect(first.setup.vocabularySources.build).toBe('local');
     setVocabularyOverride(repo, 'build', { type: null, labels: [] }, dir);
+
     const local = await readPublicationSettings(repo, { dir, reads: available });
+
     expect(local.setup.vocabulary.build).toEqual({ type: null, labels: [] });
     expect(local.setup.vocabularySources.build).toBe('local');
     expect(local.snapshot).not.toBe(first.snapshot);
@@ -100,6 +111,7 @@ test('Azure excludes disabled work item types and reads the documented tags enve
                   }
                 : [{ count: 1, value: [{ name: 'backend' }] }],
     });
+
     expect(found.types).toEqual({ state: 'available', choices: ['Bug'] });
     expect(found.labels).toEqual({ state: 'available', choices: ['backend'] });
 });
@@ -111,14 +123,17 @@ test('Azure metadata uses the extension login and only a GET, including encoded 
         expect(args).toContain('project=Team Project');
         expect(args[args.indexOf('--http-method') + 1]).toBe('GET');
         expect(args[args.indexOf('--org') + 1]).toBe('https://dev.azure.com/org');
+
         return JSON.stringify({ value: [{ name: 'backend' }] });
     });
+
     expect(found).toEqual({ value: [{ name: 'backend' }] });
 });
 
 // Repository write defaults reject malformed values at the settings boundary.
 test('issue defaults require boolean values', async () => {
     const { validateRepositorySettings } = await import('./repository-settings.ts');
+
     expect(validateRepositorySettings({ createIssuesFromAddItem: 'yes' }, false)).toBe(
         'field createIssuesFromAddItem must be a boolean',
     );
@@ -133,11 +148,14 @@ test('legacy settings load default preferences and private domain docs as off', 
         await import('./repository-settings.ts');
     const { effectiveIssueSettings } = await import('./write-access.ts');
     const dir = mkdtempSync(join(tmpdir(), 'issue-defaults-'));
+
     t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
     writeListFile(dir, {
         repositories: [{ repo: 'org/repo', settings: { overrides: { domainDocs: { kind: 'private' } } } }],
     });
+
     const read = () => readRepositorySetups(dir)[0]!;
+
     expect(read()).toMatchObject({
         domainDocs: { kind: 'off' },
         createIssuesFromAddItem: true,
@@ -180,8 +198,10 @@ test('explicit label creation requires verified access and reuses existing label
     const created: string[] = [];
     const create = async (_repo: string, name: string) => {
         created.push(name);
+
         return name;
     };
+
     await expect(saveVocabularyLabels('org/repo', ['new'], discovery, {}, create)).rejects.toThrow();
     expect(created).toEqual([]);
     await expect(
@@ -200,6 +220,7 @@ test('an upgraded setup, with label management not checked, still saves names th
     const create = async () => {
         throw new Error('nothing to create');
     };
+
     expect(await saveVocabularyLabels('org/repo', [' BACKEND '], discovery, {}, create)).toEqual(['backend']);
 });
 
@@ -210,6 +231,7 @@ test('Azure refuses a new tag with the reason it has no create, even with access
     const create = async () => {
         throw new Error('nothing to create');
     };
+
     await expect(
         saveVocabularyLabels(repo, ['new'], discovery, { 'manage-labels': 'allowed' }, create),
     ).rejects.toThrow('Azure DevOps has no way to create a tag on its own.');
@@ -221,12 +243,16 @@ for (const repo of ['org/project/repo', 'another-org/Project%20Name/repository']
         const { saveVocabularyLabels } = await import('./publication-settings.ts');
         const discovery = await discoverVocabulary(repo, available);
         const previous = process.env.LAR_FACTORY_AZURE_READ_ONLY;
+
         process.env.LAR_FACTORY_AZURE_READ_ONLY = '1';
+
         let calls = 0;
+
         try {
             await expect(
                 saveVocabularyLabels(repo, ['new'], discovery, { 'manage-labels': 'allowed' }, async () => {
                     calls++;
+
                     return 'new';
                 }),
             ).rejects.toThrow('Azure DevOps is read-only in this test session.');
@@ -253,6 +279,7 @@ test('Add item options use provider choices, keep optional values empty and tole
             azureOptions: async () => [],
         },
     );
+
     expect(options).toEqual({
         provider: 'github',
         labels: ['backend'],
@@ -262,6 +289,7 @@ test('Add item options use provider choices, keep optional values empty and tole
         iterations: [],
         problems: [],
     });
+
     const coloured = await discoverTicketOptions(
         { repo: 'org/repo', labels: [], role: '' },
         {
@@ -273,8 +301,11 @@ test('Add item options use provider choices, keep optional values empty and tole
                     : available.github(path),
         },
     );
+
     expect(coloured.labelColors).toEqual({ backend: 'B60205' });
+
     const labelReads: string[] = [];
+
     await discoverTicketOptions(
         { repo: 'org/repo', labels: [], role: '' },
         {
@@ -282,11 +313,13 @@ test('Add item options use provider choices, keep optional values empty and tole
             azureOptions: async () => [],
             github: async (path) => {
                 if (path.includes('/labels')) labelReads.push(path);
+
                 return path.includes('/labels') ? [[{ name: 'backend', color: 'B60205' }]] : available.github(path);
             },
         },
     );
     expect(labelReads, 'the colours come from the read that lists the labels').toHaveLength(1);
+
     const refused = await discoverTicketOptions(
         { repo: 'org/project/repo', team: 'Team', labels: [], role: '' },
         {
@@ -299,6 +332,7 @@ test('Add item options use provider choices, keep optional values empty and tole
             },
         },
     );
+
     expect(refused.types).toEqual([]);
     expect(refused.problems.length).toBeGreaterThan(0);
 });

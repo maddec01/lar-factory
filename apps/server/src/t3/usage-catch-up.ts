@@ -62,6 +62,7 @@ function pathLine(trace: ReadTrace, { parsed, transcripts }: StatsRead): string 
     const { inputs, discovery, warm, dedup, aggregation, publish } = trace.steps;
     const ms = (value: number) => Math.round(value);
     const longest = trace.longestBlock();
+
     return `stats read path took ${ms(trace.elapsedMs())} ms elapsed, ${ms(trace.cpuMs())} ms CPU: inputs ${ms(inputs.elapsedMs)} ms, discovery ${ms(discovery.elapsedMs)} ms, warm ${ms(warm.elapsedMs)} ms (parsed ${parsed} of ${transcripts} transcripts), dedup ${ms(dedup.elapsedMs)} ms, aggregation ${ms(aggregation.elapsedMs)} ms, publish ${ms(publish.elapsedMs)} ms; longest block ${ms(longest.ms)} ms in ${longest.step}`;
 }
 
@@ -109,6 +110,7 @@ export function createUsageCatchUp({
     /** Whether the threads of the items on the board are still those a read began with. A read counts its own threads alone, so any other moves shared records between items. */
     const sameThreads = (standing: ThreadReads) => {
         const now = protocolThreadReads(threadIds());
+
         return (
             !!now &&
             now.reads.size === standing.reads.size &&
@@ -122,26 +124,38 @@ export function createUsageCatchUp({
         wanted = false;
         urgentRunning = urgent;
         urgent = false;
+
         const startedIn = generation();
         const trace = newTrace();
+
         try {
             const reads = await readT3Stats(sources, { now: Date.now(), threadIds: ids, items: itemThreads(), trace });
+
             if (generation() !== startedIn) {
                 wanted = true;
                 followUp = true;
+
                 return;
             }
+
             trace.step('publish');
             urgentRunning = false;
+
             const same = sameThreads(standing);
+
             // Figures that may hold another item's records stay provisional, so they reach no retained total or PR block.
             publish(same ? reads : { ...reads, allObserved: false });
+
             if (!same) wanted = true;
+
             trace.finish();
+
             const { warm, dedup, aggregation, publish: shown } = trace.steps;
+
             // An outage retries for as long as it lasts, and its first line says enough.
             if (!finished && (!unreadable || !reads.statsUnavailable)) {
                 const ms = Math.round;
+
                 timed(
                     `stats read took ${ms(dedup.elapsedMs + aggregation.elapsedMs + shown.elapsedMs)} ms elapsed, ${ms(dedup.cpuMs + aggregation.cpuMs + shown.cpuMs)} ms CPU, after warming ${reads.parsed} transcripts in ${ms(warm.elapsedMs)} ms, longest ${ms(warm.longestBlockMs)} ms`,
                 );
@@ -156,8 +170,11 @@ export function createUsageCatchUp({
                 ordinaryLogged = true;
                 log(pathLine(trace, reads));
             }
+
             unreadable = reads.statsUnavailable;
+
             if (unreadable) return;
+
             readAfterSettle = settled();
             for (const [id, read] of standing.reads) if (read !== 'never') warmed.set(id, standing.observed.has(id));
         } finally {
@@ -170,40 +187,58 @@ export function createUsageCatchUp({
 
     const advance = async (mayRead = true): Promise<void> => {
         if (Date.now() < quietUntil) return;
+
         const ids = threadIds();
         const standing = protocolThreadReads(ids);
+
         if (!standing || (!ids.length && !settled())) return;
+
         if (!started) {
             started = true;
             timed('warmup started');
         }
+
         const reading = unread(standing);
         const unwarmedReads = unwarmed(standing);
+
         // retryAt holds a failing thread back from each demand, and nothing here asks again before the next tick.
         if (reading || unwarmedReads) standing.demand();
+
         if (!reading && !readsLogged) {
             readsLogged = true;
+
             const reads = [...standing.reads.values()];
             const failed = reads.filter((read) => read === 'failed').length;
+
             timed(`thread reads complete (read ${reads.length - failed}, failed ${failed}, total ${reads.length})`);
         }
+
         if (warming) {
             followUp = true;
+
             return;
         }
+
         if (!ids.length) wanted = urgent = false;
+
         const needsRead = unwarmedReads || wanted || (!!ids.length && settled() && !readAfterSettle);
+
         if (needsRead && mayRead && (urgent || sinceStatsRead() >= paceMs())) {
             await readStats(ids, standing);
+
             const again = followUp;
+
             followUp = false;
+
             return advance(again);
         }
+
         if (!finished && settled() && (unreadable || (!reading && !needsRead))) {
             finished = true;
             timed('every item settled');
             caughtUp();
         }
+
         if (finished && !reading && !needsRead) quietUntil = Date.now() + quietMs;
     };
 
@@ -212,9 +247,11 @@ export function createUsageCatchUp({
         advance: () => nextTurn().then(() => loopTrace.span('usage catch-up', () => advance())),
         want(urgently = false) {
             if (!finished) return Promise.resolve();
+
             wanted = true;
             urgent ||= urgently;
             quietUntil = 0;
+
             return nextTurn().then(() => loopTrace.span('usage catch-up', () => advance()));
         },
         reading: () => warming,

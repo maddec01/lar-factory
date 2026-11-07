@@ -62,6 +62,7 @@ export async function readAzureReadiness(
         );
     const head = async () => {
         const pr = await call('git', 'pullRequests');
+
         if (
             !object(pr) ||
             !object(pr.lastMergeSourceCommit) ||
@@ -72,12 +73,16 @@ export async function readAzureReadiness(
             typeof pr.repository.project.id !== 'string'
         )
             return malformed();
+
         return { revision: pr.lastMergeSourceCommit.commitId, projectId: pr.repository.project.id };
     };
+
     try {
         if (!Number.isSafeInteger(pullRequestId) || pullRequestId <= 0) throw new Error('Invalid pull request id');
+
         const before = await head();
         const policies: Policy[] = [];
+
         for (;;) {
             const page = list(
                 await call('policy', 'evaluations', [
@@ -87,6 +92,7 @@ export async function readAzureReadiness(
                     `$skip=${policies.length}`,
                 ]),
             );
+
             for (const p of page) {
                 if (
                     !object(p) ||
@@ -97,12 +103,16 @@ export async function readAzureReadiness(
                     typeof p.configuration.isEnabled !== 'boolean'
                 )
                     return malformed();
+
                 if (policies.some((old) => old.evaluationId === p.evaluationId))
                     throw new Error('Azure repeated a policy page');
+
                 policies.push(p as unknown as Policy);
             }
+
             if (page.length < 100) break;
         }
+
         const statuses = list(await call('git', 'pullRequestStatuses')).map((s) => {
             if (
                 !object(s) ||
@@ -113,6 +123,7 @@ export async function readAzureReadiness(
                 (s.iterationId !== undefined && typeof s.iterationId !== 'number')
             )
                 return malformed();
+
             // Azure omits state for unset statuses. Keep them as blockers instead of discarding all evidence.
             return { ...s, state: s.state ?? 'notSet' } as unknown as PrStatus;
         });
@@ -124,11 +135,14 @@ export async function readAzureReadiness(
                 (r.isRequired !== undefined && typeof r.isRequired !== 'boolean')
             )
                 return malformed();
+
             return r as unknown as Reviewer;
         });
         const after = await head();
+
         if (before.revision !== after.revision)
             return { available: false, reason: 'PR source revision changed while reading evidence' };
+
         const blockers = policies
             .filter(
                 (p) =>
@@ -137,12 +151,14 @@ export async function readAzureReadiness(
                     !['approved', 'notApplicable'].includes(p.status),
             )
             .map((p) => `policy:${p.evaluationId}:${p.status}`);
+
         for (const r of reviewers)
             if (r.vote < 0 || (r.isRequired && ![5, 10].includes(r.vote)) || ![-10, -5, 0, 5, 10].includes(r.vote))
                 blockers.push(`reviewer:${r.id}:${r.vote}`);
         for (const s of statuses)
             if (!['succeeded', 'notApplicable'].includes(s.state))
                 blockers.push(`status:${s.context.genre ?? ''}/${s.context.name}:${s.state}`);
+
         return {
             available: true,
             observedAt: new Date().toISOString(),
@@ -154,6 +170,7 @@ export async function readAzureReadiness(
         };
     } catch (error) {
         const problem = problemOf(error);
+
         return { available: false, reason: problem instanceof Error ? problem.message : String(problem) };
     }
 }

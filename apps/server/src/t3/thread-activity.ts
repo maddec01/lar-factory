@@ -30,8 +30,10 @@ function commandAction(input: string): string {
     const wrapped = /^\S*\b(?:ba|z|da)?sh\s+-l?c\s+(['"])([\s\S]*)\1\s*$/.exec(input.trim());
     const command = wrapped ? (wrapped[1] === '"' ? wrapped[2]!.replace(/\\(["\\$`])/g, '$1') : wrapped[2]!) : input;
     let rest = command.trimStart();
+
     for (;;) {
         const exporting = /^export\s+/.exec(rest);
+
         if (exporting) {
             rest = rest.slice(exporting[0].length);
             // An `export` runs to the end of its statement, naming variables with or without values.
@@ -43,12 +45,17 @@ function commandAction(input: string): string {
                 rest = rest.slice(name[0].length).replace(/^[ \t]+/, '');
         } else {
             const assignment = ASSIGNMENT.exec(rest);
+
             if (!assignment) break;
+
             rest = rest.slice(assignment[0].length).replace(/^[ \t]+/, '');
         }
+
         rest = rest.replace(SEPARATOR, '');
     }
+
     const line = (rest || command).trim().split('\n')[0]!;
+
     return line.length > MAX_ACTION ? `${line.slice(0, MAX_ACTION - 1)}…` : line;
 }
 
@@ -56,8 +63,10 @@ function commandAction(input: string): string {
 function toolAction({ title, toolName }: ActivityItemRow): string | undefined {
     if (title) {
         const path = /^(\w+) ((?:[~/]|\S+\/).*)$/.exec(title);
+
         return path ? `${path[1]} ${lastSegment(path[2]!)}` : title;
     }
+
     return toolName?.split(/__|\./).pop();
 }
 
@@ -102,6 +111,7 @@ function actionFrom(
     const shown = items.filter((item) => !current || item.runLive !== 0);
     const newestFirst = shown.filter((item) => timeOf(item)).sort((a, b) => timeOf(b)!.localeCompare(timeOf(a)!));
     const action = newestFirst.map((item) => actionOf(underWay(item) ? item : { ...item, streaming: 0 })).find(Boolean);
+
     return {
         ...(action ? { action } : {}),
         ...(newestFirst[0] ? { actionAt: timeOf(newestFirst[0]) } : {}),
@@ -134,7 +144,9 @@ export function threadActivity({ items, runLive, agents, commandRunning, readAt 
     let anyTool = toolRunning || commandRunning;
     const working = agents.map(({ row, items: agentItems }): ThreadAgent => {
         const { toolRunning: agentTool, action, actionAt } = actionFrom(agentItems, true);
+
         anyTool ||= agentTool;
+
         return {
             title: agentTitle(row.title),
             ...(row.model ? { model: row.model } : {}),
@@ -142,6 +154,7 @@ export function threadActivity({ items, runLive, agents, commandRunning, readAt 
             ...((actionAt ?? row.startedAt) ? { actionAt: (actionAt ?? row.startedAt)! } : {}),
         };
     });
+
     return { available: true, readAt, ...own, toolRunning: anyTool, agents: working };
 }
 
@@ -156,7 +169,9 @@ export function withoutReadTimes(items: Item[]): Item[] {
                   ...item,
                   threads: item.threads.map((thread) => {
                       if (!thread.activity?.available) return thread;
+
                       const { readAt: _, ...activity } = thread.activity;
+
                       return { ...thread, activity };
                   }) as Item['threads'],
               },
@@ -184,28 +199,36 @@ export function activityReads(
     const agentsRead = new Map<string, ActivityAgentRow[]>();
     const once = <T>(reads: Map<string, T>, threadId: string, readRows: () => T): T => {
         if (!reads.has(threadId)) reads.set(threadId, readRows());
+
         return reads.get(threadId)!;
     };
 
     const readThread = (thread: ItemThread): ThreadActivity => {
         if (familyOf === null) familyOf = families();
+
         if (!familyOf) return UNAVAILABLE;
+
         const database = (db ??= open());
         const family = familyOf(thread.id);
         const agents = new Map<string, ActivityAgentRow>();
         const queue = [...family.threads];
         const visited = new Set<string>();
+
         while (queue.length) {
             const id = queue.shift()!;
+
             if (visited.has(id)) continue;
+
             visited.add(id);
             for (const row of once(agentsRead, id, () => unfinishedAgents(database, id))) {
                 if (row.child === thread.id || agents.has(row.child) || !agentWorking(row, family.background.has(id)))
                     continue;
+
                 agents.set(row.child, row);
                 queue.push(row.child);
             }
         }
+
         return threadActivity({
             items: once(itemsRead, thread.id, () => activityItems(database, thread.id)),
             runLive: thread.state === 'running' || thread.state === 'needs you',
@@ -222,8 +245,11 @@ export function activityReads(
         /** The thread with its activity when it is at work, as T3 shows it now. A thread seen only through an outage is unavailable. */
         read(thread: ItemThread): ItemThread {
             if (!isLiveThread(thread) && !thread.hasRunningChildren) return thread;
+
             if (thread.observedAt) return { ...thread, activity: UNAVAILABLE };
+
             let activity = read.get(thread.id);
+
             if (!activity) {
                 try {
                     activity = readThread(thread);
@@ -231,8 +257,10 @@ export function activityReads(
                     failed = true;
                     activity = UNAVAILABLE;
                 }
+
                 read.set(thread.id, activity);
             }
+
             return { ...thread, activity };
         },
         close() {

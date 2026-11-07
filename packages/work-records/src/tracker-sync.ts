@@ -61,22 +61,30 @@ export interface StructureProvider {
     readComment(ticket: StructureTicket, id: string): Promise<string>;
     replace(ticket: StructureTicket, body: string): Promise<void>;
 }
+
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 const fail = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const numberOf = (reference: string) => Number(reference.slice(reference.lastIndexOf('#') + 1));
+
 export const structureIssueUrl = (repository: string, number: number) =>
     repository.split('/').length === 2
         ? `https://github.com/${repository}/issues/${number}`
         : `https://dev.azure.com/${repository.split('/')[0]}/${repository.split('/')[1]}/_workitems/edit/${number}`;
+
 const repoFromUrl = (url: string, setups: readonly RepositorySetup[], hint?: string) => {
     const reference = trackerReference(url);
+
     if (!reference) throw Error('The saved structure links to an unsupported issue URL.');
+
     if (url.includes('github.com')) return { ...reference };
+
     const repository =
         hint ??
         setups.find((setup) => setup.repo.toLowerCase().startsWith(`${reference.repository.toLowerCase()}/`))?.repo;
+
     if (!repository || !repository.toLowerCase().startsWith(`${reference.repository.toLowerCase()}/`))
         throw Error('Add the Azure repository before loading its saved structure.');
+
     return { repository, number: reference.number };
 };
 
@@ -97,6 +105,7 @@ export function structureProvider(): StructureProvider {
         const cacheKey = `${process.env.GH_PATH ?? 'gh'}:${path}`;
         const cached = pageCache.get(cacheKey);
         let raw: string;
+
         try {
             raw = await providerCommand('gh', [
                 'api',
@@ -108,30 +117,42 @@ export function structureProvider(): StructureProvider {
             ]);
         } catch (error) {
             if (cached && /\b304\b/.test(fail(error))) return cached.comments;
+
             throw error;
         }
+
         const split = /\r?\n\r?\n/.exec(raw);
         const headers = split ? raw.slice(0, split.index) : '';
         const comments = JSON.parse(split ? raw.slice(split.index + split[0].length) : raw) as { body: string }[];
+
         pageCache.set(cacheKey, { etag: /^etag:\s*(.+?)\s*$/im.exec(headers)?.[1], comments });
+
         return comments;
     };
     const latestMetadata = async (repository: string, number: number, count: number, original: string) => {
         const ownUrl = structureIssueUrl(repository, number);
         const managed: TrackerStructure[] = [];
+
         for (let page = Math.max(1, Math.ceil(count / 100)); page >= 1; page--) {
             const comments = await commentPage(
                 `repos/${repository}/issues/${number}/comments?per_page=100&page=${page}`,
             );
+
             for (const comment of [...comments].reverse()) {
                 if (!comment.body.trimStart().startsWith('<!-- lar-factory:structure')) continue;
+
                 const metadata = readTrackerStructure(comment.body);
+
                 if (!metadata) continue;
+
                 managed.push(metadata);
+
                 const latest = managed[0]!;
+
                 if (managed.length > 1) {
                     const before = metadata.snapshot;
                     const after = latest.snapshot;
+
                     if (
                         after &&
                         after.root === ownUrl &&
@@ -143,13 +164,17 @@ export function structureProvider(): StructureProvider {
                         throw Error(
                             'This concept has concurrent tracker versions. Both versions were kept; resolve the structural conflict before continuing.',
                         );
+
                     return latest;
                 }
+
                 if (!latest.snapshot || latest.snapshot.root !== ownUrl) return latest;
             }
         }
+
         const latest = managed[0];
         const before = readTrackerStructure(original)?.snapshot;
+
         if (
             latest?.snapshot &&
             latest.snapshot.root === ownUrl &&
@@ -159,6 +184,7 @@ export function structureProvider(): StructureProvider {
             latest.snapshot.previous !== before.digest
         )
             throw Error('This concept has concurrent tracker versions. Both versions were kept.');
+
         return latest;
     };
     const labelRepos = new Set<string>();
@@ -168,6 +194,7 @@ export function structureProvider(): StructureProvider {
                 await github(`repos/${repository}/labels/${STRUCTURE_LABEL}`);
             } catch (error) {
                 if (!/404/.test(fail(error))) throw error;
+
                 try {
                     await github(`repos/${repository}/labels`, 'POST', {
                         name: STRUCTURE_LABEL,
@@ -178,8 +205,10 @@ export function structureProvider(): StructureProvider {
                     if (!/422/.test(fail(createError))) throw createError;
                 }
             }
+
             labelRepos.add(repository);
         }
+
         await github(`repos/${repository}/issues/${number}/labels`, 'POST', { labels: [STRUCTURE_LABEL] });
     };
     const azure = async (
@@ -191,6 +220,7 @@ export function structureProvider(): StructureProvider {
     ) => {
         const [org, project] = repository.split('/');
         let folder: string | undefined;
+
         try {
             const flags = [
                 'devops',
@@ -211,14 +241,20 @@ export function structureProvider(): StructureProvider {
                 '--output',
                 'json',
             ];
+
             if (resource === 'comments' && method === 'POST') flags.push('--query-parameters', 'format=markdown');
+
             if (body !== undefined) {
                 folder = await mkdtemp(join(tmpdir(), 'factory-structure-'));
+
                 const file = join(folder, 'body.json');
+
                 await writeFile(file, JSON.stringify(body), { mode: 0o600 });
                 flags.push('--in-file', file);
+
                 if (resource === 'workitems') flags.push('--media-type', 'application/json-patch+json');
             }
+
             return JSON.parse(await providerCommand('az', flags)) as Record<string, unknown>;
         } finally {
             if (folder) await rm(folder, { recursive: true, force: true });
@@ -226,6 +262,7 @@ export function structureProvider(): StructureProvider {
     };
     const asTicket = (repository: string, raw: Record<string, unknown>, spec = false): StructureTicket => {
         const azure = repository.split('/').length !== 2;
+
         return {
             repository,
             number: Number(raw[azure ? 'id' : 'number']),
@@ -264,15 +301,19 @@ export function structureProvider(): StructureProvider {
         if (repository.split('/').length === 2) {
             const raw = await github(`repos/${repository}/issues/${number}`);
             const ticket = asTicket(repository, raw);
+
             if ((raw.labels as { name: string }[] | undefined)?.some((label) => label.name === STRUCTURE_LABEL)) {
                 const metadata = await latestMetadata(repository, number, Number(raw.comments ?? 0), ticket.body);
+
                 if (metadata) {
                     ticket.body = writeTrackerStructure(ticket.body, metadata);
                     ticket.kind = metadata.kind;
                 }
             }
+
             return ticket;
         }
+
         // invoke's workitems discovery route selects {type}, so numeric reads use the unambiguous batch resource.
         const batch = await azure(repository, 'workitemsbatch', [], {
             ids: [number],
@@ -280,7 +321,9 @@ export function structureProvider(): StructureProvider {
             errorPolicy: 'Fail',
         });
         const raw = (batch.value as Record<string, unknown>[])[0];
+
         if (!raw) throw Error('Azure did not return the saved work item.');
+
         return asTicket(repository, raw);
     };
     const readSpec = async (
@@ -295,12 +338,17 @@ export function structureProvider(): StructureProvider {
                 errorPolicy: 'Fail',
             });
             const raw = (batch.value as Record<string, unknown>[])[0];
+
             if (!raw) throw Error('Azure did not return the saved work item.');
+
             return asTicket(repository, raw, true);
         }
+
         // Read the issue's own body, never the structure metadata projected from comments.
         const ticket = asTicket(repository, await github(`repos/${repository}/issues/${number}`));
+
         if (previous && ticket.body === previous.body && ticket.title === previous.title) return ticket;
+
         try {
             const [owner, name] = repository.split('/');
             const result = await github('graphql', 'POST', {
@@ -325,6 +373,7 @@ export function structureProvider(): StructureProvider {
                     const raw = await github(
                         `repos/${repository}/collaborators/${encodeURIComponent(login)}/permission`,
                     );
+
                     return ['admin', 'maintain', 'write'].includes(String(raw.permission));
                 } catch {
                     return undefined;
@@ -332,13 +381,17 @@ export function structureProvider(): StructureProvider {
             };
             const canWrite = (login?: string) => {
                 if (!login) return Promise.resolve(undefined);
+
                 let permission = permissions.get(login);
+
                 if (!permission) {
                     permission = readPermission(login);
                     permissions.set(login, permission);
                 }
+
                 return permission;
             };
+
             // A history read racing a body/title read cannot attest to the earlier bytes.
             if (issue?.body === ticket.body && issue.title === ticket.title) {
                 [ticket.editorWrite, ticket.titleEditorWrite] = await Promise.all([
@@ -349,13 +402,16 @@ export function structureProvider(): StructureProvider {
         } catch {
             /* Missing edit history is unknown provenance, so the sync holds the edit. */
         }
+
         return ticket;
     };
     const patchAzure = async (ticket: StructureTicket, body: string, field = 'System.Description') => {
         const [org, project] = ticket.repository.split('/');
         const folder = await mkdtemp(join(tmpdir(), 'factory-spec-patch-'));
+
         try {
             const file = join(folder, 'patch.json');
+
             await writeFile(
                 file,
                 JSON.stringify([
@@ -364,6 +420,7 @@ export function structureProvider(): StructureProvider {
                 ]),
                 { mode: 0o600 },
             );
+
             return asTicket(
                 ticket.repository,
                 JSON.parse(
@@ -389,16 +446,19 @@ export function structureProvider(): StructureProvider {
             await rm(folder, { recursive: true, force: true });
         }
     };
+
     return {
         readSpec,
         replaceSpec: async (ticket, body) => {
             const fresh = await readSpec(ticket.repository, ticket.number, ticket);
+
             if (
                 fresh.body !== ticket.body ||
                 fresh.title !== ticket.title ||
                 (ticket.repository.split('/').length !== 2 && fresh.version !== ticket.version)
             )
                 throw Error('The ticket changed before the Spec write. Retry to read its latest text.');
+
             // GitHub has no conditional body PATCH; the small remaining read/write window is unavoidable.
             return ticket.repository.split('/').length === 2
                 ? asTicket(
@@ -418,18 +478,22 @@ export function structureProvider(): StructureProvider {
                         '--slurp',
                     ]),
                 ) as Record<string, unknown>[][];
+
                 return pages
                     .flat()
                     .filter((raw) => !raw.pull_request && String(raw.body ?? '').includes(`"identity":"${identity}"`))
                     .map((raw) => asTicket(repository, raw));
             }
+
             // A lost Azure create never triggers another create automatically. Query recent descriptions by durable identity.
             const project = decodeURIComponent(repository.split('/')[1]!);
             const raw = await azure(repository, 'wiql', [], {
                 query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project.replaceAll("'", "''")}' AND ([System.Description] CONTAINS '${identity.replaceAll("'", "''")}' OR [Microsoft.VSTS.TCM.ReproSteps] CONTAINS '${identity.replaceAll("'", "''")}')`,
             });
+
             return mapConcurrent((raw.workItems as { id: number }[]) ?? [], async (item) => {
                 const ticket = await readSpec(repository, item.id);
+
                 return ticket.body.includes(identity) ? ticket : read(repository, item.id);
             });
         },
@@ -459,13 +523,16 @@ export function structureProvider(): StructureProvider {
                 );
             const [backlog, fields] = await Promise.all([invoke('backlogconfiguration'), invoke('teamfieldvalues')]);
             const type = backlog.requirementBacklog?.workItemTypes?.[0]?.name;
+
             if (typeof type !== 'string' || typeof fields.defaultValue !== 'string')
                 throw Error('The Azure team has no readable issue type or default area. Check its list source.');
+
             return { type, areaPath: fields.defaultValue };
         },
         create: async (repository, title, body, type, areaPath, options = {}) => {
             if (repository.split('/').length !== 2 && !type)
                 throw Error('The Azure team has no verified issue type for concept parts.');
+
             const parsed = readTicketSpec(body.replace(/\s*<!-- lar-factory:create [^\n]*? -->\s*$/, ''));
             const marker = /<!-- lar-factory:create [^\n]*? -->/.exec(body)?.[0];
             const html = parsed.marked
@@ -508,6 +575,7 @@ export function structureProvider(): StructureProvider {
                               ...(areaPath ? [{ op: 'add', path: '/fields/System.AreaPath', value: areaPath }] : []),
                           ],
                       );
+
             return asTicket(repository, raw, true);
         },
         comment: async (ticket, body) => {
@@ -515,6 +583,7 @@ export function structureProvider(): StructureProvider {
                 ticket.repository.split('/').length === 2
                     ? await github(`repos/${ticket.repository}/issues/${ticket.number}/comments`, 'POST', { body })
                     : await azure(ticket.repository, 'comments', [`workItemId=${ticket.number}`], { text: body });
+
             return String(raw.id);
         },
         readComment: async (ticket, id) => {
@@ -522,18 +591,23 @@ export function structureProvider(): StructureProvider {
                 ticket.repository.split('/').length === 2
                     ? await github(`repos/${ticket.repository}/issues/comments/${id}`)
                     : await azure(ticket.repository, 'comments', [`workItemId=${ticket.number}`, `commentId=${id}`]);
+
             return String(raw[ticket.repository.split('/').length === 2 ? 'body' : 'text'] ?? '');
         },
         replace: async (ticket, body) => {
             const fresh = await read(ticket.repository, ticket.number);
+
             if (ticket.repository.split('/').length === 2) {
                 if (
                     JSON.stringify(readTrackerStructure(fresh.body)) !==
                     JSON.stringify(readTrackerStructure(ticket.body))
                 )
                     throw Error('The issue structure changed while saving. The pending save will recheck it.');
+
                 const metadata = readTrackerStructure(body);
+
                 if (!metadata) throw Error('The structural update has no metadata.');
+
                 await markStructural(ticket.repository, ticket.number);
                 // Structure uses comments to preserve authored bytes. replaceSpec separately writes gated text with Original.
                 await github(`repos/${ticket.repository}/issues/${ticket.number}/comments`, 'POST', {
@@ -542,6 +616,7 @@ export function structureProvider(): StructureProvider {
             } else {
                 if (fresh.version !== ticket.version || fresh.body !== ticket.body)
                     throw Error('The issue changed while saving its structure. The pending save will recheck it.');
+
                 await patchAzure(ticket, body);
             }
         },
@@ -555,35 +630,49 @@ export async function readStructureSnapshot(
     setups: readonly RepositorySetup[],
 ): Promise<{ snapshot: TrackerSnapshot; digest: string }> {
     if (!metadata.snapshot) throw Error('This issue has no saved concept structure yet.');
+
     const rootRef = repoFromUrl(metadata.snapshot.root, setups, metadata.snapshot.repository);
+
     if (!setups.some((setup) => sameRepo(setup.repo, rootRef.repository)))
         throw Error(`Add ${rootRef.repository} before loading this saved structure.`);
+
     const root =
         rootRef.repository === ticket.repository && rootRef.number === ticket.number
             ? ticket
             : await provider.read(rootRef.repository, rootRef.number);
     const manifest = readTrackerStructure(root.body)?.snapshot;
+
     if (!manifest || manifest.root !== structureIssueUrl(root.repository, root.number))
         throw Error('The concept has no committed structure manifest.');
+
     if (!manifest.chunks.length) throw Error('The saved concept structure has no chunks.');
+
     const chunks = await mapConcurrent(manifest.chunks, async ({ id, digest }, index) => {
         const body = await provider.readComment(root, id);
         const match = /^<!-- lar-factory:chunk ([a-f0-9-]{36}) (\d+)\n([A-Za-z0-9+/=]+)\n-->$/.exec(body);
+
         if (!match || match[1] !== manifest.generation || Number(match[2]) !== index || sha(match[3]!) !== digest)
             throw Error('A saved concept structure chunk is missing or changed.');
+
         return match[3]!;
     });
     const text = gunzipSync(Buffer.from(chunks.join(''), 'base64'), { maxOutputLength: 16 * 1024 * 1024 }).toString(
         'utf8',
     );
+
     if (sha(text) !== manifest.digest) throw Error('The saved concept structure checksum does not match.');
+
     const snapshot = validateTrackerSnapshot(JSON.parse(text));
+
     for (const node of snapshot.nodes)
         if (!setups.some((setup) => sameRepo(setup.repo, node.repository)))
             throw Error(`Add ${node.repository} before loading this saved structure.`);
+
     const rootNode = snapshot.nodes.find((node) => node.key === snapshot.root)!;
+
     if (rootNode.repository !== root.repository || !rootNode.ticket || numberOf(rootNode.ticket) !== root.number)
         throw Error('The saved structure root does not match its manifest.');
+
     if (
         !snapshot.nodes.some(
             (node) =>
@@ -591,6 +680,7 @@ export async function readStructureSnapshot(
         )
     )
         throw Error('The saved structure does not contain this issue.');
+
     return { snapshot, digest: manifest.digest };
 }
 

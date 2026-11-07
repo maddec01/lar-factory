@@ -20,6 +20,7 @@ function checkChoice(choice: unknown, source: string): ShapingThreadCleanup {
             `The shaping thread cleanup setting in ${source} needs a choice of ${SHAPING_THREAD_CLEANUPS.join(', ')}.`,
         );
     }
+
     return choice as ShapingThreadCleanup;
 }
 
@@ -27,19 +28,23 @@ function checkChoice(choice: unknown, source: string): ShapingThreadCleanup {
 export function readShapingThreadCleanup(dir = boardDataDir()): ShapingThreadCleanup {
     const path = shapingThreadCleanupPath(dir);
     let text: string;
+
     try {
         text = readFileSync(path, 'utf8');
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return DEFAULT_SHAPING_THREAD_CLEANUP;
+
         throw new WorkRecordError(
             'invalid',
             `Can't read the shaping thread cleanup setting ${path}: ${(error as Error).message}.`,
         );
     }
+
     try {
         return checkChoice((JSON.parse(text) as { choice?: unknown } | null)?.choice, path);
     } catch (error) {
         if (error instanceof WorkRecordError) throw error;
+
         throw new WorkRecordError(
             'invalid',
             `The shaping thread cleanup setting ${path} isn't JSON: ${(error as Error).message}.`,
@@ -51,6 +56,7 @@ export function readShapingThreadCleanup(dir = boardDataDir()): ShapingThreadCle
 export function writeShapingThreadCleanup(choice: ShapingThreadCleanup, dir = boardDataDir()): ShapingThreadCleanup {
     const checked = checkChoice(choice, 'the change');
     const path = shapingThreadCleanupPath(dir);
+
     try {
         mkdirSync(dir, { recursive: true });
         writeFileSync(`${path}.${process.pid}.tmp`, `${JSON.stringify({ choice: checked }, null, 2)}\n`);
@@ -61,5 +67,6 @@ export function writeShapingThreadCleanup(choice: ShapingThreadCleanup, dir = bo
             `Can't save the shaping thread cleanup setting ${path}: ${(error as Error).message}.`,
         );
     }
+
     return checked;
 }

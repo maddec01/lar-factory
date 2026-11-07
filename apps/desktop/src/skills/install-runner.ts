@@ -18,6 +18,7 @@ export const runInstall = (
 ): Promise<InstallResult> =>
     new Promise((resolve, reject) => {
         let answered = false;
+
         worker.on(
             'message',
             (message: {

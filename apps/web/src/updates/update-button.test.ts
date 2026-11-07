@@ -67,6 +67,7 @@ function stubBridge(start: UpdateState, restart = true) {
         getUpdateState: vi.fn(async () => start),
         onUpdateState: vi.fn((listener: (state: UpdateState) => void) => {
             push = listener;
+
             return () => {};
         }),
         checkForUpdate: vi.fn(async () => ({ checked: true, state: idle })),
@@ -74,6 +75,7 @@ function stubBridge(start: UpdateState, restart = true) {
         installUpdate: action(downloaded),
         confirmRestart: answerRestart(restart),
     });
+
     return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
 }
 
@@ -111,12 +113,15 @@ describe.each([
 describe('available', () => {
     test('a pill reads "Update available", just before Settings, and clicking it downloads', async () => {
         const { bridge } = stubBridge(available);
+
         await mountPage();
         expect(text(pill())).toBe('Update available');
         expect(pill()!.classList, "an App control's corners, not a pill").not.toContain('rounded-full');
         expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')]).toEqual(['control', true]);
         expect(icon('arrow-down-to-line')).not.toBeNull();
+
         const controls = [...pill()!.closest('.title-bar')!.querySelectorAll('button')];
+
         expect(
             controls[controls.indexOf(pill() as HTMLButtonElement) + 1]!.classList,
             'Settings comes right after it',
@@ -127,6 +132,7 @@ describe('available', () => {
 
     test('appears when a check finds an update', async () => {
         const { push } = stubBridge(idle);
+
         await mountPage();
         await push(checking);
         expect(pill()).toBeNull();
@@ -136,6 +142,7 @@ describe('available', () => {
 
     test('a failed download is available again and retries the download', async () => {
         const { bridge } = stubBridge(downloadFailed);
+
         await mountPage();
         expect(text(pill())).toBe('Update available');
         await click();
@@ -144,6 +151,7 @@ describe('available', () => {
 
     test("a download call that fails keeps the update to download, and T3's toast says so", async () => {
         const { bridge } = stubBridge(available);
+
         bridge.downloadUpdate.mockRejectedValueOnce(new Error('bridge gone'));
         await mountPage();
         await click();
@@ -155,6 +163,7 @@ describe('available', () => {
 
     test("a download that fails returns to available, and T3's toast gives the reason", async () => {
         const { bridge, push } = stubBridge(available);
+
         bridge.downloadUpdate.mockResolvedValueOnce({ accepted: true, completed: false, state: downloadFailed });
         await mountPage();
         await click();
@@ -165,6 +174,7 @@ describe('available', () => {
 
     test("a download that completes shows T3's downloaded toast", async () => {
         const { bridge } = stubBridge(available);
+
         bridge.downloadUpdate.mockResolvedValueOnce({ accepted: true, completed: true, state: downloaded });
         await mountPage();
         await click();
@@ -173,6 +183,7 @@ describe('available', () => {
 
     test('a download the app refuses shows the not-accepted toast and stays available', async () => {
         const { bridge } = stubBridge(available);
+
         bridge.downloadUpdate.mockResolvedValueOnce({ accepted: false, completed: false, state: available });
         await mountPage();
         await click();
@@ -182,6 +193,7 @@ describe('available', () => {
 
     test('a second click while the download call runs does nothing', async () => {
         const { bridge } = stubBridge(available);
+
         bridge.downloadUpdate.mockImplementationOnce(() => new Promise(() => {}));
         await mountPage();
         await click();
@@ -194,10 +206,13 @@ describe('available', () => {
 describe('downloading', () => {
     test('shows a progress ring filled to the percentage, with the percentage', async () => {
         const { push } = stubBridge(available);
+
         await mountPage();
         await push(downloading);
+
         const ring = pill()!.querySelectorAll('circle')[1]!;
         const circumference = 2 * Math.PI * 7;
+
         expect(Number(ring.getAttribute('stroke-dashoffset'))).toBeCloseTo(circumference * (1 - 0.42));
         expect(text(pill())).toBe('Downloading 42%');
         expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')]).toEqual(['control', true]);
@@ -227,6 +242,7 @@ describe('downloading', () => {
 describe('downloaded', () => {
     test('reads "Restart to update"; clicking it asks to restart, then installs on Restart', async () => {
         const { bridge } = stubBridge(downloaded);
+
         await mountPage();
         expect(text(pill())).toBe('Restart to update');
         expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')], 'tinted, not filled').toEqual([
@@ -242,6 +258,7 @@ describe('downloaded', () => {
 
     test('Cancel leaves the update downloaded, to install later', async () => {
         const { bridge } = stubBridge(downloaded, false);
+
         await mountPage();
         await click();
         expect(bridge.installUpdate).not.toHaveBeenCalled();
@@ -252,6 +269,7 @@ describe('downloaded', () => {
 
     test("a question the app can't ask shows T3's toast and installs nothing", async () => {
         const { bridge } = stubBridge(downloaded);
+
         bridge.confirmRestart.mockRejectedValueOnce(new Error('no window'));
         await mountPage();
         await click();
@@ -262,6 +280,7 @@ describe('downloaded', () => {
 
     test('a failed install reads "Restart to update" again and retries the install', async () => {
         const { bridge } = stubBridge(installFailed);
+
         await mountPage();
         expect(text(pill())).toBe('Restart to update');
         await click();
@@ -270,6 +289,7 @@ describe('downloaded', () => {
 
     test('an install that fails returns to "Restart to update", and T3\'s toast gives the reason', async () => {
         const { bridge } = stubBridge(downloaded);
+
         bridge.installUpdate.mockResolvedValueOnce({ accepted: true, completed: false, state: installFailed });
         await mountPage();
         await click();
@@ -280,6 +300,7 @@ describe('downloaded', () => {
 
     test("an install call that fails shows T3's toast", async () => {
         const { bridge } = stubBridge(downloaded);
+
         bridge.installUpdate.mockRejectedValueOnce(new Error('bridge gone'));
         await mountPage();
         await click();
@@ -288,6 +309,7 @@ describe('downloaded', () => {
 
     test("an install the app refuses shows T3's downloaded toast and stays downloaded", async () => {
         const { bridge } = stubBridge(downloaded);
+
         bridge.installUpdate.mockResolvedValueOnce({ accepted: false, completed: false, state: downloaded });
         await mountPage();
         await click();
@@ -298,6 +320,7 @@ describe('downloaded', () => {
 
     test('a background check keeps the pill, disabled until it ends', async () => {
         const { bridge, push } = stubBridge(downloaded);
+
         await mountPage();
         await push({ ...downloaded, status: 'checking', canRetry: false });
         expect(text(pill())).toBe('Restart to update');
@@ -310,6 +333,7 @@ describe('downloaded', () => {
 describe('installing', () => {
     test('reads "Installing…", disabled, from the click until the app quits', async () => {
         const { bridge } = stubBridge(downloaded);
+
         // The app drains the board server, then quits: the call never answers.
         bridge.installUpdate.mockImplementation(() => new Promise(() => {}));
         await mountPage();
@@ -322,6 +346,7 @@ describe('installing', () => {
 
     test('a failed install the app pushes later ends it, and clicking retries', async () => {
         const { bridge, push } = stubBridge(downloaded);
+
         bridge.installUpdate.mockResolvedValueOnce({ accepted: true, completed: false, state: downloaded });
         await mountPage();
         await click();
@@ -353,6 +378,7 @@ describe('the changelog', () => {
 
     test('Download starts the download', async () => {
         const { bridge, push } = stubBridge(withNotes);
+
         await mountPage();
         await hover(pill()!);
         await settle(() => changelogButton().click());
@@ -373,6 +399,7 @@ describe('the changelog', () => {
 
     test('hovering "Restart to update" shows the changelog with Restart now, which asks to restart', async () => {
         const { bridge } = stubBridge({ ...withNotes, ...downloaded });
+
         await mountPage();
         await hover(pill()!);
         expect(text(changelog()!.querySelector('.update-heading'))).toBe('1.1.0 is ready to install.');
@@ -412,6 +439,7 @@ describe('the changelog', () => {
 
     test('a click on the pill runs the update and leaves the changelog open', async () => {
         const { bridge } = stubBridge(withNotes);
+
         await mountPage();
         await hover(pill()!);
         await click();
@@ -421,6 +449,7 @@ describe('the changelog', () => {
 
     test('closes when the update goes', async () => {
         const { push } = stubBridge(withNotes);
+
         await mountPage();
         await hover(pill()!);
         await push({ ...idle, releaseNotes: withNotes.releaseNotes });

@@ -30,6 +30,7 @@ export function subscribeProjects(
         origin.password
     )
         throw new Error('Expected local T3 server');
+
     let stopped = false;
     let socket: WebSocket | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
@@ -43,26 +44,38 @@ export function subscribeProjects(
     const close = () => {
         stopped = true;
         ticketRequest?.abort();
+
         if (renewal) clearTimeout(renewal);
+
         if (retry) clearTimeout(retry);
+
         if (heartbeat) clearInterval(heartbeat);
+
         socket?.close();
         socket = undefined;
     };
     const connect = async () => {
         if (stopped) return;
+
         let availability: ProjectRead['availability'] = 'unavailable';
         let current: WebSocket | undefined;
         let session: BoardSession | undefined;
         const disconnected = (invalidate = false) => {
             if (current && socket !== current) return;
+
             if (invalidate && !stopped && session) protocol.invalidateSession(session);
+
             socket = undefined;
+
             if (heartbeat) clearInterval(heartbeat);
+
             if (renewal) clearTimeout(renewal);
+
             current?.close();
+
             if (!stopped && !retry) {
                 publish(availability);
+
                 if (!stopped)
                     retry = setTimeout(
                         () => {
@@ -73,16 +86,21 @@ export function subscribeProjects(
                     );
             }
         };
+
         try {
             let token: string;
+
             try {
                 session = await protocol.subscriptionSession();
                 token = session.token;
                 renewal = setTimeout(
                     () => {
                         if (stopped) return;
+
                         socket = undefined;
+
                         if (heartbeat) clearInterval(heartbeat);
+
                         current?.close();
                         void connect();
                     },
@@ -92,35 +110,49 @@ export function subscribeProjects(
                 availability = 'renewal-required';
                 throw Error();
             }
+
             if (stopped) return;
+
             ticketRequest = new AbortController();
+
             const response = await fetch(new URL('/api/auth/websocket-ticket/rpc', origin), {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` },
                 redirect: 'error',
                 signal: AbortSignal.any([ticketRequest.signal, AbortSignal.timeout(10_000)]),
             });
+
             if (response.status === 401 || response.status === 403) availability = 'renewal-required';
+
             if (!response.ok) throw Error();
+
             const ticket: unknown = await response.json();
+
             if (!isRecord(ticket) || typeof ticket.ticket !== 'string' || !ticket.ticket) throw Error();
+
             if (stopped) return;
+
             const url = new URL('/ws', origin);
+
             url.protocol = 'ws:';
             url.searchParams.set('orchestrationProtocol', '2');
             url.searchParams.set('wsTicket', ticket.ticket);
             current = new WebSocket(url);
             socket = current;
+
             const ws = current;
             const recovery = new ShellRecovery();
             let lastPong = Date.now();
             const send = (value: unknown) => ws.send(JSON.stringify(value));
+
             ws.addEventListener('open', () =>
                 loopTrace.span('t3 socket open', () => {
                     if (stopped) {
                         ws.close();
+
                         return;
                     }
+
                     send({
                         _tag: 'Request',
                         id: '1',
@@ -138,11 +170,15 @@ export function subscribeProjects(
             ws.addEventListener('message', (event) =>
                 loopTrace.span(`t3 ${execution?.tag ?? 'projects'}`, () => {
                     if (stopped || socket !== ws) return;
+
                     try {
                         const parsed: unknown = JSON.parse(String(event.data));
+
                         for (const frame of Array.isArray(parsed) ? parsed : [parsed]) {
                             if (!isRecord(frame)) throw Error();
+
                             lastPong = Date.now();
+
                             if (frame._tag === 'Pong') continue;
                             else if (frame._tag === 'Chunk' && frame.requestId === '1' && Array.isArray(frame.values)) {
                                 for (const value of frame.values)
@@ -160,6 +196,7 @@ export function subscribeProjects(
                                 else if (execution?.reject) {
                                     close();
                                     execution.reject(frame.exit);
+
                                     return;
                                 } else disconnected();
                             }
@@ -176,9 +213,12 @@ export function subscribeProjects(
             disconnected(true);
         }
     };
+
     void connect();
+
     return () => {
         if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ _tag: 'Interrupt', requestId: '1' }));
+
         close();
     };
 }

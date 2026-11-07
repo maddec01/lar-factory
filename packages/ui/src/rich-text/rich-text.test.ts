@@ -14,6 +14,7 @@ describe('GitHub-flavoured markdown', () => {
         const out = markdown(
             '# Title\n\nSome **bold** and _italic_ text.\n\n- one\n- two\n\n1. first\n2. second\n\n[docs](https://example.com/docs)',
         );
+
         expect(out).toMatch(/<h1>Title<\/h1>/);
         expect(out).toMatch(/<strong>bold<\/strong>/);
         expect(out).toMatch(/<em>italic<\/em>/);
@@ -24,12 +25,14 @@ describe('GitHub-flavoured markdown', () => {
 
     test('fenced and inline code', () => {
         const out = markdown('```ts\nconst a = 1;\n```\n\nUse `pnpm test`.');
+
         expect(out).toMatch(/<pre[^>]*><code[^>]*>const a = 1;\n<\/code><\/pre>/);
         expect(out).toMatch(/<code>pnpm test<\/code>/);
     });
 
     test('tables', () => {
         const out = markdown('| a | b |\n| - | - |\n| 1 | 2 |');
+
         expect(out).toMatch(/<table>/);
         expect(out).toMatch(/<th>a<\/th>/);
         expect(out).toMatch(/<td>2<\/td>/);
@@ -37,6 +40,7 @@ describe('GitHub-flavoured markdown', () => {
 
     test('task lists', () => {
         const out = markdown('- [x] done\n- [ ] todo');
+
         expect(out.match(/<input type="checkbox" disabled=""( checked="")?\/>/g)).toHaveLength(2);
         expect(out).toMatch(/<input [^>]*checked=""[^>]*\/> done/);
         expect(out).toMatch(/<input type="checkbox" disabled=""\/> todo/);
@@ -44,6 +48,7 @@ describe('GitHub-flavoured markdown', () => {
 
     test('strikethrough and autolinked URLs', () => {
         const out = markdown('~~gone~~ see https://example.com/x');
+
         expect(out).toMatch(/<del>gone<\/del>/);
         expect(out).toMatch(/<a [^>]*href="https:\/\/example.com\/x"/);
     });
@@ -52,6 +57,7 @@ describe('GitHub-flavoured markdown', () => {
 describe('raw HTML', () => {
     test('<details> and <summary> survive in markdown', () => {
         const out = markdown('<details>\n<summary>More</summary>\n\nHidden **text**\n\n</details>');
+
         expect(out).toMatch(/<details>/);
         expect(out).toMatch(/<summary>More<\/summary>/);
         expect(out).toMatch(/<strong>text<\/strong>/);
@@ -67,6 +73,7 @@ describe('raw HTML', () => {
         const out = html(
             '<div>Hello <b>there</b></div><ul><li>a</li></ul><table><tbody><tr><td>c</td></tr></tbody></table>',
         );
+
         expect(out).toMatch(/<b>there<\/b>/);
         expect(out).toMatch(/<ul><li>a<\/li><\/ul>/);
         expect(out).toMatch(/<td>c<\/td>/);
@@ -74,6 +81,7 @@ describe('raw HTML', () => {
 
     test('html is not read as markdown', () => {
         const out = html('<p>* not a list\n# not a heading</p>');
+
         expect(out).not.toMatch(/<li>|<h1>/);
     });
 });
@@ -87,6 +95,7 @@ describe('sanitizing', () => {
         'a style attribute': '<p style="position:fixed">hi</p>',
         'a style tag': '<style>body{display:none}</style>hi',
     };
+
     for (const [name, input] of Object.entries(inputs)) {
         for (const [format, run] of [
             ['markdown', markdown],
@@ -94,6 +103,7 @@ describe('sanitizing', () => {
         ] as const) {
             test(`${format} drops ${name}`, () => {
                 const out = run(input);
+
                 expect(out).not.toMatch(
                     /<script|<iframe|<style|onclick|onmouseover|javascript:|position:fixed|display:none|alert\(/i,
                 );
@@ -107,6 +117,7 @@ describe('sanitizing', () => {
 
     test('a javascript: image becomes plain text, not a link', () => {
         const out = markdown('![bad](javascript:alert(1))');
+
         expect(out).not.toMatch(/javascript:|<img/);
         expect(out).toMatch(/bad/);
     });
@@ -119,6 +130,7 @@ describe('sanitizing', () => {
 describe('images', () => {
     test('a markdown image becomes a link with its alt text, opening in a new tab', () => {
         const out = markdown('![a diagram](https://example.com/d.png)');
+
         expect(out).not.toMatch(/<img/);
         expect(out).toMatch(
             /<a [^>]*href="https:\/\/example.com\/d.png"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>a diagram<\/a>/,
@@ -127,12 +139,14 @@ describe('images', () => {
 
     test('an html image becomes a link too', () => {
         const out = html('<p><img src="https://example.com/d.png" alt="shot"></p>');
+
         expect(out).not.toMatch(/<img/);
         expect(out).toMatch(/<a [^>]*href="https:\/\/example.com\/d.png"[^>]*target="_blank"[^>]*>shot<\/a>/);
     });
 
     test('raw html in markdown becomes a link', () => {
         const out = markdown('<img src="https://example.com/d.png" alt="raw">');
+
         expect(out).not.toMatch(/<img/);
         expect(out).toMatch(/<a [^>]*href="https:\/\/example.com\/d.png"[^>]*>raw<\/a>/);
     });
@@ -144,6 +158,7 @@ describe('images', () => {
 
     test('an image inside a link does not nest links', () => {
         const out = markdown('[![alt text](https://example.com/i.png)](https://example.com/page)');
+
         expect(out.match(/<a /g)?.length).toBe(1);
         expect(out).toMatch(/href="https:\/\/example.com\/page"/);
         expect(out).toMatch(/alt text/);
@@ -171,6 +186,7 @@ describe('layout', () => {
 
     test('the container wraps long words, code and tables so nothing scrolls sideways', () => {
         const out = markdown('x');
+
         expect(out).toMatch(/^<div [^>]*class="[^"]*\bmin-w-0\b[^"]*\bmax-w-full\b[^"]*"/);
         expect(out).toMatch(/break-words/);
         expect(out).toMatch(/\[&amp;_pre\]:whitespace-pre-wrap/);

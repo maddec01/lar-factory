@@ -13,6 +13,7 @@ import { startLiveData } from './board/live-data.ts';
 // The script holds the first paint (vite.config.ts), so render now, not in a later task: the first
 // frame then shows the board.
 const root = createRoot(document.getElementById('app')!);
+
 flushSync(() =>
     root.render(
         <StrictMode>

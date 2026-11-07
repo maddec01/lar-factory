@@ -16,7 +16,9 @@ import { useWizardStore, type Run } from './wizard-store.ts';
 function KindMappingFields({ run, detection }: { run: Run; detection: SetupDetection }) {
     const { choose, detect } = useWizardStore();
     const { discovery, error, retry } = useVocabularyDiscovery(run.repo!, true);
+
     if (!discovery) return <VocabularyRead repo={run.repo!} error={error} retry={retry} />;
+
     return (
         <div className={FIELD_GROUP}>
             {(Object.keys(KIND_NAMES) as VocabularyKind[]).map((key) => (
@@ -30,8 +32,11 @@ function KindMappingFields({ run, detection }: { run: Run; detection: SetupDetec
                     onRecheck={() => void detect()}
                     onChange={(value, names) => {
                         const newLabels: NonNullable<Run['choices']['newLabels']> = { ...run.choices.newLabels };
+
                         delete newLabels[key];
+
                         if (names.some((name) => name.trim())) newLabels[key] = names;
+
                         choose({
                             vocabulary: { ...run.choices.vocabulary, [key]: value },
                             newLabels: Object.keys(newLabels).length ? newLabels : undefined,
@@ -47,6 +52,7 @@ function KindMappingFields({ run, detection }: { run: Run; detection: SetupDetec
 export function KindMapping({ run, detection }: { run: Run; detection: SetupDetection }) {
     const [open, setOpen] = useState(() => !!run.choices.vocabulary || !!run.choices.newLabels);
     const labels = trackerCapabilities(detection.repo).heading.toLowerCase();
+
     return (
         <details
             data-kind-mapping

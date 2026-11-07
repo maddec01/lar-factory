@@ -94,8 +94,11 @@ interface Edge {
 /** What leads a lane or a column: a question, then work on your desk, then running work, then what can start. */
 function urgency(p: Part): number {
     if (needsAnswer(p.item)) return 0;
+
     if (partActivity(p).kind === 'working') return 2;
+
     if (YOURS.includes(p.item.status)) return 1;
+
     return startable(p) ? 3 : 4;
 }
 
@@ -106,22 +109,31 @@ function edgesOf(parts: Part[], check: boolean): Edge[] {
     const pairs = parts.flatMap((p) =>
         ups(p).map((u) => ({ from: shownKey(u), to: shownKey(p), via: isHistory(u) ? u : p })),
     );
+
     if (check) {
         // The check waits on every build; arrows come only from the last ones, the rest it waits on through them.
         const sinks = parts.filter((p) => !parts.some((u) => ups(u).includes(p)));
         const ends = sinks.filter((p) => p.kind === 'build');
+
         pairs.push(...(ends.length ? ends : sinks).map((p) => ({ from: shownKey(p), to: CHECK, via: p })));
     }
+
     const edges = new Map<string, { from: string; to: string; via: Set<Part> }>();
+
     for (const { from, to, via } of pairs) {
         if (from === HISTORY && to === HISTORY) continue;
+
         const edge = edges.get(`${from} ${to}`) ?? { from, to, via: new Set<Part>() };
+
         edge.via.add(via);
         edges.set(`${from} ${to}`, edge);
     }
+
     return [...edges.values()].map(({ from, to, via }) => {
         const names = [...via].map((p) => itemName(p.item)).join(', ');
+
         if (from === HISTORY) return { from, to, label: plural(via.size, 'completed prerequisite'), names };
+
         return to === HISTORY
             ? { from, to, label: `before ${plural(via.size, 'completed part')}`, names }
             : { from, to };
@@ -143,11 +155,13 @@ function layout(parts: Part[], data: BoardData, width: number, check: boolean) {
     const placed: Placed[] = [];
     const bands: { lane: string; top: number; height: number }[] = [];
     let top = 0;
+
     lanes.forEach((lane) => {
         const here = current.filter((p) => laneOf(p) === lane);
         const inCol = (c: number) =>
             here.filter((p) => depth.get(keyOf(p)) === c).sort((a, b) => urgency(a) - urgency(b));
         const rows = Math.max(1, ...Array.from({ length: cols }, (_, c) => inCol(c).length));
+
         for (let c = 0; c < cols; c++) {
             inCol(c).forEach((p, r) =>
                 placed.push({
@@ -159,11 +173,15 @@ function layout(parts: Part[], data: BoardData, width: number, check: boolean) {
                 }),
             );
         }
+
         const height = PAD * 2 + rows * NODE_H + (rows - 1) * GAP;
+
         bands.push({ lane, top, height });
         top += height;
     });
+
     const lanesEnd = check ? Math.max(top, PAD * 2 + NODE_H) : top;
+
     if (check)
         placed.push({
             key: CHECK,
@@ -172,8 +190,10 @@ function layout(parts: Part[], data: BoardData, width: number, check: boolean) {
             x: LABEL_W + (cols - 1) * colW + 14,
             y: lanesEnd / 2 - NODE_H / 2,
         });
+
     const history = parts.length > current.length;
     const fullWidth = Math.max(LABEL_W + cols * colW, width);
+
     return {
         placed,
         bands,
@@ -189,19 +209,26 @@ function layout(parts: Part[], data: BoardData, width: number, check: boolean) {
 function useWidth() {
     const ref = useRef<HTMLDivElement>(null);
     const [width, setWidth] = useState(0);
+
     useEffect(() => {
         const el = ref.current;
+
         if (!el) return;
+
         const observer = new ResizeObserver(([entry]) => setWidth(entry!.contentRect.width));
+
         observer.observe(el);
+
         return () => observer.disconnect();
     }, []);
+
     return { ref, width };
 }
 
 /** A part's method or kind, in the one place and style every map surface shows it. */
 export function PartKindLabel({ kind }: { kind: PartKind }) {
     const Icon = KIND_ICON[kind];
+
     return (
         <span
             className="inline-flex shrink-0 items-center gap-1.5 text-[11px] text-(--muted-foreground)"
@@ -238,6 +265,7 @@ const RUNS: string[] = ['Shaping', 'In progress', 'Review'];
 function partDetail({ item }: Part, { kind, thread }: PartActivity): string[] {
     const active = item.slices.filter((s) => s.progress === 'active').length;
     const blocked = item.slices.filter((s) => s.progress === 'blocked').length;
+
     return [
         ...(active
             ? [`${plural(active, 'slice')} active`]
@@ -263,11 +291,13 @@ function PartNode({ part, data, width, home }: { part: Part; data: BoardData; wi
           ? 'border-dashed border-(--input)'
           : 'border-(--border)';
     let action: ReactNode = null;
+
     if (complete) action = null;
     else if (asks)
         action = <OpenThread item={item} data={data} threadId={openQuestionThread(item)?.id} label="Answer in T3" />;
     else if (item.status === 'Ready' || item.status === 'Queued')
         action = <PartStart part={part} data={data} label="Start" namesBlocker={false} />;
+
     // Open thread joins anything but the card's own Start or answer, as an icon.
     const opensThread = threadsOf(item).length > 0 && !action;
     const status = complete ? 'Complete' : shown.word;
@@ -291,6 +321,7 @@ function PartNode({ part, data, width, home }: { part: Part; data: BoardData; wi
               ...detail,
           ];
     const state = facts.join(' · ');
+
     return (
         <div
             style={{ width, height: NODE_H }}
@@ -343,6 +374,7 @@ function PartNode({ part, data, width, home }: { part: Part; data: BoardData; wi
 /** A finished part as one row of the expanded history group: its kind, title, what it followed, PR and thread when it has them. */
 function HistoryRow({ part, after, data, home }: { part: Part; after: Part[]; data: BoardData; home: string }) {
     const { item } = part;
+
     return (
         <li
             className="flex min-h-12 min-w-0 items-center gap-3 rounded-md px-3 text-[13px] hover:bg-(--soft)"
@@ -386,6 +418,7 @@ function HistoryRow({ part, after, data, home }: { part: Part; after: Part[]; da
 const historyText = (parts: Part[]) => {
     const decisions = parts.filter((p) => DECISION_KINDS.includes(p.kind)).length;
     const builds = parts.length - decisions;
+
     return [decisions && plural(decisions, 'settled decision'), builds && plural(builds, 'finished build')]
         .filter(Boolean)
         .join(' · ');
@@ -430,7 +463,9 @@ export function WorkMap({
     const [hover, setHover] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const marker = useId().replace(/[^a-zA-Z0-9]/g, '');
+
     if (!parts.length && !check) return null;
+
     const m = layout(parts, data, width, Boolean(check));
     const at = new Map(m.placed.map((p) => [p.key, p]));
     const near = (key: string) =>
@@ -449,15 +484,20 @@ export function WorkMap({
         if (!from && to) {
             const y = to.y + NODE_H / 2,
                 gx = to.x - 14;
+
             return `M${gx} ${m.groupY} L${gx} ${y + 8} Q${gx} ${y} ${gx + 8} ${y} L${to.x - 2} ${y}`;
         }
+
         if (from && !to) {
             const y = from.y + NODE_H / 2,
                 x = from.x + m.nodeW,
                 gx = x + 10;
+
             return `M${x} ${y} L${gx - 8} ${y} Q${gx} ${y} ${gx} ${y + 8} L${gx} ${m.groupY - 2}`;
         }
+
         if (!from || !to) return null;
+
         const x1 = from.x + m.nodeW,
             y1 = from.y + NODE_H / 2,
             x2 = to.x - 2,
@@ -466,10 +506,12 @@ export function WorkMap({
         // Over a column, the arrow leaves from the node's foot and runs in the gap under the row, not behind a node.
         const sx = x1 - 20,
             wy = from.y + NODE_H + GAP / 2;
+
         return to.col - from.col > 1
             ? `M${sx} ${from.y + NODE_H} L${sx} ${wy - 6} Q${sx} ${wy} ${sx + 6} ${wy} L${x2 - 30} ${wy} C${x2 - 12} ${wy} ${x2 - 18} ${y2} ${x2} ${y2}`
             : `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`;
     };
+
     return (
         <div ref={box} className="overflow-x-auto rounded-lg border border-(--border) bg-(--background)" data-work-map>
             <div className="relative" style={{ width: m.width, height: m.height }} data-map-canvas>
@@ -530,9 +572,12 @@ export function WorkMap({
                         const a = at.get(e.from),
                             b = at.get(e.to);
                         const d = line(a, b);
+
                         if (!d) return null;
+
                         const done = e.from === HISTORY || (!!a?.part && isDone(a.part.item));
                         const lit = !!hover && (e.from === hover || e.to === hover);
+
                         return (
                             <path
                                 key={`${e.from}-${e.to}`}
@@ -550,6 +595,7 @@ export function WorkMap({
                 </svg>
                 {m.edges.map((e) => {
                     if (!e.label) return null;
+
                     const to = at.get(e.to),
                         from = at.get(e.from);
                     const place = to
@@ -557,6 +603,7 @@ export function WorkMap({
                         : from
                           ? { left: from.x + m.nodeW + 14, top: m.groupY - 15, width: m.colW - 20 }
                           : null;
+
                     return (
                         place && (
                             <Tooltip key={`${e.from}-${e.to}`}>

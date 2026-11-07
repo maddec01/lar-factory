@@ -108,12 +108,14 @@ function fromFile(file: string): ItemDetailsReader {
           })
         | undefined;
     const read = () => (all ??= JSON.parse(readFileSync(file, 'utf8')) as NonNullable<typeof all>);
+
     return {
         checks: async (item) => read().$checks?.[item.id] ?? { workId: item.id, list: [], runs: [], reuses: [] },
         details: async (item) => read()[item.id] ?? NO_DETAILS,
         olderComments: async (item, before) => {
             const older = read().$older?.[item.id] ?? [];
             const from = Number(before) || 0;
+
             return {
                 comments: older.slice(from, from + PAGE),
                 olderCursor: from + PAGE < older.length ? String(from + PAGE) : null,
@@ -133,13 +135,17 @@ const bodyKindOf = (kind: string): RecordDetails['bodyKind'] =>
 /** The record's own text and progress, or undefined when it has none, such as an item read before its record was made. */
 function recordDetails(records: WorkRecords, workId: string): RecordDetails | undefined {
     let record;
+
     try {
         record = records.read(workId);
     } catch (error) {
         if (error instanceof WorkRecordError && error.code === 'not-found') return undefined;
+
         throw error;
     }
+
     const bodyKind = bodyKindOf(record.kind);
+
     return {
         bodyKind,
         body: records.body(workId, bodyKind) ?? '',
@@ -178,16 +184,19 @@ export function createItemDetails(
     }: RecordsDeps = { records: null },
 ): ItemDetailsReader {
     if (sampleFile) return fromFile(sampleFile);
+
     const azure = (item: Item) => Boolean(item.repo && onAzure(item.repo));
     /** What an update of the ticket writes, from a fresh read and the team's backlog. A failed read leaves the board's own swap standing. */
     const kindPlan = async (work: Item): Promise<ItemDetails['kindPlan']> => {
         if (!records || work.kindDisagreement?.changed !== 'item') return undefined;
+
         try {
             const record = records.read(work.id);
             const check = await checkKind(record, {
                 setup: setupOf(work.repo),
                 ...(kindsOf && { kinds: kindsOf(work.repo) }),
             });
+
             return check
                 ? {
                       itemKind: record.kind as SwapKind,
@@ -202,10 +211,12 @@ export function createItemDetails(
     };
     const readDetails: ReadItemDetails = async (work) => {
         let record = records ? recordDetails(records, work.id) : undefined;
+
         if (record && records) {
             await refreshSpecs(records, { ...specSync, workId: work.id });
             record = recordDetails(records, work.id);
         }
+
         const item = ticketOf(work);
         const read = !item
             ? NO_DETAILS
@@ -213,9 +224,11 @@ export function createItemDetails(
               ? await readAzureItemDetails(item)
               : await readGithubItemDetails(item);
         const state = record && records ? activeSpecState(records, work.id, specSync) : null;
+
         if (state) {
             const details = 'error' in read ? NO_DETAILS : read;
             const parsed = readTicketSpec(stripTrackerStructure(details.body));
+
             return {
                 ...details,
                 body: record!.body,
@@ -237,26 +250,35 @@ export function createItemDetails(
                 },
             };
         }
+
         return record && !('error' in read) ? { ...read, record } : read;
     };
+
     return {
         async checks(work) {
             if (work.kind !== 'build') return { status: 400, error: 'Checks belong to builds.' };
+
             if (!records) return { status: 503, error: 'Work records are unavailable.' };
+
             return records.checks(work.id);
         },
         async details(work) {
             const [read, plan] = await Promise.all([readDetails(work), kindPlan(work)]);
+
             return plan && !('error' in read) ? { ...read, kindPlan: plan } : read;
         },
         async olderComments(work, before) {
             const item = ticketOf(work);
+
             if (!item) return NO_TICKET;
+
             return azure(item) ? readAzureOlderComments(item, before) : readGithubOlderComments(item, before);
         },
         async saveDescription(work, { body, bodyField, revision }) {
             const item = ticketOf(work);
+
             if (!item) return NO_TICKET;
+
             if (records && recordDetails(records, work.id)) {
                 try {
                     if (await editSpec(records, work.id, body, userInfo().username, specSync)) return null;
@@ -264,14 +286,19 @@ export function createItemDetails(
                     return { status: 409, error: (error as Error).message };
                 }
             }
+
             if (!azure(item)) return saveGithubDescription(item, body);
+
             if (!bodyField || revision === undefined)
                 return { status: 400, error: "Send the field and revision the work item's details gave." };
+
             return saveAzureDescription(item, { body, bodyField, revision });
         },
         async labels(work) {
             const item = ticketOf(work);
+
             if (!item) return NO_TICKET;
+
             try {
                 return {
                     labels: (await labelsOf(item.repo).list()).filter(
@@ -287,15 +314,21 @@ export function createItemDetails(
         },
         async changeLabels(work, { label, action }) {
             const item = ticketOf(work);
+
             if (!item) return NO_TICKET;
+
             // Azure joins a ticket's tags into one field, so a name holding its separator would write the tags after it too.
             const separated = trackerCapabilities(item.repo).ticketNameProblem(label);
+
             if (separated) return { status: 422, error: separated };
+
             const labels = labelsOf(item.repo);
+
             try {
                 await (action === 'add'
                     ? labels.addToTicket(item.number, [label])
                     : labels.removeFromTicket(item.number, [label]));
+
                 return null;
             } catch (error) {
                 return {
@@ -306,11 +339,13 @@ export function createItemDetails(
         },
         async specAction(work, generation, action) {
             if (!records) return { status: 409, error: 'The board has no work records.' };
+
             try {
                 if (action === 'retry') {
                     await refreshSpecs(records, { ...specSync, workId: work.id });
                     await syncSpecs(records, { ...specSync, workId: work.id });
                 } else await resolveSpecEdit(records, work.id, generation, action, userInfo().username, specSync);
+
                 return null;
             } catch (error) {
                 return { status: 409, error: (error as Error).message };
@@ -318,11 +353,13 @@ export function createItemDetails(
         },
         async exportMarkdown(work) {
             if (!records) return { status: 409, error: 'The board has no work records to export.' };
+
             try {
                 return { paths: exportMarkdown(records, work.id, exportFolder) };
             } catch (error) {
                 // A record with nothing written or a file already in the folder refuses the export; the record stays as it was.
                 if (error instanceof WorkRecordError) return { status: 409, error: error.message };
+
                 throw error;
             }
         },

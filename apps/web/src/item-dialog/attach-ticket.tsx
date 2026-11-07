@@ -13,7 +13,9 @@ import { postAction, receive } from '../items/card-actions.ts';
 export function AttachTicket({ item }: { item: Item }) {
     const [open, setOpen] = useState(false);
     const enabled = useBoardStore((state) => state.data.capture?.enabled !== false);
+
     if (item.number || !item.repo || !enabled) return null;
+
     if (!open)
         return (
             <Button
@@ -25,11 +27,15 @@ export function AttachTicket({ item }: { item: Item }) {
                 Attach a ticket
             </Button>
         );
+
     const attach = async (number: number) => {
         const result = await postAction('/api/attach-ticket', { itemId: item.id, number });
+
         receive(result);
+
         return result.error;
     };
+
     return (
         <section aria-label="Attach a ticket" className="grid gap-1.5 pt-1">
             <span className="text-base-content text-xs font-medium">Attach a ticket</span>

@@ -23,6 +23,7 @@ test('legacy consent loads without granting access and disappears on resave', as
     const { writeListFile, readRepositorySetups, setStructureSync } = await import('./repository-settings.ts');
     const { REPOSITORY_LIST_FILE } = await import('./data-dir.ts');
     const dir = mkdtempSync(join(tmpdir(), 'legacy-access-'));
+
     t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
     writeListFile(dir, { repositories: [{ repo: 'org/repo', settings: { consent: ['publish-ticket'] } }] });
     expect(readRepositorySetups(dir)[0]).not.toHaveProperty('consent');

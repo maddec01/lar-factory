@@ -22,6 +22,7 @@ function envOutput(values: Readonly<Record<string, string>>): string {
 
 function makeProcess(output: string, exitCode = 0): ChildProcessSpawner.ChildProcessHandle {
     const stdout = output.length === 0 ? Stream.empty : Stream.make(textEncoder.encode(output));
+
     return ChildProcessSpawner.makeHandle({
         pid: ChildProcessSpawner.ProcessId(123),
         stdout,
@@ -46,12 +47,16 @@ function readChildEnvironment(input: {
     const commands: string[] = [];
     const spawner = ChildProcessSpawner.make((command) => {
         const name = command._tag === 'StandardCommand' ? command.command : '';
+
         commands.push(name);
+
         const result = input.handler(name);
+
         return Effect.succeed(
             typeof result === 'string' ? makeProcess(result) : makeProcess(result.output, result.exitCode),
         );
     });
+
     return ShellEnvironment.childEnvironment(input.env, input.userShell).pipe(
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
         Effect.provide(Logger.layer([])),
@@ -66,6 +71,7 @@ describe('childEnvironment', () => {
                 env: { SHELL: '/bin/zsh', PATH: '/usr/bin:/bin' },
                 handler: () => envOutput({ PATH: '/Users/me/.local/bin:/opt/homebrew/bin:/usr/bin' }),
             });
+
             assert.deepStrictEqual(commands, ['/bin/zsh']);
             assert.strictEqual(env.PATH, '/Users/me/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/local/bin');
         }),
@@ -81,6 +87,7 @@ describe('childEnvironment', () => {
                         ? { output: envOutput({ PATH: '/failed/bin' }), exitCode: 7 }
                         : envOutput({ PATH: '/Users/me/.cargo/bin:/usr/bin' }),
             });
+
             assert.deepStrictEqual(commands, ['/bin/failing', '/opt/homebrew/bin/fish']);
             assert.strictEqual(env.PATH, '/Users/me/.cargo/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin');
         }),
@@ -93,6 +100,7 @@ describe('childEnvironment', () => {
                 userShell: '/bin/zsh',
                 handler: (command) => (command === '/bin/launchctl' ? '/opt/homebrew/bin:/usr/bin\n' : ''),
             });
+
             assert.deepStrictEqual(commands, ['/opt/homebrew/bin/nu', '/bin/zsh', '/bin/launchctl']);
             assert.strictEqual(env.PATH, '/opt/homebrew/bin:/usr/bin:/usr/local/bin');
         }),
@@ -104,6 +112,7 @@ describe('childEnvironment', () => {
                 env: { SHELL: '/bin/zsh', PATH: '/usr/bin:/bin', HOME: '/Users/me' },
                 handler: () => ({ output: '', exitCode: 1 }),
             });
+
             assert.strictEqual(env.PATH, '/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin');
             assert.strictEqual(env.HOME, '/Users/me');
         }),
@@ -115,6 +124,7 @@ describe('childEnvironment', () => {
                 env: { SHELL: '/bin/zsh' },
                 handler: () => '',
             });
+
             assert.strictEqual(env.PATH, '/opt/homebrew/bin:/usr/local/bin');
         }),
     );
@@ -133,6 +143,7 @@ describe('childEnvironment', () => {
                         NODE_EXTRA_CA_CERTS: '/Users/me/corp-root.pem',
                     }),
             });
+
             assert.strictEqual(env.SSH_AUTH_SOCK, '/tmp/secretive.sock');
             assert.strictEqual(env.HOMEBREW_PREFIX, '/opt/homebrew');
             assert.strictEqual(env.SSL_CERT_FILE, '/opt/homebrew/etc/cacert.pem');
@@ -147,6 +158,7 @@ describe('childEnvironment', () => {
                 env: { SHELL: '/bin/zsh', PATH: '/usr/bin', __MISE_DIFF: 'stale' },
                 handler: () => envOutput({ PATH: '/mise/installs/node/latest/bin:/usr/bin', __MISE_DIFF: 'mise-diff' }),
             });
+
             assert.strictEqual(env.__MISE_DIFF, 'mise-diff');
         }),
     );
@@ -157,6 +169,7 @@ describe('childEnvironment', () => {
                 env: { SHELL: '/bin/zsh', PATH: '/usr/bin', LANG: 'en_US.UTF-8' },
                 handler: () => envOutput({ PATH: '/usr/bin', LC_ALL: 'de_DE.UTF-8' }),
             });
+
             assert.strictEqual(env.LANG, 'en_US.UTF-8');
             assert.strictEqual(env.LC_ALL, undefined);
         }),
@@ -168,6 +181,7 @@ describe('childEnvironment', () => {
                 env: { SHELL: '/bin/zsh', PATH: '/usr/bin' },
                 handler: () => envOutput({ PATH: '/usr/bin' }),
             });
+
             assert.strictEqual(env.LANG, undefined);
             assert.strictEqual(env.LC_CTYPE, 'en_US.UTF-8');
         }),
@@ -176,6 +190,7 @@ describe('childEnvironment', () => {
     it.effect('leaves the environment it was given unchanged', () =>
         Effect.gen(function* () {
             const inherited: NodeJS.ProcessEnv = { SHELL: '/bin/zsh', PATH: '/usr/bin' };
+
             yield* readChildEnvironment({
                 env: inherited,
                 handler: () => envOutput({ PATH: '/opt/homebrew/bin', SSH_AUTH_SOCK: '/tmp/agent.sock' }),

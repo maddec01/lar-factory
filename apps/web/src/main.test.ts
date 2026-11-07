@@ -30,7 +30,9 @@ test('the first paint shows the board data the server put in the page, with no f
 test('the tab shows "Lar Factory" and the logo as its icon', async () => {
     await mountPage(fresh());
     expect(document.title).toBe('Lar Factory');
+
     const icon = decodeURIComponent($<HTMLLinkElement>('link[rel="icon"]')!.getAttribute('href')!);
+
     expect(icon).toMatch(/^data:image\/svg\+xml,<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 100 100"/);
     expect(icon).toContain(`d="${BRAND_MARK_L}"`);
     expect(icon).toContain(`d="${BRAND_MARK_BLOCK}" fill="${BRAND_BLOCK_COLOR}"`);
@@ -39,8 +41,11 @@ test('the tab shows "Lar Factory" and the logo as its icon', async () => {
 
 test('an entered title round-trips through the inline board data without closing its script element', async () => {
     const title = 'Play <queue> & "mix" </script> $& $1';
+
     await mountPage({ ...fresh(), items: [{ ...sample.items[0]!, title }] });
+
     const script = $('#board-data')!;
+
     expect(script.innerHTML).not.toContain('</script>');
     expect((JSON.parse(script.textContent!) as BoardData).items[0]!.title).toBe(title);
     // The item is in List, which the List modal shows; jsdom has no ResizeObserver, which the modal observes with.
@@ -127,7 +132,9 @@ test("the lost server's warning closes, and the next failure after the server an
     await mountPage(fresh());
     fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
     await settle(() => vi.advanceTimersByTime(15_000));
+
     const close = $<HTMLButtonElement>('[data-warning="client-error"] .dismiss')!;
+
     expect(close.getAttribute('aria-label')).toBe('Dismiss: board disconnected');
     close.focus();
     await settle(() => close.click());

@@ -23,11 +23,13 @@ export async function sendThreadCommand(command: ThreadCommand): Promise<ThreadC
     const unconfirmed = (reason: string): ThreadCommandResult => ({ outcome: 'unconfirmed', reason });
     const authority = boardSessionAuthority('t3', 'orchestration:operate');
     let session: BoardSession;
+
     try {
         session = await authority.issue();
     } catch {
         return unconfirmed(`T3 authorization for ${command.type} failed.`);
     }
+
     try {
         return await new Promise<ThreadCommandResult>((resolve) => {
             let stop: (() => void) | undefined;
@@ -41,6 +43,7 @@ export async function sendThreadCommand(command: ThreadCommand): Promise<ThreadC
                 30_000,
             );
             const protocol = { subscriptionSession: async () => session, invalidateSession() {} };
+
             try {
                 stop = subscribeProjects(
                     new URL(String(readJsonRecord(serverRuntimePath(process.env))?.origin ?? '')),
@@ -80,6 +83,7 @@ export async function sendThreadCommand(command: ThreadCommand): Promise<ThreadC
 
 export function rejectionReason(cause: unknown): string | undefined {
     if (!Array.isArray(cause)) return undefined;
+
     for (const part of cause as unknown[]) {
         if (
             isRecord(part) &&
@@ -90,5 +94,6 @@ export function rejectionReason(cause: unknown): string | undefined {
         )
             return part.error.message;
     }
+
     return undefined;
 }

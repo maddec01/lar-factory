@@ -6,9 +6,11 @@ import { subscribeProjects } from './project-subscription.ts';
 
 vi.mock('./board-session.ts');
 vi.mock('./project-subscription.ts');
+
 const workspace = { type: 'existing_worktree' as const, worktreePath: '/tmp/work', branch: 'build/test' };
 const selection = { instanceId: 'codex', model: 'gpt-5', options: [{ id: 'reasoningEffort', value: 'high' }] };
 const ORIGIN = 'http://localhost:3773';
+
 afterEach(() => {
     vi.resetAllMocks();
     vi.useRealTimers();
@@ -29,17 +31,22 @@ describe('thread launch', () => {
     });
     it('keeps malformed responses uncertain and revokes launch authority', async () => {
         vi.useFakeTimers();
+
         const revoke = vi.fn().mockResolvedValue(undefined);
         const stop = vi.fn();
+
         vi.mocked(boardSessionAuthority).mockReturnValue({
             issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
             revoke,
         });
         vi.mocked(subscribeProjects).mockImplementation((_origin, _version, _protocol, _change, execution) => {
             execution!.accept({ threadId: 'incomplete' });
+
             return stop;
         });
+
         const result = launchThread('project', 'Continue', selection, workspace, 'approval-required', ORIGIN, 'stable');
+
         await vi.advanceTimersByTimeAsync(30_000);
         expect(await result).toMatchObject({ thread: null, uncertain: true });
         expect(stop).toHaveBeenCalled();
@@ -64,14 +71,17 @@ describe('thread launch', () => {
     });
     it('sends the whole selection and workspace, and tells a refusal from a lost answer', async () => {
         const revoke = vi.fn().mockResolvedValue(undefined);
+
         vi.mocked(boardSessionAuthority).mockReturnValue({
             issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
             revoke,
         });
         vi.mocked(subscribeProjects).mockImplementation((_origin, _version, _protocol, _change, execution) => {
             execution!.reject!(exit);
+
             return vi.fn();
         });
+
         let exit: unknown = { _tag: 'Interrupted' };
         const result = await launchThread(
             'project',
@@ -81,6 +91,7 @@ describe('thread launch', () => {
             'full-access',
             ORIGIN,
         );
+
         expect(result).toMatchObject({ thread: null, uncertain: true });
         expect(vi.mocked(subscribeProjects).mock.calls[0]![4]!.payload).toMatchObject({
             projectId: 'project',
@@ -106,16 +117,22 @@ describe('thread launch', () => {
         vi.stubGlobal('fetch', async () => {
             throw Error('refused');
         });
+
         const actual = await vi.importActual<typeof import('./project-subscription.ts')>('./project-subscription.ts');
+
         vi.mocked(subscribeProjects).mockImplementation(actual.subscribeProjects);
         vi.mocked(boardSessionAuthority).mockReturnValue({
             issue: async () => ({ token: 'private', sessionId: 'session', expiresAt: '2099-01-01' }),
             revoke: vi.fn().mockResolvedValue(undefined),
         });
+
         const unhandled = vi.fn();
+
         process.on('unhandledRejection', unhandled);
+
         try {
             const result = launchThread('project', 'Continue', selection, workspace, 'approval-required', ORIGIN);
+
             await vi.advanceTimersByTimeAsync(30_000);
             expect(await result).toMatchObject({ thread: null, uncertain: true });
             vi.useRealTimers();

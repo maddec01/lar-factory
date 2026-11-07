@@ -7,6 +7,7 @@ test('tracker Markdown becomes HTML while active HTML and unsafe links remain in
     const html = trackerMarkdownHtml(
         '## Steps\n\n- **Play**\n- Quit\n\n<script>alert(1)</script>\n\n[x](javascript:alert)\n\n<!-- lar-factory:create {"identity":"request"} -->',
     );
+
     expect(html).toContain('<h2>Steps</h2>');
     expect(html).toContain('<li><strong>Play</strong></li>');
     expect(html).toContain('&lt;script&gt;');
@@ -16,6 +17,7 @@ test('tracker Markdown becomes HTML while active HTML and unsafe links remain in
 
 test.each(['--!>', '>', '->'])('malformed marker terminator %s cannot expose active HTML', (terminator) => {
     const html = trackerMarkdownHtml(`<!-- lar-factory:spec ${terminator}<img src=x onerror=alert(1)><!-- -->`);
+
     expect(html).not.toContain('<img');
     expect(html).toContain('&lt;img');
 });
@@ -27,6 +29,7 @@ test('valid structure markers retain JSON containing dashes and HTML comment ter
         map: 'A --> B\nUse --strict.\n<!-- --!><img src=x onerror=alert(1)> -->',
     };
     const html = trackerMarkdownHtml(writeTrackerStructure('', structure));
+
     expect(readTrackerStructure(html)).toEqual(structure);
     expect(html).not.toContain('<img');
     expect(html).not.toContain('--!>');

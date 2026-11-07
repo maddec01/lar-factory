@@ -22,11 +22,15 @@ async function readDetails(itemId: string, updatedAt: string, signal: AbortSigna
             signal,
         });
         const body = (await response.json()) as { details?: ItemDetails; error?: string };
+
         if (response.ok && body.details) {
             const entry: DetailsEntry = { updatedAt, details: body.details, older: null };
+
             detailsCache.put(itemId, entry);
+
             return { state: 'loaded', details: body.details, entry };
         }
+
         return { state: 'failed', error: body.error ?? 'The board did not return the details.' };
     } catch {
         return { state: 'failed', error: 'Could not reach the board to read the details.' };
@@ -44,27 +48,40 @@ export function useItemDetails(
     updatedAt: string,
 ): { read: ItemDetailsRead; refresh: () => Promise<boolean> } {
     const board = useRef(updatedAt);
+
     board.current = updatedAt;
+
     const [read, setRead] = useState<{ itemId: string; result: ItemDetailsRead } | null>(null);
+
     // A layout effect starts the read before paint, so a reopened item never flashes its earlier details.
     useLayoutEffect(() => {
         const cached = detailsCache.get(itemId, board.current);
+
         if (cached) {
             setRead({ itemId, result: { state: 'loaded', details: cached.details, entry: cached } });
+
             return;
         }
+
         const reading = new AbortController();
+
         setRead({ itemId, result: LOADING });
         void readDetails(itemId, board.current, reading.signal).then(
             (result) => !reading.signal.aborted && setRead({ itemId, result }),
         );
+
         return () => reading.abort();
     }, [itemId]);
+
     const refresh = useCallback(async () => {
         const result = await readDetails(itemId, board.current, new AbortController().signal);
+
         if (result.state !== 'loaded') return false;
+
         setRead((shown) => (shown?.itemId === itemId ? { itemId, result } : shown));
+
         return true;
     }, [itemId]);
+
     return { read: read && read.itemId === itemId ? read.result : LOADING, refresh };
 }

@@ -32,6 +32,7 @@ test('a repository still onboarding shows its card with its step instead of the 
 test("a card for an older board's onboarding says it stopped at the first step", async () => {
     const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' } };
     const data: BoardData = { ...empty, onboarding: [{ repo: 'maddec01/lar-web', progress: pr }] };
+
     serve(data, []);
     await mountPage(data);
     expect(text(card())).toContain('Stopped at Project');
@@ -52,9 +53,12 @@ test("an Azure DevOps repository's card shows its name decoded, and its step", a
             },
         ],
     };
+
     serve(data, []);
     await mountPage(data);
+
     const azure = $(`[data-onboarding-card="${repo}"]`)!;
+
     expect(text(azure.querySelector('h2'))).toBe('contoso/Fabrikam Fiber/lar-api');
     expect(text(azure)).toContain('Stopped at Work and docs');
 });
@@ -85,7 +89,9 @@ test('Resume reopens the dialog on the stored step with the stored project', asy
             .find((b) => text(b).includes('Back'))!
             .click(),
     );
+
     const radio = dialog()!.querySelector('[data-choice="lar-web"] [role="radio"]')!;
+
     expect(radio.getAttribute('aria-checked')).toBe('true');
     expect(radio.hasAttribute('data-disabled'), 'its own project stays pickable').toBe(false);
 });
@@ -122,6 +128,7 @@ test.each<[string, ProjectIcon | null, (icon: Element) => void]>([
     ],
 ])('a card shows %s in place of the folder', async (_case, icon, shown) => {
     const data: BoardData = { ...waiting(empty), projectIcons: icon ? { 'maddec01/lar-web': icon } : {} };
+
     serve(data, []);
     await mountPage(data);
     shown(card()!.querySelector('[data-project-icon]')!);

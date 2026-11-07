@@ -18,6 +18,7 @@ test('a tool that fails gives its exit code and the first four lines of what it 
     const result = await runTool(process.execPath, node('console.error("\\n1\\n2\\n3\\n4\\n5"); process.exit(3)'), {
         timeout: 5_000,
     });
+
     assert.equal(result.code, 3);
     assert.equal(result.stderr, '\n1\n2\n3\n4\n5\n', 'stderr stays whole, for callers that match on all of it');
     assert.equal(result.detail, '1\n2\n3\n4');
@@ -40,6 +41,7 @@ test('a missing binary gives the spawn error code; a timeout gives null', async 
 
 test('the env and buffer limit reach the tool', async () => {
     const env = { ...process.env, RUN_TOOL_TEST: 'set' };
+
     assert.equal(
         (
             await runTool(process.execPath, node('process.stdout.write(process.env.RUN_TOOL_TEST)'), {
@@ -66,6 +68,7 @@ test('a tool receives JSON on stdin and sees the end of input', async () => {
         node('process.stdin.setEncoding("utf8"); process.stdin.on("data", (data) => process.stdout.write(data))'),
         { timeout: 5_000, input: '{"sha":null,"content":"quoted \\"text\\""}' },
     );
+
     assert.equal(result.code, 0);
     assert.equal(result.stdout, '{"sha":null,"content":"quoted \\"text\\""}');
 });

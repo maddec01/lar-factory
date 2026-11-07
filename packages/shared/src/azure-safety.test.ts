@@ -9,6 +9,7 @@ afterEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
 });
+
 const readonly = { LAR_FACTORY_AZURE_READ_ONLY: '1' };
 const invoke = (area: string, resource: string, method?: string) => [
     'devops',

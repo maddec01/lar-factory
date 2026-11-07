@@ -10,11 +10,13 @@ export interface InstallWork {
 }
 
 const work = workerData as InstallWork;
+
 try {
     const result = installSkills(work.home, work.bundle, work.version, {
         ...work.options,
         onProgress: (progress) => parentPort!.postMessage({ progress }),
     });
+
     parentPort!.postMessage({ result });
 } catch (cause) {
     parentPort!.postMessage({

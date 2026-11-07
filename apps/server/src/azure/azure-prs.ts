@@ -38,12 +38,14 @@ export const prIds = (raw: RawWorkItem): number[] =>
             rel === 'ArtifactLink'
                 ? /^vstfs:\/\/\/Git\/PullRequestId\/[^/]+%2F[^/]+%2F(\d+)$/i.exec(url)?.[1]
                 : undefined;
+
         return id ? [Number(id)] : [];
     });
 
 /** The PR as the board shows it on its linked work item. */
 export function linkedPr(pr: AzurePr): LinkedPr {
     const state = prStateOf(pr);
+
     return {
         ...(pr.lastMergeSourceCommit?.commitId && { sourceRevision: pr.lastMergeSourceCommit.commitId }),
         number: pr.pullRequestId,

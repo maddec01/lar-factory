@@ -15,7 +15,9 @@ interface ElectronReleaseNoteInfo {
 
 function isElectronReleaseNoteInfo(value: unknown): value is ElectronReleaseNoteInfo {
     if (typeof value !== 'object' || value === null) return false;
+
     const candidate = value as { readonly version?: unknown; readonly note?: unknown };
+
     return (
         typeof candidate.version === 'string' &&
         (typeof candidate.note === 'string' || candidate.note === null || candidate.note === undefined)
@@ -41,18 +43,23 @@ function decodeCodePoint(codePoint: number, entity: string): string {
     if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
         return `&${entity};`;
     }
+
     return String.fromCodePoint(codePoint);
 }
 
 function decodeHtmlEntity(entity: string): string {
     const named = HTML_ENTITY_REPLACEMENTS[entity];
+
     if (named) return named;
+
     if (entity.startsWith('#x')) {
         return decodeCodePoint(Number.parseInt(entity.slice(2), 16), entity);
     }
+
     if (entity.startsWith('#')) {
         return decodeCodePoint(Number.parseInt(entity.slice(1), 10), entity);
     }
+
     return `&${entity};`;
 }
 
@@ -75,6 +82,7 @@ function stripMarkup(input: string): string {
 
 function truncateReleaseNoteItem(item: string): string {
     if (item.length <= MAX_RELEASE_NOTE_ITEM_LENGTH) return item;
+
     return `${item.slice(0, MAX_RELEASE_NOTE_ITEM_LENGTH - 3).trimEnd()}...`;
 }
 
@@ -87,6 +95,7 @@ function normalizeReleaseNoteLine(line: string): string {
 
 function isIgnoredReleaseNoteLine(line: string): boolean {
     const normalized = normalizeReleaseNoteLine(line);
+
     return (
         normalized === '' ||
         normalized === "what's changed" ||
@@ -106,6 +115,7 @@ function extractReleaseNoteItems(note: string | null | undefined): ExtractedRele
 
     const items: string[] = [];
     let totalItems = 0;
+
     for (const rawLine of stripMarkup(note).split('\n')) {
         const item = rawLine
             .trim()
@@ -113,13 +123,19 @@ function extractReleaseNoteItems(note: string | null | undefined): ExtractedRele
             .replace(/^\d+[.)]\s+/, '')
             .replace(/\s+/g, ' ');
         const normalized = normalizeReleaseNoteLine(item);
+
         if (normalized === 'new contributors' || normalized === 'full changelog') break;
+
         if (/^#{1,6}\s+/.test(item)) continue;
+
         if (isIgnoredReleaseNoteLine(item)) continue;
+
         totalItems += 1;
         items.push(truncateReleaseNoteItem(item));
+
         if (items.length > MAX_RELEASE_NOTE_ITEMS_PER_GROUP) items.shift();
     }
+
     return { items: items.toReversed(), totalItems };
 }
 
@@ -149,7 +165,9 @@ export function normalizeReleaseNotes(
 
     const normalizedNotes = rawNotes.flatMap((entry) => {
         const { items, totalItems } = extractReleaseNoteItems(entry.note);
+
         if (totalItems === 0) return [];
+
         return [
             {
                 version: entry.version,

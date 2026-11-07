@@ -268,6 +268,7 @@ export function publicationWriteTicket(
     tickets: PublicationTicket[],
 ): PublicationTicket {
     const target = tickets.find((ticket) => ticket.workId === operation.ticketWorkId)!;
+
     return operation.kind === 'relationship' &&
         operation.relationship === 'child' &&
         target.destination.provider === 'github'

@@ -32,6 +32,7 @@ export function TargetSwitch({ path, reason }: { path: string; reason?: string }
     const running = useInstallStore((state) => state.snapshot?.running);
     const recovering = useDriftStore((state) => state.replacing || state.retrying);
     const target = targets?.find((candidate) => candidate.path === path);
+
     // Busy rather than disabled while a tick changes, so focus stays on the switch just pressed;
     // the store ignores a change that comes in meanwhile.
     return (
@@ -52,6 +53,7 @@ function Result({ from }: { from: NonNullable<SettingsResult['from']> }) {
     const error = useInstallStore((state) => state.snapshot?.error);
     const result: SettingsResult =
         stored.from === from ? stored : from === 'targets' && error ? { text: error, tone: 'error' } : { text: '' };
+
     return (
         <FormResult id="settings-result" text={result.text} tone={result.tone}>
             {result.paths && (
@@ -81,6 +83,7 @@ export function TargetsNote() {
             paths.some(({ path }) => target.paths.some((folder) => path === `${folder}/${skill}`)),
         ),
     );
+
     return (
         <div className="targets-note grid gap-2 px-1" aria-busy={targets === null}>
             {!installs && (
@@ -128,6 +131,7 @@ export function ChannelChoice() {
     const { switchingTo, setChannel } = useSettingsStore();
     // Busy while the app switches, as the target ticks, and while it downloads or installs, when it would refuse a switch.
     const busy = !state || switchingTo !== null || installing || state.status === 'downloading';
+
     return (
         <Choice
             label="Update channel"
@@ -141,6 +145,7 @@ export function ChannelChoice() {
 
 export function UpdateStatus() {
     const state = useUpdateStore((s) => s.state);
+
     return (
         <span id="update-status" role="status" aria-live="polite">
             {state ? updateStatusText(state) : ''}
@@ -154,6 +159,7 @@ function CheckNow() {
     const reason = canCheckForUpdate(state)
         ? undefined
         : (getUpdateDisabledReason(state) ?? (state ? updateStatusText(state) : 'Reading the updater…'));
+
     return (
         <SmallButton className="check-now" reason={reason} onClick={() => void check()}>
             Check now
@@ -165,8 +171,11 @@ function CheckNow() {
 export function UpdateAction() {
     const { state, installing, pending, run } = useUpdateStore();
     const pill = resolveUpdatePill(state);
+
     if (!state || (pill !== 'available' && pill !== 'ready')) return <CheckNow />;
+
     const busy = installing || pending || resolveUpdateButtonAction(state) === 'none';
+
     return (
         <Button {...kind('other')} className="update-action" disabled={busy} onClick={() => void run()}>
             {installing ? 'Installing…' : pill === 'ready' ? 'Restart to update' : 'Download'}

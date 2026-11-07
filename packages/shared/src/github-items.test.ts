@@ -69,6 +69,7 @@ test('normalizes an issue item from the GraphQL response', () => {
         },
     };
     const item = normalizeItem(raw);
+
     assert.equal(item?.id, 'I_61', "an item's id is the issue's node id");
     assert.equal(item?.status, 'Needs you');
     assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
@@ -97,6 +98,7 @@ test("an issue's assignees become its assignee, sorted and joined as a work reco
     const assigned = rawIssue('I_5', 5, 'List', ['feature'], {
         assignees: { nodes: [{ login: 'pedro' }, { login: 'ana' }] },
     });
+
     assert.equal(normalizeItem(assigned)?.assignee, 'ana, pedro');
     assert.equal(normalizeItem(rawIssue('I_6', 6, 'List', ['feature'], { assignees: { nodes: [] } }))?.assignee, null);
     assert.equal(
@@ -109,9 +111,12 @@ test("an issue's assignees become its assignee, sorted and joined as a work reco
 test("a concept's body becomes its map, and no other item keeps the body", () => {
     const body = '## Destination\nThere.\n\n## Fog\n- Why?\n';
     const concept = normalizeItem(rawIssue('I_6', 6, 'Shaping', ['concept'], { body }));
+
     assert.deepEqual(concept?.map, { destination: 'There.', decisions: [], fog: ['Why?'] });
     assert.ok(!('body' in concept!), 'the page gets the parsed sections, not the raw body');
+
     const feature = normalizeItem(rawIssue('I_7', 7, 'Shaping', ['feature'], { body }));
+
     assert.ok(!('map' in feature!) && !('body' in feature!));
 });
 
@@ -131,6 +136,7 @@ test('an item with sub-issues on the board takes its map from its body, as a con
         rawIssue('I_14', 14, 'In progress', ['feature'], { body }),
     ]);
     const map = (id: string) => items.find((i) => i.id === id)?.map;
+
     assert.deepEqual(map('I_10'), {
         destination: 'There.',
         decisions: [],
@@ -153,6 +159,7 @@ test("the dossiers' items, whose bodies the board reads: every concept, and ever
         }),
         rawIssue('I_30', 30, 'In progress', ['feature']),
     ];
+
     assert.deepEqual(
         rawDossiers(raws).map((r) => r.id),
         ['I_1', 'I_10'],
@@ -175,6 +182,7 @@ test("the linked PRs whose body and merge time the board reads: a build's, never
         withPrs('I_3', 3, ['build', 'concept'], [linked('PR_4')]),
         withPrs('I_4', 4, ['build'], [linked('PR_2')]),
     ];
+
     assert.deepEqual(
         rawBuildPrs(raws).map((pr) => pr.id),
         ['PR_1', 'PR_2', 'PR_2'],
@@ -188,6 +196,7 @@ test("a linked PR's state is open, closed or merged", () => {
                 closedByPullRequestsReferences: { nodes: [{ number: 10, url: 'p', state, isDraft: false }] },
             }),
         )?.linkedPrs[0]?.state;
+
     assert.deepEqual(['OPEN', 'CLOSED', 'MERGED'].map(linked), ['open', 'closed', 'merged']);
 });
 
@@ -204,6 +213,7 @@ test("a linked PR's check rollup becomes counts over all checks and the earliest
                 },
             },
         })?.linkedPrs[0];
+
     assert.deepEqual(
         pr({
             contexts: {
@@ -257,6 +267,7 @@ test("GitHub's merge state statuses map to can merge, checking, conflicts and bl
             normalizeMergeState(status),
         ]),
     );
+
     assert.deepEqual(states, {
         CLEAN: 'can merge',
         HAS_HOOKS: 'can merge',
@@ -286,6 +297,7 @@ test('a linked PR carries its merge state', () => {
             },
         },
     });
+
     assert.equal(issue?.linkedPrs[0]?.mergeState, 'conflicts');
 });
 
@@ -306,6 +318,7 @@ test("a build's slices come from the board query, open and closed, in GitHub's o
         state: state.toLowerCase(),
         progress,
     });
+
     assert.deepEqual(
         issue(['build'])?.slices,
         [
@@ -325,6 +338,7 @@ test('a slice closed as not planned is still no board item', () => {
         withSubIssues('I_build', 59, ['build'], [dropped]),
         withSubIssues('I_45', 45, ['improvement']),
     ]);
+
     assert.deepEqual(
         items.map((i) => i.id),
         ['I_59'],
@@ -342,6 +356,7 @@ test('a build sub-issue the `build` search found is a board item and counts as a
         ],
         { builds },
     );
+
     assert.deepEqual(
         items.map((i) => i.id),
         ['I_100', 'I_102'],
@@ -377,9 +392,11 @@ test("build sub-issues come from one search per repo of the builds' sub-issues, 
         ['is:issue label:build repo:maddec01/lar-server', 'is:issue label:build repo:maddec01/lar-apple'],
     );
     assert.deepEqual(buildSubIssueSearches([issue900(['build'], [])]), [], 'no sub-issue, no search');
+
     const onProject = rawIssue('I_1', 1, 'In progress', ['build'], {
         repository: { nameWithOwner: 'maddec01/lar-server' },
     });
+
     assert.deepEqual(
         buildSubIssueSearches([issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN')]), onProject]),
         [],
@@ -389,6 +406,7 @@ test("build sub-issues come from one search per repo of the builds' sub-issues, 
 
 test("an issue from a repository's issues takes its statuses from its status labels, and shows by the first in flow order", () => {
     const fromLabels = (...labels: string[]) => pick(normalizeItem({ ...rawIssue('I_1', 1, '', labels) }, {}));
+
     assert.deepEqual(fromLabels('status-shaping', 'feature'), ['Shaping', ['Shaping']]);
     assert.deepEqual(fromLabels('feature'), ['List', []]);
     assert.deepEqual(fromLabels('status-review', 'status-shaping'), ['Shaping', ['Shaping', 'Review']]);
@@ -402,6 +420,7 @@ test('an item closed as not planned is no board item, from either item source', 
         rawIssue('I_2', 2, 'Review', ['status-review'], { state: 'CLOSED', stateReason: 'DUPLICATE' }),
         rawIssue('I_4', 4, 'Review', ['status-review']),
     ];
+
     assert.deepEqual(
         normalizeItems(raws, {}).map((i) => i.number),
         [4],
@@ -416,10 +435,13 @@ test('a concept without parsed map content has no map, while a partial map keeps
         '## Destination\n\n## Decisions so far\n\n## Fog\n\n## End-to-end check\n',
     ]) {
         const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body });
+
         assert.equal(normalizeItem(concept)?.map, undefined, body);
         assert.equal(normalizeItems([concept])[0]?.map, undefined, body);
     }
+
     const partial = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: '## Fog\n- Where will it run?' });
+
     assert.deepEqual(normalizeItem(partial)?.map, { destination: '', decisions: [], fog: ['Where will it run?'] });
 });
 
@@ -428,6 +450,7 @@ test("an issue's labels carry GitHub's colours, and a label without a valid colo
         labels: { nodes: [{ name: 'area: web', color: 'BFDADC' }, { name: 'odd', color: 'red;' }, { name: 'plain' }] },
     });
     const item = normalizeItem(raw)!;
+
     assert.deepEqual(item.labels, ['area: web', 'odd', 'plain']);
     assert.deepEqual(item.labelColors, { 'area: web': '#BFDADC' });
     assert.equal('labelColors' in normalizeItem(rawIssue('I_8', 8, '', ['web']))!, false);

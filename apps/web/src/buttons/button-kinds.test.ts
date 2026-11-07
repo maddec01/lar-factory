@@ -44,6 +44,7 @@ test('every Button and LinkButton names a kind', () => {
                 .filter((tag) => !/[kK]ind\(|\bkind="/.test(tag))
                 .map((tag) => `${file}: ${tag.slice(0, 80)}`),
         );
+
     expect(unnamed).toEqual([]);
 });
 

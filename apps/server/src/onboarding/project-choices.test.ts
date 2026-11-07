@@ -14,12 +14,15 @@ import { projectChoices } from './project-choices.ts';
 /** A home with checkouts of these origins under ~/Developer/lar, each a T3 project, and the env that reads them. */
 function t3Home(t: TestContext, origins: Record<string, string | null>): { home: string; env: NodeJS.ProcessEnv } {
     const home = mkdtempSync(join(tmpdir(), 'lar-choices-home-'));
+
     t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
     checkouts(home, origins);
+
     const db = projectsDb(
         t,
         Object.keys(origins).map((name) => ({ id: name, root: join(home, 'Developer/lar', name) })),
     );
+
     return { home, env: { ...process.env, HOME: home, T3_STATE_DB: db } };
 }
 
@@ -29,6 +32,7 @@ test('projects come from checkout origins without reading repository settings', 
         server: 'https://dev.azure.com/org/project/_git/server',
     });
     const projects = await projectChoices([{ repo: 'TEAM/app' }], new Map(), env);
+
     assert.deepEqual(
         projects.map(({ id, repo, provider, onBoard }) => ({ id, repo, provider, onBoard })),
         [
@@ -54,12 +58,15 @@ test('each folder without a repository says why, and a folder under the home sho
         rmSync(join(folder(name), '.git'), { recursive: true });
         writeFileSync(join(folder(name), '.git'), text);
     };
+
     dotGit('worktree', 'gitdir: /Users/me/app/.git/worktrees/worktree\n');
     dotGit('submodule', 'gitdir: ../../.git/modules/submodule\n');
     // A submodule of a checkout under a folder named worktrees, or of a linked worktree, is still a submodule.
     dotGit('nested', 'gitdir: /Users/me/worktrees/app/.git/worktrees/one/modules/nested\n');
     rmSync(join(folder('no-git'), '.git'), { recursive: true });
+
     const projects = await projectChoices([], new Map(), env);
+
     assert.deepEqual(Object.fromEntries(projects.map(({ id, blocked }) => [id, blocked])), {
         valid: null,
         worktree: 'linked-worktree',
@@ -69,7 +76,9 @@ test('each folder without a repository says why, and a folder under the home sho
         'no-git': 'no-provider-origin',
         'other-host': 'no-provider-origin',
     });
+
     const valid = projects.find(({ id }) => id === 'valid')!;
+
     assert.deepEqual([valid.shownFolder, valid.folder], ['~/Developer/lar/valid', folder('valid')]);
 });
 
@@ -86,6 +95,7 @@ test("each project takes its icon by ID, whether it's on the board, off it or ha
         ['no-origin', { kind: 'monogram', text: 'NO', color: 'rose' }],
     ]);
     const projects = await projectChoices([{ repo: 'team/listed' }], icons, env);
+
     assert.deepEqual(Object.fromEntries(projects.map(({ id, icon }) => [id, icon])), {
         listed: { kind: 'emoji', emoji: '🚀' },
         'off-board': { kind: 'favicon', projectId: 'off-board', revision: 'abc' },

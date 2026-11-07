@@ -10,6 +10,7 @@ export const protocolAwaitingFirstShell = (): boolean => existsSync(process.env.
 
 export function protocolItemThreads(threadIds: readonly string[]) {
     if (protocolAwaitingFirstShell()) return threadIds.length ? ('unavailable' as const) : undefined;
+
     try {
         const threads: (FixtureThread & { retainedAt?: string })[] = JSON.parse(
             readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'),
@@ -33,8 +34,10 @@ export function protocolItemThreads(threadIds: readonly string[]) {
                 thread.turns?.at(-1)?.completedAt ?? thread.turns?.at(-1)?.startedAt ?? '2026-10-20T08:00:00.000Z',
             ).toISOString(),
         }));
+
         return executionItemThreads(shells)(threadIds)?.map((thread) => {
             const retainedAt = threads.find((source) => source.id === thread.id)?.retainedAt;
+
             return retainedAt ? { ...thread, observedAt: retainedAt } : thread;
         });
     } catch {
@@ -44,7 +47,9 @@ export function protocolItemThreads(threadIds: readonly string[]) {
 /** Spawned boards never read a thread as cleanable, so no server run reaches T3's thread commands. With FAKE_THREAD_CLEANUP, one gone from the fixture reads as absent. */
 export function threadCleanupState(threadId: string): 'unavailable' | 'absent' {
     if (process.env.FAKE_THREAD_CLEANUP !== '1') return 'unavailable';
+
     const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
+
     return threads.some((thread) => thread.id === threadId) ? 'unavailable' : 'absent';
 }
 /** Spawned boards find started threads through the fake t3 CLI alone. */
@@ -60,6 +65,7 @@ export function protocolStartedThread(): never {
 /** Spawned boards consume the same protocol mapping as production. */
 export async function protocolStatsInputs() {
     if (process.env.FAKE_EXECUTION_STATS_UNAVAILABLE === '1') throw Error('Usage unavailable');
+
     const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
     const inputs = await executionStats(
         threads
@@ -87,6 +93,7 @@ export async function protocolStatsInputs() {
                 providerThreads: [
                     ...(thread.sessions ?? []).map((entry, index) => {
                         const session = typeof entry === 'string' ? { session: entry } : entry;
+
                         return {
                             id: `${thread.id}:session:${index}`,
                             driver: session.driver ?? 'claudeAgent',
@@ -125,6 +132,7 @@ export async function protocolStatsInputs() {
             })),
     );
     const reads = threadUsage(threads);
+
     return {
         ...inputs,
         allObserved: threads.every((thread) => thread.read !== 'never'),
@@ -134,9 +142,11 @@ export async function protocolStatsInputs() {
 
 function threadFamily(threads: FixtureThread[], threadIds: readonly string[]): Set<string> {
     const family = new Set(threadIds);
+
     for (const _ of threads)
         for (const { id, rootThreadId, parentThreadId } of threads)
             if (family.has(rootThreadId ?? '') || family.has(parentThreadId ?? '')) family.add(id);
+
     return family;
 }
 
@@ -144,21 +154,27 @@ const threadUsage =
     (threads: FixtureThread[]) =>
     (id: string): ThreadUsageRead => {
         const thread = threads.find((candidate) => candidate.id === id);
+
         return !thread || thread.deletedAt ? 'gone' : (thread.read ?? 'current');
     };
 
 /** Spawned boards read each fixture thread as its `read` says; with no fixture, T3 can't answer for any of them. */
 export function protocolThreadReads(threadIds: readonly string[]): ThreadReads | null {
     if (protocolAwaitingFirstShell()) return null;
+
     let threads: FixtureThread[];
+
     try {
         if (process.env.FAKE_EXECUTION_STATS_UNAVAILABLE === '1') throw Error('Usage unavailable');
+
         threads = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
     } catch {
         return { reads: new Map(threadIds.map((id) => [id, 'failed'])), observed: new Set(), demand() {} };
     }
+
     const family = [...threadFamily(threads, threadIds)];
     const reads = threadUsage(threads);
+
     return {
         reads: new Map(family.map((id) => [id, reads(id)])),
         observed: new Set(family.filter((id) => ['current', 'failed'].includes(reads(id)))),
@@ -169,6 +185,7 @@ export function protocolThreadReads(threadIds: readonly string[]): ThreadReads |
 export function liveWorktreePaths(): string[] | undefined {
     try {
         const threads: FixtureThread[] = JSON.parse(readFileSync(process.env.T3_STATE_DB + '.execution.json', 'utf8'));
+
         return threads.some((thread) => thread.turns?.some((turn) => !turn.completedAt)) ? undefined : [];
     } catch {
         return undefined;

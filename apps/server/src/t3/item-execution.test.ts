@@ -4,12 +4,14 @@ import { executionItemThreads, protocolThreadById } from './item-execution.ts';
 
 describe('recorded thread lookup', () => {
     const shell = { id: 'root', title: 'Build', updatedAt: '2026-10-31T12:00:00Z', status: 'idle' };
+
     it('shows the recorded threads, archived ones too, whatever their first message names', () => {
         const lookup = executionItemThreads([
             shell,
             { ...shell, id: 'other' },
             { ...shell, id: 'put-away', archivedAt: shell.updatedAt },
         ]);
+
         expect(lookup(['root'])).toEqual([{ id: 'root', title: 'Build', state: 'done', updated: shell.updatedAt }]);
         expect(lookup(['put-away'])).toEqual([
             { id: 'put-away', title: 'Build', state: 'done', archived: true, updated: shell.updatedAt },
@@ -17,6 +19,7 @@ describe('recorded thread lookup', () => {
     });
     it('keeps showing a settled thread, which has a link as any other', () => {
         const lookup = executionItemThreads([{ ...shell, settledAt: shell.updatedAt, settledOverride: 'settled' }]);
+
         expect(lookup(['root'])).toEqual([{ id: 'root', title: 'Build', state: 'done', updated: shell.updatedAt }]);
     });
     describe('order, since settling moves updatedAt', () => {
@@ -34,6 +37,7 @@ describe('recorded thread lookup', () => {
             updatedAt: '2026-11-02T20:38:51Z',
             latestRunCompletedAt: '2026-11-02T20:37:13Z',
         };
+
         it('keeps a just-settled shaping thread behind the build it preceded', () => {
             expect(order([build, { ...shaping, settledAt: shaping.updatedAt, settledOverride: 'settled' }])).toEqual([
                 'build',
@@ -48,6 +52,7 @@ describe('recorded thread lookup', () => {
         });
         it('keeps a build T3 settled on its own ahead of an older unsettled shaping thread', () => {
             const autoSettled = { ...build, updatedAt: '2026-11-05T00:00:00Z', settledAt: '2026-11-05T00:00:00Z' };
+
             expect(order([autoSettled, { ...shaping, updatedAt: '2026-11-02T20:37:13Z' }])).toEqual([
                 'build',
                 'shaping',
@@ -59,12 +64,14 @@ describe('recorded thread lookup', () => {
     });
     it('leaves out a recorded thread T3 no longer has, and has nothing to show for work with no recorded thread', () => {
         const lookup = executionItemThreads([{ ...shell, id: 'gone', deletedAt: shell.updatedAt }]);
+
         expect(lookup(['root', 'gone'])).toEqual([]);
         expect(lookup([])).toBeUndefined();
     });
     it('distinguishes running descendants from waiting descendants', () => {
         const parent = { ...shell, status: 'interrupted' };
         const child = { ...shell, id: 'child', status: 'running', lineage: { parentThreadId: 'root' } };
+
         expect(executionItemThreads([parent, child])(['root'])?.[0]).toMatchObject({
             hasRunningChildren: true,
             hasLiveChildren: true,
@@ -83,6 +90,7 @@ describe('recorded thread lookup', () => {
             pendingBackgroundTasks: [{ kind: 'subagent' }],
         };
         const [own] = executionItemThreads([{ ...parent, pendingBackgroundTasks: [{ kind: 'shell' }] }])(['root'])!;
+
         expect(own).toMatchObject({ state: 'done', hasRunningChildren: true });
         expect(own).not.toHaveProperty('hasLiveChildren');
         expect(executionItemThreads([parent, child])(['root'])?.[0]).toMatchObject({
@@ -103,6 +111,7 @@ describe('recorded thread lookup', () => {
             lineage: { parentThreadId: 'missing', rootThreadId: 'root' },
         };
         const read = (changes = {}) => executionItemThreads([parent, { ...child, ...changes }])(['root'])![0]!;
+
         expect(read().childNeedsYou).toBeUndefined();
         expect(read({ pendingRuntimeRequest: { id: 'r' } })).toMatchObject({
             hasLiveChildren: true,
@@ -127,6 +136,7 @@ describe('recorded thread lookup', () => {
             status: 'queued',
             lineage: { parentThreadId: 'child', rootThreadId: 'root' },
         };
+
         expect(executionItemThreads([{ ...shell, status: 'queued' }])(['root'])).toEqual([
             { id: 'root', title: 'Build', state: 'done', queued: true, updated: shell.updatedAt },
         ]);
@@ -144,6 +154,7 @@ describe('recorded thread lookup', () => {
             const lookup = executionItemThreads([
                 { ...shell, status, activeRunId: 'older-run', activityRunStatus: 'running' },
             ]);
+
             expect(lookup(['root'])?.[0]).toMatchObject({ state: 'running', currentRunning: true });
             expect(lookup(['root'])?.[0]).not.toHaveProperty('queued');
         }
@@ -161,6 +172,7 @@ describe('recorded thread lookup', () => {
     });
     it('shows a subagent thread only when it is recorded', () => {
         const child = { ...shell, id: 'child', lineage: { relationshipToParent: 'subagent' } };
+
         expect(executionItemThreads([child])(['child'])).toHaveLength(1);
     });
     it('keeps an interrupted root held while one of its nested child threads runs or waits', () => {
@@ -177,6 +189,7 @@ describe('recorded thread lookup', () => {
             status: 'running',
             lineage: { parentThreadId: 'child', rootThreadId: 'root' },
         };
+
         expect(executionItemThreads([parent, child, grandchild])(['root', 'child'])).toMatchObject([
             { id: 'root', state: 'stopped', hasLiveChildren: true },
             { id: 'child', hasLiveChildren: true },

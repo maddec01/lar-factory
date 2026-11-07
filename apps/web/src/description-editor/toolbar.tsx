@@ -31,13 +31,16 @@ interface Active {
     link: boolean;
     block: Block;
 }
+
 const NONE: Active = { bold: false, italic: false, link: false, block: 'paragraph' };
 
 /** What the selection has on. */
 function readActive(state: EditorState): Active {
     return state.read(() => {
         const selection = $getSelection();
+
         if (!$isRangeSelection(selection)) return NONE;
+
         const node = selection.anchor.getNode();
         const top = node.getKey() === 'root' ? null : node.getTopLevelElement();
         const block = $isHeadingNode(top)
@@ -47,6 +50,7 @@ function readActive(state: EditorState): Active {
                   ? 'number'
                   : 'bullet'
               : 'paragraph';
+
         return {
             bold: selection.hasFormat('bold'),
             italic: selection.hasFormat('italic'),
@@ -76,6 +80,7 @@ function ToolButton({
 } & ComponentProps<'button'>) {
     // Held here, so a hover while quiet doesn't leave the tooltip to show once it no longer is.
     const [tip, setTip] = useState(false);
+
     return (
         <Tooltip open={tip && !quiet} onOpenChange={(open) => setTip(open && !quiet)}>
             <TooltipTrigger asChild>
@@ -116,6 +121,7 @@ function LinkField({
 }) {
     const field = useRef<HTMLInputElement>(null);
     const apply = () => close(field.current!.value.trim() || null);
+
     return (
         <Popover open={open} onOpenChange={(opened) => !opened && close(null)}>
             {/* The button opens the field itself, so the trigger's own toggle is turned off. */}
@@ -140,6 +146,7 @@ function LinkField({
                         className="border-base-300 bg-base-100 focus:border-primary/60 focus:ring-primary/15 h-7 w-56 max-w-full rounded-md border px-2 text-sm outline-none focus:ring-3"
                         onKeyDown={(event) => {
                             if (event.key !== 'Enter') return;
+
                             event.preventDefault();
                             apply();
                         }}
@@ -159,10 +166,13 @@ export function Toolbar({ className = '' }: { className?: string }) {
     const [active, setActive] = useState(NONE);
     // The selection Link opened its field on, which the field's focus would otherwise lose.
     const [linking, setLinking] = useState<BaseSelection | null>(null);
+
     useEffect(() => editor.registerUpdateListener(({ editorState }) => setActive(readActive(editorState))), [editor]);
+
     const heading = () =>
         editor.update(() => {
             const selection = $getSelection();
+
             if ($isRangeSelection(selection))
                 $setBlocksType(selection, () =>
                     active.block === 'heading' ? $createParagraphNode() : $createHeadingNode('h2'),
@@ -178,18 +188,23 @@ export function Toolbar({ className = '' }: { className?: string }) {
     };
     const link = () => {
         if (active.link) return editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+
         setLinking(editor.getEditorState().read(() => $getSelection()?.clone() ?? null));
     };
     const closeLink = (url: string | null) => {
         const selection = linking;
+
         setLinking(null);
+
         if (url && selection)
             editor.update(() => {
                 $setSelection(selection.clone());
                 $toggleLink(url);
             });
+
         editor.focus();
     };
+
     return (
         <div
             role="toolbar"

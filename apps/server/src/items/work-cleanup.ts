@@ -47,7 +47,9 @@ type CleanupInput = {
 
 async function readGit(git: typeof runTool, cwd: string, args: string[]): Promise<string> {
     const result = await git('git', ['-C', cwd, ...args], { timeout: 10_000 });
+
     if (result.code !== 0) throw new Error('Cannot inspect cleanup Git state');
+
     return result.stdout;
 }
 
@@ -56,6 +58,7 @@ async function readCheckoutLists(git: typeof runTool, checkout: string): Promise
         readGit(git, checkout, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']),
         readGit(git, checkout, ['worktree', 'list', '--porcelain']),
     ]);
+
     return {
         refs: refs.trim().split('\n').filter(Boolean),
         trees: trees.split('\n\n').map((block) => ({
@@ -82,10 +85,13 @@ export async function inspectCleanups(
     const inspectNext = async () => {
         for (; next < branches.length;) {
             const index = next++;
+
             plans[index] = await inspectCleanup({ ...input, branch: branches[index] }, lists);
         }
     };
+
     await Promise.all(Array.from({ length: Math.min(INSPECTED_AT_ONCE, branches.length) }, inspectNext));
+
     return plans;
 }
 
@@ -113,22 +119,31 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
     const state: string[] = [];
     const dirtyFiles: string[] = [];
     const unpushedCommits: string[] = [];
+
     for (const path of worktreePaths) {
         const status = await read(path, ['status', '--porcelain']);
+
         state.push(status);
+
         // Hash tracked and untracked contents below without retaining binary diffs.
         const changed = await read(path, ['diff', '--name-only', '-z', 'HEAD', '--']);
         const untracked = await read(path, ['ls-files', '--others', '--exclude-standard', '-z']);
+
         for (const file of [...new Set([...changed.split('\0'), ...untracked.split('\0')].filter(Boolean))]) {
             const target = join(path, file);
             const stat = await lstat(target).catch(() => null);
+
             if (!stat) {
                 state.push(file, 'deleted');
                 continue;
             }
+
             if (!stat.isFile() && !stat.isSymbolicLink()) throw new Error('Cannot inspect a special file for cleanup');
+
             const hash = createHash('sha256');
+
             if (!stat.isSymbolicLink()) for await (const chunk of createReadStream(target)) hash.update(chunk);
+
             state.push(file, stat.isSymbolicLink() ? await readlink(target) : hash.digest('hex'));
         }
         dirtyFiles.push(
@@ -138,13 +153,16 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
                 .map((line) => `${path}: ${line}`),
         );
     }
+
     // A build branch has no upstream, and local default branch may lag the remote it started from.
     const remoteDefault = `refs/remotes/origin/${input.defaultBranch}`;
     const defaultBase =
         (await read(input.checkout, ['for-each-ref', '--format=%(refname)', remoteDefault])).trim() ||
         input.defaultBranch;
+
     for (const ref of localBranches) {
         state.push(await read(input.checkout, ['rev-parse', `refs/heads/${ref}`]));
+
         const upstream = await read(input.checkout, [
             'for-each-ref',
             '--format=%(upstream:short)',
@@ -152,6 +170,7 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
         ]);
         const base = upstream.trim() || defaultBase;
         const commits = await read(input.checkout, ['log', '--format=%h %s', `${base}..refs/heads/${ref}`, '--']);
+
         unpushedCommits.push(
             ...commits
                 .split('\n')
@@ -159,25 +178,32 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
                 .map((line) => `${ref}: ${line}`),
         );
     }
+
     let remoteBranch: string | null = null;
     let remoteAvailable = false;
     let remoteHead: string | null = null;
     let gone = false;
     let warning: string | undefined;
+
     try {
         const provider = input.provider ?? prHost(input.repository);
         const pushed = await provider.branchExists(input.repository, branch);
         const open = await provider.openPrByHead(input.repository, branch);
+
         if (pushed) {
             const head = (await read(input.checkout, ['ls-remote', '--refs', 'origin', `refs/heads/${branch}`]))
                 .trim()
                 .split(/\s+/)[0];
+
             if (!head || !/^[0-9a-f]{40,64}$/.test(head)) throw new Error('Cannot observe remote head');
+
             remoteHead = head;
         }
+
         remoteBranch = pushed ? branch : null;
         remoteAvailable = pushed && input.writable && !open;
         gone = !owned.length && !pushed && !open && branch !== input.defaultBranch;
+
         if (open) {
             localBranches.splice(0);
             worktreePaths.splice(0);
@@ -188,11 +214,13 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
         warning =
             'PR or remote observation failed. A new branch or move could create a second PR. Deleting the remote branch could close an open PR.';
     }
+
     if (
         branch === input.defaultBranch ||
         trees.some((tree) => tree.branch === branch && tree.path && input.liveWorktreePaths.includes(tree.path))
     )
         remoteAvailable = false;
+
     return {
         remoteHead,
         fingerprint: createHash('sha256').update(JSON.stringify(state)).digest('hex'),
@@ -223,22 +251,30 @@ export async function executeCleanup(input: {
 }): Promise<{ errors: string[]; remainingBranches: string[] }> {
     if (JSON.stringify(input.plan) !== JSON.stringify(input.expectedPlan))
         throw new Error('Cleanup changed. Inspect and confirm again.');
+
     const { plan } = input;
+
     if (input.local && (plan.dirtyFiles.length || plan.unpushedCommits.length) && !input.confirmedLoss)
         throw new Error('Confirm loss of dirty files and unpushed commits.');
+
     if (input.remote && !plan.remoteAvailable) throw new Error('Remote cleanup is unavailable.');
+
     const git = input.git ?? runTool;
     const errors: string[] = [];
     const remaining = new Set(plan.localBranches);
+
     if (!plan.localAvailable && !plan.gone) remaining.add(plan.branch);
+
     if (input.local) {
         for (const path of plan.worktreePaths) {
             await validateWorktreeRemoval(input.checkout, path, plan.localBranches, git);
+
             const result = await git(
                 'git',
                 ['-C', input.checkout, 'worktree', 'remove', ...(input.confirmedLoss ? ['--force'] : []), '--', path],
                 { timeout: 10_000 },
             );
+
             if (result.code !== 0) errors.push(`Could not remove worktree ${path}`);
         }
         for (const branch of plan.localBranches) {
@@ -247,10 +283,12 @@ export async function executeCleanup(input: {
                 ['-C', input.checkout, 'branch', input.confirmedLoss ? '-D' : '-d', '--', branch],
                 { timeout: 10_000 },
             );
+
             if (result.code === 0) remaining.delete(branch);
             else errors.push(`Could not delete branch ${branch}`);
         }
     }
+
     if (input.remote) {
         try {
             await (input.provider ?? prHost(input.repository)).deleteRemoteBranch(
@@ -263,6 +301,7 @@ export async function executeCleanup(input: {
             remaining.add(plan.branch);
         }
     } else if (plan.remoteBranch || plan.warning) remaining.add(plan.branch);
+
     return { errors, remainingBranches: [...remaining] };
 }
 
@@ -275,6 +314,7 @@ async function validateWorktreeRemoval(
 ): Promise<void> {
     const root = await realpath(checkout);
     const canonical = await realpath(path);
+
     if (
         (await lstat(path)).isSymbolicLink() ||
         canonical === root ||
@@ -282,26 +322,37 @@ async function validateWorktreeRemoval(
         canonical.split('/').filter(Boolean).length < 3
     )
         throw new Error('Unsafe worktree path');
+
     // T3 creates worktrees beside the project or under its .t3 worktree root.
     const roots = [dirname(root), join(root, '.t3', 'worktrees')];
+
     if (
         !roots.some((parent) => {
             const child = relative(parent, canonical);
+
             return child && !child.startsWith('..') && !isAbsolute(child);
         })
     )
         throw new Error('Worktree is outside trusted roots');
+
     const listed = await git('git', ['-C', checkout, 'worktree', 'list', '--porcelain'], { timeout: 10_000 });
+
     if (listed.code !== 0) throw new Error('Cannot verify worktree ownership');
+
     const block = listed.stdout.split('\n\n').find((value) => value.split('\n').includes(`worktree ${path}`));
+
     if (!block || !branches.some((branch) => block.split('\n').includes(`branch refs/heads/${branch}`)))
         throw new Error('Worktree ownership changed');
+
     const common = async (cwd: string) => {
         const result = await git('git', ['-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
             timeout: 10_000,
         });
+
         if (result.code !== 0) throw new Error('Cannot verify Git ownership');
+
         return realpath(result.stdout.trim());
     };
+
     if ((await common(checkout)) !== (await common(path))) throw new Error('Worktree belongs to another repository');
 }

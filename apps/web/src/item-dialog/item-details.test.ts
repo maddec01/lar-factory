@@ -34,23 +34,31 @@ const reads = () =>
 
 async function openItem(itemId: string): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().open(itemId));
 }
+
 async function closeItem(): Promise<void> {
     const { useItemDialogStore } = await import('./item-dialog-store.ts');
+
     await settle(() => useItemDialogStore.getState().close());
 }
 
 /** Holds each details read until the test answers it, keyed by item id; a read of the board still gets the sample. */
 function holdReads(): Map<string, (response: Response) => void> {
     const held = new Map<string, (response: Response) => void>();
+
     fetchMock.mockImplementation(async (url: string) => {
         const itemId = detailsRead(url);
+
         if (!itemId) return new Response(JSON.stringify(sample));
+
         return new Promise<Response>((resolve) => held.set(itemId, resolve));
     });
+
     return held;
 }
+
 const reply = (
     held: Map<string, (response: Response) => void>,
     itemId: string,
@@ -68,6 +76,7 @@ const azureItem = (): [BoardData, string] => {
         url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/310',
         labels: ['bug'],
     };
+
     return [
         {
             ...sample,
@@ -83,6 +92,7 @@ const azureItem = (): [BoardData, string] => {
 
 test('while the details load the dialog shows the board data and a loading state, then the issue as GitHub shows it', async () => {
     const held = holdReads();
+
     await mountPage();
     await openItem('I_sample13');
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
@@ -91,7 +101,9 @@ test('while the details load the dialog shows the board data and a loading state
 
     await reply(held, 'I_sample13');
     expect(inDialog('[aria-busy="true"]')).toBeNull();
+
     const body = description()!;
+
     expect(text(body.querySelector('h2'))).toBe('Description');
     expect([...body.querySelectorAll('table th')].map(text)).toEqual(['Column', 'Type', 'Notes']);
     expect(body.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
@@ -137,6 +149,7 @@ test('an issue shows its body', async () => {
 
 test('an Azure DevOps work item shows its iteration and area in place of a milestone, and each comment in its own format', async () => {
     const [data, id] = azureItem();
+
     await mountPage(data);
     await openItem(id);
     expect(meta()).toMatch(/IterationFabrikam\\Sprint 42/);
@@ -144,7 +157,9 @@ test('an Azure DevOps work item shows its iteration and area in place of a miles
     expect(meta()).not.toMatch(/Milestone/);
     expect(description()!.querySelector('b')!.textContent).toBe('sign-in');
     expect(description()!.querySelector('img'), 'an image is a link').toBeNull();
+
     const [markdown, html] = $$('[data-comments] li').map((li) => li.querySelector('[data-slot="rich-text"]')!);
+
     expect([text(markdown), text(html)]).toEqual([
         'I can reproduce it with a locked test account.',
         'Seen on iOS too.',
@@ -162,6 +177,7 @@ test('an item with no description and no comments shows an empty state for each,
 
 test('a failed read shows its error in the modal and the board data stays visible', async () => {
     const held = holdReads();
+
     await mountPage();
     await openItem('I_sample13');
     await reply(
@@ -185,13 +201,16 @@ test('details hide managed and mapped labels, and show linked-work only as a loc
     const setup = {
         vocabulary: effectiveVocabulary({ bug: { type: null, labels: ['type: bug'] } }).vocabulary,
     } as NonNullable<BoardData['repos'][number]['setup']>;
+
     await mountPage({
         ...sample,
         repos: sample.repos.map((r) => (r.repo === labelled.repo ? { ...r, setup } : r)),
         items: sample.items.map((i) => (i.id === labelled.id ? labelled : i)),
     });
     await openItem('I_sample13');
+
     const chips = [...$$<HTMLElement>('[data-item-dialog] [data-labels] [data-label-chip]')];
+
     expect(chips.map(text)).toEqual(['urgent']);
     expect(chips[0]!.style.backgroundColor).toContain('color-mix');
     expect(text(inDialog('[data-labels] [data-locked-label]'))).toBe('linked-work');
@@ -204,6 +223,7 @@ test('details name labels as the tracker does: tags on Azure DevOps, with no loc
         repo: 'fabrikam/fiber/lar-factory',
         labels: ['web'],
     };
+
     await mountPage({ ...sample, items: sample.items.map((i) => (i.id === azure.id ? azure : i)) });
     await openItem('I_sample13');
     expect(text(inDialog('[data-meta]'))).toContain('Tagsweb');
@@ -225,7 +245,9 @@ test('one read per open: live board data updates the board fields and leaves the
     await mountPage();
     await openItem('I_sample13');
     expect(reads()).toEqual(['I_sample13']);
+
     const before = text(description());
+
     await push({
         ...sample,
         items: sample.items.map((i) =>
@@ -245,11 +267,14 @@ const updatedAt = (iso: string): BoardData => ({
 
 test('reopening the dialog on an item whose updatedAt is unchanged shows its details at once, with no read', async () => {
     const held = holdReads();
+
     await mountPage();
     await openItem('I_sample13');
     await reply(held, 'I_sample13');
+
     const before = text(description());
     const earlier = fetchMock.mock.calls.length;
+
     await closeItem();
     await openItem('I_sample13');
     expect(fetchMock.mock.calls.length, 'no read of its own').toBe(earlier);
@@ -259,11 +284,14 @@ test('reopening the dialog on an item whose updatedAt is unchanged shows its det
 
 test("reopening the dialog once the item's updatedAt has changed reads the details again", async () => {
     const held = holdReads();
+
     await mountPage();
     await openItem('I_sample13');
     await reply(held, 'I_sample13');
     expect(description()).not.toBeNull();
+
     const earlier = fetchMock.mock.calls.length;
+
     await closeItem();
     await push(updatedAt('2026-10-21T09:45:00Z'));
     await openItem('I_sample13');
@@ -277,6 +305,7 @@ test("reopening the dialog once the item's updatedAt has changed reads the detai
 
 test('a comment that moves updatedAt while the dialog is open does not read again until it reopens', async () => {
     const held = holdReads();
+
     await mountPage();
     await openItem('I_sample13');
     await reply(held, 'I_sample13');
@@ -288,6 +317,7 @@ test('a comment that moves updatedAt while the dialog is open does not read agai
 
 test('a reply for an item that is no longer open is ignored', async () => {
     const held = holdReads();
+
     await mountPage();
     await openItem('I_sample13');
     await closeItem();
@@ -304,6 +334,7 @@ test('a reply for an item that is no longer open is ignored', async () => {
 test('Azure native fields and extra description sections remain visible when relations fail', async () => {
     const held = holdReads();
     const [data, id] = azureItem();
+
     data.items[0]!.azure = { type: 'Bug', state: 'Committed', assignee: 'Ana Silva' };
     await mountPage(data);
     await openItem(id);
@@ -338,10 +369,12 @@ test('Azure native fields and extra description sections remain visible when rel
 test('Azure attachments, Related work and blockers show named links even without children or pull requests', async () => {
     const held = holdReads();
     const [data, id] = azureItem();
+
     data.items[0]!.linkedPrs = [];
     data.items[0]!.subIssues = { total: 0, completed: 0 };
     await mountPage(data);
     await openItem(id);
+
     const ref = {
         number: 6711,
         title: 'Get credentials',
@@ -349,6 +382,7 @@ test('Azure attachments, Related work and blockers show named links even without
         repo: 'contoso/Fabrikam/web',
         state: 'open',
     };
+
     await reply(
         held,
         id,
@@ -396,9 +430,11 @@ test('Azure attachments, Related work and blockers show named links even without
 test('current sprint progress and children come first, with other children behind a closed toggle', async () => {
     const held = holdReads();
     const [data, id] = azureItem();
+
     data.items[0]!.currentSprint = { name: 'Sprint 60', childNumbers: [12, 13] };
     await mountPage(data);
     await openItem(id);
+
     const child = (number: number, state = 'open') => ({
         number,
         title: `Task ${number}`,
@@ -406,6 +442,7 @@ test('current sprint progress and children come first, with other children behin
         repo: 'contoso/Fabrikam/web',
         state,
     });
+
     await reply(
         held,
         id,
@@ -428,7 +465,9 @@ test('current sprint progress and children come first, with other children behin
     expect(sidebar()).toContain('This sprint: 1 of 2 done');
     expect(sidebar()).toContain('Sprint 60');
     expect($$('[data-item-dialog] aside li a').map(text)).toEqual(['#12 Task 12', '#13 Task 13', '#11 Task 11']);
+
     const history = inDialog<HTMLDetailsElement>('aside details')!;
+
     expect(history.open).toBe(false);
     expect(text(history.querySelector('summary'))).toBe('Other children (1)');
     expect(text(history)).toContain('#11 Task 11');
@@ -439,6 +478,7 @@ test('current sprint progress and children come first, with other children behin
 test('Spec details show Original collapsed and expose retry plus exact-generation accept and reject actions', async () => {
     let held = false;
     const actions: unknown[] = [];
+
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
         if (detailsRead(url))
             return new Response(
@@ -465,20 +505,27 @@ test('Spec details show Original collapsed and expose retry plus exact-generatio
                     },
                 }),
             );
+
         if (url === '/api/item-spec') {
             actions.push(JSON.parse(String(init?.body)));
+
             return new Response(JSON.stringify({ error: null }));
         }
+
         return new Response(JSON.stringify(sample));
     });
     await mountPage();
     await openItem('I_sample13');
     expect(text(description())).toContain('Spec');
+
     const original = description()!.querySelector<HTMLDetailsElement>('details')!;
+
     expect(original.open).toBe(false);
     expect(text(original)).toContain('Authored Original.');
+
     const button = (name: string) =>
         [...description()!.querySelectorAll<HTMLButtonElement>('button')].find((button) => text(button) === name)!;
+
     await settle(() => button('Retry Spec sync').click());
     expect(actions).toEqual([{ itemId: 'I_sample13', generation: 12, action: 'retry' }]);
     held = true;
@@ -493,14 +540,20 @@ test('Spec details show Original collapsed and expose retry plus exact-generatio
 
 test('build checks load once on expansion and retain the empty result on reopen', async () => {
     await mountPage();
+
     const build = sample.items.find((item) => item.kind === 'build')!;
+
     await openItem(build.id);
+
     const calls = () => fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/item-checks'));
+
     expect(calls()).toHaveLength(0);
     fetchMock.mockImplementation(
         async () => new Response(JSON.stringify({ checks: { workId: build.id, list: [], runs: [], reuses: [] } })),
     );
+
     const section = inDialog<HTMLDetailsElement>('[data-checks]')!;
+
     await settle(() => {
         section.open = true;
         section.dispatchEvent(new Event('toggle'));
@@ -520,7 +573,9 @@ test('build checks load once on expansion and retain the empty result on reopen'
 
 test('checks show outcomes, reasons and named open failures', async () => {
     await mountPage();
+
     const build = sample.items.find((item) => item.kind === 'build')!;
+
     await openItem(build.id);
     fetchMock.mockImplementation(
         async () =>
@@ -546,7 +601,9 @@ test('checks show outcomes, reasons and named open failures', async () => {
                 }),
             ),
     );
+
     const section = inDialog<HTMLDetailsElement>('[data-checks]')!;
+
     await settle(() => {
         section.open = true;
         section.dispatchEvent(new Event('toggle'));
@@ -561,7 +618,9 @@ test('a failed checks read stays in the section', async () => {
     fetchMock.mockImplementation(
         async () => new Response(JSON.stringify({ error: 'Database unavailable' }), { status: 503 }),
     );
+
     const section = inDialog<HTMLDetailsElement>('[data-checks]')!;
+
     await settle(() => {
         section.open = true;
         section.dispatchEvent(new Event('toggle'));
@@ -576,6 +635,7 @@ test('concept details show refinement independently of delivery', async () => {
         refinement: { complete: true, reasons: [] },
         completion: { complete: false, reasons: ['No delivery planned.'] },
     };
+
     await mountPage({ ...sample, items: [item] });
     await openItem(item.id);
     expect(meta()).toContain('Refinement');

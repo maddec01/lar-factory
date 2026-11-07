@@ -37,12 +37,15 @@ export async function azureAccess(repo: string, run: Az = az): Promise<Access> {
     ): Promise<'allowed' | 'refused' | undefined> => {
         const space = namespaces.value.find((s) => s.name === namespace);
         const permission = space?.actions.find((a) => a.name === action);
+
         if (!space || !permission) return undefined;
+
         try {
             const answer = await azureGet<{ value: boolean[] }>(
                 `${origin}/_apis/permissions/${space.namespaceId}/${permission.bit}?tokens=${encodeURIComponent(token)}&api-version=${API_VERSION}`,
                 run,
             );
+
             return answer.value.length === 1 && typeof answer.value[0] === 'boolean'
                 ? answer.value[0]
                     ? 'allowed'
@@ -67,13 +70,18 @@ export async function azureAccess(repo: string, run: Az = az): Promise<Access> {
         ).catch(() => null),
     ]);
     const access: Access = {};
+
     if (contribute === 'refused' || branch === 'refused') access['push-branch'] = 'refused';
     else if (contribute === 'allowed' && branch === 'allowed') access['push-branch'] = 'allowed';
+
     if (pr) access['open-pr'] = pr;
+
     if (tagging.includes('refused')) access['manage-labels'] = 'refused';
     else if (tagging.every((answer) => answer === 'allowed')) access['manage-labels'] = 'allowed';
+
     if (area?.identifier) {
         const edit = await evaluate('CSS', `vstfs:///Classification/Node/${area.identifier}`, 'WORK_ITEM_WRITE');
+
         if (edit)
             for (const op of [
                 'publish-ticket',
@@ -85,5 +93,6 @@ export async function azureAccess(repo: string, run: Az = az): Promise<Access> {
             ] as const)
                 access[op] = edit;
     }
+
     return access;
 }

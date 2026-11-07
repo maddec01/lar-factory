@@ -23,8 +23,10 @@ const UNMET_DEPENDENCY = new RegExp(`^Its Dependency ${WORK_ID} on (.+) isn't me
 function readableReasons(reasons: readonly string[], items: readonly Item[]): { text: string; names: string } {
     const unfinished = new Map<string, string[]>();
     const others: string[] = [];
+
     for (const reason of reasons) {
         const part = UNFINISHED_PART.exec(reason);
+
         if (part) unfinished.set(part[1]!, [...(unfinished.get(part[1]!) ?? []), part[2]!]);
         else
             others.push(
@@ -33,10 +35,12 @@ function readableReasons(reasons: readonly string[], items: readonly Item[]): { 
                     .replace(new RegExp(` ?${WORK_ID}`, 'g'), ''),
             );
     }
+
     const counts = [...unfinished].map(
         ([kind, ids]) => `${plural(ids.length, kind)} ${kind === 'decision' ? 'unsettled' : 'remaining'}.`,
     );
     const names = [...unfinished.values()].flat().flatMap((id) => items.find((item) => item.id === id)?.title ?? []);
+
     return { text: [...counts, ...others].join(' '), names: names.join(', ') };
 }
 
@@ -46,6 +50,7 @@ export function ConceptState({ state }: { state: { complete: boolean; reasons: s
         state.reasons,
         useBoardStore((board) => board.data.items),
     );
+
     return <span title={names || undefined}>{state.complete ? 'Complete' : text}</span>;
 }
 
@@ -55,6 +60,7 @@ export function ConceptWork({ item }: { item: Item }) {
         item,
         useBoardStore((state) => state.data.items),
     );
+
     return (
         <>
             <AgentWork item={item} label="Own cost" />
@@ -73,6 +79,7 @@ function PartRow({ item, data, openPart }: { item: Item; data: BoardData; openPa
     const shown = useShownStatus(item);
     const complete = isDone(item);
     const hasThread = item.threads === 'unavailable' || Boolean(item.threads?.length);
+
     return (
         <li
             data-concept-part={item.id}
@@ -113,7 +120,9 @@ export function ConceptParts({
     openPart: (itemId: string) => void;
 }) {
     const parts = partsOf(item, data.items);
+
     if (!parts.length) return null;
+
     return (
         <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-concept-parts>
             <h2 className="m-0 text-[13px] font-medium">Parts</h2>

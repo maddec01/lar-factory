@@ -70,12 +70,15 @@ function finiteNumber(value: unknown): number | null {
 function readTokenRates(entry: LiteLlmEntry, suffix: string, standard?: TokenRates): TokenRates | null {
     const input = finiteNumber(entry[`input_cost_per_token${suffix}`]);
     const output = finiteNumber(entry[`output_cost_per_token${suffix}`]);
+
     if (input === null || output === null) return null;
+
     const cacheRate = (name: string, field: 'cacheReadCostPerToken' | 'cacheCreationCostPerToken') =>
         finiteNumber(entry[`${name}${suffix}`]) ??
         (standard !== undefined && standard.inputCostPerToken > 0
             ? (standard[field] / standard.inputCostPerToken) * input
             : input);
+
     return {
         inputCostPerToken: input,
         outputCostPerToken: output,
@@ -93,8 +96,11 @@ function scaleTokenRates(rates: TokenRates, multiple: number): TokenRates {
 
 function fastMultiplier(entry: LiteLlmEntry): number | null {
     const specific = entry['provider_specific_entry'];
+
     if (typeof specific !== 'object' || specific === null) return null;
+
     const fast = finiteNumber((specific as Record<string, unknown>)['fast']);
+
     return fast !== null && fast > 0 ? fast : null;
 }
 
@@ -104,16 +110,23 @@ function fastMultiplier(entry: LiteLlmEntry): number | null {
  */
 export function parseRateTable(document: unknown): RateTable {
     const table = new Map<string, ModelRate>();
+
     if (typeof document !== 'object' || document === null) return table;
 
     for (const [name, raw] of Object.entries(document as Record<string, unknown>)) {
         if (typeof raw !== 'object' || raw === null) continue;
+
         const entry = raw as LiteLlmEntry;
         const standard = readTokenRates(entry, '');
+
         if (standard === null) continue;
+
         const key = normalizeRateKey(name);
+
         if (key.length === 0) continue;
+
         const multiple = fastMultiplier(entry);
+
         table.set(key, {
             ...standard,
             fast:
@@ -124,19 +137,25 @@ export function parseRateTable(document: unknown): RateTable {
 
     // A bare name stands for its qualified entries when they all have one rate.
     const aliasCandidates = new Map<string, ModelRate | null>();
+
     for (const [key, rate] of table) {
         const alias = bareModelName(key);
+
         if (alias.length === 0 || alias === key || table.has(alias)) continue;
+
         const held = aliasCandidates.get(alias);
+
         if (held === undefined) aliasCandidates.set(alias, rate);
         else if (held !== null && !sameRate(held, rate)) aliasCandidates.set(alias, null);
     }
     for (const [alias, rate] of aliasCandidates) if (rate !== null) table.set(alias, rate);
+
     return table;
 }
 
 function sameTokenRates(a: TokenRates | null, b: TokenRates | null): boolean {
     if (a === null || b === null) return a === b;
+
     return TOKEN_RATE_KEYS.every((key) => a[key] === b[key]);
 }
 
@@ -154,12 +173,14 @@ function normalizeRateKey(model: string): string {
 
 function bareModelName(key: string): string {
     const slash = key.lastIndexOf('/');
+
     return slash === -1 ? key : key.slice(slash + 1);
 }
 
 /** Drops a bracketed variant suffix such as Claude Code's 1M context tier `[1m]`: priced at the base tier. */
 function stripVariantSuffix(key: string): string {
     const bracket = key.indexOf('[');
+
     return bracket === -1 ? key : key.slice(0, bracket);
 }
 
@@ -169,7 +190,9 @@ const UNPRICEABLE_MODELS = new Set(['<synthetic>', 'synthetic', 'opus', 'sonnet'
 export function lookupRate(table: RateTable, model: string): ModelRate | null {
     const key = stripVariantSuffix(normalizeRateKey(model));
     const bareName = bareModelName(key);
+
     if (bareName.length === 0 || UNPRICEABLE_MODELS.has(bareName)) return null;
+
     return table.get(key) ?? null;
 }
 
@@ -200,25 +223,33 @@ export function priceUsage(
     const override = overrides?.get(model.trim());
     const reported =
         override === undefined && reportedCostUsd !== null && Number.isFinite(reportedCostUsd) ? reportedCostUsd : null;
+
     // T3 also splits a priced record's cost by category, which only its usage page shows.
     if (reported !== null) return { costUsd: reported, costSource: 'providerReported' };
+
     const rate = override ?? lookupRate(table, model);
+
     if (rate === null) return { costUsd: 0, costSource: 'unpriced' };
+
     return { costUsd: listCost(totals, ratesAt(rate, record.speed)), costSource: 'modelPriced' };
 }
 
 /** Each aliased model's final target, following chains; a model in a cycle keeps its own name. */
 export function resolveModelAliases(aliases: Readonly<Record<string, string>>): ReadonlyMap<string, string> {
     const resolved = new Map<string, string>();
+
     for (const model of Object.keys(aliases)) {
         const seen = new Set([model]);
         let target = aliases[model]!;
+
         while (Object.hasOwn(aliases, target) && !seen.has(target)) {
             seen.add(target);
             target = aliases[target]!;
         }
+
         if (!Object.hasOwn(aliases, target)) resolved.set(model, target);
     }
+
     return resolved;
 }
 
@@ -233,6 +264,7 @@ export interface Pricing {
 export function apiCost(records: Iterable<UsageRecord>, pricing: Pricing): number | null {
     let total = 0;
     let priced = false;
+
     for (const record of records) {
         const { costUsd, costSource } = priceUsage(
             pricing.rates,
@@ -240,8 +272,11 @@ export function apiCost(records: Iterable<UsageRecord>, pricing: Pricing): numbe
             pricing.overrides,
             pricing.aliases.get(record.model) ?? record.model,
         );
+
         total += costUsd;
+
         if (costSource !== 'unpriced') priced = true;
     }
+
     return priced ? total : null;
 }

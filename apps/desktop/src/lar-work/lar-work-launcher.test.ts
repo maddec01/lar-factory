@@ -23,6 +23,7 @@ let commandFile: string;
 
 beforeAll(async () => {
     const outDir = tempDir('lar-work-bundle-');
+
     await build({ ...larWorkPack, cwd: APP_DIR, outDir, logLevel: 'silent', config: false });
     commandFile = NodePath.join(outDir, 'lar-work.mjs');
 }, 60_000);
@@ -48,6 +49,7 @@ describe('the bundled command', () => {
         const dataDir = tempDir('lar-work-data-');
 
         const help = run(['--help']);
+
         assert.strictEqual(help.status, 0, help.stderr);
         assert.include(help.stdout, 'Usage: lar-work');
 
@@ -62,9 +64,12 @@ describe('the bundled command', () => {
             '--data-dir',
             dataDir,
         ]);
+
         assert.strictEqual(created.status, 0, created.stderr);
+
         const { workId } = JSON.parse(created.stdout);
         const read = run(['read', workId, '--data-dir', dataDir]);
+
         assert.strictEqual(read.status, 0, read.stderr);
         assert.strictEqual(JSON.parse(read.stdout).repository, 'maddec01/lar');
     });
@@ -88,13 +93,16 @@ describe('install', () => {
             '--data-dir',
             dataDir,
         ]);
+
         assert.strictEqual(created.status, 0, created.stderr);
+
         const read = runFrom(LarWorkLauncher.launcherPath(home), [
             'read',
             JSON.parse(created.stdout).workId,
             '--data-dir',
             dataDir,
         ]);
+
         assert.strictEqual(read.status, 0, read.stderr);
         assert.strictEqual(JSON.parse(read.stdout).kind, 'concept');
     });
@@ -102,7 +110,9 @@ describe('install', () => {
     it("gives Claude Code and Codex threads the board's database whatever their HOME and folder", () => {
         const appHome = tempDir('app-home-');
         const dataDir = boardDataDir(appHome, {});
+
         install(appHome, commandFile, dataDir);
+
         const agents = [
             { driver: 'claudeAgent', home: tempDir('claude-home-') },
             { driver: 'codex', home: tempDir('codex-home-') },
@@ -110,14 +120,17 @@ describe('install', () => {
 
         // Claude Code makes its home folder; the app installs only where one exists.
         NodeFS.mkdirSync(NodePath.join(agents[0]!.home, '.claude'));
+
         const targets = agents.map(
             ({ driver, home }) => installTargets(driver, appHome, { environment: [{ name: 'HOME', value: home }] })[0]!,
         );
+
         // As the app installs: into the fallback targets and those of T3's instances.
         installSkills(appHome, makeBundle(), '1.0.0', { targets: [...defaultTargets(appHome), ...targets] });
 
         const workIds = agents.map(({ driver, home }, index) => {
             assert.isTrue(NodeFS.existsSync(NodePath.join(targets[index]!.path, 'lar-work/SKILL.md')));
+
             const created = runFrom(
                 LarWorkLauncher.launcherPath(appHome),
                 ['create', '--title', driver, '--repository', 'maddec01/lar', '--kind', 'build'],
@@ -126,12 +139,15 @@ describe('install', () => {
                     home,
                 },
             );
+
             assert.strictEqual(created.status, 0, created.stderr);
+
             return JSON.parse(created.stdout).workId as string;
         });
 
         for (const [index, workId] of workIds.entries()) {
             const read = runFrom(LarWorkLauncher.launcherPath(appHome), ['read', workId, '--data-dir', dataDir]);
+
             assert.strictEqual(read.status, 0, read.stderr);
             assert.strictEqual(JSON.parse(read.stdout).title, agents[index]!.driver);
         }
@@ -139,6 +155,7 @@ describe('install', () => {
 
     it('leaves a current launcher as it is', () => {
         const home = tempDir('lar-work-home-');
+
         install(home);
 
         assert.deepStrictEqual(install(home), { kind: 'unchanged', path: LarWorkLauncher.launcherPath(home) });
@@ -146,13 +163,18 @@ describe('install', () => {
 
     it('points the launcher at the app after the app moves', () => {
         const home = tempDir('lar-work-home-');
+
         install(home, '/Applications/Old Lar Factory.app/Contents/Resources/work-records/lar-work.mjs');
+
         const moved = NodePath.join(tempDir('moved-app-'), "it's here", 'lar-work.mjs');
+
         NodeFS.mkdirSync(NodePath.dirname(moved));
         NodeFS.copyFileSync(commandFile, moved);
 
         assert.deepStrictEqual(install(home, moved), { kind: 'installed', path: LarWorkLauncher.launcherPath(home) });
+
         const help = runFrom(LarWorkLauncher.launcherPath(home), ['--help']);
+
         assert.strictEqual(help.status, 0, help.stderr);
         assert.notInclude(NodeFS.readFileSync(LarWorkLauncher.launcherPath(home), 'utf8'), 'Old Lar Factory');
     });
@@ -160,6 +182,7 @@ describe('install', () => {
     it('leaves a file the app did not install alone and reports it', () => {
         const home = tempDir('lar-work-home-');
         const path = LarWorkLauncher.launcherPath(home);
+
         NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
         NodeFS.writeFileSync(path, '#!/bin/sh\necho mine\n', { mode: 0o755 });
 
@@ -170,6 +193,7 @@ describe('install', () => {
     it("leaves a symlink at the launcher's path alone", () => {
         const home = tempDir('lar-work-home-');
         const path = LarWorkLauncher.launcherPath(home);
+
         NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
         NodeFS.symlinkSync(commandFile, path);
 
@@ -182,6 +206,7 @@ describe('onLaunch', () => {
     it.effect('installs the matching command when a dev run opts into skill installation', () =>
         Effect.gen(function* () {
             const home = tempDir('lar-work-home-');
+
             yield* LarWorkLauncher.onLaunch({
                 isPackaged: false,
                 installInDevelopment: true,
@@ -197,6 +222,7 @@ describe('onLaunch', () => {
     it.effect('installs nothing in a dev run', () =>
         Effect.gen(function* () {
             const home = tempDir('lar-work-home-');
+
             yield* LarWorkLauncher.onLaunch({
                 isPackaged: false,
                 home,
@@ -212,6 +238,7 @@ describe('onLaunch', () => {
         Effect.gen(function* () {
             const home = tempDir('lar-work-home-');
             const path = LarWorkLauncher.launcherPath(home);
+
             NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
             NodeFS.writeFileSync(path, 'mine\n');
             yield* LarWorkLauncher.onLaunch({

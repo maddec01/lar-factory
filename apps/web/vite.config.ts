@@ -45,13 +45,17 @@ function lazyLucideIcons() {
                 .filter(([, names]) => names!.split(',').some((name) => imported.has(name.trim().split(/\s+/).at(-1)!)))
                 .map(([, , file]) => file!),
         );
+
         if (imported.size && !kept.size)
             throw new Error(
                 "Can't read lucide-react's barrel; named icons would pull the lazy icon chunk into the entry",
             );
+
         const file = id.match(/\/lucide-react\/dist\/esm\/icons\/([^/]+)$/)?.[1];
+
         return file !== undefined && file !== 'index.mjs' && !kept.has(file);
     };
+
     return { plugin, isLazyIcon };
 }
 
@@ -77,6 +81,7 @@ export default defineConfig({
             // components, so Rolldown's warning that bundling drops the directive is noise.
             onwarn(warning, warn) {
                 if (warning.code === 'MODULE_LEVEL_DIRECTIVE' && warning.message.includes('"use client"')) return;
+
                 warn(warning);
             },
         },

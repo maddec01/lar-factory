@@ -37,6 +37,7 @@ const unlisted: ItemSource = {
 /** A repository's config as the page sees it: its role, item source and custom labels. */
 export function repoView({ repo, role, itemSource, labels }: RepositoryConfig): RepoConfig {
     if (itemSource.kind === 'issues') return { repo, role, items: 'issues', labels };
+
     return { repo, role, items: 'azure-board', team: itemSource.team, labels };
 }
 
@@ -49,31 +50,40 @@ export function configuredSources(configs: readonly RepositoryConfig[], run: Az 
     const teamKey = (repo: string, kind: string, team: string) =>
         [kind, ...repo.split('/').slice(0, 2).map(decodePart), team].join('/').toLowerCase();
     const teams = new Map<string, string[]>();
+
     for (const { repo, itemSource } of configs) {
         if (itemSource.kind !== 'azure-board') continue;
+
         const key = teamKey(repo, itemSource.kind, itemSource.team);
+
         teams.set(key, [...(teams.get(key) ?? []), repo]);
     }
+
     const azure = new Map<string, ItemSource>();
     const teamSource = (repo: string, kind: 'azure-board', team: string) => {
         const key = teamKey(repo, kind, team);
+
         if (!azure.has(key)) azure.set(key, azureBoard(teams.get(key)!, team, run));
+
         return azure.get(key)!;
     };
     const byRepo = new Map(
         configs.map(({ repo, itemSource }): [string, ItemSource] => {
             if (itemSource.kind === 'issues') return [repo, repoIssues(repo)];
+
             return [repo, teamSource(repo, itemSource.kind, itemSource.team)];
         }),
     );
     const kinds = new Map(
         configs.map((config): [ItemSource, ItemSourceKind] => [byRepo.get(config.repo)!, itemSource(repoView(config))]),
     );
+
     return mergeSources(byRepo, kinds);
 }
 
 /** How often a source holding active work reads, and how often an idle one does: its safety read for edits made elsewhere. */
 export const ACTIVE_READ_MS = 15_000;
+
 const IDLE_READ_MS = 5 * 60_000;
 /** How often each source checks for changes made elsewhere, as on github.com: a check that finds none costs no quota. */
 const PROBE_MS = 5_000;
@@ -107,9 +117,11 @@ const listsUrl = (item: Item, url: string) =>
     [item.url, ...item.slices.map((s) => s.url), ...item.linkedPrs.map((pr) => pr.url)].some(
         (at) => at?.toLowerCase() === url.toLowerCase(),
     );
+
 /** The repository, lowercased, and number a GitHub issue or PR URL names; undefined for any other URL. */
 function githubRef(url: string): { repo: string; number: number } | undefined {
     const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:issues|pull)\/(\d+)/i.exec(url);
+
     return match ? { repo: match[1]!.toLowerCase(), number: Number(match[2]) } : undefined;
 }
 
@@ -126,7 +138,9 @@ export function mergeSources(
     const sourceByRepo = new Map([...byRepo].map(([repo, source]) => [repo.toLowerCase(), source]));
     const sources = [...new Set([...byRepo.values()])];
     const named = new Map<ItemSource, string[]>();
+
     for (const [repo, source] of byRepo) named.set(source, [...(named.get(source) ?? []), repo]);
+
     /** How a read names the source: its own name, else the repositories it stands for, else a generic source name. */
     const nameOf = (source: ItemSource) =>
         source.name ??
@@ -137,7 +151,9 @@ export function mergeSources(
         'an item source';
     const readOf = async (source: ItemSource, progress?: ReadProgress): Promise<ItemsRead> => {
         const name = nameOf(source);
+
         progress?.started(name);
+
         try {
             return await readNamed(source);
         } finally {
@@ -146,6 +162,7 @@ export function mergeSources(
     };
     const readNamed = (source: ItemSource): Promise<ItemsRead> => {
         const repos = named.get(source);
+
         return repos === undefined
             ? source.read()
             : source.read().catch((err: unknown) => {
@@ -159,6 +176,7 @@ export function mergeSources(
                               ...(err.fix !== undefined && { fix: err.fix }),
                           })),
                       };
+
                   throw new Error(`${repos.join(', ')}: ${err instanceof Error ? err.message : String(err)}`, {
                       cause: err,
                   });
@@ -179,6 +197,7 @@ export function mergeSources(
     /** Whether the pace holds the source back, by its kind. */
     const waits = (source: ItemSource, pace: ReadPace) => {
         const kind = kinds.get(source);
+
         return kind !== undefined && pace.waits?.(kind) === true;
     };
     /**
@@ -187,18 +206,27 @@ export function mergeSources(
      */
     const planOf = (source: ItemSource, pace: ReadPace): 'whole' | Item[] | null => {
         if (waits(source, pace)) return null;
+
         const started = startedAt.get(source);
+
         if (started === undefined) return 'whole';
+
         const since = pace.now - started;
         const activeMs = pace.activeMs ?? ACTIVE_READ_MS;
+
         // A source that never read retries at the active pace, not on every tick.
         if (!lastRead.has(source)) return since >= activeMs ? 'whole' : null;
+
         if (askedWhole.has(source) && since >= (failed.has(source) ? activeMs : minGap(pace))) return 'whole';
+
         if (pace.now - wholeAt.get(source)! >= (pace.idleMs ?? IDLE_READ_MS)) return 'whole';
+
         const listed = lastRead.get(source)!.items;
         const asked = listed.filter((item) => askedItems.has(item.id));
         const active = pace.slow ? [] : listed.filter(source.seesEdits ? pace.polled : pace.active);
+
         if (!(asked.length && since >= minGap(pace)) && !(active.length && since >= activeMs)) return null;
+
         return source.readSome ? [...new Set([...asked, ...active])] : 'whole';
     };
     /** Reads the plan's items alone, keeping the rest of the source's last read; a failed read of a few reads it all. */
@@ -208,13 +236,16 @@ export function mergeSources(
         progress?: ReadProgress,
     ): Promise<ItemsRead> => {
         if (plan === 'whole') return readOf(source, progress);
+
         const last = lastRead.get(source)!;
         let fresh: Item[];
+
         try {
             fresh = await source.readSome!(plan);
         } catch {
             return readOf(source, progress);
         }
+
         const byId = new Map(fresh.map((item) => [item.id, item]));
         // A planned item the provider no longer lists, as when it was deleted, leaves. A read can bring more than it was
         // asked for, as an Azure item's Tasks, new ones too, so every item it brings replaces or joins the last read. A
@@ -222,10 +253,14 @@ export function mergeSources(
         const planned = new Set(plan.map((item) => item.id));
         const kept = last.items.flatMap((item) => {
             const fresh = byId.get(item.id);
+
             if (!fresh) return planned.has(item.id) ? [] : [item];
+
             byId.delete(item.id);
+
             return [fresh.map === undefined && item.map ? { ...fresh, map: item.map } : fresh];
         });
+
         return { ...last, items: [...kept, ...byId.values()] };
     };
     /** When each source's last good change check started, and when one that failed may check again. */
@@ -245,6 +280,7 @@ export function mergeSources(
                 ...(ref ? [refKey(ref.repo, ref.number)] : []),
             ].map((key) => key.toLowerCase()),
         );
+
         return [
             ...found,
             ...all.filter(
@@ -260,9 +296,12 @@ export function mergeSources(
      */
     const ask = (source: ItemSource, changed: string[] | null) => {
         if (changed === null) return void askedWhole.add(source);
+
         for (const url of changed) {
             const found = listing(url);
+
             for (const item of found) askedItems.add(item.id);
+
             if (!found.length) askedWhole.add(source);
         }
     };
@@ -280,13 +319,16 @@ export function mergeSources(
         const items = reads.flatMap((read, index) =>
             read.items.filter((item) => {
                 if (listed.has(item.id)) return false;
+
                 listed.set(item.id, sources[index]!);
+
                 return true;
             }),
         );
         const problems = reads.flatMap((read) => read.problems ?? []);
         const blocked = (source: ItemSource) => {
             const kind = kinds.get(source);
+
             return kind !== undefined && pace?.blocked?.(kind) === true;
         };
         const waiting = [...byRepo]
@@ -298,23 +340,29 @@ export function mergeSources(
             ...(problems.length > 0 && { problems }),
             ...(waiting.length > 0 && { waiting }),
         };
+
         return { read, listed };
     };
+
     return {
         async read(progress, pace) {
             const plans = sources.flatMap((source) => {
                 const plan = pace ? planOf(source, pace) : 'whole';
+
                 return plan ? [{ source, plan }] : [];
             });
             const now = pace?.now ?? Date.now();
+
             for (const { source, plan } of plans) {
                 startedAt.set(source, now);
+
                 if (plan === 'whole') {
                     wholeAt.set(source, now);
                     askedWhole.delete(source);
                     for (const item of lastRead.get(source)?.items ?? []) askedItems.delete(item.id);
                 } else for (const item of plan) askedItems.delete(item.id);
             }
+
             // A source that read keeps its read though another failed, so the next read needn't read it again. Each read
             // that lands while another still reads shows what has landed so far.
             let reading = plans.length;
@@ -325,33 +373,45 @@ export function mergeSources(
                             failed.add(source);
                             throw err;
                         });
+
                         lastRead.set(source, read);
                         failed.delete(source);
+
                         if (reading > 1) progress?.landed?.(merged(pace).read);
                     } finally {
                         reading--;
                     }
                 }),
             );
+
             // A failed read asks again for what it read, so a change a check found isn't lost to a passing error.
             settled.forEach((read, index) => {
                 const { source } = plans[index]!;
+
                 if (read.status === 'rejected' && lastRead.has(source)) askedWhole.add(source);
             });
+
             const rejected = settled.find((read) => read.status === 'rejected');
+
             if (rejected) throw rejected.reason;
+
             afresh = new Set(plans.filter(({ plan }) => plan === 'whole').map(({ source }) => source));
             afreshItems = new Set(plans.flatMap(({ plan }) => (plan === 'whole' ? [] : plan.map((item) => item.id))));
+
             const { read, listed } = merged(pace);
+
             listedBy = listed;
+
             return read;
         },
         async probe(pace) {
             if (pace.slow) return;
+
             // A check looks back to the last good one, or to the source's first read; a failed check leaves that in place.
             await Promise.allSettled(
                 sources.map(async (source) => {
                     const since = probedAt.get(source) ?? wholeAt.get(source);
+
                     if (
                         !source.changes ||
                         !lastRead.has(source) ||
@@ -360,6 +420,7 @@ export function mergeSources(
                         pace.now < (probeAfter.get(source) ?? since + PROBE_MS)
                     )
                         return;
+
                     probeAfter.set(source, pace.now + PROBE_RETRY_MS);
                     ask(source, await source.changes(since));
                     probedAt.set(source, pace.now);
@@ -370,11 +431,15 @@ export function mergeSources(
         due: (pace) => sources.some((source) => planOf(source, pace) !== null),
         invalidate(url) {
             const found = url === undefined ? [] : listing(url);
+
             for (const item of found) askedItems.add(item.id);
+
             if (found.length) return;
+
             // A GitHub URL outside the onboarded repositories cannot affect any source.
             const ref = url === undefined ? undefined : githubRef(url);
             const own = ref && sourceByRepo.get(ref.repo);
+
             for (const source of own ? [own] : ref ? [] : sources) askedWhole.add(source);
         },
         readAfresh: (item) => afresh.has(sourceOf(item)) || afreshItems.has(item.id),
@@ -414,24 +479,31 @@ export function onboardedSources(
         !pace ||
         loadedAt === null ||
         pace.now - loadedAt >= (reloadAsked ? minGap(pace) : (pace.idleMs ?? IDLE_READ_MS));
+
     return {
         async read(progress, pace) {
             if (loadDue(pace)) {
                 loadedAt = pace?.now ?? Date.now();
                 reloadAsked = false;
+
                 const loaded = await load();
+
                 configs = loaded.configs;
+
                 if (JSON.stringify(configs) !== key) {
                     current = build(configs);
                     key = JSON.stringify(configs);
                 }
+
                 leftOff = new Set(loaded.problems.map((p) => p.repo.toLowerCase()));
             }
+
             const shown = (read: ItemsRead) => ({
                 ...read,
                 items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')),
             });
             const landed = progress?.landed;
+
             return shown(
                 await current.read(landed ? { ...progress!, landed: (read) => landed(shown(read)) } : progress, pace),
             );

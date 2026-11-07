@@ -41,8 +41,11 @@ import { OnYourDesk, YOURS, ROW_OPENS, picked, threadText } from './stage-track.
 /** The one thing a status asks next, or where to act on an item that waits on you. */
 function Side({ item, data }: { item: Item; data: BoardData }) {
     const { working } = useShownStatus(item);
+
     if (working) return <OpenThread item={item} data={data} threadId={currentBuildThread(item)?.id} />;
+
     if (YOURS.includes(item.status)) return <OnYourDesk />;
+
     switch (item.status) {
         case 'Queued':
             return hasLiveThread(item) ? (
@@ -54,6 +57,7 @@ function Side({ item, data }: { item: Item; data: BoardData }) {
             return <StartBuild item={item} data={data} namesBlocker={false} />;
         case 'In progress':
             if (canRetryBuild(item)) return <StartBuild item={item} data={data} namesBlocker={false} />;
+
             return <OpenThread item={item} data={data} />;
         case 'Shaping':
         case 'Review':
@@ -67,6 +71,7 @@ function Side({ item, data }: { item: Item; data: BoardData }) {
 const sliceNote = (item: Item) => {
     const b = item.slices.filter((s) => s.progress === 'blocked');
     const a = item.slices.filter((s) => s.progress === 'active');
+
     return [
         ...b.map((s) => ({ s, word: 'blocked', tone: 'text-(--st-review)' })),
         ...a.map((s) => ({ s, word: 'active', tone: 'text-(--st-now)' })),
@@ -76,6 +81,7 @@ const sliceNote = (item: Item) => {
 /** Which concept or parent the row's work belongs to. */
 function PartOf({ concept }: { concept: Item }) {
     const text = `${concept.kind === 'concept' ? 'Concept' : 'Part of'}: ${concept.title}`;
+
     return (
         <span
             data-concept
@@ -95,13 +101,17 @@ function stateText(
     runKnown: boolean,
 ): string {
     if (label === 'Activity unavailable') return runKnown ? 'Working' : word;
+
     if (label === word || label === 'Working') return label;
+
     if (running) return label;
+
     if (
         (label === 'Starting' || label === 'May have started') &&
         ['Queued', 'Ready', 'In progress'].includes(item.status)
     )
         return word;
+
     return `${word} · ${label}`;
 }
 
@@ -136,6 +146,7 @@ export function StageRow({ row: { item, concept }, data, n }: { row: Row; data: 
         (figures && hasFigures(figures)) ||
         usageLoading(item, data) ||
         blocked;
+
     return (
         <li data-item={item.id} className={`@container py-2 ${ROW_RULE} hover:bg-(--accent) ${picked(isPicked)}`}>
             <div className="row-first">

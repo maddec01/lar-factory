@@ -18,6 +18,7 @@ export function writeState(
     action?: ItemAction,
 ): { disabled?: true; title?: string; 'aria-disabled'?: true } {
     if (data.capture?.enabled === false) return { disabled: true, title: 'Disabled in sample mode' };
+
     return action?.phase === 'pending' ? { 'aria-disabled': true } : {};
 }
 
@@ -25,6 +26,7 @@ export function writeState(
 export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
     const action = useItemAction(item.id);
     const verb = action?.phase === 'pending' && action.kind === 'queue' ? 'Queuing…' : 'Queue';
+
     return (
         <Button
             {...kind('other')}
@@ -42,6 +44,7 @@ export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
 export function BackToListButton({ item, data }: { item: Item; data: BoardData }) {
     const action = useItemAction(item.id);
     const moving = action?.phase === 'pending' && action.kind === 'back-to-list';
+
     return (
         <Button
             {...kind('other')}
@@ -60,12 +63,15 @@ export function BackToListButton({ item, data }: { item: Item; data: BoardData }
 export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
     const action = useItemAction(item.id);
     const reason = useId();
+
     if (!canAbandon(item)) return null;
+
     const verb = action?.phase === 'pending' && action.kind === 'abandon' ? 'Abandoning…' : 'Abandon';
     const refusal = item.abandonRefusal;
     const state = refusal
         ? { disabled: true as const, title: refusal, 'aria-describedby': reason }
         : writeState(data, action);
+
     return (
         <>
             <Button
@@ -91,11 +97,14 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
 export function ActionError({ item }: { item: Item }) {
     const action = useItemAction(item.id);
     const el = useRef<HTMLSpanElement>(null);
+
     if (action?.phase !== 'error' || !action.message) return null;
+
     const close = () =>
         closeKeepingFocus(el.current, () => useActionStore.getState().set(item.id, undefined), [
             `[data-queue="${CSS.escape(item.id)}"]`,
         ]);
+
     return (
         <span className="action-error" ref={el}>
             <span role="alert">{action.message}</span>{' '}

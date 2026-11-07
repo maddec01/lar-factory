@@ -23,12 +23,14 @@ const BLOCKERS: {
         kind: 'decision',
         start(records, workId) {
             const concept = records.create({ title: 'Concept', repository: REPO, kind: 'concept', status: 'Shaping' });
+
             records.setParent(workId, at(records, workId), concept.workId);
             records.setBody(workId, at(records, workId), 'answer', 'Use SQLite.');
             records.setBody(workId, at(records, workId), 'domain-drafts', 'None.');
         },
         finish(records, workId) {
             const concept = records.read(workId).parentId!;
+
             records.setBody(concept, at(records, concept), 'map', '# Map\n\nSettled.');
         },
     },
@@ -36,6 +38,7 @@ const BLOCKERS: {
         kind: 'concept',
         start(records, workId) {
             const build = records.create({ title: 'Delivery', repository: REPO, kind: 'build' });
+
             records.setParent(build.workId, build.revision, workId);
             records.setPullRequest(build.workId, at(records, build.workId), `${REPO}#91`);
             records.observe(build.workId, at(records, build.workId), { of: 'pr', state: 'merged' });
@@ -56,10 +59,12 @@ for (const { kind, start, finish } of BLOCKERS) {
     test(`Start after waits on a ${kind} blocker until its local facts complete it, never on its Status or thread`, async (t) => {
         const dir = mkdtempSync(join(tmpdir(), 'lar-start-after-'));
         const records = await openWorkRecords(join(dir, 'work-records.db'));
+
         t.onTestFinished(() => {
             records.close();
             rmSync(dir, { recursive: true, force: true });
         });
+
         const blocker = records.create({
             title: `The ${kind}`,
             repository: REPO,
@@ -67,6 +72,7 @@ for (const { kind, start, finish } of BLOCKERS) {
             status: kind === 'build' ? 'In progress' : 'Shaping',
         });
         const work = records.create({ title: 'Waiting work', repository: REPO, kind: 'feature', status: 'Queued' });
+
         records.addBlocker(work.workId, work.revision, blocker.workId);
         start(records, blocker.workId);
         records.update(blocker.workId, at(records, blocker.workId), { status: 'Done' });
@@ -83,11 +89,13 @@ for (const { kind, start, finish } of BLOCKERS) {
             commands: {
                 start: async (...args) => {
                     started.push(args);
+
                     return { status: 200, body: { error: null } };
                 },
                 startBuild: async () => ({ status: 200, body: { error: null } }),
             },
         });
+
         assert.equal(blockedText(board.find(work.workId)!), `Blocked by The ${kind} until it completes`);
         assert.equal(startAfter.arm(work.workId, undefined).status, 200);
         await startAfter.startUnblocked();
@@ -103,12 +111,15 @@ for (const { kind, start, finish } of BLOCKERS) {
 test('an armed start whose item the board does not show stays armed until the records or the onboarded list say it is gone', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'start-after-gone-'));
     const records = await openWorkRecords(join(dir, 'work-records.db'));
+
     try {
         const file = join(dir, 'armed.json');
         const work = records.create({ title: 'Ticketless', repository: REPO, kind: 'build', status: 'Ready' });
         let list: () => { repo: string }[] = () => [{ repo: REPO }];
         const board = createBoardState({ items: [], repos: [] } as unknown as BoardData);
+
         writeFileSync(file, JSON.stringify({ [work.workId]: {}, gone: {} }));
+
         const startAfter = createStartAfter({
             board,
             file,
@@ -119,6 +130,7 @@ test('an armed start whose item the board does not show stays armed until the re
                 startBuild: async () => ({ status: 200, body: { error: null } }),
             },
         });
+
         await startAfter.startUnblocked();
         assert.deepEqual(
             board.snapshot().armed,
@@ -136,11 +148,15 @@ test('an armed start whose item the board does not show stays armed until the re
         assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), {});
 
         list = () => [{ repo: REPO }];
+
         const gone = armedWorkGone(records, () => list());
+
         assert.equal(gone(work.workId), false);
         records.update(work.workId, records.read(work.workId).revision, { status: 'In progress' });
         assert.equal(gone(work.workId), true, 'it moved on from Ready');
+
         const aside = records.create({ title: 'Aside', repository: REPO, kind: 'build', status: 'Ready' });
+
         records.setAside(aside.workId, aside.revision);
         assert.equal(gone(aside.workId), true, 'set aside');
         assert.equal(armedWorkGone(null, () => list())(work.workId), false, 'unreadable records prove nothing');

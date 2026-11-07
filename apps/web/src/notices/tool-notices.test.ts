@@ -18,19 +18,24 @@ const rechecks = () => fetchMock.mock.calls.filter(([url]) => url === '/api/rech
 
 /** The next POST waits until the test answers it, so Checking… can be seen. */
 let answer: (response: Response | Error) => Promise<void>;
+
 function holdRecheck(): void {
     fetchMock.mockImplementation(async (url: string) => {
         if (url !== '/api/recheck') return new Response(JSON.stringify(sample));
+
         return new Promise<Response>((resolve, reject) => {
             answer = (response) => settle(() => (response instanceof Error ? reject(response) : resolve(response)));
         });
     });
 }
+
 const board = (data: BoardData) => new Response(JSON.stringify({ error: null, board: data }));
 
 test('a missing t3 replaces the main area with a notice and Recheck', async () => {
     await mountPage(withTools({ t3: { result: 'missing' } }));
+
     const notice = $('main .tool-missing .tool-missing-box')!;
+
     expect(notice.getAttribute('role')).toBe('alert');
     expect(notice.querySelector('h1')!.textContent).toBe('T3 Code not found');
     expect(notice.querySelector('.lar-brand-mark')!.getAttribute('aria-label')).toBe('Lar');
@@ -55,7 +60,9 @@ test('a t3 override that points nowhere is named', async () => {
 
 test('a missing or logged-out gh shows its own notice, and other read failures show none', async () => {
     await mountPage(withTools({ gh: { result: 'missing', fix: 'brew install gh' } }, failed));
+
     const warnings = () => $$('[data-slot="notice"]');
+
     expect(warnings().length).toBe(1);
     expect(warnings()[0]!.closest('[data-slot="toaster"]')).toBeNull();
     expect(warningText(warnings()[0]!)).toEqual([
@@ -121,7 +128,9 @@ test('Recheck posts, shows Checking…, then the board once the tool is found, a
 
 test("after Recheck a gh warning says it's still logged out, or why Recheck failed, until the server answers again", async () => {
     holdRecheck();
+
     const loggedOut = withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } });
+
     await mountPage(loggedOut);
     expect(note(), 'nothing before a Recheck').toBeNull();
     await settle(() => recheckButton().click());
@@ -139,7 +148,9 @@ test("after Recheck a gh warning says it's still logged out, or why Recheck fail
 
 test('a Recheck note answers only the tool problems it found, and goes once they change', async () => {
     holdRecheck();
+
     const loggedOut = withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } });
+
     await mountPage(loggedOut);
     await settle(() => recheckButton().click());
     await answer(board(loggedOut));
@@ -155,7 +166,9 @@ test('a Recheck note answers only the tool problems it found, and goes once they
 
 test('a missing git, jq or curl shows a warning with its install command and Recheck, and the board still shows', async () => {
     await mountPage(withTools({ jq: { result: 'missing', fix: 'brew install jq' } }));
+
     const warnings = () => $$('[data-slot="notice"]');
+
     expect(warnings().map(warningText)).toEqual([
         [
             'jq not found.',
@@ -186,9 +199,13 @@ test('a missing git, jq or curl shows a warning with its install command and Rec
 
 test('an az that fails its check shows a warning with its fix, and the board still shows', async () => {
     holdRecheck();
+
     const loggedOut = withTools({ az: { result: 'logged-out', version: '2.67.0', fix: 'az login' } });
+
     await mountPage(loggedOut);
+
     const warnings = () => $$('[data-slot="notice"]');
+
     expect(warnings().map(warningText)).toEqual([
         [
             'Azure CLI is logged out.',
@@ -218,7 +235,9 @@ test('an az that fails its check shows a warning with its fix, and the board sti
 
 test('T3 Code not running shows a warning with its fix and Recheck, and the board still shows', async () => {
     holdRecheck();
+
     const closed = withTools({ t3: { result: 'not-running', version: '0.1.3-nightly.1' } });
+
     await mountPage(closed);
     expect($$('[data-slot="notice"]').map(warningText)).toEqual([
         [

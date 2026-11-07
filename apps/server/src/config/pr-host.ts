@@ -42,5 +42,6 @@ export async function observePr(
     run?: (args: string[]) => Promise<string>,
 ): Promise<PullRequestState> {
     const state = await prHost(repo).prState(prUrl(repo, number), run);
+
     return state === 'MERGED' ? 'merged' : state === 'CLOSED' ? 'closed' : 'open';
 }

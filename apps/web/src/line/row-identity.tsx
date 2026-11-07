@@ -14,6 +14,7 @@ import { PartKindLabel } from './work-map.tsx';
 /** A row's kind: its badge, a decision's method or Build, with or without a ticket; a ticket with no recognised kind has none. */
 export const RowKind = memo(function RowKind({ item }: { item: Item }) {
     if (KIND_BADGES[item.kind]) return <KindBadge kind={item.kind} />;
+
     return item.kind === 'decision' || item.kind === 'build' || isBuild(item) ? (
         <Badge>
             <PartKindLabel kind={partKind(item)} />

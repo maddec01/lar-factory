@@ -21,6 +21,7 @@ export interface Cooldown {
 export function createCooldown(tool: string, reset: () => Promise<number | null> = async () => null): Cooldown {
     let until = 0;
     let wait = FIRST_WAIT_MS;
+
     return {
         check(now = Date.now()) {
             if (now < until)
@@ -30,7 +31,9 @@ export function createCooldown(tool: string, reset: () => Promise<number | null>
         },
         async failed(detail, now = Date.now()) {
             if (!RATE_LIMITED.test(detail)) return;
+
             const at = await reset().catch(() => null);
+
             until = at !== null && at > now ? at : now + wait;
             wait = Math.min(wait * 2, LONGEST_WAIT_MS);
         },

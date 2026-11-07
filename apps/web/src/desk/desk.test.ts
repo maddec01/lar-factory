@@ -26,10 +26,14 @@ const withItem = (id: string, change: Partial<Item>): BoardData => ({
 test('the desk shows what waits on you, counted, as cards in one row that scrolls sideways with no scrollbar', async () => {
     await mountPage();
     expect(text($('#desk-h'))).toBe('Your desk 7');
+
     const statuses = cards().map((c) => sample.items.find((i) => i.id === c.dataset.item)!.status);
+
     expect(new Set(statuses)).toEqual(new Set(['Needs you', 'Verify', 'Ready to merge']));
     expect(cards()).toHaveLength(7);
+
     const row = cards()[0]!.parentElement!.className.split(' ');
+
     expect(row).toEqual(
         expect.arrayContaining([
             '-mx-6',
@@ -43,7 +47,9 @@ test('the desk shows what waits on you, counted, as cards in one row that scroll
 
 test('a desk card shows its repository, kind and age, numbered title, then its status and next step beside its action', async () => {
     await mountPage();
+
     const rows = [...card('I_sample16').querySelector('button')!.children];
+
     expect(rows.map(text)).toEqual(['🍎lar-appleFeature1h ago', '#31 New artwork grid layout']);
     expect(nextLine('I_sample16')).toBe('can merge · 1 passed');
     expect(text(card('I_sample16'))).toContain('Verify');
@@ -52,13 +58,16 @@ test('a desk card shows its repository, kind and age, numbered title, then its s
 
 test("a desk card's title is one line, cut short, with the whole title in its tooltip", async () => {
     await mountPage();
+
     const title = card('I_sample28').querySelector('.desk-title')!;
+
     expect(title.className.split(' ')).toEqual(expect.arrayContaining(['truncate', 'h-5']));
     expect(title.getAttribute('title')).toBe('#147 Fall back to software transcoding when the GPU is busy');
 });
 
 test('every desk card has the same rows at the same heights', async () => {
     await mountPage();
+
     const heights = (c: HTMLElement) =>
         [
             c.querySelector('.desk-meta'),
@@ -66,6 +75,7 @@ test('every desk card has the same rows at the same heights', async () => {
             c.querySelector('.desk-next'),
             c.querySelector('.desk-actions'),
         ].map((row) => row?.className.split(' ').find((name) => /^h-\d+$/.test(name)));
+
     for (const c of cards()) expect(heights(c)).toEqual(['h-6', 'h-5', 'h-5', 'h-8']);
 });
 
@@ -147,7 +157,9 @@ test("a card's check counts read in full in a tooltip, since they can truncate",
 
 test("Open thread in a card's corner is a square icon button named and titled Open thread", async () => {
     await mountPage(withItem('I_sample16', { threads: liveThread }));
+
     const corner = card('I_sample16').querySelector('.desk-actions [data-open-thread]')!;
+
     expect([
         corner.getAttribute('aria-label'),
         corner.getAttribute('title'),
@@ -158,7 +170,9 @@ test("Open thread in a card's corner is a square icon button named and titled Op
 test('Open thread opens the latest thread in T3, and Open PR the pull request the item dialog links, in a new tab', async () => {
     await mountPage();
     expect(card('I_sample12').querySelector('[data-open-thread]')!.getAttribute('href')).toMatch(/^t3code:\/\//);
+
     const pr = card('I_sample16').querySelector<HTMLAnchorElement>('[data-pr-link]')!;
+
     expect([pr.getAttribute('href'), pr.target]).toEqual(['https://github.com/maddec01/lar-apple/pull/32', '_blank']);
 });
 
@@ -176,6 +190,7 @@ test.each([
 
 test('a Verify card reads the PR Open PR opens, its first linked one', async () => {
     const linkedPrs = (id: string) => sample.items.find((i) => i.id === id)!.linkedPrs;
+
     await mountPage(
         withItem('I_sample16', {
             linkedPrs: [...linkedPrs('I_sample16'), { ...linkedPrs('I_sample27')[0]!, number: 99 }],
@@ -244,6 +259,7 @@ describe('narrowed by Scope, Kind and Labels', () => {
                       : i,
             ),
         };
+
         seedFilters(['bug'], ['area: web']);
         await mountPage(data);
         expect(cards().map((c) => c.dataset.item)).toEqual(['I_sample16']);
@@ -278,6 +294,7 @@ describe('narrowed by Scope, Kind and Labels', () => {
                 (i) => i.repo !== 'maddec01/lar-apple' || !['Needs you', 'Verify', 'Ready to merge'].includes(i.status),
             ),
         };
+
         localStorage.setItem('lar-board:scope', 'maddec01/lar-apple');
         await mountPage(data);
         expect(text($('.desk'))).toBe(FILTERED);
@@ -300,7 +317,9 @@ describe('narrowed by Scope, Kind and Labels', () => {
     test('the disconnected message comes before the filtered one', async () => {
         seedFilters([], ['no such label']);
         await mountPage();
+
         const { useBoardStore } = await import('../board/board-store.ts');
+
         await settle(() => useBoardStore.getState().fail('down'));
         expect(text($('.desk'))).toBe('Your deskNothing waited on you at the last read.');
     });
@@ -366,15 +385,20 @@ const questionBoard = (child: Partial<Item> = {}, concept: Partial<Item> = {}): 
 
 test('a decision with no thread answers in its concept thread without inheriting its thread association or usage', async () => {
     const data = questionBoard({ stats: undefined });
+
     await mountPage(data);
+
     const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+
     expect([text(action), action.href]).toEqual([
         'Answer in concept thread',
         't3code://threads/sample-environment/concept-question',
     ]);
     expect(nextLine('I_sample12'), 'its action says it').toBe('');
+
     const { useBoardStore } = await import('../board/board-store.ts');
     const child = useBoardStore.getState().data.items.find((item) => item.id === 'I_sample12')!;
+
     expect(child.threads).toEqual([]);
     expect(child.stats).toBeUndefined();
     expect(card('I_sample09')).not.toBeNull();
@@ -388,7 +412,9 @@ test('a decision keeps its own thread even when its concept has a waiting thread
             threads: [{ id: 'own-decision', title: 'Decision', state: 'stopped', updated: '2026-10-21T09:00:00.000Z' }],
         }),
     );
+
     const action = card('I_sample12').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+
     expect(action.href).toBe('t3code://threads/sample-environment/own-decision');
     expect(text(action)).toBe('Answer in T3');
 });
@@ -423,7 +449,9 @@ test.each([
     'a decision does not borrow an unrelated question for %s',
     async (_name, child, concept) => {
         await mountPage(questionBoard(child, concept));
+
         const action = card('I_sample12').querySelector<HTMLButtonElement>('[data-open-thread]')!;
+
         expect(action.tagName).toBe('BUTTON');
         expect(action.disabled).toBe(true);
         expect(action.getAttribute('href')).toBeNull();
@@ -456,6 +484,7 @@ test('shaping questions target the older question and leave the desk on a board 
             { id: 'question', title: 'Question', state: 'needs you', updated: '2026-11-01' },
         ],
     });
+
     await mountPage(data);
     expect(nextLine('I_sample12'), 'its action says it').toBe('');
     expect(card('I_sample12').querySelector('a')?.getAttribute('href')).toBe(
@@ -471,7 +500,9 @@ test('shaping questions target the older question and leave the desk on a board 
         ['Open thread', 't3code://threads/sample-environment/newer'],
         ['Answer in T3', 't3code://threads/sample-environment/question'],
     ]);
+
     const { useBoardStore } = await import('../board/board-store.ts');
+
     await settle(() =>
         useBoardStore.getState().receive({
             ...data,
@@ -512,9 +543,12 @@ test('desk status icons stay still and Needs you keeps its amber colour even wit
             ],
         })),
     };
+
     await mountPage(data);
     expect(cards()).toHaveLength(7);
     expect($('.desk-card svg.status-pulse, .desk-card .status-spin')).toBeNull();
+
     const needsYou = data.items.find((item) => item.status === 'Needs you')!;
+
     expect(card(needsYou.id).querySelector<SVGElement>('svg.lucide-circle-dot')!.style.color).toBe('var(--st-amber)');
 });

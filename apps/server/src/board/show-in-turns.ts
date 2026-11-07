@@ -20,7 +20,9 @@ export async function showInTurns(
 ): Promise<void> {
     const applied = board.applied();
     const items = await read();
+
     await turn();
+
     if (board.applied() === applied) show(items);
     else if (readNow) show(readNow());
 }

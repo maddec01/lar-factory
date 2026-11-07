@@ -33,6 +33,7 @@ export function boardSessionAuthority(
                     { timeout: 30_000, maxBuffer: 64 * 1024 },
                 );
                 const value: unknown = JSON.parse(stdout);
+
                 if (
                     typeof value !== 'object' ||
                     value === null ||
@@ -44,6 +45,7 @@ export function boardSessionAuthority(
                     typeof value.expiresAt !== 'string'
                 )
                     throw Error();
+
                 return { token: value.token, sessionId: value.sessionId, expiresAt: value.expiresAt };
             } catch {
                 throw new Error('Board session issuance failed');

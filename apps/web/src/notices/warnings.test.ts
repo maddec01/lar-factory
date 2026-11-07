@@ -21,7 +21,9 @@ const closeWarning = (key: string) => settle(() => warning(key)!.querySelector<H
 
 test('a tool warning stays amber in the shared stack until its condition clears', async () => {
     await mountPage({ ...sample, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) });
+
     const warning = $('[data-slot="notice"]')!;
+
     expect(warning).not.toBeNull();
     expect(warning.textContent).toContain('GitHub CLI not found.');
     expect(warning.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: GitHub CLI not found.');
@@ -89,7 +91,9 @@ test.each(conditions)(
     '$key stays closed through refreshes and changed details, then shows after clearing and recurring',
     async ({ key, failed, changed }) => {
         await mountPage({ ...healthy, ...failed });
+
         const entry = warning(key)!;
+
         expect(entry.dataset.slot).toBe('notice');
         expect(entry.querySelector('.dismiss')!.getAttribute('aria-label')).toMatch(/^Dismiss: .+/);
         await settle(() => stream().onopen!());
@@ -121,6 +125,7 @@ test.each(['empty', 'T3 Code missing'])(
             items: [],
             tools: toolChecks(screen === 'empty' ? {} : { t3: { result: 'missing' } }),
         };
+
         await mountPage(data);
         expect($(screen === 'empty' ? '[data-empty-state]' : '.tool-missing')).not.toBeNull();
         fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
@@ -129,7 +134,9 @@ test.each(['empty', 'T3 Code missing'])(
             'Board disconnected — showing last received data',
             'HTTP 502',
         ]);
+
         const entry = warning('client-error');
+
         fetchMock.mockImplementation(async () => new Response('', { status: 503 }));
         await settle(() => vi.advanceTimersByTime(60_000));
         expect(warning('client-error')).toBe(entry);
@@ -164,8 +171,11 @@ test('a successful Recheck restores a closed server warning as well as successfu
 
 test('a closed tool warning stays closed across scope, empty state and T3 Code missing screen changes', async () => {
     const data: BoardData = { ...healthy, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) };
+
     await mountPage(data);
+
     const { useScopeStore } = await import('../board/scope-store.ts');
+
     await closeWarning('gh');
     await settle(() => useScopeStore.getState().setScope(sample.repos[0]!.repo));
     await push({ ...data, tools: { ...data.tools!, t3: { result: 'missing' } } });
@@ -185,6 +195,7 @@ test('az coverage hides an item-source warning without clearing its dismissal', 
         itemSourceProblems: [{ repo: 'owner/repo', problem: 'logged out', fix: 'az login' }],
     };
     const covered: BoardData = { ...data, tools: toolChecks({ az: { result: 'logged-out', fix: 'az login' } }) };
+
     await mountPage(data);
     await closeWarning('item-source:owner/repo');
     await push(covered);
@@ -203,16 +214,24 @@ test('az coverage hides an item-source warning without clearing its dismissal', 
 
 test('warning details update in place among toasts without changing age, scrolling or other timers', async () => {
     await mountPage(healthy);
+
     const { showToast } = await import('./toasts.tsx');
+
     await settle(() => showToast({ slot: 'success', what: 'Saved', body: 'Saved' }));
     await settle(() => vi.advanceTimersByTime(4_800));
     await push({ ...healthy, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) });
+
     const entry = warning('gh');
     const recheck = entry!.querySelector<HTMLElement>('[data-recheck]')!;
+
     await settle(() => recheck.focus());
+
     const id = entry!.dataset.toastId;
+
     await settle(() => showToast({ slot: 'failure', failed: true, what: 'Failed', body: 'Failed' }));
+
     const viewport = $('[data-slot="toaster"]')!;
+
     viewport.scrollTop = 25;
     await push({ ...healthy, tools: toolChecks({ gh: { result: 'logged-out', fix: 'gh auth login' } }) });
     expect(warning('gh')).toBe(entry);
@@ -241,11 +260,16 @@ test('warning details update in place among toasts without changing age, scrolli
 
 test('unchanged warnings make no live-region mutations on refreshes and clock ticks', async () => {
     const data: BoardData = { ...healthy, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) };
+
     await mountPage(data);
+
     const entry = warning('gh')!;
+
     expect(entry.closest('[data-board-notices]')).not.toBeNull();
+
     const mutations: MutationRecord[] = [];
     const observer = new MutationObserver((records) => mutations.push(...records));
+
     observer.observe(entry, { subtree: true, childList: true, characterData: true, attributes: true });
     await settle(() => stream().onopen!());
     for (let i = 0; i < 3; i++) {
@@ -260,9 +284,13 @@ test('unchanged warnings make no live-region mutations on refreshes and clock ti
 test('more warnings and toasts than fit remain in one bounded scrolling viewport', async () => {
     await mountPage(healthy);
     addStylesheet();
+
     const viewport = $('[data-slot="toaster"]')!;
+
     Object.defineProperty(viewport, 'scrollHeight', { value: 1_000 });
+
     const { showToast } = await import('./toasts.tsx');
+
     await settle(() => showToast({ slot: 'success', what: 'Saved', body: 'Saved' }));
     await push({
         ...healthy,
@@ -298,12 +326,17 @@ test('closing a focused warning on the T3 Code missing screen returns focus to S
 
 test.each(['item', 'settings'])('closing a focused warning keeps focus in the open %s dialog', async (kind) => {
     await mountPage({ ...healthy, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) });
+
     // Exercise the notification's focus fallback without the modal trap redirecting focus before close.
     const dialog = document.createElement('div');
+
     dialog.setAttribute('role', 'dialog');
     dialog.setAttribute('data-state', 'open');
+
     if (kind === 'item') dialog.setAttribute('data-item-dialog', '');
+
     const close = document.createElement('button');
+
     close.setAttribute('data-slot', 'modal-close');
     close.textContent = 'Close';
     dialog.append(close);
@@ -320,13 +353,18 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
         fetchedAt: new Date(Date.now()).toISOString(),
         items: sample.items.filter((i) => i.status === 'Queued'),
     };
+
     await mountPage(empty);
+
     const dot = () => $('.refreshed [data-dot]')!;
     const refreshed = () => $('.refreshed')!.textContent;
+
     expect(dot().className).toContain('bg-success');
     fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
     await settle(() => vi.advanceTimersByTime(15_000));
+
     const notice = warning('client-error')!;
+
     expect(warningText(notice)).toEqual(['Board disconnected — showing last received data', 'HTTP 502']);
     expect(notice.closest('details'), 'not behind a collapsed summary').toBeNull();
     expect(dot().className).toContain('bg-danger');
@@ -348,8 +386,11 @@ test('while the page has lost the board, the notice shows uncollapsed, freshness
 
 test('closing the disconnected notice leaves the title bar saying Disconnected until the board recovers', async () => {
     const empty: BoardData = { ...healthy, error: null, fetchedAt: new Date(Date.now()).toISOString(), items: [] };
+
     await mountPage(empty);
+
     const refreshed = () => $('.refreshed')!.textContent;
+
     fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
     await settle(() => vi.advanceTimersByTime(15_000));
     await closeWarning('client-error');

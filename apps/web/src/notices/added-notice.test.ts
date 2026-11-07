@@ -4,26 +4,34 @@ import { $, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
 
 test('Added to List offers Queue beside View item', async () => {
     await mountPage(sample);
+
     const { notify } = await import('./notices.tsx');
+
     await settle(() => notify({ verb: 'Added', item: sample.items[0]!, to: 'List' }));
     expect($('[data-toast="notice"]')?.textContent).toContain('Queue');
 });
 
 test('Queue holds feedback, coordinates requests and hands focus to View item', async () => {
     await mountPage(sample);
+
     const { notify } = await import('./notices.tsx');
     const item = sample.items.find((value) => value.status === 'List')!;
+
     await settle(() => notify({ verb: 'Added', item, to: 'List' }));
+
     let finish!: (response: Response) => void;
+
     fetchMock.mockImplementationOnce(
         () =>
             new Promise<Response>((resolve) => {
                 finish = resolve;
             }),
     );
+
     const button = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-toast="notice"] button')).find(
         (value) => value.textContent === 'Queue',
     )!;
+
     button.focus();
     await settle(() => {
         button.click();
@@ -52,11 +60,15 @@ test('Queue holds feedback, coordinates requests and hands focus to View item', 
 
 test('a dismissed pending notice stays gone when its request settles', async () => {
     await mountPage(sample);
+
     const { notify } = await import('./notices.tsx');
     const { clearToast } = await import('./toasts.tsx');
     const item = sample.items.find((value) => value.status === 'List')!;
+
     await settle(() => notify({ verb: 'Added', item, to: 'List' }));
+
     let finish!: (response: Response) => void;
+
     fetchMock.mockImplementationOnce(
         () =>
             new Promise<Response>((resolve) => {
@@ -75,12 +87,16 @@ test('a dismissed pending notice stays gone when its request settles', async () 
 
 test('Queue failure becomes a danger alert and permits retry in place', async () => {
     await mountPage(sample);
+
     const { notify } = await import('./notices.tsx');
     const item = sample.items.find((value) => value.status === 'List')!;
+
     await settle(() => notify({ verb: 'Added', item, to: 'List' }));
+
     const button = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-toast="notice"] button')).find(
         (value) => value.textContent === 'Queue',
     )!;
+
     button.focus();
     fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify({ error: 'Refused' })));
     await settle(() => button.click());

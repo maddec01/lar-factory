@@ -74,11 +74,16 @@ const LOOKS_LIKE_MARKDOWN = /(^|\n)\s*([-*+] |\d+[.)] |#{1,6} |> |```)|\*\*[^*]+
  *  the block the caret is in, unless it is empty, as inserted at the caret the first block's text would join that block's. */
 function $insertPasted(nodes: LexicalNode[]) {
     const selection = $getSelection();
+
     if ($isRangeSelection(selection)) selection.removeText();
+
     const block = $isRangeSelection(selection) ? selection.anchor.getNode().getTopLevelElement() : null;
     const first = nodes[0];
+
     if (!block || !first || $isParagraphNode(first) || block.getTextContentSize() === 0) return $insertNodes(nodes);
+
     let last: LexicalNode = block;
+
     for (const node of nodes) last = last.insertAfter(node);
     last.selectEnd();
 }
@@ -86,23 +91,30 @@ function $insertPasted(nodes: LexicalNode[]) {
 /** Plain text that reads as Markdown, pasted without HTML, goes in as the nodes it stands for. */
 function MarkdownPastePlugin() {
     const [editor] = useLexicalComposerContext();
+
     useEffect(
         () =>
             editor.registerCommand(
                 PASTE_COMMAND,
                 (event) => {
                     const data = 'clipboardData' in event ? event.clipboardData : null;
+
                     if (!data || data.types.includes('text/html')) return false;
+
                     const text = data.getData('text/plain');
+
                     if (!LOOKS_LIKE_MARKDOWN.test(text)) return false;
+
                     event.preventDefault();
                     editor.update(() => $insertPasted($generateNodesFromMarkdownString(text, TRANSFORMERS)));
+
                     return true;
                 },
                 COMMAND_PRIORITY_HIGH,
             ),
         [editor],
     );
+
     return null;
 }
 
@@ -111,20 +123,26 @@ function MarkdownPastePlugin() {
  *  moves focus on rather than trapping it in the editor. */
 function ListTabPlugin() {
     const [editor] = useLexicalComposerContext();
+
     useEffect(
         () =>
             editor.registerCommand(
                 KEY_TAB_COMMAND,
                 (event) => {
                     const selection = $getSelection();
+
                     if (!$isRangeSelection(selection)) return false;
+
                     const items = selection
                         .getNodes()
                         .map((node) => ($isListItemNode(node) ? node : $findMatchingParent(node, $isListItemNode)));
                     const moves = (item: ListItemNode | null) =>
                         item !== null && (event.shiftKey ? item.getIndent() > 0 : item.getPreviousSibling() !== null);
+
                     if (!items.some(moves)) return false;
+
                     event.preventDefault();
+
                     return editor.dispatchCommand(
                         event.shiftKey ? OUTDENT_CONTENT_COMMAND : INDENT_CONTENT_COMMAND,
                         undefined,
@@ -134,29 +152,35 @@ function ListTabPlugin() {
             ),
         [editor],
     );
+
     return null;
 }
 
 /** Locks the text, as a disabled field does. */
 function EditablePlugin({ editable }: { editable: boolean }) {
     const [editor] = useLexicalComposerContext();
+
     useEffect(() => editor.setEditable(editable), [editor, editable]);
+
     return null;
 }
 
 /** Reports the Markdown the editor makes of its starting text, which a check for changes compares against. */
 function BaselinePlugin({ onBaseline }: { onBaseline: (markdown: string) => void }) {
     const [editor] = useLexicalComposerContext();
+
     useEffect(
         () => editor.getEditorState().read(() => onBaseline($convertToMarkdownString(TRANSFORMERS))),
         [editor, onBaseline],
     );
+
     return null;
 }
 
 /** Fills a new editor from `value`, read as Markdown or as HTML. */
 const startFrom = (value: string, format: TextFormat) => (editor: LexicalEditor) => {
     if (format === 'markdown') return $convertFromMarkdownString(value, TRANSFORMERS);
+
     $getRoot().select();
     $insertNodes($generateNodesFromDOM(editor, new DOMParser().parseFromString(value, 'text/html')));
 };
@@ -206,6 +230,7 @@ export function DescriptionEditor({
         (state: EditorState) => state.read(() => onChange($convertToMarkdownString(TRANSFORMERS))),
         [onChange],
     );
+
     return (
         <LexicalComposer
             initialConfig={{

@@ -32,7 +32,9 @@ export function Warnings() {
             .map((problem) => `item-source:${problem.repo.toLowerCase()}`),
     ].filter((key) => !dismissed.has(key));
     const disconnected = clientError && !dismissed.has(CLIENT_ERROR);
+
     if (!keys.length && !disconnected) return null;
+
     return (
         <aside data-board-notices className="shrink-0 border-b bg-(--warning-surface) px-6 py-2 text-(--foreground)">
             <div className="flex items-start justify-between gap-3">
@@ -78,6 +80,7 @@ export function Warnings() {
                                 {gh && <GhWarning check={gh} />}
                                 {(['git', 'jq', 'curl'] as const).map((name) => {
                                     const check = failedCheck(data.tools, name);
+
                                     return check && <CommandWarning key={name} name={name} check={check} />;
                                 })}
                                 {az && <AzWarning check={az} />}
@@ -95,6 +98,7 @@ export function Warnings() {
                     {...kind('other')}
                     onClick={() => {
                         const settings = useSettingsStore.getState();
+
                         settings.setSection('diagnostics');
                         settings.setOpen(true);
                     }}

@@ -58,6 +58,7 @@ test('closed issues are paged light and only the kept ones read in full: a close
     };
     const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
     const data = await until(board, (d) => d.fetchedAt !== null);
+
     assert.deepEqual(
         data.items.map((i) => [i.number, i.status]),
         [
@@ -73,9 +74,11 @@ test('closed issues are paged light and only the kept ones read in full: a close
         ['I_21', 'I_22', 'I_23'],
         'a slice whose build was not read stays; one closed as not planned is never read',
     );
+
     const closedPages = (await board.calls()).filter((args) =>
         args.some((a) => a.includes('states: [CLOSED]') || a.includes('is:closed')),
     );
+
     assert.ok(
         closedPages.length > 0 && closedPages.every((args) => !args.some((a) => a.includes('subIssues('))),
         'closed pages read no sub-issues',
@@ -94,17 +97,22 @@ test("closed issues are searched in close-date ranges at once, and one the searc
     };
     const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups, unindexed: ['I_27'] });
     const data = await until(board, (d) => d.fetchedAt !== null);
+
     assert.deepEqual(data.items.map((i) => [i.number, i.status]).sort(), [
         [22, 'Done'],
         [25, 'Done'],
         [26, 'Done'],
         [27, 'Done'],
     ]);
+
     const ranges = (await board.calls()).flatMap((args) =>
         args.filter((a) => a.startsWith('q=') && a.includes('is:closed')).map((a) => /closed:(\S+)/.exec(a)![1]),
     );
+
     assert.equal(new Set(ranges).size, 10, 'one search per tenth of the week');
+
     const recent = (await board.calls()).filter((args) => args.some((a) => a.includes('states: [CLOSED]')));
+
     assert.equal(recent.length, 1, 'one page of the closed issues updated last, never paged');
     assert.ok(recent[0]!.some((a) => a.includes('UPDATED_AT')));
 });
@@ -112,6 +120,7 @@ test("closed issues are searched in close-date ranges at once, and one the searc
 /** How many closed-range searches and pages of the closed issues updated last the board has run. */
 const closedReads = async (board: Board) => {
     const calls = await board.calls();
+
     return {
         ranges: calls.filter((args) => args.some((a) => a.startsWith('q=') && a.includes('is:closed'))).length,
         pages: calls.filter((args) => args.some((a) => a.includes('states: [CLOSED]'))).length,
@@ -129,6 +138,7 @@ async function untilClosed(board: Board, kind: 'ranges' | 'pages', count: number
             ),
         count,
     );
+
     return closedReads(board);
 }
 
@@ -140,6 +150,7 @@ test('after the first read, a whole read searches the close-date ranges only whe
         true,
     );
     const read = await untilClosed(few, 'pages', 3);
+
     assert.ok(read.pages >= 3, 'the board read whole again');
     assert.equal(read.ranges, 10, 'only the first read searched the ranges');
     assert.deepEqual(((await few.board()) as BoardData).items.map((i) => i.number).sort(), [22, 25]);
@@ -154,6 +165,7 @@ test('after the first read, a whole read searches the close-date ranges only whe
         false,
         true,
     );
+
     assert.ok(
         (await untilClosed(full, 'ranges', 20)).ranges >= 20,
         'a full page might miss some, so a later read searches the ranges again',
@@ -163,10 +175,13 @@ test('after the first read, a whole read searches the close-date ranges only whe
 test('the kept closed issues are read in full in calls of at most 25 issues', async (t) => {
     const repoIssues = { [APPLE]: Array.from({ length: 30 }, (_, i) => closedIssue(100 + i, 1)) };
     const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
+
     await until(board, (d) => d.fetchedAt !== null);
+
     const calls = (await board.calls()).filter((args) =>
         args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues(')),
     );
+
     assert.deepEqual(
         calls.map((args) => args.filter((a) => a.startsWith('ids[]=')).length).sort((a, b) => b - a),
         [25, 5],
@@ -192,10 +207,13 @@ test('a repository read runs each build search once, one repository a search, an
         ],
     };
     const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
+
     await until(board, (d) => d.fetchedAt !== null);
+
     const searches = (await board.calls()).flatMap((args) =>
         args.filter((a) => a.startsWith('q=') && !a.includes('is:closed')),
     );
+
     assert.deepEqual([...searches].sort(), [...new Set(searches)].sort(), 'no search runs twice');
     assert.ok(
         searches.every((q) => q.match(/repo:/g)?.length === 1),
@@ -222,6 +240,7 @@ test('open and kept closed issues normalize together: a closed dossier keeps its
     };
     const board = await startBoard(t, { repositories: [APPLE], repoIssues, localSetups });
     const data = await until(board, (d) => d.fetchedAt !== null);
+
     assert.deepEqual(data.items.map((i) => i.number).sort(), [40, 41, 50]);
     assert.equal(data.items.find((i) => i.number === 40)!.map?.destination, 'There.');
     assert.deepEqual(
@@ -239,7 +258,9 @@ async function issuesBoard(
     const items = options.items ?? [];
     const repoIssues = options.repoIssues ?? { [APPLE]: [appleIssue(8)] };
     const board = await startBoard(t, { ...options, items, repoIssues, localSetups }, false, false, env);
+
     await until(board, (d) => d.fetchedAt !== null);
+
     return board;
 }
 
@@ -254,42 +275,57 @@ test('in a repository with no factory labels or config, Add item records work lo
         repoIssues: { [APPLE]: [appleIssue(8, { title: 'Seek stalls', labels: { nodes: [] }, body: 'Steps.' })] },
         recorded: false,
     });
+
     await until(board, (d) => d.fetchedAt !== null);
+
     const draft = { createIssue: false, repo: APPLE, kind: 'feature', title: 'Capture an item', description: '' };
     const captured = await board.postSession({ requestId: randomUUID(), draft }, '/api/items');
+
     assert.equal(captured.status, 200);
+
     const { item } = (await captured.json()) as { item: { id: string; number: number; status: string } };
+
     assert.deepEqual([item.number, item.status], [0, 'List']);
 
     const search = await fetch(`${board.url}/api/tickets?repo=${APPLE}&q=seek`);
+
     assert.deepEqual(((await search.json()) as { tickets: unknown[] }).tickets, [
         { number: 8, title: 'Seek stalls', url: `https://github.com/${APPLE}/issues/8` },
     ]);
+
     const pick = () => board.postSession({ repo: APPLE, number: 8 }, '/api/pick-ticket');
     const first = (await (await pick()).json()) as {
         item: { id: string; number: number; url: string };
         board: BoardData;
     };
+
     assert.deepEqual([first.item.number, first.item.url], [8, `https://github.com/${APPLE}/issues/8`]);
+
     const again = (await (await pick()).json()) as { item: { id: string }; board: BoardData };
+
     assert.equal(again.item.id, first.item.id);
     assert.deepEqual(again.board.items.map((i) => i.number).sort(), [0, 8]);
+
     const searched = (await (await fetch(`${board.url}/api/tickets?repo=${APPLE}&q=seek`)).json()) as {
         tickets: { workId?: string }[];
     };
+
     assert.equal(searched.tickets[0]!.workId, first.item.id);
+
     const writes = (await board.calls()).filter(
         (args) =>
             args[0] === 'label' ||
             (args[0] === 'issue' && !['list', 'view'].includes(args[1]!)) ||
             args.includes('POST'),
     );
+
     assert.deepEqual(writes, []);
 });
 
 test("closing an abandoned item's ticket from a repository's issues closes it as not planned; without write access it shows gh's error", async (t) => {
     const deleted = await issuesBoard(t, { repoIssues: { [APPLE]: [appleIssue(8), appleIssue(9)] } });
     const response = await deleted.postSession({ itemId: deleted.id(8, APPLE) }, '/api/abandon');
+
     assert.equal(response.status, 200);
     assert.deepEqual(
         ((await response.json()) as { board: BoardData }).board.items.map((i) => i.number),
@@ -303,8 +339,11 @@ test("closing an abandoned item's ticket from a repository's issues closes it as
     assert.deepEqual(await projectCommands(deleted), []);
 
     const kept = await issuesBoard(t, { fail: 'abandon' });
+
     assert.equal((await kept.postSession({ itemId: kept.id(8, APPLE) }, '/api/abandon')).status, 200);
+
     const refused = await kept.postSession({ itemId: kept.id(8, APPLE) }, '/api/close-ticket');
+
     assert.equal(refused.status, 502);
     assert.match(((await refused.json()) as { error: string }).error, /^Could not abandon #8\. .*write access/);
 });

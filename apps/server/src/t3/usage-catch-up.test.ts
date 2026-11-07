@@ -15,7 +15,9 @@ import type { StatsRead } from './t3-reads.ts';
 import { createUsageCatchUp, type UsageCatchUpOptions } from './usage-catch-up.ts';
 
 vi.spyOn(execution, 'protocolStatsInputs').mockImplementation(() => fixtureInputs());
+
 const threadReads = vi.spyOn(execution, 'protocolThreadReads').mockImplementation((ids) => fixtureReads(ids));
+
 beforeEach(() => threadReads.mockImplementation((ids) => fixtureReads(ids)));
 
 const turn = { id: 'a1', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:10:00Z' };
@@ -34,16 +36,20 @@ function catchUp(
     options: Partial<UsageCatchUpOptions> = {},
 ) {
     const home = tempDir(t, 'lar-home-');
+
     claudeHome(
         t,
         Object.fromEntries(threads.map(({ id }) => [`session-${id}`, { main: [assistant(`m-${id}`, 0, 0, 0, 7)] }])),
         join(home, '.claude'),
     );
+
     const db = statsDb(t, threads);
+
     vi.stubEnv('T3_STATE_DB', db);
     t.onTestFinished(() => {
         vi.unstubAllEnvs();
     });
+
     const state = {
         settled: false,
         since: Infinity,
@@ -54,6 +60,7 @@ function catchUp(
         caughtUp: 0,
     };
     const sources = { db, home, settings: join(home, 'settings.json'), rates: join(home, 'rates.json') };
+
     return {
         state,
         db,
@@ -85,14 +92,19 @@ function catchUp(
 
 test('every read parses asynchronously, through the warm: the first, one at the normal pace and one after a run finishes', async (t) => {
     const warm = vi.spyOn(transcripts, 'warmTranscripts');
+
     t.onTestFinished(() => warm.mockRestore());
+
     const { catchUp: usage, state, transcript } = catchUp(t, [thread('a')], ['a']);
+
     state.settled = true;
     await usage.advance();
     assert.equal(state.published.at(-1)?.parsed, 1);
     assert.equal(warm.mock.calls.length, 1);
     assert.equal(state.caughtUp, 1);
+
     const tokens = () => (state.published.at(-1)!.stats(['a']) as ItemStats).tokens;
+
     assert.equal(tokens(), 7);
     appendFileSync(transcript('a'), JSON.stringify(assistant('later', 0, 0, 0, 5)) + '\n');
     state.since = 5_000;
@@ -116,6 +128,7 @@ test('every read parses asynchronously, through the warm: the first, one at the 
 
 test('an ask before catching up has finished changes nothing, and one at the pace waits for it', async (t) => {
     const { catchUp: usage, state } = catchUp(t, [thread('a')], ['a']);
+
     await usage.want(true);
     assert.equal(state.published.length, 0, 'catching up runs its own reads');
     state.settled = true;
@@ -134,10 +147,13 @@ test('an ask before catching up has finished changes nothing, and one at the pac
 
 test('each read logs its whole path during catch-up, the first ordinary one too, and one after only when it blocks or runs long', async (t) => {
     const { catchUp: usage, state } = catchUp(t, [thread('a')], ['a']);
+
     state.settled = true;
     await usage.advance();
+
     const path =
         /^stats read path took \d+ ms elapsed, \d+ ms CPU: inputs \d+ ms, discovery \d+ ms, warm \d+ ms \(parsed 1 of 1 transcripts\), dedup \d+ ms, aggregation \d+ ms, publish \d+ ms; longest block \d+ ms in (inputs|discovery|warm|dedup|aggregation|publish)$/;
+
     assert.ok(
         state.logged.some((line) => path.test(line)),
         state.logged.join('\n'),
@@ -163,15 +179,20 @@ test('a thread joining the board during a read leaves that read provisional, so 
     const held = heldWarms(t);
     const ids = ['a'];
     const { catchUp: usage, state } = catchUp(t, [thread('a'), thread('b')], ids);
+
     state.settled = true;
+
     const first = usage.advance();
+
     await until(() => held.calls === 1);
     ids.push('b');
     held.release.shift()!();
     await until(() => state.published.length === 1);
     assert.equal(state.published[0]!.allObserved, false);
     state.since = 5_000;
+
     const next = first.then(() => usage.advance());
+
     await until(() => held.calls === 2);
     held.release.shift()!();
     await next;
@@ -182,6 +203,7 @@ test('a read a deletion overtook shows nothing, and the follow-up does', async (
     const held = heldWarms(t);
     const { catchUp: usage, state } = catchUp(t, [thread('a')], ['a'], { paceMs: () => 0 });
     const first = usage.advance();
+
     await until(() => held.calls === 1);
     state.generation++;
     held.release.shift()!();
@@ -194,6 +216,7 @@ test('a read a deletion overtook shows nothing, and the follow-up does', async (
 
 test('warmup waits for an item with a thread or the settled first read', async (t) => {
     const { catchUp: usage, state } = catchUp(t, [], []);
+
     await usage.advance();
     assert.deepEqual(state.logged, []);
     state.settled = true;
@@ -213,6 +236,7 @@ test('stats reads run when reads land, at the catch-up pace, and wait for no thr
         state,
         db,
     } = catchUp(t, [thread('a'), thread('b', 'never'), thread('c', 'failed')], ['a', 'b', 'c']);
+
     await usage.advance();
     assert.equal(state.published.length, 1);
     state.since = 4_999;
@@ -234,6 +258,7 @@ test('stats reads run when reads land, at the catch-up pace, and wait for no thr
 test('a thread recorded after catch-up and a read that later succeeds each get a warm first', async (t) => {
     const ids = ['a'];
     const { catchUp: usage, state } = catchUp(t, [thread('a'), thread('b')], ids);
+
     state.settled = true;
     await usage.advance();
     assert.equal(state.caughtUp, 1);
@@ -280,7 +305,9 @@ function heldWarms(t: Parameters<typeof tempDir>[0]) {
                 });
             }),
     );
+
     t.onTestFinished(() => warm.mockRestore());
+
     return held;
 }
 
@@ -290,8 +317,11 @@ test('no warm or stats read overlaps another: a stats read waits while a warm ru
     const held = heldWarms(t);
     const { catchUp: usage, state } = catchUp(t, [thread('a')], ['a'], { paceMs: () => 0 });
     const first = usage.advance();
+
     await until(() => held.calls === 1);
+
     const during = await Promise.all([usage.advance(), usage.advance()]);
+
     assert.deepEqual(during, [undefined, undefined]);
     assert.equal(usage.reading(), true, 'the stats reads of other paths wait for it');
     assert.equal(state.published.length, 0, 'the stats read follows its warm');
@@ -307,6 +337,7 @@ test('triggers during a run coalesce into one follow-up, and with none there is 
     const ids = ['a'];
     const { catchUp: usage, state } = catchUp(t, [thread('a'), thread('b'), thread('c')], ids, { paceMs: () => 0 });
     const first = usage.advance();
+
     await until(() => held.calls === 1);
     ids.push('b');
     for (let i = 0; i < 5; i++) await usage.advance();
@@ -321,7 +352,9 @@ test('triggers during a run coalesce into one follow-up, and with none there is 
         'five triggers made one follow-up, and c, with no trigger during that run, waits for the next tick',
     );
     assert.equal(state.published.length, 2);
+
     const next = usage.advance();
+
     await until(() => held.calls === 3);
     held.release.shift()!();
     await next;
@@ -332,6 +365,7 @@ test('triggers during a run coalesce into one follow-up, and with none there is 
 test('a failing thread schedules nothing: repeated ticks read stats once and only demand its read', async (t) => {
     const { catchUp: usage, state } = catchUp(t, [thread('a')], ['a', 'b'], { paceMs: () => 0 });
     let demands = 0;
+
     threadReads.mockImplementation(() => ({
         reads: new Map([
             ['a', 'current'],
@@ -350,7 +384,9 @@ test('a failing thread schedules nothing: repeated ticks read stats once and onl
         'a failure that lands once needs one stats read, however often the board ticks',
     );
     assert.equal(demands, 51, 'one demand each tick, and one for the follow-up check, which retryAt then limits');
+
     const timers = vi.spyOn(globalThis, 'setTimeout');
+
     t.onTestFinished(() => timers.mockRestore());
     await usage.advance();
     assert.equal(timers.mock.calls.length, 0, 'it starts no timer of its own');
@@ -360,6 +396,7 @@ test('a caught-up board looks for nothing until a stats read finds a thread wait
     const ids = ['a'];
     const threadIds = vi.fn(() => ids);
     const { catchUp: usage, state } = catchUp(t, [thread('a'), thread('b')], ids, { threadIds });
+
     state.settled = true;
     await usage.advance();
     assert.equal(state.caughtUp, 1);
@@ -395,6 +432,7 @@ test('an unreadable database reports at once, holds up no settling, and its reco
         },
         timed: () => {},
     });
+
     await missing.advance();
     assert.equal(state.published[0]?.statsUnavailable, true);
     assert.equal(state.caughtUp, 1);
@@ -413,13 +451,18 @@ test('an urgent read stays owed until it publishes, and a dropped one until its 
             state.since = 0;
         },
     });
+
     state.settled = true;
+
     const first = usage.advance();
+
     await until(() => held.calls === 1);
     held.release.shift()!();
     await first;
     state.since = 0;
+
     const urgent = usage.want(true);
+
     await until(() => held.calls === 2);
     assert.equal(usage.owed(), true, 'a PR block written now would miss the last turn');
     state.generation++;

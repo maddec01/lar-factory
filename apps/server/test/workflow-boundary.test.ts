@@ -18,9 +18,12 @@ test(
     async (t) => {
         const { repo, origin, files } = NO_FACTORY_FILES;
         const home = mkdtempSync(join(tmpdir(), 'lar-boundary-home-'));
+
         t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
         checkouts(home, { 'lar-web': origin });
+
         const dir = join(home, 'Library/Application Support/Lar Factory');
+
         mkdirSync(dir, { recursive: true });
         writeFileSync(
             join(dir, 'repository-settings.json'),
@@ -30,6 +33,7 @@ test(
                 ],
             }),
         );
+
         const db = projectsDb(t, [{ id: 'lar-web', root: `${home}/Developer/lar/lar-web` }]);
         const board = await startBoard(t, { files, localSetups: { [repo]: null }, recorded: false }, false, true, {
             HOME: home,
@@ -39,7 +43,9 @@ test(
         const { detection } = (await (
             await board.post({ repo, projectId: 'lar-web' }, board.url, '/api/onboarding/detect')
         ).json()) as { detection: SetupDetection };
+
         assert.deepEqual([detection.domainDocs, detection.projectSkills], [{ found: { kind: 'off' } }, { found: [] }]);
+
         const saved = await board.post(
             {
                 repo,
@@ -53,6 +59,7 @@ test(
             board.url,
             '/api/onboarding/setup',
         );
+
         assert.equal(saved.status, 200);
 
         const created = await larWork(
@@ -67,10 +74,15 @@ test(
             '--status',
             'Queued',
         );
+
         await until(board, (d) => d.items.some((i) => i.id === created.workId && i.status === 'Queued'));
+
         const started = await board.postSession({ itemId: created.workId }, '/api/start');
+
         assert.equal(started.status, 200);
+
         const [start] = (await board.t3Calls()).filter((args) => args[1] === 'start');
+
         assert.deepEqual(start, [
             'thread',
             'start',
@@ -98,6 +110,7 @@ test('an Azure DevOps repository with its own guidance, with existing project ru
         },
     );
     const { detection } = answer as { detection: SetupDetection };
+
     assert.deepEqual(
         [detection.provider, detection.checkout, detection.itemSources],
         [

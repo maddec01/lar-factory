@@ -38,17 +38,22 @@ function Brand() {
 }
 
 type Health = 'waiting' | 'live' | 'stale' | 'disconnected';
+
 const DOT = { waiting: 'bg-base-500', live: 'bg-success', stale: 'bg-amber-500', disconnected: 'bg-danger' } as const;
 
 /** How many reads landed after this page opened: a newer `fetchedAt` than the one shown. */
 function useLandedReads(fetchedAt: string | null) {
     const [landed, setLanded] = useState(0);
     const shown = useRef(fetchedAt);
+
     useEffect(() => {
         const before = shown.current;
+
         shown.current = fetchedAt;
+
         if (fetchedAt && (!before || Date.parse(fetchedAt) > Date.parse(before))) setLanded((count) => count + 1);
     }, [fetchedAt]);
+
     return landed;
 }
 
@@ -78,21 +83,27 @@ function Refreshed({ data }: { data: BoardData }) {
     const { fetchedAt } = data;
     const clientError = useBoardStore((state) => state.clientError);
     const [now, setNow] = useState(Date.now);
+
     useEffect(() => {
         let timer: ReturnType<typeof setInterval> | undefined;
         const followVisibility = () => {
             clearInterval(timer);
+
             if (document.hidden) return;
+
             setNow(Date.now());
             timer = setInterval(() => setNow(Date.now()), 1_000);
         };
+
         document.addEventListener('visibilitychange', followVisibility);
         followVisibility();
+
         return () => {
             clearInterval(timer);
             document.removeEventListener('visibilitychange', followVisibility);
         };
     }, [fetchedAt]);
+
     const landed = useLandedReads(fetchedAt);
     // A repository whose items haven't landed would show as empty, so the board says it still reads instead.
     const reading = data.firstRead.waiting ?? [];
@@ -106,6 +117,7 @@ function Refreshed({ data }: { data: BoardData }) {
               ? 'live'
               : 'waiting';
     const ago = fetchedAt ? shortAgo(fetchedAt, now) : null;
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -154,6 +166,7 @@ export function TitleBar() {
     const board = useBoardStore((state) => failedCheck(state.data.tools, 't3')?.result !== 'missing');
     const data = useBoardStore((state) => state.data);
     const inset = useWindowControlsInset();
+
     return (
         <div
             data-native-window={inMacApp() || undefined}

@@ -19,13 +19,16 @@ const kinds = (file: string) => samplesIn(file).map((sample) => sample.kind);
 test('it appends a sample with the PID at start, then every 30 seconds', (t) => {
     const file = join(tempDir(t, 'lar-memory-'), 'samples.jsonl');
     const stop = startMemorySampler({ BOARD_MEMORY_SAMPLES: file });
+
     t.onTestFinished(stop);
     assert.deepEqual(kinds(file), ['start']);
     vi.advanceTimersByTime(29_999);
     assert.deepEqual(kinds(file), ['start']);
     vi.advanceTimersByTime(1);
     assert.deepEqual(kinds(file), ['start', 'interval']);
+
     const [sample] = samplesIn(file);
+
     assert.equal(sample!.pid, process.pid);
     for (const figure of [
         sample!.rss,
@@ -42,11 +45,14 @@ test('it appends a sample with the PID at start, then every 30 seconds', (t) => 
 test('with the GC variable it samples before and after a forced GC every 5 minutes', (t) => {
     const file = join(tempDir(t, 'lar-memory-'), 'samples.jsonl');
     const stop = startMemorySampler({ BOARD_MEMORY_SAMPLES: file, BOARD_MEMORY_FORCE_GC: '1' });
+
     t.onTestFinished(stop);
     vi.advanceTimersByTime(299_999);
     assert.ok(!kinds(file).includes('before-gc'));
     vi.advanceTimersByTime(1);
+
     const taken = kinds(file);
+
     assert.deepEqual(
         taken.filter((kind) => kind.endsWith('-gc')),
         ['before-gc', 'after-gc'],
@@ -56,6 +62,7 @@ test('with the GC variable it samples before and after a forced GC every 5 minut
 
 test('stopping ends the samples', (t) => {
     const file = join(tempDir(t, 'lar-memory-'), 'samples.jsonl');
+
     startMemorySampler({ BOARD_MEMORY_SAMPLES: file })();
     vi.advanceTimersByTime(120_000);
     assert.deepEqual(kinds(file), ['start']);
@@ -63,12 +70,14 @@ test('stopping ends the samples', (t) => {
 
 test('with both variables unset it writes nothing and sets no timer', () => {
     const stop = startMemorySampler({});
+
     assert.equal(vi.getTimerCount(), 0);
     stop();
 });
 
 test('the GC variable without a samples file logs, forces no GC and sets no timer', (t) => {
     const logged = vi.spyOn(console, 'log').mockImplementation(() => {});
+
     t.onTestFinished(() => logged.mockRestore());
     startMemorySampler({ BOARD_MEMORY_FORCE_GC: '1' });
     assert.equal(vi.getTimerCount(), 0);
@@ -77,6 +86,7 @@ test('the GC variable without a samples file logs, forces no GC and sets no time
 
 test('a relative path logs and takes no samples', (t) => {
     const logged = vi.spyOn(console, 'log').mockImplementation(() => {});
+
     t.onTestFinished(() => logged.mockRestore());
     startMemorySampler({ BOARD_MEMORY_SAMPLES: 'samples.jsonl' });
     assert.equal(vi.getTimerCount(), 0);
@@ -86,10 +96,13 @@ test('a relative path logs and takes no samples', (t) => {
 
 test('a failed write logs, throws nothing and the next tick tries again', (t) => {
     const logged = vi.spyOn(console, 'log').mockImplementation(() => {});
+
     t.onTestFinished(() => logged.mockRestore());
+
     const stop = startMemorySampler({
         BOARD_MEMORY_SAMPLES: join(tempDir(t, 'lar-memory-'), 'missing', 'samples.jsonl'),
     });
+
     t.onTestFinished(stop);
     vi.advanceTimersByTime(30_000);
     assert.equal(logged.mock.calls.length, 2);

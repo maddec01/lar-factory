@@ -22,6 +22,7 @@ export function useProjectSessions(own: BoardSessions): void {
 /** Calls `changed` when T3's project facts or availability differ from the last it announced, until the returned function is called. Thread updates never do. */
 export function subscribeRepositoryProjects(changed: () => void): () => void {
     subscribers.add(changed);
+
     return () => {
         subscribers.delete(changed);
     };
@@ -29,7 +30,9 @@ export function subscribeRepositoryProjects(changed: () => void): () => void {
 
 function announce({ availability, observation }: ProjectRead) {
     const next = JSON.stringify([availability, observation?.projects]);
+
     if (next === announced) return;
+
     announced = next;
     for (const changed of subscribers) changed();
 }
@@ -39,6 +42,7 @@ export function repositoryProjects(env: NodeJS.ProcessEnv = process.env): Promis
     pending ??= discover(env).finally(() => {
         pending = undefined;
     });
+
     return pending;
 }
 
@@ -53,19 +57,26 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
     const path = serverRuntimePath(env);
     const runtime = readJsonRecord(path);
     const key = JSON.stringify([path, runtime?.origin, runtime?.serverVersion, runtime?.pid]);
+
     // The subscription says when this T3 stops, so while it shows T3 the board need not ask the process.
     if (current?.key === key && current.read.availability === 'available') return current.read;
+
     if (!t3Running(path) || typeof runtime?.origin !== 'string') {
         current?.stop();
+
         if (current) {
             current.key = '';
             current.read = { ...current.read, availability: 'unavailable' };
             announce(current.read);
         }
+
         return current?.read ?? { availability: 'unavailable' };
     }
+
     if (current?.key === key) return current.read;
+
     current?.stop();
+
     try {
         const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
         const protocol = boardProjects(runtime.origin, version, sessions);
@@ -77,6 +88,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
             read: { ...read, observation: read.observation ?? current?.read.observation },
             stop: () => {},
         };
+
         current = state;
         // The HTTP read can lack what the shell supplies, so the first shell data always counts as a change.
         announced = undefined;
@@ -84,6 +96,7 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
             state.read = { ...read, observation: read.observation ?? state.read.observation };
             announce(state.read);
         });
+
         return state.read;
     } catch {
         return {
@@ -94,18 +107,24 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
 }
 
 let authorizing: Promise<ProjectRead> | undefined;
+
 /** Coalesce requests and restart discovery after renewing the server-held session. */
 export function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
     authorizing ??= (async () => {
         await repositoryProjects();
+
         const state = current;
+
         if (!state) throw new Error('T3 unavailable');
+
         await state.protocol.reauthorize();
         state.stop();
         state.key = '';
+
         return repositoryProjects();
     })().finally(() => {
         authorizing = undefined;
     });
+
     return authorizing;
 }

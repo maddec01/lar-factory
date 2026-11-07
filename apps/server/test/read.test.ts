@@ -30,7 +30,9 @@ const firstRead = (board: Board) => until(board, (d) => d.fetchedAt !== null && 
 /** A path the fake gh's readHold watches: while the file exists, a read of open issues waits. */
 async function holdPath(t: TestContext): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'lar-read-hold-'));
+
     t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
     return join(dir, 'hold');
 }
 
@@ -40,9 +42,13 @@ async function askForeignHost(board: Board): Promise<number> {
         method: 'POST',
         headers: { Host: 'evil.example', Origin: 'http://evil.example', 'Content-Type': 'application/json' },
     });
+
     req.end('{}');
+
     const [res] = (await once(req, 'response')) as [IncomingMessage];
+
     res.resume();
+
     return res.statusCode!;
 }
 
@@ -59,6 +65,7 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
     const feature = boardIssue(2, 'List', 'maddec01/lar-server', ['feature']);
     const coupled = boardIssue(3, 'In progress', 'maddec01/lar-server', ['feature']);
     const part = boardIssue(4, 'Ready', 'maddec01/lar-server', ['build']);
+
     Object.assign(concept.content!, { id: 'I_1', body });
     // A ticket's provider blocker never reaches the page; the record's blocker does.
     Object.assign(feature.content!, {
@@ -78,11 +85,14 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
             repository: { nameWithOwner: 'maddec01/lar-server' },
         },
     });
+
     const board = await startBoard(t, {
         repositories: ['maddec01/lar-server'],
         items: [concept, feature, coupled, part],
     });
+
     await firstRead(board);
+
     const [conceptId, featureId] = [board.id(1, 'maddec01/lar-server'), board.id(2, 'maddec01/lar-server')];
     const shown = await changeRecords(
         board,
@@ -91,6 +101,7 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
             for (let attempt = 0; ; attempt++) {
                 try {
                     records.addBlocker(featureId, records.read(featureId).revision, conceptId);
+
                     return;
                 } catch (error) {
                     if (!(error instanceof WorkRecordError) || error.code !== 'stale-revision' || attempt >= 4)
@@ -103,6 +114,7 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
     );
     const [map, plain, parent, child] = shown.items;
     const read = { destination: 'There.', decisions: [], fog: [], check: { title: 'Try it', steps: ['Step'] } };
+
     assert.deepEqual(map?.map, read);
     assert.deepEqual(parent?.map, read, 'an item with a sub-issue on the board is a dossier, with its map');
     assert.deepEqual(map?.blockers, []);
@@ -111,9 +123,11 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
     ]);
     assert.ok(!('map' in plain!) && !('body' in plain!), 'a feature gets no map and no body');
     assert.ok(!('map' in child!) && !('body' in child!), 'nor does a part');
+
     const bodyReads = (await board.calls()).filter((args) =>
         args.some((a) => a.includes('nodes(ids:') && a.includes('id body }')),
     );
+
     assert.equal(
         bodyReads.filter((args) => args.some((a) => a.includes('id body }'))).length,
         1,
@@ -128,8 +142,11 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
 
 test('a read request starts a read of GitHub at once', async (t) => {
     const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')] });
+
     await firstRead(board);
+
     const before = await reads(board);
+
     assert.equal((await askRead(board)).status, 202);
     await waitFor(async () => (await reads(board)) === before + 1);
 });
@@ -142,8 +159,11 @@ test('requests during a read queue one more read after it, never two at once', a
         readDelay: 300,
         readHold: hold,
     });
+
     await firstRead(board);
+
     const before = await reads(board);
+
     await writeFile(hold, '');
     assert.equal((await askRead(board)).status, 202);
     // The requested read waits on the hold, so every request below lands during it.
@@ -169,30 +189,38 @@ test('an interval read during a read is skipped, not queued', async (t) => {
         true,
         { FAST_REFRESH_MS: '1000', FAST_REFRESH_TICKS: '1' },
     );
+
     await firstRead(board);
     await writeFile(hold, '');
     await board.untilCalled((args) => args[0] === 'held');
+
     const isRead = (args: string[]) => args.some((a) => a.includes('states: [OPEN]'));
     const isTick = (args: string[]) => args[0] === 'tick';
     /** The calls after the first `marker` entry. */
     const after = async (marker: string) => {
         const calls = await board.calls();
+
         return calls.slice(calls.findIndex((args) => args[0] === marker) + 1);
     };
+
     // Two ticks land while the interval read waits on the hold.
     await waitFor(async () => (await after('held')).filter(isTick).length >= 2);
     await rm(hold);
     await board.untilCalled((args) => args[0] === 'released');
     await waitFor(async () => (await after('released')).some(isRead));
+
     const held = await after('held');
     const during = held.slice(
         0,
         held.findIndex((args) => args[0] === 'released'),
     );
+
     assert.ok(during.filter(isTick).length >= 2);
     assert.deepEqual(during.filter(isRead), [], 'the ticks during the read start no read');
+
     const next = await after('released');
     const tick = next.findIndex(isTick);
+
     assert.ok(
         tick >= 0 && tick < next.findIndex(isRead),
         'the next read waits for a tick instead of starting as the held read ends',
@@ -201,8 +229,11 @@ test('an interval read during a read is skipped, not queued', async (t) => {
 
 test('a read request without JSON, from another origin or to another host reads nothing', async (t) => {
     const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')] });
+
     await firstRead(board);
+
     const before = await reads(board);
+
     assert.equal(
         (await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url }, body: '{}' })).status,
         415,
@@ -217,6 +248,7 @@ test('a read request without JSON, from another origin or to another host reads 
 
 test('the sample board answers a read request and reads nothing', async (t) => {
     const board = await startBoard(t, { repositories: ['maddec01/lar-factory'] }, true);
+
     assert.equal((await askRead(board)).status, 200);
     await new Promise((r) => setTimeout(r, 200));
     assert.equal((await board.calls()).length, 0);
@@ -224,11 +256,14 @@ test('the sample board answers a read request and reads nothing', async (t) => {
 
 test('a read request naming an item reads that item alone, without loading the configs again', async (t) => {
     const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'Queued')] });
+
     await firstRead(board);
+
     const [item] = (await board.board()).items;
     const configReads = async () =>
         (await board.calls()).filter((args) => args.some((a) => a.endsWith('/.lar-factory.json'))).length;
     const [readsBefore, configsBefore] = [await reads(board), await configReads()];
+
     await new Promise((r) => setTimeout(r, 2_000));
     assert.equal(
         (
@@ -240,9 +275,11 @@ test('a read request naming an item reads that item alone, without loading the c
         ).status,
         202,
     );
+
     const itemReads = async () =>
         (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues(')))
             .length;
+
     await waitFor(async () => (await itemReads()) === 1);
     assert.equal(await reads(board), readsBefore, 'the repository is not read whole');
     assert.equal(await configReads(), configsBefore);
@@ -255,29 +292,39 @@ test('a completed board read publishes while its Spec reads are still blocked', 
     const repository = 'example/product';
     const issue = boardIssue(1, 'List', repository);
     const board = await startBoard(t, { repositories: [repository], items: [issue] });
+
     await firstRead(board);
+
     const hold = await holdPath(t);
+
     await writeFile(hold, '');
     setOverride(repository, 'writeRefinedSpec', true, board.dataDir);
+
     const records = await openWorkRecords(join(board.dataDir, 'work-records.db'));
+
     try {
         const id = board.id(1, repository);
         const state = records.specState(id);
+
         records.saveSpecState(id, state.generation, { ...state, active: true });
     } finally {
         records.close();
     }
+
     await board.update({
         repositories: [repository],
         items: [boardIssue(1, 'List', repository, ['bug'])],
         specReadHold: hold,
     });
+
     try {
         await askRead(board);
         await board.untilCalled((args) => args[0] === 'spec-held');
+
         const shown = await until(board, (data) =>
             data.items.some((item) => item.number === 1 && item.labels.includes('bug')),
         );
+
         assert.equal(shown.error, null);
     } finally {
         await rm(hold, { force: true });

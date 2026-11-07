@@ -1,5 +1,5 @@
 import type { TrackerCapabilities } from '@lar-factory/shared';
-import { BoardNote, Button, buttonKind, CreateLabelForm, Input, InsetPanel } from '@lar-works/design-system';
+import { Button, buttonKind, CreateLabelForm, Input, InsetPanel, Text } from '@lar-works/design-system';
 import { Plus } from '@lar-works/design-system/icons';
 import { useState, type FormEvent } from 'react';
 
@@ -64,7 +64,11 @@ export function CreateLabel({
                     </CreateLabelForm>
                 </FieldRow>
             </InsetPanel>
-            {showUnavailable && <BoardNote>{createUnavailable}</BoardNote>}
+            {showUnavailable && (
+                <Text variant="caption" tone="muted">
+                    {createUnavailable}
+                </Text>
+            )}
             <ProblemText>{problem ?? failure}</ProblemText>
         </>
     );

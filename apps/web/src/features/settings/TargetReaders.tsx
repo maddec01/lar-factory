@@ -1,6 +1,6 @@
 // Reader badges are shared by Settings and the install overview. Targets arrive physically deduplicated from the app.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Badge, BoardNote, LabelsValue } from '@lar-works/design-system';
+import { Badge, LabelsValue, Text } from '@lar-works/design-system';
 
 import { useInstallStore } from '@/services/install/install.hooks';
 
@@ -29,7 +29,9 @@ export function TargetReaders({ target }: { target: TargetSnapshot }) {
                     );
                 })
             ) : (
-                <BoardNote>{target.locked ? 'Shared skill copies' : 'Manual target'}</BoardNote>
+                <Text variant="caption" tone="muted">
+                    {target.locked ? 'Shared skill copies' : 'Manual target'}
+                </Text>
             )}
         </LabelsValue>
     );

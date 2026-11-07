@@ -1,6 +1,6 @@
 // Skill work and retained results, with recovery through the desktop-owned installer.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { BoardNote, Button, ButtonRow, buttonKind, Progress, SettingDetails, Text } from '@lar-works/design-system';
+import { Button, buttonKind, ButtonRow, Progress, SettingDetails, Text } from '@lar-works/design-system';
 
 import { useSettingsStore } from './SettingsStore';
 import { useDriftStore } from '@/services/install/drift.hooks';
@@ -18,7 +18,9 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
 
     return (
         <SettingDetails>
-            <BoardNote>Retry and Replace apply to all active targets.</BoardNote>
+            <Text variant="caption" tone="muted">
+                Retry and Replace apply to all active targets.
+            </Text>
             <ButtonRow layout="wrap">
                 {failed && (
                     <Button

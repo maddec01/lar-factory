@@ -1,6 +1,6 @@
 import { trackerCapabilities, type SetupDetection } from '@lar-factory/shared';
 import { emptyVocabularyTerm } from '@lar-factory/shared/vocabulary';
-import { BoardNote, Disclosure, HelpTip, InsetPanel } from '@lar-works/design-system';
+import { Disclosure, HelpTip, InsetPanel, Text } from '@lar-works/design-system';
 
 import { useWizardStore, type Run } from './WizardStore';
 import {
@@ -59,14 +59,14 @@ export function KindMapping({ run, detection }: { run: Run; detection: SetupDete
             lazy
             defaultOpen={!!run.choices.vocabulary || !!run.choices.newLabels}
         >
-            <BoardNote>
+            <Text variant="caption" tone="muted">
                 New {labels} wait until you add the Project.{' '}
                 <HelpTip label="kind mapping">
                     Skip this if you like. Without a mapping, new tickets get no {labels} from their kind. New {labels}{' '}
                     are created only when you choose Save and add Project. You can edit these mappings later in
                     Settings.
                 </HelpTip>
-            </BoardNote>
+            </Text>
             <KindMappingFields run={run} detection={detection} />
         </Disclosure>
     );

@@ -7,13 +7,13 @@ import {
     type ModelGroup,
 } from '@lar-factory/shared';
 import {
-    BoardNote,
     Button,
     buttonKind,
     DropdownMenu,
     ProjectValueList,
     SettingControl,
     Stack,
+    Text,
 } from '@lar-works/design-system';
 // Settings uses the same provider groups and keyboard navigation as Start, with its saved model checked, and names the model each repository's builds use on T3 Project default.
 import { useState } from 'react';
@@ -98,9 +98,9 @@ export function AutoBuildModelSetting({ data }: { data: AutoBuildData }) {
                     </DropdownMenu.Content>
                 </DropdownMenu>
                 {error && (
-                    <BoardNote tone="error" role="alert">
+                    <Text variant="caption" tone="danger" role="alert">
                         {error}
-                    </BoardNote>
+                    </Text>
                 )}
             </SettingControl>
             <RepositoryDefaults data={data} />

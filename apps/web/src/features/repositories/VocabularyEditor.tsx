@@ -2,10 +2,9 @@ import { trackerCapabilities, type VocabularyTerm } from '@lar-factory/shared';
 import type { VocabularyDiscovery } from '@lar-factory/shared/vocabulary';
 import {
     Alert,
-    BoardNote,
     Button,
-    ButtonRow,
     buttonKind,
+    ButtonRow,
     FormSelect,
     InlineButton,
     Text,
@@ -124,7 +123,11 @@ export function VocabularyFields({
                             {`+${chosen.length - 2}`}
                         </VocabularyMore>
                     )}
-                    {!chosen.length && !suggested && <BoardNote>None</BoardNote>}
+                    {!chosen.length && !suggested && (
+                        <Text variant="caption" tone="muted">
+                            None
+                        </Text>
+                    )}
                     {suggested && (
                         <VocabularySuggestion
                             disabled={disabled}
@@ -160,9 +163,9 @@ export function VocabularyFields({
                 />
             )}
             {!types.length && !typesProblem && (
-                <BoardNote>
+                <Text variant="caption" tone="muted">
                     This Project has no {discovery.provider === 'azure' ? 'work item' : 'issue'} types.
-                </BoardNote>
+                </Text>
             )}
             {value.type && (typesProblem || !types.includes(value.type)) && (
                 <ButtonRow>
@@ -176,9 +179,9 @@ export function VocabularyFields({
                 </ButtonRow>
             )}
             {error && (
-                <BoardNote tone="error" role="alert">
+                <Text variant="caption" tone="danger" role="alert">
                     {error} <InlineButton onClick={retryCommit}>Retry</InlineButton>
-                </BoardNote>
+                </Text>
             )}
         </VocabularyRow>
     );

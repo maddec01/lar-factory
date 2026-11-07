@@ -10,13 +10,7 @@
 
 import { plural, itemName, repoKey } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import {
-    BoardNote,
-    DossierBody as Body,
-    DossierList,
-    DossierRow as Row,
-    DossierToggle,
-} from '@lar-works/design-system';
+import { DossierBody as Body, DossierList, DossierRow as Row, DossierToggle, Text } from '@lar-works/design-system';
 import type { MouseEvent } from 'react';
 
 import { Attention } from './Attention';
@@ -47,11 +41,15 @@ function DossierBody({ parent, parts, data, view }: { parent: Item; parts: Part[
 
     return (
         <Body>
-            {noDelivery(parent) && <BoardNote data-no-delivery>{NO_DELIVERY}</BoardNote>}
+            {noDelivery(parent) && (
+                <Text variant="caption" tone="muted" data-no-delivery>
+                    {NO_DELIVERY}
+                </Text>
+            )}
             {missing > 0 && (
-                <BoardNote data-unread-parts>
+                <Text variant="caption" tone="muted" data-unread-parts>
                     {plural(missing, 'part')} the board doesn't read. A Project may no longer be on the board.
-                </BoardNote>
+                </Text>
             )}
             <StructureSync item={unsynced} />
             {view === 'map' ? (

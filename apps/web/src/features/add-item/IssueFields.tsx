@@ -8,7 +8,6 @@ import {
 } from '@lar-factory/shared';
 // Add item's Create issue checkbox follows the repository's default until this item changes it, and shows the optional provider fields.
 import {
-    BoardNote,
     Checkbox,
     CreateIssueChoice,
     DraftTicketPart,
@@ -16,6 +15,7 @@ import {
     InlineButton,
     PanelField,
     Stack,
+    Text,
 } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
@@ -77,9 +77,19 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
         };
     }, [repo.repo]);
 
-    if (error) return <BoardNote role="status">{error}</BoardNote>;
+    if (error)
+        return (
+            <Text variant="caption" tone="muted" role="status">
+                {error}
+            </Text>
+        );
 
-    if (!read) return <BoardNote role="status">Reading issue options… You can submit while they load.</BoardNote>;
+    if (!read)
+        return (
+            <Text variant="caption" tone="muted" role="status">
+                Reading issue options… You can submit while they load.
+            </Text>
+        );
 
     const setup = repo.setup;
     const access = setup?.access ?? {};
@@ -94,9 +104,9 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
     return (
         <Stack>
             {read.problems.length > 0 && (
-                <BoardNote role="status">
+                <Text variant="caption" tone="muted" role="status">
                     Some issue options could not be read. You can still submit the title and description.
-                </BoardNote>
+                </Text>
             )}
             {labelsShown && <DraftLabels repo={repo} kind={kind} read={read} kept={kept} />}
             {!writeAccessProblem(repo.repo, 'type-ticket', access, safety) && (
@@ -164,7 +174,7 @@ export function CreateIssueBox({
             }
             reason={
                 reason && (
-                    <BoardNote id="item-create-reason">
+                    <Text variant="caption" tone="muted" id="item-create-reason">
                         {reason}{' '}
                         <InlineButton
                             disabled={disabled || running !== null}
@@ -172,10 +182,16 @@ export function CreateIssueBox({
                         >
                             Recheck access
                         </InlineButton>
-                    </BoardNote>
+                    </Text>
                 )
             }
-            error={error && <BoardNote role="status">{error}</BoardNote>}
+            error={
+                error && (
+                    <Text variant="caption" tone="muted" role="status">
+                        {error}
+                    </Text>
+                )
+            }
         />
     );
 }
@@ -199,13 +215,13 @@ export function IssueFields({
             {checked ? (
                 <TicketOptionFields repo={repo} kind={kind} kept={kept?.kind === kind ? kept.options : undefined} />
             ) : (
-                <BoardNote>
+                <Text variant="caption" tone="muted">
                     Local work has its kind alone.
                     {reason
                         ? ''
                         : ` Tick Create issue to add ${trackerCapabilities(repo.repo).heading.toLowerCase()}.`}{' '}
                     Saved only on this machine.
-                </BoardNote>
+                </Text>
             )}
         </DraftTicketPart>
     );

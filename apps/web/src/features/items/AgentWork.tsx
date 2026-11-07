@@ -2,7 +2,7 @@
 
 import { UNREADABLE, clock, day, duration, formatTokens, formatUsd } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats } from '@lar-factory/shared';
-import { BoardNote } from '@lar-works/design-system';
+import { Text } from '@lar-works/design-system';
 
 import { isDone } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -60,7 +60,9 @@ export function AgentWork({
     if (s.wallMs) figures.push(['Wall time', duration(s.wallMs), ' wall']);
 
     return (
-        <BoardNote
+        <Text
+            variant="caption"
+            tone="muted"
             data-agent-work
             data-last-known={old ? '' : undefined}
             title={[figures.map(([k, v]) => `${k} ${v}`).join(' · '), old, s.incomplete && INCOMPLETE_TOTAL]
@@ -73,7 +75,7 @@ export function AgentWork({
             {figures.map(([, v, unit]) => v + unit).join(' · ')}
             {old && ' · last known'}
             {s.incomplete && ' · incomplete'}
-        </BoardNote>
+        </Text>
     );
 }
 
@@ -116,6 +118,8 @@ export function AgentWorkNote({ item }: { item: Item }) {
     const none = item.kind === 'concept' ? 'No T3 thread of its own.' : 'No T3 thread has worked on this yet.';
 
     return (
-        <BoardNote>{s === 'unavailable' ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : none}</BoardNote>
+        <Text variant="caption" tone="muted">
+            {s === 'unavailable' ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : none}
+        </Text>
     );
 }

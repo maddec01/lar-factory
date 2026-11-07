@@ -4,7 +4,7 @@
 
 import { UNREADABLE, itemTotal, plural } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { BoardNote, ConceptPart, ConceptPartList, DetailsSection, ItemNote } from '@lar-works/design-system';
+import { ConceptPart, ConceptPartList, DetailsSection, Text } from '@lar-works/design-system';
 
 import {
     AgentWork,
@@ -72,7 +72,9 @@ export function ConceptWork({ item }: { item: Item }) {
         <>
             <AgentWork item={item} label="Own cost" />
             {total === 'unavailable' ? (
-                <BoardNote data-total-incomplete>{INCOMPLETE_TOTAL}</BoardNote>
+                <Text variant="caption" tone="muted" data-total-incomplete>
+                    {INCOMPLETE_TOTAL}
+                </Text>
             ) : (
                 total && <AgentWork item={item} stats={total} label="Total on the board" />
             )}
@@ -95,7 +97,13 @@ function PartRow({ item, data, openPart }: { item: Item; data: BoardData; openPa
             name={<ItemTitle item={item} />}
             state={complete ? 'Complete' : shown.word}
         >
-            {usageUnreadable(item) ? <ItemNote>{UNREADABLE}</ItemNote> : <AgentWork item={item} />}
+            {usageUnreadable(item) ? (
+                <Text as="span" variant="caption" tone="muted">
+                    {UNREADABLE}
+                </Text>
+            ) : (
+                <AgentWork item={item} />
+            )}
             {hasThread && <OpenThread item={item} data={data} />}
         </ConceptPart>
     );

@@ -3,7 +3,7 @@
 
 import { canAbandon, itemName, ref } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { ActionError as DesignActionError, Button, buttonKind, ItemNote } from '@lar-works/design-system';
+import { ActionError as DesignActionError, Button, buttonKind, Text } from '@lar-works/design-system';
 import { useId, useRef } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
@@ -84,9 +84,9 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
                 {verb}
             </Button>
             {refusal && (
-                <ItemNote id={reason} data-abandon-refusal>
+                <Text as="span" variant="caption" tone="muted" id={reason} data-abandon-refusal>
                     {refusal}
-                </ItemNote>
+                </Text>
             )}
         </>
     );

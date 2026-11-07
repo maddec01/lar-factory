@@ -3,16 +3,16 @@
 import type { ItemComment } from '@lar-factory/shared';
 import { shortAgo } from '@lar-factory/shared';
 import {
-    BoardNote,
     Button,
-    ButtonRow,
     buttonKind,
+    ButtonRow,
     Comment as CommentCard,
     CommentList,
     DetailsHeading,
     DetailsText,
     MainSection,
     RichText,
+    Text,
 } from '@lar-works/design-system';
 
 import type { DetailsEntry } from './DetailsCache';
@@ -74,9 +74,9 @@ function Comments({
                         Load older comments
                     </Button>
                     {older.error && (
-                        <BoardNote tone="error" role="alert">
+                        <Text variant="caption" tone="danger" role="alert">
                             Could not load older comments: {older.error}
-                        </BoardNote>
+                        </Text>
                     )}
                 </ButtonRow>
             )}

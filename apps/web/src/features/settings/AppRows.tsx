@@ -4,7 +4,7 @@
 // call did.
 
 import type { UpdateChannel } from '@lar-factory/shared';
-import { BoardNote, Button, buttonKind, FormResult, SettingsNote } from '@lar-works/design-system';
+import { Button, buttonKind, FormResult, SettingsNote, Text } from '@lar-works/design-system';
 
 import { type SettingsResult, useSettingsStore } from './SettingsStore';
 import { InstallRecovery } from './TargetProgress';
@@ -82,20 +82,24 @@ export function TargetsNote() {
     return (
         <SettingsNote busy={targets === null}>
             {!installs && (
-                <BoardNote>
+                <Text variant="caption" tone="muted">
                     This run of Lar Factory doesn't install skills, so you can't tick or untick a folder. Start it with
                     --install-skills to change them.
-                </BoardNote>
+                </Text>
             )}
             {installs && !installed && (
-                <BoardNote>
+                <Text variant="caption" tone="muted">
                     Lar Factory hasn't installed its skills yet, so you can't tick or untick a folder. It installs them
                     when it starts. If the install failed, use Retry to try again.
-                </BoardNote>
+                </Text>
             )}
-            {targets === null && <BoardNote>Loading…</BoardNote>}
+            {targets === null && (
+                <Text variant="caption" tone="muted">
+                    Loading…
+                </Text>
+            )}
             {targets !== null && installs && snapshot && (
-                <BoardNote role="status">
+                <Text variant="caption" tone="muted" role="status">
                     {snapshot.discovery === 'waiting'
                         ? 'Waiting for T3 Code to list its provider instances. Fallback targets remain available.'
                         : snapshot.discovery !== 'available'
@@ -103,7 +107,7 @@ export function TargetsNote() {
                           : !snapshot.targets.some(({ instances }) => instances.length)
                             ? 'Discovery completed. No provider targets were reported. Manual and fallback targets remain available.'
                             : 'T3 Code listed its provider targets. Required targets stay ticked, including those read by disabled instances.'}
-                </BoardNote>
+                </Text>
             )}
             <Result from="targets" />
             {targets !== null && (

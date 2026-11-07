@@ -2,7 +2,7 @@
 
 import { kindSwapAccessProblem, sameRepo, trackerCapabilities } from '@lar-factory/shared';
 import type { Item, KindTicketSwap, SwapKind } from '@lar-factory/shared';
-import { BoardNote, Button, buttonKind, InlineButton, KindQuestion } from '@lar-works/design-system';
+import { Button, buttonKind, InlineButton, KindQuestion, Text } from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { detailsCache } from './DetailsCache';
@@ -84,10 +84,10 @@ export function KindNotice({
 
     if (kept && !reopened) {
         return (
-            <BoardNote data-kind-kept ownLine>
+            <Text variant="caption" tone="muted" data-kind-kept ownLine>
                 {ticketKind ? `Ticket says ${kindName(ticketKind)}. Kept as is.` : 'Ticket has no kind. Left as is.'}{' '}
                 <InlineButton onClick={() => setReopened(true)}>Change</InlineButton>
-            </BoardNote>
+            </Text>
         );
     }
 
@@ -138,17 +138,17 @@ export function KindNotice({
                 </>
             }
         >
-            <BoardNote data-kind-notice-hint>
+            <Text variant="caption" tone="muted" data-kind-notice-hint>
                 {ticketMoved
                     ? 'Changes this item only. Nothing is written to the ticket.'
                     : checking
                       ? 'Checking what the update changes…'
                       : (problem ?? swapLine(item, swap, note))}
-            </BoardNote>
+            </Text>
             {answering?.error && (
-                <BoardNote tone="error" role="alert">
+                <Text variant="caption" tone="danger" role="alert">
                     {answering.error}
-                </BoardNote>
+                </Text>
             )}
         </KindQuestion>
     );

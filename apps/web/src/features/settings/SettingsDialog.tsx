@@ -5,7 +5,6 @@
 
 import { boardApp, shownRepo } from '@lar-factory/shared';
 import {
-    BoardNote,
     Button,
     buttonKind,
     FormSection,
@@ -17,6 +16,7 @@ import {
     SettingsNav,
     SidebarNavigationGroup,
     SidebarNavigationItem,
+    Text,
 } from '@lar-works/design-system';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -74,7 +74,9 @@ function GroupView({ group }: { group: Group }) {
                             {row.control.type === 'custom' ? (
                                 row.control.render()
                             ) : (
-                                <BoardNote>Not available yet</BoardNote>
+                                <Text variant="caption" tone="muted">
+                                    Not available yet
+                                </Text>
                             )}
                         </FieldRow>
                     ))}

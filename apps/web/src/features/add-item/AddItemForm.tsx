@@ -2,7 +2,6 @@
 
 import { ITEM_KINDS } from '@lar-factory/shared';
 import {
-    BoardNote,
     Button,
     buttonKind,
     DraftFields,
@@ -12,6 +11,7 @@ import {
     MarkdownEditor,
     Modal,
     PanelField,
+    Text,
 } from '@lar-works/design-system';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -133,7 +133,9 @@ export function AddItemForm() {
                             disabled={locked}
                             fill="wide"
                         />
-                        <BoardNote>Formats as you type · saved as Markdown</BoardNote>
+                        <Text variant="caption" tone="muted">
+                            Formats as you type · saved as Markdown
+                        </Text>
                         <FormResult id="item-result" text={message} />
                     </>
                 }

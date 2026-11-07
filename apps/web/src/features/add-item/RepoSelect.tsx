@@ -1,7 +1,7 @@
 // The repository select both Add item panes start with, and the hint when none is onboarded.
 
 import { noneOnboarded, repoName } from '@lar-factory/shared';
-import { BoardNote, FormSelect } from '@lar-works/design-system';
+import { FormSelect, Text } from '@lar-works/design-system';
 
 import { AddingARepository } from '@/features/notices';
 import { ProjectIcon } from '@/features/repositories';
@@ -27,9 +27,9 @@ export function RepoSelect({ id, repo, onRepo }: { id: string; repo: string; onR
                 }))}
             />
             {hint && (
-                <BoardNote id={`${id}-hint`}>
+                <Text variant="caption" tone="muted" id={`${id}-hint`}>
                     No Project is onboarded. <AddingARepository />
-                </BoardNote>
+                </Text>
             )}
         </>
     );

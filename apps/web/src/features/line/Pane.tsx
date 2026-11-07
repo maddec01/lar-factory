@@ -1,9 +1,9 @@
-// A section of the board's work by stage: a titled list that takes the height of its rows, so a section with none stays
-// small and the page scrolls past them all.
+// A section of the board's work by stage, on the design system's StagePane: a titled list that takes the height of its
+// rows, so a section with none stays small and the page scrolls past them all.
 
 import { readingScope } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
-import { Spinner } from '@lar-works/design-system';
+import { Spinner, StagePane, StagePaneEmpty } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { useShownScope } from '@/features/filters';
@@ -17,7 +17,6 @@ export function Pane({
     running,
     count,
     right,
-    className = '',
     children,
 }: {
     id: string;
@@ -26,24 +25,18 @@ export function Pane({
     running?: boolean;
     count: number;
     right?: ReactNode;
-    className?: string;
     children: ReactNode;
 }) {
     return (
-        <section
-            data-stage={id}
-            aria-labelledby={`${id}-h`}
-            className={`min-w-0 overflow-hidden rounded-xl border border-(--border) bg-(--card) shadow-xs ${className}`}
+        <StagePane
+            id={id}
+            title={title}
+            glyph={status && <StatusGlyph status={status} running={running} />}
+            count={count}
+            right={right}
         >
-            <header className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-(--border) px-3 py-1">
-                {status && <StatusGlyph status={status} running={running} />}
-                <h3 id={`${id}-h`} className="m-0 text-[13px] font-medium whitespace-nowrap">
-                    {title} <span className="font-normal text-(--muted-foreground) tabular-nums">{count}</span>
-                </h3>
-                {right && <span className="row-action ml-auto flex max-w-full min-w-0 items-center">{right}</span>}
-            </header>
-            <div className="@container">{children}</div>
-        </section>
+            {children}
+        </StagePane>
     );
 }
 
@@ -53,8 +46,6 @@ export function PaneEmpty({ filtered, none, children }: { filtered: boolean; non
     const reading = useBoardStore((state) => readingScope(state.data, scope ?? undefined));
 
     return (
-        <p data-pane-empty className="m-0 px-3 py-3 text-[12px] text-(--muted-foreground)">
-            {reading ? <Spinner label="Loading Projects…" /> : filtered ? children : none}
-        </p>
+        <StagePaneEmpty>{reading ? <Spinner label="Loading Projects…" /> : filtered ? children : none}</StagePaneEmpty>
     );
 }

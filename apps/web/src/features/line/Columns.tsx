@@ -1,10 +1,9 @@
-// What the stage rows, dock rows and concept parts share: their second line, the agent figures on it, and what holds a
-// row's action. rows.css keeps the columns.
+// What the stage rows, dock rows and concept parts share: their second line, on the design system's RowSecondLine, and
+// the agent figures on it.
 
 import { duration, formatTokens, formatUsd, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats, LinkedPr } from '@lar-factory/shared';
-import { Spinner } from '@lar-works/design-system';
-import { GitPullRequest } from '@lar-works/design-system/icons';
+import { PullRequestRef, RowSecondLine as DesignRowSecondLine, Spinner, UsageFigures } from '@lar-works/design-system';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { useActivityStill } from './ActivityLine';
@@ -12,12 +11,6 @@ import { statsOf } from './StageTrack';
 import { useItemDialogStore } from '@/features/item-dialog';
 import { hasFigures, INCOMPLETE_TOTAL, useLastKnown, usageLoading } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
-
-/** What a row's action slot holds, centred and against its right edge. */
-export const ROW_ACTION =
-    'flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-xs text-(--muted-foreground)';
-/** The rule under a row, which takes no height, so every row of a type measures the same. */
-export const ROW_RULE = 'shadow-[inset_0_-1px_var(--border)] last:shadow-none';
 
 /** A click on a second line beside its controls opens the item, as its first line's button does; letting go of a drag that selected text doesn't. */
 export const opensItem = (item: Item) => (e: MouseEvent<HTMLElement>) => {
@@ -43,24 +36,17 @@ export function RowSecondLine({
     children?: ReactNode;
 }) {
     return (
-        <div data-progress onClick={onClick} className={`row-second ${onClick ? 'cursor-pointer' : ''}`}>
-            <span data-col="bar" className="min-w-0">
-                {bar}
-            </span>
-            {count || <span data-col="count" />}
-            <span data-col="next" className="flex min-w-0 items-center gap-3">
-                {children}
-            </span>
-            <span data-col="pr" className="flex min-w-0 gap-2 overflow-hidden tabular-nums">
-                {prs.map((pr) => (
-                    <span key={pr.number} title={prLabel(pr)} className="inline-flex shrink-0 items-center gap-1">
-                        <GitPullRequest className="size-3 shrink-0 text-(--st-done)" />
-                        {prLabel(pr)}
-                    </span>
-                ))}
-            </span>
-            <span data-col="figures">{figures}</span>
-        </div>
+        <DesignRowSecondLine
+            onClick={onClick}
+            bar={bar}
+            count={count}
+            prs={prs.map((pr) => (
+                <PullRequestRef key={pr.number} label={prLabel(pr)} title={prLabel(pr)} />
+            ))}
+            figures={figures}
+        >
+            {children}
+        </DesignRowSecondLine>
     );
 }
 
@@ -98,21 +84,14 @@ export function Figures({ s, item, total }: { s: ItemStats | null; item: Item; t
               .join('. ');
 
     return (
-        <span
-            className="flex min-w-0 items-center justify-end gap-1 text-(--muted-foreground) tabular-nums"
+        <UsageFigures
             title={title}
-        >
-            {loading && <Spinner title={UPDATING} still={still} />}
-            {text && <span className="truncate">{text}</span>}
-            {s.incomplete &&
-                (text ? (
-                    <span className="-ml-1 shrink-0" data-partial>
-                        +<span className="sr-only"> partial</span>
-                    </span>
-                ) : (
-                    <span className="shrink-0">Usage incomplete</span>
-                ))}
-        </span>
+            text={text}
+            updating={loading ? UPDATING : undefined}
+            still={still}
+            partial={s.incomplete ? 'partial' : undefined}
+            incomplete={s.incomplete ? 'Usage incomplete' : undefined}
+        />
     );
 }
 

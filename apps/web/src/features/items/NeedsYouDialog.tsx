@@ -3,7 +3,7 @@
 
 import { needsYouPrompt } from '@lar-factory/shared';
 import type { BoardData, Item, NeedsYouAction } from '@lar-factory/shared';
-import { Alert, Button, buttonKind, DropdownMenu, Modal, Text } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, DropdownMenu, Modal, Stack, Text } from '@lar-works/design-system';
 import { useEffect, useRef, useState } from 'react';
 
 import { useActionStore, useItemAction } from './ActionStore';
@@ -201,7 +201,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
                 closeOnOverlayClick={false}
             >
                 <Modal.Body>
-                    <div className="grid gap-2">
+                    <Stack space="related">
                         <Text id="needs-you-detail" tone="muted">
                             {prompt.detail}
                         </Text>
@@ -240,7 +240,7 @@ export function NeedsYouDialog({ item, data, offer, label, onClose }: Props) {
                         )}
                         {cleanup && next && <CleanupChoices choices={cleanupChoices} />}
                         {error && <Alert tone="danger">{error}</Alert>}
-                    </div>
+                    </Stack>
                 </Modal.Body>
                 <Modal.Footer>
                     <Button {...buttonKind('other')} disabled={loading} onClick={dismiss}>

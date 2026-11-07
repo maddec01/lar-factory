@@ -99,7 +99,7 @@ function PartRow({ item, data, openPart }: { item: Item; data: BoardData; openPa
             >
                 <SourceIcon item={item} />
                 <span className="mt-0.5 inline-flex">
-                    <ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} className="size-3.5" />
+                    <ItemStatusGlyph item={item} status={complete ? 'Done' : item.status} />
                 </span>
                 <span className="line-clamp-2">
                     <ItemTitle item={item} />

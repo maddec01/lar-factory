@@ -3,7 +3,7 @@
 
 import { isBuild } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Badge } from '@lar-works/design-system';
+import { Badge, RowIdentity } from '@lar-works/design-system';
 import { memo } from 'react';
 
 import { partKind } from './DossierParts';
@@ -24,9 +24,9 @@ export const RowKind = memo(function RowKind({ item }: { item: Item }) {
 /** The ticket's source and the repository, side by side. */
 export const RowSource = memo(function RowSource({ item }: { item: Item }) {
     return (
-        <span data-row-identity className="flex min-w-0 items-center gap-1.5 text-[11px] text-(--muted-foreground)">
+        <RowIdentity>
             <SourceIcon item={item} />
             <RepoCell item={item} />
-        </span>
+        </RowIdentity>
     );
 });

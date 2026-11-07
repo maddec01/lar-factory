@@ -586,7 +586,10 @@ test("Abandon is greyed out with the reason on an item whose type can't be aband
 
     const abandon = button('abandon', 'I_sample01');
 
-    expect(abandon.className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
+    expect(
+        abandon.matches('button:disabled[title]'),
+        "pointer events stay on (the board's base styles keep them on a disabled button with a title), so the title shows",
+    ).toBe(true);
 
     const reason = footer().querySelector<HTMLElement>('[data-abandon-refusal]')!;
 

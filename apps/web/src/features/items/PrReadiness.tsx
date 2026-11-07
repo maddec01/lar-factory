@@ -1,5 +1,5 @@
 import { writeHeaders, type Item, type LinkedPr } from '@lar-factory/shared';
-import { Button, buttonKind } from '@lar-works/design-system';
+import { Button, buttonKind, PullRequestReadiness, ReadinessDetails } from '@lar-works/design-system';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -104,53 +104,56 @@ export function PrReadiness({ item, pr }: { item: Item; pr: LinkedPr }) {
     if (!item.azure) return null;
 
     return (
-        <div className="basis-full text-xs text-(--muted-foreground)">
-            <Button
-                {...buttonKind('other')}
-                aria-expanded={open}
-                aria-controls={detailsId}
-                onClick={() => {
-                    // A new attempt, so a reopened panel reads afresh.
-                    setAttempt((n) => n + 1);
-                    setOpen(!open);
-                }}
-            >
-                Readiness details
-            </Button>
-            {open && (
-                <div id={detailsId} role="status" aria-live="polite">
-                    <p>
-                        {disconnected
-                            ? 'Readiness unavailable: disconnected.'
-                            : stale
-                              ? 'Refreshing current revision. Previous evidence is stale.'
-                              : evidence?.available
-                                ? pr.sourceRevision && evidence.sourceRevision !== pr.sourceRevision
-                                    ? 'Source revision changed. Refresh readiness.'
-                                    : pr.isDraft || pr.state !== 'open' || evidence.blockers.length
-                                      ? 'Readiness blocked.'
-                                      : 'Ready to merge based on this observation.'
-                                : evidence?.reason}
-                    </p>
-                    {evidence?.available && (
-                        <>
-                            <p>
-                                Observed <time dateTime={evidence.observedAt}>{evidence.observedAt}</time> · revision{' '}
-                                {evidence.sourceRevision}
-                            </p>
-                            <ul>
-                                {evidence.blockers.map((b) => (
-                                    <li key={b}>{blockerLabel(b)}</li>
-                                ))}
-                            </ul>
-                        </>
-                    )}
-                    <p>T3 Azure PR context is unsupported; evidence comes from Azure.</p>
-                    <Button {...buttonKind('other')} onClick={() => setAttempt((n) => n + 1)}>
-                        Refresh readiness
-                    </Button>
-                </div>
-            )}
-        </div>
+        <PullRequestReadiness
+            toggle={
+                <Button
+                    {...buttonKind('other')}
+                    aria-expanded={open}
+                    aria-controls={detailsId}
+                    onClick={() => {
+                        // A new attempt, so a reopened panel reads afresh.
+                        setAttempt((n) => n + 1);
+                        setOpen(!open);
+                    }}
+                >
+                    Readiness details
+                </Button>
+            }
+            details={
+                open && (
+                    <ReadinessDetails
+                        id={detailsId}
+                        status={
+                            disconnected
+                                ? 'Readiness unavailable: disconnected.'
+                                : stale
+                                  ? 'Refreshing current revision. Previous evidence is stale.'
+                                  : evidence?.available
+                                    ? pr.sourceRevision && evidence.sourceRevision !== pr.sourceRevision
+                                        ? 'Source revision changed. Refresh readiness.'
+                                        : pr.isDraft || pr.state !== 'open' || evidence.blockers.length
+                                          ? 'Readiness blocked.'
+                                          : 'Ready to merge based on this observation.'
+                                    : evidence?.reason
+                        }
+                        observed={
+                            evidence?.available && (
+                                <>
+                                    Observed <time dateTime={evidence.observedAt}>{evidence.observedAt}</time> ·
+                                    revision {evidence.sourceRevision}
+                                </>
+                            )
+                        }
+                        blockers={evidence?.available ? evidence.blockers.map(blockerLabel) : []}
+                        note="T3 Azure PR context is unsupported; evidence comes from Azure."
+                        refresh={
+                            <Button {...buttonKind('other')} onClick={() => setAttempt((n) => n + 1)}>
+                                Refresh readiness
+                            </Button>
+                        }
+                    />
+                )
+            }
+        />
     );
 }

@@ -2,6 +2,7 @@
 
 import { needsAnswer, plural, itemName, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+import type { DossierChipTone } from '@lar-works/design-system';
 import { Ban, CircleHelp, MessagesSquare } from '@lar-works/design-system/icons';
 import type { ReactNode } from 'react';
 
@@ -105,7 +106,7 @@ export const NO_DELIVERY = 'No delivery planned.';
 
 export interface Chip {
     words: string;
-    tone: 'warning' | 'danger' | 'neutral' | 'accent' | 'success';
+    tone: DossierChipTone;
     icon?: ReactNode;
     refined?: boolean;
 }
@@ -121,7 +122,7 @@ export function chipsOf(parent: Item, m: Moving): Chip[] {
         n ? [{ words: `${n} ${word}`, tone, icon }] : [];
 
     return [
-        ...count(m.needsYou.length, 'need you', 'warning', <StatusGlyph status="Needs you" className="size-3" />),
+        ...count(m.needsYou.length, 'need you', 'warning', <StatusGlyph status="Needs you" presentation="compact" />),
         ...count(m.decisions.length, m.decisions.length === 1 ? 'decision' : 'decisions', 'accent', <MessagesSquare />),
         ...count(m.blockedSlices.length, 'blocked', 'danger', <Ban />),
         ...(parent.refinement?.complete ? [{ words: 'Refined', tone: 'success' as const, refined: true }] : []),

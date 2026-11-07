@@ -16,7 +16,7 @@ const saved = (key: string) => JSON.parse(localStorage.getItem(key)!) as unknown
 const seed = (key: string, kinds: string[], labels: string[] = []) =>
     localStorage.setItem(key, JSON.stringify({ kinds, labels }));
 
-const queueRows = () => $$<HTMLLIElement>('.queue ol > li');
+const queueRows = () => $$<HTMLLIElement>('[data-stage="queue"] ol > li');
 const bar = () => $('[data-list-modal] [data-item-filters]')!;
 const open = (which: string) =>
     settle(() => bar().querySelector<HTMLButtonElement>(`[data-filter="${which}"]`)!.click());
@@ -121,7 +121,7 @@ test('the board keeps Queue numbers while a filter hides the first row, whose it
         ['Q3', '3'],
     ]);
     expect(text($('#queue-h'))).toBe('Queue 2');
-    expect($('.queue header button')).toBeNull();
+    expect($('[data-stage="queue"] header button')).toBeNull();
     await search();
     await removeToken('Bug');
     expect(queueRows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
@@ -134,10 +134,10 @@ test('a start error on a hidden row stays out of view, and shows on the row once
     const { useStartStore } = await import('@/features/items/StartStore');
 
     await settle(() => useStartStore.getState().set('Q1', { phase: 'error', message: 'T3 is down' }));
-    expect(text($('.queue'))).not.toContain('T3 is down');
+    expect(text($('[data-stage="queue"]'))).not.toContain('T3 is down');
     await search();
     await removeToken('Bug');
-    expect(text($('.queue li[data-item="Q1"] [role="alert"]'))).toBe('T3 is down');
+    expect(text($('[data-stage="queue"] li[data-item="Q1"] [role="alert"]'))).toBe('T3 is down');
 });
 
 const parent = item('P', { number: 10, title: 'Parent', kind: 'bug', status: 'In progress', labels: ['area: web'] });
@@ -178,7 +178,7 @@ test('the filters apply to every pane, their counts follow, and each says when n
         ]),
     );
     expect(['#queue-h', '#shaping-h', '#build-h'].map((h) => text($(h)))).toEqual(['Queue 0', 'Shaping 0', 'Build 0']);
-    expect(text($('.queue'))).toContain('Nothing queued matches.');
+    expect(text($('[data-stage="queue"]'))).toContain('Nothing queued matches.');
     expect(text($('[data-stage="shaping"] p'))).toBe('Nothing in shaping matches.');
     expect(text($('[data-stage="ready"]'))).toContain('Nothing ready to build matches.');
     expect(text($('[data-stage="build"] p'))).toBe('Nothing in build matches.');

@@ -2,6 +2,7 @@
 
 import { UNREADABLE, clock, day, duration, formatTokens, formatUsd } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats } from '@lar-factory/shared';
+import { BoardNote } from '@lar-works/design-system';
 
 import { isDone } from '@/features/line';
 import { useBoardStore } from '@/services/board/board.hooks';
@@ -31,18 +32,19 @@ export const hasFigures = (s: ItemStats) => Boolean(s.agentMs || s.wallMs || s.t
 /**
  * Cost, agent time, tokens and wall time as one small muted line after any `label`, each named in the tooltip; nothing
  * when no thread worked on the item or T3's database can't be read. While T3 can't be read, the board keeps the figures
- * it last saw, and the line says so. `stats` shows other figures than the item's own.
+ * it last saw, and the line says so. `stats` shows other figures than the item's own; `only` shows it only in a narrow
+ * or a wide container.
  */
 export function AgentWork({
     item,
     stats: s = item.stats,
     label,
-    className = '',
+    only,
 }: {
     item: Item;
     stats?: ItemStats | 'unavailable';
     label?: string;
-    className?: string;
+    only?: 'narrow' | 'wide';
 }) {
     const lastKnown = useLastKnown(item);
 
@@ -58,19 +60,20 @@ export function AgentWork({
     if (s.wallMs) figures.push(['Wall time', duration(s.wallMs), ' wall']);
 
     return (
-        <p
+        <BoardNote
             data-agent-work
             data-last-known={old ? '' : undefined}
             title={[figures.map(([k, v]) => `${k} ${v}`).join(' · '), old, s.incomplete && INCOMPLETE_TOTAL]
                 .filter(Boolean)
                 .join('. ')}
-            className={`m-0 text-xs text-(--muted-foreground) tabular-nums ${className}`}
+            numeric
+            only={only}
         >
             {label && `${label}: `}
             {figures.map(([, v, unit]) => v + unit).join(' · ')}
             {old && ' · last known'}
             {s.incomplete && ' · incomplete'}
-        </p>
+        </BoardNote>
     );
 }
 
@@ -113,8 +116,6 @@ export function AgentWorkNote({ item }: { item: Item }) {
     const none = item.kind === 'concept' ? 'No T3 thread of its own.' : 'No T3 thread has worked on this yet.';
 
     return (
-        <p className="m-0 text-xs text-(--muted-foreground)">
-            {s === 'unavailable' ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : none}
-        </p>
+        <BoardNote>{s === 'unavailable' ? UNREADABLE : hasThread ? 'Usage totals are still loading.' : none}</BoardNote>
     );
 }

@@ -1,6 +1,6 @@
 import { ref, threadLink, abandonPrompt, closeTicketPrompt } from '@lar-factory/shared';
 import type { Item, StartedThread, Status } from '@lar-factory/shared';
-import { Button, buttonKind, useNotificationControls } from '@lar-works/design-system';
+import { Button, ButtonLink, buttonKind, useNotificationControls } from '@lar-works/design-system';
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 // What this page just did to an item, announced in a toast: added, moved or kept with View item,
@@ -9,7 +9,7 @@ import { flushSync } from 'react-dom';
 import { clearToast, showToast } from './Toasts';
 import type { Toast } from './Toasts';
 import { useItemDialogStore } from '@/features/item-dialog';
-import { useActionStore, useItemAction, TitleLink, LinkButton } from '@/features/items';
+import { useActionStore, useItemAction, TitleLink } from '@/features/items';
 import type { StartKind } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
@@ -94,9 +94,9 @@ function toastOf(notice: Notice): Toast {
                     <>
                         {notice.kind === 'build' ? 'Build' : 'Refining'} started for {ref(item)}.{' '}
                         {environment && (
-                            <LinkButton kind="open" href={threadLink(environment, notice.thread.threadId)}>
+                            <ButtonLink {...buttonKind('open')} href={threadLink(environment, notice.thread.threadId)}>
                                 Open thread
-                            </LinkButton>
+                            </ButtonLink>
                         )}
                     </>
                 ),

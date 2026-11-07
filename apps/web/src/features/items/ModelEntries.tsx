@@ -46,10 +46,7 @@ export function ModelEntries({
                 data-model={choice?.model}
                 onSelect={(event) => (why === undefined ? onPick(choice) : event.preventDefault())}
             >
-                <span className="min-w-0 flex-1 truncate">
-                    {label}
-                    {detail && <span className="block truncate text-xs">{detail}</span>}
-                </span>
+                <DropdownMenu.ItemText detail={detail}>{label}</DropdownMenu.ItemText>
             </DropdownMenu.RadioItem>
         );
     };

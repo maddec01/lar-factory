@@ -15,7 +15,16 @@ import {
     startProgressOf,
 } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-import { Badge, Button, buttonKind, DropdownMenu, SpinnerIcon } from '@lar-works/design-system';
+import {
+    ActionError,
+    Button,
+    buttonKind,
+    DropdownMenu,
+    StartGroup,
+    StartLine,
+    StartNote,
+    StartTag,
+} from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -123,49 +132,37 @@ export function StartControl({
 
     if (thread && observed?.state === 'done') {
         return (
-            <span className="start-group">
-                <span className="basis-full">
+            <StartGroup>
+                <StartNote>
                     {delegatedWorkRunning(item) || observed.hasRunningChildren
                         ? 'Working. Parent run finished.'
                         : 'Run finished.'}
-                </span>
+                </StartNote>
                 {observed.id !== linkedBeside && <OpenThread item={item} data={data} threadId={observed.id} />}
-            </span>
+            </StartGroup>
         );
     }
 
     // The toast announces a start; the tag only keeps Start from running twice.
     if (thread && !stopped && !pending)
         return (
-            <span className="start-group">
-                <Badge
-                    tone="success"
-                    className="started-tag"
-                    tabIndex={-1}
-                    data-start-result={item.id}
-                    title={`T3 thread ${thread.threadId}`}
-                >
+            <StartGroup>
+                <StartTag data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>
                     Started
-                </Badge>
-            </span>
+                </StartTag>
+            </StartGroup>
         );
 
     if (uncertain) {
         // Once its message is closed, a tag still says why Start is gone.
         return (
-            <span className="start-group">
+            <StartGroup>
                 {closed && (
-                    <Badge
-                        tone="warning"
-                        className="started-tag unsure"
-                        tabIndex={-1}
-                        data-start-result={item.id}
-                        title="Check T3 before starting it again"
-                    >
+                    <StartTag unsure data-start-result={item.id} title="Check T3 before starting it again">
                         May have started
-                    </Badge>
+                    </StartTag>
                 )}
-            </span>
+            </StartGroup>
         );
     }
 
@@ -182,14 +179,14 @@ export function StartControl({
     };
 
     return (
-        <span className="start-group">
+        <StartGroup>
             {retry
                 ? currentBuildThread(item)?.id !== linkedBeside && (
                       <OpenThread item={item} data={data} iconOnly threadId={currentBuildThread(item)?.id} />
                   )
                 : stopped && (
                       <>
-                          <span className="basis-full">Run stopped.</span>
+                          <StartNote>Run stopped.</StartNote>
                           {observed.id !== linkedBeside && (
                               <OpenThread item={item} data={data} threadId={observed.id} />
                           )}
@@ -199,8 +196,8 @@ export function StartControl({
                 <DropdownMenu.Trigger asChild>
                     <Button
                         {...buttonKind('start')}
-                        aria-busy={pending || undefined}
-                        leftIcon={pending ? <SpinnerIcon motion="always" className="size-4" /> : !retry && ICON.play}
+                        busy={pending}
+                        leftIcon={!retry && ICON.play}
                         data-start={item.id}
                         aria-label={`${verb} ${itemName(item)}`}
                         {...state}
@@ -213,7 +210,7 @@ export function StartControl({
                     <StartEntries item={item} data={data} onPick={pick} />
                 </DropdownMenu.Content>
             </DropdownMenu>
-        </span>
+        </StartGroup>
     );
 }
 
@@ -261,11 +258,11 @@ export function StartMessage({ item, kind = 'refine' }: { item: Item; kind?: Sta
         );
 
     return (
-        <p className="start" ref={el} {...(uncertain && { tabIndex: -1, 'data-start-result': item.id })}>
-            <span className="action-error">
+        <StartLine ref={el} {...(uncertain && { tabIndex: -1, 'data-start-result': item.id })}>
+            <ActionError>
                 <span role="alert">{message}</span>{' '}
                 <DismissButton inline what={` error for ${ref(item)}`} onClick={close} />
-            </span>
-        </p>
+            </ActionError>
+        </StartLine>
     );
 }

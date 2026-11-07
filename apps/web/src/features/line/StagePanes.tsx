@@ -2,6 +2,7 @@
 // factory's builds at work against the build limit.
 
 import { activityUnavailable, buildsAtWork, limitNumber } from '@lar-factory/shared';
+import { BuildLimit as DesignBuildLimit, StageList } from '@lar-works/design-system';
 
 import { AutoBuildSwitch } from './AutoBuildSwitch';
 import { Pane, PaneEmpty } from './Pane';
@@ -16,11 +17,11 @@ function Rows({ rows }: { rows: Row[] }) {
     const data = useBoardStore((state) => state.data);
 
     return (
-        <ol className="m-0 grid list-none p-0">
+        <StageList>
             {rows.map((row) => (
                 <StageRow key={row.item.id} row={row} data={data} />
             ))}
-        </ol>
+        </StageList>
     );
 }
 
@@ -59,24 +60,14 @@ export function ReadyToBuild({ ready, shows }: { ready: Row[]; shows: Shows }) {
 /** Builds at work against the build limit, one bar per build it allows, more when they're over it. */
 function BuildLimit({ building, limit }: { building: number; limit: number | undefined }) {
     return (
-        <span
-            className="build-limit inline-flex items-center gap-1.5 text-[11px] whitespace-nowrap text-(--muted-foreground) tabular-nums"
+        <DesignBuildLimit
+            building={building}
+            limit={limit}
+            color={STATUS_COLOR['In progress']}
             title="Builds at work against the build limit"
         >
-            {limit !== undefined && (
-                <span className="inline-flex gap-[3px]">
-                    {Array.from({ length: Math.max(limit, building) }, (_, n) => (
-                        <span
-                            key={n}
-                            className="bar h-1.5 w-3 rounded-full"
-                            style={{ background: n < building ? STATUS_COLOR['In progress'] : 'var(--border)' }}
-                        />
-                    ))}
-                </span>
-            )}
-            {building}
-            {limit !== undefined && `/${limit}`} building
-        </span>
+            {`${building}${limit !== undefined ? `/${limit}` : ''} building`}
+        </DesignBuildLimit>
     );
 }
 

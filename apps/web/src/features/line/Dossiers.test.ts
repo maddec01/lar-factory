@@ -46,8 +46,11 @@ const press = (el: Element) =>
     });
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialogTitle = () => text($('[data-item-dialog] [data-slot="modal-header"] h2'));
+/** The button named `label`, by its text or, for an icon button, its accessible name. */
 const button = (within: Element, label: string) =>
-    [...within.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!;
+    [...within.querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => text(b) === label || b.getAttribute('aria-label') === label,
+    )!;
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData => ({
     ...data,
     items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)),
@@ -123,7 +126,10 @@ test('a Queued concept stays out of the dock until it starts', async () => {
     };
 
     await mountPage({ ...sample, items: [...sample.items, concept] });
-    expect([$('[data-dossier="I_queued"]'), $('.queue li[data-item="I_queued"]') !== null]).toEqual([null, true]);
+    expect([$('[data-dossier="I_queued"]'), $('[data-stage="queue"] li[data-item="I_queued"]') !== null]).toEqual([
+        null,
+        true,
+    ]);
 });
 
 const SECTIONS = ['queue', 'shaping', 'ready', 'build', 'dock'];
@@ -263,7 +269,7 @@ test('the expanded line holds the local planning note, with its detail on focus 
 
     const tools = header().querySelector<HTMLElement>('[data-dossier-tools]')!;
 
-    expect([...tools.querySelectorAll('button')].map((b) => [text(b), b.title])).toEqual([
+    expect([...tools.querySelectorAll('button')].map((b) => [b.getAttribute('aria-label'), b.title])).toEqual([
         ['Work map', 'Work map'],
         ['Parts list', 'Parts list'],
     ]);

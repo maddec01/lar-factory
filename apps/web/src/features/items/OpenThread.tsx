@@ -4,10 +4,18 @@
 
 import { isLiveThread, needsAnswer, openQuestionThread, threadLink } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
-import { Button, buttonKind, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
+import {
+    Button,
+    ButtonLink,
+    buttonKind,
+    EarlierThread,
+    EarlierThreadList,
+    Tooltip,
+    TooltipPopup,
+    TooltipTrigger,
+} from '@lar-works/design-system';
 
 import { ICON } from './ButtonIcons';
-import { LinkButton } from './LinkButton';
 import { useOnRow } from './RowActions';
 
 /** A child question may belong to its nearest concept's thread before it has a thread of its own. */
@@ -85,26 +93,25 @@ export function OpenThread({
     const iconOnly = given || (onRow && actionLabel === 'Open thread');
     const tooltip = onRow && iconOnly;
     // A square Open, the thread icon alone, named by its label.
-    const named = iconOnly ? { 'aria-label': actionLabel, 'data-icon-only': '' } : {};
+    const named = iconOnly ? { 'aria-label': actionLabel, iconOnly: true } : {};
     const shown = iconOnly ? null : actionLabel;
     // Pointer events stay on while it's disabled, so its title says why; TooltipTrigger gives a disabled one its own focusable hover target.
     const button =
         'link' in thread ? (
-            <LinkButton
-                kind="open"
-                leftIcon={ICON.thread}
+            <ButtonLink
+                {...buttonKind('open')}
+                icon={ICON.thread}
                 data-open-thread={item.id}
                 href={thread.link}
                 title={iconOnly && !tooltip ? actionLabel : undefined}
                 {...named}
             >
                 {shown}
-            </LinkButton>
+            </ButtonLink>
         ) : (
             <Button
                 {...buttonKind('open')}
                 leftIcon={ICON.thread}
-                className={tooltip ? '' : 'disabled:pointer-events-auto'}
                 data-open-thread={item.id}
                 disabled
                 title={tooltip ? undefined : thread.reason}
@@ -144,21 +151,20 @@ export function EarlierThreads({ item, data }: { item: Item; data: BoardData }) 
     if (!earlier.length) return null;
 
     return (
-        <ul className="m-0 grid list-none gap-1 p-0 text-xs text-(--muted-foreground)" data-earlier-threads>
+        <EarlierThreadList>
             {earlier.map((thread) => (
-                <li key={thread.id} className="flex min-w-0 items-center gap-1.5" title={thread.title}>
-                    {!thread.archived && data.t3EnvironmentId ? (
-                        <a href={threadLink(data.t3EnvironmentId, thread.id)} className="truncate underline">
-                            T3 · {thread.title}
-                        </a>
-                    ) : (
-                        <span className="truncate">T3 · {thread.title}</span>
-                    )}{' '}
-                    <span className="shrink-0">
-                        · {thread.archived ? 'archived' : thread.purpose === 'shape' ? 'shaping' : 'earlier'}
-                    </span>
-                </li>
+                <EarlierThread
+                    key={thread.id}
+                    name={`T3 · ${thread.title}`}
+                    title={thread.title}
+                    href={
+                        !thread.archived && data.t3EnvironmentId
+                            ? threadLink(data.t3EnvironmentId, thread.id)
+                            : undefined
+                    }
+                    state={thread.archived ? 'archived' : thread.purpose === 'shape' ? 'shaping' : 'earlier'}
+                />
             ))}
-        </ul>
+        </EarlierThreadList>
     );
 }

@@ -4,8 +4,17 @@
 
 import { ref } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
-import { ChevronDown, ChevronRight, Hammer, Lightbulb } from '@lar-works/design-system/icons';
+import {
+    MapBand,
+    MapCanvas,
+    MapEdgeLabel,
+    MapEdges,
+    MapHistoryGroup,
+    MapHistoryList,
+    MapLaneName,
+    MapNode,
+    WorkMapFrame,
+} from '@lar-works/design-system';
 import { useId, useState } from 'react';
 
 import { isDone, isHistory, upstreamOf } from './DossierParts';
@@ -49,86 +58,43 @@ export function WorkMap({
     const ups = upstreamOf(parts);
 
     return (
-        <div ref={box} className="overflow-x-auto rounded-lg border border-(--border) bg-(--background)" data-work-map>
-            <div className="relative" style={{ width: m.width, height: m.height }} data-map-canvas>
+        <WorkMapFrame frameRef={box}>
+            <MapCanvas width={m.width} height={m.height}>
                 {m.bands.map((b, n) => (
-                    <div
-                        key={b.lane}
-                        className={`absolute left-0 ${n ? 'border-t border-(--border)' : ''} ${n % 2 ? 'bg-[color-mix(in_srgb,var(--muted)_50%,transparent)]' : ''}`}
-                        style={{ top: b.top, height: b.height, width: m.width }}
-                    >
-                        <div
-                            className="sticky left-0 flex h-full flex-col justify-center gap-0.5 bg-[color-mix(in_srgb,var(--background)_85%,transparent)] px-3"
-                            style={{ width: LABEL_W }}
-                        >
-                            <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
-                                {b.lane === DECISIONS ? (
-                                    <>
-                                        <Lightbulb className="size-3.5 text-(--muted-foreground)" />
-                                        {DECISIONS}
-                                    </>
-                                ) : b.lane === home ? (
-                                    <>
-                                        <Hammer className="size-3.5 text-(--muted-foreground)" />
-                                        Builds
-                                    </>
-                                ) : (
-                                    <RepoIdentity repo={b.lane} data={data} />
-                                )}
-                            </span>
-                        </div>
-                    </div>
+                    <MapBand key={b.lane} index={n} top={b.top} height={b.height} width={m.width} labelWidth={LABEL_W}>
+                        {b.lane === DECISIONS ? (
+                            <MapLaneName lane="decisions">{DECISIONS}</MapLaneName>
+                        ) : b.lane === home ? (
+                            <MapLaneName lane="builds">Builds</MapLaneName>
+                        ) : (
+                            <RepoIdentity repo={b.lane} data={data} />
+                        )}
+                    </MapBand>
                 ))}
-                <svg
-                    className="pointer-events-none absolute inset-0"
+                <MapEdges
                     width={m.width}
                     height={m.height}
-                    aria-hidden="true"
-                >
-                    <defs>
-                        {['done', 'open'].map((k) => (
-                            <marker
-                                key={k}
-                                id={`${marker}-${k}`}
-                                viewBox="0 0 8 8"
-                                refX="7"
-                                refY="4"
-                                markerWidth="7"
-                                markerHeight="7"
-                                orient="auto"
-                            >
-                                <path
-                                    d="M0 0 8 4 0 8z"
-                                    fill={k === 'done' ? 'var(--st-done)' : 'var(--muted-foreground)'}
-                                />
-                            </marker>
-                        ))}
-                    </defs>
-                    {m.edges.map((e) => {
+                    markerId={marker}
+                    edges={m.edges.flatMap((e) => {
                         const a = at.get(e.from),
                             b = at.get(e.to);
                         const d = edgeLine(m, a, b);
 
-                        if (!d) return null;
+                        if (!d) return [];
 
-                        const done = e.from === HISTORY || (!!a?.part && isDone(a.part.item));
                         const lit = !!hover && (e.from === hover || e.to === hover);
 
-                        return (
-                            <path
-                                key={`${e.from}-${e.to}`}
-                                d={d}
-                                fill="none"
-                                data-edge={`${e.from} ${e.to}`}
-                                stroke={done ? 'var(--st-done)' : 'var(--muted-foreground)'}
-                                strokeWidth={lit ? 2.5 : 1.5}
-                                strokeDasharray={done ? undefined : '5 4'}
-                                opacity={hover && !lit ? 0.2 : done ? 0.7 : 0.9}
-                                markerEnd={`url(#${marker}-${done ? 'done' : 'open'})`}
-                            />
-                        );
+                        return [
+                            {
+                                key: `${e.from} ${e.to}`,
+                                d,
+                                done: e.from === HISTORY || (!!a?.part && isDone(a.part.item)),
+                                lit,
+                                dim: !!hover && !lit,
+                            },
+                        ];
                     })}
-                </svg>
+                />
                 {m.edges.map((e) => {
                     if (!e.label) return null;
 
@@ -142,79 +108,56 @@ export function WorkMap({
 
                     return (
                         place && (
-                            <Tooltip key={`${e.from}-${e.to}`}>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
-                                        aria-label={`${e.label}: ${e.names}`}
-                                        onClick={() => setShowHistory(true)}
-                                        data-edge-label={`${e.from} ${e.to}`}
-                                        className="absolute truncate rounded text-left text-[11px] leading-3.5 text-(--muted-foreground) hover:text-(--foreground) hover:underline focus-visible:outline-2 focus-visible:outline-(--primary)"
-                                        style={{ left: place.left, top: place.top, maxWidth: place.width }}
-                                    >
-                                        {e.label}
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipPopup side="top">{e.names}</TooltipPopup>
-                            </Tooltip>
+                            <MapEdgeLabel
+                                key={`${e.from}-${e.to}`}
+                                edge={`${e.from} ${e.to}`}
+                                label={e.label}
+                                names={e.names ?? ''}
+                                left={place.left}
+                                top={place.top}
+                                maxWidth={place.width}
+                                onOpen={() => setShowHistory(true)}
+                            />
                         )
                     );
                 })}
                 {m.placed.map((p) => (
-                    <div
+                    <MapNode
                         key={p.key}
-                        className={`absolute transition-opacity ${near(p.key) ? '' : 'opacity-40'}`}
-                        style={{ left: p.x, top: p.y }}
-                        onMouseEnter={() => setHover(p.key)}
-                        onMouseLeave={() => setHover(null)}
+                        left={p.x}
+                        top={p.y}
+                        dim={!near(p.key)}
+                        onHover={(on) => setHover(on ? p.key : null)}
                     >
                         {p.part ? (
                             <PartNode part={p.part} data={data} width={m.nodeW} home={home} />
                         ) : (
                             check && <CheckNode check={check} width={m.nodeW} after={builds} />
                         )}
-                    </div>
+                    </MapNode>
                 ))}
                 {history.length > 0 && (
-                    <button
-                        type="button"
-                        aria-expanded={showHistory}
-                        onClick={() => setShowHistory(!showHistory)}
-                        data-map-history
-                        onMouseEnter={() => setHover(HISTORY)}
-                        onMouseLeave={() => setHover(null)}
-                        className={`absolute flex items-center gap-2 rounded-lg border border-(--border) bg-(--card) px-2.5 text-left text-xs shadow-xs transition-opacity hover:bg-(--accent) focus-visible:outline-2 focus-visible:outline-(--primary) ${near(HISTORY) ? '' : 'opacity-40'}`}
-                        style={{ left: 12, right: 12, top: m.groupY, height: GROUP_H }}
-                    >
-                        <StatusGlyph status="Done" className="size-3.5 shrink-0" />
-                        <span className="min-w-0 truncate font-medium">{historyText(history)}</span>
-                        <span className="inline-flex shrink-0 items-center gap-1 text-(--muted-foreground)">
-                            {showHistory ? (
-                                <>
-                                    Hide
-                                    <ChevronDown className="size-3.5" />
-                                </>
-                            ) : (
-                                <>
-                                    Show
-                                    <ChevronRight className="size-3.5" />
-                                </>
-                            )}
-                        </span>
-                    </button>
+                    <MapHistoryGroup
+                        open={showHistory}
+                        top={m.groupY}
+                        height={GROUP_H}
+                        dim={!near(HISTORY)}
+                        glyph={<StatusGlyph status="Done" />}
+                        text={historyText(history)}
+                        showLabel="Show"
+                        hideLabel="Hide"
+                        onToggle={() => setShowHistory(!showHistory)}
+                        onHover={(on) => setHover(on ? HISTORY : null)}
+                    />
                 )}
-            </div>
+            </MapCanvas>
             {showHistory && (
-                <ol
-                    className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-x-4 gap-y-1 px-3 pb-3"
-                    style={{ width: m.width }}
-                    data-map-history-parts
-                >
+                <MapHistoryList width={m.width}>
                     {history.map((p) => (
                         <HistoryRow key={keyOf(p)} part={p} after={ups(p).filter(isHistory)} data={data} home={home} />
                     ))}
-                </ol>
+                </MapHistoryList>
             )}
-        </div>
+        </WorkMapFrame>
     );
 }

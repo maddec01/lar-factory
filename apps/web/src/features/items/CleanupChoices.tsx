@@ -2,7 +2,7 @@
 // only reads; the board changes nothing until the confirmation executes the ticked steps.
 
 import { ABANDON_CLEANUP } from '@lar-factory/shared';
-import { Alert, Text } from '@lar-works/design-system';
+import { Alert, Checkbox, LossList, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -140,24 +140,18 @@ export function CleanupChoices({
                     ),
             )}
             {localBranches.length > 0 && (
-                <label className="wrap-anywhere">
-                    <input
-                        type="checkbox"
-                        checked={local}
-                        onChange={(event) => choices.setLocal(event.target.checked)}
-                    />{' '}
-                    Remove old local worktrees and branches: {localBranches.join(', ')}
-                </label>
+                <Checkbox
+                    label={`Remove old local worktrees and branches: ${localBranches.join(', ')}`}
+                    checked={local}
+                    onChange={(event) => choices.setLocal(event.target.checked)}
+                />
             )}
             {remoteOffered && (
-                <label className="wrap-anywhere">
-                    <input
-                        type="checkbox"
-                        checked={remote}
-                        onChange={(event) => choices.setRemote(event.target.checked)}
-                    />{' '}
-                    Delete pushed remote branch: {remoteBranches.join(', ')}
-                </label>
+                <Checkbox
+                    label={`Delete pushed remote branch: ${remoteBranches.join(', ')}`}
+                    checked={remote}
+                    onChange={(event) => choices.setRemote(event.target.checked)}
+                />
             )}
             {remoteOffered && remoteNote}
             <Text>
@@ -172,24 +166,16 @@ export function CleanupChoices({
                         data-cleanup-loss
                         title="Deleting local work will lose these files and commits"
                     >
-                        <ul className="m-0 list-disc ps-5 wrap-anywhere">
-                            {cleanup.plans
+                        <LossList
+                            branches={cleanup.plans
                                 .filter((plan) => plan.dirtyFiles.length || plan.unpushedCommits.length)
-                                .map((plan) => (
-                                    <li key={plan.branch}>
-                                        <span>{plan.branch}</span>
-                                        <ul className="m-0 list-disc ps-5">
-                                            {[...plan.dirtyFiles, ...plan.unpushedCommits].map((loss) => (
-                                                <li key={loss}>
-                                                    {loss.startsWith(`${plan.branch}: `)
-                                                        ? loss.slice(plan.branch.length + 2)
-                                                        : loss}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </li>
-                                ))}
-                        </ul>
+                                .map((plan) => ({
+                                    name: plan.branch,
+                                    losses: [...plan.dirtyFiles, ...plan.unpushedCommits].map((loss) =>
+                                        loss.startsWith(`${plan.branch}: `) ? loss.slice(plan.branch.length + 2) : loss,
+                                    ),
+                                }))}
+                        />
                     </Alert>
                 </div>
             )}

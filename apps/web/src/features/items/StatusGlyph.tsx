@@ -1,4 +1,5 @@
-// One glyph per status, the way T3 marks a thread working, waiting or done, in the status's colour.
+// One glyph per status, the way T3 marks a thread working, waiting or done, in the status's colour: the design system's
+// StatusGlyph, animated while the board trusts that the item's work runs.
 
 import {
     activityLost,
@@ -8,79 +9,18 @@ import {
     itemActivityThread,
 } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
-import { ambientMotion, SpinnerIcon } from '@lar-works/design-system';
-import {
-    Check,
-    Circle,
-    CircleArrowRight,
-    CircleDashed,
-    CircleDot,
-    Clock3,
-    Eye,
-    GitMerge,
-    List,
-} from '@lar-works/design-system/icons';
+import { StatusGlyph, statusColor } from '@lar-works/design-system';
+import type { ComponentProps } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useStartStore } from './StartStore';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useClock } from '@/shared/time/useClock';
 
-export const STATUS_COLOR: Record<Status, string> = {
-    List: 'var(--st-idle)',
-    Queued: 'var(--st-idle)',
-    Shaping: 'var(--st-now)',
-    'Needs you': 'var(--st-amber)',
-    Ready: 'var(--st-now)',
-    'In progress': 'var(--st-now)',
-    Review: 'var(--st-review)',
-    Verify: 'var(--st-amber)',
-    'Ready to merge': 'var(--st-done)',
-    Done: 'var(--st-done)',
-};
+export { StatusGlyph };
 
-export function StatusGlyph({
-    status,
-    running = false,
-    className = 'size-3.5',
-}: {
-    status: Status;
-    running?: boolean;
-    className?: string;
-}) {
-    const style = { color: STATUS_COLOR[status] };
-    const pulse = running && ['Shaping', 'Review', 'Verify', 'Ready to merge'].includes(status);
-    const props = {
-        ref: pulse ? ambientMotion : undefined,
-        className: `shrink-0 ${className}${pulse ? ' status-pulse' : ''}`,
-        style,
-        strokeWidth: 2.25,
-    };
-
-    switch (status) {
-        case 'List':
-            return <List {...props} />;
-        case 'Needs you':
-        case 'Verify':
-            return <CircleDot {...props} />;
-        case 'In progress':
-            return running ? <SpinnerIcon motion="status" {...props} /> : <Circle {...props} />;
-        case 'Ready':
-            return <CircleArrowRight {...props} />;
-        case 'Shaping':
-            return <CircleDashed {...props} />;
-        case 'Review':
-            return <Eye {...props} />;
-        case 'Ready to merge':
-            return <GitMerge {...props} />;
-        case 'Done':
-            return <Check {...props} />;
-        case 'Queued':
-            return <Clock3 {...props} />;
-        default:
-            return <Circle {...props} />;
-    }
-}
+/** Each status's colour, as the design system's StatusGlyph draws it. */
+export const STATUS_COLOR: Record<Status, string> = statusColor;
 
 /** Current execution for status icons, including delegated work after its parent turn ends. */
 export function useStatusActivity() {
@@ -141,16 +81,16 @@ export function useStatusActivity() {
 export function ItemStatusGlyph({
     item,
     status = item.status,
-    className,
+    presentation,
 }: {
     item: Item;
     status?: Status;
-    className?: string;
+    presentation?: ComponentProps<typeof StatusGlyph>['presentation'];
 }) {
     const running = useStatusActivity();
 
     // A read going old changes the answer with no new data.
     useClock((now) => activityLost(itemActivityThread(item)?.activity, now));
 
-    return <StatusGlyph status={status} running={running(item)} className={className} />;
+    return <StatusGlyph status={status} running={running(item)} presentation={presentation} />;
 }

@@ -3,7 +3,7 @@
 
 import { HINTS, itemName, needsAnswer, onAzure, sameRepo, writeAccessProblem } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button, buttonKind, Modal } from '@lar-works/design-system';
+import { Button, ButtonLink, buttonKind, Modal } from '@lar-works/design-system';
 
 import { ConceptParts } from './ConceptParts';
 import { ItemAside } from './ItemAside';
@@ -22,7 +22,6 @@ import {
     AgentWork,
     EarlierThreads,
     ItemStatusGlyph,
-    LinkButton,
     NeedsYou,
     StartAfterError,
     StartMessage,
@@ -83,12 +82,7 @@ export function ItemDialogContent({
             focusFirstField={false}
             headerActions={
                 <>
-                    {item.kind !== 'concept' && (
-                        <AgentWork
-                            item={item}
-                            className="text-base-700 text-xs whitespace-nowrap @max-[40rem]:hidden"
-                        />
-                    )}
+                    {item.kind !== 'concept' && <AgentWork item={item} only="wide" />}
                     <ExpandButton expanded={expanded} toggle={toggleExpanded} />
                 </>
             }
@@ -104,7 +98,7 @@ export function ItemDialogContent({
                     <ItemAgents item={item} />
                     {hint && (
                         <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
-                            <ItemStatusGlyph item={item} className="size-4" />
+                            <ItemStatusGlyph item={item} presentation="title" />
                             <span className="min-w-0 flex-1 font-medium text-(--warning-foreground)">{hint}</span>
                         </div>
                     )}
@@ -190,9 +184,9 @@ export function ItemDialogContent({
             >
                 <span className="inline-flex items-center gap-1.5">
                     {item.url && (
-                        <LinkButton kind="other" href={item.url} target="_blank" rel="noopener">
+                        <ButtonLink {...buttonKind('other')} href={item.url} target="_blank" rel="noopener">
                             {item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}
-                        </LinkButton>
+                        </ButtonLink>
                     )}
                     <StatusActions item={item} data={data} />
                 </span>

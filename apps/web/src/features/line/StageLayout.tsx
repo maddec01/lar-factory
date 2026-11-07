@@ -3,6 +3,7 @@
 // change their placement. A dossier expands in place, under its row.
 
 import type { Item } from '@lar-factory/shared';
+import { StageSections } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 import { Dossiers } from './Dossiers';
@@ -25,7 +26,7 @@ export function StageLayout({ items, desk }: { items: Item[]; desk: ReactNode })
     return (
         <>
             {desk}
-            <section className="stages flex flex-col gap-3" aria-label="Work by stage">
+            <StageSections label="Work by stage">
                 <RowActions>
                     <Queue rows={queue} shows={showsRow} />
                     <Shaping shaping={shaping} shows={showsRow} />
@@ -33,7 +34,7 @@ export function StageLayout({ items, desk }: { items: Item[]; desk: ReactNode })
                     <Build build={build} shows={showsRow} />
                     <Dossiers dossiers={dock.filter(({ parent }) => shows(parent))} />
                 </RowActions>
-            </section>
+            </StageSections>
         </>
     );
 }

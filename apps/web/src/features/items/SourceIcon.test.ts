@@ -129,7 +129,7 @@ test('List and the details it opens identify local work even in an Azure reposit
 });
 
 test.each<[string, Partial<Item>, string]>([
-    ['Queue', { status: 'Queued', statuses: ['Queued'] }, '.queue [data-item]'],
+    ['Queue', { status: 'Queued', statuses: ['Queued'] }, '[data-stage="queue"] [data-item]'],
     ['stage row', { status: 'Shaping', statuses: ['Shaping'] }, '[data-stage="shaping"] li[data-item]'],
     ['dossier', { status: 'Shaping', statuses: ['Shaping'], kind: 'concept' }, '[data-dossier] [data-item]'],
 ])('%s identifies its source alongside the title', async (_name, change, selector) => {

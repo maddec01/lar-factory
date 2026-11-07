@@ -1,20 +1,14 @@
-// The title bar's List button and the List modal it opens, on the copied Modal's paned layout. The left pane picks
+// The title bar's List button and the List modal it opens, on the design system's Modal's paned layout. The left pane picks
 // All Projects or a repository, each with how many of its items match the search and filters;
 // the right pane shows the chosen group's items with the search, Add item, Scope board, the sort menu and the filters. It starts on
 // the board's scope. An item opens the item dialog and Add item opens the Add item flow, each over the List modal, so
 // closing them comes back to the List as it was.
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Inbox, SquarePen } from 'lucide-react';
+import { ChevronDown, Inbox, SquarePen } from '@lar-works/design-system/icons';
 import { boardSections, readingScope, ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { Item, ListGroup } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
-import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
-import { Input } from '@lar-factory/ui/design-system/Input';
-import { Modal } from '@lar-factory/ui/design-system/Modal';
-import { SidebarNavigationItem } from '@lar-factory/ui/design-system/SidebarNavigationItem';
-import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-system/SidebarPane';
+import { Button, Badge, DropdownMenu, Input, Modal, SidebarNavigationItem, SidebarNavigationGroup, SidebarPane } from '@lar-works/design-system';
 import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -91,7 +85,7 @@ function SortMenu({ sort, onSort }: { sort: Sort; onSort: (sort: Sort) => void }
 }
 
 /**
- * When the item dialog closes and the copied Modal had nowhere to return focus, as when its item left List while it
+ * When the item dialog closes and the design system's Modal had nowhere to return focus, as when its item left List while it
  * was open and took its row along, focus goes to the List's search field.
  */
 function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElement | null>) {
@@ -101,7 +95,7 @@ function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElem
     const closed = wasOpen.current && !itemOpen;
     wasOpen.current = itemOpen;
     if (!closed) return;
-    // The copied Modal returns focus on the next task when the element that had it is still on the page.
+    // The design system's Modal returns focus on the next task when the element that had it is still on the page.
     const timer = setTimeout(() => { if (document.activeElement === document.body || document.activeElement === searchField.current?.closest('[data-list-modal]')) searchField.current?.focus({ preventScroll: true }); });
     return () => clearTimeout(timer);
   }, [itemOpen, searchField]);

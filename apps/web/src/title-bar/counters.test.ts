@@ -211,7 +211,7 @@ test('every panel lists every item in a list that scrolls between its head and f
   expect(classes(pop)).toEqual(expect.arrayContaining(['flex', 'flex-col', 'min-h-0']));
 });
 
-// jsdom lays nothing out, so this checks the classes. The menu rows in packages/ui grow the same way under lg or a coarse pointer.
+// jsdom lays nothing out, so this checks the classes. The menu rows in the design system grow the same way under lg or a coarse pointer.
 test('a panel has a menu\'s padding, and a row a menu row\'s height, radius and font', async () => {
   await mountPage();
   const pop = await openCounter('building');

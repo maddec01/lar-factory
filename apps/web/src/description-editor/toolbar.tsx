@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
-import { Bold, Heading, Italic, Link, List, ListOrdered } from 'lucide-react';
+import { Bold, Heading, Italic, Link, List, ListOrdered } from '@lar-works/design-system/icons';
 import { $createParagraphNode, $getSelection, $isRangeSelection, $setSelection, FORMAT_TEXT_COMMAND } from 'lexical';
 import type { BaseSelection, EditorState } from 'lexical';
 import { $isLinkNode, $toggleLink, TOGGLE_LINK_COMMAND } from '@lexical/link';
@@ -13,9 +13,7 @@ import { $isListNode, INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND
 import { $createHeadingNode, $isHeadingNode } from '@lexical/rich-text';
 import { $setBlocksType } from '@lexical/selection';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Popover } from '@lar-factory/ui/design-system/Popover';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { Button, Popover, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { kind } from '../buttons/button-kinds.tsx';
 
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';

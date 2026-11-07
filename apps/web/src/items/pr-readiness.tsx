@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { writeHeaders, type Item, type LinkedPr } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 

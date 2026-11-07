@@ -4,7 +4,7 @@
 
 import { DEPENDENCY_OBSERVATION_WORDS, dependencyNotice, itemName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, DependencyHold, Item } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useItemAction } from './action-store.ts';
 import { markDependencyMet } from './card-actions.ts';
 import { writeState } from './item-actions.tsx';

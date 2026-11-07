@@ -1,6 +1,6 @@
-// The board's fieldset: a bordered group of form controls under a legend, on lar-server's border and type. lar-server
-// has none, so the board writes it on the native fieldset, which also disables every control inside it. Unstyled, it
-// only groups and disables its fields.
+// The board's fieldset: a bordered group of form controls under a legend, on the design system's border and type.
+// The design system has none, so the board writes it on the native fieldset, which also disables every control
+// inside it. Unstyled, it only groups and disables its fields.
 import type * as React from 'react';
 
 export function Fieldset({ className = '', unstyled = false, ...props }: React.ComponentProps<'fieldset'> & { unstyled?: boolean }) {

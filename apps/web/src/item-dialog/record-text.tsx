@@ -4,7 +4,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { kind } from '../buttons/button-kinds.tsx';

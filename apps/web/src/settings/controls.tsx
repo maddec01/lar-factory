@@ -1,9 +1,8 @@
 // The settings rows' working controls, on the design system's Switch, Select and Button.
 
 import type { ReactNode } from 'react';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button, Switch as DesignSwitch } from '@lar-works/design-system';
 import { FormSelect } from '@lar-factory/ui/form-select';
-import { Switch as DesignSwitch } from '@lar-factory/ui/design-system/Switch';
 import { kind } from '../buttons/button-kinds.tsx';
 
 /** A working row renders its control. Unbuilt settings carry no value. */

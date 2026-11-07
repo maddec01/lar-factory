@@ -4,7 +4,7 @@ import { T3AvailabilityWarning } from './t3-availability-warning.tsx';
 import { failedCheck } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { CLIENT_ERROR, useDismissStore } from './dismiss-store.ts';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useSettingsStore } from '../settings/settings-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { Warning } from './warning.tsx';

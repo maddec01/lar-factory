@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { kind } from '../buttons/button-kinds.tsx';

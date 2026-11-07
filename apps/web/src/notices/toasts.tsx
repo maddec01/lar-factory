@@ -4,8 +4,8 @@
 import { createContext, useEffect, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode, RefObject } from 'react';
 import { flushSync } from 'react-dom';
-import { IconButton } from '@lar-factory/ui/design-system/IconButton';
-import { CloseIcon } from '@lar-factory/ui/design-system/NavigationIcons';
+import { IconButton } from '@lar-works/design-system';
+import { XIcon as CloseIcon } from '@lar-works/design-system/icons';
 import { toast as toasts, Toaster } from '@lar-factory/ui/toasts';
 import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 

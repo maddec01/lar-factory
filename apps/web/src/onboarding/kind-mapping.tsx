@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { trackerCapabilities, type SetupDetection } from '@lar-factory/shared';
 import { emptyVocabularyTerm } from '@lar-factory/shared/vocabulary';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Badge } from '@lar-works/design-system';
 import { KIND_NAMES, useVocabularyDiscovery, VocabularyFields, VocabularyRead, type VocabularyKind } from '../repositories/vocabulary-editor.tsx';
 import { FIELD_GROUP, HelpTip } from '../settings/field-row.tsx';
 import { useWizardStore, type Run } from './wizard-store.ts';

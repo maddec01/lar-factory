@@ -6,12 +6,10 @@
 // decides what shows: Spend goes first, then Shaping and Shipped.
 
 import type { ReactNode } from 'react';
-import { CircleDollarSign } from 'lucide-react';
+import { CircleDollarSign } from '@lar-works/design-system/icons';
 import { activityUnavailable, boardSections, buildsAtWork, formatUsd, limitNumber, plural, itemName, readingScope, repoKey, shortAgo, usageFailed, usageIncomplete } from '@lar-factory/shared';
 import type { Item, Status } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Popover } from '@lar-factory/ui/design-system/Popover';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { Button, Popover, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';

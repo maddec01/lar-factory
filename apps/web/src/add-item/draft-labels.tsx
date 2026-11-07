@@ -3,12 +3,10 @@
 
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '@lar-works/design-system/icons';
 import { sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { RepoConfig, TicketCreationOptions, TicketOptions, VocabularyKey } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Popover } from '@lar-factory/ui/design-system/Popover';
+import { Badge, Button, Popover } from '@lar-works/design-system';
 import { kind as buttonKind } from '../buttons/button-kinds.tsx';
 import { tint } from '../items/label-tint.ts';
 import { LabelPicker } from '../labels/label-picker.tsx';

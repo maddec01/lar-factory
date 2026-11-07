@@ -4,7 +4,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
-import { ArrowDownToLine, RotateCcw } from 'lucide-react';
+import { ArrowDownToLine, RotateCcw } from '@lar-works/design-system/icons';
 
 const DOWNLOAD_PROGRESS_RADIUS = 7;
 const DOWNLOAD_PROGRESS_CIRCUMFERENCE = 2 * Math.PI * DOWNLOAD_PROGRESS_RADIUS;

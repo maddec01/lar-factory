@@ -9,7 +9,14 @@
       // vp pack builds main.ts and preload.ts, which knip's Vite plugin doesn't read;
       // electron-builder runs sign-macos.ts as its sign hook, and the tests spawn fake-board.mjs and preload pause-copy.mjs.
       // Knip's Vitest plugin finds vite.config.ts and the tests.
-      "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/*.mjs"]
+      "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/*.mjs"],
+      // The starting page's CSS, which knip doesn't read, imports the design system's styles.
+      "ignoreDependencies": ["@lar-works/design-system"]
+    },
+    "packages/ui": {
+      // styles.css lists these ninna-ui packages' components as Tailwind sources, as the design system renders them;
+      // their own @source paths resolve inside pnpm's store, where they aren't siblings.
+      "ignoreDependencies": ["@ninna-ui/forms", "@ninna-ui/layout", "@ninna-ui/primitives", "@ninna-ui/react-internal"]
     }
   },
   // ensure-electron-runtime.mjs, copied unchanged from T3 Code, runs macOS's `file`;
@@ -17,9 +24,7 @@
   // The board app runs the `t3` CLI from the login shell's PATH to ask T3 Code for its provider instances.
   "ignoreBinaries": ["file", "pgrep", "t3"],
   // Ports from T3 Code keep T3's exports, so later T3 fixes port line for line.
-  // Copies keep every export upstream has (packages/ui/UPSTREAM.md).
   "ignoreIssues": {
-    "packages/ui/src/design-system/**": ["exports", "types"],
     "apps/desktop/src/updates/AppUpdates.ts": ["exports", "types"],
     "apps/desktop/src/updates/updateMachine.ts": ["exports"],
     "apps/web/src/updates/update-button-logic.ts": ["exports"]

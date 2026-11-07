@@ -1,9 +1,9 @@
-// lar-server's Select over plain choices, for a form to read. The copied Select is a button over a listbox: its items
+// The design system's Select over plain choices, for a form to read. That Select is a button over a listbox: its items
 // can't have an empty value and it fires no input event, so this holds "none" as a stand-in, gives the form the value
 // in a hidden field, and fires input on that field once a pick has rendered.
 import { forwardRef, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { Select, SelectItem, type SelectProps } from '../design-system/forms/Select.tsx';
+import { Select, SelectItem, type SelectProps } from '@lar-works/design-system';
 
 const NONE = '__none';
 

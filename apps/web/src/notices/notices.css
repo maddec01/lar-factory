@@ -41,7 +41,7 @@
 .notification-stack:has(:focus-visible) > [data-slot="toast"] { mask-image: none; }
 .notification-stack [data-slot="content"] { min-width: 0; }
 
-/* Keep native severity tints above the copied theme's unlayered neutral toast styles. */
+/* Keep native severity tints above the design system's theme's unlayered neutral toast styles. */
 .notification-stack [data-slot="toast"][data-toast-color="warning"] {
   @apply bg-warning/10 text-(--warning-foreground) border-warning/20;
 }

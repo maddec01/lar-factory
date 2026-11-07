@@ -2,13 +2,10 @@
 // and Clear. Labels offers what `rows`, the items the modal holds, show, whatever the filters hide.
 
 import { useRef, type ReactNode } from 'react';
-import { ChevronDown, CircleDashed } from 'lucide-react';
+import { ChevronDown, CircleDashed } from '@lar-works/design-system/icons';
 import { sameLabel } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
-import { Popover } from '@lar-factory/ui/design-system/Popover';
+import { Badge, Button, Checkbox, Popover } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind as buttonKind } from '../buttons/button-kinds.tsx';
 import { KIND_BADGES, KindBadge } from '../items/item-parts.tsx';

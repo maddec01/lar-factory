@@ -1,14 +1,9 @@
 // Settings' Labels section. The tracker holds the only copy, so the section reads it each time and keeps no list. It reads
 // the capability description for what the tracker's labels have, and never checks a provider's name.
 import { useEffect, useState, type FormEvent } from 'react';
-import { Lock, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Lock, Pencil, Plus, Trash2 } from '@lar-works/design-system/icons';
 import { trackerCapabilities, writeAccessProblem, type RepositorySetup, type TrackerCapabilities, type TrackerLabel } from '@lar-factory/shared';
-import { Alert } from '@lar-factory/ui/design-system/Alert';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Input } from '@lar-factory/ui/design-system/Input';
-import { Modal } from '@lar-factory/ui/design-system/Modal';
-import { Text } from '@lar-factory/ui/design-system/Typography';
+import { Alert, Badge, Button, Input, Modal, Text } from '@lar-works/design-system';
 import { kind } from '../buttons/button-kinds.tsx';
 import { postAction } from '../items/card-actions.ts';
 import { tint } from '../items/label-tint.ts';

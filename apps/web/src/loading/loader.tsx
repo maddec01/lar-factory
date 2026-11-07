@@ -1,7 +1,7 @@
 // What the board shows in place of something still loading after the splash: a small spinner, still under reduced motion,
 // and what loads.
 
-import { LoaderCircle, type LucideProps } from 'lucide-react';
+import { LoaderCircle, type LucideProps } from '@lar-works/design-system/icons';
 import { ambientMotion } from '../motion/ambient-motion.ts';
 
 /**

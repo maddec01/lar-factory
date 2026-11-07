@@ -2,10 +2,10 @@
 
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
-import { Archive, ExternalLink, FolderGit2, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
+import { Archive, ExternalLink, FolderGit2, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from '@lar-works/design-system/icons';
 import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type Item, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { ArchiveActions, archivedAs, RetentionSetting } from '../archive/archive.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { useSettingsStore } from './settings-store.ts';

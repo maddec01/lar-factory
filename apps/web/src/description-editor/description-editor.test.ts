@@ -5,7 +5,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
+import { TooltipProvider } from '@lar-works/design-system';
 import { DescriptionEditor } from './description-editor.tsx';
 import { pastePlain, selectAll, selectEnd, typeInto } from '../../test/editor.ts';
 

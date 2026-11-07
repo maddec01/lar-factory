@@ -2,9 +2,7 @@
 // the merge, and Resume, which reopens the onboarding dialog there.
 
 import { shownRepo } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
-import { NoticeCard } from '@lar-factory/ui/design-system/NoticeCard';
+import { Button, Badge, NoticeCard } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { stoppedAt, useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';

@@ -2,8 +2,8 @@
 // tickets once there is a query. Tokens narrow tickets alone, and Search all tickets lists what they hide. Tickets are
 // the board's items, Done's only within its 7-day window. Archive stays off the board data, so nothing archived shows.
 
-import { Archive, Inbox, ListX, RefreshCw, Search, Settings2, SquarePen, TicketPlus } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Archive, Inbox, ListX, RefreshCw, Search, Settings2, SquarePen, TicketPlus } from '@lar-works/design-system/icons';
+import type { LucideIcon } from '@lar-works/design-system/icons';
 import { byFlowOrder, inRepo, isRecentlyDone, readingScope, ref, repoKey, repoName, shownRepo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { useAddItemStore } from '../add-item/add-item-store.ts';

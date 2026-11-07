@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react';
-import { CircleHelp } from 'lucide-react';
-import { Popover } from '@lar-factory/ui/design-system/Popover';
+import { CircleHelp } from '@lar-works/design-system/icons';
+import { Popover } from '@lar-works/design-system';
 
 export function HelpTip({ title, children }: { title: string; children: ReactNode }) {
   return <Popover>

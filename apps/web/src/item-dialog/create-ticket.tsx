@@ -1,7 +1,7 @@
 // Local work previews its authoritative outgoing text and reuses Add item's provider options.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { writeAccessProblem, type Item } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { TicketOptionFields, ticketOptions } from '../add-item/issue-fields.tsx';

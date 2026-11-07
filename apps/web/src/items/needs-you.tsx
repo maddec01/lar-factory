@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { itemName } from '@lar-factory/shared';
 import type { BoardData, Item, NeedsYouAction, NeedsYouOffer } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { useActionStore, useItemAction } from './action-store.ts';
 import { askAbandon } from './card-actions.ts';
 import { writeState } from './item-actions.tsx';

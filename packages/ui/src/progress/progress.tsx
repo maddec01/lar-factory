@@ -1,7 +1,8 @@
-// The board's progress bar: a rounded track filled to value / max, then an optional caption. lar-server has none, so
-// the board writes it with lar-server's tokens and type, as its StackedMeter is, and sets the progressbar's ARIA values.
+// The board's progress bar: a rounded track filled to value / max, then an optional caption. The design system has
+// none, so the board writes it with the design system's tokens and type, as its StackedMeter is, and sets the
+// progressbar's ARIA values.
 import type * as React from 'react';
-import { Text } from '../design-system/typography/Typography.tsx';
+import { Text } from '@lar-works/design-system';
 
 export function Progress({ className = '', caption, value, max = 100, ...props }: Omit<React.ComponentProps<'div'>, 'children'> & {
   value: number; max?: number; caption?: React.ReactNode;

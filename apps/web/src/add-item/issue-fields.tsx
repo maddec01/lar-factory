@@ -1,7 +1,7 @@
 // Add item's Create issue checkbox follows the repository's default until this item changes it, and shows the optional provider fields.
 import { useEffect, useState, type ReactNode } from 'react';
 import { effectiveIssueSettings, trackerCapabilities, writeAccessProblem, type RepoConfig, type TicketCreationOptions, type TicketOptions } from '@lar-factory/shared';
-import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
+import { Checkbox } from '@lar-works/design-system';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { useEditStore } from '../repositories/edit-store.ts';
 import type { DraftValues } from './add-item-store.ts';

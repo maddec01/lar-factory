@@ -1,4 +1,4 @@
-// Each button kind names the copied Button recipe it draws over and marks the button with its kind, which the kinds'
+// Each button kind names the design system's Button recipe it draws over and marks the button with its kind, which the kinds'
 // sheet sizes and tints.
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { kind } from './button-kinds.tsx';
 const sheet = readFileSync('src/buttons/button-kinds.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 const rule = (selector: string) => sheet.match(new RegExp(`^${selector.replace(/[[\]()]/g, '\\$&')} \\{([^}]*)\\}`, 'm'))?.[1] ?? '';
 
-test('each kind draws over one recipe of the copied Button and names itself', () => {
+test("each kind draws over one recipe of the design system's Button and names itself", () => {
   expect((['main', 'start', 'open', 'control', 'other'] as const).map((k) => kind(k))).toEqual([
     { variant: 'primary', 'data-kind': 'main' },
     { variant: 'quiet', 'data-kind': 'start' },
@@ -45,7 +45,7 @@ test('an icon-only button is 28 px square, keeping its kind\'s icon, or a 20 px 
   expect(rule('[data-kind][data-icon-only] svg'), 'an unmarked one keeps its kind\'s icon size').toBe('');
 });
 
-test("the copied Modal's Close is 28 px square", () => {
+test("the design system's Modal's Close is 28 px square", () => {
   expect(rule('[data-slot="modal-close"]')).toMatch(/width: --spacing\(7\);\s*height: --spacing\(7\);/);
 });
 

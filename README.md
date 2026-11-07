@@ -256,7 +256,7 @@ apps/server/          local board server and provider adapters
 apps/web/             board UI
 apps/desktop/         Electron app
 packages/shared/      shared model and local settings
-packages/ui/          design system
+packages/ui/          board UI on @lar-works/design-system
 packages/work-records/ local work records and lar-work command
 scripts/              assembly, workspace setup and release tools
 ```

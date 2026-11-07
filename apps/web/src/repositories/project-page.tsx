@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { onAzure, trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Input } from '@lar-factory/ui/design-system/Input';
+import { Button, Input } from '@lar-works/design-system';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { kind } from '../buttons/button-kinds.tsx';
 import { FIELD_GROUP, FieldRow } from '../settings/field-row.tsx';

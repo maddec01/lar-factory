@@ -1,4 +1,4 @@
-/* The button kinds (button-kinds.tsx), over the copied Button's recipes and LinkButton's. Unlayered, so these win over
+/* The button kinds (button-kinds.tsx), over the design system's Button's recipes and LinkButton's. Unlayered, so these win over
    the Copy's Tailwind utilities, which sit in a layer. */
 
 /* Every kind is 28 px tall, with 12 px text, except a toggle marked data-toggle (Scope board), which keeps its own
@@ -28,5 +28,5 @@
 /* A button marked data-wrap, whose long label would clip on a narrow dialog: the label wraps and the button grows. */
 [data-kind][data-wrap] { height: auto; min-height: --spacing(7); padding-block: --spacing(1); white-space: normal; }
 
-/* The copied Modal's Close: 28 px square, like every icon-only button. */
+/* The design system's Modal's Close: 28 px square, like every icon-only button. */
 [data-slot="modal-close"] { width: --spacing(7); height: --spacing(7); }

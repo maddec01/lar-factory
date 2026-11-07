@@ -5,12 +5,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { boardApp } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Input } from '@lar-factory/ui/design-system/Input';
-import { Modal } from '@lar-factory/ui/design-system/Modal';
-import { SidebarNavigationItem } from '@lar-factory/ui/design-system/SidebarNavigationItem';
-import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-system/SidebarPane';
-import { SettingsIcon } from '@lar-factory/ui/design-system/NavigationIcons';
+import { Button, Input, Modal, SidebarNavigationItem, SidebarNavigationGroup, SidebarPane } from '@lar-works/design-system';
+import { SettingsIcon } from '@lar-works/design-system/icons';
 import { useArchiveStore } from '../archive/archive-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';

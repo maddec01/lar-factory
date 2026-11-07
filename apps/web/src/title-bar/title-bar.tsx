@@ -1,20 +1,18 @@
-// The board's title bar, laid out as lar-server's AppTitleBar on the copied TitleBar. On the left, the brand, then how
+// The board's title bar, laid out as lar-server's AppTitleBar on the design system's TitleBar. On the left, the brand, then how
 // the board is doing: a strip with the Refreshed time and the counters. Beside the actions, the board search's field,
 // up to 26rem wide. On the right is what you can do, at the bar's right edge: List, Add item (the bar's Main action), a
 // divider, then Update while there's an update, and Settings. Every control is an App control from the button kinds, 28
 // px tall and 24 px inside the strip. The bar starts past the traffic lights and drags the window, except on its
 // controls. Above the missing-t3 notice there's no board to search, count or add to, so it holds only the brand and
 // Settings.
-// Every control keeps its own width, and the bar folds by its own width (the copied TitleBar is the container
+// Every control keeps its own width, and the bar folds by its own width (the design system's TitleBar is the container
 // queried) instead: the List and Add item labels (kept for screen readers) go first, then Spend, Shaping and Shipped,
 // then the Refreshed text, and on a narrow page the Refreshed dot. The field fits itself in what's left.
 
 import { useEffect, useRef, useState } from 'react';
 import { clock, failedCheck, inMacApp, isStale, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
-import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
-import { TitleBar as LarTitleBar } from '@lar-factory/ui/design-system/TitleBar';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { BrandMark, TitleBar as LarTitleBar, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { AddItem } from '../add-item/add-item.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { BoardSearch } from '../board-search/board-search.tsx';
@@ -24,7 +22,7 @@ import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { Counters } from './counters.tsx';
 import { TrafficLights, useWindowControlsInset } from './window-controls.tsx';
 
-/** "Lar Factory": the copied BrandMark, the mark as the L and "ar", then a muted "Factory" on the same baseline, in
+/** "Lar Factory": the design system's BrandMark, the mark as the L and "ar", then a muted "Factory" on the same baseline, in
  *  BrandMark's size and type. Screen readers skip it: the page's hidden h1 names the page. */
 function Brand() {
   return (

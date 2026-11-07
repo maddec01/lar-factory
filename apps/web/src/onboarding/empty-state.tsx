@@ -1,6 +1,5 @@
 // The board before its first repository is added.
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
+import { Button, BrandMark } from '@lar-works/design-system';
 import { useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 

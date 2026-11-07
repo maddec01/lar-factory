@@ -2,7 +2,7 @@
 // row's action. rows.css keeps the columns.
 
 import type { MouseEvent, ReactNode } from 'react';
-import { GitPullRequest } from 'lucide-react';
+import { GitPullRequest } from '@lar-works/design-system/icons';
 import { duration, formatTokens, formatUsd, itemMembers, itemTotal, prLabel } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats, LinkedPr } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';

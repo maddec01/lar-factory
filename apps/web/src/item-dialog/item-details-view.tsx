@@ -7,12 +7,11 @@ import { ItemChecksSection } from './item-checks.tsx';
 // Beside a work record's own text, the description and comments are the ticket's context and say so.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { CircleCheck, CircleDot, Lock, Pencil } from 'lucide-react';
+import { CircleCheck, CircleDot, Lock, Pencil } from '@lar-works/design-system/icons';
 import { STRUCTURE_LABEL, SWAP_KINDS, kindCanChange, kindLabels, kindSwapAccessProblem, onAzure, sameRepo, shortAgo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { IssueRef, Item, ItemComment, ItemDetails, KindTicketSwap, SwapKind, TextFormat } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button, Popover } from '@lar-works/design-system';
 import { FormSelect } from '@lar-factory/ui/form-select';
-import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { MarkdownDiagrams } from '../diagrams/markdown-diagrams.tsx';
 import { DescriptionEditor } from '../description-editor/description-editor.tsx';

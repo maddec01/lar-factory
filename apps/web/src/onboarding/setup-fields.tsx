@@ -1,10 +1,10 @@
 // T3 project choices keep their folder paths beside the radio control.
 
 import { useId, type ReactNode } from 'react';
-import { RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
+import { RadioGroupItem } from '@lar-works/design-system';
 
 /**
- * One choice of a radio group, on one line. The copied item's own label can't shrink, so a long title wouldn't truncate;
+ * One choice of a radio group, on one line. The design system's item's own label can't shrink, so a long title wouldn't truncate;
  * this label sits beside the bare radio instead.
  */
 export function Choice({ value, children }: { value: string; children: ReactNode }) {

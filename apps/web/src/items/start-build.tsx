@@ -4,7 +4,7 @@
 // onboarding or T3 has no project for its repository.
 
 import { buildAccessProblem, sameRepo, type BoardData, type Item } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { OpenThread, hasLiveThread } from './open-thread.tsx';
 import { useOnRow } from './row-actions.tsx';

@@ -6,8 +6,7 @@
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 import { clock, day, type Item, type RetentionState } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Input } from '@lar-factory/ui/design-system/Input';
+import { Button, Input } from '@lar-works/design-system';
 import { kind } from '../buttons/button-kinds.tsx';
 import { ExportedLine, ExportMarkdown, type Exported } from '../item-dialog/record-text.tsx';
 import { useAbandonStore } from '../items/abandon-store.ts';

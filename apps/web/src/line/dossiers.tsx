@@ -10,11 +10,10 @@
 
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
-import { Ban, Check, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
+import { Ban, Check, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from '@lar-works/design-system/icons';
 import { ACTIVITY_WORD, UNREADABLE, itemActivityStill, needsAnswer, openQuestionThread, blockerGroups, blockerRef, canRetryBuild, currentBuildThread, plural, prLabel, itemName, ref, repoKey, repoName, workingAgain } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { Badge, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { dependenciesOf } from '../items/dependencies.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';

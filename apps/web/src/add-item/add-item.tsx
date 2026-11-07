@@ -1,10 +1,9 @@
 // Add item captures a draft locally or creates its tracker ticket, and can find existing tickets.
 import { useEffect, useRef, useState } from 'react';
-import { SquarePen } from 'lucide-react';
+import { SquarePen } from '@lar-works/design-system/icons';
 import type { FormEvent } from 'react';
 import { ITEM_KINDS, noneOnboarded, repoName } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Modal } from '@lar-factory/ui/design-system/Modal';
+import { Button, Modal } from '@lar-works/design-system';
 import { Fieldset } from '@lar-factory/ui/fieldset';
 import { FormSelect } from '@lar-factory/ui/form-select';
 import { FormResult } from '../notices/form-result.tsx';

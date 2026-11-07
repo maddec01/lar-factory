@@ -1,24 +1,22 @@
-/* The design system's tokens and base styles: lar-server's theme (design-system/foundations/theme.css, a Copy), with
-   ninna-ui's minimal preset under it, following the system's light or dark setting on html[data-theme="minimal"].
-   On top of it, this file adds only the board's own: the role names its pages read, each pointed at a lar-server
-   token as theme.css's palette comment pairs them, and the board's own roles. */
-/* Tailwind scans only the sources listed, here and in each app's CSS: the page's own class names would
-   otherwise turn on Tailwind utilities of the same name. ninna-ui's own @source paths resolve inside pnpm's store,
-   where its packages aren't siblings, so its components are listed here. */
-@import "./design-system/foundations/theme.css" source(none);
-@source "./design-system";
+/* The board's own styles on top of the design system's (@lar-works/design-system/styles.css), which each app's CSS
+   imports first: the role names the board's pages read, each pointed at a design-system token, and the board's own
+   roles. */
+/* Tailwind scans only the sources listed, here and in each app's CSS: the page's own class names would otherwise turn
+   on Tailwind utilities of the same name. The design system lists its own components; ninna-ui's own @source paths
+   resolve inside pnpm's store, where its packages aren't siblings, so its components are listed here. */
 @source "./form";
 @source "./progress";
 @source "./rich-text";
 @source "./search-dialog";
 @source "../node_modules/@ninna-ui/feedback/dist";
 @source "../node_modules/@ninna-ui/forms/dist";
+@source "../node_modules/@ninna-ui/layout/dist";
 @source "../node_modules/@ninna-ui/overlays/dist";
 @source "../node_modules/@ninna-ui/primitives/dist";
 @source "../node_modules/@ninna-ui/react-internal/dist";
 
 /* The roles the board's pages read as CSS variables. They are plain variables, not Tailwind colours, so ninna-ui's
-   own primary, secondary and accent hues stay as theme.css sets them. */
+   own primary, secondary and accent hues stay as the design system sets them. */
 :root {
   --radius: var(--radius-lg);
   --background: var(--color-base-50);
@@ -68,14 +66,14 @@
   }
 }
 
-/* The board app's window drags by its title bar; lar-server's Modal, its overlay and its content, which cover the
-   bar, must not, so a click over the bar while a modal is open reaches the page. */
+/* The board app's window drags by its title bar; the design system's Modal, its overlay and its content, which cover
+   the bar, must not, so a click over the bar while a modal is open reaches the page. */
 [data-slot="modal-overlay"],
 [data-slot="modal-content"] {
   -webkit-app-region: no-drag;
 }
 
-/* The search dialog fills a phone's screen, so it drops the frame theme.css gives every modal. That rule is outside
+/* The search dialog fills a phone's screen, so it drops the frame the design system gives every modal. That rule is outside
    Tailwind's layers, so utilities can't override it. */
 @media (width < 40rem) {
   [data-slot="modal-content"][data-search-dialog] {

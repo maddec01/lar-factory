@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { TicketMatch } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
+import { Button } from '@lar-works/design-system';
 import { kind } from '../buttons/button-kinds.tsx';
 import { FormResult } from '../notices/form-result.tsx';
 

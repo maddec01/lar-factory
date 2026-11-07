@@ -33,7 +33,7 @@ function readFullscreen(): boolean {
 /** Whether macOS full screen hides the traffic lights; false outside the Mac app. */
 const useLightsHidden = () => useSyncExternalStore(subscribeToFullscreen, readFullscreen);
 
-/** The title bar's padding past the traffic lights or their stand-ins: with the copied TitleBar's own 16 px, the
+/** The title bar's padding past the traffic lights or their stand-ins: with the design system's TitleBar's own 16 px, the
  *  brand starts 90 px in. None while full screen hides the lights. */
 export const useWindowControlsInset = () => (useLightsHidden() ? '' : 'pl-[74px]');
 

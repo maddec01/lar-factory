@@ -4,10 +4,10 @@
 // sentence and what its thread is doing or its first blocked or active slice, then its pull request and figures.
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from '@lar-works/design-system/icons';
 import { ACTIVITY_WORD, blockedText, canRetryBuild, currentBuildThread, itemName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Badge } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ActivityFeedback, Age, AzureFields, ItemTitle, KindMarker, SliceBar, SliceList, hasFigures, usageLoading, useActivityFeedback, useActivityUnavailable, useShownStatus } from '../items/item-parts.tsx';

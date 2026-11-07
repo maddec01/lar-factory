@@ -16,8 +16,8 @@ const renderBlockingEntry: Plugin = {
 /**
  * Merges the lucide icons that only DynamicIcon's name map reaches into one lazy chunk, where each would otherwise be
  * a chunk of its own, about 1,900 files the server reads at startup. Every icon is in the name map, so an icon that
- * page code imports by name has to stay out: the entry would load the whole chunk with it. Those names are collected
- * as modules load, which is before chunking.
+ * page code imports by name, from lucide-react or the design system's icons, has to stay out: the entry would load the
+ * whole chunk with it. Those names are collected as modules load, which is before chunking.
  */
 function lazyLucideIcons() {
   const imported = new Set<string>();
@@ -27,7 +27,7 @@ function lazyLucideIcons() {
     name: 'lazy-lucide-icons',
     transform(code, id) {
       if (id.endsWith('/lucide-react/dist/esm/lucide-react.mjs')) barrel = code;
-      else for (const [, names] of code.matchAll(/\{([^}]*)\}\s*from\s*['"]lucide-react['"]/g)) {
+      else for (const [, names] of code.matchAll(/\{([^}]*)\}\s*from\s*['"](?:lucide-react|@lar-works\/design-system\/icons)['"]/g)) {
         for (const name of names!.split(',')) imported.add(name.trim().split(/\s+/)[0]!);
       }
     },

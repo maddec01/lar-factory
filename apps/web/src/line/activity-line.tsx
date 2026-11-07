@@ -5,8 +5,7 @@
 
 import { itemActivityAgents, itemActivityLine, itemActivityStill, plural, shortAge } from '@lar-factory/shared';
 import type { Item, ThreadActivityLine, ThreadActivityState, ThreadAgent } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { Badge, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { useBoardStore } from '../board/board-store.ts';
 import { useClock } from '../board/second-clock.ts';
 import { useActivityFeedback } from '../items/item-parts.tsx';

@@ -1,5 +1,5 @@
 // The title bar's update pill, a Port of T3 Code's update pill (apps/web/src/components/sidebar/SidebarUpdatePill.tsx
-// at d53873b) on the copied Popover, Button and Tooltip, drawn as the board's other App controls are, tinted in
+// at d53873b) on the design system's Popover, Button and Tooltip, drawn as the board's other App controls are, tinted in
 // every state (buttons/button-kinds.tsx), instead of as T3's pill. With no update it
 // doesn't show; Settings › Updates checks. An available update reads "Update available", a download shows a progress
 // ring with the percentage, and a downloaded update reads "Restart to update". Clicking the pill runs that step, with
@@ -13,9 +13,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { boardApp, type UpdateState } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/design-system/Button';
-import { Popover } from '@lar-factory/ui/design-system/Popover';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { Button, Popover, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 import { useUpdateStore } from './update-store.ts';
 import { downloadPercent, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from './update-button-logic.ts';
 import { kind } from '../buttons/button-kinds.tsx';

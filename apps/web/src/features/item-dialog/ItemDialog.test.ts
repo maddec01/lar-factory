@@ -1867,7 +1867,7 @@ test('a concept with no usable total shows its own cost only, and unreadable usa
     await openItem(CONCEPT);
     expect(text(inDialog('[data-meta]'))).toContain('Own cost: $1.00');
     expect(text(inDialog('[data-meta]'))).not.toContain('Total on the board');
-    expect(text(inDialog('[data-concept-part="I_sample10"]'))).toContain('Usage details are unavailable.');
+    expect(text(inDialog('[data-part="I_sample10"]'))).toContain('Usage details are unavailable.');
 });
 
 test("a concept whose usage can't be read says so instead of a number", async () => {
@@ -1881,7 +1881,7 @@ test('concept details list each part with its status, cost and Open thread, and 
     await mountPage(conceptBoard(stats(1), stats(2)));
     await openItem(CONCEPT);
 
-    const row = inDialog('[data-concept-part="I_sample10"]')!;
+    const row = inDialog('[data-part="I_sample10"]')!;
 
     expect(text(row)).toContain('#201 Relay: broker only or full TURN?');
     expect(text(row)).toContain('Shaping');
@@ -1889,10 +1889,7 @@ test('concept details list each part with its status, cost and Open thread, and 
     expect(row.querySelector('[data-open-thread]')!.getAttribute('href')).toBe(
         't3code://threads/sample-environment/part',
     );
-    expect(
-        inDialog('[data-concept-part="I_sample13"] [data-open-thread]'),
-        'a part with no thread has no control',
-    ).toBeNull();
+    expect(inDialog('[data-part="I_sample13"] [data-open-thread]'), 'a part with no thread has no control').toBeNull();
     await press(row.querySelector('button')!);
     expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#201 Relay: broker only or full TURN?');
 });
@@ -2219,7 +2216,7 @@ test('concept parts retain their own status icons while work resumes and stops',
     await mountPage(data(true));
     await openItem(CONCEPT);
 
-    const row = () => inDialog('[data-concept-part="I_sample13"]')!;
+    const row = () => inDialog('[data-part="I_sample13"]')!;
 
     expect(row().querySelector('svg.lucide-circle-dot.status-pulse')).not.toBeNull();
     expect(text(row())).toContain('Working');

@@ -11,8 +11,8 @@ import {
     Checkbox,
     CreateIssueChoice,
     DraftTicketPart,
-    FormSelect,
     InlineLink,
+    OptionSelect,
     PanelField,
     Stack,
     Text,
@@ -32,7 +32,7 @@ function OptionField({
 }: {
     name: string;
     label: string;
-    choices: { value: string; name: string }[];
+    choices: { value: string; label: string }[];
     value?: string;
 }) {
     const [value, setValue] = useState(() => (choices.some((choice) => choice.value === start) ? start : ''));
@@ -40,13 +40,13 @@ function OptionField({
     return (
         choices.length > 0 && (
             <PanelField heading={label} htmlFor={`item-${name}`}>
-                <FormSelect
+                <OptionSelect
                     id={`item-${name}`}
                     name={name}
                     none="None"
                     value={value}
                     onChange={setValue}
-                    choices={choices}
+                    options={choices}
                 />
             </PanelField>
         )
@@ -96,7 +96,7 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
     const safety = { azureReadOnly: setup?.azureReadOnly };
     const mapping = setup?.vocabulary[kind as 'bug' | 'feature' | 'improvement'];
     const type = kept?.type ?? mapping?.type ?? '';
-    const names = (values: string[]) => values.map((value) => ({ value, name: value }));
+    const names = (values: string[]) => values.map((value) => ({ value, label: value }));
     const labelsShown =
         !writeAccessProblem(repo.repo, 'tag-ticket', access, safety) &&
         (read.labels.length > 0 || !writeAccessProblem(repo.repo, 'manage-labels', access, safety));
@@ -120,7 +120,12 @@ export function TicketOptionFields({ repo, kind, kept }: { repo: RepoConfig; kin
             )}
             <OptionField name="assignee" label="Assignee" choices={names(read.assignees)} value={kept?.assignee} />
             {read.provider === 'github' && (
-                <OptionField name="milestone" label="Milestone" choices={read.milestones} value={kept?.milestone} />
+                <OptionField
+                    name="milestone"
+                    label="Milestone"
+                    choices={read.milestones.map(({ value, name }) => ({ value, label: name }))}
+                    value={kept?.milestone}
+                />
             )}
             {read.provider === 'azure' && (
                 <OptionField

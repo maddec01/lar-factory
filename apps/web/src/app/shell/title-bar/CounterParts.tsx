@@ -61,7 +61,7 @@ export function spendFace(figure: string, known: boolean, unavailable: boolean, 
         ) : unavailable ? (
             <CounterDash />
         ) : loading ? (
-            <Loading presentation="inline" title="Usage totals are still loading."  />
+            <Loading presentation="inline" title="Usage totals are still loading." />
         ) : (
             figure
         ),

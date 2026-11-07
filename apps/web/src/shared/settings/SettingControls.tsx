@@ -1,6 +1,6 @@
-// The settings rows' working controls, on the design system's Switch, FormSelect, Button and StatusText.
+// The settings rows' working controls, on the design system’s Switch, OptionSelect, Button and StatusIndicator.
 
-import { Button, buttonKind, FormSelect, StatusIndicator, Switch as DesignSwitch } from '@lar-works/design-system';
+import { Button, buttonKind, OptionSelect, StatusIndicator, Switch as DesignSwitch } from '@lar-works/design-system';
 import type { ReactNode } from 'react';
 
 /** A working row renders its control. Unbuilt settings carry no value. */
@@ -53,8 +53,8 @@ export function Choice({
     busy?: boolean;
 }) {
     return (
-        <FormSelect
-            aria-label={label}
+        <OptionSelect
+            label={label}
             presentation="setting"
             writesOnPick
             placeholder="Choose"
@@ -63,7 +63,7 @@ export function Choice({
             aria-disabled={busy}
             busy={busy}
             onChange={(next) => onChange?.(next)}
-            choices={options.map((option) => ({ value: option.value, name: option.label }))}
+            options={options.map((option) => ({ value: option.value, label: option.label }))}
         />
     );
 }

@@ -5,7 +5,7 @@ import { Alert, Button, buttonKind, Loading } from '@lar-works/design-system';
 import { useWizardStore } from './WizardStore';
 
 export function Pending({ children }: { children: string }) {
-    return <Loading presentation="status" label={children}  />;
+    return <Loading presentation="status" label={children} />;
 }
 
 export function DetectionPending() {

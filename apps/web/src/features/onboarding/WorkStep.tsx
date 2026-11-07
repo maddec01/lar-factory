@@ -3,13 +3,13 @@
 import { writeAccessProblem, type SetupDetection } from '@lar-factory/shared';
 import {
     Button,
-    ButtonRow,
     buttonKind,
+    ButtonRow,
     Checkbox,
     Disclosure,
-    FormSelect,
     Input,
     InsetPanel,
+    OptionSelect,
     SetupStep,
     Text,
 } from '@lar-works/design-system';
@@ -65,13 +65,13 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
                             GitHub issues
                         </Text>
                     ) : (
-                        <FormSelect
+                        <OptionSelect
                             presentation="setting"
-                            aria-label="Team"
+                            label="Team"
                             placeholder="Choose a team"
                             value={answers.itemSource?.kind === 'azure-board' ? answers.itemSource.team : ''}
                             onChange={(team) => choose({ itemSource: { kind: 'azure-board', team } })}
-                            choices={sources.map((source) => ({ value: source.id, name: source.title }))}
+                            options={sources.map((source) => ({ value: source.id, label: source.title }))}
                         />
                     )}
                 </FieldRow>

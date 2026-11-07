@@ -102,7 +102,7 @@ export function Desk({ items: inScope }: { items: Item[] }) {
                 clientError ? (
                     'Nothing waited on you at the last read.'
                 ) : readingScope(data, scope ?? undefined) ? (
-                    <Loading presentation="inline" label="Loading Projects…"  />
+                    <Loading presentation="inline" label="Loading Projects…" />
                 ) : deskItems(data, unavailable).length ? (
                     'Nothing on your desk matches the filters.'
                 ) : (

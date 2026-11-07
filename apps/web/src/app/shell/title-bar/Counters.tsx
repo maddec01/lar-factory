@@ -71,7 +71,9 @@ export function Counters() {
     const countOf = (n: number) => (unknown(n) ? <CounterDash /> : n);
     const hintFor = (n: number, hint: string) => (unknown(n) ? 'Still loading Projects' : hint);
     const subFor = (n: number) => (unknown(n) ? undefined : n);
-    const empty = (none: string) => <Empty>{reading ? <Loading presentation="inline" label="Loading Projects…"  /> : none}</Empty>;
+    const empty = (none: string) => (
+        <Empty>{reading ? <Loading presentation="inline" label="Loading Projects…" /> : none}</Empty>
+    );
     const listOf = (items: Item[], none: string) => (items.length ? <List items={items} now={now} /> : empty(none));
 
     return (
@@ -205,7 +207,7 @@ export function Counters() {
                         {unavailable ? (
                             'Usage is unavailable, so nothing is priced.'
                         ) : usageStillLoading ? (
-                            <Loading presentation="inline" label="Loading usage…"  />
+                            <Loading presentation="inline" label="Loading usage…" />
                         ) : (
                             'No priced agent work yet.'
                         )}

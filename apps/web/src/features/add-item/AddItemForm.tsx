@@ -6,10 +6,10 @@ import {
     buttonKind,
     DraftFields,
     FormResult,
-    FormSelect,
     Input,
     MarkdownEditor,
     Modal,
+    OptionSelect,
     PanelField,
     Text,
 } from '@lar-works/design-system';
@@ -26,7 +26,7 @@ import { useBoardStore } from '@/services/board/board.hooks';
 const KIND_CHOICES = ITEM_KINDS.map((value) => {
     const { name, icon: Icon, hue } = KIND_BADGES[value]!;
 
-    return { value, name, icon: <Icon />, hue };
+    return { value, label: name, icon: <Icon />, hue };
 });
 
 /** The form's values, the editor's `description` and the Create issue `createChoice`, for the store to keep. */
@@ -145,14 +145,14 @@ export function AddItemForm() {
                             <RepoSelect id="item-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
                         </PanelField>
                         <PanelField heading="Kind" htmlFor="item-kind">
-                            <FormSelect
+                            <OptionSelect
                                 ref={kindSelect}
                                 id="item-kind"
                                 name="kind"
                                 placeholder="Choose a kind"
                                 value={itemKind}
                                 onChange={setKind}
-                                choices={KIND_CHOICES}
+                                options={KIND_CHOICES}
                             />
                         </PanelField>
                         {selected && (

@@ -85,7 +85,9 @@ test("the picker offers the tracker's labels in their colours, ticks those on th
     expect(choice('needs-design').querySelector('input')!.checked).toBe(true);
     expect(choice('docs').querySelector('input')!.checked).toBe(false);
     expect(choice('type: improvement').querySelector('input')!.disabled).toBe(true);
-    expect(choice('docs').querySelector<HTMLElement>('[data-label-dot] > span')!.style.background).toBe('rgb(14, 138, 22)');
+    expect(choice('docs').querySelector<HTMLElement>('[data-label-dot] > span')!.style.background).toBe(
+        'rgb(14, 138, 22)',
+    );
 });
 
 test('typing narrows the picker', async () => {

@@ -1,7 +1,7 @@
 // The repository select both Add item panes start with, and the hint when none is onboarded.
 
 import { noneOnboarded, repoName } from '@lar-factory/shared';
-import { FormSelect, Text } from '@lar-works/design-system';
+import { OptionSelect, Text } from '@lar-works/design-system';
 
 import { AddingARepository } from '@/features/notices';
 import { ProjectIcon } from '@/features/repositories';
@@ -14,15 +14,15 @@ export function RepoSelect({ id, repo, onRepo }: { id: string; repo: string; onR
 
     return (
         <>
-            <FormSelect
+            <OptionSelect
                 id={id}
                 name="repo"
                 value={repo}
                 onChange={onRepo}
                 aria-describedby={hint ? `${id}-hint` : undefined}
-                choices={data.repos.map((r) => ({
+                options={data.repos.map((r) => ({
                     value: r.repo,
-                    name: repoName(r.repo, data.repos),
+                    label: repoName(r.repo, data.repos),
                     icon: <ProjectIcon repo={r.repo} size="small" />,
                 }))}
             />

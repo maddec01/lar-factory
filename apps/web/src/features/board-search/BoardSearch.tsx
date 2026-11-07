@@ -97,7 +97,7 @@ function Dialog({
             listLabel="Search results"
             empty="Nothing matches."
             busy={reading}
-            busyLabel={<Loading presentation="inline" label="Loading Projects…"  />}
+            busyLabel={<Loading presentation="inline" label="Loading Projects…" />}
             footer={
                 <>
                     <span>

@@ -1,5 +1,5 @@
-/* The button kinds (button-kinds.tsx), over the design system's Button's recipes and LinkButton's. Unlayered, so these win over
-   the Copy's Tailwind utilities, which sit in a layer. */
+/* The button kinds (button-kinds.tsx), over the design system's Button recipes and LinkButton's. Unlayered, so these
+   win over the design system's Tailwind utilities, which sit in a layer. */
 
 /* Every kind is 28 px tall, with 12 px text, except a toggle marked data-toggle (Scope board), which keeps its own
    size. `:where` keeps the selector as specific as [data-kind], so the title bar's strip still sizes its counters. */

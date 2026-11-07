@@ -11,7 +11,7 @@ const button = (label: string) =>
 const heading = () => text(dialog()!.querySelector('[data-slot="modal-header"] h2'));
 
 async function pick(name = 'lar-web', work = true) {
-    await settle(() => dialog()!.querySelector<HTMLElement>(`[data-choice="${name}"] [role="radio"]`)!.click());
+    await settle(() => dialog()!.querySelector<HTMLElement>(`[data-choice="${name}"] input[type="radio"]`)!.click());
     await settle(() => button('Next').click());
 
     if (work) await settle(() => button('Next').click());
@@ -543,9 +543,9 @@ test('the heading shows a chosen icon, or the initial for a project with none', 
     await openOnboarding([project('rocket', { icon: { kind: 'emoji', emoji: '🚀' } }), project('plain')], {
         '/api/onboarding/detect': { detection: detection() },
     });
-    await settle(() => dialog()!.querySelector<HTMLElement>('[data-choice="rocket"] [role="radio"]')!.click());
+    await settle(() => dialog()!.querySelector<HTMLElement>('[data-choice="rocket"] input[type="radio"]')!.click());
     expect(text(placeIcon())).toBe('🚀');
-    await settle(() => dialog()!.querySelector<HTMLElement>('[data-choice="plain"] [role="radio"]')!.click());
+    await settle(() => dialog()!.querySelector<HTMLElement>('[data-choice="plain"] input[type="radio"]')!.click());
     expect(text(placeIcon())).toBe('P');
 });
 

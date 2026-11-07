@@ -41,8 +41,8 @@ test('a row shows its path from ~, with the full path on hover and for screen re
         expect.arrayContaining(['max-w-[30%]', 'sm:max-w-1/2']),
     );
 
-    const radio = dialog()!.querySelector<HTMLElement>('[data-choice="web"] [role="radio"]')!;
-    const label = dialog()!.querySelector<HTMLLabelElement>(`label[for="${radio.id}"]`)!;
+    const radio = dialog()!.querySelector<HTMLElement>('[data-choice="web"] input[type="radio"]')!;
+    const label = radio.closest('label')!;
 
     expect(label.querySelector('.sr-only')!.textContent).toBe('/Users/me/Developer/web');
 });
@@ -62,7 +62,7 @@ test('both sections count their projects and start collapsed, and their rows can
     expect(text(rows('blocked')[1])).toContain('This folder has no GitHub or Azure DevOps origin.');
     for (const name of ['added', 'blocked']) {
         expect(section(name)!.closest('[data-slot="radio-group"]')).toBeNull();
-        expect(section(name)!.querySelector('[role="radio"]')).toBeNull();
+        expect(section(name)!.querySelector('input[type="radio"]')).toBeNull();
     }
 });
 
@@ -79,7 +79,7 @@ test('a resumed setup keeps its own project selectable and checked', async () =>
     await mountPage(data);
     await settle(() => $<HTMLButtonElement>('[data-onboarding-card="maddec01/set-up"] [data-resume]')!.click());
     expect(choices()).toEqual(['set-up', 'new']);
-    expect(dialog()!.querySelector('[data-choice="set-up"] [role="radio"]')!.getAttribute('aria-checked')).toBe('true');
+    expect(dialog()!.querySelector<HTMLInputElement>('[data-choice="set-up"] input[type="radio"]')!.checked).toBe(true);
     expect(rows('added')).toHaveLength(1);
 });
 

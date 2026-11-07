@@ -9,13 +9,13 @@ import {
     buttonKind,
     ChoiceDetails,
     Disclosure,
+    FormFieldset,
     Input,
     InsetPanel,
     ProjectLine as Line,
     ProjectList,
     ProjectListItem,
-    RadioGroup,
-    RadioGroupChoice,
+    RadioChoice,
 } from '@lar-works/design-system';
 import { FolderPlus } from '@lar-works/design-system/icons';
 
@@ -57,26 +57,34 @@ export function ProjectStep({ run }: { run: Run }) {
                     label="T3 project"
                     below={
                         <>
-                            <RadioGroup
-                                aria-label="T3 project"
-                                value={run.projectId ?? (creating ? 'new' : '')}
-                                onValueChange={(id) => (id === 'new' ? chooseNew() : pick(id as string))}
-                                presentation="choices"
-                            >
-                                {rows
-                                    .filter(({ reason }) => !reason)
-                                    .map(({ project }) => (
-                                        <RadioGroupChoice key={project.id} value={project.id}>
-                                            <ProjectLine project={project} badge={project.provider} />
-                                        </RadioGroupChoice>
-                                    ))}
-                                <RadioGroupChoice value="new">
-                                    <AddFolderLine
-                                        title="Add a repository folder"
-                                        hint="Choose a folder already on this machine."
-                                    />
-                                </RadioGroupChoice>
-                            </RadioGroup>
+                            <FormFieldset presentation="group" legend="T3 project" hiddenLegend>
+                                <InsetPanel presentation="settings">
+                                    {rows
+                                        .filter(({ reason }) => !reason)
+                                        .map(({ project }) => (
+                                            <RadioChoice
+                                                key={project.id}
+                                                name="t3-project"
+                                                checked={run.projectId === project.id}
+                                                onChange={() => pick(project.id)}
+                                                data-choice={project.id}
+                                            >
+                                                <ProjectLine project={project} badge={project.provider} />
+                                            </RadioChoice>
+                                        ))}
+                                    <RadioChoice
+                                        name="t3-project"
+                                        checked={!run.projectId && !!creating}
+                                        onChange={chooseNew}
+                                        data-choice="new"
+                                    >
+                                        <AddFolderLine
+                                            title="Add a repository folder"
+                                            hint="Choose a folder already on this machine."
+                                        />
+                                    </RadioChoice>
+                                </InsetPanel>
+                            </FormFieldset>
                             {creating && (
                                 <ChoiceDetails>
                                     <FieldRow label="Repository folder">

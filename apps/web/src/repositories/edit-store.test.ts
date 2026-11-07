@@ -43,7 +43,7 @@ test('Project saves wait their turn and an older save preserves newer text', asy
     const answers: ((response: Response) => void)[] = [];
 
     fetchMock.mockImplementation((async (_url: string, init: RequestInit) => {
-        sent.push(JSON.parse(String(init.body)));
+        sent.push(JSON.parse(init.body as string));
 
         return new Promise<Response>((resolve) => answers.push(resolve));
     }) as typeof fetchMock);
@@ -99,7 +99,7 @@ test('returning to an earlier value still queues the last edit and keeps its dra
     const answers: ((response: Response) => void)[] = [];
 
     fetchMock.mockImplementation((async (_url: string, init: RequestInit) => {
-        sent.push(JSON.parse(String(init.body)));
+        sent.push(JSON.parse(init.body as string));
 
         return new Promise<Response>((resolve) => answers.push(resolve));
     }) as typeof fetchMock);

@@ -160,8 +160,9 @@ export async function captureWork(
 
     if (!number && !fresh) {
         try {
-            const matches = (await provider.find(draft.repo, input.requestId)).filter((ticket) =>
-                ticket.body.includes(`<!-- lar-factory:create {"identity":"${input.requestId}"} -->`),
+            const { requestId } = input;
+            const matches = (await provider.find(draft.repo, requestId)).filter((ticket) =>
+                ticket.body.includes(`<!-- lar-factory:create {"identity":"${requestId}"} -->`),
             );
 
             if (matches.length !== 1)

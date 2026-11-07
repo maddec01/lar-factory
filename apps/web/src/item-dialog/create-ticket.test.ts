@@ -59,7 +59,8 @@ const posts = () =>
     fetchMock.mock.calls
         .filter(([url]) => url === '/api/create-ticket')
         .map(
-            (call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>,
+            (call) =>
+                JSON.parse((call as unknown as [string, RequestInit])[1].body as string) as Record<string, unknown>,
         );
 
 async function open(

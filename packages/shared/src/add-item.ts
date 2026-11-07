@@ -143,7 +143,12 @@ export function validateDraft(
         )
             throw new Error('Choose valid issue options.');
 
-        if (raw.milestone && !/^[1-9]\d*$/.test(String(raw.milestone))) throw new Error('Choose a valid milestone.');
+        if (
+            raw.milestone &&
+            ((typeof raw.milestone !== 'string' && typeof raw.milestone !== 'number') ||
+                !/^[1-9]\d*$/.test(String(raw.milestone)))
+        )
+            throw new Error('Choose a valid milestone.');
 
         options = raw as TicketOptions;
     }

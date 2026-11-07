@@ -55,6 +55,13 @@ export function serverRuntimePath(env: NodeJS.ProcessEnv = process.env): string 
     return env.T3_SERVER_RUNTIME || `${userdata(env)}/server-runtime.json`;
 }
 
+/** The origin T3's runtime file names, or an empty string while it names none. */
+export function serverRuntimeOrigin(env: NodeJS.ProcessEnv = process.env): string {
+    const origin = readJsonRecord(serverRuntimePath(env))?.origin;
+
+    return typeof origin === 'string' ? origin : '';
+}
+
 /**
  * Whether T3 Code runs: the runtime file at `path` names a pid whose process is alive, as T3's
  * isProcessAlive checks it. `t3 thread start` needs that file; a crash can leave it behind, naming a dead pid.

@@ -1,10 +1,9 @@
 import { isRecord } from '@lar-factory/shared';
 
-import { readJsonRecord } from '../json-file.ts';
 import { boardSessionAuthority } from './board-session.ts';
 import type { BoardSession } from './project-protocol.ts';
 import { subscribeProjects } from './project-subscription.ts';
-import { serverRuntimePath } from './t3-settings.ts';
+import { serverRuntimeOrigin } from './t3-settings.ts';
 
 /** After a lost answer, retry with the same commandId, which T3 answers from its receipt. T3 answers a rejected commandId with that rejection every time, so a retry after a rejection needs a new one. */
 export interface ThreadCommand {
@@ -46,7 +45,7 @@ export async function sendThreadCommand(command: ThreadCommand): Promise<ThreadC
 
             try {
                 stop = subscribeProjects(
-                    new URL(String(readJsonRecord(serverRuntimePath(process.env))?.origin ?? '')),
+                    new URL(serverRuntimeOrigin(process.env)),
                     '',
                     protocol,
                     () => finish(unconfirmed(`The T3 connection failed before T3 answered ${command.type}.`)),

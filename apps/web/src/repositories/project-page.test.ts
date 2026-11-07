@@ -63,7 +63,7 @@ function serve(
 
         if (url !== '/api/repositories/settings') return new Response(JSON.stringify(board));
 
-        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        const body = JSON.parse(init?.body as string) as Record<string, unknown>;
 
         if (body.change === 'discover-vocabulary') return new Response(JSON.stringify({ discovery }));
 
@@ -360,7 +360,7 @@ test('an older kind save can refresh discovery without erasing another picker se
     let finish!: (response: Response) => void;
 
     fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
-        if (url === '/api/repositories/settings' && JSON.parse(String(init?.body)).change === 'vocabulary')
+        if (url === '/api/repositories/settings' && JSON.parse(init?.body as string).change === 'vocabulary')
             return new Promise<Response>((resolve) => {
                 finish = resolve;
             });

@@ -1126,7 +1126,7 @@ export function publicationRecords(
                     db
                         .prepare('SELECT work_id, body, written, has_content, has_passing_gate FROM bodies')
                         .all()
-                        .map((row) => [`${row.work_id}:${row.body}`, bodyReadiness(row)]),
+                        .map((row) => [`${String(row.work_id)}:${String(row.body)}`, bodyReadiness(row)]),
                 );
                 const published = new Set(
                     db

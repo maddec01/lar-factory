@@ -1,10 +1,9 @@
 import { isRecord, type ModelSelection, type StartResult } from '@lar-factory/shared';
 import { randomUUID } from 'node:crypto';
 
-import { readJsonRecord } from '../json-file.ts';
 import { boardSessionAuthority } from './board-session.ts';
 import { subscribeProjects } from './project-subscription.ts';
-import { serverRuntimePath } from './t3-settings.ts';
+import { serverRuntimeOrigin } from './t3-settings.ts';
 import { rejectionReason } from './thread-commands.ts';
 
 /** The workspace strategies of T3's `orchestration.launchThread` that the board uses. `startFromOrigin` stays unset, as the CLI leaves it. */
@@ -34,7 +33,7 @@ export async function launchThread(
     selection: ModelSelection,
     workspace: LaunchWorkspace,
     runtimeMode: string,
-    origin = String(readJsonRecord(serverRuntimePath(process.env))?.origin ?? ''),
+    origin = serverRuntimeOrigin(process.env),
     commandId: string = randomUUID(),
 ): Promise<StartResult> {
     const authority = boardSessionAuthority('t3', 'orchestration:operate');

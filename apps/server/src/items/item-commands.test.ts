@@ -696,7 +696,7 @@ test('Start again refuses while the board shows an older stopped thread but has 
 
     records.addThread(workId, records.read(workId).revision, 'just-recorded', 'build');
     assert.deepEqual(
-        (board.find(workId)?.threads as ItemThread[]).map((t) => t.id),
+        (board.find(workId)!.threads as ItemThread[]).map((t) => t.id),
         ['older-shape'],
         'the board last read only the older thread',
     );
@@ -1138,7 +1138,7 @@ test('unknown lookup retains protection and warns without concurrent duplicate c
     await commands.start(item.id, undefined);
     assert.equal(calls, 1);
     assert.equal(branches.length, 1);
-    assert.equal((await commands.backToList(item.id)).status, 409);
+    assert.equal(commands.backToList(item.id).status, 409);
     assert.equal(board.snapshot().startCheckFailures?.[item.id], item.title);
 });
 
@@ -1240,7 +1240,7 @@ test('Queue and Back to List move the work record and write nothing to its ticke
     assert.equal((await commands.queue(work.workId)).status, 200);
     assert.equal(records.read(work.workId).status, 'Queued');
     assert.equal(board.find(work.workId)?.status, 'Queued', 'the board reads the record again at once');
-    assert.equal((await commands.backToList(work.workId)).status, 200);
+    assert.equal(commands.backToList(work.workId).status, 200);
     assert.equal(records.read(work.workId).status, 'List');
     assert.deepEqual(log, []);
 });

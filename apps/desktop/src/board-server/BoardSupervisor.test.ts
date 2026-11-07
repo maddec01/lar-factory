@@ -16,7 +16,7 @@ import * as BoardSupervisor from './BoardSupervisor.ts';
 
 /** A fake server per start: each gets the next port and exits when the test says so. */
 const makeFakeServer = (options?: { readonly failStarts?: number }) =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
         const children: Array<{ port: number; crash: Effect.Effect<void>; stopped: boolean }> = [];
         let failures = options?.failStarts ?? 0;
         const start = Effect.gen(function* () {

@@ -656,7 +656,7 @@ test("a Codex record whose rollout has no speed tier takes the one its turn star
 
 /** A read of the sessions' figures for `items`, counting its pauses by step. */
 async function chunkedRead(
-    t: Parameters<typeof tempDir>[0] & Parameters<typeof statsDb>[0],
+    t: Parameters<typeof tempDir>[0],
     threads: FixtureThread[],
     sessions: Parameters<typeof claudeHome>[1],
     items: string[][],

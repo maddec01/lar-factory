@@ -256,15 +256,22 @@ export async function acquireOwnerLock(path: string, lost: () => Error): Promise
 
             released = true;
 
-            try {
-                await releasePath(path, owner);
-            } finally {
+            const removeCandidate = async () => {
                 try {
                     await unlink(candidate);
                 } catch (error) {
                     if (!missing(error)) throw error;
                 }
+            };
+
+            try {
+                await releasePath(path, owner);
+            } catch (error) {
+                await removeCandidate();
+                throw error;
             }
+
+            await removeCandidate();
         },
     };
 }

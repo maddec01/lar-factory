@@ -15,7 +15,7 @@ let announced: string | undefined;
 let sessions: BoardSessions | undefined;
 
 /** Has discovery read T3 with `own` instead of the board's Keychain session, from its next read. */
-export function useProjectSessions(own: BoardSessions): void {
+export function setProjectSessions(own: BoardSessions): void {
     sessions = own;
 }
 

@@ -66,8 +66,8 @@ export const workItemPatch = (
     '--output',
     'json',
 ];
-/** Runs `use` on a temporary file holding `body` as JSON, for az's --in-file, and removes the file after. */
-export async function withFile<T>(body: unknown, use: (file: string) => Promise<T>): Promise<T> {
+/** Runs `task` on a temporary file holding `body` as JSON, for az's --in-file, and removes the file after. */
+export async function withFile<T>(body: unknown, task: (file: string) => Promise<T>): Promise<T> {
     const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
 
     try {
@@ -75,7 +75,7 @@ export async function withFile<T>(body: unknown, use: (file: string) => Promise<
 
         await writeFile(file, JSON.stringify(body));
 
-        return await use(file);
+        return await task(file);
     } finally {
         await rm(dir, { recursive: true, force: true });
     }

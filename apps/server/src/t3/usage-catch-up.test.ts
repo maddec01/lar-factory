@@ -30,7 +30,7 @@ const thread = (id: string, read?: 'never' | 'failed') => ({
 
 /** A catch-up over T3's fixture threads, with its stats reads and log lines, whose first read settles when `state.settled` says. */
 function catchUp(
-    t: Parameters<typeof tempDir>[0] & Parameters<typeof statsDb>[0],
+    t: Parameters<typeof tempDir>[0],
     threads: Parameters<typeof statsDb>[1],
     ids: string[],
     options: Partial<UsageCatchUpOptions> = {},

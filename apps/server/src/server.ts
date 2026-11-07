@@ -98,7 +98,7 @@ import { createProjectIcons } from './t3/project-icons.ts';
 import {
     repositoryProjects,
     reauthorizeRepositoryProjects,
-    useProjectSessions,
+    setProjectSessions,
 } from './t3/repository-project-discovery.ts';
 import { anyOnAzureDevOps, repositoryProjectReads } from './t3/repository-project.ts';
 import { sampleT3Session } from './t3/sample-t3-session.ts';
@@ -128,7 +128,7 @@ const fixture = process.env.BOARD_DATA_FILE;
 /** `pnpm run sample:t3`: the sample board also reads T3's projects, icons and availability, with a session of its own. */
 const sampleT3 = fixture && process.env.BOARD_SAMPLE_T3 ? sampleT3Session() : null;
 
-if (sampleT3) useProjectSessions(sampleT3);
+if (sampleT3) setProjectSessions(sampleT3);
 
 const capture = { session: randomUUID(), enabled: !fixture };
 const bundled = loopTrace.span('bundled skills', loadBundledSkills);

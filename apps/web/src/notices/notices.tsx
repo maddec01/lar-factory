@@ -131,7 +131,8 @@ function AddedNotice({ item }: { item: Item }) {
     const action = useItemAction(item.id);
     const hold = useContext(ToastLifetime);
     const fail = useContext(ToastFailure);
-    const [result, setResult] = useState<'added' | 'pending' | 'success' | string>('added');
+    // 'added', 'pending', 'success', or the error that stopped it.
+    const [result, setResult] = useState<string>('added');
     const mounted = useRef(true);
     const queue = useRef<HTMLButtonElement>(null);
     const view = useRef<HTMLSpanElement>(null);

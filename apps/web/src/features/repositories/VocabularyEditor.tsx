@@ -6,9 +6,9 @@ import {
     buttonKind,
     ButtonRow,
     InlineLink,
+    LabelChip,
     OptionSelect,
     Text,
-    VocabularyChip,
     VocabularyMore,
     VocabularyRow,
     VocabularySuggestion,
@@ -104,16 +104,14 @@ export function VocabularyFields({
             labels={
                 <>
                     {chosen.slice(0, 2).map((label) => (
-                        <VocabularyChip
+                        <LabelChip
                             key={label}
                             label={label}
+                            note={newLabels.includes(label) ? '(new)' : gone(label) ? '(unavailable)' : undefined}
                             removeLabel={`Remove ${label} from ${title}`}
                             disabled={disabled}
                             onRemove={() => toggle(label)}
-                        >
-                            {label}
-                            {newLabels.includes(label) ? ' (new)' : gone(label) ? ' (unavailable)' : ''}
-                        </VocabularyChip>
+                        />
                     ))}
                     {chosen.length > 2 && (
                         <VocabularyMore

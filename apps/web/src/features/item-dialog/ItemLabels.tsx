@@ -6,9 +6,9 @@ import {
     ChipGroup,
     DetailFact as Fact,
     IconButton,
+    LabelChip,
     LabelEditorPanel,
     LabelsValue,
-    LockedLabel,
     Popover,
     Text,
 } from '@lar-works/design-system';
@@ -50,12 +50,12 @@ export function ItemLabels({ item }: { item: Item }) {
                     <ChipGroup data-labels>
                         <LabelChips item={item} />
                         {linked && (
-                            <LockedLabel
-                                data-locked-label
-                                title="The factory manages this for saved links, so it can't be edited."
-                            >
-                                {STRUCTURE_LABEL}
-                            </LockedLabel>
+                            <LabelChip
+                                data-locked-label=""
+                                label={STRUCTURE_LABEL}
+                                locked
+                                lockedLabel="The factory manages this for saved links, so it can't be edited."
+                            />
                         )}
                     </ChipGroup>
                 )}

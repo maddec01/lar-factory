@@ -11,8 +11,8 @@ import {
     FilterChip,
     FilterChoice,
     FilterChoices,
-    FilterLabelBadge,
     FilterMenu,
+    LabelChip,
 } from '@lar-works/design-system';
 import { CircleDashed } from '@lar-works/design-system/icons';
 import { useRef, type ReactNode } from 'react';
@@ -89,7 +89,11 @@ export function ItemFilterBar({
                     removeLabel={`Remove ${label}`}
                     onRemove={() => thenFocusKind(() => toggleLabel(label))}
                 >
-                    <FilterLabelBadge label={label} color={choices.find(({ name }) => sameLabel(name, label))?.color} />
+                    <LabelChip
+                        label={label}
+                        color={choices.find(({ name }) => sameLabel(name, label))?.color}
+                        removable
+                    />
                 </FilterChip>
             ))}
             {filtering(filters) && (

@@ -896,7 +896,7 @@ test('a typed label is created on submit, is kept with the draft, and can be unt
     expect(search().value).toBe('');
     expect(typedLabels()).toEqual(['needs-design']);
     expect(picked()).toEqual(['backend']);
-    expect(chips()).toEqual(['backend', 'needs-designnew']);
+    expect(chips()).toEqual(['backend', 'needs-design new']);
     expect(text($('[data-label-picker]'))).toContain('The new label is created when the ticket submits.');
     await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
     await settle(() => vi.advanceTimersByTime(50));

@@ -200,7 +200,7 @@ test('details hide managed and mapped labels, and show linked-work only as a loc
 
     const chips = [...$$<HTMLElement>('[data-item-dialog] [data-labels] [data-label-chip]')];
 
-    expect(chips.map(text)).toEqual(['urgent']);
+    expect(chips.map(text)).toEqual(['urgent', 'linked-work']);
     expect(chips[0]!.style.backgroundColor).toContain('color-mix');
     expect(text(inDialog('[data-labels] [data-locked-label]'))).toBe('linked-work');
     expect(text(inDialog('[data-kind-badge]'))).toBe('Bug');

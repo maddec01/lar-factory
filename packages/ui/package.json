@@ -29,7 +29,7 @@
         "vite-plus": "1.5.0"
     },
     "dependencies": {
-        "@lar-works/design-system": "^0.1.1",
+        "@lar-works/design-system": "^0.2.0",
         "@ninna-ui/feedback": "^0.6.0",
         "@ninna-ui/forms": "^0.6.0",
         "@ninna-ui/layout": "^0.6.0",

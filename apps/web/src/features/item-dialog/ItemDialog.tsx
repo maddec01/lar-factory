@@ -42,20 +42,35 @@ import { useDescriptionEdit } from './useDescriptionEdit';
 import type { DescriptionEdit } from './useDescriptionEdit';
 import type { ItemDetailsRead } from './useItemDetails';
 import { useItemDetails } from './useItemDetails';
-import { Dependencies, dependenciesOf } from '@/features/items/Dependencies';
-import { AbandonButton, ActionError, BackToListButton, QueueButton } from '@/features/items/ItemActions';
-import { AgentWork, ItemKind, PrList, RepoTag, StructureSync, useShownStatus } from '@/features/items/ItemParts';
-import { LinkButton } from '@/features/items/LinkButton';
-import { NeedsYou } from '@/features/items/NeedsYou';
-import { EarlierThreads, OpenThread, hasLiveThread } from '@/features/items/OpenThread';
-import { PrLink } from '@/features/items/PrLink';
-import { SourceIcon } from '@/features/items/SourceIcon';
-import { StartAfterError, StartOrAfter } from '@/features/items/StartAfter';
-import { StartBuild } from '@/features/items/StartBuild';
-import { StartMessage, useStartHolds } from '@/features/items/StartControl';
-import { ItemStatusGlyph } from '@/features/items/StatusGlyph';
-import { ItemAgents } from '@/features/line/ActivityLine';
-import { useEditStore } from '@/features/repositories/EditStore';
+import {
+    Dependencies,
+    dependenciesOf,
+    AbandonButton,
+    ActionError,
+    BackToListButton,
+    QueueButton,
+    AgentWork,
+    ItemKind,
+    PrList,
+    RepoTag,
+    StructureSync,
+    useShownStatus,
+    LinkButton,
+    NeedsYou,
+    EarlierThreads,
+    OpenThread,
+    hasLiveThread,
+    PrLink,
+    SourceIcon,
+    StartAfterError,
+    StartOrAfter,
+    StartBuild,
+    StartMessage,
+    useStartHolds,
+    ItemStatusGlyph,
+} from '@/features/items';
+import { ItemAgents } from '@/features/line';
+import { useEditStore } from '@/features/repositories';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { EXPANDED, ExpandButton, useExpand } from '@/shared/ui/expand-dialog/ExpandDialog';

@@ -45,12 +45,19 @@ import {
 import type { Part, PartActivity, PartKind } from './DossierParts';
 import { PartStart, startable } from './PartStart';
 import { YOURS, lastSeen } from './StageTrack';
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { AzureFields, ItemTitle, SliceBar, useActivityUnavailable, useShownStatus } from '@/features/items/ItemParts';
-import { OpenThread } from '@/features/items/OpenThread';
-import { SourceIcon } from '@/features/items/SourceIcon';
-import { ItemStatusGlyph, StatusGlyph } from '@/features/items/StatusGlyph';
-import { ProjectIcon } from '@/features/repositories/ProjectIcon';
+import { useItemDialogStore } from '@/features/item-dialog';
+import {
+    AzureFields,
+    ItemTitle,
+    SliceBar,
+    useActivityUnavailable,
+    useShownStatus,
+    OpenThread,
+    SourceIcon,
+    ItemStatusGlyph,
+    StatusGlyph,
+} from '@/features/items';
+import { ProjectIcon } from '@/features/repositories';
 
 const DECISIONS = 'Decisions';
 const KIND_ICON: Record<PartKind, typeof Hammer> = {

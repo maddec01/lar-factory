@@ -11,7 +11,7 @@ import {
 } from '@lar-factory/shared';
 import { create } from 'zustand';
 
-import { useUpdateStore } from '@/features/updates/UpdateStore';
+import { useUpdateStore } from '@/features/updates';
 import { useInstallStore } from '@/services/install/install.hooks';
 
 /** What the last call did, and the group it came from: the Skill folders or the updates. */

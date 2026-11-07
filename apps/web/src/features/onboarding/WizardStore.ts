@@ -14,7 +14,7 @@ import {
 import { create } from 'zustand';
 
 import { STEP_TITLES, answerProblem, answersOf, connectionsOf, isStep, stepsOf, type StepId } from './WizardChoices';
-import { showToast } from '@/features/notices/Toasts';
+import { showToast } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 

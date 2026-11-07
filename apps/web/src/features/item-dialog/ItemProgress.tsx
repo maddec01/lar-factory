@@ -6,10 +6,16 @@
 import { itemName } from '@lar-factory/shared';
 import type { Item, Slice, Status } from '@lar-factory/shared';
 
-import { ActivityFeedback, useActivityFeedback, useShownStatus, SliceBar, SliceMark } from '@/features/items/ItemParts';
-import { SourceIcon } from '@/features/items/SourceIcon';
-import { STATUS_COLOR } from '@/features/items/StatusGlyph';
-import { WORKFLOW_STEPS } from '@/features/items/WorkflowSteps';
+import {
+    ActivityFeedback,
+    useActivityFeedback,
+    useShownStatus,
+    SliceBar,
+    SliceMark,
+    SourceIcon,
+    STATUS_COLOR,
+    WORKFLOW_STEPS,
+} from '@/features/items';
 
 const SPLIT_STATUSES: readonly Status[] = ['In progress', 'Review'];
 

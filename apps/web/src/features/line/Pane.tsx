@@ -5,8 +5,8 @@ import { readingScope } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import type { ReactNode } from 'react';
 
-import { useShownScope } from '@/features/filters/ScopeStore';
-import { StatusGlyph } from '@/features/items/StatusGlyph';
+import { useShownScope } from '@/features/filters';
+import { StatusGlyph } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { Loader } from '@/shared/ui/loading/Loader';
 

@@ -7,7 +7,7 @@ import { itemActivityAgents, itemActivityLine, itemActivityStill, plural, shortA
 import type { Item, ThreadActivityLine, ThreadActivityState, ThreadAgent } from '@lar-factory/shared';
 import { Badge, Tooltip, TooltipPopup, TooltipTrigger } from '@lar-works/design-system';
 
-import { useActivityFeedback } from '@/features/items/ItemParts';
+import { useActivityFeedback } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { useClock } from '@/shared/time/useClock';
 

@@ -16,7 +16,7 @@ import { threadAtWork, threadsOf } from './DossierParts';
 import { RowKind, RowSource } from './RowIdentity';
 import type { StageRow as Row } from './StageRows';
 import { OnYourDesk, YOURS, ROW_OPENS, picked, threadText } from './StageTrack';
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
+import { useItemDialogStore } from '@/features/item-dialog';
 import {
     ActivityFeedback,
     Age,
@@ -30,12 +30,14 @@ import {
     useActivityFeedback,
     useActivityUnavailable,
     useShownStatus,
-} from '@/features/items/ItemParts';
-import { OpenThread, hasLiveThread } from '@/features/items/OpenThread';
-import { StartAfterError, StartOrAfter } from '@/features/items/StartAfter';
-import { StartBuild } from '@/features/items/StartBuild';
-import { StartMessage } from '@/features/items/StartControl';
-import { ItemStatusGlyph } from '@/features/items/StatusGlyph';
+    OpenThread,
+    hasLiveThread,
+    StartAfterError,
+    StartOrAfter,
+    StartBuild,
+    StartMessage,
+    ItemStatusGlyph,
+} from '@/features/items';
 
 /** The one thing a status asks next, or where to act on an item that waits on you. */
 function Side({ item, data }: { item: Item; data: BoardData }) {

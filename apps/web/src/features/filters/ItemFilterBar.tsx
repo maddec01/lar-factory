@@ -9,7 +9,7 @@ import { useRef, type ReactNode } from 'react';
 
 import { KIND_FILTERS, filtering, headingOf, labelChoices, toggled } from './ItemFilters';
 import type { ItemFilters, KindFilter } from './ItemFilters';
-import { KIND_BADGES, KindBadge } from '@/features/items/ItemParts';
+import { KIND_BADGES, KindBadge } from '@/features/items';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind as buttonKind } from '@/shared/ui/buttons/ButtonKinds';
 import { LabelPicker } from '@/shared/ui/labels/LabelPicker';

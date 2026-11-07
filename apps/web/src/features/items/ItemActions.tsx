@@ -9,7 +9,7 @@ import { useId, useRef } from 'react';
 import { useActionStore, useItemAction } from './ActionStore';
 import type { ItemAction } from './ActionStore';
 import { askAbandon, backToList, queueItem } from './CardActions';
-import { DismissButton, closeKeepingFocus } from '@/features/notices/Toasts';
+import { DismissButton, closeKeepingFocus } from '@/features/notices';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 
 /** Board writes are off in sample mode, so its buttons are too; an action in flight holds them. */

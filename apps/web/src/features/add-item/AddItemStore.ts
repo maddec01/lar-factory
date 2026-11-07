@@ -8,8 +8,8 @@ import type { CreationResult, ItemDraft, BoardData, TicketMatch, TicketOptions }
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { useItemDialogStore } from '@/features/item-dialog/ItemDialogStore';
-import { notify } from '@/features/notices/Notices';
+import { useItemDialogStore } from '@/features/item-dialog';
+import { notify } from '@/features/notices';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { postAction, receive } from '@/services/board/board.service';
 

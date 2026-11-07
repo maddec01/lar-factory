@@ -17,8 +17,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { type Group, type Page, pages, settingsData, type SettingsData } from './SettingsPages';
 import { useSettingsStore } from './SettingsStore';
-import { ProjectPage, projectSettings } from '@/features/repositories/ProjectPage';
-import { useUpdateStore } from '@/features/updates/UpdateStore';
+import { ProjectPage, projectSettings } from '@/features/repositories';
+import { useUpdateStore } from '@/features/updates';
 import { useArchiveStore } from '@/services/archive/archive.hooks';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';

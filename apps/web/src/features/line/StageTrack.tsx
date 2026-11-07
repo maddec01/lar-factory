@@ -4,7 +4,7 @@
 import { clock, currentBuildThread, delegatedWorkRunning } from '@lar-factory/shared';
 import type { Item, ItemStats, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
-import { STATUS_COLOR, StatusGlyph } from '@/features/items/StatusGlyph';
+import { STATUS_COLOR, StatusGlyph } from '@/features/items';
 
 const STAGES: { name: string; statuses: Status[] }[] = [
     { name: 'Refining', statuses: ['Shaping', 'Needs you'] },

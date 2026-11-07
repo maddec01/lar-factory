@@ -130,7 +130,7 @@ test('the counters sit after the brand, and the field takes up to 26rem beside t
     );
 });
 
-// The kinds' sheet sizes each to 28 px (shared/ui/buttons/button-kinds.css); inside the strip the title bar's sheet makes them 24.
+// Every kind is the design system's compact 28 px Button (buttonKind); inside the strip the title bar's sheet makes them 24.
 test("Add item is the bar's Main action and every other control an App control; Settings is icon-only", async () => {
     stubApp({
         getUpdateState: vi.fn(async () => ({
@@ -154,12 +154,13 @@ test("Add item is the bar's Main action and every other control an App control; 
 
     const settings = titleBar().querySelector('.open-settings')!;
 
-    expect([settings.getAttribute('data-icon-only'), settings.getAttribute('aria-label'), text(settings)]).toEqual([
-        'large',
+    expect([settings.hasAttribute('data-icon-only'), settings.getAttribute('aria-label'), text(settings)]).toEqual([
+        true,
         'Settings',
         '',
     ]);
     expect(settings.className.split(' '), 'its icon takes the text colour').toContain('text-base-content');
+    expect(settings.className.split(' '), 'its icon is the large 20 px one').toContain('[&_svg]:size-5');
     expect(refreshed().className.split(' '), "Refreshed is 24 px, as the strip's counters").toContain('h-6');
 });
 
@@ -215,12 +216,14 @@ test('above the missing-t3 notice the bar holds only the brand and Settings, whi
     expect(controls()).toEqual(['brand', 'settings']);
     await settle(() => $<HTMLButtonElement>('.title-bar .open-settings')!.click());
     await settle(() =>
-        $$<HTMLButtonElement>('.settings-nav button')
+        $$<HTMLButtonElement>('[data-settings-nav] button')
             .find((b) => text(b) === 'Skills')!
             .click(),
     );
     await settle(() => vi.advanceTimersByTime(50));
-    expect($('[role="dialog"] .settings-body')!.textContent, 'Settings opens over the notice').toContain('~/.claude');
+    expect($('[role="dialog"] [data-settings-body]')!.textContent, 'Settings opens over the notice').toContain(
+        '~/.claude',
+    );
     expect($('.tool-missing')).not.toBeNull();
 });
 

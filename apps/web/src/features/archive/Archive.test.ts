@@ -64,7 +64,7 @@ async function openArchive(
     await settle(() => $<HTMLButtonElement>('.open-settings')!.click());
     expect(archiveReads(), 'Archive is read only once it opens').toBe(0);
     await settle(() =>
-        $$<HTMLButtonElement>('.settings-nav button')
+        $$<HTMLButtonElement>('[data-settings-nav] button')
             .find((b) => text(b) === 'Archive')!
             .click(),
     );
@@ -161,12 +161,14 @@ test('a timed delete names the work it would delete and saves only on its confir
     await settle(() => $<HTMLButtonElement>('[data-confirm-delete]')!.click());
     expect(posted('/api/retention').at(-1)).toEqual({ hideAfterDays: 7, deleteAfterDays: 30, confirmed: true });
     expect($('.settings-row[data-row="archived-W_done"]')).toBeNull();
-    expect(text(setting.closest('.settings-body')!.querySelector('[data-last-delete]'))).toContain('deleted 1 record.');
+    expect(text(setting.closest('[data-settings-body]')!.querySelector('[data-last-delete]'))).toContain(
+        'deleted 1 record.',
+    );
     expect(text($('[data-last-delete]'))).toContain('Kept W_done. It owns the slice W_slice, which is kept.');
 });
 
 test('sample mode keeps no work records, so Archive offers nothing', async () => {
     await openArchive(sample, {}, []);
-    expect(text($('.settings-body'))).toContain('Sample mode keeps no work records.');
-    expect($$('.settings-body button')).toHaveLength(0);
+    expect(text($('[data-settings-body]'))).toContain('Sample mode keeps no work records.');
+    expect($$('[data-settings-body] button')).toHaveLength(0);
 });

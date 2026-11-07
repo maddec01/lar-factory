@@ -92,7 +92,7 @@ async function openRepositories(board: BoardData): Promise<void> {
     await mountPage(board);
     await settle(() => $<HTMLButtonElement>('.open-settings')!.click());
     await settle(() =>
-        $$<HTMLButtonElement>('.settings-nav button')
+        $$<HTMLButtonElement>('[data-settings-nav] button')
             .find((b) => text(b) === 'Projects')!
             .click(),
     );
@@ -142,12 +142,12 @@ test('Projects opens a long page with a back link and no Edit dialog or publicat
     expect(text(dialog())).not.toContain('Legacy structural publication');
     expect(setting('role').querySelector<HTMLInputElement>('input')!.value).toBe('Backend API server');
     await settle(() =>
-        $$<HTMLButtonElement>('.settings-body button')
+        $$<HTMLButtonElement>('[data-settings-body] button')
             .find((button) => text(button) === '← Projects')!
             .click(),
     );
     expect(dialog()).toBeNull();
-    expect(text($('.settings-body'))).toContain('Settings stay on this machine.');
+    expect(text($('[data-settings-body]'))).toContain('Settings stay on this machine.');
 });
 
 test('text saves on blur and an error remains beside its field with the typed value', async () => {

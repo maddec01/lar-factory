@@ -3,7 +3,7 @@
 
 import { sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { RepoConfig, TicketCreationOptions, TicketOptions, VocabularyKey } from '@lar-factory/shared';
-import { Badge, Button, buttonKind, Popover } from '@lar-works/design-system';
+import { Button, buttonKind, HiddenField, LabelChip, LabelsValue, PanelField, Popover } from '@lar-works/design-system';
 import { ChevronDown } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -20,13 +20,11 @@ export function DraftLabels({
     kind,
     read,
     kept,
-    headingClass,
 }: {
     repo: RepoConfig;
     kind: string;
     read: Pick<TicketCreationOptions, 'labels' | 'labelColors'>;
     kept?: TicketOptions | undefined;
-    headingClass: string;
 }) {
     const { heading, noun, nameProblem, isManaged } = trackerCapabilities(repo.repo);
     const { setup } = repo;
@@ -62,19 +60,18 @@ export function DraftLabels({
     }));
 
     return (
-        <div ref={group} id="item-labels" role="group" aria-label={heading} className="grid gap-1.5">
-            <span className={headingClass}>{heading}</span>
+        <PanelField ref={group} id="item-labels" heading={heading}>
             {picked.map((name) => (
-                <input key={name} type="hidden" name={has(typed, name) ? 'newLabels' : 'labels'} value={name} />
+                <HiddenField key={name} name={has(typed, name) ? 'newLabels' : 'labels'} value={name} />
             ))}
-            <span className="flex flex-wrap items-center gap-1">
+            <LabelsValue>
                 {picked.map((name) => (
-                    <Badge key={name} data-label-chip className="max-w-full" labelColor={colorOf(read, name)}>
-                        <span className="max-w-52 truncate" title={name}>
-                            {name}
-                        </span>
-                        {has(typed, name) && <span className="opacity-70">new</span>}
-                    </Badge>
+                    <LabelChip
+                        key={name}
+                        label={name}
+                        color={colorOf(read, name)}
+                        note={has(typed, name) ? 'new' : undefined}
+                    />
                 ))}
                 <Popover>
                     <Popover.Trigger asChild>
@@ -107,7 +104,7 @@ export function DraftLabels({
                         />
                     </Popover.Content>
                 </Popover>
-            </span>
-        </div>
+            </LabelsValue>
+        </PanelField>
     );
 }

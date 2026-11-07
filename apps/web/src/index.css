@@ -1,12 +1,4 @@
-/* The board page's styles: the design system's board entry (@lar-works/design-system/board.css) brings Tailwind, the
-   tokens, the board's roles and base styles, and every component's styles. The feature folders that still style
-   themselves keep their sheets and their Tailwind sources here until they move into the design system. */
+/* The board page's styles, all from the design system: its board entry brings Tailwind, the tokens, the board's
+   roles and base styles, and every component's styles. The page styles nothing itself, so Tailwind scans none of its
+   files (`source(none)`): words in its code and tests would otherwise turn on utilities of the same name. */
 @import '@lar-works/design-system/board.css' source(none);
-@import './features/settings/settings.css';
-/* Tailwind scans only the files listed here, and the design system's components: the page's own class names would
-   otherwise turn on Tailwind utilities of the same name. */
-@source "./features/add-item";
-@source "./features/item-dialog";
-@source "./features/onboarding";
-@source "./features/repositories";
-@source "./features/settings";

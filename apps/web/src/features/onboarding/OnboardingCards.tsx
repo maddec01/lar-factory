@@ -2,7 +2,7 @@
 // the merge, and Resume, which reopens the onboarding dialog there.
 
 import { shownRepo } from '@lar-factory/shared';
-import { Badge, Button, buttonKind, NoticeCard } from '@lar-works/design-system';
+import { Badge, Button, buttonKind, NoticeCard, SetupCardList } from '@lar-works/design-system';
 
 import { stoppedAt, useWizardStore } from './WizardStore';
 import { ProjectIcon } from '@/features/repositories';
@@ -15,7 +15,7 @@ export function OnboardingCards() {
     if (!onboarding?.length) return null;
 
     return (
-        <div className="grid max-h-[35%] shrink-0 gap-2 overflow-y-auto">
+        <SetupCardList>
             {onboarding.map(({ repo, progress }) => {
                 const where = stoppedAt(progress);
 
@@ -36,6 +36,6 @@ export function OnboardingCards() {
                     </div>
                 );
             })}
-        </div>
+        </SetupCardList>
     );
 }

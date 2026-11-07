@@ -101,7 +101,7 @@ test('while the details load the dialog shows the board data and a loading state
     expect(body.querySelector('img'), 'an image is a link').toBeNull();
     expect(body.querySelector<HTMLAnchorElement>('a[href="https://example.com/sign-up-flow.png"]')).not.toBeNull();
 
-    expect($$('[data-comments] li').map((li) => text(li.querySelector('.font-medium')))).toEqual([
+    expect($$('[data-comments] li').map((li) => text(li.querySelector('[data-comment-author]')))).toEqual([
         'maddec01',
         'claude-bot',
         'reviewer-anne',
@@ -349,7 +349,7 @@ test('Azure native fields and extra description sections remain visible when rel
         ),
     );
     expect(meta()).toContain('Azure typeBugAzure stateCommitted');
-    expect(meta()).toContain('AssigneesAAna Silva');
+    expect(meta(), 'the assignee beside their initials').toContain('AssigneesASAna Silva');
     expect(text(description())).toContain('Reproduce the bug.Acceptance CriteriaFixed');
     expect(description()!.querySelector('strong')!.textContent).toBe('Fixed');
     expect(sidebar()).toContain('Could not load linked work items: Timed out');

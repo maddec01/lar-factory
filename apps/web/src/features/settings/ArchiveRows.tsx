@@ -1,6 +1,7 @@
 // Settings' Archive page: this Mac's retention, then the work in Archive.
 
 import { shownRepo } from '@lar-factory/shared';
+import { RepoIdentity } from '@lar-works/design-system';
 
 import { custom, type Group, type PagesInput, type Row, type SettingsData } from './SettingsModel';
 import { ArchiveActions, archivedAs, RetentionSetting } from '@/features/archive';
@@ -15,14 +16,13 @@ export function archiveGroups(data: SettingsData, archive: PagesInput['archive']
         id: `archived-${item.id}`,
         title: item.title || item.id,
         description: (
-            <span className="inline-flex min-w-0 items-center gap-2">
-                <SourceIcon item={item} />
-                <span className="min-w-0 wrap-anywhere">
-                    {[shownRepo(item.repo), item.number ? `#${item.number}` : 'No ticket', archivedAs(item)].join(
-                        ' · ',
-                    )}
-                </span>
-            </span>
+            <RepoIdentity
+                presentation="wrap"
+                icon={<SourceIcon item={item} />}
+                name={[shownRepo(item.repo), item.number ? `#${item.number}` : 'No ticket', archivedAs(item)].join(
+                    ' · ',
+                )}
+            />
         ),
         control: custom(() => <ArchiveActions item={item} />),
     }));

@@ -259,9 +259,6 @@ importers:
       '@lar-works/design-system':
         specifier: ^0.2.0
         version: 0.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(tailwindcss@4.3.3)
-      lucide-react:
-        specifier: ^1.70.0
-        version: 1.70.0(@types/react@19.3.0)(react@19.3.0)
       mermaid:
         specifier: ^12.2.0
         version: 12.2.0

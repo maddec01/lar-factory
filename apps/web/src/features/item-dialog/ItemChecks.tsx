@@ -1,4 +1,5 @@
 import type { ItemChecks } from '@lar-factory/shared';
+import { CheckRun, ChecksDisclosure, Text } from '@lar-works/design-system';
 import { useRef, useState } from 'react';
 
 /** One read per mounted section; collapsing and board refreshes keep its result. */
@@ -27,63 +28,57 @@ export function ItemChecksSection({ itemId }: { itemId: string }) {
     }
 
     return (
-        <details
-            data-checks
-            className="w-full min-w-0 text-sm"
-            onToggle={(event) => {
-                if (event.currentTarget.open) void read();
-            }}
-        >
-            <summary className="min-h-11 cursor-pointer py-3 font-medium">Checks</summary>
-            <div className="grid gap-3 pt-2">
-                {error ? (
-                    <p role="alert">Could not load checks: {error}</p>
-                ) : !record ? (
-                    <p role="status">Loading checks…</p>
-                ) : (
-                    <>
-                        {record.runs.length === 0 && <p>No checks are recorded.</p>}
-                        {record.runs.map((run) => (
-                            <section key={run.checkId} className="min-w-0 rounded border border-(--border) p-2">
-                                <code className="wrap-anywhere whitespace-pre-wrap">
-                                    {run.command.map((arg) => JSON.stringify(arg)).join(' ')}
-                                </code>
-                                <p>
-                                    {run.folder} · {run.outcome} · Run by {run.role}
-                                    {run.reason ? `: ${run.reason}` : ''}
-                                </p>
-                                {run.outcome === 'passed' && !run.eligible && (
-                                    <p>Ineligible as passing evidence: {run.snapshotState} snapshot.</p>
-                                )}
-                                {record.reuses
-                                    .filter((reuse) => reuse.checkId === run.checkId)
-                                    .map((reuse, index) => (
-                                        <p key={index}>
-                                            Reused by {reuse.role}: {reuse.reason}
-                                        </p>
-                                    ))}
-                                {run.failureState === 'open' && (
-                                    <div>
-                                        <p>Open failure</p>
-                                        {run.failure ? (
-                                            <>
-                                                <ul>
-                                                    {run.failure.tests.map((name) => (
-                                                        <li key={name}>{name}</li>
-                                                    ))}
-                                                </ul>
-                                                <p>{run.failure.diagnosis}</p>
-                                            </>
-                                        ) : (
-                                            <p>No failure names recorded.</p>
-                                        )}
-                                    </div>
-                                )}
-                            </section>
-                        ))}
-                    </>
-                )}
-            </div>
-        </details>
+        <ChecksDisclosure summary="Checks" onOpen={() => void read()} data-checks>
+            {error ? (
+                <Text variant="inherit" role="alert">
+                    Could not load checks: {error}
+                </Text>
+            ) : !record ? (
+                <Text variant="inherit" role="status">
+                    Loading checks…
+                </Text>
+            ) : (
+                <>
+                    {record.runs.length === 0 && <Text variant="inherit">No checks are recorded.</Text>}
+                    {record.runs.map((run) => (
+                        <CheckRun key={run.checkId} command={run.command.map((arg) => JSON.stringify(arg)).join(' ')}>
+                            <Text variant="inherit">
+                                {run.folder} · {run.outcome} · Run by {run.role}
+                                {run.reason ? `: ${run.reason}` : ''}
+                            </Text>
+                            {run.outcome === 'passed' && !run.eligible && (
+                                <Text variant="inherit">
+                                    Ineligible as passing evidence: {run.snapshotState} snapshot.
+                                </Text>
+                            )}
+                            {record.reuses
+                                .filter((reuse) => reuse.checkId === run.checkId)
+                                .map((reuse, index) => (
+                                    <Text variant="inherit" key={index}>
+                                        Reused by {reuse.role}: {reuse.reason}
+                                    </Text>
+                                ))}
+                            {run.failureState === 'open' && (
+                                <div>
+                                    <Text variant="inherit">Open failure</Text>
+                                    {run.failure ? (
+                                        <>
+                                            <ul>
+                                                {run.failure.tests.map((name) => (
+                                                    <li key={name}>{name}</li>
+                                                ))}
+                                            </ul>
+                                            <Text variant="inherit">{run.failure.diagnosis}</Text>
+                                        </>
+                                    ) : (
+                                        <Text variant="inherit">No failure names recorded.</Text>
+                                    )}
+                                </div>
+                            )}
+                        </CheckRun>
+                    ))}
+                </>
+            )}
+        </ChecksDisclosure>
     );
 }

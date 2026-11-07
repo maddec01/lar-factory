@@ -3,7 +3,7 @@
 // is picked, or an offered run until Next or a change, then keeps it to resume. Once Finish saves, it says so, with Go to the board.
 
 import { shownRepo } from '@lar-factory/shared';
-import { Button, buttonKind, Modal, Progress, Text } from '@lar-works/design-system';
+import { Button, buttonKind, Modal, Progress, SetupHeader, Text } from '@lar-works/design-system';
 import { ArrowRight, Check } from '@lar-works/design-system/icons';
 import { useEffect, useRef } from 'react';
 
@@ -128,19 +128,21 @@ function WizardModal({ run }: { run: Run }) {
                 aria-describedby={undefined}
                 focusFirstField={false}
             >
-                <div className="grid shrink-0 gap-2 px-5 pb-4 sm:px-6">
-                    <div className="flex min-w-0 items-center gap-2">
-                        {picked ? (
+                <SetupHeader
+                    icon={
+                        picked ? (
                             <ProjectChoiceIcon project={picked} size="row" />
                         ) : (
                             run.repo && <ProjectIcon repo={run.repo} size="row" />
-                        )}
+                        )
+                    }
+                    place={
                         <Text id="onboarding-place" tone="muted">
                             Set up {picked?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a Project'}.
                         </Text>
-                    </div>
-                    <Progress value={doneCount} max={steps.length} caption={done} aria-label={done} />
-                </div>
+                    }
+                    progress={<Progress value={doneCount} max={steps.length} caption={done} aria-label={done} />}
+                />
                 <Modal.Body>
                     <StepBody run={run} />
                 </Modal.Body>

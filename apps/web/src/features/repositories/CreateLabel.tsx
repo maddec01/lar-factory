@@ -1,5 +1,5 @@
 import type { TrackerCapabilities } from '@lar-factory/shared';
-import { Button, buttonKind, Input, InsetPanel } from '@lar-works/design-system';
+import { BoardNote, Button, buttonKind, CreateLabelForm, Input, InsetPanel } from '@lar-works/design-system';
 import { Plus } from '@lar-works/design-system/icons';
 import { useState, type FormEvent } from 'react';
 
@@ -40,7 +40,7 @@ export function CreateLabel({
         <>
             <InsetPanel presentation="settings">
                 <FieldRow label={`New ${noun}`}>
-                    <form className="flex max-w-full min-w-0 flex-wrap gap-2" onSubmit={(event) => void create(event)}>
+                    <CreateLabelForm onSubmit={(event) => void create(event)}>
                         <Input
                             data-new-label
                             aria-label={`New ${noun}`}
@@ -55,17 +55,16 @@ export function CreateLabel({
                         <Button
                             {...buttonKind('other')}
                             type="submit"
-                            className="shrink-0"
                             leftIcon={<Plus />}
                             disabled={!!cannotCreate || !!problem || !fresh.trim() || running !== null}
                             {...(cannotCreate && { title: cannotCreate })}
                         >
                             Create {noun}
                         </Button>
-                    </form>
+                    </CreateLabelForm>
                 </FieldRow>
             </InsetPanel>
-            {showUnavailable && <p className="text-base-700 m-0 text-xs">{createUnavailable}</p>}
+            {showUnavailable && <BoardNote>{createUnavailable}</BoardNote>}
             <ProblemText>{problem ?? failure}</ProblemText>
         </>
     );

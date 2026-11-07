@@ -4,7 +4,7 @@
 // call did.
 
 import type { UpdateChannel } from '@lar-factory/shared';
-import { Button, buttonKind, FormResult } from '@lar-works/design-system';
+import { BoardNote, Button, buttonKind, FormResult, SettingsNote } from '@lar-works/design-system';
 
 import { type SettingsResult, useSettingsStore } from './SettingsStore';
 import { InstallRecovery } from './TargetProgress';
@@ -53,17 +53,14 @@ function Result({ from }: { from: NonNullable<SettingsResult['from']> }) {
         stored.from === from ? stored : from === 'targets' && error ? { text: error, tone: 'error' } : { text: '' };
 
     return (
-        <FormResult id="settings-result" text={result.text} tone={result.tone}>
-            {result.paths && (
-                <ul>
-                    {result.paths.map((path) => (
-                        <li key={path}>
-                            <code>{path}</code>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </FormResult>
+        <FormResult
+            id="settings-result"
+            text={result.text}
+            tone={result.tone}
+            list={result.paths?.map((path) => (
+                <code key={path}>{path}</code>
+            ))}
+        />
     );
 }
 
@@ -83,22 +80,22 @@ export function TargetsNote() {
     );
 
     return (
-        <div className="targets-note grid gap-2 px-1" aria-busy={targets === null}>
+        <SettingsNote busy={targets === null}>
             {!installs && (
-                <p className="m-0 text-xs text-(--muted-foreground)">
+                <BoardNote>
                     This run of Lar Factory doesn't install skills, so you can't tick or untick a folder. Start it with
                     --install-skills to change them.
-                </p>
+                </BoardNote>
             )}
             {installs && !installed && (
-                <p className="m-0 text-xs text-(--muted-foreground)">
+                <BoardNote>
                     Lar Factory hasn't installed its skills yet, so you can't tick or untick a folder. It installs them
                     when it starts. If the install failed, use Retry to try again.
-                </p>
+                </BoardNote>
             )}
-            {targets === null && <p className="m-0 text-xs text-(--muted-foreground)">Loading…</p>}
+            {targets === null && <BoardNote>Loading…</BoardNote>}
             {targets !== null && installs && snapshot && (
-                <p role="status" className="m-0 text-xs text-(--muted-foreground)">
+                <BoardNote role="status">
                     {snapshot.discovery === 'waiting'
                         ? 'Waiting for T3 Code to list its provider instances. Fallback targets remain available.'
                         : snapshot.discovery !== 'available'
@@ -106,21 +103,21 @@ export function TargetsNote() {
                           : !snapshot.targets.some(({ instances }) => instances.length)
                             ? 'Discovery completed. No provider targets were reported. Manual and fallback targets remain available.'
                             : 'T3 Code listed its provider targets. Required targets stay ticked, including those read by disabled instances.'}
-                </p>
+                </BoardNote>
             )}
             <Result from="targets" />
             {targets !== null && (
                 <InstallRecovery failed={!!snapshot?.error} drift={!!snapshot?.drift.length && !driftInRows} />
             )}
-        </div>
+        </SettingsNote>
     );
 }
 
 export function UpdatesNote() {
     return (
-        <div className="px-1">
+        <SettingsNote>
             <Result from="updates" />
-        </div>
+        </SettingsNote>
     );
 }
 
@@ -175,7 +172,7 @@ export function UpdateAction() {
     const busy = installing || pending || resolveUpdateButtonAction(state) === 'none';
 
     return (
-        <Button {...buttonKind('other')} className="update-action" disabled={busy} onClick={() => void run()}>
+        <Button {...buttonKind('other')} data-update-action disabled={busy} onClick={() => void run()}>
             {installing ? 'Installing…' : pill === 'ready' ? 'Restart to update' : 'Download'}
         </Button>
     );

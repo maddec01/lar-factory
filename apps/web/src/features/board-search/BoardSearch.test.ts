@@ -467,9 +467,9 @@ const returnFocus = () => settle(() => vi.advanceTimersByTime(0));
 test.each([
     ['Add item', '', '[data-pane]'],
     ['List', '', '[data-list-modal]'],
-    ['Settings', '', '.settings-nav'],
+    ['Settings', '', '[data-settings-nav]'],
     ['Add item from a ticket', 'ticket', '[data-pane]'],
-    ['Archive', 'archive', '.settings-nav'],
+    ['Archive', 'archive', '[data-settings-nav]'],
 ] as const)(
     'choosing %s closes the dialog, opens its own, and returns the focus to the field when that closes',
     async (name, query, opened) => {
@@ -521,13 +521,13 @@ test('choosing a Settings section or a single setting opens Settings on the sect
     await type('diagnostics');
     await choose('Diagnostics');
     expect(settings()).toMatchObject({ open: true, section: 'diagnostics' });
-    expect(text($('.settings-body'))).toContain('Board server');
+    expect(text($('[data-settings-body]'))).toContain('Board server');
     await settle(() => settings().setOpen(false));
     await openDialog();
     await type('full refresh');
     await choose('Full refresh');
     expect(settings()).toMatchObject({ open: true, section: 'general' });
-    expect(text($('.settings-body'))).toContain('Full refresh');
+    expect(text($('[data-settings-body]'))).toContain('Full refresh');
 });
 
 const UPDATE = { ...updatesOff, enabled: true, status: 'available', availableVersion: '9.9.9', message: null } as const;

@@ -1,6 +1,6 @@
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
-import { Badge, Button, buttonKind } from '@lar-works/design-system';
-import { Lock, Pencil, Trash2 } from '@lar-works/design-system/icons';
+import { Button, buttonKind, TrackerLabelChip, TrackerLabelRow } from '@lar-works/design-system';
+import { Pencil, Trash2 } from '@lar-works/design-system/icons';
 
 import { useEditStore, type LabelChange } from './EditStore';
 import { LabelEditor } from './LabelEditor';
@@ -34,30 +34,23 @@ export function LabelRow({
     const disabled = !!readOnly || running !== null;
 
     return (
-        <li data-label={label.name} className="border-b last:border-b-0">
-            <div className="flex min-w-0 items-center gap-3 px-3 py-1.5">
-                <span className="max-w-[45%] min-w-0">
-                    <Badge
-                        data-label-chip
-                        className="max-w-full min-w-0"
-                        labelColor={capabilities.color && label.color ? `#${label.color}` : undefined}
-                    >
-                        <span className="inline-flex min-w-0 items-center gap-1">
-                            {locked && <Lock className="size-3 shrink-0" aria-label="Factory-managed" />}
-                            <span className="truncate" title={label.name}>
-                                {label.name}
-                            </span>
-                        </span>
-                    </Badge>
-                </span>
-                <span className="text-base-700 min-w-0 flex-1 truncate text-xs" title={detail}>
-                    {detail}
-                </span>
-                {!locked && (
-                    <span className="flex shrink-0 gap-1">
+        <TrackerLabelRow
+            data-label={label.name}
+            chip={
+                <TrackerLabelChip
+                    name={label.name}
+                    color={capabilities.color && label.color ? `#${label.color}` : undefined}
+                    locked={locked}
+                    lockedLabel="Factory-managed"
+                />
+            }
+            detail={detail}
+            actions={
+                !locked && (
+                    <>
                         <Button
                             {...buttonKind('control')}
-                            data-icon-only=""
+                            iconOnly
                             aria-label={`Edit ${label.name}`}
                             title={readOnly ?? `Edit ${label.name}`}
                             disabled={disabled}
@@ -66,25 +59,27 @@ export function LabelRow({
                         />
                         <Button
                             {...buttonKind('control')}
-                            data-icon-only=""
+                            iconOnly
                             aria-label={`Delete ${label.name}`}
                             title={readOnly ?? `Delete ${label.name}`}
                             disabled={disabled}
                             leftIcon={<Trash2 />}
                             onClick={onDelete}
                         />
-                    </span>
-                )}
-            </div>
-            {editing && (
-                <LabelEditor
-                    label={label}
-                    capabilities={capabilities}
-                    mappings={mappings}
-                    onSave={onSave}
-                    onDone={() => onEdit(false)}
-                />
-            )}
-        </li>
+                    </>
+                )
+            }
+            editor={
+                editing && (
+                    <LabelEditor
+                        label={label}
+                        capabilities={capabilities}
+                        mappings={mappings}
+                        onSave={onSave}
+                        onDone={() => onEdit(false)}
+                    />
+                )
+            }
+        />
     );
 }

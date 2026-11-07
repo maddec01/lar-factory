@@ -21,13 +21,13 @@ the flow and `docs/plan.md` for how it was set up.
   `app/` is the composition root (providers, the shell with the title bar and loading screen), `features/<feature>/`
   holds one user-facing area with an `index.ts` public API, `services/<domain>/` the board's data and server calls
   (`<domain>.service.ts`, `<domain>.hooks.ts`, never UI), `shared/` cross-cutting foundations and `test/` the test
-  support. `apps/web` composes the design system's components and styles nothing itself (`lar/no-visual-recipes`;
-  the feature folders that still hold class names are moving into the design system), and `src/index.css` imports
-  `@lar-works/design-system/board.css`. Components are PascalCase (`ItemDialog.tsx`), hooks `useX.ts`; imports across those folders use the `@/`
+  support. `apps/web` composes the design system's components and styles nothing itself: no class names, inline
+  styles, raw headings, paragraphs, buttons, inputs or svgs, look props or sheets of its own (`lar/no-visual-recipes`),
+  and `src/index.css` only imports `@lar-works/design-system/board.css`. Components are PascalCase (`ItemDialog.tsx`), hooks `useX.ts`; imports across those folders use the `@/`
   alias, with no file extensions. `lar/boundaries` and `max-lines` (in `@lar-works/config`) enforce it.
 - Components, tokens and styles come from `@lar-works/design-system` (lar-web); import icons from
-  `@lar-works/design-system/icons`, never from `lucide-react` (only `DynamicIcon`, which it doesn't re-export, comes
-  from `lucide-react/dynamic`). A look the board needs and the design system lacks is added there, in lar-web, as a
+  `@lar-works/design-system/icons` (lucide's `DynamicIcon`, which draws an icon by name, from
+  `@lar-works/design-system/icons/dynamic`), never from `lucide-react`. A look the board needs and the design system lacks is added there, in lar-web, as a
   generic component or, for the board's own compositions, in its `board/` category.
 - Repository settings live only in the local app data folder. The factory never
   reads, writes, detects or offers repository configuration or guidance files.

@@ -101,15 +101,15 @@ function stubBridge(setResult: InstallOperationResult = { snapshot: listed }) {
 const LATER_READ = '2026-11-01T00:00:00.000Z';
 const settingsButton = () => $<HTMLButtonElement>('.open-settings');
 const modal = () => $('[data-slot="modal-content"]');
-const sections = () => $$<HTMLButtonElement>('.settings-nav button');
+const sections = () => $$<HTMLButtonElement>('[data-settings-nav] button');
 const section = (label: string) => sections().find((b) => text(b) === label)!;
 const close = () => modal()!.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
-const body = () => $('.settings-body')!;
+const body = () => $('[data-settings-body]')!;
 const row = (id: string) => $(`.settings-row[data-row="${id}"]`)!;
-const switches = () => $$<HTMLButtonElement>('.settings-body [role="switch"]');
+const switches = () => $$<HTMLButtonElement>('[data-settings-body] [role="switch"]');
 const ticked = (box: Element) => box.getAttribute('aria-checked') === 'true';
 const result = () => $('#settings-result')!;
-const search = () => $<HTMLInputElement>('.settings-nav input[aria-label="Search settings"]')!;
+const search = () => $<HTMLInputElement>('[data-settings-nav] input[aria-label="Search settings"]')!;
 
 async function type(input: HTMLInputElement, value: string): Promise<void> {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
@@ -130,7 +130,7 @@ test('Settings opens from the title bar, in a browser too, as a modal over the b
     await settle(() => settingsButton()!.click());
     expect(modal()!.getAttribute('role')).toBe('dialog');
     expect(
-        $$('.settings-nav [role="group"]').map((g) => [
+        $$('[data-settings-nav] [role="group"]').map((g) => [
             g.getAttribute('aria-label'),
             [...g.querySelectorAll('button')].map(text),
         ]),
@@ -142,7 +142,13 @@ test('Settings opens from the title bar, in a browser too, as a modal over the b
     expect(section('General').getAttribute('aria-current')).toBe('page');
     expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
     expect(text(modal())).not.toContain('Board preferences.');
-    expect($$('.settings-group h3').map(text)).toEqual(['Dialogs', 'Threads', 'Commands', 'Auto-build', 'Refresh']);
+    expect($$('[data-settings-group] h3').map(text)).toEqual([
+        'Dialogs',
+        'Threads',
+        'Commands',
+        'Auto-build',
+        'Refresh',
+    ]);
     expect($('.title-bar')!.closest('[hidden]'), 'the board stays under it').toBeNull();
     expect($('.desk')).not.toBeNull();
 });
@@ -162,7 +168,7 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
     await type(search(), 'skill folders');
     expect(sections().map(text)).toEqual(['Skills']);
     expect(
-        $$('.settings-nav [role="group"]').map((g) => g.getAttribute('aria-label')),
+        $$('[data-settings-nav] [role="group"]').map((g) => g.getAttribute('aria-label')),
         'a group with no match goes',
     ).toEqual(['Connections']);
     await type(search(), '');
@@ -188,10 +194,10 @@ test('a search that matches nothing says so in the section list and keeps the op
     await open('General');
     await type(search(), 'zzz');
     expect(sections()).toHaveLength(0);
-    expect(text($('.settings-nav [role="status"]')), 'screen readers announce it').toBe('No settings match.');
+    expect(text($('[data-settings-nav] [role="status"]')), 'screen readers announce it').toBe('No settings match.');
     expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
     await type(search(), '');
-    expect($('.settings-nav .no-match')).toBeNull();
+    expect($('[data-settings-nav] [data-no-match]')).toBeNull();
 });
 
 test('Close returns to the board as it was, and Settings opens again on the same section', async () => {
@@ -205,7 +211,7 @@ test('Close returns to the board as it was, and Settings opens again on the same
     await settle(() => close().click());
     await settle(() => vi.advanceTimersByTime(50));
     expect(modal()).toBeNull();
-    expect($('.settings-body')).toBeNull();
+    expect($('[data-settings-body]')).toBeNull();
     expect($('[data-search-field]')!.getAttribute('aria-label')).toBe('Search, filtered by lar-apple');
     await settle(() => settingsButton()!.click());
     expect(section('Diagnostics').getAttribute('aria-current')).toBe('page');
@@ -238,7 +244,7 @@ test('settings only show working controls', async () => {
 
 /** Each Settings group's title with its rows' ids. */
 const groups = () =>
-    $$('.settings-group').map((g) => [
+    $$('[data-settings-group]').map((g) => [
         text(g.querySelector('h3')),
         [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row')),
     ]);
@@ -290,7 +296,7 @@ test('onboarded and onboarding repository rows show the project icon or toned in
     expect(text(icon(`repo-${sample.repos[1]!.repo}`))).toBe('L');
     expect(text(icon('repo-maddec01/lar-web'))).toBe('L');
     await settle(() => section('Integrations').click());
-    expect($('.settings-body [data-project-icon]')).toBeNull();
+    expect($('[data-settings-body] [data-project-icon]')).toBeNull();
 });
 
 test('a Project with a setup offers its page, an unread one has none, and Add Project opens onboarding over Settings', async () => {
@@ -298,12 +304,12 @@ test('a Project with a setup offers its page, an unread one has none, and Add Pr
 
     serve(board, [project('lar-web')]);
     await open('Projects', board);
-    expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
+    expect($$<HTMLButtonElement>('[data-settings-body] button').map((b) => [text(b), b.disabled])).toEqual([
         ['Open Project', false],
         ['Add Project', false],
     ]);
 
-    const add = $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === 'Add Project')!;
+    const add = $$<HTMLButtonElement>('[data-settings-body] button').find((b) => text(b) === 'Add Project')!;
 
     // A click focuses the button it presses.
     add.focus();
@@ -533,7 +539,7 @@ test('a browser explains app-only features without fictional targets or update v
     await settle(() => section('Updates').click());
     expect(text(body())).toContain('Only the board app updates itself.');
     expect(text(body())).not.toMatch(/Nightly|0\.1\.0|3 minutes ago/);
-    expect($$('.settings-body button')).toHaveLength(0);
+    expect($$('[data-settings-body] button')).toHaveLength(0);
 });
 
 test('Skills credits each bundled skill and checklist, with a link to its source, in a browser too', async () => {
@@ -554,7 +560,7 @@ test('Skills credits each bundled skill and checklist, with a link to its source
             },
         ],
     });
-    expect($$('.settings-group h3').map(text)).toContain('Bundled skills');
+    expect($$('[data-settings-group] h3').map(text)).toContain('Bundled skills');
 
     const rows = ['bundled-lar-work', 'bundled-references/security-checklist.md'].map(row);
 
@@ -640,7 +646,7 @@ test("a blocked skill's row says which paths block it, where each leaves it miss
             "/home/.claude/skills/grill (the skill isn't linked into ~/.claude; unticking the profile also clears it), " +
             "/home/.gemini/config/skills/grill (the skill isn't installed for Antigravity). Move each path away to install this skill.",
     );
-    expect(states('grill')[0]?.[1]).toBe(text(row('bundled-grill').querySelector('.block')));
+    expect(states('grill')[0]?.[1]).toBe(text(row('bundled-grill').querySelector('[data-blocked-reason]')));
     expect(text(row('bundled-tdd').querySelector('.text-xs'))).toBe('Matt Pocock · MIT · updated 19 Oct');
 });
 
@@ -718,7 +724,7 @@ test('Skills has no Skill sync group', async () => {
 test("Skills says so in one row when it couldn't read the bundled skills", async () => {
     await open('Skills', { ...sample, bundledSkills: [] });
 
-    const group = $$('.settings-group').find((g) => text(g.querySelector('h3')) === 'Bundled skills')!;
+    const group = $$('[data-settings-group]').find((g) => text(g.querySelector('h3')) === 'Bundled skills')!;
 
     expect(
         [...group.querySelectorAll<HTMLElement>('.settings-row')].map((r) => [
@@ -1033,11 +1039,11 @@ describe('updates', () => {
         return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
     }
 
-    const select = () => $('.settings-body [role="combobox"]')!;
+    const select = () => $('[data-settings-body] [role="combobox"]')!;
     const checked = () => text(select()).toLowerCase();
     const pick = (channel: UpdateChannel) => chooseOption(select(), channel === 'latest' ? 'Latest' : 'Nightly');
     const status = () => $('#update-status')!.textContent;
-    const checkNow = () => $<HTMLButtonElement>('.settings-body [data-check-now]')!;
+    const checkNow = () => $<HTMLButtonElement>('[data-settings-body] [data-check-now]')!;
 
     test('shows the channel the app is on, nightly and latest to choose from, and the version', async () => {
         stubChannel();
@@ -1149,7 +1155,7 @@ describe('updates', () => {
     describe("shows the update pill's state", () => {
         const next = '0.2.0-nightly.20261024.42';
         const available: UpdateState = { ...nightly, status: 'available', availableVersion: next };
-        const action = () => $<HTMLButtonElement>('.settings-body .update-action');
+        const action = () => $<HTMLButtonElement>('[data-settings-body] [data-update-action]');
         const pill = () => $('.title-bar .update-button')!;
 
         test('an available update says so, and Download downloads it', async () => {
@@ -1157,7 +1163,7 @@ describe('updates', () => {
 
             await open('Updates');
             expect([status(), text(pill())]).toEqual([`${next} is available.`, 'Update available']);
-            expect($('.settings-body [data-check-now]')).toBeNull();
+            expect($('[data-settings-body] [data-check-now]')).toBeNull();
             await settle(() => action()!.click());
             expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
         });
@@ -1290,9 +1296,10 @@ test('Skills shows live work and recovery without counting blocked skills as ins
     expect(text(row('target-~/.agents/skills'))).toContain('Release 0.1.0');
     expect(text(row('target-~/.agents/skills'))).toContain('lar-shape: Installing');
 
-    const progress = row('target-~/.agents/skills').querySelector('progress')!;
+    const progress = row('target-~/.agents/skills').querySelector('[role="progressbar"]')!;
 
-    expect([progress.value, progress.max]).toEqual([1, 2]);
+    expect([progress.getAttribute('aria-valuenow'), progress.getAttribute('aria-valuemax')]).toEqual(['1', '2']);
+    expect(progress.getAttribute('aria-label')).toBe('Skills installed in ~/.agents/skills');
     await bridge.push({
         ...listed,
         targets: [
@@ -1310,10 +1317,12 @@ test('Skills shows live work and recovery without counting blocked skills as ins
     });
     expect(text(row('target-~/.agents/skills'))).toContain('Permission denied');
     expect(text(row('target-~/.agents/skills'))).toContain('Restored skills: lar-build');
-    expect(row('target-~/.agents/skills').querySelector('progress')!.value).toBe(1);
+    expect(row('target-~/.agents/skills').querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe(
+        '1',
+    );
     expect(row('target-~/.agents/skills').querySelector('button[data-retry-install]')).not.toBeNull();
     await bridge.push({ ...listed, targets: [{ ...work, operation: 'check', running: true }] });
-    expect(row('target-~/.agents/skills').querySelector('progress')).toBeNull();
+    expect(row('target-~/.agents/skills').querySelector('[role="progressbar"]')).toBeNull();
     expect(text(row('target-~/.agents/skills'))).toContain('Checking');
 });
 
@@ -1430,7 +1439,7 @@ test('a failed first install can retry globally in Settings after dismissal with
 
     await open();
 
-    const retry = () => $<HTMLButtonElement>('.settings-body [data-retry-install]')!;
+    const retry = () => $<HTMLButtonElement>('[data-settings-body] [data-retry-install]')!;
 
     expect(retry()).not.toBeNull();
     expect(retry().getAttribute('aria-label')).toContain('all active targets');
@@ -1676,7 +1685,7 @@ test('a push with the same repositories renders nothing in the Projects section,
     const data: BoardData = { ...sample, projectIcons: { [sample.repos[0]!.repo]: { kind: 'emoji', emoji: '🚀' } } };
     const { onRender, push } = await renderCounted('projects', data);
 
-    expect($$('.settings-body [data-project-icon]').map(text).slice(0, 2)).toEqual(['🚀', 'L']);
+    expect($$('[data-settings-body] [data-project-icon]').map(text).slice(0, 2)).toEqual(['🚀', 'L']);
     await push({ ...data, items: sample.items.slice(1), fetchedAt: LATER_READ });
     expect(onRender).not.toHaveBeenCalled();
 });

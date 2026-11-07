@@ -2,7 +2,7 @@
 // gives here; a number is a whole number from 1, saved with its own button or Enter.
 
 import type { HeavyCommandLimit, HeavyCommandLimitState } from '@lar-factory/shared';
-import { Button, buttonKind, Input } from '@lar-works/design-system';
+import { BoardNote, Button, buttonKind, Inline, Input, Stack } from '@lar-works/design-system';
 import { useId, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -76,7 +76,7 @@ export function LimitSetting({
     ];
 
     return (
-        <div className="grid gap-2" data-limit={name}>
+        <Stack space="related" data-limit={name}>
             <Choice
                 label={label}
                 options={options}
@@ -94,9 +94,9 @@ export function LimitSetting({
                 }}
             />
             {shown === 'number' && (
-                <form className="flex items-center gap-2" onSubmit={submit}>
+                <Inline as="form" space="related" align="center" onSubmit={submit}>
                     <Input
-                        className="w-20"
+                        presentation="count"
                         inputMode="numeric"
                         aria-label={field}
                         value={text}
@@ -110,28 +110,28 @@ export function LimitSetting({
                         type="submit"
                         disabled={number === null}
                         aria-disabled={held || undefined}
-                        className="aria-disabled:opacity-64"
+                        pendingLook="disabled"
                         data-save-limit={name}
                     >
                         Save
                     </Button>
-                </form>
+                </Inline>
             )}
             {shown === 'number' && invalid && (
-                <p id={hint} className="m-0 text-xs text-(--error-foreground)">
+                <BoardNote id={hint} tone="error">
                     Enter a whole number from 1.
-                </p>
+                </BoardNote>
             )}
             {state?.problem && (
-                <p className="m-0 text-xs text-(--error-foreground)" role="alert">
+                <BoardNote tone="error" role="alert">
                     {state.problem} The board uses Automatic until you save a choice.
-                </p>
+                </BoardNote>
             )}
             {error && (
-                <p className="m-0 text-xs text-(--error-foreground)" role="alert">
+                <BoardNote tone="error" role="alert">
                     {error}
-                </p>
+                </BoardNote>
             )}
-        </div>
+        </Stack>
     );
 }

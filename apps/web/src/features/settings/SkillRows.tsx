@@ -2,7 +2,7 @@
 
 import { blockedBy, clock, day, type BundledSkill, type TargetSnapshot } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
-import { ExternalLink } from '@lar-works/design-system/icons';
+import { BoardNote, CodeText, Inline, InlineLink, SourceLink, Text } from '@lar-works/design-system';
 import type { ComponentProps } from 'react';
 
 import { TargetSwitch, TargetsNote } from './AppRows';
@@ -42,7 +42,7 @@ export function targetGroup({ app, targets }: PagesInput): Group {
         return {
             title: 'Skill folders',
             rows: [],
-            note: <p className="m-0 text-xs text-(--muted-foreground)">{ONLY_APP_TARGETS}</p>,
+            note: <BoardNote>{ONLY_APP_TARGETS}</BoardNote>,
         };
 
     return {
@@ -109,16 +109,16 @@ function BlockedReason({ status }: { status: BundledSkill['status'] }) {
     if (status?.state !== 'blocked') return null;
 
     const [opening, ...rest] = blockedBy(status.paths, (path) => (
-        <code key={path} className="break-all">
+        <CodeText key={path} wrap="anywhere">
             {path}
-        </code>
+        </CodeText>
     ));
 
     return (
-        <span className="block text-(--destructive-foreground)">
+        <BoardNote tone="error" data-blocked-reason>
             {capitalise(opening)}
             {rest}. {moveAway(status.paths)}
-        </span>
+        </BoardNote>
     );
 }
 
@@ -133,12 +133,18 @@ export function bundledGroup({ data, version }: PagesInput): Group {
         skill.date ? (
             <>
                 {' '}
-                · <span className="whitespace-nowrap">updated {day(skill.date, 'UTC')}</span>
+                ·{' '}
+                <Text as="span" variant="inherit" nowrap>
+                    updated {day(skill.date, 'UTC')}
+                </Text>
             </>
         ) : skill.author === 'Lar' && version ? (
             <>
                 {' '}
-                · <span className="whitespace-nowrap">updated in Lar Factory {version}</span>
+                ·{' '}
+                <Text as="span" variant="inherit" nowrap>
+                    updated in Lar Factory {version}
+                </Text>
             </>
         ) : null;
     const rows: Row[] = skills.length
@@ -150,29 +156,25 @@ export function bundledGroup({ data, version }: PagesInput): Group {
                       {skill.author} · {skill.licence}
                       {updated(skill)}
                       {skill.includedAuthors?.length ? (
-                          <span className="block">
+                          <BoardNote>
                               Includes work by {skill.includedAuthors.join(', ')}.{' '}
-                              <a href={skill.notices} target="_blank" rel="noopener" className="underline">
-                                  THIRD_PARTY_NOTICES.md
-                              </a>
-                          </span>
+                              {skill.notices ? (
+                                  <InlineLink href={skill.notices}>THIRD_PARTY_NOTICES.md</InlineLink>
+                              ) : (
+                                  'THIRD_PARTY_NOTICES.md'
+                              )}
+                          </BoardNote>
                       ) : null}
                       <BlockedReason status={skill.status} />
                   </>
               ),
               control: custom(() => (
-                  <span className="flex items-center gap-2">
+                  <Inline as="span" space="related" align="center">
                       <InstallState status={skill.status} />
-                      <a
-                          className="inline-flex items-center gap-1 text-xs font-medium text-(--foreground) underline-offset-2 hover:underline [&_svg]:size-3.5"
-                          aria-label={`${skill.name} source`}
-                          href={skill.source}
-                          target="_blank"
-                          rel="noopener"
-                      >
-                          <ExternalLink /> Source
-                      </a>
-                  </span>
+                      <SourceLink label={`${skill.name} source`} href={skill.source}>
+                          Source
+                      </SourceLink>
+                  </Inline>
               )),
           }))
         : [

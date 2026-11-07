@@ -1,15 +1,22 @@
 // Add item captures a draft locally or creates its tracker ticket, and can find existing tickets.
 
 import { repoName } from '@lar-factory/shared';
-import { Button, buttonKind, Modal } from '@lar-works/design-system';
-import { SquarePen } from '@lar-works/design-system/icons';
+import {
+    AddItemButton,
+    BoardNote,
+    Button,
+    buttonKind,
+    Modal,
+    PanelField,
+    TicketSearchPane,
+    ViewToggle,
+} from '@lar-works/design-system';
 import { useEffect, useState } from 'react';
 
 import { AddItemForm } from './AddItemForm';
 import { useAddItemStore } from './AddItemStore';
 import type { AddItemPane } from './AddItemStore';
-import { PanelSection } from './IssueFields';
-import { HINT, RepoSelect } from './RepoSelect';
+import { RepoSelect } from './RepoSelect';
 import { TicketPicker } from './TicketPicker';
 import { useBoardStore } from '@/services/board/board.hooks';
 import { ExpandButton, useExpand } from '@/shared/dialogs/ExpandDialog';
@@ -25,14 +32,11 @@ function PickTicketPane() {
 
     return (
         <>
-            <div
-                className="border-base-300 grid min-h-0 content-start gap-4 overflow-y-auto border-t px-5 pt-4 pb-5 sm:px-6"
-                id="pick-ticket"
-            >
-                <p className={HINT}>Find tickets outside your list, or open one you’ve already added.</p>
-                <PanelSection heading="Project" htmlFor="pick-repo">
+            <TicketSearchPane id="pick-ticket">
+                <BoardNote>Find tickets outside your list, or open one you’ve already added.</BoardNote>
+                <PanelField heading="Project" htmlFor="pick-repo">
                     <RepoSelect id="pick-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
-                </PanelSection>
+                </PanelField>
                 <TicketPicker
                     id="pick"
                     repo={selected?.repo ?? ''}
@@ -40,8 +44,8 @@ function PickTicketPane() {
                     key={selected?.repo}
                     onPick={(ticket) => pick(selected!.repo, ticket)}
                 />
-                {data.capture?.enabled === false && <p className={HINT}>Picking tickets is disabled in sample mode.</p>}
-            </div>
+                {data.capture?.enabled === false && <BoardNote>Picking tickets is disabled in sample mode.</BoardNote>}
+            </TicketSearchPane>
             <Modal.Footer>
                 <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
                     Cancel
@@ -54,25 +58,14 @@ function PickTicketPane() {
 /** New work or Find a ticket, as two buttons, the shown pane's pressed. */
 function PaneSwitch() {
     const { pane, setPane } = useAddItemStore();
-    const choice = (to: AddItemPane, label: string) => (
-        <button
-            type="button"
-            data-pane={to}
-            aria-pressed={pane === to}
-            onClick={() => setPane(to)}
-            className={`focus-visible:ring-primary h-7 rounded-md px-2.5 text-xs font-medium outline-none focus-visible:ring-2 ${pane === to ? 'bg-base-100 text-base-content shadow-sm' : 'hover:text-base-content text-(--muted-foreground)'}`}
-        >
-            {label}
-        </button>
-    );
 
-    return (
-        <div role="group" aria-label="Add" className="bg-base-200 flex gap-0.5 rounded-lg p-0.5">
-            {choice('new', 'New work')}
-            {choice('pick', 'Find a ticket')}
-        </div>
-    );
+    return <ViewToggle presentation="text" label="Add" value={pane} onChange={setPane} options={PANES} />;
 }
+
+const PANES = [
+    { value: 'new', label: 'New work', attributes: { 'data-pane': 'new' } },
+    { value: 'pick', label: 'Find a ticket', attributes: { 'data-pane': 'pick' } },
+] as const satisfies readonly { value: AddItemPane; label: string; attributes: { 'data-pane': string } }[];
 
 /** What the shown pane does, in the repository the form has picked: the kept draft's, else the first. */
 function useDescription(): string {
@@ -83,9 +76,6 @@ function useDescription(): string {
 
     return pane === 'pick' ? `Find an open ticket${where}.` : `Record work${where} and add it to List.`;
 }
-
-/** Find a ticket's pane is short, so the dialog keeps its width but takes the pane's height; a long result list scrolls inside it. */
-const FITS_CONTENT = { height: 'auto' };
 
 /** The open dialog; each opening starts at the normal size. */
 function AddItemDialog() {
@@ -103,7 +93,9 @@ function AddItemDialog() {
                 aria-describedby="add-item-description"
                 presentation="paned"
                 expanded={expanded}
-                style={!expanded && pane === 'pick' ? FITS_CONTENT : undefined}
+                // Find a ticket's pane is short, so the dialog keeps its width but takes the pane's height; a long result
+                // list scrolls inside it.
+                fitsContent={pane === 'pick'}
                 headerActions={
                     <>
                         <PaneSwitch />
@@ -139,16 +131,7 @@ export function AddItem() {
 
     return (
         <>
-            <Button
-                {...buttonKind('main')}
-                className="add-item px-2"
-                leftIcon={<SquarePen />}
-                title="Add item (⌘N)"
-                aria-keyshortcuts="Meta+N"
-                onClick={() => setOpen(true)}
-            >
-                <span className="@max-[70rem]:sr-only">Add item</span>
-            </Button>
+            <AddItemButton label="Add item" title="Add item (⌘N)" keyShortcuts="Meta+N" onOpen={() => setOpen(true)} />
             {open && <AddItemDialog />}
         </>
     );

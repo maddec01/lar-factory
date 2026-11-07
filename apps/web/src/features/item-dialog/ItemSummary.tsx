@@ -3,6 +3,13 @@
 
 import { blockedText, itemName, openBlockers, repoKey, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+import {
+    ItemSummary as Summary,
+    SummaryAge,
+    SummaryBlocked,
+    SummaryParent,
+    SummaryStatus,
+} from '@lar-works/design-system';
 
 import { AttachTicket } from './AttachTicket';
 import { CreateTicket } from './CreateTicket';
@@ -12,41 +19,39 @@ export function ItemSummary({ item, data, now }: { item: Item; data: BoardData; 
     const shown = useShownStatus(item);
 
     return (
-        <div
-            className="border-base-300 text-base-700 @container grid shrink-0 gap-1 border-b px-5 pb-3 text-xs sm:px-6"
+        <Summary
             data-item-summary
-        >
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <SourceIcon item={item} />
-                <RepoTag repo={repoKey(item)} repos={data.repos} />
-                <ItemStatusGlyph item={item} /> <span className="text-base-content font-medium">{shown.word}</span>
-                <span className="min-w-0 truncate @max-[30rem]:hidden">· updated {shortAgo(item.updatedAt, now)}</span>
-                {openBlockers(item).length > 0 && (
-                    <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">
-                        {blockedText(item)}
-                    </span>
-                )}
-            </div>
-            {item.parent && (
-                <p className="m-0 min-w-0 wrap-anywhere" data-item-parent>
-                    Part of{' '}
-                    {item.parent.url ? (
-                        <a href={item.parent.url} target="_blank" rel="noopener" className="underline">
-                            {itemName(item.parent)}
-                        </a>
-                    ) : (
-                        itemName(item.parent)
-                    )}
-                </p>
-            )}
-            <div className="flex flex-wrap items-center gap-2">
-                <ItemKind item={item} />
-                <StructureSync item={item} />
-            </div>
-            <div className="flex flex-wrap items-start gap-2">
-                <AttachTicket item={item} />
-                <CreateTicket item={item} />
-            </div>
-        </div>
+            line={
+                <>
+                    <SourceIcon item={item} />
+                    <RepoTag repo={repoKey(item)} repos={data.repos} />
+                    <ItemStatusGlyph item={item} /> <SummaryStatus>{shown.word}</SummaryStatus>
+                    <SummaryAge>· updated {shortAgo(item.updatedAt, now)}</SummaryAge>
+                    {openBlockers(item).length > 0 && <SummaryBlocked>{blockedText(item)}</SummaryBlocked>}
+                </>
+            }
+            parent={
+                item.parent && (
+                    <SummaryParent
+                        data-item-parent
+                        prefix="Part of"
+                        name={itemName(item.parent)}
+                        href={item.parent.url}
+                    />
+                )
+            }
+            kind={
+                <>
+                    <ItemKind item={item} />
+                    <StructureSync item={item} />
+                </>
+            }
+            actions={
+                <>
+                    <AttachTicket item={item} />
+                    <CreateTicket item={item} />
+                </>
+            }
+        />
     );
 }

@@ -23,9 +23,15 @@ test('the Azure board combines backlog and sprint once, keeping sprint completio
     const source = azureBoard([REPO], 'Fabrikam Team', az.run);
     const read = await source.read();
 
-    assert.deepEqual(read.items.map((i) => i.number).sort(), [1, 2, 3, 6]);
+    assert.deepEqual(
+        read.items.map((i) => i.number).sort((a, b) => a - b),
+        [1, 2, 3, 6],
+    );
     assert.equal(read.items.find((i) => i.number === 3)?.status, 'Done');
-    assert.deepEqual((await source.readSome!(read.items)).map((i) => i.number).sort(), [1, 2, 3, 6]);
+    assert.deepEqual(
+        (await source.readSome!(read.items)).map((i) => i.number).sort((a, b) => a - b),
+        [1, 2, 3, 6],
+    );
 });
 
 test('the Azure board still reads the backlog when no sprint is current', async () => {

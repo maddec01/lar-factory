@@ -47,8 +47,10 @@ const element = (props: Partial<SearchDialogProps>) => {
         onClose: () => undefined,
         ...props,
         options,
+        // oxlint-disable-next-line react/no-children-prop -- required by the props type, which createElement's third argument can't fill
         children: createElement(SearchDialogGroup, {
             label: 'Actions',
+            // oxlint-disable-next-line react/no-children-prop -- required by the props type, which createElement's third argument can't fill
             children: options.map((value) => createElement(Option, { key: value, value })),
         }),
     });

@@ -270,10 +270,10 @@ const main = async () => {
     if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.includes('.default_branch'))
         return void process.stdout.write('main\n');
 
-    if (args[0] === 'api' && /\/git\/ref\/heads\/main$/.test(args[1])) return void process.stdout.write('abc123\n');
+    if (args[0] === 'api' && args[1].endsWith('/git/ref/heads/main')) return void process.stdout.write('abc123\n');
 
     // The default branch's files at abc123: options.files, or none.
-    if (args[0] === 'api' && /\/git\/trees\/abc123\?recursive=1$/.test(args[1])) {
+    if (args[0] === 'api' && args[1].endsWith('/git/trees/abc123?recursive=1')) {
         return void (
             fail('tree', 'HTTP 502: Bad Gateway\n') ||
             output({
@@ -315,13 +315,13 @@ const main = async () => {
         return void fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
     }
 
-    if (args[0] === 'api' && /\/git\/refs$/.test(args[1]))
+    if (args[0] === 'api' && args[1].endsWith('/git/refs'))
         return void (fail('branch', 'gh: Reference already exists (HTTP 422)\n') || output({}));
 
     // Onboarding's PR commit: its tree, then the commit, each answered with its SHA.
-    if (args[0] === 'api' && /\/git\/trees$/.test(args[1])) return void process.stdout.write('tree1\n');
+    if (args[0] === 'api' && args[1].endsWith('/git/trees')) return void process.stdout.write('tree1\n');
 
-    if (args[0] === 'api' && /\/git\/commits$/.test(args[1])) return void process.stdout.write('commit1\n');
+    if (args[0] === 'api' && args[1].endsWith('/git/commits')) return void process.stdout.write('commit1\n');
 
     if (args[0] === 'pr' && args[1] === 'create') {
         if (

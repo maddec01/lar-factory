@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import {
+import fs, {
     chmodSync,
     existsSync,
     lstatSync,
@@ -276,7 +275,7 @@ for (const [change, make] of Object.entries(restores)) {
         const result = installSkills(home, source, '1.0.0', { now, replace: true });
 
         assert.deepEqual([result.installed, result.replaced, result.drift], [true, ['tdd'], []]);
-        assert.deepEqual(readdirSync(join(home, '.agents/skills/tdd'), { recursive: true }).sort(), [
+        assert.deepEqual(readdirSync(join(home, '.agents/skills/tdd'), { recursive: true }).map(String).sort(), [
             'SKILL.md',
             'scripts',
             'scripts/run.sh',

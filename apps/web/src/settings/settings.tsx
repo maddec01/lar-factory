@@ -3,8 +3,7 @@
 // on top of the sections and focused by /, keeps the sections whose name or a row matches, or says none does. Closing it
 // returns to the board as it was, since the board stays rendered under it.
 
-import { boardApp } from '@lar-factory/shared';
-import { shownRepo } from '@lar-factory/shared';
+import { boardApp, shownRepo } from '@lar-factory/shared';
 import {
     Button,
     Input,

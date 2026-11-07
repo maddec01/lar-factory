@@ -245,6 +245,7 @@ test("the List counts follow the filters, and its Labels filter holds the chosen
     const rows = () =>
         $$<HTMLButtonElement>('[data-list-modal] button[data-item]')
             .map((b) => b.dataset.item)
+            .map(String)
             .sort();
 
     expect(rows(), 'matched without case across repositories').toEqual(['L1', 'L2']);

@@ -172,7 +172,10 @@ test('a read of more than 200 ids reads their fields in batches of at most 200',
     const read = await azureSprint([REPO], TEAM, az.run).read();
 
     assert.equal(read.items.length, 450);
-    assert.deepEqual(az.batches.map((ids) => ids.length).sort(), [200, 200, 50]);
+    assert.deepEqual(
+        az.batches.map((ids) => ids.length).sort((a, b) => a - b),
+        [50, 200, 200],
+    );
 
     const calls = invokes(az.calls, 'workitemsbatch');
 
@@ -347,7 +350,13 @@ test("a work item's linked PRs show their state from az repos pr show, a draft a
     // One az repos pr show per PR, however many items link it.
     const shows = az.calls.filter((c) => c.slice(0, 3).join(' ') === 'repos pr show');
 
-    assert.deepEqual(shows.map((c) => c[c.indexOf('--id') + 1]).sort(), ['41', '42', '43', '44', '45']);
+    assert.deepEqual(
+        shows
+            .map((c) => c[c.indexOf('--id') + 1])
+            .map(String)
+            .sort(),
+        ['41', '42', '43', '44', '45'],
+    );
     assert.ok(shows.every((c) => c[c.indexOf('--org') + 1] === 'https://dev.azure.com/contoso'));
 });
 

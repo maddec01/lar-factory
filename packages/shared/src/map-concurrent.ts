@@ -4,7 +4,7 @@ export async function mapConcurrent<T, R>(
     read: (value: T, index: number) => Promise<R>,
     concurrency = 6,
 ): Promise<R[]> {
-    const results = new Array<R>(values.length);
+    const results = Array.from<R>({ length: values.length });
     let cursor = 0;
     const worker = async () => {
         while (cursor < values.length) {

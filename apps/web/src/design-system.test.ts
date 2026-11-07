@@ -17,9 +17,11 @@ test("The design system's Modal opens a titled dialog with its close button and 
         root.render(
             createElement(Modal, {
                 onClose,
+                // oxlint-disable-next-line react/no-children-prop -- required by the props type, which createElement's third argument can't fill
                 children: createElement(Modal.Content, {
                     title: 'Edit settings',
-                    children: createElement(Button, { children: 'Save' }),
+                    // oxlint-disable-next-line react/no-children-prop -- required by the props type, as above
+                    children: createElement(Button, null, 'Save'),
                 }),
             }),
         ),

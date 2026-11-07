@@ -80,7 +80,7 @@ export async function inspectCleanups(
     input: Omit<CleanupInput, 'branch'>,
 ): Promise<CleanupPlan[]> {
     const lists = await readCheckoutLists(input.git ?? runTool, input.checkout);
-    const plans: CleanupPlan[] = new Array(branches.length);
+    const plans: CleanupPlan[] = Array.from({ length: branches.length });
     let next = 0;
     const inspectNext = async () => {
         for (; next < branches.length;) {
@@ -129,7 +129,7 @@ export async function inspectCleanup(input: CleanupInput, lists?: CheckoutLists)
         const changed = await read(path, ['diff', '--name-only', '-z', 'HEAD', '--']);
         const untracked = await read(path, ['ls-files', '--others', '--exclude-standard', '-z']);
 
-        for (const file of [...new Set([...changed.split('\0'), ...untracked.split('\0')].filter(Boolean))]) {
+        for (const file of new Set([...changed.split('\0'), ...untracked.split('\0')].filter(Boolean))) {
             const target = join(path, file);
             const stat = await lstat(target).catch(() => null);
 

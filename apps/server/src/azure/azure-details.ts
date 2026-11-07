@@ -1,8 +1,7 @@
-import { isStructureComment, stripTrackerStructure } from '@lar-factory/shared';
+import { isStructureComment, stripTrackerStructure, decodePart, onAzure } from '@lar-factory/shared';
 // A work item's description and comments, which the item dialog reads when it opens. The board-wide read in
 // azure-items.ts leaves them out and stays on API_VERSION. az devops invoke can't pass a preview's resource version,
 // as in 7.1-preview.4: it reads the version as a number. Given 7.1-preview, az adds the server's latest one.
-import { decodePart, onAzure } from '@lar-factory/shared';
 import type {
     AzureBodyField,
     IssueRef,

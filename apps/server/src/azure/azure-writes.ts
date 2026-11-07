@@ -1,8 +1,7 @@
-import { writeTrackerStructure } from '@lar-factory/shared';
+import { writeTrackerStructure, decodePart, onAzure } from '@lar-factory/shared';
 // Writes to Azure DevOps work items through az: Abandon's confirmed close moves State to the type's Removed-category
 // state, in one JSON patch that fails if the work item changed since the board read it.
 // A description save writes the field the item dialog read, as markdown, failing if the work item changed since the dialog read it.
-import { decodePart, onAzure } from '@lar-factory/shared';
 import type { AzureBodyField, Item } from '@lar-factory/shared';
 import { MARKDOWN_API_VERSION } from '@lar-factory/shared/provider-command';
 

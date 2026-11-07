@@ -37,7 +37,7 @@ test('Start, and an App control marked data-tint, are tinted with the primary co
 
 test('every Button and LinkButton names a kind', () => {
     const unnamed = readdirSync('src', { recursive: true, encoding: 'utf8' })
-        .filter((file) => /\.tsx$/.test(file) && !/\.test\./.test(file))
+        .filter((file) => file.endsWith('.tsx') && !file.includes('.test.'))
         .flatMap((file) =>
             [...readFileSync(`src/${file}`, 'utf8').matchAll(/<(Button|LinkButton)\b(?:[^>]|=>)*>/g)]
                 .map(([tag]) => tag)

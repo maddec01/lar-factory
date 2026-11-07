@@ -136,7 +136,7 @@ export function mergeSources(
     kinds: ReadonlyMap<ItemSource, ItemSourceKind> = new Map(),
 ): MergedSource {
     const sourceByRepo = new Map([...byRepo].map(([repo, source]) => [repo.toLowerCase(), source]));
-    const sources = [...new Set([...byRepo.values()])];
+    const sources = [...new Set(byRepo.values())];
     const named = new Map<ItemSource, string[]>();
 
     for (const [repo, source] of byRepo) named.set(source, [...(named.get(source) ?? []), repo]);

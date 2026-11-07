@@ -612,7 +612,7 @@ function leave(target: Target, previous: TargetState, bundled: string[], inside:
  * made there: a real folder in a copy target, a link in a Claude target. Stops owning each either way.
  */
 function removeObsolete(target: InstallTarget, bundled: string[], work: Work): void {
-    for (const skill of [...work.owned]) {
+    for (const skill of work.owned) {
         if (bundled.includes(skill)) continue;
 
         const path = join(target.path, skill);
@@ -873,7 +873,7 @@ function linkTarget(
     drift: Drift,
     report: (skill: string, state: InstallSkillState) => void = () => {},
 ): void {
-    for (const skill of [...work.owned]) {
+    for (const skill of work.owned) {
         if (skills.includes(skill)) continue;
 
         if (removeLink(join(folder, skill))) work.changed = true;

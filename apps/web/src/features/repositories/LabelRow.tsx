@@ -1,5 +1,5 @@
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
-import { Button, buttonKind, TrackerLabelChip, TrackerLabelRow } from '@lar-works/design-system';
+import { Button, buttonKind, LabelChip, TrackerLabelRow } from '@lar-works/design-system';
 import { Pencil, Trash2 } from '@lar-works/design-system/icons';
 
 import { useEditStore, type LabelChange } from './EditStore';
@@ -37,8 +37,8 @@ export function LabelRow({
         <TrackerLabelRow
             data-label={label.name}
             chip={
-                <TrackerLabelChip
-                    name={label.name}
+                <LabelChip
+                    label={label.name}
                     color={capabilities.color && label.color ? `#${label.color}` : undefined}
                     locked={locked}
                     lockedLabel="Factory-managed"

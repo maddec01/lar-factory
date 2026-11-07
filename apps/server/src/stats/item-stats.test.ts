@@ -600,6 +600,7 @@ test("API cost is T3's price for the item's records, with the aliases and overri
     );
 });
 
+// oxlint-disable-next-line vitest/expect-expect -- close() asserts each cost
 test("a Codex record whose rollout has no speed tier takes the one its turn started with in T3's history", async (t) => {
     const home = tempDir(t, 'lar-home-');
     const sessions = [

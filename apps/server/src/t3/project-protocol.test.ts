@@ -279,6 +279,7 @@ it('reauthorization prevents a late vault read from restoring credentials', asyn
         '',
     );
     const pending = adapter.subscriptionSession();
+    // oxlint-disable-next-line vitest/valid-expect -- awaited below, once the release settles it
     const rejected = expect(pending).rejects.toThrow('Session invalidated');
     const renewal = adapter.reauthorize();
 

@@ -83,9 +83,9 @@ test('The row refuses anything but a whole number from 1', async () => {
     await pick('number');
     for (const value of ['', '0', '-1', '2.5', 'many']) {
         await type(value);
-        expect(saveButton().disabled, value).toBe(true);
+        expect(saveButton().disabled, `value ${value}`).toBe(true);
 
-        if (value) expect(text(row()), value).toContain('Enter a whole number from 1.');
+        if (value) expect(text(row()), `value ${value}`).toContain('Enter a whole number from 1.');
     }
     expect(posted()).toEqual([]);
 });

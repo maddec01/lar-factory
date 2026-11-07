@@ -175,7 +175,7 @@ throw Error('Local exploration must not call a tracker');
                         map,
                     );
 
-                    expect(edited.code, edited.stderr).toBe(0);
+                    expect(edited.code, `stderr: ${edited.stderr}`).toBe(0);
 
                     const child = await larWork(
                         data,
@@ -188,7 +188,7 @@ throw Error('Local exploration must not call a tracker');
                         'build',
                     );
 
-                    expect(child.code, child.stderr).toBe(0);
+                    expect(child.code, `stderr: ${child.stderr}`).toBe(0);
 
                     const linked = await larWork(
                         data,
@@ -200,7 +200,7 @@ throw Error('Local exploration must not call a tracker');
                         root.workId,
                     );
 
-                    expect(linked.code, linked.stderr).toBe(0);
+                    expect(linked.code, `stderr: ${linked.stderr}`).toBe(0);
 
                     const retried = await larWork(
                         data,

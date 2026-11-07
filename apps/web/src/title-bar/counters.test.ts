@@ -405,8 +405,8 @@ test('while the first read could add items, a count with none is a dash, one wit
 
         const pop = await openCounter(label);
 
-        expect(text(pop.querySelector('p')), label).toBe('Loading Projects…');
-        expect(pop.querySelector('[data-loader]'), label).not.toBeNull();
+        expect(text(pop.querySelector('p')), `${label} pop-up`).toBe('Loading Projects…');
+        expect(pop.querySelector('[data-loader]'), `${label} pop-up`).not.toBeNull();
         expect(pop.querySelector('.border-t'), `${label} has no foot yet`).toBeNull();
         await close();
     }

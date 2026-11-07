@@ -202,7 +202,7 @@ it('deletes an owned branch in a disposable repository and preserves main', asyn
     const git = async (args: string[]) => {
         const result = await runTool('git', ['-C', checkout, ...args], { timeout: 10000 });
 
-        expect(result.code, result.stderr).toBe(0);
+        expect(result.code, `stderr: ${result.stderr}`).toBe(0);
 
         return result.stdout;
     };
@@ -261,7 +261,7 @@ it('resolves only a branch that is gone everywhere, and still reports each held 
     const git = async (args: string[]) => {
         const result = await runTool('git', ['-C', checkout, ...args], { timeout: 10000 });
 
-        expect(result.code, result.stderr).toBe(0);
+        expect(result.code, `stderr: ${result.stderr}`).toBe(0);
     };
     const remainingOf = async (
         branch: string,
@@ -484,7 +484,7 @@ it('removes only a verified sibling worktree of the same repository', async () =
     const git = async (args: string[]) => {
         const result = await runTool('git', ['-C', checkout, ...args], { timeout: 10000 });
 
-        expect(result.code, result.stderr).toBe(0);
+        expect(result.code, `stderr: ${result.stderr}`).toBe(0);
     };
 
     try {

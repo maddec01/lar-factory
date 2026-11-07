@@ -48,7 +48,7 @@ it("reads a file it can't use as off and says why", () => {
         '{ "on": true, "model": { "instanceId": "codex" } }',
     ]) {
         writeFileSync(path, text);
-        expect(readAutoBuild(dir), text).toEqual({
+        expect(readAutoBuild(dir), `saved as ${text}`).toEqual({
             on: false,
             problem: `The Auto-build setting ${path} needs "on" as true or false, and a model choice or none.`,
         });

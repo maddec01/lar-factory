@@ -231,6 +231,7 @@ function usage(model: string, input: number, extra: Partial<UsageRecord> = {}): 
     };
 }
 
+// oxlint-disable-next-line vitest/expect-expect -- close() asserts the cost
 test("an item's API cost sums its records, after aliases, with overrides for the aliased model", () => {
     const pricing: Pricing = {
         rates: parseRateTable({ 'claude-opus-4-1': rate(1e-5), 'gpt-6-sol': rate(2e-6) }),

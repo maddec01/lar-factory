@@ -147,7 +147,7 @@ test("Add item is the bar's Main action and every other control an App control; 
 
     expect(kindOf('.add-item')).toBe('main');
     for (const selector of ['.list-button', '.update-button', '.open-settings'])
-        expect(kindOf(selector), selector).toBe('control');
+        expect(kindOf(selector), `${selector} kind`).toBe('control');
     expect([...titleBar().querySelectorAll('.counters button')].map((b) => b.getAttribute('data-kind'))).toEqual(
         Array(5).fill('control'),
     );

@@ -837,7 +837,7 @@ test("the picker starts from the kind's mapped labels, leaving out one the track
     expect(chips()).toEqual(['backend']);
     await openPicker();
     expect(choices().map(text)).toEqual(['backend', 'docs']);
-    expect(choice('docs').querySelector<HTMLElement>('[data-label-dot]')!.style.background).toBe('rgb(14, 138, 22)');
+    expect(choice('docs').querySelector<HTMLElement>('[data-label-dot] > span')!.style.background).toBe('rgb(14, 138, 22)');
 });
 
 test('on Azure the picker never offers a repo- tag, and refuses a typed name holding one or a separator', async () => {

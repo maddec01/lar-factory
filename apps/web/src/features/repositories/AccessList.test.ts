@@ -51,11 +51,11 @@ test('the shared list accepts a separate read row and the compact onboarding ope
         'Push branches',
         'Open PRs',
     ]);
-    expect([...host.querySelectorAll('.tool-state')].map(text)).toEqual([
-        '● Allowed',
-        '● Refused',
-        '● Not checked',
-        '● Allowed',
+    expect([...host.querySelectorAll('[data-slot="status-indicator"]')].map(text)).toEqual([
+        'Allowed',
+        'Refused',
+        'Not checked',
+        'Allowed',
     ]);
     await settle(() => $<HTMLButtonElement>('[data-access] button')!.click());
     expect(recheck).toHaveBeenCalledOnce();

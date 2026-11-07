@@ -5,11 +5,11 @@ import {
     AddFolderLine,
     Alert,
     Button,
-    ButtonRow,
     buttonKind,
     ChoiceDetails,
     Disclosure,
     FormFieldset,
+    Inline,
     Input,
     InsetPanel,
     ProjectLine as Line,
@@ -100,7 +100,7 @@ export function ProjectStep({ run }: { run: Run }) {
                                             }}
                                         />
                                     </FieldRow>
-                                    <ButtonRow>
+                                    <Inline as="span">
                                         <Button
                                             {...buttonKind('other')}
                                             leftIcon={<FolderPlus />}
@@ -110,7 +110,7 @@ export function ProjectStep({ run }: { run: Run }) {
                                         >
                                             Add folder
                                         </Button>
-                                    </ButtonRow>
+                                    </Inline>
                                     {creating.error && (
                                         <Alert tone="danger" title="Could not add folder">
                                             {creating.error}

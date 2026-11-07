@@ -1,6 +1,6 @@
 // Skill work and retained results, with recovery through the desktop-owned installer.
 import type { TargetSnapshot } from '@lar-factory/shared';
-import { Button, buttonKind, ButtonRow, Progress, SettingDetails, Text } from '@lar-works/design-system';
+import { Button, buttonKind, Inline, Progress, SettingDetails, Text } from '@lar-works/design-system';
 
 import { useSettingsStore } from './SettingsStore';
 import { useDriftStore } from '@/services/install/drift.hooks';
@@ -21,7 +21,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
             <Text variant="caption" tone="muted">
                 Retry and Replace apply to all active targets.
             </Text>
-            <ButtonRow layout="wrap">
+            <Inline as="span" wrap>
                 {failed && (
                     <Button
                         {...buttonKind('other')}
@@ -44,7 +44,7 @@ export function InstallRecovery({ failed, drift }: { failed: boolean; drift: boo
                         {replacing ? 'Replacing…' : 'Restore bundled skills'}
                     </Button>
                 )}
-            </ButtonRow>
+            </Inline>
             {(error || retryError) && <span role="alert">{error || retryError}</span>}
         </SettingDetails>
     );

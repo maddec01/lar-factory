@@ -3,7 +3,7 @@
 
 import { sameLabel, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { RepoConfig, TicketCreationOptions, TicketOptions, VocabularyKey } from '@lar-factory/shared';
-import { Button, buttonKind, HiddenField, LabelChip, LabelsValue, PanelField, Popover } from '@lar-works/design-system';
+import { Button, buttonKind, HiddenField, Inline, LabelChip, PanelField, Popover } from '@lar-works/design-system';
 import { ChevronDown } from '@lar-works/design-system/icons';
 import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -64,7 +64,7 @@ export function DraftLabels({
             {picked.map((name) => (
                 <HiddenField key={name} name={has(typed, name) ? 'newLabels' : 'labels'} value={name} />
             ))}
-            <LabelsValue>
+            <Inline as="span" wrap align="center" space="tight">
                 {picked.map((name) => (
                     <LabelChip
                         key={name}
@@ -104,7 +104,7 @@ export function DraftLabels({
                         />
                     </Popover.Content>
                 </Popover>
-            </LabelsValue>
+            </Inline>
         </PanelField>
     );
 }

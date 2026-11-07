@@ -6,7 +6,7 @@ import {
     Input,
     InsetPanel,
     OptionSelect,
-    SettingsGroups,
+    Stack,
     Text,
 } from '@lar-works/design-system';
 import { useEffect, useLayoutEffect, useRef } from 'react';
@@ -107,7 +107,7 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
         );
 
     return (
-        <SettingsGroups data-project-page={repo}>
+        <Stack space="page" data-project-page={repo}>
             <FormSection presentation="dense" title="Project">
                 <InsetPanel presentation="settings">
                     <FieldRow
@@ -214,6 +214,6 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                     </Text>
                 )}
             </FormSection>
-        </SettingsGroups>
+        </Stack>
     );
 }

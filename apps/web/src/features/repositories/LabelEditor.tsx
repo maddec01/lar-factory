@@ -5,8 +5,8 @@ import {
     Alert,
     Button,
     buttonKind,
-    ButtonRow,
     ColorSwatches,
+    Inline,
     Input,
     InsetPanel,
     Text,
@@ -137,7 +137,7 @@ export function LabelEditor({
                 )}
             </InsetPanel>
             <ProblemText>{failure}</ProblemText>
-            <ButtonRow>
+            <Inline as="span">
                 <Button {...buttonKind('other')} type="button" disabled={running !== null} onClick={onDone}>
                     Cancel
                 </Button>
@@ -149,7 +149,7 @@ export function LabelEditor({
                 >
                     Save
                 </Button>
-            </ButtonRow>
+            </Inline>
         </TrackerLabelEditor>
     );
 }

@@ -4,9 +4,9 @@ import { writeAccessProblem, type SetupDetection } from '@lar-factory/shared';
 import {
     Button,
     buttonKind,
-    ButtonRow,
     Checkbox,
     Disclosure,
+    Inline,
     Input,
     InsetPanel,
     OptionSelect,
@@ -143,11 +143,11 @@ export function WorkStep({ run, detection }: { run: Run; detection: SetupDetecti
                     )}
                 </InsetPanel>
             </Disclosure>
-            <ButtonRow>
+            <Inline as="span">
                 <Button {...buttonKind('other')} onClick={recheck}>
                     Recheck access
                 </Button>
-            </ButtonRow>
+            </Inline>
         </SetupStep>
     );
 }

@@ -4,7 +4,6 @@
 import type { ItemDetails, TextFormat } from '@lar-factory/shared';
 import {
     Button,
-    ButtonRow,
     buttonKind,
     DetailsText,
     Disclosure,
@@ -12,6 +11,7 @@ import {
     EditorSlot,
     HeaderStatus,
     Heading,
+    Inline,
     MainColumnSlot,
     MainSection,
     MarkdownEditor,
@@ -135,14 +135,14 @@ function SpecNotice({
                         </Heading>
                         <RichText text={spec.held.body} format="markdown" />
                     </Disclosure>
-                    <ButtonRow>
+                    <Inline as="span">
                         <Button {...buttonKind('other')} disabled={busy} onClick={() => void act('accept')}>
                             Accept edit
                         </Button>
                         <Button {...buttonKind('other')} disabled={busy} onClick={() => void act('reject')}>
                             Reject edit
                         </Button>
-                    </ButtonRow>
+                    </Inline>
                 </>
             ) : (
                 (spec.pending || spec.error) && (

@@ -2,10 +2,10 @@ import { writeAccessProblem, type Item } from '@lar-factory/shared';
 import {
     AccessNotice,
     Button,
-    ButtonRow,
     buttonKind,
     FocusPanel,
     FormFieldset,
+    Inline,
     OutgoingTicket,
     Stack,
     Text,
@@ -116,11 +116,11 @@ export function CreateTicket({ item }: { item: Item }) {
                 </Text>
             )}
             {!outgoing && (
-                <ButtonRow>
+                <Inline as="span">
                     <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
                         Cancel
                     </Button>
-                </ButtonRow>
+                </Inline>
             )}
             {outgoing && (
                 <Stack as="form" onSubmit={onSubmit} aria-busy={attempt?.phase === 'pending'}>
@@ -146,7 +146,7 @@ export function CreateTicket({ item }: { item: Item }) {
                             {attempt.message}
                         </Text>
                     )}
-                    <ButtonRow>
+                    <Inline as="span">
                         <Button {...buttonKind('other')} onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
@@ -161,7 +161,7 @@ export function CreateTicket({ item }: { item: Item }) {
                                   ? 'Retry this submission'
                                   : 'Create issue'}
                         </Button>
-                    </ButtonRow>
+                    </Inline>
                 </Stack>
             )}
         </FocusPanel>

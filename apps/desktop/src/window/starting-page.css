@@ -1,6 +1,6 @@
 /* The starting page's styles, compiled with the design system's tokens and base styles at build time
    (packages/ui's compiledCss), since the page is a data: URL that loads nothing. The lockup, the draw and the roll
-   copy apps/web/src/loading/loading-screen.css, so the board page's loading screen carries on from this one. */
+   copy apps/web/src/app/shell/loading/loading-screen.css, so the board page's loading screen carries on from this one. */
 @import '@lar-works/design-system/styles.css' source(none);
 @import '@lar-factory/ui/styles.css';
 

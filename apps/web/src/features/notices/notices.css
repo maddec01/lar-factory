@@ -1,0 +1,103 @@
+/* Banners, the missing-tool notice, close buttons and toasts. */
+
+[data-warning] .err {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+[data-warning] code {
+    overflow-wrap: anywhere;
+}
+/* Fills the main area below the title bar. */
+.tool-missing {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: --spacing(5);
+}
+.tool-missing-box h1 {
+    font-size: var(--text-base);
+    font-weight: 600;
+    margin: --spacing(3) 0 0;
+    letter-spacing: -0.01em;
+}
+.tool-missing-box {
+    max-width: --spacing(130);
+    @apply border;
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: --spacing(5) --spacing(6);
+}
+.tool-missing-box p {
+    margin: --spacing(3) 0 0;
+    color: var(--muted-foreground);
+}
+.tool-missing-box code {
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+}
+
+/* a close button on every failure, and successes as toasts that clear themselves */
+.dismiss {
+    float: right;
+    margin: --spacing(-0.75) --spacing(-1.5) 0 --spacing(2);
+}
+.action-error .dismiss {
+    float: none;
+    margin: --spacing(-1) 0 --spacing(-1) --spacing(0.5);
+    vertical-align: middle;
+}
+.view-item {
+    margin-left: --spacing(1);
+}
+
+/* Variant B's corner placement, with oldest entries above the newest and room to scroll through them all. The same
+   gap from the window's bottom and right edges, and from the title bar (h-13) when it's full. */
+.notification-stack {
+    --notice-edge: calc(var(--spacing) * 4);
+    right: var(--notice-edge);
+    bottom: var(--notice-edge);
+    z-index: 100; /* Above every dialog (z-50) and the loading screen, which covers the board at 60. */
+    flex-direction: column;
+    width: min(calc(var(--spacing) * 104), calc(100vw - var(--spacing) * 8));
+    max-width: none;
+    max-height: calc(100dvh - var(--spacing) * 13 - var(--notice-edge) * 2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+    -webkit-app-region: no-drag;
+}
+.notification-stack:empty {
+    pointer-events: none;
+}
+.notification-stack [data-slot='toast'] {
+    flex-shrink: 0;
+    overflow-wrap: anywhere;
+}
+/* Each notice's slice of the stack's edge fade, measured in Toasts.tsx. On the notices, not the stack, so their
+   backdrop blur still reaches the board. Off while a notice has keyboard focus, as in a Modal's body. */
+.notification-stack > [data-slot='toast'] {
+    mask-image: linear-gradient(
+        to bottom,
+        transparent var(--fade-from, 0%),
+        black var(--fade-top, 0%),
+        black var(--fade-bottom, 100%),
+        transparent var(--fade-to, 100%)
+    );
+}
+.notification-stack:has(:focus-visible) > [data-slot='toast'] {
+    mask-image: none;
+}
+.notification-stack [data-slot='content'] {
+    min-width: 0;
+}
+
+/* Keep native severity tints above the design system's theme's unlayered neutral toast styles. */
+.notification-stack [data-slot='toast'][data-toast-color='warning'] {
+    @apply bg-warning/10 border-warning/20 text-(--warning-foreground);
+}
+.notification-stack [data-slot='toast'][data-toast-color='success'] {
+    @apply bg-success/10 border-success/20 text-(--success-foreground);
+}
+.notification-stack [data-slot='toast'][data-toast-color='danger'] {
+    @apply bg-danger/10 border-danger/20 text-(--error-foreground);
+}

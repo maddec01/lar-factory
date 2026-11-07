@@ -8,21 +8,41 @@ import { defineConfig } from 'vite-plus';
 
 const lintConfig = lint({ apps: ['apps/web'] });
 
+/** Copies match their upstream byte for byte (UPSTREAM.md, packages/ui/UPSTREAM.md), so neither tool rewrites them. */
+const copies = [
+    'skills/lar-build/skills/**',
+    'skills/lar-build/references/**',
+    'packages/ui/src/search-dialog/useModalAutoFocus.ts',
+    'packages/ui/src/search-dialog/useScrollFade.ts',
+    'apps/desktop/scripts/ensure-electron-runtime.mjs',
+];
+
+/** Skill text and the copy record, which skill-sync compares with upstream and edits with its own scripts. */
+const skillSync = ['skills/**/*.md', '.agents/skills/**/*.md', 'UPSTREAM.md'];
+
 export default defineConfig({
-  fmt,
-  lint: {
-    ...lintConfig,
-    overrides: [
-      ...(lintConfig.overrides ?? []),
-      {
-        files: ['apps/web/src/**/*.ts', 'apps/web/src/**/*.tsx'],
-        // Step 2 of the lar-web alignment turns these on.
-        rules: { 'lar/boundaries': 'off', 'lar/no-visual-recipes': 'off', 'max-lines': 'off' },
-      },
-    ],
-  },
-  test: {
-    ...test,
-    projects: ['packages/shared', 'packages/ui', 'packages/work-records', 'apps/server', 'apps/web', 'apps/desktop'],
-  },
+    fmt: { ...fmt, ignorePatterns: [...(fmt.ignorePatterns ?? []), ...copies, ...skillSync] },
+    lint: {
+        ...lintConfig,
+        ignorePatterns: [...(lintConfig.ignorePatterns ?? []), ...copies],
+        overrides: [
+            ...(lintConfig.overrides ?? []),
+            {
+                files: ['apps/web/src/**/*.ts', 'apps/web/src/**/*.tsx'],
+                // Step 2 of the lar-web alignment turns these on.
+                rules: { 'lar/boundaries': 'off', 'lar/no-visual-recipes': 'off', 'max-lines': 'off' },
+            },
+        ],
+    },
+    test: {
+        ...test,
+        projects: [
+            'packages/shared',
+            'packages/ui',
+            'packages/work-records',
+            'apps/server',
+            'apps/web',
+            'apps/desktop',
+        ],
+    },
 });

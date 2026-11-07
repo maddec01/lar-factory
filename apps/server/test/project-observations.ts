@@ -37,7 +37,7 @@ export const subscribeRepositoryProjects =
     () => {};
 
 /** Spawned boards issue no session, so a sample board holds this one to revoke when it stops. */
-export const useProjectSessions = ({ vault }: BoardSessions): void => {
+export const setProjectSessions = ({ vault }: BoardSessions): void => {
     void vault.write({ token: 'fake-token', sessionId: 'fake-session', expiresAt: '2099-01-01T00:00:00Z' });
 };
 

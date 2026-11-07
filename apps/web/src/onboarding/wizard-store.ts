@@ -311,7 +311,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
 
             // A run Finish saved is on the board, so there's no onboarding left to keep.
             if (run?.projectId && run.repo && finish.state !== 'done')
-                keep({ ...run, projectId: run.projectId, repo: run.repo }, detection);
+                void keep({ ...run, projectId: run.projectId, repo: run.repo }, detection);
         },
         loadProjects: async () => {
             const read = ++reads;

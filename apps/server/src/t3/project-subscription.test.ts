@@ -149,6 +149,7 @@ it('reports no change for thread updates', async () => {
         readyState = 1;
         constructor() {
             super();
+            // oxlint-disable-next-line typescript/no-this-alias -- the test drives the socket the subscription made
             socket = this;
         }
         send() {}

@@ -84,8 +84,8 @@ const comment = (raw: RawComment): ItemComment => {
 /** One `az devops invoke` of the work item tracking area, its answer parsed. */
 type Call = <R>(resource: string, route: string[], version: string, more?: string[]) => Promise<R>;
 
-/** Runs `use` with a call for an Azure DevOps item, and its repository, or says why it can't: the item is not a work item, or the `az` error. */
-async function inArea<T>(item: Item, run: Az, use: (call: Call, repo: string) => Promise<T>): Promise<T | Refused> {
+/** Runs `task` with a call for an Azure DevOps item, and its repository, or says why it can't: the item is not a work item, or the `az` error. */
+async function inArea<T>(item: Item, run: Az, task: (call: Call, repo: string) => Promise<T>): Promise<T | Refused> {
     if (!item.repo || !onAzure(item.repo) || item.number === null)
         return { status: 404, error: 'That item is not an Azure DevOps work item.' };
 
@@ -115,7 +115,7 @@ async function inArea<T>(item: Item, run: Az, use: (call: Call, repo: string) =>
     };
 
     try {
-        return await use(call, item.repo);
+        return await task(call, item.repo);
     } catch (err) {
         if (err instanceof ReadProblem)
             return { status: 502, error: `${err.message}${err.fix ? ` Run ${err.fix}.` : ''}` };

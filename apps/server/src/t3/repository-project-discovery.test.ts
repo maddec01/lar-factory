@@ -5,7 +5,7 @@ import {
     repositoryProjects,
     reauthorizeRepositoryProjects,
     subscribeRepositoryProjects,
-    useProjectSessions,
+    setProjectSessions,
 } from './repository-project-discovery.ts';
 
 const fixture = vi.hoisted(() => ({
@@ -156,7 +156,7 @@ test('reads with the Keychain session until told to use another', async () => {
         },
     };
 
-    useProjectSessions(own);
+    setProjectSessions(own);
     await reauthorizeRepositoryProjects();
     expect(fixture.sessions).toHaveBeenLastCalledWith(own);
 });

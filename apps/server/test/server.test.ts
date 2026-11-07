@@ -314,7 +314,7 @@ test('a record shared with an unread thread of another item shows provisionally,
         { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 7 },
         'the inflated figure was never retained',
     );
-    assert.equal((item(settled, 13)?.stats as ItemStats).tokens, 1000);
+    assert.equal((item(settled, 13)!.stats as ItemStats).tokens, 1000);
     await board.untilLogged('updated item stats in https://github.com/maddec01/lar-factory/pull/40');
     assert.ok((await edits()).every((args) => !String(args[5]).includes('1,007') && !String(args[5]).includes('1.0K')));
     assert.ok(String((await edits())[0]![5]).includes('"tokens":7'));
@@ -626,7 +626,7 @@ test('a run that finishes reads its final turn apart from the refresh, parsing w
 
     await until(
         board,
-        (d) => tokens(d) === 7 && !(d.items[0]?.stats as ItemStats).provisional && d.items[0]?.threads !== undefined,
+        (d) => tokens(d) === 7 && !(d.items[0]!.stats as ItemStats).provisional && d.items[0]?.threads !== undefined,
     );
     await board.untilLogged('every item settled');
 

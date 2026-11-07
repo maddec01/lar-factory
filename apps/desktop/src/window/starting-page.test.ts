@@ -53,6 +53,7 @@ describe('StartingPage messages', () => {
     const run = (script: string) => {
         const calls: Array<[string, string]> = [];
 
+        // oxlint-disable-next-line typescript/no-implied-eval -- runs the starting page's own script in a stand-in window
         new Function('window', script)({
             larLoading: {
                 step: (text: string) => calls.push(['step', text]),
@@ -76,7 +77,9 @@ describe('StartingPage messages', () => {
     });
 
     it('does nothing on a page that is not the starting page', () => {
+        // oxlint-disable-next-line typescript/no-implied-eval -- runs the starting page's own script in a stand-in window
         assert.doesNotThrow(() => new Function('window', StartingPage.stepScript('x'))({}));
+        // oxlint-disable-next-line typescript/no-implied-eval -- runs the starting page's own script in a stand-in window
         assert.doesNotThrow(() => new Function('window', StartingPage.errorScript('x'))({}));
     });
 });
@@ -117,8 +120,9 @@ describe('StartingPage script', () => {
 
         const timers: Array<() => void> = [];
         const script = /<script>([\s\S]*)<\/script>/.exec(html(StartingPage.url()))![1]!;
-        const window: Record<string, any> = {};
+        const window: { larLoading?: { step: (text: string) => void; error: (text: string) => void } } = {};
 
+        // oxlint-disable-next-line typescript/no-implied-eval -- runs the starting page's own script in a stand-in window
         new Function('window', 'document', 'matchMedia', 'setTimeout', script)(
             window,
             { getElementById: (id: string) => nodes[id], createElement: () => new Node() },
@@ -128,7 +132,7 @@ describe('StartingPage script', () => {
 
         const slot = () => nodes.slot!.children.map((child) => child.textContent);
 
-        return { page: window.larLoading, nodes, slot, timers };
+        return { page: window.larLoading!, nodes, slot, timers };
     };
 
     it('rolls a new step in over the old one, which leaves when the roll ends', () => {

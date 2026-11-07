@@ -90,10 +90,10 @@ test('Resume reopens the dialog on the stored step with the stored project', asy
             .click(),
     );
 
-    const radio = dialog()!.querySelector('[data-choice="lar-web"] [role="radio"]')!;
+    const radio = dialog()!.querySelector<HTMLInputElement>('[data-choice="lar-web"] input[type="radio"]')!;
 
-    expect(radio.getAttribute('aria-checked')).toBe('true');
-    expect(radio.hasAttribute('data-disabled'), 'its own project stays pickable').toBe(false);
+    expect(radio.checked).toBe(true);
+    expect(radio.disabled, 'its own project stays pickable').toBe(false);
 });
 
 test("closing a run the server can't keep says why in a toast", async () => {

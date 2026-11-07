@@ -5,9 +5,9 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 
 import { AccessList, AccessReason, accessRows } from './AccessList';
 import { shownDrafts, useEditStore, type Drafts, type DraftSetting } from './EditStore';
+import { EditVocabulary } from './EditVocabulary';
 import { IssueDefaults } from './IssueDefaults';
 import { LabelsSection } from './LabelsSection';
-import { EditVocabulary } from './VocabularyEditor';
 import { kind } from '@/shared/ui/buttons/ButtonKinds';
 import { FIELD_GROUP, FieldRow } from '@/shared/ui/setting-rows/FieldRow';
 

@@ -13,7 +13,7 @@ import {
     LabelChip,
     RepoIdentity,
     RepoTag as DesignRepoTag,
-    ItemNote,
+    Text,
     TitleLink as DesignTitleLink,
 } from '@lar-works/design-system';
 import { Bug, Lightbulb, Sparkles, TrendingUp, type LucideIcon } from '@lar-works/design-system/icons';
@@ -163,18 +163,21 @@ export function StructureSync({ item }: { item: Item }) {
     return (
         <>
             {item.specSync && (
-                <ItemNote data-spec-sync role="status">
+                <Text as="span" variant="caption" tone="muted" data-spec-sync role="status">
                     {item.specSync.warning ?? item.specSync.error ?? 'Spec waiting to save to tracker'}
-                </ItemNote>
+                </Text>
             )}
             {item.sync && item.sync.state !== 'saved' && (
-                <ItemNote
+                <Text
+                    as="span"
+                    variant="caption"
+                    tone="muted"
                     data-structure-sync
                     title={item.sync.message}
                     role={item.sync.state === 'error' || item.sync.state === 'conflict' ? 'status' : undefined}
                 >
                     Planning is saved on this Mac.
-                </ItemNote>
+                </Text>
             )}
         </>
     );

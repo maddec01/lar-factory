@@ -6,7 +6,6 @@
 import { clock, day, type Item, type RetentionState } from '@lar-factory/shared';
 import {
     ActionStack,
-    BoardNote,
     Button,
     buttonKind,
     FormUnit,
@@ -15,6 +14,7 @@ import {
     SettingConfirm,
     SettingLastRun,
     Stack,
+    Text,
 } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -146,9 +146,9 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
 
     if (retention.problem)
         return (
-            <BoardNote tone="error" role="alert">
+            <Text variant="caption" tone="danger" role="alert">
                 {retention.problem} The board keeps and shows all work until the setting can be read.
-            </BoardNote>
+            </Text>
         );
 
     return (
@@ -233,11 +233,19 @@ export function RetentionSetting({ retention }: { retention: RetentionState }) {
                     </Button>
                 </span>
             )}
-            {invalid && <BoardNote tone="error">Enter whole days from 0.</BoardNote>}
+            {invalid && (
+                <Text variant="caption" tone="danger">
+                    Enter whole days from 0.
+                </Text>
+            )}
             {message && (
-                <BoardNote tone={message.error ? 'error' : 'muted'} role={message.error ? 'alert' : 'status'}>
+                <Text
+                    variant="caption"
+                    tone={message.error ? 'danger' : 'muted'}
+                    role={message.error ? 'alert' : 'status'}
+                >
                     {message.text}
-                </BoardNote>
+                </Text>
             )}
             {retention.lastDelete && <LastDelete lastDelete={retention.lastDelete} />}
         </Stack>

@@ -3,7 +3,6 @@
 import { STRUCTURE_LABEL, kindLabels, sameRepo, trackerCapabilities, writeAccessProblem } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import {
-    BoardNote,
     ChipGroup,
     DetailFact as Fact,
     IconButton,
@@ -11,6 +10,7 @@ import {
     LabelsValue,
     LockedLabel,
     Popover,
+    Text,
 } from '@lar-works/design-system';
 import { Pencil } from '@lar-works/design-system/icons';
 import { useState } from 'react';
@@ -82,20 +82,24 @@ export function ItemLabels({ item }: { item: Item }) {
                                     onToggle={(name) => void edit.toggle(name)}
                                 />
                             ) : (
-                                !edit.error && <BoardNote role="status">Reading {noun}s…</BoardNote>
+                                !edit.error && (
+                                    <Text variant="caption" tone="muted" role="status">
+                                        Reading {noun}s…
+                                    </Text>
+                                )
                             )}
                             {edit.error && (
-                                <BoardNote tone="error" role="alert">
+                                <Text variant="caption" tone="danger" role="alert">
                                     {edit.error}
-                                </BoardNote>
+                                </Text>
                             )}
                         </LabelEditorPanel>
                     </Popover.Content>
                 </Popover>
                 {edit.error && !open && (
-                    <BoardNote tone="error" role="alert">
+                    <Text variant="caption" tone="danger" role="alert">
                         {edit.error}
-                    </BoardNote>
+                    </Text>
                 )}
             </LabelsValue>
         </Fact>

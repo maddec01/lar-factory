@@ -2,7 +2,7 @@
 // when the setting can't be read, as saving one replaces the file.
 
 import type { ShapingThreadCleanup, ShapingThreadCleanupState } from '@lar-factory/shared';
-import { BoardNote, Stack } from '@lar-works/design-system';
+import { Stack, Text } from '@lar-works/design-system';
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -44,14 +44,14 @@ export function ShapingThreadCleanupSetting({ state }: { state: ShapingThreadCle
                 onChange={(choice) => void save(choice as ShapingThreadCleanup)}
             />
             {state && 'problem' in state && (
-                <BoardNote tone="error" role="alert">
+                <Text variant="caption" tone="danger" role="alert">
                     {state.problem} Saving a choice replaces the file.
-                </BoardNote>
+                </Text>
             )}
             {error && (
-                <BoardNote tone="error" role="alert">
+                <Text variant="caption" tone="danger" role="alert">
                     {error}
-                </BoardNote>
+                </Text>
             )}
         </Stack>
     );

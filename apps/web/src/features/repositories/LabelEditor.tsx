@@ -3,13 +3,13 @@
 import type { TrackerCapabilities, TrackerLabel } from '@lar-factory/shared';
 import {
     Alert,
-    BoardNote,
     Button,
-    ButtonRow,
     buttonKind,
+    ButtonRow,
     ColorSwatches,
     Input,
     InsetPanel,
+    Text,
     TrackerLabelEditor,
 } from '@lar-works/design-system';
 import { useState, type FormEvent } from 'react';
@@ -100,7 +100,11 @@ export function LabelEditor({
                     />
                 </FieldRow>
                 <ProblemText>{problem}</ProblemText>
-                {mappings && update.name !== undefined && <BoardNote>This also updates {mappings}.</BoardNote>}
+                {mappings && update.name !== undefined && (
+                    <Text variant="caption" tone="muted">
+                        This also updates {mappings}.
+                    </Text>
+                )}
                 {capabilities.color && (
                     <FieldRow label="Colour">
                         <ColorSwatches

@@ -4,7 +4,6 @@
 
 import { parseDecisionMethod, type Item, type RecordDetails } from '@lar-factory/shared';
 import {
-    BoardNote,
     Button,
     buttonKind,
     DetailFact,
@@ -15,6 +14,7 @@ import {
     MainSection,
     RichText,
     SectionHeader,
+    Text,
 } from '@lar-works/design-system';
 import { useState } from 'react';
 
@@ -60,16 +60,16 @@ export function ExportMarkdown({
 export function ExportedLine({ exported }: { exported: Exported }) {
     if (exported.state === 'done')
         return (
-            <BoardNote role="status" breaks>
+            <Text variant="caption" tone="muted" role="status" breaks>
                 Exported to {exported.paths.join(', ')}
-            </BoardNote>
+            </Text>
         );
 
     if (exported.state === 'failed')
         return (
-            <BoardNote tone="error" role="alert">
+            <Text variant="caption" tone="danger" role="alert">
                 {exported.error}
-            </BoardNote>
+            </Text>
         );
 
     return null;

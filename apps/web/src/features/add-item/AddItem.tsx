@@ -3,11 +3,11 @@
 import { repoName } from '@lar-factory/shared';
 import {
     AddItemButton,
-    BoardNote,
     Button,
     buttonKind,
     Modal,
     PanelField,
+    Text,
     TicketSearchPane,
     ViewToggle,
 } from '@lar-works/design-system';
@@ -33,7 +33,9 @@ function PickTicketPane() {
     return (
         <>
             <TicketSearchPane id="pick-ticket">
-                <BoardNote>Find tickets outside your list, or open one you’ve already added.</BoardNote>
+                <Text variant="caption" tone="muted">
+                    Find tickets outside your list, or open one you’ve already added.
+                </Text>
                 <PanelField heading="Project" htmlFor="pick-repo">
                     <RepoSelect id="pick-repo" repo={selected?.repo ?? ''} onRepo={setRepo} />
                 </PanelField>
@@ -44,7 +46,11 @@ function PickTicketPane() {
                     key={selected?.repo}
                     onPick={(ticket) => pick(selected!.repo, ticket)}
                 />
-                {data.capture?.enabled === false && <BoardNote>Picking tickets is disabled in sample mode.</BoardNote>}
+                {data.capture?.enabled === false && (
+                    <Text variant="caption" tone="muted">
+                        Picking tickets is disabled in sample mode.
+                    </Text>
+                )}
             </TicketSearchPane>
             <Modal.Footer>
                 <Button {...buttonKind('other')} onClick={() => setOpen(false)}>

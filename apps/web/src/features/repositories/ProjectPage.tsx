@@ -1,6 +1,5 @@
 import { onAzure, trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
 import {
-    BoardNote,
     Button,
     buttonKind,
     FormSection,
@@ -8,6 +7,7 @@ import {
     Input,
     InsetPanel,
     SettingsGroups,
+    Text,
 } from '@lar-works/design-system';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 
@@ -134,7 +134,9 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
                                 {resetButton('itemSource')}
                             </>
                         ) : (
-                            <BoardNote>This repository's GitHub issues.</BoardNote>
+                            <Text variant="caption" tone="muted">
+                                This repository's GitHub issues.
+                            </Text>
                         )}
                     </FieldRow>
                 </InsetPanel>
@@ -207,9 +209,9 @@ export function ProjectPage({ setup }: { setup: RepositorySetup }) {
             <FormSection presentation="dense" title="Access">
                 <AccessList rows={accessRows(setup)} checking={running === 'recheck'} onRecheck={recheckAccess} />
                 {errors.recheck && (
-                    <BoardNote tone="error" role="alert">
+                    <Text variant="caption" tone="danger" role="alert">
                         {errors.recheck}
-                    </BoardNote>
+                    </Text>
                 )}
             </FormSection>
         </SettingsGroups>

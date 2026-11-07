@@ -2,7 +2,7 @@
 // gives here; a number is a whole number from 1, saved with its own button or Enter.
 
 import type { HeavyCommandLimit, HeavyCommandLimitState } from '@lar-factory/shared';
-import { BoardNote, Button, buttonKind, Inline, Input, Stack } from '@lar-works/design-system';
+import { Button, buttonKind, Inline, Input, Stack, Text } from '@lar-works/design-system';
 import { useId, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -118,19 +118,19 @@ export function LimitSetting({
                 </Inline>
             )}
             {shown === 'number' && invalid && (
-                <BoardNote id={hint} tone="error">
+                <Text variant="caption" id={hint} tone="danger">
                     Enter a whole number from 1.
-                </BoardNote>
+                </Text>
             )}
             {state?.problem && (
-                <BoardNote tone="error" role="alert">
+                <Text variant="caption" tone="danger" role="alert">
                     {state.problem} The board uses Automatic until you save a choice.
-                </BoardNote>
+                </Text>
             )}
             {error && (
-                <BoardNote tone="error" role="alert">
+                <Text variant="caption" tone="danger" role="alert">
                     {error}
-                </BoardNote>
+                </Text>
             )}
         </Stack>
     );

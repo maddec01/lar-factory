@@ -1,5 +1,5 @@
 import { trackerCapabilities, writeAccessProblem, type RepositorySetup } from '@lar-factory/shared';
-import { Alert, BoardNote, Button, buttonKind, FormSection, Text, TrackerLabelList } from '@lar-works/design-system';
+import { Alert, Button, buttonKind, FormSection, Text, TrackerLabelList } from '@lar-works/design-system';
 // Settings' Labels section. The tracker holds the only copy, so the section reads it each time and keeps no list. It reads
 // the capability description for what the tracker's labels have, and never checks a provider's name.
 import { useState } from 'react';
@@ -101,7 +101,9 @@ export function LabelsSection({ repo, setup }: { repo: string; setup: Repository
                             ))}
                         </TrackerLabelList>
                     ) : (
-                        <BoardNote>No {heading.toLowerCase()} yet.</BoardNote>
+                        <Text variant="caption" tone="muted">
+                            No {heading.toLowerCase()} yet.
+                        </Text>
                     )}
                 </>
             )}

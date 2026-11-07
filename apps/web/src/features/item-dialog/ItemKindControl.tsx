@@ -2,7 +2,7 @@
 
 import { SWAP_KINDS, kindCanChange } from '@lar-factory/shared';
 import type { Item, SwapKind } from '@lar-factory/shared';
-import { BoardNote, Button, buttonKind, ChangeFailed, DetailFact as Fact, FormSelect } from '@lar-works/design-system';
+import { Button, buttonKind, ChangeFailed, DetailFact as Fact, FormSelect, Text } from '@lar-works/design-system';
 import { useEffect, useRef } from 'react';
 
 import { OPEN_ITEM_DIALOG } from './ItemDialogStore';
@@ -78,9 +78,9 @@ export function ItemKindControl({ item }: { item: Item }) {
                 />
             ) : (
                 change?.line && (
-                    <BoardNote role="status" ownLine data-kind-change-line>
+                    <Text variant="caption" tone="muted" role="status" ownLine data-kind-change-line>
                         {change.line}
-                    </BoardNote>
+                    </Text>
                 )
             )}
         </>

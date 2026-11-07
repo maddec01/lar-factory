@@ -1,7 +1,7 @@
 // Onboarding's access step: what the board can do in the repository with your access.
 
 import { trackerCapabilities, type SetupDetection } from '@lar-factory/shared';
-import { BoardNote, HelpTip, SetupStep } from '@lar-works/design-system';
+import { HelpTip, SetupStep, Text } from '@lar-works/design-system';
 
 import { useWizardStore, type Run } from './WizardStore';
 import { AccessList, accessRows, operationNames, type AccessRow } from '@/features/repositories';
@@ -30,16 +30,16 @@ export function AccessStep({ detection }: { run: Run; detection: SetupDetection 
         <SetupStep data-access-step>
             <AccessList rows={rows} onRecheck={() => void detect()} />
             {detection.access['manage-labels'] !== 'allowed' && (
-                <BoardNote>
+                <Text variant="caption" tone="muted">
                     New {labels} stay off until {names['manage-labels']} is allowed.
                     <HelpTip label="label access">
                         You can add this Project without it. Until it is allowed, Settings can't create, rename or
                         delete {labels}.
                     </HelpTip>
-                </BoardNote>
+                </Text>
             )}
             {buildsShort && (
-                <BoardNote>
+                <Text variant="caption" tone="muted">
                     Builds and docs need permission to push branches and open PRs.
                     <HelpTip label="build access">
                         You can shape issues now. Builds need permission to push branches and open pull requests.
@@ -52,16 +52,16 @@ export function AccessStep({ detection }: { run: Run; detection: SetupDetection 
                             </>
                         )}
                     </HelpTip>
-                </BoardNote>
+                </Text>
             )}
             {other.length > 0 && (
-                <BoardNote data-other-access>
+                <Text variant="caption" tone="muted" data-other-access>
                     Also unavailable:{' '}
                     {other
                         .map((row) => `${row.name}, ${row.access === 'refused' ? 'Refused' : 'Not checked'}`)
                         .join('; ')}
                     . Options that need this access stay off.
-                </BoardNote>
+                </Text>
             )}
         </SetupStep>
     );

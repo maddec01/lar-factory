@@ -2,7 +2,7 @@
 
 import { blockedBy, clock, day, type BundledSkill, type TargetSnapshot } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
-import { BoardNote, CodeText, Inline, InlineLink, SourceLink, Text } from '@lar-works/design-system';
+import { CodeText, Inline, InlineLink, SourceLink, Text } from '@lar-works/design-system';
 import type { ComponentProps } from 'react';
 
 import { TargetSwitch, TargetsNote } from './AppRows';
@@ -42,7 +42,11 @@ export function targetGroup({ app, targets }: PagesInput): Group {
         return {
             title: 'Skill folders',
             rows: [],
-            note: <BoardNote>{ONLY_APP_TARGETS}</BoardNote>,
+            note: (
+                <Text variant="caption" tone="muted">
+                    {ONLY_APP_TARGETS}
+                </Text>
+            ),
         };
 
     return {
@@ -115,10 +119,10 @@ function BlockedReason({ status }: { status: BundledSkill['status'] }) {
     ));
 
     return (
-        <BoardNote tone="error" data-blocked-reason>
+        <Text variant="caption" tone="danger" data-blocked-reason>
             {capitalise(opening)}
             {rest}. {moveAway(status.paths)}
-        </BoardNote>
+        </Text>
     );
 }
 
@@ -156,14 +160,14 @@ export function bundledGroup({ data, version }: PagesInput): Group {
                       {skill.author} · {skill.licence}
                       {updated(skill)}
                       {skill.includedAuthors?.length ? (
-                          <BoardNote>
+                          <Text variant="caption" tone="muted">
                               Includes work by {skill.includedAuthors.join(', ')}.{' '}
                               {skill.notices ? (
                                   <InlineLink href={skill.notices}>THIRD_PARTY_NOTICES.md</InlineLink>
                               ) : (
                                   'THIRD_PARTY_NOTICES.md'
                               )}
-                          </BoardNote>
+                          </Text>
                       ) : null}
                       <BlockedReason status={skill.status} />
                   </>

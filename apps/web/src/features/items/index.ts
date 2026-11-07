@@ -5,35 +5,37 @@ export { Dependencies, dependenciesOf } from './Dependencies';
 export { AbandonButton, ActionError, BackToListButton, QueueButton } from './ItemActions';
 export {
     ActivityFeedback,
-    Age,
+    shownStatus,
+    useActivityFeedback,
+    useActivityUnavailable,
+    useShownStatus,
+} from './ActivityFeedback';
+export {
     AgentWork,
     AgentWorkNote,
-    AzureFields,
     INCOMPLETE_TOTAL,
+    hasFigures,
+    usageLoading,
+    usageUnreadable,
+    useLastKnown,
+} from './AgentWork';
+export {
+    Age,
+    AzureFields,
     ItemKind,
     ItemTitle,
     KIND_BADGES,
     KindBadge,
     KindMarker,
     LabelChips,
-    PrList,
     RepoCell,
     RepoTag,
-    SliceBar,
-    SliceList,
-    SliceMark,
     StructureSync,
     TitleLink,
-    hasFigures,
-    shownStatus,
-    usageLoading,
-    usageUnreadable,
-    useActivityFeedback,
-    useActivityUnavailable,
-    useLastKnown,
     useShownLabels,
-    useShownStatus,
 } from './ItemParts';
+export { PrList } from './PrList';
+export { SliceBar, SliceList, SliceMark } from './SliceParts';
 export { KeepClicks } from './KeepClicks';
 export { LinkButton } from './LinkButton';
 export { ModelEntries, opensOnChecked } from './ModelEntries';
